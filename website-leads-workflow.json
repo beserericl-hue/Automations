@@ -1,0 +1,577 @@
+{
+  "name": "Website Leads to Google Sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "leads/new",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-webhook",
+      "name": "Webhook - Receive Lead",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond-valid",
+              "leftValue": "={{ $json._validationResult }}",
+              "rightValue": "pass",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-validate",
+      "name": "IF - Validate Required Fields",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        592,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "set-email",
+              "name": "email",
+              "value": "={{ $json.body.email.toLowerCase().trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "set-first-name",
+              "name": "first_name",
+              "value": "={{ $json.body.first_name.trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "set-last-name",
+              "name": "last_name",
+              "value": "={{ $json.body.last_name ? $json.body.last_name.trim() : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "set-full-name",
+              "name": "full_name",
+              "value": "={{ ($json.body.first_name.trim() + ' ' + ($json.body.last_name ? $json.body.last_name.trim() : '')).trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "set-phone",
+              "name": "phone",
+              "value": "={{ $json.body.phone ? $json.body.phone.replace(/[^\\d+]/g, '') : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "set-company",
+              "name": "company",
+              "value": "={{ $json.body.company || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "set-message",
+              "name": "message",
+              "value": "={{ $json.body.message || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "set-source",
+              "name": "source",
+              "value": "={{ $json.body.source || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "set-page-url",
+              "name": "page_url",
+              "value": "={{ $json.body.page_url || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "set-utm-source",
+              "name": "utm_source",
+              "value": "={{ $json.body.utm_source || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "set-utm-medium",
+              "name": "utm_medium",
+              "value": "={{ $json.body.utm_medium || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "set-utm-campaign",
+              "name": "utm_campaign",
+              "value": "={{ $json.body.utm_campaign || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "set-utm-term",
+              "name": "utm_term",
+              "value": "={{ $json.body.utm_term || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "set-utm-content",
+              "name": "utm_content",
+              "value": "={{ $json.body.utm_content || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "set-consent",
+              "name": "consent",
+              "value": "={{ $json.body.consent }}",
+              "type": "boolean"
+            },
+            {
+              "id": "set-submitted-at",
+              "name": "submitted_at",
+              "value": "={{ $json.body.submitted_at || new Date().toISOString() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-normalize",
+      "name": "Set - Normalize Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        800,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "email",
+              "lookupValue": "={{ $json.email }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-search-duplicate",
+      "name": "Google Sheets - Search Duplicate",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1040,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-no-duplicate",
+              "leftValue": "={{ $json.email ? \"duplicate\" : \"new_lead\" }}",
+              "rightValue": "new_lead",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-duplicate-check",
+      "name": "IF - Duplicate Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "email": "={{ $('Set - Normalize Fields').item.json.email }}",
+            "first_name": "={{ $('Set - Normalize Fields').item.json.first_name }}",
+            "last_name": "={{ $('Set - Normalize Fields').item.json.last_name }}",
+            "full_name": "={{ $('Set - Normalize Fields').item.json.full_name }}",
+            "phone": "={{ $('Set - Normalize Fields').item.json.phone }}",
+            "company": "={{ $('Set - Normalize Fields').item.json.company }}",
+            "message": "={{ $('Set - Normalize Fields').item.json.message }}",
+            "source": "={{ $('Set - Normalize Fields').item.json.source }}",
+            "page_url": "={{ $('Set - Normalize Fields').item.json.page_url }}",
+            "utm_source": "={{ $('Set - Normalize Fields').item.json.utm_source }}",
+            "utm_medium": "={{ $('Set - Normalize Fields').item.json.utm_medium }}",
+            "utm_campaign": "={{ $('Set - Normalize Fields').item.json.utm_campaign }}",
+            "utm_term": "={{ $('Set - Normalize Fields').item.json.utm_term }}",
+            "utm_content": "={{ $('Set - Normalize Fields').item.json.utm_content }}",
+            "consent": "={{ $('Set - Normalize Fields').item.json.consent }}",
+            "submitted_at": "={{ $('Set - Normalize Fields').item.json.submitted_at }}"
+          },
+          "matchingColumns": [
+            "email"
+          ],
+          "schema": [
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "first_name",
+              "displayName": "first_name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": false,
+              "type": "string"
+            },
+            {
+              "id": "last_name",
+              "displayName": "last_name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": false,
+              "type": "string"
+            },
+            {
+              "id": "full_name",
+              "displayName": "full_name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": false,
+              "type": "string"
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": false,
+              "type": "string"
+            },
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": false,
+              "type": "string"
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": false,
+              "type": "string"
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": false,
+              "type": "string"
+            },
+            {
+              "id": "page_url",
+              "displayName": "page_url",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": false,
+              "type": "string"
+            },
+            {
+              "id": "utm_source",
+              "displayName": "utm_source",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": false,
+              "type": "string"
+            },
+            {
+              "id": "utm_medium",
+              "displayName": "utm_medium",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": false,
+              "type": "string"
+            },
+            {
+              "id": "utm_campaign",
+              "displayName": "utm_campaign",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": false,
+              "type": "string"
+            },
+            {
+              "id": "utm_term",
+              "displayName": "utm_term",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": false,
+              "type": "string"
+            },
+            {
+              "id": "utm_content",
+              "displayName": "utm_content",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": false,
+              "type": "string"
+            },
+            {
+              "id": "consent",
+              "displayName": "consent",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": false,
+              "type": "string"
+            },
+            {
+              "id": "submitted_at",
+              "displayName": "submitted_at",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": false,
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-append-row",
+      "name": "Google Sheets - Append Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1520,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'success', message: 'Lead saved successfully', email: $('Set - Normalize Fields').item.json.email }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "node-respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1760,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'error', message: 'Missing required fields: email, first_name, and consent are required' }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "node-respond-validation-error",
+      "name": "Respond Validation Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        800,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'error', message: 'Duplicate lead: a lead with this email already exists', email: $('Set - Normalize Fields').item.json.email }) }}",
+        "options": {
+          "responseCode": 409
+        }
+      },
+      "id": "node-respond-duplicate-error",
+      "name": "Respond Duplicate Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1520,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const body = (item.json && item.json.body) || {};\n  const emailOk = body.email && String(body.email).trim().length > 0;\n  const nameOk = body.first_name && String(body.first_name).trim().length > 0;\n  const consentOk = body.consent === true;\n\n  results.push({\n    json: {\n      ...item.json,\n      _validationResult: (emailOk && nameOk && consentOk) ? 'pass' : 'fail'\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "node-code-validate",
+      "name": "Code - Validate Fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        304
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook - Receive Lead": {
+      "main": [
+        [
+          {
+            "node": "Code - Validate Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Validate Required Fields": {
+      "main": [
+        [
+          {
+            "node": "Set - Normalize Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set - Normalize Fields": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Search Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Search Duplicate": {
+      "main": [
+        [
+          {
+            "node": "IF - Duplicate Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Duplicate Check": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Append Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Duplicate Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Append Row": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Validate Fields": {
+      "main": [
+        [
+          {
+            "node": "IF - Validate Required Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "triggerCount": 1,
+  "updatedAt": "2026-02-23T16:10:22.804Z",
+  "versionId": "1"
+}
