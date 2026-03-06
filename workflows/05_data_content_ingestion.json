@@ -1,0 +1,323 @@
+{
+  "name": "Data: Content Ingestion",
+  "nodes": [
+    {
+      "id": "ci-trigger",
+      "name": "workflow_trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "genre_slug"
+            },
+            {
+              "name": "date"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ci-settings",
+      "name": "settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        120,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "SUPABASE_URL",
+              "value": "https://qsirioazmsmrrfoltrhn.supabase.co",
+              "type": "string"
+            },
+            {
+              "id": "sapi",
+              "name": "SUPABASE_API_KEY",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ci-params",
+      "name": "set_params",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "p1",
+              "name": "genre_slug",
+              "value": "={{ $json.genre_slug }}",
+              "type": "string"
+            },
+            {
+              "id": "p2",
+              "name": "query_date",
+              "value": "={{ $json.date || $now.format('yyyy-MM-dd') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ci-query",
+      "name": "query_content_index",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/content_index?genre_slug=eq.{{ $json.genre_slug }}&scraped_at=gte.{{ $json.query_date }}&order=scraped_at.desc&limit=50",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ci-filter",
+      "name": "filter_relevant",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "f1",
+              "leftValue": "={{ $json.title }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ci-download",
+      "name": "download_content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/storage/v1/object/public/author-content/{{ $json.content_path }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "ci-prepare",
+      "name": "prepare_content",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "pc1",
+              "name": "title",
+              "value": "={{ $('filter_relevant').item.json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "pc2",
+              "name": "source_type",
+              "value": "={{ $('filter_relevant').item.json.source_type }}",
+              "type": "string"
+            },
+            {
+              "id": "pc3",
+              "name": "source_url",
+              "value": "={{ $('filter_relevant').item.json.source_url }}",
+              "type": "string"
+            },
+            {
+              "id": "pc4",
+              "name": "genre_slug",
+              "value": "={{ $('filter_relevant').item.json.genre_slug }}",
+              "type": "string"
+            },
+            {
+              "id": "pc5",
+              "name": "content",
+              "value": "={{ $json.data }}",
+              "type": "string"
+            },
+            {
+              "id": "pc6",
+              "name": "content_id",
+              "value": "={{ $('filter_relevant').item.json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ci-aggregate",
+      "name": "aggregate_content",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1440,
+        0
+      ],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "workflow_trigger": {
+      "main": [
+        [
+          {
+            "node": "settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "settings": {
+      "main": [
+        [
+          {
+            "node": "set_params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_params": {
+      "main": [
+        [
+          {
+            "node": "query_content_index",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "query_content_index": {
+      "main": [
+        [
+          {
+            "node": "filter_relevant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "filter_relevant": {
+      "main": [
+        [
+          {
+            "node": "download_content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "download_content": {
+      "main": [
+        [
+          {
+            "node": "prepare_content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prepare_content": {
+      "main": [
+        [
+          {
+            "node": "aggregate_content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

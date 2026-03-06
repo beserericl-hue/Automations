@@ -1,0 +1,648 @@
+{
+  "name": "Tool - Write Chapter",
+  "nodes": [
+    {
+      "id": "ch-trigger",
+      "name": "workflow_trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "genre_slug"
+            },
+            {
+              "name": "project_title"
+            },
+            {
+              "name": "chapter_number"
+            },
+            {
+              "name": "brief"
+            },
+            {
+              "name": "outline"
+            },
+            {
+              "name": "research_topics"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ch-settings",
+      "name": "settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        120,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "SUPABASE_URL",
+              "value": "https://qsirioazmsmrrfoltrhn.supabase.co",
+              "type": "string"
+            },
+            {
+              "id": "sapi",
+              "name": "SUPABASE_API_KEY",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ch-genre",
+      "name": "get_genre_config",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/genre_config?genre_slug=eq.{{ $json.genre_slug }}&limit=1",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ch-project",
+      "name": "get_project",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/writing_projects?title=eq.{{ encodeURIComponent($('workflow_trigger').item.json.project_title) }}&limit=1",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ch-bible",
+      "name": "fetch_story_bible",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/story_bible?project_id=eq.{{ $('get_project').first().json[0]?.id }}&order=entry_type,name",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ch-samples",
+      "name": "fetch_writing_samples",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        200
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/storage/v1/object/list/author-content/writing-samples/",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ch-research-q",
+      "name": "build_research_query",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "crq1",
+              "name": "research_query",
+              "value": "=Research for chapter {{ $('workflow_trigger').item.json.chapter_number }} of a {{ $('get_genre_config').first().json[0]?.genre_name }} novel titled \"{{ $('workflow_trigger').item.json.project_title }}\". Chapter brief: {{ $('workflow_trigger').item.json.brief }}. Provide factual details about: {{ $('workflow_trigger').item.json.research_topics || $('workflow_trigger').item.json.brief }}.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ch-research",
+      "name": "research_topic",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.perplexity.ai/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: 'sonar-reasoning', messages: [{ role: 'user', content: $json.research_query }] }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "ch-prompt",
+      "name": "build_chapter_prompt",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1440,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bcp1",
+              "name": "prompt",
+              "value": "=You are writing Chapter {{ $('workflow_trigger').item.json.chapter_number }} of \"{{ $('workflow_trigger').item.json.project_title }}\", a {{ $('get_genre_config').first().json[0]?.genre_name }} novel.\n\n## Genre Guidelines\n{{ $('get_genre_config').first().json[0]?.writing_guidelines }}\n\n## Research\n{{ $('research_topic').item.json.choices?.[0]?.message?.content || '' }}\n\n## Story Bible\n{{ JSON.stringify($('fetch_story_bible').first().json || []) }}\n\n## Outline\n{{ $('workflow_trigger').item.json.outline }}\n\n## This Chapter\n{{ $('workflow_trigger').item.json.brief }}\n\n## Requirements\n- Internal arc per chapter\n- End on a hook\n- Track character development\n- 3000-5000 words\n- Include scene breaks (---)\n\n## Output\nReturn JSON: { chapter_title, chapter_text, word_count, chapter_summary, next_chapter_notes, new_story_bible_entries }",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ch-write",
+      "name": "write_chapter",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        1680,
+        0
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "hasOutputParser": true,
+        "batching": {}
+      }
+    },
+    {
+      "id": "ch-claude",
+      "name": "claude-sonnet",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        1680,
+        208
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-4-20250514",
+          "mode": "list",
+          "cachedResultName": "Claude Sonnet 4"
+        },
+        "options": {
+          "maxTokensToSample": 16000
+        }
+      }
+    },
+    {
+      "id": "ch-parser",
+      "name": "chapter_parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1872,
+        208
+      ],
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\"type\":\"object\",\"properties\":{\"chapter_title\":{\"type\":\"string\"},\"chapter_text\":{\"type\":\"string\"},\"word_count\":{\"type\":\"integer\"},\"chapter_summary\":{\"type\":\"string\"},\"next_chapter_notes\":{\"type\":\"string\"},\"new_story_bible_entries\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"entry_type\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"description\":{\"type\":\"string\"}}}}},\"required\":[\"chapter_title\",\"chapter_text\",\"word_count\",\"chapter_summary\",\"next_chapter_notes\"]}"
+      }
+    },
+    {
+      "id": "ch-update-bible",
+      "name": "update_story_bible",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1920,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/story_bible",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify(($json.output?.new_story_bible_entries || []).map(e => ({ ...e, project_id: $('get_project').first().json[0]?.id, chapter_introduced: parseInt($('workflow_trigger').item.json.chapter_number), last_chapter_seen: parseInt($('workflow_trigger').item.json.chapter_number) }))) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ch-update-proj",
+      "name": "update_project",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2160,
+        0
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/writing_projects?id=eq.{{ $('get_project').first().json[0]?.id }}",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ chapter_count: parseInt($('workflow_trigger').item.json.chapter_number), status: 'in_progress', updated_at: $now.toISO() }) }}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ch-save",
+      "name": "save_draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2400,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/storage/v1/object/author-content/drafts/chapter_{{ $('workflow_trigger').item.json.project_title?.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 30) || 'book' }}_ch{{ $('workflow_trigger').item.json.chapter_number }}_{{ $now.format('yyyy-MM-dd') }}.md",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/markdown",
+        "body": "={{ $('write_chapter').item.json.output?.chapter_text || '' }}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ch-email",
+      "name": "send_email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2640,
+        0
+      ],
+      "parameters": {
+        "operation": "send",
+        "sendTo": "eric@agileadtesting.com",
+        "subject": "={{ $('workflow_trigger').item.json.project_title }} - Chapter {{ $('workflow_trigger').item.json.chapter_number }}: {{ $('write_chapter').item.json.output?.chapter_title || 'Draft' }}",
+        "message": "={{ ($('write_chapter').item.json.output?.chapter_text || '').replace(/\\n/g, '<br>') }}",
+        "options": {
+          "appendAttribution": false
+        }
+      }
+    },
+    {
+      "id": "ch-result",
+      "name": "set_result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2880,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cr1",
+              "name": "result",
+              "value": "=Chapter {{ $('workflow_trigger').item.json.chapter_number }} written: {{ $('write_chapter').item.json.output?.chapter_title || 'Untitled' }} ({{ $('write_chapter').item.json.output?.word_count || 0 }} words)",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "workflow_trigger": {
+      "main": [
+        [
+          {
+            "node": "settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "settings": {
+      "main": [
+        [
+          {
+            "node": "get_genre_config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_genre_config": {
+      "main": [
+        [
+          {
+            "node": "get_project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_project": {
+      "main": [
+        [
+          {
+            "node": "fetch_story_bible",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "fetch_writing_samples",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch_story_bible": {
+      "main": [
+        [
+          {
+            "node": "build_research_query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "build_research_query": {
+      "main": [
+        [
+          {
+            "node": "research_topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "research_topic": {
+      "main": [
+        [
+          {
+            "node": "build_chapter_prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "build_chapter_prompt": {
+      "main": [
+        [
+          {
+            "node": "write_chapter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "claude-sonnet": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "write_chapter",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "chapter_parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "write_chapter",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "write_chapter": {
+      "main": [
+        [
+          {
+            "node": "update_story_bible",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update_story_bible": {
+      "main": [
+        [
+          {
+            "node": "update_project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update_project": {
+      "main": [
+        [
+          {
+            "node": "save_draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "save_draft": {
+      "main": [
+        [
+          {
+            "node": "send_email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send_email": {
+      "main": [
+        [
+          {
+            "node": "set_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

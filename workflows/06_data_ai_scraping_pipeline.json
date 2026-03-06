@@ -1,0 +1,934 @@
+{
+  "name": "Data: AI Scraping Pipeline",
+  "nodes": [
+    {
+      "id": "sp-trigger",
+      "name": "schedule_trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "sp-settings",
+      "name": "settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        120,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "SUPABASE_URL",
+              "value": "https://qsirioazmsmrrfoltrhn.supabase.co",
+              "type": "string"
+            },
+            {
+              "id": "s2",
+              "name": "GOOGLE_BOOKS_API_KEY",
+              "value": "YOUR_GOOGLE_BOOKS_API_KEY",
+              "type": "string"
+            },
+            {
+              "id": "s3",
+              "name": "JINA_API_KEY",
+              "value": "jina_da590009969f4ee09edb32352f8fa645XRu8tBvLsc1nAc1p45EBfBni0Akp",
+              "type": "string"
+            },
+            {
+              "id": "sapi",
+              "name": "SUPABASE_API_KEY",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "sp-genres",
+      "name": "get_active_genres",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/genre_config?active=eq.true",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "sp-iterate-genres",
+      "name": "iterate_genres",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "sp-set-genre",
+      "name": "set_genre_context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "sg1",
+              "name": "genre_slug",
+              "value": "={{ $json.genre_slug }}",
+              "type": "string"
+            },
+            {
+              "id": "sg2",
+              "name": "genre_name",
+              "value": "={{ $json.genre_name }}",
+              "type": "string"
+            },
+            {
+              "id": "sg3",
+              "name": "keywords",
+              "value": "={{ $json.keywords }}",
+              "type": "string"
+            },
+            {
+              "id": "sg4",
+              "name": "subreddit_names",
+              "value": "={{ $json.subreddit_names }}",
+              "type": "string"
+            },
+            {
+              "id": "sg5",
+              "name": "rss_feed_urls",
+              "value": "={{ $json.rss_feed_urls }}",
+              "type": "string"
+            },
+            {
+              "id": "sg6",
+              "name": "today",
+              "value": "={{ $now.format('yyyy-MM-dd') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "sp-split-rss",
+      "name": "split_rss_feeds",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        960,
+        -160
+      ],
+      "parameters": {
+        "fieldToSplitOut": "rss_feed_urls",
+        "options": {}
+      }
+    },
+    {
+      "id": "sp-iterate-rss",
+      "name": "iterate_rss_feeds",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1200,
+        -160
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "sp-scrape-rss",
+      "name": "scrape_rss_feed",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        1440,
+        -160
+      ],
+      "parameters": {
+        "url": "={{ $json.rss_feed_urls }}"
+      }
+    },
+    {
+      "id": "sp-filter-rss",
+      "name": "filter_rss_recent",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        1680,
+        -160
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "fr1",
+              "leftValue": "={{ $json.title }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "sp-prepare-rss",
+      "name": "prepare_rss_content",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1920,
+        -160
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "pr1",
+              "name": "title",
+              "value": "={{ $json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "pr2",
+              "name": "source_url",
+              "value": "={{ $json.link }}",
+              "type": "string"
+            },
+            {
+              "id": "pr3",
+              "name": "summary",
+              "value": "={{ $json.contentSnippet || $json.content?.substring(0, 500) || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "pr4",
+              "name": "source_type",
+              "value": "rss",
+              "type": "string"
+            },
+            {
+              "id": "pr5",
+              "name": "feed_name",
+              "value": "={{ $json.creator || new URL($json.link || '').hostname }}",
+              "type": "string"
+            },
+            {
+              "id": "pr6",
+              "name": "pub_date",
+              "value": "={{ $json.isoDate || $json.pubDate }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "sp-scrape-reddit",
+      "name": "scrape_reddit",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        160
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://www.reddit.com/r/{{ JSON.parse($('set_genre_context').item.json.subreddit_names)[0] }}/hot.json?limit=25",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "headers": {
+            "parameters": [
+              {
+                "name": "User-Agent",
+                "value": "AuthorAgent/1.0"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "sp-filter-reddit",
+      "name": "filter_reddit_posts",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        160
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "frd1",
+              "leftValue": "={{ $json.data?.score }}",
+              "rightValue": 10,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "sp-prepare-reddit",
+      "name": "prepare_reddit_content",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1440,
+        160
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "prd1",
+              "name": "title",
+              "value": "={{ $json.data.title }}",
+              "type": "string"
+            },
+            {
+              "id": "prd2",
+              "name": "source_url",
+              "value": "=https://www.reddit.com{{ $json.data.permalink }}",
+              "type": "string"
+            },
+            {
+              "id": "prd3",
+              "name": "summary",
+              "value": "={{ $json.data.selftext?.substring(0, 500) || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "prd4",
+              "name": "source_type",
+              "value": "reddit",
+              "type": "string"
+            },
+            {
+              "id": "prd5",
+              "name": "feed_name",
+              "value": "=r/{{ $json.data.subreddit }}",
+              "type": "string"
+            },
+            {
+              "id": "prd6",
+              "name": "score",
+              "value": "={{ $json.data.score }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "sp-scrape-books",
+      "name": "scrape_google_books",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        320
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://www.googleapis.com/books/v1/volumes?q=subject:science+fiction+{{ JSON.parse($('set_genre_context').item.json.keywords)[0] }}&maxResults=10&orderBy=newest&key={{ $('settings').item.json.GOOGLE_BOOKS_API_KEY }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "sp-prepare-books",
+      "name": "prepare_book_data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        320
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "pb1",
+              "name": "title",
+              "value": "={{ $json.volumeInfo?.title }}",
+              "type": "string"
+            },
+            {
+              "id": "pb2",
+              "name": "source_url",
+              "value": "={{ $json.volumeInfo?.infoLink }}",
+              "type": "string"
+            },
+            {
+              "id": "pb3",
+              "name": "summary",
+              "value": "={{ $json.volumeInfo?.description?.substring(0, 500) || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "pb4",
+              "name": "source_type",
+              "value": "google_books",
+              "type": "string"
+            },
+            {
+              "id": "pb5",
+              "name": "feed_name",
+              "value": "Google Books",
+              "type": "string"
+            },
+            {
+              "id": "pb6",
+              "name": "authors",
+              "value": "={{ $json.volumeInfo?.authors?.join(', ') || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "sp-scrape-ol",
+      "name": "scrape_open_library",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        480
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://openlibrary.org/search.json?subject=science_fiction&q={{ JSON.parse($('set_genre_context').item.json.keywords)[0] }}&limit=10&sort=new",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "sp-prepare-ol",
+      "name": "prepare_open_library_data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        480
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "pol1",
+              "name": "title",
+              "value": "={{ $json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "pol2",
+              "name": "source_url",
+              "value": "=https://openlibrary.org{{ $json.key }}",
+              "type": "string"
+            },
+            {
+              "id": "pol3",
+              "name": "summary",
+              "value": "={{ $json.first_sentence?.join(' ')?.substring(0, 500) || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "pol4",
+              "name": "source_type",
+              "value": "open_library",
+              "type": "string"
+            },
+            {
+              "id": "pol5",
+              "name": "feed_name",
+              "value": "Open Library",
+              "type": "string"
+            },
+            {
+              "id": "pol6",
+              "name": "authors",
+              "value": "={{ $json.author_name?.join(', ') || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "sp-aggregate",
+      "name": "aggregate_all_content",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        160
+      ],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      }
+    },
+    {
+      "id": "sp-upload",
+      "name": "upload_to_supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1920,
+        160
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/storage/v1/object/author-content/{{ $('set_genre_context').item.json.today }}/{{ $('set_genre_context').item.json.genre_slug }}/batch_{{ $now.toMillis() }}.json",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "data",
+              "value": "={{ JSON.stringify($json.data) }}"
+            }
+          ]
+        },
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "sp-index",
+      "name": "index_content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2160,
+        160
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/content_index",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.data.map(item => ({ genre_slug: $('set_genre_context').item.json.genre_slug, source_type: item.source_type, feed_name: item.feed_name, source_url: item.source_url, title: item.title, summary: item.summary, content_path: $('set_genre_context').item.json.today + '/' + $('set_genre_context').item.json.genre_slug + '/batch_' + $now.toMillis() + '.json' }))) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "sp-next",
+      "name": "iterate_next",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2400,
+        160
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "sp-done",
+      "name": "no_op_done",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        720,
+        320
+      ],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "schedule_trigger": {
+      "main": [
+        [
+          {
+            "node": "settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "settings": {
+      "main": [
+        [
+          {
+            "node": "get_active_genres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_active_genres": {
+      "main": [
+        [
+          {
+            "node": "iterate_genres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "iterate_genres": {
+      "main": [
+        [
+          {
+            "node": "set_genre_context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "no_op_done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_genre_context": {
+      "main": [
+        [
+          {
+            "node": "split_rss_feeds",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "scrape_reddit",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "scrape_google_books",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "scrape_open_library",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "split_rss_feeds": {
+      "main": [
+        [
+          {
+            "node": "iterate_rss_feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "iterate_rss_feeds": {
+      "main": [
+        [
+          {
+            "node": "scrape_rss_feed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "aggregate_all_content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "scrape_rss_feed": {
+      "main": [
+        [
+          {
+            "node": "filter_rss_recent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "filter_rss_recent": {
+      "main": [
+        [
+          {
+            "node": "prepare_rss_content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prepare_rss_content": {
+      "main": [
+        [
+          {
+            "node": "iterate_rss_feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "scrape_reddit": {
+      "main": [
+        [
+          {
+            "node": "filter_reddit_posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "filter_reddit_posts": {
+      "main": [
+        [
+          {
+            "node": "prepare_reddit_content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prepare_reddit_content": {
+      "main": [
+        [
+          {
+            "node": "aggregate_all_content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "scrape_google_books": {
+      "main": [
+        [
+          {
+            "node": "prepare_book_data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prepare_book_data": {
+      "main": [
+        [
+          {
+            "node": "aggregate_all_content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "scrape_open_library": {
+      "main": [
+        [
+          {
+            "node": "prepare_open_library_data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prepare_open_library_data": {
+      "main": [
+        [
+          {
+            "node": "aggregate_all_content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "aggregate_all_content": {
+      "main": [
+        [
+          {
+            "node": "upload_to_supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "upload_to_supabase": {
+      "main": [
+        [
+          {
+            "node": "index_content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "index_content": {
+      "main": [
+        [
+          {
+            "node": "iterate_next",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "iterate_next": {
+      "main": [
+        [
+          {
+            "node": "iterate_genres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

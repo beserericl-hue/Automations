@@ -1,0 +1,300 @@
+{
+  "name": "Sub - Manage Story Bible",
+  "nodes": [
+    {
+      "id": "sb-trigger",
+      "name": "workflow_trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "operation"
+            },
+            {
+              "name": "project_title"
+            },
+            {
+              "name": "entries"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "sb-settings",
+      "name": "settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        120,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "SUPABASE_URL",
+              "value": "https://qsirioazmsmrrfoltrhn.supabase.co",
+              "type": "string"
+            },
+            {
+              "id": "sapi",
+              "name": "SUPABASE_API_KEY",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "sb-project",
+      "name": "get_project",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/writing_projects?title=eq.{{ encodeURIComponent($json.project_title) }}&limit=1",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "sb-check",
+      "name": "check_operation",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $('workflow_trigger').item.json.operation }}",
+              "rightValue": "get",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "sb-get",
+      "name": "get_story_bible",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        -100
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/story_bible?project_id=eq.{{ $('get_project').first().json[0]?.id }}&order=entry_type,name",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "sb-update",
+      "name": "update_story_bible",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/story_bible",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify(JSON.parse($('workflow_trigger').item.json.entries || '[]').map(e => ({ ...e, project_id: $('get_project').first().json[0]?.id }))) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "sb-result",
+      "name": "set_result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "sr1",
+              "name": "result",
+              "value": "={{ $('check_operation').item.json.operation === 'get' ? JSON.stringify($('get_story_bible').first().json) : 'Story bible updated successfully' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "workflow_trigger": {
+      "main": [
+        [
+          {
+            "node": "settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "settings": {
+      "main": [
+        [
+          {
+            "node": "get_project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_project": {
+      "main": [
+        [
+          {
+            "node": "check_operation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check_operation": {
+      "main": [
+        [
+          {
+            "node": "get_story_bible",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "update_story_bible",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_story_bible": {
+      "main": [
+        [
+          {
+            "node": "set_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update_story_bible": {
+      "main": [
+        [
+          {
+            "node": "set_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}
