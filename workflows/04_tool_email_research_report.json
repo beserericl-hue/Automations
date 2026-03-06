@@ -1,0 +1,58 @@
+{
+  "name": "Tool - Email Research Report",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            { "name": "markdownReportContent" },
+            { "name": "emailAddress" },
+            { "name": "subjectLine" }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [640, -272],
+      "id": "559da46a-0c14-46f7-bdb2-c60e4e7bb4db",
+      "name": "workflow_trigger"
+    },
+    {
+      "parameters": {
+        "mode": "markdownToHtml",
+        "markdown": "={{ $json.markdownReportContent }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.markdown",
+      "typeVersion": 1,
+      "position": [880, -272],
+      "id": "8b5341da-e09a-4de2-93e1-e0ec67d84507",
+      "name": "convert_to_html"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.emailAddress }}",
+        "subject": "={{ $json.subjectLine }}",
+        "message": "={{ $json.data }}",
+        "options": { "appendAttribution": false }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1136, -272],
+      "id": "5f5a2242-ab3f-47be-a787-f5d2ac7794bd",
+      "name": "send_email"
+    }
+  ],
+  "connections": {
+    "workflow_trigger": {
+      "main": [[{ "node": "convert_to_html", "type": "main", "index": 0 }]]
+    },
+    "convert_to_html": {
+      "main": [[{ "node": "send_email", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

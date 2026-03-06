@@ -1,0 +1,70 @@
+{
+  "name": "Tool - Repurpose to Social Posts",
+  "nodes": [
+    {
+      "parameters": { "workflowInputs": { "values": [{ "name": "content" }, { "name": "platform" }] } },
+      "type": "n8n-nodes-base.executeWorkflowTrigger", "typeVersion": 1.1, "position": [0, 0],
+      "id": "956e6883-eb67-4a1a-8c61-d47ddccd936c", "name": "workflow_trigger"
+    },
+    {
+      "parameters": {
+        "assignments": { "assignments": [{
+          "id": "cf7f1edf-db80-490c-adea-e8a7579bf2c2", "name": "platform_config",
+          "value": "={{ (() => {\nconst platform = $('workflow_trigger').item.json.platform || 'twitter';\nconst configs = {\n  twitter: {\n    name: 'Twitter/X',\n    charLimit: 280,\n    format: 'Thread of numbered tweets (1/, 2/, etc.). Each tweet max 280 chars. Use line breaks for readability. Emojis sparingly. Include relevant @mentions. End with engagement CTA.',\n    example: '1/ Big news in sci-fi this week...\\n\\n2/ [Story point with detail]\\n\\n3/ [Another story point]\\n\\nWhat do you think? Reply with your take.'\n  },\n  linkedin: {\n    name: 'LinkedIn',\n    charLimit: 3000,\n    format: 'Single post, max 3000 chars. Professional tone. Use line breaks every 1-2 sentences. Hook in first line. Include 3-5 relevant hashtags at end. No emojis in body.',\n    example: 'The future of [topic] is changing fast.\\n\\nHere\\'s what caught my attention this week:\\n\\n[Key points with analysis]\\n\\n#ScienceFiction #WritingCommunity'\n  },\n  instagram: {\n    name: 'Instagram',\n    charLimit: 2200,\n    format: 'Caption style, max 2200 chars. Conversational tone. Hook first line. Use paragraph breaks. 20-30 relevant hashtags in a separate block at the end. Include a CTA (save this, share, comment).',\n    example: 'This blew my mind. \\ud83e\\udde0\\n\\n[Engaging summary]\\n\\nSave this for later \\u2b07\\ufe0f\\n\\n.\\n.\\n.\\n#SciFi #Books #WritingCommunity'\n  }\n};\nreturn JSON.stringify(configs[platform] || configs.twitter);\n})() }}",
+          "type": "string"
+        }] }, "options": {}
+      },
+      "type": "n8n-nodes-base.set", "typeVersion": 3.4, "position": [240, 0],
+      "id": "ff80061d-671a-449c-83bc-24dc15bf1e44", "name": "set_platform_examples"
+    },
+    {
+      "parameters": {
+        "assignments": { "assignments": [{
+          "id": "605dbce8-a3a0-475f-a76f-b670e7e77fd2", "name": "prompt",
+          "value": "=# Repurpose Content to Social Posts\n\n## Persona\nYou are an expert science fiction content creator and social media strategist. You excel at distilling written content into engaging social media posts that resonate with the sci-fi community.\n\n## Platform\n{{ JSON.parse($('set_platform_examples').item.json.platform_config).name }}\n\n## Platform Rules\n- Character limit: {{ JSON.parse($('set_platform_examples').item.json.platform_config).charLimit }}\n- Format: {{ JSON.parse($('set_platform_examples').item.json.platform_config).format }}\n\n## Example\n{{ JSON.parse($('set_platform_examples').item.json.platform_config).example }}\n\n## Source Content\n{{ $('workflow_trigger').item.json.content }}\n\n## Instructions\n1. Read the source content carefully\n2. Extract the most compelling points, hooks, and insights\n3. Craft posts following the platform format rules above\n4. Maintain an authoritative, knowledgeable voice about science fiction\n5. Include specific references to works, authors, or concepts from the content\n6. Make every word count within the character limit\n\n## Output\nReturn a JSON object with a 'posts' array. Each post has 'text' (the post content) and 'hashtags' (array of relevant hashtags without #).",
+          "type": "string"
+        }] }, "options": {}
+      },
+      "type": "n8n-nodes-base.set", "typeVersion": 3.4, "position": [480, 0],
+      "id": "89016beb-98f0-4849-b922-67af7fc1cc14", "name": "build_prompt"
+    },
+    {
+      "parameters": { "promptType": "define", "text": "={{ $json.prompt }}", "hasOutputParser": true, "batching": {} },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm", "typeVersion": 1.7, "position": [704, 0],
+      "id": "142ad298-d484-4659-8785-04e57693cff5", "name": "write_posts"
+    },
+    {
+      "parameters": { "model": { "__rl": true, "value": "claude-sonnet-4-20250514", "mode": "list", "cachedResultName": "Claude Sonnet 4" }, "options": {} },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic", "typeVersion": 1.3, "position": [704, 208],
+      "id": "2db6dc77-be00-4744-9c67-f775aec87456", "name": "claude-sonnet-4"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n\t\t\"posts\": {\n\t\t\t\"type\": \"array\",\n\t\t\t\"items\": {\n\t\t\t\t\"type\": \"object\",\n\t\t\t\t\"properties\": {\n\t\t\t\t\t\"text\": { \"type\": \"string\", \"description\": \"The post content\" },\n\t\t\t\t\t\"hashtags\": { \"type\": \"array\", \"items\": { \"type\": \"string\" }, \"description\": \"Relevant hashtags without #\" }\n\t\t\t\t}\n\t\t\t},\n\t\t\t\"description\": \"Array of social media posts\"\n\t\t}\n\t}\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured", "typeVersion": 1.3, "position": [896, 208],
+      "id": "c80a8168-7718-44c5-b8f6-58e2aa441da1", "name": "posts_parser"
+    },
+    {
+      "parameters": { "assignments": { "assignments": [{ "id": "14254389-8e3b-4abf-95ed-79401a54e084", "name": "result", "value": "={{ $json.output.posts }}", "type": "string" }] }, "options": {} },
+      "type": "n8n-nodes-base.set", "typeVersion": 3.4, "position": [1136, 0],
+      "id": "f36113a8-6d12-4319-be3f-fc4fc9349862", "name": "set_result"
+    },
+    {
+      "parameters": { "operation": "send", "sendTo": "eric@agileadtesting.com", "subject": "=Social Posts: {{ $('workflow_trigger').item.json.platform }}", "message": "=<h2>Social Posts for {{ $('workflow_trigger').item.json.platform }}</h2><pre>{{ $json.result }}</pre>", "options": { "appendAttribution": false } },
+      "type": "n8n-nodes-base.gmail", "typeVersion": 2.1, "position": [1392, 0],
+      "id": "8d279d12-7996-4076-8d26-d017db477d56", "name": "send_email"
+    }
+  ],
+  "connections": {
+    "workflow_trigger": { "main": [[{ "node": "set_platform_examples", "type": "main", "index": 0 }]] },
+    "set_platform_examples": { "main": [[{ "node": "build_prompt", "type": "main", "index": 0 }]] },
+    "build_prompt": { "main": [[{ "node": "write_posts", "type": "main", "index": 0 }]] },
+    "claude-sonnet-4": { "ai_languageModel": [[{ "node": "write_posts", "type": "ai_languageModel", "index": 0 }]] },
+    "posts_parser": { "ai_outputParser": [[{ "node": "write_posts", "type": "ai_outputParser", "index": 0 }]] },
+    "write_posts": { "main": [[{ "node": "set_result", "type": "main", "index": 0 }]] },
+    "set_result": { "main": [[{ "node": "send_email", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1", "callerPolicy": "workflowsFromSameOwner" }
+}

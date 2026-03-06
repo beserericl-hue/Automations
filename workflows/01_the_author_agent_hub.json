@@ -1,0 +1,172 @@
+{
+  "name": "The Author Agent",
+  "nodes": [
+    {
+      "id": "hub-webhook", "name": "webhook_trigger", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [0, 0],
+      "parameters": { "httpMethod": "POST", "path": "author-agent", "options": {}, "webhookId": "author-agent-webhook" }
+    },
+    {
+      "id": "hub-chat", "name": "chat_trigger", "type": "@n8n/n8n-nodes-langchain.chatTrigger", "typeVersion": 1.1, "position": [0, 200],
+      "parameters": { "options": {} }
+    },
+    {
+      "id": "hub-agent", "name": "Author Agent", "type": "@n8n/n8n-nodes-langchain.agent", "typeVersion": 1.7, "position": [480, 0],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.chatInput || $json.body?.message || $json.message }}",
+        "hasOutputParser": false,
+        "options": {
+          "systemMessage": "You are The Author Agent, a specialized AI writing assistant for science fiction. You help plan, research, write, and manage fiction and non-fiction content across three genre niches: Post-Apocalyptic Science Fiction, Political Science Fiction, and Historical Time Travel.\n\n## Your Capabilities\n- **Research**: Use deep_research for comprehensive topic research, email_report to deliver findings\n- **Writing**: write_blog_post, write_newsletter, write_short_story, write_chapter for different formats\n- **Visual**: generate_cover_art for genre-specific book/story cover images\n- **Distribution**: repurpose_to_social for Twitter/LinkedIn/Instagram posts\n- **Continuity**: manage_story_bible to track characters, events, locations across chapters\n\n## Genre Slugs\n- post-apocalyptic\n- political-scifi\n- historical-time-travel\n\n## Workflow\n1. When asked to write, ALWAYS ask which genre first if not specified\n2. For fiction: brainstorm → outline → research → write\n3. For non-fiction: research → outline → write\n4. For books: create a project, establish story bible, then write chapter by chapter\n5. Always email results to eric@agileadtesting.com\n\n## Rules\n- Use Claude Sonnet for all writing tasks\n- Use Perplexity for research\n- Save all drafts to Supabase storage\n- Track content provenance (what sources informed what output)\n- Maintain story bible consistency across chapters"
+        }
+      }
+    },
+    {
+      "id": "hub-gemini", "name": "gemini-2.5-pro", "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini", "typeVersion": 1.1, "position": [480, 400],
+      "parameters": { "modelName": "models/gemini-2.5-pro-preview-05-06", "options": { "temperature": 0.7 } }
+    },
+    {
+      "id": "hub-memory", "name": "memory", "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow", "typeVersion": 1.3, "position": [680, 400],
+      "parameters": { "sessionIdType": "customKey", "sessionKey": "author-agent", "contextWindowLength": 20 }
+    },
+    {
+      "id": "hub-think", "name": "think", "type": "@n8n/n8n-nodes-langchain.toolThink", "typeVersion": 1, "position": [880, 400],
+      "parameters": {}
+    },
+    {
+      "id": "hub-deep-research", "name": "deep_research", "type": "@n8n/n8n-nodes-langchain.toolWorkflow", "typeVersion": 2, "position": [240, 400],
+      "parameters": {
+        "workflowId": { "__rl": true, "value": "QAbYfOOd05lyesva", "mode": "id" },
+        "description": "Deep research on any topic. Sends a detailed markdown report via email. Input: topic (string), emailAddress (string, default: eric@agileadtesting.com), subjectLine (string).",
+        "fields": { "values": [
+          { "name": "markdownReportContent", "value": "={{ $fromAI('markdownReportContent', 'The full markdown research report content') }}" },
+          { "name": "emailAddress", "value": "={{ $fromAI('emailAddress', 'Email address to send to', 'eric@agileadtesting.com') }}" },
+          { "name": "subjectLine", "value": "={{ $fromAI('subjectLine', 'Email subject line') }}" }
+        ] }
+      }
+    },
+    {
+      "id": "hub-email-report", "name": "email_report", "type": "@n8n/n8n-nodes-langchain.toolWorkflow", "typeVersion": 2, "position": [240, 600],
+      "parameters": {
+        "workflowId": { "__rl": true, "value": "QAbYfOOd05lyesva", "mode": "id" },
+        "description": "Send a markdown report via email. Input: markdownReportContent, emailAddress, subjectLine.",
+        "fields": { "values": [
+          { "name": "markdownReportContent", "value": "={{ $fromAI('markdownReportContent', 'Markdown content of the report') }}" },
+          { "name": "emailAddress", "value": "={{ $fromAI('emailAddress', 'Recipient email', 'eric@agileadtesting.com') }}" },
+          { "name": "subjectLine", "value": "={{ $fromAI('subjectLine', 'Subject line for the email') }}" }
+        ] }
+      }
+    },
+    {
+      "id": "hub-cover-art", "name": "generate_cover_art", "type": "@n8n/n8n-nodes-langchain.toolWorkflow", "typeVersion": 2, "position": [1080, 400],
+      "parameters": {
+        "workflowId": { "__rl": true, "value": "SxeLHxzvITEKyKc0", "mode": "id" },
+        "description": "Generate genre-specific cover art via DALL-E and email it. Input: imageContext (description), imageTitle (title), genre_slug.",
+        "fields": { "values": [
+          { "name": "imageContext", "value": "={{ $fromAI('imageContext', 'Detailed description of the image to generate') }}" },
+          { "name": "imageTitle", "value": "={{ $fromAI('imageTitle', 'Title for the cover art') }}" },
+          { "name": "genre_slug", "value": "={{ $fromAI('genre_slug', 'Genre: post-apocalyptic, political-scifi, or historical-time-travel') }}" }
+        ] }
+      }
+    },
+    {
+      "id": "hub-social", "name": "repurpose_to_social", "type": "@n8n/n8n-nodes-langchain.toolWorkflow", "typeVersion": 2, "position": [1080, 600],
+      "parameters": {
+        "workflowId": { "__rl": true, "value": "95z13RGuzJDHVNSw", "mode": "id" },
+        "description": "Repurpose content into social media posts for Twitter, LinkedIn, or Instagram. Input: content (text to repurpose), platform (twitter/linkedin/instagram).",
+        "fields": { "values": [
+          { "name": "content", "value": "={{ $fromAI('content', 'The content to repurpose into social posts') }}" },
+          { "name": "platform", "value": "={{ $fromAI('platform', 'Target platform: twitter, linkedin, or instagram') }}" }
+        ] }
+      }
+    },
+    {
+      "id": "hub-blog", "name": "write_blog_post", "type": "@n8n/n8n-nodes-langchain.toolWorkflow", "typeVersion": 2, "position": [480, 600],
+      "parameters": {
+        "workflowId": { "__rl": true, "value": "iMBIWzO2PjsLNH9w", "mode": "id" },
+        "description": "Write an SEO-optimized blog post. Input: topic, genre_slug, keywords, target_length.",
+        "fields": { "values": [
+          { "name": "topic", "value": "={{ $fromAI('topic', 'Blog post topic') }}" },
+          { "name": "genre_slug", "value": "={{ $fromAI('genre_slug', 'Genre slug') }}" },
+          { "name": "keywords", "value": "={{ $fromAI('keywords', 'SEO keywords') }}" },
+          { "name": "target_length", "value": "={{ $fromAI('target_length', 'Target word count', '1500') }}" }
+        ] }
+      }
+    },
+    {
+      "id": "hub-newsletter", "name": "write_newsletter", "type": "@n8n/n8n-nodes-langchain.toolWorkflow", "typeVersion": 2, "position": [680, 600],
+      "parameters": {
+        "workflowId": { "__rl": true, "value": "cjIUEjrqvyGZyKwN", "mode": "id" },
+        "description": "Write a genre-focused newsletter. Input: topic, genre_slug, date.",
+        "fields": { "values": [
+          { "name": "topic", "value": "={{ $fromAI('topic', 'Newsletter topic/theme') }}" },
+          { "name": "genre_slug", "value": "={{ $fromAI('genre_slug', 'Genre slug') }}" },
+          { "name": "date", "value": "={{ $fromAI('date', 'Newsletter date', '') }}" }
+        ] }
+      }
+    },
+    {
+      "id": "hub-short-story", "name": "write_short_story", "type": "@n8n/n8n-nodes-langchain.toolWorkflow", "typeVersion": 2, "position": [880, 600],
+      "parameters": {
+        "workflowId": { "__rl": true, "value": "LTZ63B2H0w8Sl4FW", "mode": "id" },
+        "description": "Write a short story with style matching and scene-by-scene generation. Input: genre_slug, premise, tone, length, style_references, research_topics.",
+        "fields": { "values": [
+          { "name": "genre_slug", "value": "={{ $fromAI('genre_slug', 'Genre slug') }}" },
+          { "name": "premise", "value": "={{ $fromAI('premise', 'Story premise/concept') }}" },
+          { "name": "tone", "value": "={{ $fromAI('tone', 'Desired tone') }}" },
+          { "name": "length", "value": "={{ $fromAI('length', 'Target word count', '3000') }}" },
+          { "name": "style_references", "value": "={{ $fromAI('style_references', 'Authors or works to emulate', '') }}" },
+          { "name": "research_topics", "value": "={{ $fromAI('research_topics', 'Topics needing factual research', '') }}" }
+        ] }
+      }
+    },
+    {
+      "id": "hub-chapter", "name": "write_chapter", "type": "@n8n/n8n-nodes-langchain.toolWorkflow", "typeVersion": 2, "position": [1280, 400],
+      "parameters": {
+        "workflowId": { "__rl": true, "value": "tpj55Sf66jrBPNT8", "mode": "id" },
+        "description": "Write a book chapter with continuity tracking via story bible. Input: genre_slug, project_title, chapter_number, brief, outline, research_topics.",
+        "fields": { "values": [
+          { "name": "genre_slug", "value": "={{ $fromAI('genre_slug', 'Genre slug') }}" },
+          { "name": "project_title", "value": "={{ $fromAI('project_title', 'Book/project title') }}" },
+          { "name": "chapter_number", "value": "={{ $fromAI('chapter_number', 'Chapter number') }}" },
+          { "name": "brief", "value": "={{ $fromAI('brief', 'What happens in this chapter') }}" },
+          { "name": "outline", "value": "={{ $fromAI('outline', 'Full book outline for context', '') }}" },
+          { "name": "research_topics", "value": "={{ $fromAI('research_topics', 'Topics needing factual research', '') }}" }
+        ] }
+      }
+    },
+    {
+      "id": "hub-story-bible", "name": "manage_story_bible", "type": "@n8n/n8n-nodes-langchain.toolWorkflow", "typeVersion": 2, "position": [1280, 600],
+      "parameters": {
+        "workflowId": { "__rl": true, "value": "9cvuhBS412AQRJxf", "mode": "id" },
+        "description": "Read or update the story bible for a book project. Input: operation (get/update), project_title, entries (JSON array for updates).",
+        "fields": { "values": [
+          { "name": "operation", "value": "={{ $fromAI('operation', 'get or update') }}" },
+          { "name": "project_title", "value": "={{ $fromAI('project_title', 'Book/project title') }}" },
+          { "name": "entries", "value": "={{ $fromAI('entries', 'JSON array of story bible entries for update', '[]') }}" }
+        ] }
+      }
+    },
+    {
+      "id": "hub-noop", "name": "no_operation", "type": "n8n-nodes-base.noOp", "typeVersion": 1, "position": [800, 0],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "webhook_trigger": { "main": [[{ "node": "Author Agent", "type": "main", "index": 0 }]] },
+    "chat_trigger": { "main": [[{ "node": "Author Agent", "type": "main", "index": 0 }]] },
+    "gemini-2.5-pro": { "ai_languageModel": [[{ "node": "Author Agent", "type": "ai_languageModel", "index": 0 }]] },
+    "memory": { "ai_memory": [[{ "node": "Author Agent", "type": "ai_memory", "index": 0 }]] },
+    "think": { "ai_tool": [[{ "node": "Author Agent", "type": "ai_tool", "index": 0 }]] },
+    "deep_research": { "ai_tool": [[{ "node": "Author Agent", "type": "ai_tool", "index": 0 }]] },
+    "email_report": { "ai_tool": [[{ "node": "Author Agent", "type": "ai_tool", "index": 0 }]] },
+    "generate_cover_art": { "ai_tool": [[{ "node": "Author Agent", "type": "ai_tool", "index": 0 }]] },
+    "repurpose_to_social": { "ai_tool": [[{ "node": "Author Agent", "type": "ai_tool", "index": 0 }]] },
+    "write_blog_post": { "ai_tool": [[{ "node": "Author Agent", "type": "ai_tool", "index": 0 }]] },
+    "write_newsletter": { "ai_tool": [[{ "node": "Author Agent", "type": "ai_tool", "index": 0 }]] },
+    "write_short_story": { "ai_tool": [[{ "node": "Author Agent", "type": "ai_tool", "index": 0 }]] },
+    "write_chapter": { "ai_tool": [[{ "node": "Author Agent", "type": "ai_tool", "index": 0 }]] },
+    "manage_story_bible": { "ai_tool": [[{ "node": "Author Agent", "type": "ai_tool", "index": 0 }]] },
+    "Author Agent": { "main": [[{ "node": "no_operation", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1", "callerPolicy": "workflowsFromSameOwner" }
+}
