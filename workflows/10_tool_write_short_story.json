@@ -2,14 +2,6 @@
   "name": "Tool - Write Short Story",
   "nodes": [
     {
-      "id": "ss-trigger",
-      "name": "workflow_trigger",
-      "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1.1,
-      "position": [
-        0,
-        0
-      ],
       "parameters": {
         "workflowInputs": {
           "values": [
@@ -33,17 +25,17 @@
             }
           ]
         }
-      }
+      },
+      "id": "ss-trigger",
+      "name": "workflow_trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
     },
     {
-      "id": "ss-settings",
-      "name": "settings",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        120,
-        0
-      ],
       "parameters": {
         "assignments": {
           "assignments": [
@@ -62,27 +54,19 @@
           ]
         },
         "options": {}
-      }
+      },
+      "id": "ss-settings",
+      "name": "settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        128,
+        0
+      ]
     },
     {
-      "id": "ss-genre",
-      "name": "get_genre_config",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        240,
-        0
-      ],
       "parameters": {
-        "method": "GET",
-        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/genre_config?genre_slug=eq.{{ $json.genre_slug }}&limit=1",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
-        },
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/genre_config?genre_slug=eq.{{ $('workflow_trigger').item.json.genre_slug }}&limit=1",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -95,10 +79,38 @@
               "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
             }
           ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
         }
-      }
+      },
+      "id": "ss-genre",
+      "name": "get_genre_config",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        304,
+        0
+      ]
     },
     {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "rq1",
+              "name": "research_query",
+              "value": "=Research for a {{ $('get_genre_config').first().json.genre_name || $('get_genre_config').first().json[0]?.genre_name }} short story about: {{ $('workflow_trigger').item.json.premise }}. Provide factual details about: {{ $('workflow_trigger').item.json.research_topics || $('workflow_trigger').item.json.premise }}. Include scientific accuracy, historical details, cultural context, and sensory details useful for fiction writing.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
       "id": "ss-research-query",
       "name": "build_research_query",
       "type": "n8n-nodes-base.set",
@@ -106,99 +118,81 @@
       "position": [
         480,
         0
-      ],
+      ]
+    },
+    {
       "parameters": {
-        "assignments": {
-          "assignments": [
+        "messages": {
+          "message": [
             {
-              "id": "rq1",
-              "name": "research_query",
-              "value": "=Research for a {{ $('get_genre_config').first().json[0]?.genre_name }} short story about: {{ $('workflow_trigger').item.json.premise }}. Provide factual details about: {{ $('workflow_trigger').item.json.research_topics || $('workflow_trigger').item.json.premise }}. Include scientific accuracy, historical details, cultural context, and sensory details useful for fiction writing.",
-              "type": "string"
+              "content": "=You are a research assistant. Provide detailed, factual information with citations useful for fiction writing.",
+              "role": "system"
+            },
+            {
+              "content": "={{ $json.research_query }}"
             }
           ]
         },
-        "options": {}
-      }
-    },
-    {
+        "simplify": true,
+        "options": {
+          "temperature": 0.1,
+          "searchRecency": "month"
+        },
+        "requestOptions": {}
+      },
       "id": "ss-research",
       "name": "research_topic",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.perplexity",
+      "typeVersion": 1,
       "position": [
         720,
         0
       ],
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.perplexity.ai/chat/completions",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendBody": true,
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ model: 'sonar-reasoning', messages: [{ role: 'user', content: $json.research_query }] }) }}",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
+      "credentials": {
+        "perplexityApi": {
+          "id": "ggr9QCRobQVA6Lwb",
+          "name": "Perplexity account"
         }
       }
     },
     {
+      "parameters": {
+        "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey };\n\nlet files = [];\ntry {\n  const listResp = await this.helpers.httpRequest({\n    method: 'POST',\n    url: supabaseUrl + '/storage/v1/object/list/author-content',\n    headers: { ...headers, 'Content-Type': 'application/json' },\n    body: { prefix: 'writing-samples', limit: 20 },\n    returnFullResponse: false\n  });\n  files = (listResp || []).filter(f => f.name && f.name !== '.gitkeep' && f.metadata?.size > 0);\n} catch (e) {\n  return [{ json: { samples_text: 'No writing samples available.', sample_count: 0 } }];\n}\n\nif (files.length === 0) {\n  return [{ json: { samples_text: 'No writing samples available.', sample_count: 0 } }];\n}\n\nconst samples = [];\nfor (const file of files.slice(0, 5)) {\n  try {\n    const content = await this.helpers.httpRequest({\n      method: 'GET',\n      url: supabaseUrl + '/storage/v1/object/author-content/writing-samples/' + file.name,\n      headers: headers,\n      returnFullResponse: false,\n      encoding: 'utf-8',\n      json: false\n    });\n    samples.push('--- ' + file.name + ' ---\\n' + (typeof content === 'string' ? content : JSON.stringify(content)));\n  } catch (e) {}\n}\n\nconst samplesText = samples.length > 0 ? samples.join('\\n\\n') : 'No writing samples available.';\nreturn [{ json: { samples_text: samplesText, sample_count: samples.length } }];"
+      },
       "id": "ss-samples",
       "name": "fetch_writing_samples",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         960,
         160
-      ],
-      "parameters": {
-        "method": "GET",
-        "url": "={{ $('settings').item.json.SUPABASE_URL }}/storage/v1/object/list/author-content/writing-samples/",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
-            }
-          ]
-        }
-      }
+      ]
     },
     {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze these writing samples and extract the author's distinctive style guidelines:\n\nSamples found: {{ $json.sample_count || 0 }}\n\n{{ $json.samples_text }}\n\nIf no samples are available, describe a general literary fiction style with vivid imagery and strong character voice.\n\nExtract and summarize: Voice, Pacing, Sentence structure, Dialogue style, Literary devices, Paragraph structure, Formatting rules.",
+        "batching": {}
+      },
       "id": "ss-style",
       "name": "style_analysis",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.7,
       "position": [
-        1200,
+        1152,
         160
-      ],
-      "parameters": {
-        "promptType": "define",
-        "text": "=Analyze these writing samples and extract the author's distinctive style:\n\nSamples found: {{ $json.length || 0 }}\nSample names: {{ $json.map?.(s => s.name)?.join(', ') || 'No samples available' }}\n\nIf no samples are available, describe a general literary fiction style with vivid imagery and strong character voice.\n\nExtract: Voice, Pacing, Sentence structure, Dialogue style, Literary devices, Paragraph structure.",
-        "hasOutputParser": false,
-        "batching": {}
-      }
+      ]
     },
     {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-4-20250514",
+          "mode": "list",
+          "cachedResultName": "Claude Sonnet 4"
+        },
+        "options": {}
+      },
       "id": "ss-style-claude",
       "name": "claude-sonnet-style",
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
@@ -207,17 +201,20 @@
         1200,
         368
       ],
-      "parameters": {
-        "model": {
-          "__rl": true,
-          "value": "claude-sonnet-4-20250514",
-          "mode": "list",
-          "cachedResultName": "Claude Sonnet 4"
-        },
-        "options": {}
+      "credentials": {
+        "anthropicApi": {
+          "id": "5LhCYKsaFO3fF7II",
+          "name": "Anthropic account"
+        }
       }
     },
     {
+      "parameters": {
+        "workflowId": {
+          "value": "iLuMoCq0tNJJAH5n"
+        },
+        "options": {}
+      },
       "id": "ss-content",
       "name": "get_recent_content",
       "type": "n8n-nodes-base.executeWorkflow",
@@ -226,98 +223,37 @@
         960,
         -160
       ],
-      "parameters": {
-        "workflowId": {
-          "value": "iLuMoCq0tNJJAH5n"
-        },
-        "fields": {
-          "values": [
-            {
-              "name": "genre_slug",
-              "value": "={{ $('workflow_trigger').item.json.genre_slug }}"
-            },
-            {
-              "name": "date",
-              "value": "={{ $now.minus(14, 'days').format('yyyy-MM-dd') }}"
-            }
-          ]
-        }
-      }
+      "onError": "continueRegularOutput"
     },
     {
+      "parameters": {
+        "jsCode": "const research = $('research_topic').first().json.message || '';\nconst style = $('style_analysis').first().json.output || $('style_analysis').first().json.text || '';\nconst trigger = $('workflow_trigger').first().json;\nconst genre = $('get_genre_config').first().json;\nconst genreData = Array.isArray(genre) ? genre[0] : genre;\nconst genreName = genreData?.genre_name || 'Science Fiction';\nconst guidelines = genreData?.writing_guidelines || '';\nconst length = parseInt(trigger.length) || 3000;\n\nconst prompt = `You are a world-class science fiction author.\n\n## Genre\n${genreName}\n\n## Genre Guidelines\n${guidelines}\n\n## Research\n${research}\n\n## Writing Style\n${style}\n\n## Assignment\nWrite a complete short story of approximately ${length} words.\n\n- Premise: ${trigger.premise}\n- Tone: ${trigger.tone}\n- Target length: ${length} words\n\n## Structure\nWrite the story with natural scene breaks (use --- between scenes). Include:\n1. Opening: Establish the world, introduce the protagonist\n2. Rising action: Develop conflict, deepen character\n3. Climax and resolution\n\nWrite the story text directly. No JSON wrapping, no metadata, no scene labels. Just the story.`;\n\nreturn [{ json: { prompt: prompt, title: trigger.premise?.split(' ').slice(0, 5).join(' ') || 'Untitled' } }];"
+      },
       "id": "ss-plan",
-      "name": "plan_scenes",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "name": "build_story_prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         1440,
         0
-      ],
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "ps1",
-              "name": "scene_plan",
-              "value": "={{ JSON.stringify((() => {\n  const length = parseInt($('workflow_trigger').item.json.length) || 3000;\n  const numScenes = Math.max(3, Math.min(7, Math.ceil(length / 1000)));\n  const scenes = [];\n  for (let i = 1; i <= numScenes; i++) {\n    scenes.push({ scene_number: i, total_scenes: numScenes, brief: i === 1 ? 'Opening: Establish the world, introduce protagonist.' : i === numScenes ? 'Climax and resolution.' : 'Scene ' + i + ': Develop conflict, deepen character.' });\n  }\n  return scenes;\n})()) }}",
-              "type": "string"
-            },
-            {
-              "id": "ps2",
-              "name": "research_results",
-              "value": "={{ $('research_topic').item.json.choices?.[0]?.message?.content || '' }}",
-              "type": "string"
-            },
-            {
-              "id": "ps3",
-              "name": "style_results",
-              "value": "={{ $('style_analysis').item.json.output || $('style_analysis').item.json.text || '' }}",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      }
+      ]
     },
     {
-      "id": "ss-iterate",
-      "name": "iterate_scenes",
-      "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3,
-      "position": [
-        1680,
-        0
-      ],
       "parameters": {
-        "batchSize": 1,
-        "options": {}
-      }
-    },
-    {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "batching": {}
+      },
       "id": "ss-write",
-      "name": "write_scene",
+      "name": "write_story",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.7,
       "position": [
-        1920,
+        1680,
         0
-      ],
-      "parameters": {
-        "promptType": "define",
-        "text": "=You are a world-class science fiction author writing scene {{ $json.scene_number || 1 }} of {{ $json.total_scenes || 5 }}.\n\n## Genre\n{{ $('get_genre_config').first().json[0]?.genre_name }}\n\n## Guidelines\n{{ $('get_genre_config').first().json[0]?.writing_guidelines }}\n\n## Research\n{{ $('plan_scenes').item.json.research_results }}\n\n## Style\n{{ $('plan_scenes').item.json.style_results }}\n\n## Story\n- Premise: {{ $('workflow_trigger').item.json.premise }}\n- Tone: {{ $('workflow_trigger').item.json.tone }}\n- Length: {{ $('workflow_trigger').item.json.length }} words total\n\n## Scene Brief\n{{ $json.brief || 'Continue the story.' }}\n\nWrite the scene text directly. No JSON wrapping.",
-        "hasOutputParser": false,
-        "batching": {}
-      }
+      ]
     },
     {
-      "id": "ss-write-claude",
-      "name": "claude-sonnet-write",
-      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
-      "typeVersion": 1.3,
-      "position": [
-        1920,
-        208
-      ],
       "parameters": {
         "model": {
           "__rl": true,
@@ -326,103 +262,202 @@
           "cachedResultName": "Claude Sonnet 4"
         },
         "options": {
-          "maxTokensToSample": 8000
+          "maxTokensToSample": 16000
+        }
+      },
+      "id": "ss-write-claude",
+      "name": "claude-sonnet-write",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        1680,
+        208
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "5LhCYKsaFO3fF7II",
+          "name": "Anthropic account"
         }
       }
     },
     {
-      "id": "ss-aggregate",
-      "name": "aggregate_scenes",
-      "type": "n8n-nodes-base.aggregate",
-      "typeVersion": 1,
-      "position": [
-        2160,
-        0
-      ],
       "parameters": {
-        "aggregate": "aggregateAllItemData",
-        "options": {}
-      }
-    },
-    {
+        "jsCode": "const storyText = $input.first().json.output || $input.first().json.text || '';\nconst title = $('build_story_prompt').first().json.title || 'Untitled';\nconst trigger = $('workflow_trigger').first().json;\nconst genre = $('get_genre_config').first().json;\nconst genreData = Array.isArray(genre) ? genre[0] : genre;\nconst genreName = genreData?.genre_name || 'Science Fiction';\n\n// Extract the opening scene (first ~300 words) for visual reference\nconst openingScene = storyText.split(/\\n---\\n|\\n\\n/)[0]?.substring(0, 1200) || storyText.substring(0, 1200);\n\n// Build a rich visual image description from the story content\nconst imagePrompt = `A cinematic, atmospheric cover image for a ${genreName} short story titled \"${title}\".\n\nStory premise: ${trigger.premise}\nTone: ${trigger.tone || 'literary'}\n\nKey scene from the opening:\n${openingScene}\n\nCreate a single powerful visual scene that captures the mood, setting, and central tension of this story. Focus on the most visually striking moment \u2014 the environment, lighting, character silhouettes, and atmospheric details. Do NOT include any text, titles, or words in the image.`;\n\nreturn [{ json: { story_text: storyText, title: title, image_prompt: imagePrompt } }];"
+      },
       "id": "ss-full",
       "name": "set_full_story",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
-        2400,
+        1920,
         0
-      ],
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "sf1",
-              "name": "story_text",
-              "value": "={{ $json.data?.map(s => s.output || s.text || '').join('\\n\\n---\\n\\n') || '' }}",
-              "type": "string"
-            },
-            {
-              "id": "sf2",
-              "name": "title",
-              "value": "={{ $('workflow_trigger').item.json.premise?.split(' ').slice(0, 5).join(' ') || 'Untitled' }}",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      }
+      ]
     },
     {
-      "id": "ss-save",
-      "name": "save_draft",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        2640,
-        0
-      ],
       "parameters": {
         "method": "POST",
-        "url": "={{ $('settings').item.json.SUPABASE_URL }}/storage/v1/object/author-content/drafts/story_{{ $json.title?.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50) || 'untitled' }}_{{ $now.format('yyyy-MM-dd') }}.md",
-        "sendBody": true,
-        "contentType": "raw",
-        "rawContentType": "text/markdown",
-        "body": "={{ $json.story_text }}",
-        "options": {},
+        "url": "={{ $('settings').first().json.SUPABASE_URL }}/storage/v1/object/author-content/drafts/story_{{ $json.title?.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50) || 'untitled' }}_{{ $now.format('yyyy-MM-dd_HHmmss') }}.md",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+              "value": "={{ $('settings').first().json.SUPABASE_API_KEY }}"
             },
             {
               "name": "Authorization",
-              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+              "value": "=Bearer {{ $('settings').first().json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "x-upsert",
+              "value": "true"
             }
           ]
-        }
-      }
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/markdown",
+        "body": "={{ $json.story_text }}",
+        "options": {}
+      },
+      "id": "ss-save",
+      "name": "save_draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2160,
+        0
+      ]
     },
     {
+      "parameters": {
+        "sendTo": "eric@agileadtesting.com",
+        "subject": "=Short Story Draft: {{ $('set_full_story').first().json.title }}",
+        "message": "={{ $('set_full_story').first().json.story_text.replace(/\\n/g, '<br>') }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
       "id": "ss-email",
       "name": "send_email",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        2880,
+        2640,
         0
       ],
-      "parameters": {
-        "operation": "send",
-        "sendTo": "eric@agileadtesting.com",
-        "subject": "=Short Story Draft: {{ $('set_full_story').item.json.title }}",
-        "message": "={{ $('set_full_story').item.json.story_text.replace(/\\n/g, '<br>') }}",
-        "options": {
-          "appendAttribution": false
+      "webhookId": "161a2317-1fdf-494b-b9c5-cb8a60825107",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "CPCSZOInV8Zj1PI1",
+          "name": "Gmail account"
         }
       }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "value": "SxeLHxzvITEKyKc0"
+        },
+        "options": {},
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "story_title": "={{ $('set_full_story').first().json.title }}",
+            "image_description": "={{ $('set_full_story').first().json.image_prompt }}",
+            "genre_slug": "={{ $('workflow_trigger').first().json.genre_slug }}",
+            "content_type": "Short Story"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "image_description",
+              "displayName": "image_description",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "story_title",
+              "displayName": "story_title",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "genre_slug",
+              "displayName": "genre_slug",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "content_type",
+              "displayName": "content_type",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            }
+          ]
+        }
+      },
+      "id": "ss-cover",
+      "name": "generate_cover_image",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2160,
+        240
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "sr1",
+              "name": "result",
+              "value": "=Short story written, saved, emailed, and cover art generated: {{ $('set_full_story').first().json.title }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ss-result",
+      "name": "set_result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\n\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: supabaseUrl + '/rest/v1/published_content',\n    headers,\n    body: {\n      title: $('set_full_story').first().json.title,\n      content_type: 'short_story',\n      genre_slug: $('workflow_trigger').first().json.genre_slug,\n      content_text: $('set_full_story').first().json.story_text,\n      storage_path: $json.Key || '',\n      project_id: null,\n      chapter_number: null,\n      status: 'draft'\n    }\n  });\n} catch (e) {\n  // Don't fail the workflow if draft insert fails\n}\n\nreturn $input.all();"
+      },
+      "id": "ss-draft",
+      "name": "insert_draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        0
+      ]
     }
   ],
   "connections": {
@@ -512,7 +547,7 @@
       "main": [
         [
           {
-            "node": "plan_scenes",
+            "node": "build_story_prompt",
             "type": "main",
             "index": 0
           }
@@ -523,36 +558,18 @@
       "main": [
         [
           {
-            "node": "plan_scenes",
+            "node": "build_story_prompt",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "plan_scenes": {
+    "build_story_prompt": {
       "main": [
         [
           {
-            "node": "iterate_scenes",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "iterate_scenes": {
-      "main": [
-        [
-          {
-            "node": "write_scene",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "aggregate_scenes",
+            "node": "write_story",
             "type": "main",
             "index": 0
           }
@@ -563,25 +580,14 @@
       "ai_languageModel": [
         [
           {
-            "node": "write_scene",
+            "node": "write_story",
             "type": "ai_languageModel",
             "index": 0
           }
         ]
       ]
     },
-    "write_scene": {
-      "main": [
-        [
-          {
-            "node": "iterate_scenes",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "aggregate_scenes": {
+    "write_story": {
       "main": [
         [
           {
@@ -599,11 +605,49 @@
             "node": "save_draft",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "generate_cover_image",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
     },
     "save_draft": {
+      "main": [
+        [
+          {
+            "node": "insert_draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send_email": {
+      "main": [
+        [
+          {
+            "node": "set_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "generate_cover_image": {
+      "main": [
+        [
+          {
+            "node": "set_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "insert_draft": {
       "main": [
         [
           {
@@ -617,6 +661,9 @@
   },
   "settings": {
     "executionOrder": "v1",
-    "callerPolicy": "workflowsFromSameOwner"
-  }
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "pinData": {}
 }

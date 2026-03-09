@@ -4,7 +4,7 @@
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "author-agent",
+        "path": "author_request",
         "options": {}
       },
       "id": "hub-webhook",
@@ -12,8 +12,8 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        0,
-        0
+        256,
+        -384
       ],
       "webhookId": "87c552c6-3d64-47e4-898a-76d42d2bc30a"
     },
@@ -26,17 +26,17 @@
       "type": "@n8n/n8n-nodes-langchain.chatTrigger",
       "typeVersion": 1.1,
       "position": [
-        0,
-        208
+        240,
+        -160
       ],
       "webhookId": "51ef2658-ee92-49bc-affd-03821bdcc4cb"
     },
     {
       "parameters": {
         "promptType": "define",
-        "text": "={{ $json.chatInput || $json.body?.message || $json.message }}",
+        "text": "={{ $json.chatInput || $json.body?.user_message_request || $json.body.user_message_request}}",
         "options": {
-          "systemMessage": "You are The Author Agent, a specialized AI writing assistant for science fiction. You help plan, research, write, and manage fiction and non-fiction content across three genre niches: Post-Apocalyptic Science Fiction, Political Science Fiction, and Historical Time Travel.\n\n## Your Capabilities\n- **Research**: Use deep_research for comprehensive topic research, email_report to deliver findings\n- **Writing**: write_blog_post, write_newsletter, write_short_story, write_chapter for different formats\n- **Visual**: generate_cover_art for genre-specific book/story cover images\n- **Distribution**: repurpose_to_social for Twitter/LinkedIn/Instagram posts\n- **Continuity**: manage_story_bible to track characters, events, locations across chapters\n\n## Genre Slugs\n- post-apocalyptic\n- political-scifi\n- historical-time-travel\n\n## Workflow\n1. When asked to write, ALWAYS ask which genre first if not specified\n2. For fiction: brainstorm → outline → research → write\n3. For non-fiction: research → outline → write\n4. For books: create a project, establish story bible, then write chapter by chapter\n5. Always email results to eric@agileadtesting.com\n\n## Rules\n- Use Claude Sonnet for all writing tasks\n- Use Perplexity for research\n- Save all drafts to Supabase storage\n- Track content provenance (what sources informed what output)\n- Maintain story bible consistency across chapters"
+          "systemMessage": "=You are The Author Agent, a specialized AI writing assistant. You help plan, research, write, and manage fiction and non-fiction content across multiple genres.\n\nToday's date is {{ $now.format('yyyy-MM-dd') }}. You are operating in the year {{ $now.format('yyyy') }}.\n\n## AVAILABLE GENRES\nEach genre has a slug you must pass to writing tools. Match the user's request to the best genre:\n\n| Genre Slug | Genre Name | Matches These Topics |\n|---|---|---|\n| post-apocalyptic | Post-Apocalyptic Sci-Fi | apocalypse, survival, wasteland, collapse, dystopian, extinction, plague, fallout |\n| political-scifi | Political Sci-Fi | politics in space, empire, republic, governance, revolution, propaganda, insurgency, diplomacy |\n| historical-time-travel | Historical Time Travel | time travel, past lives, romance across eras, historical periods, paradox, alternate history, reincarnation |\n| ai-marketing | AI & Marketing Technology | artificial intelligence, AI tools, marketing automation, LLM, martech, generative AI, content marketing |\n| political-history | Political & Historical Events | geopolitics, political history, revolution, democracy, elections, cold war, historical analysis |\n| ancient-history | Ancient History & Historical Novels | ancient Rome, Greece, Egypt, Mesopotamia, medieval, archaeology, classical antiquity, historical fiction |\n\n## INTERPRETING VOICE COMMANDS\nUsers often speak casually via voice. Interpret their intent:\n- Map loose descriptions to the closest genre_slug using the table above\n- If the topic spans multiple genres or doesn't clearly match one, ask: \"That sounds like it could fit [genre A] or [genre B]. Which genre would you like me to use?\"\n- If the user names a genre that doesn't exist yet, say: \"That genre isn't configured yet. The available genres are: [list]. Which is the closest fit, or would you like me to add a new genre?\"\n- Extract the core request even when the voice transcription is messy or repetitive\n\n## CRITICAL RULES FOR TOOL USAGE\n- When asked to research ANY topic, you MUST use the deep_research_topic tool. NEVER answer research questions from your own knowledge. Your training data is outdated \u2014 always use the tool for current information.\n- After completing research, ALWAYS save the report using manage_research_reports (operation: save) so it can be referenced and modified later.\n- When asked to modify, update, or expand a previous research report, use manage_research_reports (operation: get) to retrieve it, then update it (operation: update) after making changes.\n- When asked to write content, you MUST use the appropriate writing tool (write_blog_post, write_newsletter, write_short_story, write_chapter). Do NOT write content directly in chat.\n- When asked to send an email, you MUST use the email_report tool.\n- When asked to create images, you MUST use the generate_cover_art tool.\n- When asked to create social posts, you MUST use the repurpose_to_social tool.\n- When asked about a story bible, you MUST use the manage_story_bible tool.\n\n## Handling Empty or Error Results\n- If manage_story_bible returns empty or an error for a project, tell the user: \"This project doesn't exist in the database yet. To get started, I can help you brainstorm and outline your book. Once we have characters, locations, and plot threads defined, I'll save them to the story bible using manage_story_bible (operation: update). You can also ask me to write chapter 1, which will automatically create the project and begin populating the story bible.\"\n- If manage_research_reports returns empty on a list operation, tell the user: \"No research reports saved yet. Ask me to research any topic and I'll save the results automatically.\"\n- If a writing tool fails because genre_config is empty, tell the user the genre needs to be configured in the Supabase database first.\n- NEVER say \"there was an error\" without explaining what the user can do about it.\n\n## Your Capabilities\n- **Research**: Use deep_research_topic for comprehensive topic research with citations. Use manage_research_reports to save/retrieve/update/list research reports. Use email_report to deliver findings via email.\n- **Writing**: write_blog_post, write_newsletter, write_short_story, write_chapter for different formats\n- **Visual**: generate_cover_art for genre-specific book/story cover images\n- **Distribution**: repurpose_to_social for Twitter/LinkedIn/Instagram posts\n- **Continuity**: manage_story_bible to track characters, events, locations across chapters\n\n## Story Bible Workflow\nThe story bible tracks characters, locations, events, plot threads, timeline entries, and world rules for a book project. Here is how it works:\n1. **Starting a new book**: Brainstorm the concept in conversation. Once you have key elements, save them with manage_story_bible (operation: update) with entries like: [{\"entry_type\": \"character\", \"name\": \"...\", \"description\": \"...\", \"chapter_introduced\": 1}]\n2. **Before writing a chapter**: Always retrieve the story bible first with manage_story_bible (operation: get) to ensure continuity.\n3. **After writing a chapter**: Update the story bible with any new characters, locations, events, or plot developments introduced in that chapter.\n4. **Entry types**: character, event, location, timeline, plot_thread, world_rule\n\n## Workflow\n1. When asked to write, infer the genre from context using the genre table above. If ambiguous, ask which genre to use and present the options clearly.\n2. For fiction: brainstorm > outline > research > write\n3. For non-fiction: research > outline > write\n4. For books: create a project, establish story bible, then write chapter by chapter\n5. Always email results to eric@agileadtesting.com\n\n## Rules\n- Use Claude Sonnet for all writing tasks\n- Use deep_research_topic (Perplexity) for ALL factual research - it returns answers with citations\n- Always save research reports via manage_research_reports after completing research\n- Save all drafts to Supabase storage\n- Track content provenance (what sources informed what output)\n- Maintain story bible consistency across chapters"
         }
       },
       "id": "hub-agent",
@@ -44,34 +44,8 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 1.7,
       "position": [
-        480,
-        0
-      ]
-    },
-    {
-      "parameters": {},
-      "id": "hub-gemini",
-      "name": "gemini-2.5-pro",
-      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
-      "typeVersion": 1.1,
-      "position": [
-        480,
-        400
-      ]
-    },
-    {
-      "parameters": {
-        "sessionIdType": "customKey",
-        "sessionKey": "author-agent",
-        "contextWindowLength": 20
-      },
-      "id": "hub-memory",
-      "name": "memory",
-      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
-      "typeVersion": 1.3,
-      "position": [
-        688,
-        400
+        832,
+        -288
       ]
     },
     {
@@ -81,13 +55,14 @@
       "type": "@n8n/n8n-nodes-langchain.toolThink",
       "typeVersion": 1,
       "position": [
-        880,
-        400
+        288,
+        240
       ]
     },
     {
       "parameters": {
-        "description": "Deep research on any topic. Sends a detailed markdown report via email. Input: topic (string), emailAddress (string, default: eric@agileadtesting.com), subjectLine (string).",
+        "name": "email_report",
+        "description": "Send a markdown report via email. Input: markdownReportContent (the full markdown text), emailAddress (default: eric@agileadtesting.com), subjectLine (email subject).",
         "workflowId": {
           "__rl": true,
           "value": "QAbYfOOd05lyesva",
@@ -95,83 +70,180 @@
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
-          "value": {},
+          "value": {
+            "markdownReportContent": "={{ $fromAI('markdownReportContent', 'The full markdown content for the report', 'string') }}",
+            "emailAddress": "={{ $fromAI('emailAddress', 'The email address to send to, default eric@agileadtesting.com', 'string') }}",
+            "subjectLine": "={{ $fromAI('subjectLine', 'The email subject line', 'string') }}"
+          },
           "matchingColumns": [],
-          "schema": [],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "name": "deep_research"
-      },
-      "id": "hub-deep-research",
-      "name": "deep_research",
-      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
-      "typeVersion": 2,
-      "position": [
-        240,
-        400
-      ]
-    },
-    {
-      "parameters": {
-        "description": "Send a markdown report via email. Input: markdownReportContent, emailAddress, subjectLine.",
-        "workflowId": {
-          "__rl": true,
-          "value": "QAbYfOOd05lyesva",
-          "mode": "id"
-        },
-        "name": "email_report"
+          "schema": [
+            {
+              "id": "markdownReportContent",
+              "displayName": "markdownReportContent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "emailAddress",
+              "displayName": "emailAddress",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "subjectLine",
+              "displayName": "subjectLine",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
       },
       "id": "hub-email-report",
       "name": "email_report",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2,
       "position": [
-        240,
-        608
+        1744,
+        256
       ]
     },
     {
       "parameters": {
-        "description": "Generate genre-specific cover art via DALL-E and email it. Input: imageContext (description), imageTitle (title), genre_slug.",
+        "name": "generate_cover_art",
+        "description": "Generate genre-specific cover art via DALL-E and email it. Input: image_description (description of the image), story_title (title for the content), content_type (Blog Post, Short Story, Book Chapter, Social Media Post), genre_slug (any active genre slug).",
         "workflowId": {
-          "__rl": true,
           "value": "SxeLHxzvITEKyKc0",
+          "__rl": true,
           "mode": "id"
         },
-        "name": "generate_cover_art"
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "image_description": "={{ $fromAI('image_description', 'Detailed description of the image to generate', 'string') }}",
+            "story_title": "={{ $fromAI('story_title', 'Title of the content this art is for', 'string') }}",
+            "genre_slug": "={{ $fromAI('genre_slug', 'Genre slug from the available genres table in the system prompt', 'string') }}",
+            "content_type": "={{ $fromAI('content_type', 'Type of content: Blog Post, Short Story, Book Chapter, or Social Media Post', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "image_description",
+              "displayName": "image_description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "story_title",
+              "displayName": "story_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "genre_slug",
+              "displayName": "genre_slug",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "content_type",
+              "displayName": "content_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
       },
       "id": "hub-cover-art",
       "name": "generate_cover_art",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2,
       "position": [
-        1088,
-        400
+        480,
+        240
       ]
     },
     {
       "parameters": {
-        "description": "Repurpose content into social media posts for Twitter, LinkedIn, or Instagram. Input: content (text to repurpose), platform (twitter/linkedin/instagram).",
+        "name": "repurpose_to_social",
+        "description": "Repurpose content into social media posts for Twitter, LinkedIn, Facebook, or Instagram. ALWAYS use this tool for social post creation \u2014 never write posts directly in chat. Input: content (text to repurpose), platform (twitter, linkedin, facebook, or instagram), genre_slug (optional, used for image generation).",
         "workflowId": {
           "__rl": true,
           "value": "95z13RGuzJDHVNSw",
           "mode": "id"
         },
-        "name": "repurpose_to_social"
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "content": "={{ $fromAI('content', 'The content to repurpose into social posts', 'string') }}",
+            "platform": "={{ $fromAI('platform', 'Target platform: twitter, linkedin, facebook, or instagram', 'string') }}",
+            "genre_slug": "={{ $fromAI('genre_slug', 'Genre slug from the available genres table in the system prompt', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "content",
+              "displayName": "content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "platform",
+              "displayName": "platform",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "genre_slug",
+              "displayName": "genre_slug",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
       },
       "id": "hub-social",
       "name": "repurpose_to_social",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2,
       "position": [
-        1088,
-        608
+        656,
+        240
       ]
     },
     {
       "parameters": {
-        "description": "Write an SEO-optimized blog post. Input: topic, genre_slug, keywords, target_length.",
+        "name": "write_blog_post",
+        "description": "Write an SEO-optimized blog post. Input: topic (blog post topic), genre_slug (any active genre slug), keywords (comma-separated SEO keywords), target_length (word count).",
         "workflowId": {
           "__rl": true,
           "value": "iMBIWzO2PjsLNH9w",
@@ -179,97 +251,338 @@
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
-          "value": {},
+          "value": {
+            "topic": "={{ $fromAI('topic', 'The blog post topic', 'string') }}",
+            "genre_slug": "={{ $fromAI('genre_slug', 'Genre slug from the available genres table in the system prompt', 'string') }}",
+            "keywords": "={{ $fromAI('keywords', 'Comma-separated SEO keywords', 'string') }}",
+            "target_length": "={{ $fromAI('target_length', 'Target word count', 'string') }}"
+          },
           "matchingColumns": [],
-          "schema": [],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "name": "write_blog_post"
+          "schema": [
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "genre_slug",
+              "displayName": "genre_slug",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "keywords",
+              "displayName": "keywords",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "target_length",
+              "displayName": "target_length",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
       },
       "id": "hub-blog",
       "name": "write_blog_post",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2,
       "position": [
-        480,
-        608
+        704,
+        448
       ]
     },
     {
       "parameters": {
-        "description": "Write a genre-focused newsletter. Input: topic, genre_slug, date.",
+        "name": "write_newsletter",
+        "description": "Write a genre-focused newsletter. Input: topic (newsletter theme), genre_slug (any active genre slug), date (YYYY-MM-DD).",
         "workflowId": {
           "__rl": true,
           "value": "cjIUEjrqvyGZyKwN",
           "mode": "id"
         },
-        "name": "write_newsletter"
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "topic": "={{ $fromAI('topic', 'The newsletter theme or topic', 'string') }}",
+            "genre_slug": "={{ $fromAI('genre_slug', 'Genre slug from the available genres table in the system prompt', 'string') }}",
+            "date": "={{ $fromAI('date', 'Newsletter date in YYYY-MM-DD format', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "genre_slug",
+              "displayName": "genre_slug",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
       },
       "id": "hub-newsletter",
       "name": "write_newsletter",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2,
       "position": [
-        688,
-        608
+        928,
+        240
       ]
     },
     {
       "parameters": {
-        "description": "Write a short story with style matching and scene-by-scene generation. Input: genre_slug, premise, tone, length, style_references, research_topics.",
+        "name": "write_short_story",
+        "description": "Write a short story with style matching and scene-by-scene generation. Input: genre_slug (any active genre slug), premise (story premise), tone (e.g. literary, dark, hopeful), length (target word count), research_topics (JSON array of topics to research).",
         "workflowId": {
           "__rl": true,
           "value": "LTZ63B2H0w8Sl4FW",
           "mode": "id"
         },
-        "name": "write_short_story"
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "genre_slug": "={{ $fromAI('genre_slug', 'Genre slug from the available genres table in the system prompt', 'string') }}",
+            "premise": "={{ $fromAI('premise', 'The story premise and plot summary', 'string') }}",
+            "tone": "={{ $fromAI('tone', 'Desired tone: literary, dark, hopeful, etc', 'string') }}",
+            "length": "={{ $fromAI('length', 'Target word count', 'string') }}",
+            "research_topics": "={{ $fromAI('research_topics', 'JSON array of research topics for factual grounding', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "genre_slug",
+              "displayName": "genre_slug",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "premise",
+              "displayName": "premise",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tone",
+              "displayName": "tone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "length",
+              "displayName": "length",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "research_topics",
+              "displayName": "research_topics",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
       },
       "id": "hub-short-story",
       "name": "write_short_story",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2,
       "position": [
-        880,
-        608
+        1056,
+        336
       ]
     },
     {
       "parameters": {
-        "description": "Write a book chapter with continuity tracking via story bible. Input: genre_slug, project_title, chapter_number, brief, outline, research_topics.",
+        "name": "write_chapter",
+        "description": "Write a book chapter with continuity tracking via story bible. Input: genre_slug (any active genre slug), project_title (book title), chapter_number, brief (chapter description), outline (chapter outline), research_topics (JSON array of topics).",
         "workflowId": {
           "__rl": true,
           "value": "tpj55Sf66jrBPNT8",
           "mode": "id"
         },
-        "name": "write_chapter"
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "genre_slug": "={{ $fromAI('genre_slug', 'Genre slug from the available genres table in the system prompt', 'string') }}",
+            "project_title": "={{ $fromAI('project_title', 'The book project title', 'string') }}",
+            "chapter_number": "={{ $fromAI('chapter_number', 'Chapter number', 'string') }}",
+            "brief": "={{ $fromAI('brief', 'Brief description of what happens in this chapter', 'string') }}",
+            "outline": "={{ $fromAI('outline', 'Detailed chapter outline with scenes', 'string') }}",
+            "research_topics": "={{ $fromAI('research_topics', 'JSON array of research topics for factual grounding', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "genre_slug",
+              "displayName": "genre_slug",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "project_title",
+              "displayName": "project_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "chapter_number",
+              "displayName": "chapter_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "brief",
+              "displayName": "brief",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "outline",
+              "displayName": "outline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "research_topics",
+              "displayName": "research_topics",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
       },
       "id": "hub-chapter",
       "name": "write_chapter",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2,
       "position": [
-        1280,
-        400
+        1152,
+        224
       ]
     },
     {
       "parameters": {
-        "description": "Read or update the story bible for a book project. Input: operation (get/update), project_title, entries (JSON array for updates).",
+        "name": "manage_story_bible",
+        "description": "Read or update the story bible for a book project. Input: operation (get or update), project_title (book title), entries (JSON array of story bible entries for updates, empty string for get).",
         "workflowId": {
           "__rl": true,
           "value": "9cvuhBS412AQRJxf",
           "mode": "id"
         },
-        "name": "manage_story_bible"
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "operation": "={{ $fromAI('operation', 'Operation: get or update', 'string') }}",
+            "project_title": "={{ $fromAI('project_title', 'The book project title', 'string') }}",
+            "entries": "={{ $fromAI('entries', 'JSON array of story bible entries for update, or empty string for get', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "operation",
+              "displayName": "operation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "project_title",
+              "displayName": "project_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "entries",
+              "displayName": "entries",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
       },
       "id": "hub-story-bible",
       "name": "manage_story_bible",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2,
       "position": [
-        1280,
-        608
+        1312,
+        320
       ]
     },
     {
@@ -279,8 +592,362 @@
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        800,
-        0
+        1232,
+        -288
+      ]
+    },
+    {
+      "parameters": {
+        "messages": {
+          "message": [
+            {
+              "content": "=Today's date is {{ $now.format('yyyy-MM-dd') }}. You are operating in the year {{ $now.format('yyyy') }}. You are a research assistant. Provide detailed, comprehensive answers with citations from reliable sources. Always include specific data points, names, dates, and URLs when available.",
+              "role": "system"
+            },
+            {
+              "content": "={{ $fromAI('query', 'The research question to investigate', 'string') }}"
+            }
+          ]
+        },
+        "simplify": true,
+        "options": {
+          "temperature": 0.1,
+          "searchRecency": "month"
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.perplexityTool",
+      "typeVersion": 1,
+      "position": [
+        1632,
+        416
+      ],
+      "id": "6f2f51b6-61a4-4ba7-a6d6-3c36c2c88d3c",
+      "name": "deep_research_topic",
+      "credentials": {
+        "perplexityApi": {
+          "id": "ggr9QCRobQVA6Lwb",
+          "name": "Perplexity account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "=author-agent -{{ $now.format('yyyy-MM-dd') }}-",
+        "contextWindowLength": 1000
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryRedisChat",
+      "typeVersion": 1.5,
+      "position": [
+        144,
+        240
+      ],
+      "id": "00bafd2d-8b4f-4f42-b5df-d95f2a9dfe3e",
+      "name": "Redis Chat Memory",
+      "credentials": {
+        "redis": {
+          "id": "n8IeXB9NzHxHnxbd",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-pro",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        240
+      ],
+      "id": "c4b751c7-dee0-47cd-a3ca-9b826c39d77f",
+      "name": "gemini-2.5-pro",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "QCbiHRahj2Q15wqr",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Shared",
+        "height": 448,
+        "width": 496
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -64,
+        144
+      ],
+      "typeVersion": 1,
+      "id": "3a8e2ade-df6f-4334-b4d2-bd5528496a2a",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Content Creation\n",
+        "height": 448,
+        "width": 1008,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        432,
+        144
+      ],
+      "typeVersion": 1,
+      "id": "0cf0a214-bb4e-4ce7-96bc-a3ea328ad55c",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Content Research",
+        "height": 448,
+        "width": 448,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1440,
+        144
+      ],
+      "typeVersion": 1,
+      "id": "6e3e3db7-398c-44af-8e43-cc4fd27c16f6",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "name": "manage_research_reports",
+        "description": "Save, retrieve, list, or update research reports in persistent storage. Operations: save (store new report), get (retrieve by report_id), list (show recent reports), update (modify existing report by report_id). Input: operation, report_id (for get/update), topic (for save/update), genre_slug (for save), content (report text for save/update), status (draft/final/archived for save/update).",
+        "workflowId": {
+          "__rl": true,
+          "value": "MLjncwcdMSjBkS4Z",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "operation": "={{ $fromAI('operation', 'Operation: save, get, list, or update', 'string') }}",
+            "report_id": "={{ $fromAI('report_id', 'Report UUID for get/update operations, empty for save/list', 'string') }}",
+            "topic": "={{ $fromAI('topic', 'Research topic title', 'string') }}",
+            "genre_slug": "={{ $fromAI('genre_slug', 'Genre slug if applicable, or empty', 'string') }}",
+            "content": "={{ $fromAI('content', 'Full research report content in markdown', 'string') }}",
+            "status": "={{ $fromAI('status', 'Report status: draft, final, or archived', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "operation",
+              "displayName": "operation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "report_id",
+              "displayName": "report_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "genre_slug",
+              "displayName": "genre_slug",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "content",
+              "displayName": "content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "id": "hub-research-reports",
+      "name": "manage_research_reports",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "name": "manage_library",
+        "description": "Manage the content library. Operations: list_drafts, list_published, approve, publish, reject. Use content_id (UUID) for approve/publish/reject. Optional content_type_filter (short_story, blog_post, newsletter, chapter).",
+        "workflowId": {
+          "__rl": true,
+          "value": "1JERh5yJ3yDJka8s",
+          "mode": "list",
+          "cachedResultName": "Sub - Manage Library"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "operation": "={{ $fromAI('operation', 'Operation to perform: list_drafts, list_published, approve, publish, or reject') }}",
+            "content_id": "={{ $fromAI('content_id', 'UUID of the content item (required for approve/publish/reject, empty for list operations)', 'string') }}",
+            "content_type_filter": "={{ $fromAI('content_type_filter', 'Optional filter: short_story, blog_post, newsletter, or chapter', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "operation",
+              "displayName": "operation",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "content_id",
+              "displayName": "content_id",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "content_type_filter",
+              "displayName": "content_type_filter",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            }
+          ]
+        }
+      },
+      "id": "hub-manage-lib",
+      "name": "manage_library",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [
+        848,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "name": "brainstorm_story",
+        "description": "Brainstorm and outline a new book. Researches the concept, generates character profiles and a chapter-by-chapter outline. Saves the outline to writing_projects for automatic use by write_chapter.",
+        "workflowId": {
+          "__rl": true,
+          "value": "StwejB5GLFE26hmU",
+          "mode": "list",
+          "cachedResultName": "Tool - Brainstorm Story"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "genre_slug": "={{ $fromAI('genre_slug', 'Genre slug from the available genres table in the system prompt') }}",
+            "project_title": "={{ $fromAI('project_title', 'Title of the book project') }}",
+            "initial_concept": "={{ $fromAI('initial_concept', 'The core concept or premise of the story') }}",
+            "themes": "={{ $fromAI('themes', 'Themes to explore, comma-separated') }}",
+            "target_chapter_count": "={{ $fromAI('target_chapter_count', 'Target number of chapters, default 10', 'number') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "genre_slug",
+              "displayName": "genre_slug",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "project_title",
+              "displayName": "project_title",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "initial_concept",
+              "displayName": "initial_concept",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "themes",
+              "displayName": "themes",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "target_chapter_count",
+              "displayName": "target_chapter_count",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            }
+          ]
+        }
+      },
+      "id": "hub-brainstorm",
+      "name": "brainstorm_story",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        448
       ]
     }
   ],
@@ -307,40 +974,7 @@
         ]
       ]
     },
-    "gemini-2.5-pro": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "Author Agent",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "memory": {
-      "ai_memory": [
-        [
-          {
-            "node": "Author Agent",
-            "type": "ai_memory",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "think": {
-      "ai_tool": [
-        [
-          {
-            "node": "Author Agent",
-            "type": "ai_tool",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "deep_research": {
       "ai_tool": [
         [
           {
@@ -449,11 +1083,113 @@
           }
         ]
       ]
+    },
+    "deep_research_topic": {
+      "ai_tool": [
+        [
+          {
+            "node": "Author Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Author Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "gemini-2.5-pro": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Author Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "manage_research_reports": {
+      "main": [
+        []
+      ],
+      "ai_tool": [
+        [
+          {
+            "node": "Author Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "manage_library": {
+      "ai_tool": [
+        [
+          {
+            "node": "Author Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "brainstorm_story": {
+      "ai_tool": [
+        [
+          {
+            "node": "Author Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
     "executionOrder": "v1",
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
+  },
+  "staticData": null,
+  "pinData": {
+    "webhook_trigger": [
+      {
+        "json": {
+          "headers": {
+            "host": "n8n.agileadautomation.com",
+            "user-agent": "ElevenLabs/1.0",
+            "content-length": "608",
+            "accept": "*/*",
+            "accept-encoding": "gzip, br",
+            "cdn-loop": "cloudflare; loops=1",
+            "cf-connecting-ip": "34.59.11.47",
+            "cf-ipcountry": "US",
+            "cf-ray": "9d93206e9db6381e-ORD",
+            "cf-visitor": "{\"scheme\":\"https\"}",
+            "cf-warp-tag-id": "928c4c4e-610a-4fd2-a6d1-68d5b261c478",
+            "connection": "keep-alive",
+            "content-type": "application/json",
+            "x-forwarded-for": "34.59.11.47",
+            "x-forwarded-proto": "https"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "user_message_request": "Okay. Um, all right. Uh, um, also, uh, after this research report is ready, can you create a project and, um, you know, so we store it, uh, in the, uh, um, in, in, in, um, whatever storage we have? And I'd like you to write a, uh, short story that, um, uses the genre that we just described. Um, use Medium as-Mm-hmm. A, um, as a, as a method of where we're going to deliver the story to. So that should be part of your writing style. And I'd like you to, um, um, use, uh, again, use that genre specifically. Um, uh, you can do that after you do the research report. Uh, you okay?"
+          },
+          "webhookUrl": "https://n8n.agileadautomation.com/webhook/author_request",
+          "executionMode": "production"
+        }
+      }
+    ]
   }
 }

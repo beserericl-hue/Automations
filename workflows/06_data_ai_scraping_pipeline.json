@@ -2,14 +2,6 @@
   "name": "Data: AI Scraping Pipeline",
   "nodes": [
     {
-      "id": "sp-trigger",
-      "name": "schedule_trigger",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [
-        0,
-        0
-      ],
       "parameters": {
         "rule": {
           "interval": [
@@ -19,17 +11,17 @@
             }
           ]
         }
-      }
+      },
+      "id": "sp-trigger",
+      "name": "schedule_trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
     },
     {
-      "id": "sp-settings",
-      "name": "settings",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        120,
-        0
-      ],
       "parameters": {
         "assignments": {
           "assignments": [
@@ -42,7 +34,7 @@
             {
               "id": "s2",
               "name": "GOOGLE_BOOKS_API_KEY",
-              "value": "YOUR_GOOGLE_BOOKS_API_KEY",
+              "value": "AIzaSyAYcaijaBykSzNM2hpfGIS9274_WZvGW3k",
               "type": "string"
             },
             {
@@ -60,27 +52,19 @@
           ]
         },
         "options": {}
-      }
+      },
+      "id": "sp-settings",
+      "name": "settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        128,
+        0
+      ]
     },
     {
-      "id": "sp-genres",
-      "name": "get_active_genres",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        240,
-        0
-      ],
       "parameters": {
-        "method": "GET",
         "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/genre_config?active=eq.true",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
-        },
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -93,32 +77,38 @@
               "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
             }
           ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
         }
-      }
+      },
+      "id": "sp-genres",
+      "name": "get_active_genres",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ]
     },
     {
+      "parameters": {
+        "options": {}
+      },
       "id": "sp-iterate-genres",
       "name": "iterate_genres",
       "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3,
+      "typeVersion": 2,
       "position": [
         480,
         0
-      ],
-      "parameters": {
-        "batchSize": 1,
-        "options": {}
-      }
+      ]
     },
     {
-      "id": "sp-set-genre",
-      "name": "set_genre_context",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        720,
-        0
-      ],
       "parameters": {
         "assignments": {
           "assignments": [
@@ -161,91 +151,45 @@
           ]
         },
         "options": {}
-      }
-    },
-    {
-      "id": "sp-split-rss",
-      "name": "split_rss_feeds",
-      "type": "n8n-nodes-base.splitOut",
-      "typeVersion": 1,
+      },
+      "id": "sp-set-genre",
+      "name": "set_genre_context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
-        960,
-        -160
-      ],
-      "parameters": {
-        "fieldToSplitOut": "rss_feed_urls",
-        "options": {}
-      }
+        720,
+        0
+      ]
     },
     {
+      "parameters": {
+        "options": {}
+      },
       "id": "sp-iterate-rss",
       "name": "iterate_rss_feeds",
       "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3,
+      "typeVersion": 2,
       "position": [
         1200,
         -160
-      ],
-      "parameters": {
-        "batchSize": 1,
-        "options": {}
-      }
+      ]
     },
     {
+      "parameters": {
+        "url": "={{ $json.feed_url }}",
+        "options": {}
+      },
       "id": "sp-scrape-rss",
       "name": "scrape_rss_feed",
       "type": "n8n-nodes-base.rssFeedRead",
       "typeVersion": 1,
       "position": [
-        1440,
-        -160
+        1568,
+        -176
       ],
-      "parameters": {
-        "url": "={{ $json.rss_feed_urls }}"
-      }
+      "continueOnFail": true
     },
     {
-      "id": "sp-filter-rss",
-      "name": "filter_rss_recent",
-      "type": "n8n-nodes-base.filter",
-      "typeVersion": 2.2,
-      "position": [
-        1680,
-        -160
-      ],
-      "parameters": {
-        "conditions": {
-          "options": {
-            "version": 2,
-            "leftValue": "",
-            "caseSensitive": true,
-            "typeValidation": "strict"
-          },
-          "combinator": "and",
-          "conditions": [
-            {
-              "id": "fr1",
-              "leftValue": "={{ $json.title }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "isNotEmpty"
-              }
-            }
-          ]
-        },
-        "options": {}
-      }
-    },
-    {
-      "id": "sp-prepare-rss",
-      "name": "prepare_rss_content",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        1920,
-        -160
-      ],
       "parameters": {
         "assignments": {
           "assignments": [
@@ -288,9 +232,27 @@
           ]
         },
         "options": {}
-      }
+      },
+      "id": "sp-prepare-rss",
+      "name": "prepare_rss_content",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1920,
+        -160
+      ]
     },
     {
+      "parameters": {
+        "url": "=https://www.reddit.com/r/{{ JSON.parse($('set_genre_context').first().json.subreddit_names)[0] }}/hot.json?limit=25",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
       "id": "sp-scrape-reddit",
       "name": "scrape_reddit",
       "type": "n8n-nodes-base.httpRequest",
@@ -299,113 +261,19 @@
         960,
         160
       ],
+      "continueOnFail": true
+    },
+    {
       "parameters": {
-        "method": "GET",
-        "url": "=https://www.reddit.com/r/{{ JSON.parse($('set_genre_context').item.json.subreddit_names)[0] }}/hot.json?limit=25",
+        "url": "=https://www.googleapis.com/books/v1/volumes?q=subject:science+fiction+{{ JSON.parse($('set_genre_context').first().json.keywords)[0] }}&maxResults=10&orderBy=newest&key={{ $('settings').first().json.GOOGLE_BOOKS_API_KEY }}",
         "options": {
           "response": {
             "response": {
               "responseFormat": "json"
             }
-          },
-          "headers": {
-            "parameters": [
-              {
-                "name": "User-Agent",
-                "value": "AuthorAgent/1.0"
-              }
-            ]
           }
         }
-      }
-    },
-    {
-      "id": "sp-filter-reddit",
-      "name": "filter_reddit_posts",
-      "type": "n8n-nodes-base.filter",
-      "typeVersion": 2.2,
-      "position": [
-        1200,
-        160
-      ],
-      "parameters": {
-        "conditions": {
-          "options": {
-            "version": 2,
-            "leftValue": "",
-            "caseSensitive": true,
-            "typeValidation": "strict"
-          },
-          "combinator": "and",
-          "conditions": [
-            {
-              "id": "frd1",
-              "leftValue": "={{ $json.data?.score }}",
-              "rightValue": 10,
-              "operator": {
-                "type": "number",
-                "operation": "gte"
-              }
-            }
-          ]
-        },
-        "options": {}
-      }
-    },
-    {
-      "id": "sp-prepare-reddit",
-      "name": "prepare_reddit_content",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        1440,
-        160
-      ],
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "prd1",
-              "name": "title",
-              "value": "={{ $json.data.title }}",
-              "type": "string"
-            },
-            {
-              "id": "prd2",
-              "name": "source_url",
-              "value": "=https://www.reddit.com{{ $json.data.permalink }}",
-              "type": "string"
-            },
-            {
-              "id": "prd3",
-              "name": "summary",
-              "value": "={{ $json.data.selftext?.substring(0, 500) || '' }}",
-              "type": "string"
-            },
-            {
-              "id": "prd4",
-              "name": "source_type",
-              "value": "reddit",
-              "type": "string"
-            },
-            {
-              "id": "prd5",
-              "name": "feed_name",
-              "value": "=r/{{ $json.data.subreddit }}",
-              "type": "string"
-            },
-            {
-              "id": "prd6",
-              "name": "score",
-              "value": "={{ $json.data.score }}",
-              "type": "number"
-            }
-          ]
-        },
-        "options": {}
-      }
-    },
-    {
+      },
       "id": "sp-scrape-books",
       "name": "scrape_google_books",
       "type": "n8n-nodes-base.httpRequest",
@@ -414,46 +282,28 @@
         960,
         320
       ],
-      "parameters": {
-        "method": "GET",
-        "url": "=https://www.googleapis.com/books/v1/volumes?q=subject:science+fiction+{{ JSON.parse($('set_genre_context').item.json.keywords)[0] }}&maxResults=10&orderBy=newest&key={{ $('settings').item.json.GOOGLE_BOOKS_API_KEY }}",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
-        }
-      }
+      "continueOnFail": true
     },
     {
-      "id": "sp-prepare-books",
-      "name": "prepare_book_data",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        1200,
-        320
-      ],
       "parameters": {
         "assignments": {
           "assignments": [
             {
               "id": "pb1",
               "name": "title",
-              "value": "={{ $json.volumeInfo?.title }}",
+              "value": "={{ $json.volumeInfo?.title || $json.items?.[0]?.volumeInfo?.title || null }}",
               "type": "string"
             },
             {
               "id": "pb2",
               "name": "source_url",
-              "value": "={{ $json.volumeInfo?.infoLink }}",
+              "value": "={{ $json.volumeInfo?.infoLink || $json.items?.[0]?.volumeInfo?.infoLink || null }}",
               "type": "string"
             },
             {
               "id": "pb3",
               "name": "summary",
-              "value": "={{ $json.volumeInfo?.description?.substring(0, 500) || '' }}",
+              "value": "={{ ($json.volumeInfo?.description || $json.items?.[0]?.volumeInfo?.description || '').substring(0, 500) }}",
               "type": "string"
             },
             {
@@ -471,15 +321,33 @@
             {
               "id": "pb6",
               "name": "authors",
-              "value": "={{ $json.volumeInfo?.authors?.join(', ') || '' }}",
+              "value": "={{ ($json.volumeInfo?.authors || $json.items?.[0]?.volumeInfo?.authors || []).join(', ') }}",
               "type": "string"
             }
           ]
         },
         "options": {}
-      }
+      },
+      "id": "sp-prepare-books",
+      "name": "prepare_book_data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        320
+      ]
     },
     {
+      "parameters": {
+        "url": "=https://openlibrary.org/search.json?subject=science_fiction&q={{ JSON.parse($('set_genre_context').first().json.keywords)[0] }}&limit=10&sort=new",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
       "id": "sp-scrape-ol",
       "name": "scrape_open_library",
       "type": "n8n-nodes-base.httpRequest",
@@ -488,72 +356,13 @@
         960,
         480
       ],
-      "parameters": {
-        "method": "GET",
-        "url": "=https://openlibrary.org/search.json?subject=science_fiction&q={{ JSON.parse($('set_genre_context').item.json.keywords)[0] }}&limit=10&sort=new",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
-        }
-      }
+      "continueOnFail": true
     },
     {
-      "id": "sp-prepare-ol",
-      "name": "prepare_open_library_data",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        1200,
-        480
-      ],
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "pol1",
-              "name": "title",
-              "value": "={{ $json.title }}",
-              "type": "string"
-            },
-            {
-              "id": "pol2",
-              "name": "source_url",
-              "value": "=https://openlibrary.org{{ $json.key }}",
-              "type": "string"
-            },
-            {
-              "id": "pol3",
-              "name": "summary",
-              "value": "={{ $json.first_sentence?.join(' ')?.substring(0, 500) || '' }}",
-              "type": "string"
-            },
-            {
-              "id": "pol4",
-              "name": "source_type",
-              "value": "open_library",
-              "type": "string"
-            },
-            {
-              "id": "pol5",
-              "name": "feed_name",
-              "value": "Open Library",
-              "type": "string"
-            },
-            {
-              "id": "pol6",
-              "name": "authors",
-              "value": "={{ $json.author_name?.join(', ') || '' }}",
-              "type": "string"
-            }
-          ]
-        },
+        "aggregate": "aggregateAllItemData",
         "options": {}
-      }
-    },
-    {
+      },
       "id": "sp-aggregate",
       "name": "aggregate_all_content",
       "type": "n8n-nodes-base.aggregate",
@@ -561,52 +370,87 @@
       "position": [
         1680,
         160
-      ],
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "sp-next",
+      "name": "iterate_next",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2640,
+        160
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "sp-done",
+      "name": "no_op_done",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        544,
+        432
+      ]
+    },
+    {
       "parameters": {
-        "aggregate": "aggregateAllItemData",
-        "options": {}
-      }
+        "jsCode": "const aggregated = $input.first().json;\nconst items = Array.isArray(aggregated.data) ? aggregated.data : [aggregated];\nconst genre = $('set_genre_context').first().json;\nconst cleaned = [];\nconst indexRecords = [];\n\nfor (const d of items) {\n  if (d && d.title && typeof d.title === 'string') {\n    const clean = {\n      title: String(d.title),\n      source_url: String(d.source_url || ''),\n      summary: String(d.summary || '').substring(0, 1000),\n      source_type: String(d.source_type || ''),\n      feed_name: String(d.feed_name || 'unknown'),\n    };\n    cleaned.push(clean);\n    indexRecords.push({\n      genre_slug: genre.genre_slug,\n      source_type: clean.source_type,\n      feed_name: clean.feed_name,\n      source_url: clean.source_url,\n      title: clean.title,\n      summary: clean.summary,\n      content_path: genre.today + '/' + genre.genre_slug + '/batch.json'\n    });\n  }\n}\n\nreturn [{ json: { data: cleaned, index_body: JSON.stringify(indexRecords) } }];"
+      },
+      "id": "sp-clean",
+      "name": "clean_data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const genre = $input.first().json;\nconst urls = typeof genre.rss_feed_urls === 'string' ? JSON.parse(genre.rss_feed_urls) : (genre.rss_feed_urls || []);\nreturn urls.map(url => ({ json: { feed_url: url, genre_slug: genre.genre_slug } }));"
+      },
+      "id": "sp-split-rss",
+      "name": "split_rss_feeds",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst children = response?.data?.children || [];\nreturn children\n  .filter(c => c.data && c.data.score >= 10)\n  .slice(0, 10)\n  .map(c => ({\n    json: {\n      title: c.data.title || null,\n      source_url: 'https://www.reddit.com' + (c.data.permalink || ''),\n      summary: (c.data.selftext || '').substring(0, 500),\n      source_type: 'reddit',\n      feed_name: 'r/' + (c.data.subreddit || 'unknown'),\n      authors: c.data.author || ''\n    }\n  }));"
+      },
+      "id": "sp-prepare-reddit",
+      "name": "prepare_reddit_content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        160
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst docs = response?.docs || [];\nreturn docs.slice(0, 10).map(doc => {\n  // Build summary from multiple fallback fields\n  let summary = (doc.first_sentence || []).join(' ');\n  if (!summary && doc.subtitle) {\n    summary = doc.subtitle;\n  }\n  if (!summary) {\n    const parts = [];\n    if (doc.subject && doc.subject.length > 0) {\n      parts.push('Subjects: ' + doc.subject.slice(0, 5).join(', '));\n    }\n    if (doc.publisher && doc.publisher.length > 0) {\n      parts.push('Publisher: ' + doc.publisher[0]);\n    }\n    if (doc.first_publish_year) {\n      parts.push('First published: ' + doc.first_publish_year);\n    }\n    if (doc.author_name && doc.author_name.length > 0) {\n      parts.push('By: ' + doc.author_name.join(', '));\n    }\n    summary = parts.join('. ');\n  }\n  return {\n    json: {\n      title: doc.title || null,\n      source_url: 'https://openlibrary.org' + (doc.key || ''),\n      summary: summary.substring(0, 500),\n      source_type: 'open_library',\n      feed_name: 'Open Library',\n      authors: (doc.author_name || []).join(', ')\n    }\n  };\n});"
+      },
+      "id": "sp-prepare-ol",
+      "name": "prepare_open_library_data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        480
+      ],
+      "onError": "continueRegularOutput"
     },
     {
       "id": "sp-upload",
       "name": "upload_to_supabase",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1920,
-        160
-      ],
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $('settings').item.json.SUPABASE_URL }}/storage/v1/object/author-content/{{ $('set_genre_context').item.json.today }}/{{ $('set_genre_context').item.json.genre_slug }}/batch_{{ $now.toMillis() }}.json",
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "data",
-              "value": "={{ JSON.stringify($json.data) }}"
-            }
-          ]
-        },
-        "options": {},
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "id": "sp-index",
-      "name": "index_content",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -615,54 +459,86 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/content_index",
+        "url": "={{ $('settings').first().json.SUPABASE_URL }}/storage/v1/object/author-content/{{ $('set_genre_context').first().json.today }}/{{ $('set_genre_context').first().json.genre_slug }}/batch.json",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').first().json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').first().json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-upsert",
+              "value": "true"
+            }
+          ]
+        },
         "sendBody": true,
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "body": "={{ JSON.stringify($json.data.map(item => ({ genre_slug: $('set_genre_context').item.json.genre_slug, source_type: item.source_type, feed_name: item.feed_name, source_url: item.source_url, title: item.title, summary: item.summary, content_path: $('set_genre_context').item.json.today + '/' + $('set_genre_context').item.json.genre_slug + '/batch_' + $now.toMillis() + '.json' }))) }}",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.data) }}",
         "options": {
           "response": {
             "response": {
               "responseFormat": "json"
             }
           }
-        },
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "sp-index",
+      "name": "index_content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2400,
+        160
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('settings').first().json.SUPABASE_URL }}/rest/v1/content_index",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+              "value": "={{ $('settings').first().json.SUPABASE_API_KEY }}"
             },
             {
               "name": "Authorization",
-              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+              "value": "=Bearer {{ $('settings').first().json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
             }
           ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('clean_data').first().json.index_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
         }
-      }
-    },
-    {
-      "id": "sp-next",
-      "name": "iterate_next",
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [
-        2400,
-        160
-      ],
-      "parameters": {}
-    },
-    {
-      "id": "sp-done",
-      "name": "no_op_done",
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [
-        720,
-        320
-      ],
-      "parameters": {}
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -721,11 +597,6 @@
       "main": [
         [
           {
-            "node": "split_rss_feeds",
-            "type": "main",
-            "index": 0
-          },
-          {
             "node": "scrape_reddit",
             "type": "main",
             "index": 0
@@ -739,15 +610,9 @@
             "node": "scrape_open_library",
             "type": "main",
             "index": 0
-          }
-        ]
-      ]
-    },
-    "split_rss_feeds": {
-      "main": [
-        [
+          },
           {
-            "node": "iterate_rss_feeds",
+            "node": "split_rss_feeds",
             "type": "main",
             "index": 0
           }
@@ -772,66 +637,11 @@
         ]
       ]
     },
-    "scrape_rss_feed": {
-      "main": [
-        [
-          {
-            "node": "filter_rss_recent",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "filter_rss_recent": {
-      "main": [
-        [
-          {
-            "node": "prepare_rss_content",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "prepare_rss_content": {
       "main": [
         [
           {
             "node": "iterate_rss_feeds",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "scrape_reddit": {
-      "main": [
-        [
-          {
-            "node": "filter_reddit_posts",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "filter_reddit_posts": {
-      "main": [
-        [
-          {
-            "node": "prepare_reddit_content",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "prepare_reddit_content": {
-      "main": [
-        [
-          {
-            "node": "aggregate_all_content",
             "type": "main",
             "index": 0
           }
@@ -850,6 +660,61 @@
       ]
     },
     "prepare_book_data": {
+      "main": [
+        [
+          {
+            "node": "aggregate_all_content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "iterate_next": {
+      "main": [
+        [
+          {
+            "node": "iterate_genres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "aggregate_all_content": {
+      "main": [
+        [
+          {
+            "node": "clean_data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "split_rss_feeds": {
+      "main": [
+        [
+          {
+            "node": "iterate_rss_feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "scrape_reddit": {
+      "main": [
+        [
+          {
+            "node": "prepare_reddit_content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prepare_reddit_content": {
       "main": [
         [
           {
@@ -882,7 +747,18 @@
         ]
       ]
     },
-    "aggregate_all_content": {
+    "scrape_rss_feed": {
+      "main": [
+        [
+          {
+            "node": "prepare_rss_content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "clean_data": {
       "main": [
         [
           {
@@ -914,21 +790,17 @@
           }
         ]
       ]
-    },
-    "iterate_next": {
-      "main": [
-        [
-          {
-            "node": "iterate_genres",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
     }
   },
   "settings": {
     "executionOrder": "v1",
-    "callerPolicy": "workflowsFromSameOwner"
-  }
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:schedule_trigger": {
+      "recurrenceRules": []
+    }
+  },
+  "pinData": {}
 }

@@ -16,7 +16,8 @@
    - 5.4 [Tool: Write Blog Post](#54-tool-write-blog-post)
    - 5.5 [Tool: Write Newsletter](#55-tool-write-newsletter)
    - 5.6 [Tool: Write Short Story](#56-tool-write-short-story)
-   - 5.7 [Tool: Write Long Form / Book Chapter](#57-tool-write-long-form--book-chapter)
+   - 5.7 [Tool: Write Chapter](#57-tool-write-chapter)
+   - 5.7b [Sub: Manage Story Bible](#57b-sub-manage-story-bible)
    - 5.8 [Tool: Deep Research](#58-tool-deep-research)
    - 5.9 [Tool: Email Report](#59-tool-email-report)
    - 5.10 [Tool: Generate Cover Art](#510-tool-generate-cover-art)
@@ -53,10 +54,13 @@
 |  | write_newsletter      |  | write_short_story    |                  |
 |  +-----------------------+  +----------------------+                   |
 |  +-----------------------+  +----------------------+                   |
-|  | write_long_form       |  | deep_research        |                  |
+|  | write_chapter         |  | deep_research        |                  |
 |  +-----------------------+  +----------------------+                   |
 |  +-----------------------+  +----------------------+                   |
-|  | email_report (reuse)  |  | generate_cover_art   |                  |
+|  | manage_story_bible    |  | email_report (reuse) |
+  |  +-----------------------+  +----------------------+                   |
+  |  +-----------------------+  +----------------------+                   |
+  |  | generate_cover_art    |                  |
 |  +-----------------------+  +----------------------+                   |
 |  +-----------------------+                                             |
 |  | repurpose_to_social   |                                             |
@@ -212,10 +216,15 @@ author-content/
   │       ├── reddit_{post_id}.json
   │       ├── article_{hash}.md
   │       └── book_{isbn}.json
-  └── drafts/
-      ├── blog_{title_slug}_{date}.md
-      ├── story_{title_slug}_{date}.md
-      └── chapter_{book_slug}_{chapter_num}_{date}.md
+  ├── drafts/
+  │   ├── blog_{title_slug}_{date}.md
+  │   ├── story_{title_slug}_{date}.md
+  │   └── chapter_{book_slug}_{chapter_num}_{date}.md
+  └── writing-samples/
+      ├── {user_id}/
+      │   ├── sample_1.md
+      │   ├── sample_2.md
+      │   └── ...
 ```
 
 #### Supabase Tables
@@ -225,7 +234,8 @@ author-content/
 CREATE TABLE content_index (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   genre_slug TEXT NOT NULL REFERENCES genre_config(genre_slug),
-  source_type TEXT NOT NULL, -- 'reddit', 'article', 'book', 'goodreads_review'
+  source_type TEXT NOT NULL, -- 'rss', 'reddit', 'google_books', 'open_library'
+  feed_name TEXT, -- e.g. 'Clarkesworld', 'Medium/post-apocalyptic', 'r/printSF'
   source_url TEXT,
   title TEXT NOT NULL,
   summary TEXT,
@@ -247,6 +257,48 @@ CREATE TABLE writing_projects (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Content usage tracking (provenance: what source content was used in which output)
+CREATE TABLE content_usage (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  content_id UUID REFERENCES content_index(id),
+  output_type TEXT NOT NULL, -- 'newsletter', 'blog', 'short_story', 'book_chapter'
+  output_title TEXT NOT NULL,
+  output_date DATE DEFAULT CURRENT_DATE,
+  project_id UUID REFERENCES writing_projects(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Story bible (continuity tracking for book projects)
+CREATE TABLE story_bible (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  project_id UUID NOT NULL REFERENCES writing_projects(id),
+  entry_type TEXT NOT NULL, -- 'character', 'event', 'location', 'timeline', 'plot_thread', 'world_rule'
+  name TEXT NOT NULL,
+  description TEXT NOT NULL,
+  metadata JSONB DEFAULT '{}', -- flexible: aliases, relationships, chapter_introduced, status, etc.
+  chapter_introduced INTEGER,
+  last_chapter_seen INTEGER,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX idx_story_bible_project ON story_bible(project_id);
+CREATE INDEX idx_story_bible_type ON story_bible(project_id, entry_type);
+
+-- Content metrics view (aggregate reporting on source usage)
+CREATE VIEW content_metrics AS
+SELECT
+  ci.genre_slug,
+  ci.source_type,
+  ci.feed_name,
+  DATE(ci.scraped_at) AS scrape_date,
+  COUNT(*) AS items_collected,
+  COUNT(cu.id) AS items_used,
+  ROUND(COUNT(cu.id)::numeric / NULLIF(COUNT(*), 0) * 100, 1) AS usage_rate_pct
+FROM content_index ci
+LEFT JOIN content_usage cu ON ci.id = cu.content_id
+GROUP BY ci.genre_slug, ci.source_type, ci.feed_name, DATE(ci.scraped_at)
+ORDER BY scrape_date DESC, genre_slug, source_type;
 ```
 
 ---
@@ -335,7 +387,7 @@ Headers: apikey: {SUPABASE_KEY}, Authorization: Bearer {SUPABASE_KEY}
 **Replaces:** The Recap AI - Marketing Team Agent (sYFuDciMUonqrkqh)
 **Changes:** New system prompt, new tool set, email delivery, Supabase storage, writing-focused
 
-#### Nodes (14 nodes)
+#### Nodes (16 nodes)
 
 | # | Node Name | Type | TypeVersion | Position | Parameters |
 |---|-----------|------|-------------|----------|-----------|
@@ -348,12 +400,13 @@ Headers: apikey: {SUPABASE_KEY}, Authorization: Bearer {SUPABASE_KEY}
 | 7 | write_blog_post | @n8n/n8n-nodes-langchain.toolWorkflow | 2.2 | [64, 640] | See Workflow 5.4 |
 | 8 | write_newsletter | @n8n/n8n-nodes-langchain.toolWorkflow | 2.2 | [224, 640] | See Workflow 5.5 |
 | 9 | write_short_story | @n8n/n8n-nodes-langchain.toolWorkflow | 2.2 | [400, 640] | See Workflow 5.6 |
-| 10 | write_long_form | @n8n/n8n-nodes-langchain.toolWorkflow | 2.2 | [576, 640] | See Workflow 5.7 |
-| 11 | deep_research | n8n-nodes-base.perplexityTool | 1 | [752, 640] | model: sonar-reasoning |
-| 12 | email_report | @n8n/n8n-nodes-langchain.toolWorkflow | 2.2 | [928, 640] | See Workflow 5.9 (reuse) |
-| 13 | generate_cover_art | @n8n/n8n-nodes-langchain.toolWorkflow | 2.2 | [1104, 640] | See Workflow 5.10 |
-| 14 | repurpose_to_social | @n8n/n8n-nodes-langchain.toolWorkflow | 2.2 | [1280, 640] | See Workflow 5.11 |
-| 15 | no_operation | n8n-nodes-base.noOp | 1 | [816, 192] | Terminal |
+| 10 | write_chapter | @n8n/n8n-nodes-langchain.toolWorkflow | 2.2 | [576, 640] | See Workflow 5.7 |
+| 11 | manage_story_bible | @n8n/n8n-nodes-langchain.toolWorkflow | 2.2 | [736, 640] | See Workflow 5.7b |
+| 12 | deep_research | n8n-nodes-base.perplexityTool | 1 | [896, 640] | model: sonar-reasoning |
+| 13 | email_report | @n8n/n8n-nodes-langchain.toolWorkflow | 2.2 | [1056, 640] | See Workflow 5.9 (reuse) |
+| 14 | generate_cover_art | @n8n/n8n-nodes-langchain.toolWorkflow | 2.2 | [1216, 640] | See Workflow 5.10 |
+| 15 | repurpose_to_social | @n8n/n8n-nodes-langchain.toolWorkflow | 2.2 | [1376, 640] | See Workflow 5.11 |
+| 16 | no_operation | n8n-nodes-base.noOp | 1 | [816, 192] | Terminal |
 
 #### Connections
 ```
@@ -365,7 +418,8 @@ think ──[ai_tool]──> Author Agent
 write_blog_post ──[ai_tool]──> Author Agent
 write_newsletter ──[ai_tool]──> Author Agent
 write_short_story ──[ai_tool]──> Author Agent
-write_long_form ──[ai_tool]──> Author Agent
+write_chapter ──[ai_tool]──> Author Agent
+manage_story_bible ──[ai_tool]──> Author Agent
 deep_research ──[ai_tool]──> Author Agent
 email_report ──[ai_tool]──> Author Agent
 generate_cover_art ──[ai_tool]──> Author Agent
@@ -396,13 +450,14 @@ When the user doesn't specify a genre, ask which niche they want or infer from c
 - **`think`**: Use for complex tasks requiring multi-step planning. Always think before writing long-form content.
 
 ## Writing Tools
-- **`write_blog_post`**: Blog posts with SEO awareness. Inputs: topic, genre_slug, tone, audience, length, keywords.
+- **`write_blog_post`**: Blog posts with SEO awareness. Inputs: topic, genre_slug, tone, audience, length, keywords, research_topics.
 - **`write_newsletter`**: Newsletters on sci-fi topics. Inputs: topic, genre_slug, date.
-- **`write_short_story`**: Short fiction (1000-10000 words). Inputs: genre_slug, premise, tone, length, style_references.
-- **`write_long_form`**: Book chapters / long-form fiction. Inputs: genre_slug, project_title, chapter_number, brief, outline, previous_context.
+- **`write_short_story`**: Short fiction (1000-10000 words). Inputs: genre_slug, premise, tone, length, style_references, research_topics. Includes Perplexity research + style matching from user writing samples.
+- **`write_chapter`**: Book chapters with story bible continuity. Inputs: genre_slug, project_title, chapter_number, brief, outline, research_topics. Automatically loads story bible for continuity and updates it after writing.
 
-## Research
+## Research & Knowledge
 - **`deep_research`**: Perplexity deep research on any topic. Use for factual grounding, historical research, genre analysis.
+- **`manage_story_bible`**: Read/write the story bible for a book project. Inputs: operation (get/update), project_id, entries[]. Use to load context before brainstorming and to save state after chapter completion.
 
 ## Delivery
 - **`email_report`**: Sends completed content via email. Inputs: markdownContent, subjectLine. Always email after completing a writing task.
@@ -414,8 +469,14 @@ When the user doesn't specify a genre, ask which niche they want or infer from c
 # 5. Workflow Rules
 - Always call the appropriate tool IMMEDIATELY — do not delay.
 - For blog posts and newsletters: research first if the topic requires factual accuracy.
-- For fiction: use `think` first to plan story structure, then `write_short_story` or `write_long_form`.
-- For long-form/book projects: maintain continuity by passing previous_context and outline.
+- For fiction: use `think` first to plan story structure, identify research topics, then call the writing tool with `research_topics`.
+- For short stories: identify 2-5 research topics from the premise (science, history, culture, geography) and pass them to `write_short_story`. The tool will research these via Perplexity before writing.
+- For book projects:
+  1. **Brainstorming**: When user gives a topic, brainstorm premises, themes, character concepts, conflicts directly in conversation using `think`.
+  2. **Outlining**: Generate chapter-by-chapter outline with arc structure. Iterate with user until approved.
+  3. **Research topics**: For each chapter, use `think` to identify research topics (historical periods, scientific concepts, cultural details). Pass these as `research_topics` when calling `write_chapter`.
+  4. **Story bible**: Use `manage_story_bible` to load context before brainstorming and to save updated entries after chapter completion.
+  5. **Writing**: When user says "write chapter N", call `write_chapter` with the agreed outline + research_topics. The tool handles story bible continuity automatically.
 - ALWAYS email the finished content after writing it.
 - Act as if YOU are doing the work — never mention tools or backend systems.
 
@@ -652,7 +713,14 @@ write_newsletter ──> set_full_newsletter ──> convert_to_html ──> sav
 
 ### 5.6 Tool: Write Short Story
 
-**New workflow**
+**Repurposed from Newsletter Agent's iterative segment-writing pattern**
+
+**Purpose:** Generate short fiction modeled after Medium stories + user's uploaded writing samples, grounded in Perplexity research on the story's topic. Uses iterative scene-by-scene generation for longer stories.
+
+#### Tool Description (for hub agent)
+```
+Writes a short story (1000-10000 words) in the specified sci-fi niche. Researches the story's topics via Perplexity for factual grounding, analyzes user's writing samples for style matching, then writes scene-by-scene using an iterative pattern. Delivers the finished story via email.
+```
 
 #### Tool Inputs (fromAI)
 | Parameter | Description | Type |
@@ -662,25 +730,32 @@ write_newsletter ──> set_full_newsletter ──> convert_to_html ──> sav
 | tone | Writing tone (gritty, literary, pulpy, cerebral, etc.) | string |
 | length | Target word count (1000-10000) | string |
 | style_references | Reference authors/works for style guidance | string |
+| research_topics | Topics to research for factual grounding (e.g., "nuclear winter ecology, post-collapse governance") | string |
 
-#### Nodes (10 nodes)
+#### Nodes (16 nodes)
 
 | # | Node Name | Type | TypeVersion | Parameters |
 |---|-----------|------|-------------|-----------|
 | 1 | workflow_trigger | executeWorkflowTrigger | 1.1 | Inputs above |
 | 2 | get_genre_config | supabase | 1 | table: genre_config; filter: genre_slug |
-| 3 | build_prompt | set | 3.4 | Story writing prompt (see below) |
-| 4 | write_story | chainLlm | 1.7 | High max_tokens for long output |
-| 5 | claude-sonnet | lmChatAnthropic | 1.3 | model: claude-sonnet-4-20250514; maxTokens: 16000 |
-| 6 | story_parser | outputParserStructured | 1.3 | Schema: title, story_text, word_count, logline |
-| 7 | convert_to_html | markdown | 1 | Format for email |
-| 8 | save_draft | httpRequest | 4.2 | POST to Supabase: `author-content/drafts/story_{slug}_{date}.md` |
-| 9 | send_email | gmail | 1 | to: eric@agileadtesting.com; subject: `Short Story Draft: {title}` |
-| 10 | set_result | set | 3.4 | Returns title, word_count, logline |
+| 3 | build_research_query | set | 3.4 | Constructs query: "Research for a {genre} short story about {premise}. Provide factual details about: {research_topics}" |
+| 4 | research_topic | perplexityTool | 1 | model: sonar-reasoning; query from build_research_query |
+| 5 | fetch_writing_samples | httpRequest | 4.2 | GET Supabase Storage: `author-content/writing-samples/{user_id}/` — list + download user's uploaded writing samples |
+| 6 | style_analysis | chainLlm | 1.7 | Prompt: "Analyze these writing samples. Extract: voice, pacing, sentence structure, dialogue style, POV preference, favorite literary devices." |
+| 7 | claude-sonnet-style | lmChatAnthropic | 1.3 | model: claude-sonnet-4-20250514 |
+| 8 | get_recent_content | executeWorkflow | 1.2 | Calls Content Ingestion (5.3) — fetches Medium RSS excerpts for genre tone reference |
+| 9 | plan_scenes | set | 3.4 | Build scene plan: divide story into 3-7 scenes based on length, each with brief + research context |
+| 10 | iterate_scenes | splitInBatches | 3 | batchSize: 1; iterates over scene plan |
+| 11 | write_scene | chainLlm | 1.7 | Writes one scene at a time with style + research + previous scenes as context |
+| 12 | claude-sonnet-write | lmChatAnthropic | 1.3 | model: claude-sonnet-4-20250514; maxTokens: 8000 |
+| 13 | aggregate_scenes | aggregate | 1 | Combines all written scenes into full story |
+| 14 | set_full_story | set | 3.4 | Assembles: title, story_text, word_count, logline |
+| 15 | save_draft | httpRequest | 4.2 | POST to Supabase: `author-content/drafts/story_{slug}_{date}.md` |
+| 16 | send_email | gmail | 1 | to: eric@agileadtesting.com; subject: `Short Story Draft: {title}` |
 
-#### Short Story Writing Prompt
+#### Short Story Writing Prompt (per scene)
 ```
-You are a world-class science fiction author. Write a short story.
+You are a world-class science fiction author writing scene {{ scene_number }} of {{ total_scenes }}.
 
 ## Genre
 {{ genre_name }}: {{ description }}
@@ -688,39 +763,62 @@ You are a world-class science fiction author. Write a short story.
 ## Genre Writing Guidelines
 {{ writing_guidelines }}
 
-## Assignment
+## Research Findings (factual grounding)
+{{ research_results }}
+
+## Style Reference (match this voice)
+{{ style_analysis_results }}
+
+## Story Plan
 - Premise: {{ premise }}
 - Tone: {{ tone }}
-- Target length: {{ length }} words
+- Target total length: {{ length }} words
 - Style inspiration: {{ style_references }}
+
+## Scene Brief
+{{ scene_brief }}
+
+## Previous Scenes
+{{ previous_scenes_text }}
 
 ## Craft Requirements
 - Open with a hook that places the reader inside the world immediately
 - Show, don't tell — use sensory details, not exposition dumps
 - Characters must want something specific and face meaningful obstacles
 - Dialogue should reveal character and advance plot simultaneously
-- The ending must feel both surprising and inevitable
+- Incorporate researched factual details naturally — never as exposition dumps
+- Match the voice, pacing, and sentence structure from the style analysis
 - Every scene must do at least two things (advance plot + reveal character, build world + create tension, etc.)
 - Avoid: info dumps, purple prose, deus ex machina, passive voice in action scenes
 - The story should work on two levels: surface plot + thematic resonance
 
 ## Output
-Return JSON with: title, story_text (full story in markdown), word_count, logline (one-sentence summary)
+Return the scene text in markdown. No JSON wrapping for individual scenes.
 ```
 
 #### Connections
 ```
-workflow_trigger ──> get_genre_config ──> build_prompt ──> write_story
-claude-sonnet ──[ai_languageModel]──> write_story
-story_parser ──[ai_outputParser]──> write_story
-write_story ──> convert_to_html ──> save_draft ──> send_email ──> set_result
+workflow_trigger ──> get_genre_config ──> build_research_query ──> research_topic
+     ──> fetch_writing_samples ──> style_analysis
+claude-sonnet-style ──[ai_languageModel]──> style_analysis
+     ──> get_recent_content ──> plan_scenes ──> iterate_scenes
+iterate_scenes ──[next]──> write_scene ──> iterate_scenes (loop)
+claude-sonnet-write ──[ai_languageModel]──> write_scene
+iterate_scenes ──[done]──> aggregate_scenes ──> set_full_story ──> save_draft ──> send_email
 ```
 
 ---
 
-### 5.7 Tool: Write Long Form / Book Chapter
+### 5.7 Tool: Write Chapter
 
-**New workflow**
+**New workflow — writes a single book chapter with story bible continuity and Perplexity research**
+
+**Purpose:** Write a single book chapter with full continuity from the story bible, grounded in Perplexity research on chapter-specific topics. Called when user says "write chapter N" after brainstorming/outlining in conversation.
+
+#### Tool Description (for hub agent)
+```
+Writes a single book chapter with full story bible continuity. Automatically loads the project's story bible (characters, events, locations, timeline), researches chapter-specific topics via Perplexity, matches user's writing style, then writes the chapter. Updates the story bible with new characters/events after writing. Delivers via email.
+```
 
 #### Tool Inputs (fromAI)
 | Parameter | Description | Type |
@@ -730,24 +828,28 @@ write_story ──> convert_to_html ──> save_draft ──> send_email ──
 | chapter_number | Which chapter to write | string |
 | brief | What should happen in this chapter | string |
 | outline | Full book outline (JSON or text) | string |
-| previous_context | Summary of previous chapters | string |
+| research_topics | Topics to research for this chapter (e.g., "Weimar Republic daily life, 1920s Berlin architecture") | string |
 
-#### Nodes (12 nodes)
+#### Nodes (16 nodes)
 
 | # | Node Name | Type | TypeVersion | Parameters |
 |---|-----------|------|-------------|-----------|
 | 1 | workflow_trigger | executeWorkflowTrigger | 1.1 | Inputs above |
 | 2 | get_genre_config | supabase | 1 | table: genre_config; filter: genre_slug |
 | 3 | get_project | supabase | 1 | table: writing_projects; filter: title = project_title; upsert if not exists |
-| 4 | build_prompt | set | 3.4 | Chapter writing prompt with full context |
-| 5 | write_chapter | chainLlm | 1.7 | High max_tokens |
-| 6 | claude-sonnet | lmChatAnthropic | 1.3 | model: claude-sonnet-4-20250514; maxTokens: 16000 |
-| 7 | chapter_parser | outputParserStructured | 1.3 | Schema: chapter_title, chapter_text, word_count, chapter_summary, next_chapter_notes, characters_introduced[], plot_threads[] |
-| 8 | update_project | supabase | 1 | table: writing_projects; update chapter_count, status |
-| 9 | convert_to_html | markdown | 1 | Format for email |
-| 10 | save_draft | httpRequest | 4.2 | POST to Supabase: `author-content/drafts/chapter_{slug}_{num}_{date}.md` |
-| 11 | send_email | gmail | 1 | to: eric@agileadtesting.com; subject: `{project_title} - Chapter {chapter_number}: {chapter_title}` |
-| 12 | set_result | set | 3.4 | Returns chapter_title, word_count, chapter_summary, next_chapter_notes |
+| 4 | fetch_story_bible | supabase | 1 | table: story_bible; filter: project_id; operation: getAll — loads characters, events, locations, timeline, plot threads |
+| 5 | fetch_writing_samples | httpRequest | 4.2 | GET Supabase Storage: `author-content/writing-samples/{user_id}/` — for style matching |
+| 6 | build_research_query | set | 3.4 | Constructs query from chapter outline + genre: "Research for chapter {N} of a {genre} novel. Provide factual details about: {research_topics}" |
+| 7 | research_topic | perplexityTool | 1 | model: sonar-reasoning; query from build_research_query |
+| 8 | build_chapter_prompt | set | 3.4 | Full chapter prompt with outline, story bible, style reference, **research findings** |
+| 9 | write_chapter | chainLlm | 1.7 | High max_tokens |
+| 10 | claude-sonnet | lmChatAnthropic | 1.3 | model: claude-sonnet-4-20250514; maxTokens: 16000 |
+| 11 | chapter_parser | outputParserStructured | 1.3 | Schema: chapter_title, chapter_text, word_count, chapter_summary, next_chapter_notes, new_story_bible_entries[] |
+| 12 | update_story_bible | supabase | 1 | table: story_bible; operation: upsert — new characters, events, plot threads from chapter_parser output |
+| 13 | update_project | supabase | 1 | table: writing_projects; update chapter_count, status |
+| 14 | save_draft | httpRequest | 4.2 | POST to Supabase: `author-content/drafts/chapter_{slug}_{num}_{date}.md` |
+| 15 | send_email | gmail | 1 | to: eric@agileadtesting.com; subject: `{project_title} - Chapter {chapter_number}: {chapter_title}` |
+| 16 | set_result | set | 3.4 | Returns chapter_title, word_count, chapter_summary, next_chapter_notes |
 
 #### Chapter Writing Prompt
 ```
@@ -756,14 +858,33 @@ You are writing Chapter {{ chapter_number }} of "{{ project_title }}", a {{ genr
 ## Genre Guidelines
 {{ writing_guidelines }}
 
+## Research Findings (factual grounding for this chapter)
+{{ research_results }}
+
+## Story Bible (continuity reference)
+### Characters
+{{ story_bible_characters }}
+
+### Locations
+{{ story_bible_locations }}
+
+### Timeline
+{{ story_bible_timeline }}
+
+### Active Plot Threads
+{{ story_bible_plot_threads }}
+
 ## Book Outline
 {{ outline }}
 
-## Previous Chapters Summary
-{{ previous_context }}
+## Previous Chapter Summaries
+{{ previous_chapter_summaries }}
 
 ## This Chapter's Brief
 {{ brief }}
+
+## Style Reference (match this voice)
+{{ style_analysis_results }}
 
 ## Craft Requirements
 - Maintain consistent voice and tone from previous chapters
@@ -771,27 +892,70 @@ You are writing Chapter {{ chapter_number }} of "{{ project_title }}", a {{ genr
 - End the chapter on a hook that compels the reader to continue
 - Track character development — characters must grow or change
 - Weave in foreshadowing for later plot points from the outline
+- Incorporate researched factual details naturally — never as exposition dumps
 - Vary sentence rhythm: short punchy lines for action, longer flowing ones for reflection
 - Target: 3000-5000 words per chapter
 - Include scene breaks (marked with ---) where appropriate
 
 ## Continuity Checklist
-Before writing, verify:
-- Character names and descriptions match previous chapters
-- Timeline is consistent
-- Plot threads from previous chapters are acknowledged
+Before writing, verify against the story bible:
+- Character names, descriptions, and relationships match previous chapters
+- Timeline is consistent with established events
+- Plot threads from previous chapters are acknowledged or advanced
 - Setting details don't contradict established world-building
+- New characters/events introduced here must be flagged in the output
 
 ## Output
-Return JSON with: chapter_title, chapter_text (full chapter in markdown), word_count, chapter_summary (2-3 sentences for continuity tracking), next_chapter_notes (suggestions for what should happen next), characters_introduced (array of new character names), plot_threads (array of active plot threads)
+Return JSON with: chapter_title, chapter_text (full chapter in markdown), word_count, chapter_summary (2-3 sentences for continuity tracking), next_chapter_notes (suggestions for what should happen next), new_story_bible_entries (array of {entry_type, name, description, metadata} for any new characters, events, locations, or plot threads introduced in this chapter)
 ```
 
 #### Connections
 ```
-workflow_trigger ──> get_genre_config ──> get_project ──> build_prompt ──> write_chapter
+workflow_trigger ──> get_genre_config ──> get_project ──> fetch_story_bible
+     ──> fetch_writing_samples
+     ──> build_research_query ──> research_topic
+     ──> build_chapter_prompt ──> write_chapter
 claude-sonnet ──[ai_languageModel]──> write_chapter
 chapter_parser ──[ai_outputParser]──> write_chapter
-write_chapter ──> update_project ──> convert_to_html ──> save_draft ──> send_email ──> set_result
+write_chapter ──> update_story_bible ──> update_project ──> save_draft ──> send_email ──> set_result
+```
+
+---
+
+### 5.7b Sub: Manage Story Bible
+
+**New sub-workflow — called by hub agent to read/write story bible entries**
+
+**Purpose:** Hub agent calls this to load story bible context before brainstorming and to save state after chapter completion or outline changes.
+
+#### Tool Description (for hub agent)
+```
+Reads or writes the story bible for a book project. Use 'get' to load all characters, events, locations, timeline, and plot threads before brainstorming. Use 'update' to add or modify entries after outlining or chapter completion.
+```
+
+#### Tool Inputs (fromAI)
+| Parameter | Description | Type |
+|-----------|-------------|------|
+| operation | 'get' to load full bible, 'update' to add/modify entries | string |
+| project_title | Book/project title | string |
+| entries | JSON array of {entry_type, name, description, metadata} — only for 'update' operation | string |
+
+#### Nodes (6 nodes)
+
+| # | Node Name | Type | TypeVersion | Parameters |
+|---|-----------|------|-------------|-----------|
+| 1 | workflow_trigger | executeWorkflowTrigger | 1.1 | Inputs above |
+| 2 | get_project | supabase | 1 | table: writing_projects; filter: title = project_title |
+| 3 | check_operation | if | 2.2 | Condition: operation == 'get' |
+| 4 | get_story_bible | supabase | 1 | table: story_bible; filter: project_id; operation: getAll |
+| 5 | update_story_bible | supabase | 1 | table: story_bible; operation: upsert; data from entries input |
+| 6 | set_result | set | 3.4 | Returns story bible entries (for get) or confirmation (for update) |
+
+#### Connections
+```
+workflow_trigger ──> get_project ──> check_operation
+check_operation ──[true/get]──> get_story_bible ──> set_result
+check_operation ──[false/update]──> update_story_bible ──> set_result
 ```
 
 ---
@@ -916,12 +1080,15 @@ Period-accurate details. Anachronistic objects as focal points. No text.
 | **Image generation** | Watercolor brand art (Recap) | Genre-specific cover art (sci-fi) |
 | **Avatar video** | HeyGen talking avatar | Removed (not relevant for author) |
 | **Blog post** | Not available | New tool |
-| **Short story** | Not available | New tool |
-| **Long form / chapters** | Not available | New tool |
+| **Short story** | Not available | New tool (with research + style matching + iterative scenes) |
+| **Book chapters** | Not available | New tool (with story bible continuity + research) |
+| **Story bible** | Not available | New sub-workflow for continuity tracking |
 | **Research** | Perplexity (inline) | Perplexity (inline, unchanged) |
 | **Email report** | Gmail (to david@dlmholdings.com) | Gmail (to eric@agileadtesting.com) |
 | **Data scraping** | External pipeline (not documented) | Built-in scheduled scraper with Reddit, Google Books, Open Library, Jina |
 | **Project tracking** | None | Supabase writing_projects table |
+| **Content provenance** | None | content_usage table + content_metrics view |
+| **Writing samples** | None | Supabase bucket for style matching |
 
 ### Workflows Removed
 - Content - Short Form News Script Generator (replaced by writing tools)
@@ -937,6 +1104,7 @@ Period-accurate details. Anachronistic objects as focal points. No text.
 - AI Scraping Pipeline (scheduled data collection)
 - Content Ingestion (Supabase retrieval sub-workflow)
 - Tool - Write Blog Post
-- Tool - Write Short Story
-- Tool - Write Long Form / Book Chapter
+- Tool - Write Short Story (with research + style matching + iterative scenes)
+- Tool - Write Chapter (with story bible + research)
+- Sub - Manage Story Bible
 - Tool - Write Newsletter (simplified)

@@ -1,0 +1,125 @@
+{
+  "name": "Sub - Manage Library",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "trigger-001",
+      "name": "workflow_trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "set-url",
+              "name": "SUPABASE_URL",
+              "value": "https://qsirioazmsmrrfoltrhn.supabase.co",
+              "type": "string"
+            },
+            {
+              "id": "set-key",
+              "name": "SUPABASE_API_KEY",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "set-001",
+      "name": "settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\nconst trigger = $('workflow_trigger').first().json;\nconst operation = trigger.operation || 'list_drafts';\nconst contentId = trigger.content_id || '';\nconst typeFilter = trigger.content_type_filter || '';\n\nlet result = '';\n\nif (operation === 'list_drafts' || operation === 'list_published') {\n  const status = operation === 'list_drafts' ? 'draft' : 'published';\n  let url = supabaseUrl + '/rest/v1/published_content?status=eq.' + status + '&order=created_at.desc&limit=20&select=id,title,content_type,genre_slug,status,created_at,published_at';\n  if (typeFilter) url += '&content_type=eq.' + typeFilter;\n  const resp = await this.helpers.httpRequest({ method: 'GET', url, headers });\n  const items = Array.isArray(resp) ? resp : [];\n  if (items.length === 0) {\n    result = 'No ' + status + ' content found.';\n  } else {\n    result = 'Found ' + items.length + ' ' + status + ' item(s):\\n' + items.map((item, i) => \n      (i + 1) + '. ' + item.title + ' (' + item.content_type + ', ' + (item.genre_slug || 'no genre') + ') \u2014 ' + new Date(item.created_at).toLocaleDateString() + ' [ID: ' + item.id + ']'\n    ).join('\\n');\n  }\n} else if (['approve', 'publish', 'reject'].includes(operation)) {\n  if (!contentId) {\n    result = 'Error: content_id is required for ' + operation + ' operation.';\n  } else {\n    const body = { status: operation === 'approve' ? 'approved' : operation === 'publish' ? 'published' : 'rejected', updated_at: new Date().toISOString() };\n    if (operation === 'publish') body.published_at = new Date().toISOString();\n    await this.helpers.httpRequest({ method: 'PATCH', url: supabaseUrl + '/rest/v1/published_content?id=eq.' + contentId, headers: { ...headers, 'Prefer': 'return=representation' }, body });\n    result = 'Content ' + (operation === 'approve' ? 'approved' : operation === 'publish' ? 'published' : 'rejected') + ' successfully.';\n  }\n} else {\n  result = 'Unknown operation: ' + operation + '. Valid operations: list_drafts, list_published, approve, publish, reject';\n}\n\nreturn [{ json: { result } }];"
+      },
+      "id": "code-001",
+      "name": "handle_operation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "set-result",
+              "name": "result",
+              "value": "={{ $json.result }}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "set-002",
+      "name": "set_result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        660,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "workflow_trigger": {
+      "main": [
+        [
+          {
+            "node": "settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "settings": {
+      "main": [
+        [
+          {
+            "node": "handle_operation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "handle_operation": {
+      "main": [
+        [
+          {
+            "node": "set_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "pinData": null
+}

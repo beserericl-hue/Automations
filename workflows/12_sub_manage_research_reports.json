@@ -1,0 +1,363 @@
+{
+  "name": "Sub - Manage Research Reports",
+  "nodes": [
+    {
+      "id": "rr-trigger",
+      "name": "workflow_trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "operation"
+            },
+            {
+              "name": "report_id"
+            },
+            {
+              "name": "topic"
+            },
+            {
+              "name": "genre_slug"
+            },
+            {
+              "name": "content"
+            },
+            {
+              "name": "status"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "rr-settings",
+      "name": "settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        200,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "SUPABASE_URL",
+              "value": "https://qsirioazmsmrrfoltrhn.supabase.co",
+              "type": "string"
+            },
+            {
+              "id": "s2",
+              "name": "SUPABASE_API_KEY",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "rr-switch",
+      "name": "check_operation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const operation = $('workflow_trigger').first().json.operation || 'save';\nconst item = { json: $input.first().json };\n// Output 0=save, 1=get, 2=list, 3=update\nconst outputs = [[], [], [], []];\nswitch (operation) {\n  case 'save': outputs[0].push(item); break;\n  case 'get': outputs[1].push(item); break;\n  case 'list': outputs[2].push(item); break;\n  case 'update': outputs[3].push(item); break;\n  default: outputs[0].push(item); break;\n}\nreturn outputs;"
+      }
+    },
+    {
+      "id": "rr-save",
+      "name": "save_report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        -200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/research_reports",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ topic: $('workflow_trigger').item.json.topic, genre_slug: $('workflow_trigger').item.json.genre_slug || null, content: $('workflow_trigger').item.json.content, status: $('workflow_trigger').item.json.status || 'draft' }) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "rr-get",
+      "name": "get_report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        -50
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/research_reports?id=eq.{{ $('workflow_trigger').item.json.report_id }}&limit=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "rr-list",
+      "name": "list_reports",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        100
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/research_reports?order=updated_at.desc&limit=20&select=id,topic,genre_slug,status,created_at,updated_at",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "rr-update",
+      "name": "update_report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        250
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/research_reports?id=eq.{{ $('workflow_trigger').item.json.report_id }}",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify(Object.assign({}, $('workflow_trigger').item.json.content ? { content: $('workflow_trigger').item.json.content } : {}, $('workflow_trigger').item.json.topic ? { topic: $('workflow_trigger').item.json.topic } : {}, $('workflow_trigger').item.json.status ? { status: $('workflow_trigger').item.json.status } : {}, { updated_at: new Date().toISOString() })) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "rr-result",
+      "name": "set_result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1000,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "result",
+              "value": "={{ JSON.stringify($input.first().json) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "workflow_trigger": {
+      "main": [
+        [
+          {
+            "node": "settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "settings": {
+      "main": [
+        [
+          {
+            "node": "check_operation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check_operation": {
+      "main": [
+        [
+          {
+            "node": "save_report",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "get_report",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "list_reports",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "update_report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "save_report": {
+      "main": [
+        [
+          {
+            "node": "set_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_report": {
+      "main": [
+        [
+          {
+            "node": "set_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "list_reports": {
+      "main": [
+        [
+          {
+            "node": "set_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update_report": {
+      "main": [
+        [
+          {
+            "node": "set_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "pinData": null
+}

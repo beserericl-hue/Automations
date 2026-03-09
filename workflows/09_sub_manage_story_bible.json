@@ -2,14 +2,6 @@
   "name": "Sub - Manage Story Bible",
   "nodes": [
     {
-      "id": "sb-trigger",
-      "name": "workflow_trigger",
-      "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1.1,
-      "position": [
-        0,
-        0
-      ],
       "parameters": {
         "workflowInputs": {
           "values": [
@@ -24,17 +16,17 @@
             }
           ]
         }
-      }
+      },
+      "id": "sb-trigger",
+      "name": "workflow_trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
     },
     {
-      "id": "sb-settings",
-      "name": "settings",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        120,
-        0
-      ],
       "parameters": {
         "assignments": {
           "assignments": [
@@ -53,51 +45,30 @@
           ]
         },
         "options": {}
-      }
+      },
+      "id": "sb-settings",
+      "name": "settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        128,
+        0
+      ]
     },
     {
+      "parameters": {
+        "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\nconst projectTitle = $('workflow_trigger').first().json.project_title;\nconst operation = $('workflow_trigger').first().json.operation || 'get';\n\n// Find the project\nlet project = null;\ntry {\n  const resp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: supabaseUrl + '/rest/v1/writing_projects?title=eq.' + encodeURIComponent(projectTitle) + '&limit=1',\n    headers: headers\n  });\n  const projects = Array.isArray(resp) ? resp : [resp];\n  if (projects.length > 0 && projects[0]?.id) {\n    project = projects[0];\n  }\n} catch (e) {}\n\nif (!project) {\n  return [{ json: { project: null, error: 'Project not found: ' + projectTitle, operation: operation } }];\n}\n\nreturn [{ json: { project: project, operation: operation } }];"
+      },
       "id": "sb-project",
       "name": "get_project",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
-        240,
+        288,
         0
-      ],
-      "parameters": {
-        "method": "GET",
-        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/writing_projects?title=eq.{{ encodeURIComponent($json.project_title) }}&limit=1",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
-            }
-          ]
-        }
-      }
+      ]
     },
     {
-      "id": "sb-check",
-      "name": "check_operation",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        480,
-        0
-      ],
       "parameters": {
         "conditions": {
           "options": {
@@ -110,7 +81,7 @@
           "conditions": [
             {
               "id": "c1",
-              "leftValue": "={{ $('workflow_trigger').item.json.operation }}",
+              "leftValue": "={{ $json.operation }}",
               "rightValue": "get",
               "operator": {
                 "type": "string",
@@ -120,81 +91,76 @@
           ]
         },
         "options": {}
-      }
+      },
+      "id": "sb-check",
+      "name": "check_operation",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        0
+      ]
     },
     {
+      "parameters": {
+        "url": "={{ $('settings').first().json.SUPABASE_URL }}/rest/v1/story_bible?project_id=eq.{{ $('get_project').first().json.project?.id }}&order=entry_type,name",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').first().json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').first().json.SUPABASE_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
       "id": "sb-get",
       "name": "get_story_bible",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
         720,
-        -100
-      ],
-      "parameters": {
-        "method": "GET",
-        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/story_bible?project_id=eq.{{ $('get_project').first().json[0]?.id }}&order=entry_type,name",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
-            }
-          ]
-        }
-      }
+        -96
+      ]
     },
     {
+      "parameters": {
+        "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\nconst projectId = $('get_project').first().json.project?.id;\n\nif (!projectId) {\n  return [{ json: { result: 'Error: Project not found. Cannot update story bible.' } }];\n}\n\nconst entriesStr = $('workflow_trigger').first().json.entries || '[]';\nlet entries = [];\ntry {\n  entries = JSON.parse(entriesStr);\n} catch (e) {\n  // entries might already be an array/object\n  entries = Array.isArray(entriesStr) ? entriesStr : [entriesStr];\n}\n\nconst enriched = entries.map(e => ({ ...e, project_id: projectId }));\n\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: supabaseUrl + '/rest/v1/story_bible',\n    headers: headers,\n    body: enriched\n  });\n} catch (e) {\n  return [{ json: { result: 'Error updating story bible: ' + e.message } }];\n}\n\nreturn [{ json: { result: 'Story bible updated with ' + entries.length + ' entries for project ' + $('workflow_trigger').first().json.project_title } }];"
+      },
       "id": "sb-update",
       "name": "update_story_bible",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         720,
-        100
-      ],
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/story_bible",
-        "sendBody": true,
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "body": "={{ JSON.stringify(JSON.parse($('workflow_trigger').item.json.entries || '[]').map(e => ({ ...e, project_id: $('get_project').first().json[0]?.id }))) }}",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
-            }
-          ]
-        }
-      }
+        112
+      ]
     },
     {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "sr1",
+              "name": "result",
+              "value": "={{ $json.result || JSON.stringify($json) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
       "id": "sb-result",
       "name": "set_result",
       "type": "n8n-nodes-base.set",
@@ -202,20 +168,7 @@
       "position": [
         960,
         0
-      ],
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "sr1",
-              "name": "result",
-              "value": "={{ $('check_operation').item.json.operation === 'get' ? JSON.stringify($('get_story_bible').first().json) : 'Story bible updated successfully' }}",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      }
+      ]
     }
   ],
   "connections": {
@@ -295,6 +248,9 @@
   },
   "settings": {
     "executionOrder": "v1",
-    "callerPolicy": "workflowsFromSameOwner"
-  }
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "pinData": {}
 }

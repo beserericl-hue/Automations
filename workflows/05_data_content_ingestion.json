@@ -67,13 +67,13 @@
             {
               "id": "p1",
               "name": "genre_slug",
-              "value": "={{ $json.genre_slug }}",
+              "value": "={{ $('workflow_trigger').item.json.genre_slug }}",
               "type": "string"
             },
             {
               "id": "p2",
               "name": "query_date",
-              "value": "={{ $json.date || $now.format('yyyy-MM-dd') }}",
+              "value": "={{ $('workflow_trigger').item.json.date || $now.format('yyyy-MM-dd') }}",
               "type": "string"
             }
           ]
@@ -116,45 +116,12 @@
       }
     },
     {
-      "id": "ci-filter",
-      "name": "filter_relevant",
-      "type": "n8n-nodes-base.filter",
-      "typeVersion": 2.2,
-      "position": [
-        720,
-        0
-      ],
-      "parameters": {
-        "conditions": {
-          "options": {
-            "version": 2,
-            "leftValue": "",
-            "caseSensitive": true,
-            "typeValidation": "strict"
-          },
-          "combinator": "and",
-          "conditions": [
-            {
-              "id": "f1",
-              "leftValue": "={{ $json.title }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "isNotEmpty"
-              }
-            }
-          ]
-        },
-        "options": {}
-      }
-    },
-    {
       "id": "ci-download",
       "name": "download_content",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        960,
+        1080,
         0
       ],
       "parameters": {
@@ -172,54 +139,14 @@
     {
       "id": "ci-prepare",
       "name": "prepare_content",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
-        1200,
+        1320,
         0
       ],
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "pc1",
-              "name": "title",
-              "value": "={{ $('filter_relevant').item.json.title }}",
-              "type": "string"
-            },
-            {
-              "id": "pc2",
-              "name": "source_type",
-              "value": "={{ $('filter_relevant').item.json.source_type }}",
-              "type": "string"
-            },
-            {
-              "id": "pc3",
-              "name": "source_url",
-              "value": "={{ $('filter_relevant').item.json.source_url }}",
-              "type": "string"
-            },
-            {
-              "id": "pc4",
-              "name": "genre_slug",
-              "value": "={{ $('filter_relevant').item.json.genre_slug }}",
-              "type": "string"
-            },
-            {
-              "id": "pc5",
-              "name": "content",
-              "value": "={{ $json.data }}",
-              "type": "string"
-            },
-            {
-              "id": "pc6",
-              "name": "content_id",
-              "value": "={{ $('filter_relevant').item.json.id }}",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
+        "jsCode": "// Parse the downloaded batch.json which contains all cleaned items.\nconst raw = $input.first().json.data || $input.first().json;\nlet items;\ntry {\n  items = typeof raw === 'string' ? JSON.parse(raw) : raw;\n} catch (e) {\n  items = [];\n}\nif (!Array.isArray(items)) items = [items];\n\nconst genre = $('dedupe_paths').first().json.genre_slug;\n\nreturn items\n  .filter(d => d && d.title)\n  .map(d => ({\n    json: {\n      title: d.title,\n      source_type: d.source_type || '',\n      source_url: d.source_url || '',\n      genre_slug: genre,\n      summary: d.summary || '',\n      feed_name: d.feed_name || '',\n      content: JSON.stringify(d)\n    }\n  }));"
       }
     },
     {
@@ -228,12 +155,25 @@
       "type": "n8n-nodes-base.aggregate",
       "typeVersion": 1,
       "position": [
-        1440,
+        1560,
         0
       ],
       "parameters": {
         "aggregate": "aggregateAllItemData",
         "options": {}
+      }
+    },
+    {
+      "id": "ci-dedupe",
+      "name": "dedupe_paths",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Filter items with non-empty titles AND deduplicate by content_path.\nconst seen = new Set();\nconst results = [];\nfor (const item of $input.all()) {\n  const title = item.json.title;\n  const path = item.json.content_path;\n  // Skip items without a real title\n  if (!title || (typeof title === 'string' && title.trim() === '')) continue;\n  // Deduplicate by content_path so we download each batch file only once\n  if (path && !seen.has(path)) {\n    seen.add(path);\n    results.push(item);\n  }\n}\nreturn results;"
       }
     }
   ],
@@ -271,28 +211,6 @@
         ]
       ]
     },
-    "query_content_index": {
-      "main": [
-        [
-          {
-            "node": "filter_relevant",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "filter_relevant": {
-      "main": [
-        [
-          {
-            "node": "download_content",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "download_content": {
       "main": [
         [
@@ -314,10 +232,35 @@
           }
         ]
       ]
+    },
+    "dedupe_paths": {
+      "main": [
+        [
+          {
+            "node": "download_content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "query_content_index": {
+      "main": [
+        [
+          {
+            "node": "dedupe_paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
     "executionOrder": "v1",
-    "callerPolicy": "workflowsFromSameOwner"
-  }
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "pinData": null
 }

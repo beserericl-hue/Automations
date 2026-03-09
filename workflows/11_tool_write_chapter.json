@@ -2,14 +2,6 @@
   "name": "Tool - Write Chapter",
   "nodes": [
     {
-      "id": "ch-trigger",
-      "name": "workflow_trigger",
-      "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1.1,
-      "position": [
-        0,
-        0
-      ],
       "parameters": {
         "workflowInputs": {
           "values": [
@@ -33,17 +25,17 @@
             }
           ]
         }
-      }
+      },
+      "id": "ch-trigger",
+      "name": "workflow_trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -32,
+        0
+      ]
     },
     {
-      "id": "ch-settings",
-      "name": "settings",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        120,
-        0
-      ],
       "parameters": {
         "assignments": {
           "assignments": [
@@ -62,242 +54,127 @@
           ]
         },
         "options": {}
-      }
+      },
+      "id": "ch-settings",
+      "name": "settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        128,
+        0
+      ]
     },
     {
+      "parameters": {
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/genre_config?genre_slug=eq.{{ $('workflow_trigger').item.json.genre_slug }}&limit=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
       "id": "ch-genre",
       "name": "get_genre_config",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        240,
+        304,
         0
-      ],
-      "parameters": {
-        "method": "GET",
-        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/genre_config?genre_slug=eq.{{ $json.genre_slug }}&limit=1",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
-            }
-          ]
-        }
-      }
+      ]
     },
     {
+      "parameters": {
+        "jsCode": "// Get or create the writing project\nconst supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\nconst projectTitle = $('workflow_trigger').first().json.project_title;\nconst genreSlug = $('workflow_trigger').first().json.genre_slug;\n\n// Try to find the project (includes outline)\nlet project = null;\ntry {\n  const resp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: supabaseUrl + '/rest/v1/writing_projects?title=eq.' + encodeURIComponent(projectTitle) + '&limit=1',\n    headers: headers\n  });\n  const projects = Array.isArray(resp) ? resp : [resp];\n  if (projects.length > 0 && projects[0]?.id) {\n    project = projects[0];\n  }\n} catch (e) {}\n\n// Create project if not found\nif (!project) {\n  try {\n    const created = await this.helpers.httpRequest({\n      method: 'POST',\n      url: supabaseUrl + '/rest/v1/writing_projects',\n      headers: { ...headers, 'Prefer': 'return=representation' },\n      body: { title: projectTitle, genre_slug: genreSlug, project_type: 'book', status: 'in_progress', chapter_count: 0 }\n    });\n    project = Array.isArray(created) ? created[0] : created;\n  } catch (e) {\n    project = { id: null, title: projectTitle };\n  }\n}\n\n// Fetch story bible entries\nlet storyBible = [];\nif (project?.id) {\n  try {\n    const bibleResp = await this.helpers.httpRequest({\n      method: 'GET',\n      url: supabaseUrl + '/rest/v1/story_bible?project_id=eq.' + project.id + '&order=chapter_introduced,entry_type,name',\n      headers: headers\n    });\n    storyBible = Array.isArray(bibleResp) ? bibleResp : [];\n  } catch (e) {}\n}\n\n// Fetch writing samples\nlet samplesText = 'No writing samples available.';\ntry {\n  const listResp = await this.helpers.httpRequest({\n    method: 'POST',\n    url: supabaseUrl + '/storage/v1/object/list/author-content',\n    headers: headers,\n    body: { prefix: 'writing-samples', limit: 20 }\n  });\n  const files = (listResp || []).filter(f => f.name && f.name !== '.gitkeep' && f.metadata?.size > 0);\n  if (files.length > 0) {\n    const samples = [];\n    for (const file of files.slice(0, 5)) {\n      try {\n        const content = await this.helpers.httpRequest({\n          method: 'GET',\n          url: supabaseUrl + '/storage/v1/object/author-content/writing-samples/' + file.name,\n          headers: { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey },\n          encoding: 'utf-8',\n          json: false\n        });\n        samples.push(typeof content === 'string' ? content : JSON.stringify(content));\n      } catch (e) {}\n    }\n    if (samples.length > 0) samplesText = samples.join('\\n\\n');\n  }\n} catch (e) {}\n\nreturn [{ json: { project: project, story_bible: storyBible, writing_samples: samplesText, outline: project?.outline || null } }];"
+      },
       "id": "ch-project",
-      "name": "get_project",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "name": "get_project_data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         480,
         0
-      ],
-      "parameters": {
-        "method": "GET",
-        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/writing_projects?title=eq.{{ encodeURIComponent($('workflow_trigger').item.json.project_title) }}&limit=1",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
-            }
-          ]
-        }
-      }
+      ]
     },
     {
-      "id": "ch-bible",
-      "name": "fetch_story_bible",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "parameters": {
+        "messages": {
+          "message": [
+            {
+              "content": "=You are a research assistant. Provide detailed, factual information with citations useful for fiction writing.",
+              "role": "system"
+            },
+            {
+              "content": "=Research for chapter {{ $('workflow_trigger').first().json.chapter_number }} of a novel titled \"{{ $('workflow_trigger').first().json.project_title }}\". Chapter brief: {{ $('workflow_trigger').first().json.brief }}. Provide factual details about: {{ $('workflow_trigger').first().json.research_topics || $('workflow_trigger').first().json.brief }}."
+            }
+          ]
+        },
+        "simplify": true,
+        "options": {
+          "temperature": 0.1,
+          "searchRecency": "month"
+        },
+        "requestOptions": {}
+      },
+      "id": "ch-research",
+      "name": "research_topic",
+      "type": "n8n-nodes-base.perplexity",
+      "typeVersion": 1,
       "position": [
         720,
         0
       ],
-      "parameters": {
-        "method": "GET",
-        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/story_bible?project_id=eq.{{ $('get_project').first().json[0]?.id }}&order=entry_type,name",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
-            }
-          ]
+      "credentials": {
+        "perplexityApi": {
+          "id": "ggr9QCRobQVA6Lwb",
+          "name": "Perplexity account"
         }
       }
     },
     {
-      "id": "ch-samples",
-      "name": "fetch_writing_samples",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        720,
-        200
-      ],
       "parameters": {
-        "method": "GET",
-        "url": "={{ $('settings').item.json.SUPABASE_URL }}/storage/v1/object/list/author-content/writing-samples/",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "id": "ch-research-q",
-      "name": "build_research_query",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+        "jsCode": "const trigger = $('workflow_trigger').first().json;\nconst genre = $('get_genre_config').first().json;\nconst genreData = Array.isArray(genre) ? genre[0] : genre;\nconst research = $('research_topic').first().json.message || '';\nconst projectData = $('get_project_data').first().json;\nconst storyBible = projectData.story_bible || [];\nconst writingSamples = projectData.writing_samples || '';\n\n// Auto-load outline: use trigger.outline if provided, otherwise fall back to stored outline\nconst storedOutline = projectData.outline;\nlet outlineText = trigger.outline || '';\n\nif (!outlineText && storedOutline) {\n  // Format the stored JSON outline into readable text for the prompt\n  if (typeof storedOutline === 'object') {\n    const parts = [];\n    if (storedOutline.premise) parts.push('PREMISE: ' + storedOutline.premise);\n    if (storedOutline.themes) parts.push('THEMES: ' + storedOutline.themes.join(', '));\n    if (storedOutline.characters) {\n      parts.push('CHARACTERS:\\n' + storedOutline.characters.map(c => \n        '- ' + c.name + ' (' + c.role + '): ' + c.arc + (c.description ? ' \u2014 ' + c.description : '')\n      ).join('\\n'));\n    }\n    if (storedOutline.chapters) {\n      parts.push('CHAPTER OUTLINE:\\n' + storedOutline.chapters.map(ch => \n        'Ch ' + ch.number + ' \u2014 ' + ch.title + ': ' + ch.brief + (ch.arc_notes ? ' [Arc: ' + ch.arc_notes + ']' : '')\n      ).join('\\n'));\n    }\n    outlineText = parts.join('\\n\\n');\n  } else {\n    outlineText = String(storedOutline);\n  }\n}\n\n// Format story bible for the prompt\nconst bibleText = storyBible.length > 0\n  ? storyBible.map(e => '[' + e.entry_type + '] ' + e.name + ': ' + e.description + ' (ch' + e.chapter_introduced + (e.last_chapter_seen > e.chapter_introduced ? '-ch' + e.last_chapter_seen : '') + ')').join('\\n')\n  : 'No story bible entries yet (this is likely the first chapter).';\n\nconst chapterNum = parseInt(trigger.chapter_number);\n\n// If we have a stored outline, extract this specific chapter's details\nlet chapterBrief = trigger.brief || '';\nlet chapterResearchTopics = '';\nif (storedOutline?.chapters && !trigger.brief) {\n  const thisChapter = storedOutline.chapters.find(ch => ch.number === chapterNum);\n  if (thisChapter) {\n    chapterBrief = thisChapter.brief + (thisChapter.arc_notes ? '\\nArc notes: ' + thisChapter.arc_notes : '');\n    if (thisChapter.research_topics) chapterResearchTopics = thisChapter.research_topics.join(', ');\n  }\n}\n\nconst prompt = 'You are a world-class novelist writing Chapter ' + chapterNum + ' of \"' + trigger.project_title + '\", a ' + (genreData?.genre_name || 'fiction') + ' novel.\\n\\n## Genre Guidelines\\n' + (genreData?.writing_guidelines || '') + '\\n\\n## Writing Style Reference\\n' + writingSamples + '\\n\\n## Research\\n' + research + '\\n\\n## Story Bible (established canon - DO NOT contradict)\\n' + bibleText + '\\n\\n## Book Outline\\n' + (outlineText || 'No outline provided.') + '\\n\\n## This Chapter\\'s Brief\\n' + (chapterBrief || trigger.brief || 'No specific brief provided.') + '\\n\\n## Requirements\\n- Maintain consistency with all story bible entries above\\n- Internal character arc within this chapter\\n- End on a compelling hook for the next chapter\\n- Track character development and relationships\\n- 3000-5000 words\\n- Include natural scene breaks (---)\\n- Reference established locations, characters, and plot threads where relevant\\n\\n## Output Format\\nReturn JSON with these fields:\\n- chapter_title: title for this chapter\\n- chapter_text: the full chapter text\\n- word_count: approximate word count\\n- chapter_summary: 2-3 sentence summary of what happens\\n- next_chapter_notes: suggestions for what should happen next\\n- new_story_bible_entries: array of new entries to add [{entry_type, name, description}] where entry_type is one of: character, location, plot_thread, item, event';\n\nreturn [{ json: { prompt: prompt, project_id: projectData.project?.id } }];"
+      },
+      "id": "ch-prompt",
+      "name": "build_chapter_prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         960,
         0
-      ],
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "crq1",
-              "name": "research_query",
-              "value": "=Research for chapter {{ $('workflow_trigger').item.json.chapter_number }} of a {{ $('get_genre_config').first().json[0]?.genre_name }} novel titled \"{{ $('workflow_trigger').item.json.project_title }}\". Chapter brief: {{ $('workflow_trigger').item.json.brief }}. Provide factual details about: {{ $('workflow_trigger').item.json.research_topics || $('workflow_trigger').item.json.brief }}.",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      }
+      ]
     },
     {
-      "id": "ch-research",
-      "name": "research_topic",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1200,
-        0
-      ],
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.perplexity.ai/chat/completions",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendBody": true,
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ model: 'sonar-reasoning', messages: [{ role: 'user', content: $json.research_query }] }) }}",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
-        }
-      }
-    },
-    {
-      "id": "ch-prompt",
-      "name": "build_chapter_prompt",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        1440,
-        0
-      ],
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "bcp1",
-              "name": "prompt",
-              "value": "=You are writing Chapter {{ $('workflow_trigger').item.json.chapter_number }} of \"{{ $('workflow_trigger').item.json.project_title }}\", a {{ $('get_genre_config').first().json[0]?.genre_name }} novel.\n\n## Genre Guidelines\n{{ $('get_genre_config').first().json[0]?.writing_guidelines }}\n\n## Research\n{{ $('research_topic').item.json.choices?.[0]?.message?.content || '' }}\n\n## Story Bible\n{{ JSON.stringify($('fetch_story_bible').first().json || []) }}\n\n## Outline\n{{ $('workflow_trigger').item.json.outline }}\n\n## This Chapter\n{{ $('workflow_trigger').item.json.brief }}\n\n## Requirements\n- Internal arc per chapter\n- End on a hook\n- Track character development\n- 3000-5000 words\n- Include scene breaks (---)\n\n## Output\nReturn JSON: { chapter_title, chapter_text, word_count, chapter_summary, next_chapter_notes, new_story_bible_entries }",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      }
-    },
-    {
-      "id": "ch-write",
-      "name": "write_chapter",
-      "type": "@n8n/n8n-nodes-langchain.chainLlm",
-      "typeVersion": 1.7,
-      "position": [
-        1680,
-        0
-      ],
       "parameters": {
         "promptType": "define",
         "text": "={{ $json.prompt }}",
         "hasOutputParser": true,
         "batching": {}
-      }
+      },
+      "id": "ch-write",
+      "name": "write_chapter",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        1200,
+        0
+      ]
     },
     {
-      "id": "ch-claude",
-      "name": "claude-sonnet",
-      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
-      "typeVersion": 1.3,
-      "position": [
-        1680,
-        208
-      ],
       "parameters": {
         "model": {
           "__rl": true,
@@ -308,165 +185,214 @@
         "options": {
           "maxTokensToSample": 16000
         }
+      },
+      "id": "ch-claude",
+      "name": "claude-sonnet",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        1200,
+        224
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "5LhCYKsaFO3fF7II",
+          "name": "Anthropic account"
+        }
       }
     },
     {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\"type\":\"object\",\"properties\":{\"chapter_title\":{\"type\":\"string\"},\"chapter_text\":{\"type\":\"string\"},\"word_count\":{\"type\":\"integer\"},\"chapter_summary\":{\"type\":\"string\"},\"next_chapter_notes\":{\"type\":\"string\"},\"new_story_bible_entries\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"entry_type\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"description\":{\"type\":\"string\"}}}}},\"required\":[\"chapter_title\",\"chapter_text\",\"word_count\",\"chapter_summary\",\"next_chapter_notes\"]}"
+      },
       "id": "ch-parser",
       "name": "chapter_parser",
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.3,
       "position": [
-        1872,
-        208
-      ],
-      "parameters": {
-        "schemaType": "manual",
-        "inputSchema": "{\"type\":\"object\",\"properties\":{\"chapter_title\":{\"type\":\"string\"},\"chapter_text\":{\"type\":\"string\"},\"word_count\":{\"type\":\"integer\"},\"chapter_summary\":{\"type\":\"string\"},\"next_chapter_notes\":{\"type\":\"string\"},\"new_story_bible_entries\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"entry_type\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"description\":{\"type\":\"string\"}}}}},\"required\":[\"chapter_title\",\"chapter_text\",\"word_count\",\"chapter_summary\",\"next_chapter_notes\"]}"
-      }
+        1360,
+        240
+      ]
     },
     {
-      "id": "ch-update-bible",
+      "parameters": {
+        "jsCode": "// Update story bible with new entries from this chapter\nconst supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\nconst projectId = $('build_chapter_prompt').first().json.project_id;\nconst chapterNum = parseInt($('workflow_trigger').first().json.chapter_number);\nconst output = $input.first().json.output || {};\nconst newEntries = output.new_story_bible_entries || [];\n\n// Insert new story bible entries\nif (newEntries.length > 0 && projectId) {\n  try {\n    const entries = newEntries.map(e => ({\n      entry_type: e.entry_type,\n      name: e.name,\n      description: e.description,\n      project_id: projectId,\n      chapter_introduced: chapterNum,\n      last_chapter_seen: chapterNum\n    }));\n    await this.helpers.httpRequest({\n      method: 'POST',\n      url: supabaseUrl + '/rest/v1/story_bible',\n      headers: headers,\n      body: entries\n    });\n  } catch (e) {}\n}\n\n// Update project chapter count\nif (projectId) {\n  try {\n    await this.helpers.httpRequest({\n      method: 'PATCH',\n      url: supabaseUrl + '/rest/v1/writing_projects?id=eq.' + projectId,\n      headers: headers,\n      body: { chapter_count: chapterNum, status: 'in_progress', updated_at: new Date().toISOString() }\n    });\n  } catch (e) {}\n}\n\nreturn [{ json: { output: output, project_id: projectId } }];"
+      },
+      "id": "ch-update",
       "name": "update_story_bible",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
-        1920,
+        1440,
         0
-      ],
+      ]
+    },
+    {
       "parameters": {
         "method": "POST",
-        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/story_bible",
-        "sendBody": true,
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "body": "={{ JSON.stringify(($json.output?.new_story_bible_entries || []).map(e => ({ ...e, project_id: $('get_project').first().json[0]?.id, chapter_introduced: parseInt($('workflow_trigger').item.json.chapter_number), last_chapter_seen: parseInt($('workflow_trigger').item.json.chapter_number) }))) }}",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
+        "url": "={{ $('settings').first().json.SUPABASE_URL }}/storage/v1/object/author-content/drafts/chapter_{{ $('workflow_trigger').first().json.project_title?.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 30) || 'book' }}_ch{{ $('workflow_trigger').first().json.chapter_number }}_{{ $now.format('yyyy-MM-dd_HHmmss') }}.md",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').first().json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').first().json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "x-upsert",
+              "value": "true"
             }
-          }
+          ]
         },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "id": "ch-update-proj",
-      "name": "update_project",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        2160,
-        0
-      ],
-      "parameters": {
-        "method": "PATCH",
-        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/writing_projects?id=eq.{{ $('get_project').first().json[0]?.id }}",
         "sendBody": true,
         "contentType": "raw",
-        "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ chapter_count: parseInt($('workflow_trigger').item.json.chapter_number), status: 'in_progress', updated_at: $now.toISO() }) }}",
-        "options": {},
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
-            }
-          ]
-        }
-      }
-    },
-    {
+        "rawContentType": "text/markdown",
+        "body": "={{ $json.output?.chapter_text || '' }}",
+        "options": {}
+      },
       "id": "ch-save",
       "name": "save_draft",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2400,
+        1680,
         0
-      ],
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $('settings').item.json.SUPABASE_URL }}/storage/v1/object/author-content/drafts/chapter_{{ $('workflow_trigger').item.json.project_title?.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 30) || 'book' }}_ch{{ $('workflow_trigger').item.json.chapter_number }}_{{ $now.format('yyyy-MM-dd') }}.md",
-        "sendBody": true,
-        "contentType": "raw",
-        "rawContentType": "text/markdown",
-        "body": "={{ $('write_chapter').item.json.output?.chapter_text || '' }}",
-        "options": {},
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
-            }
-          ]
-        }
-      }
+      ]
     },
     {
+      "parameters": {
+        "sendTo": "eric@agileadtesting.com",
+        "subject": "={{ $('workflow_trigger').first().json.project_title }} - Chapter {{ $('workflow_trigger').first().json.chapter_number }}: {{ $('update_story_bible').first().json.output?.chapter_title || 'Draft' }}",
+        "message": "={{ ($('update_story_bible').first().json.output?.chapter_text || '').replace(/\\n/g, '<br>') }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
       "id": "ch-email",
       "name": "send_email",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        2640,
+        2160,
         0
       ],
-      "parameters": {
-        "operation": "send",
-        "sendTo": "eric@agileadtesting.com",
-        "subject": "={{ $('workflow_trigger').item.json.project_title }} - Chapter {{ $('workflow_trigger').item.json.chapter_number }}: {{ $('write_chapter').item.json.output?.chapter_title || 'Draft' }}",
-        "message": "={{ ($('write_chapter').item.json.output?.chapter_text || '').replace(/\\n/g, '<br>') }}",
-        "options": {
-          "appendAttribution": false
+      "webhookId": "2980b0e0-2638-4b1e-a72e-742faef985f5",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "CPCSZOInV8Zj1PI1",
+          "name": "Gmail account"
         }
       }
     },
     {
-      "id": "ch-result",
-      "name": "set_result",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "parameters": {
+        "workflowId": {
+          "value": "SxeLHxzvITEKyKc0"
+        },
+        "options": {},
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "story_title": "={{ $('workflow_trigger').first().json.project_title }} - Chapter {{ $('workflow_trigger').first().json.chapter_number }}",
+            "image_description": "=A cinematic cover image for Chapter {{ $('workflow_trigger').first().json.chapter_number }} of \"{{ $('workflow_trigger').first().json.project_title }}\".\n\nChapter synopsis: {{ $('workflow_trigger').first().json.brief }}\n\nOpening scene excerpt:\n{{ $('set_chapter_text').first().json.chapter_text?.substring(0, 1200) || 'No text available' }}\n\nCreate a single powerful visual scene capturing this chapter's key moment \u2014 the environment, lighting, character silhouettes, and atmospheric details. Do NOT include any text, titles, or words in the image.",
+            "genre_slug": "={{ $('workflow_trigger').first().json.genre_slug }}",
+            "content_type": "Book Chapter"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "image_description",
+              "displayName": "image_description",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "story_title",
+              "displayName": "story_title",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "genre_slug",
+              "displayName": "genre_slug",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "content_type",
+              "displayName": "content_type",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            }
+          ]
+        }
+      },
+      "id": "ch-cover",
+      "name": "generate_cover_image",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
       "position": [
-        2880,
-        0
+        1680,
+        240
       ],
+      "onError": "continueRegularOutput"
+    },
+    {
       "parameters": {
         "assignments": {
           "assignments": [
             {
               "id": "cr1",
               "name": "result",
-              "value": "=Chapter {{ $('workflow_trigger').item.json.chapter_number }} written: {{ $('write_chapter').item.json.output?.chapter_title || 'Untitled' }} ({{ $('write_chapter').item.json.output?.word_count || 0 }} words)",
+              "value": "=Chapter {{ $('workflow_trigger').first().json.chapter_number }} written: {{ $('update_story_bible').first().json.output?.chapter_title || 'Untitled' }} ({{ $('update_story_bible').first().json.output?.word_count || 0 }} words). Story bible updated with {{ ($('update_story_bible').first().json.output?.new_story_bible_entries || []).length }} new entries.",
               "type": "string"
             }
           ]
         },
         "options": {}
-      }
+      },
+      "id": "ch-result",
+      "name": "set_result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2400,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\n\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: supabaseUrl + '/rest/v1/published_content',\n    headers,\n    body: {\n      title: ($('update_story_bible').first().json.output?.chapter_title || 'Chapter ' + $('workflow_trigger').first().json.chapter_number),\n      content_type: 'chapter',\n      genre_slug: $('workflow_trigger').first().json.genre_slug,\n      content_text: ($('update_story_bible').first().json.output?.chapter_text || ''),\n      storage_path: $json.Key || '',\n      project_id: $('build_chapter_prompt').first().json.project_id || null,\n      chapter_number: parseInt($('workflow_trigger').first().json.chapter_number) || null,\n      status: 'draft'\n    }\n  });\n} catch (e) {\n  // Don't fail the workflow if draft insert fails\n}\n\nreturn $input.all();"
+      },
+      "id": "ch-draft",
+      "name": "insert_draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        0
+      ]
     }
   ],
   "connections": {
@@ -496,41 +422,14 @@
       "main": [
         [
           {
-            "node": "get_project",
+            "node": "get_project_data",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "get_project": {
-      "main": [
-        [
-          {
-            "node": "fetch_story_bible",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "fetch_writing_samples",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "fetch_story_bible": {
-      "main": [
-        [
-          {
-            "node": "build_research_query",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "build_research_query": {
+    "get_project_data": {
       "main": [
         [
           {
@@ -600,18 +499,12 @@
       "main": [
         [
           {
-            "node": "update_project",
+            "node": "save_draft",
             "type": "main",
             "index": 0
-          }
-        ]
-      ]
-    },
-    "update_project": {
-      "main": [
-        [
+          },
           {
-            "node": "save_draft",
+            "node": "generate_cover_image",
             "type": "main",
             "index": 0
           }
@@ -622,7 +515,7 @@
       "main": [
         [
           {
-            "node": "send_email",
+            "node": "insert_draft",
             "type": "main",
             "index": 0
           }
@@ -639,10 +532,35 @@
           }
         ]
       ]
+    },
+    "generate_cover_image": {
+      "main": [
+        [
+          {
+            "node": "set_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "insert_draft": {
+      "main": [
+        [
+          {
+            "node": "send_email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
     "executionOrder": "v1",
-    "callerPolicy": "workflowsFromSameOwner"
-  }
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "pinData": {}
 }

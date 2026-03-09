@@ -5,54 +5,127 @@
       "parameters": {
         "workflowInputs": {
           "values": [
-            { "name": "markdownReportContent" },
-            { "name": "emailAddress" },
-            { "name": "subjectLine" }
+            {
+              "name": "markdownReportContent"
+            },
+            {
+              "name": "emailAddress"
+            },
+            {
+              "name": "subjectLine"
+            }
           ]
         }
       },
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
-      "position": [640, -272],
+      "position": [
+        640,
+        -272
+      ],
       "id": "559da46a-0c14-46f7-bdb2-c60e4e7bb4db",
       "name": "workflow_trigger"
     },
     {
       "parameters": {
+        "jsCode": "// Ensure markdown tables have blank lines before/after so Showdown parses them\nlet md = $input.first().json.markdownReportContent || '';\n\n// Match table blocks: lines starting with | that include a separator row (|---|)\n// Add blank lines before and after table blocks if missing\nmd = md.replace(/(^|\\n)([^\\n]*\\|[^\\n]*\\n\\|[-| :]+\\|[^\\n]*(?:\\n\\|[^\\n]*)*)/g, (match, prefix, table) => {\n  return prefix + '\\n' + table + '\\n';\n});\n\nreturn [{\n  json: {\n    markdownReportContent: md,\n    emailAddress: $input.first().json.emailAddress,\n    subjectLine: $input.first().json.subjectLine\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        -272
+      ],
+      "id": "fix-tables",
+      "name": "fix_table_formatting"
+    },
+    {
+      "parameters": {
         "mode": "markdownToHtml",
         "markdown": "={{ $json.markdownReportContent }}",
-        "options": {}
+        "options": {
+          "simplifiedAutoLink": true,
+          "ghCodeBlocks": true,
+          "simpleLineBreaks": false,
+          "strikethrough": true,
+          "tables": true
+        }
       },
       "type": "n8n-nodes-base.markdown",
       "typeVersion": 1,
-      "position": [880, -272],
+      "position": [
+        992,
+        -272
+      ],
       "id": "8b5341da-e09a-4de2-93e1-e0ec67d84507",
       "name": "convert_to_html"
     },
     {
       "parameters": {
-        "sendTo": "={{ $json.emailAddress }}",
-        "subject": "={{ $json.subjectLine }}",
+        "sendTo": "={{ $('workflow_trigger').item.json.emailAddress }}",
+        "subject": "={{ $('workflow_trigger').item.json.subjectLine }}",
         "message": "={{ $json.data }}",
-        "options": { "appendAttribution": false }
+        "options": {
+          "appendAttribution": false
+        }
       },
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
-      "position": [1136, -272],
+      "position": [
+        1200,
+        -272
+      ],
       "id": "5f5a2242-ab3f-47be-a787-f5d2ac7794bd",
-      "name": "send_email"
+      "name": "send_email",
+      "webhookId": "0a57613f-f954-4777-a8e7-7e3445829329",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "CPCSZOInV8Zj1PI1",
+          "name": "Gmail account"
+        }
+      }
     }
   ],
   "connections": {
     "workflow_trigger": {
-      "main": [[{ "node": "convert_to_html", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "fix_table_formatting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fix_table_formatting": {
+      "main": [
+        [
+          {
+            "node": "convert_to_html",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "convert_to_html": {
-      "main": [[{ "node": "send_email", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "send_email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
     "executionOrder": "v1",
-    "callerPolicy": "workflowsFromSameOwner"
-  }
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "pinData": {}
 }

@@ -2,93 +2,228 @@
   "name": "Tool - Generate Cover Art",
   "nodes": [
     {
-      "parameters": { "workflowInputs": { "values": [{ "name": "imageContext" }, { "name": "imageTitle" }, { "name": "genre_slug" }] } },
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "image_description"
+            },
+            {
+              "name": "story_title"
+            },
+            {
+              "name": "genre_slug"
+            },
+            {
+              "name": "content_type"
+            }
+          ]
+        }
+      },
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
-      "position": [-1008, 96],
-      "id": "da66e06d-37d2-405d-8e65-1051d157f523",
+      "position": [
+        -1008,
+        96
+      ],
+      "id": "da66e06d",
       "name": "workflow_trigger"
     },
     {
       "parameters": {
         "assignments": {
-          "assignments": [{
-            "id": "b8fdb1d1-2fe2-4a3f-867c-af393c29a725",
-            "name": "art_guidelines",
-            "value": "={{ (() => {\nconst genre = $('workflow_trigger').item.json.genre_slug;\nconst guidelines = {\n  'post-apocalyptic': 'Cinematic digital painting. Muted earth tones with toxic greens and ember oranges. Crumbling infrastructure reclaimed by nature. Dramatic lighting through dust and haze. Lone figures silhouetted against vast ruined landscapes. No text.',\n  'political-scifi': 'Clean, geometric composition. Cold blues and institutional grays with strategic red accents. Architecture of power — domes, corridors, council chambers. Figures in formation or confrontation. Propaganda poster aesthetic blended with photorealism. No text.',\n  'historical-time-travel': 'Split composition showing two eras. Warm sepia for historical elements, cool modern tones for present/future. Visible temporal distortion at the boundary. Period-accurate details. Anachronistic objects as focal points. No text.'\n};\nreturn guidelines[genre] || guidelines['post-apocalyptic'];\n})() }}",
-            "type": "string"
-          }]
+          "assignments": [
+            {
+              "id": "b8fdb1d1",
+              "name": "art_guidelines",
+              "value": "={{ (() => {\nconst genre = $('workflow_trigger').item.json.genre_slug;\nconst guidelines = {\n  'post-apocalyptic': 'Cinematic digital painting. Muted earth tones with toxic greens and ember oranges. Crumbling infrastructure reclaimed by nature. Dramatic lighting through dust and haze. Lone figures silhouetted against vast ruined landscapes. No text.',\n  'political-scifi': 'Clean, geometric composition. Cold blues and institutional grays with strategic red accents. Architecture of power \\u2014 domes, corridors, council chambers. Figures in formation or confrontation. Propaganda poster aesthetic blended with photorealism. No text.',\n  'historical-time-travel': 'Split composition showing two eras. Warm sepia for historical elements, cool modern tones for present/future. Visible temporal distortion at the boundary. Period-accurate details. Anachronistic objects as focal points. No text.',\n  'ai-marketing': 'Clean, modern tech aesthetic. Gradient blues and purples. Circuit board patterns, neural network visualizations. Minimalist with high contrast. Data visualization elements. No text.',\n  'political-history': 'Documentary photography meets oil painting. Warm amber lighting on architecture of power \\u2014 parliaments, war rooms, protest squares. Figures in period dress. Maps and documents as compositional elements. No text.',\n  'ancient-history': 'Classical oil painting style. Warm golden light on marble and stone. Temples, amphitheaters, markets. Rich earth tones with lapis and gold accents. Archaeological texture \\u2014 weathered, layered, timeless. No text.'\n};\nreturn guidelines[genre] || guidelines['post-apocalyptic'];\n})() }}",
+              "type": "string"
+            }
+          ]
         },
         "options": {}
       },
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [-752, 96],
-      "id": "f96116e4-8b9b-4063-a5ec-4adc185b6fac",
+      "position": [
+        -752,
+        96
+      ],
+      "id": "f96116e4",
       "name": "set_art_guidelines"
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://api.openai.com/v1/images/generations",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            { "name": "model", "value": "gpt-image-1" },
-            { "name": "prompt", "value": "=<prompt>\n{{ $('workflow_trigger').item.json.imageContext }}\n</prompt>\n\n<art_direction>\n{{ $node[\"set_art_guidelines\"].json.art_guidelines }}\n</art_direction>" },
-            { "name": "size", "value": "1536x1024" }
+            {
+              "name": "model",
+              "value": "gpt-image-1"
+            },
+            {
+              "name": "prompt",
+              "value": "=<prompt>\n{{ $('workflow_trigger').item.json.image_description }}\n</prompt>\n\n<art_direction>\n{{ $node[\"set_art_guidelines\"].json.art_guidelines }}\n</art_direction>"
+            },
+            {
+              "name": "size",
+              "value": "1536x1024"
+            }
           ]
         },
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-496, 96],
-      "id": "e2007d0e-ab15-4d0d-92ba-92f61e8076f8",
-      "name": "generate_image"
+      "position": [
+        -496,
+        96
+      ],
+      "id": "e2007d0e",
+      "name": "generate_image",
+      "credentials": {
+        "openAiApi": {
+          "id": "xSzPIySN61drme77",
+          "name": "OpenAi account"
+        }
+      }
     },
     {
-      "parameters": { "operation": "toBinary", "sourceProperty": "data[0].b64_json", "binaryPropertyName": "=data", "options": {} },
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "data[0].b64_json",
+        "binaryPropertyName": "=data",
+        "options": {}
+      },
       "type": "n8n-nodes-base.convertToFile",
       "typeVersion": 1.1,
-      "position": [-256, 96],
-      "id": "8483c2b5-5fcb-4445-9a4c-782d8bd656f7",
+      "position": [
+        -256,
+        96
+      ],
+      "id": "8483c2b5",
       "name": "convert_to_png"
     },
     {
       "parameters": {
         "sendTo": "eric@agileadtesting.com",
-        "subject": "=Cover Art: {{ $('workflow_trigger').item.json.imageTitle }}",
-        "message": "=<p>Generated cover art for: <strong>{{ $('workflow_trigger').item.json.imageTitle }}</strong></p><p>Genre: {{ $('workflow_trigger').item.json.genre_slug }}</p>",
-        "options": { "appendAttribution": false, "attachmentsUi": { "attachmentsBinary": [{ "property": "data" }] } },
-        "operation": "send"
+        "subject": "=Cover Art: {{ $('workflow_trigger').item.json.content_type || 'Content' }} \u2014 {{ $('workflow_trigger').item.json.story_title }}",
+        "message": "=<h2>Cover Art Generated</h2><table style=\"border-collapse:collapse;width:100%;max-width:500px;\"><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Content Type</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.content_type || 'Not specified' }}</td></tr><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Title</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.story_title }}</td></tr><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Genre</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.genre_slug }}</td></tr><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Description</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.image_description }}</td></tr></table>",
+        "options": {
+          "appendAttribution": false,
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {}
+            ]
+          }
+        }
       },
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
-      "position": [0, 96],
-      "id": "8da9f9da-dc76-43f1-8eaf-30eb6e9d6eec",
-      "name": "send_email_with_image"
+      "position": [
+        0,
+        96
+      ],
+      "id": "8da9f9da",
+      "name": "send_email_with_image",
+      "webhookId": "336a6420-61b8-45c8-a953-e51b1294dddd",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "CPCSZOInV8Zj1PI1",
+          "name": "Gmail account"
+        }
+      }
     },
     {
       "parameters": {
-        "assignments": { "assignments": [{ "id": "result1", "name": "result", "value": "=Cover art generated and emailed: {{ $('workflow_trigger').item.json.imageTitle }}", "type": "string" }] },
+        "assignments": {
+          "assignments": [
+            {
+              "id": "result1",
+              "name": "result",
+              "value": "=Cover art generated and emailed for {{ $('workflow_trigger').item.json.content_type || 'content' }}: {{ $('workflow_trigger').item.json.story_title }}",
+              "type": "string"
+            }
+          ]
+        },
         "options": {}
       },
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [256, 96],
-      "id": "7844368f-0059-4846-a0b9-50f79f7b01ed",
+      "position": [
+        256,
+        96
+      ],
+      "id": "7844368f",
       "name": "set_result"
     }
   ],
   "connections": {
-    "workflow_trigger": { "main": [[{ "node": "set_art_guidelines", "type": "main", "index": 0 }]] },
-    "set_art_guidelines": { "main": [[{ "node": "generate_image", "type": "main", "index": 0 }]] },
-    "generate_image": { "main": [[{ "node": "convert_to_png", "type": "main", "index": 0 }]] },
-    "convert_to_png": { "main": [[{ "node": "send_email_with_image", "type": "main", "index": 0 }]] },
-    "send_email_with_image": { "main": [[{ "node": "set_result", "type": "main", "index": 0 }]] }
+    "workflow_trigger": {
+      "main": [
+        [
+          {
+            "node": "set_art_guidelines",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_art_guidelines": {
+      "main": [
+        [
+          {
+            "node": "generate_image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "generate_image": {
+      "main": [
+        [
+          {
+            "node": "convert_to_png",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "convert_to_png": {
+      "main": [
+        [
+          {
+            "node": "send_email_with_image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send_email_with_image": {
+      "main": [
+        [
+          {
+            "node": "set_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1", "callerPolicy": "workflowsFromSameOwner" }
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "pinData": {}
 }
