@@ -22,6 +22,12 @@
             },
             {
               "name": "research_topics"
+            },
+            {
+              "name": "recipient_email"
+            },
+            {
+              "name": "bcc_email"
             }
           ]
         }
@@ -37,28 +43,12 @@
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "s1",
-              "name": "SUPABASE_URL",
-              "value": "https://qsirioazmsmrrfoltrhn.supabase.co",
-              "type": "string"
-            },
-            {
-              "id": "sapi",
-              "name": "SUPABASE_API_KEY",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
+        "jsCode": "const SUPABASE_URL = 'https://qsirioazmsmrrfoltrhn.supabase.co';\nconst SUPABASE_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk';\nconst trigger = $('workflow_trigger').first().json;\n\n// Fetch email config from app_config (centralized source of truth)\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\nif (!recipient_email) {\n  try {\n    const rows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/app_config?key=in.(recipient_email,bcc_email)&select=key,value`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    for (const row of rows) {\n      if (row.key === 'recipient_email') recipient_email = row.value;\n      if (row.key === 'bcc_email') bcc_email = row.value;\n    }\n  } catch (e) {\n    recipient_email = 'eric@agileadtesting.com';\n    bcc_email = '';\n  }\n}\n\nreturn [{ json: { SUPABASE_URL, SUPABASE_API_KEY, recipient_email, bcc_email: bcc_email || '' } }];"
       },
       "id": "ss-settings",
       "name": "settings",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         128,
         0
@@ -223,11 +213,12 @@
         960,
         -160
       ],
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
     },
     {
       "parameters": {
-        "jsCode": "const research = $('research_topic').first().json.message || '';\nconst style = $('style_analysis').first().json.output || $('style_analysis').first().json.text || '';\nconst trigger = $('workflow_trigger').first().json;\nconst genre = $('get_genre_config').first().json;\nconst genreData = Array.isArray(genre) ? genre[0] : genre;\nconst genreName = genreData?.genre_name || 'Science Fiction';\nconst guidelines = genreData?.writing_guidelines || '';\nconst length = parseInt(trigger.length) || 3000;\n\nconst prompt = `You are a world-class science fiction author.\n\n## Genre\n${genreName}\n\n## Genre Guidelines\n${guidelines}\n\n## Research\n${research}\n\n## Writing Style\n${style}\n\n## Assignment\nWrite a complete short story of approximately ${length} words.\n\n- Premise: ${trigger.premise}\n- Tone: ${trigger.tone}\n- Target length: ${length} words\n\n## Structure\nWrite the story with natural scene breaks (use --- between scenes). Include:\n1. Opening: Establish the world, introduce the protagonist\n2. Rising action: Develop conflict, deepen character\n3. Climax and resolution\n\nWrite the story text directly. No JSON wrapping, no metadata, no scene labels. Just the story.`;\n\nreturn [{ json: { prompt: prompt, title: trigger.premise?.split(' ').slice(0, 5).join(' ') || 'Untitled' } }];"
+        "jsCode": "const research = $('research_topic').first().json.message || '';\nlet style = '';\ntry { style = $('style_analysis').first().json.output || $('style_analysis').first().json.text || ''; } catch (e) { style = ''; }\nconst trigger = $('workflow_trigger').first().json;\nconst genre = $('get_genre_config').first().json;\nconst genreData = Array.isArray(genre) ? genre[0] : genre;\nconst genreName = genreData?.genre_name || 'Science Fiction';\nconst guidelines = genreData?.writing_guidelines || '';\nconst length = parseInt(trigger.length) || 3000;\n\nconst prompt = `You are a world-class science fiction author.\n\n## Genre\n${genreName}\n\n## Genre Guidelines\n${guidelines}\n\n## Writing Prime Directive\nWrite like a human, not a machine. Use clear, everyday language and short sentences. Cut cliches \u2014 no \"revolutionize,\" \"game-changing,\" \"unleash,\" or \"delve.\" Get to the point \u2014 remove filler words. No hype, just facts. Be genuine \u2014 don't fake excitement. Show, don't tell \u2014 use concrete details and sensory moments instead of vague claims. Stay focused \u2014 one idea per paragraph. Keep paragraphs short. Respect the reader's intelligence. Write like you'd tell a story to a smart friend. Skip unnecessary adjectives and adverbs. Relax about perfect grammar if it makes dialogue or narration sound more natural. After drafting, cut anything that doesn't move the story forward.\n\n## Research\n${research}\n\n## Writing Style\n${style}\n\n## Assignment\nWrite a complete short story of approximately ${length} words.\n\n- Premise: ${trigger.premise}\n- Tone: ${trigger.tone}\n- Target length: ${length} words\n\n## Structure\nWrite the story with natural scene breaks (use --- between scenes). Include:\n1. Opening: Establish the world, introduce the protagonist\n2. Rising action: Develop conflict, deepen character\n3. Climax and resolution\n\nWrite the story text directly. No JSON wrapping, no metadata, no scene labels. Just the story.`;\n\nreturn [{ json: { prompt: prompt, title: trigger.premise?.split(' ').slice(0, 5).join(' ') || 'Untitled' } }];"
       },
       "id": "ss-plan",
       "name": "build_story_prompt",
@@ -331,11 +322,12 @@
     },
     {
       "parameters": {
-        "sendTo": "eric@agileadtesting.com",
+        "sendTo": "={{ $('settings').item.json.recipient_email }}",
         "subject": "=Short Story Draft: {{ $('set_full_story').first().json.title }}",
         "message": "={{ $('set_full_story').first().json.story_text.replace(/\\n/g, '<br>') }}",
         "options": {
-          "appendAttribution": false
+          "appendAttribution": false,
+          "bccList": "={{ $('settings').item.json.bcc_email }}"
         }
       },
       "id": "ss-email",

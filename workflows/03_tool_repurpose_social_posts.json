@@ -13,6 +13,12 @@
             },
             {
               "name": "genre_slug"
+            },
+            {
+              "name": "recipient_email"
+            },
+            {
+              "name": "bcc_email"
             }
           ]
         }
@@ -28,20 +34,10 @@
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "cf7f1edf",
-              "name": "platform_config",
-              "value": "={{ (() => {\nconst platform = $('workflow_trigger').item.json.platform || 'twitter';\nconst configs = {\n  twitter: { name: 'Twitter/X', charLimit: 280, format: 'Thread of numbered tweets (1/, 2/, etc.). Each tweet max 280 chars.', example: '1/ Big news in sci-fi this week...' },\n  linkedin: { name: 'LinkedIn', charLimit: 3000, format: 'Single post, max 3000 chars. Professional tone. Hook in first line. Include 3-5 hashtags.', example: 'The future of [topic] is changing fast.' },\n  facebook: { name: 'Facebook', charLimit: 63206, format: 'Single post or short series. Conversational, community-engaging tone. Can use emojis. Include 3-5 hashtags. Good for storytelling and discussion prompts.', example: 'Have you read this yet? Let me tell you why this matters...' },\n  instagram: { name: 'Instagram', charLimit: 2200, format: 'Caption style, max 2200 chars. Conversational tone. 20-30 hashtags at end.', example: 'This blew my mind.' }\n};\nreturn JSON.stringify(configs[platform] || configs.twitter);\n})() }}",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
+        "jsCode": "const SUPABASE_URL = 'https://qsirioazmsmrrfoltrhn.supabase.co';\nconst SUPABASE_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk';\nconst trigger = $('workflow_trigger').first().json;\n\n// Fetch email config from app_config (centralized source of truth)\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\nif (!recipient_email) {\n  try {\n    const rows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/app_config?key=in.(recipient_email,bcc_email)&select=key,value`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    for (const row of rows) {\n      if (row.key === 'recipient_email') recipient_email = row.value;\n      if (row.key === 'bcc_email') bcc_email = row.value;\n    }\n  } catch (e) {\n    recipient_email = 'eric@agileadtesting.com';\n    bcc_email = '';\n  }\n}\n\n// Platform config\nconst platform = trigger.platform || 'twitter';\nconst configs = {\n  twitter: { name: 'Twitter/X', charLimit: 280, format: 'Thread of numbered tweets (1/, 2/, etc.). Each tweet max 280 chars.', example: '1/ Big news in sci-fi this week...' },\n  linkedin: { name: 'LinkedIn', charLimit: 3000, format: 'Single post, max 3000 chars. Professional tone. Hook in first line. Include 3-5 hashtags.', example: 'The future of [topic] is changing fast.' },\n  facebook: { name: 'Facebook', charLimit: 63206, format: 'Single post or short series. Conversational, community-engaging tone. Can use emojis. Include 3-5 hashtags.', example: 'Have you read this yet? Let me tell you why this matters...' },\n  instagram: { name: 'Instagram', charLimit: 2200, format: 'Caption style, max 2200 chars. Conversational tone. 20-30 hashtags at end.', example: 'This blew my mind.' }\n};\nconst platform_config = JSON.stringify(configs[platform] || configs.twitter);\n\nreturn [{ json: { platform_config, recipient_email, bcc_email: bcc_email || '' } }];"
       },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         240,
         0
@@ -56,7 +52,7 @@
             {
               "id": "605dbce8",
               "name": "prompt",
-              "value": "=# Repurpose Content to Social Posts\n\n## Platform\n{{ JSON.parse($('set_platform_examples').item.json.platform_config).name }}\n\n## Platform Rules\n- Character limit: {{ JSON.parse($('set_platform_examples').item.json.platform_config).charLimit }}\n- Format: {{ JSON.parse($('set_platform_examples').item.json.platform_config).format }}\n\n## Source Content\n{{ $('workflow_trigger').item.json.content }}\n\n## Output\nReturn a JSON object with a 'posts' array. Each post has 'text' and 'hashtags' (array without #).",
+              "value": "=# Repurpose Content to Social Posts\n\n## Platform\n{{ JSON.parse($('set_platform_examples').item.json.platform_config).name }}\n\n## Platform Rules\n- Character limit: {{ JSON.parse($('set_platform_examples').item.json.platform_config).charLimit }}\n- Format: {{ JSON.parse($('set_platform_examples').item.json.platform_config).format }}\n\n## Source Content\n{{ $('workflow_trigger').item.json.content }}\n\n## Writing Prime Directive\nWrite like a human, not a machine. Use clear, everyday language and short sentences. Cut cliches \u2014 no 'revolutionize,' 'game-changing,' 'unleash,' or 'delve.' Get to the point \u2014 remove filler words. No hype, just facts. Be genuine \u2014 don't fake excitement. Show, don't tell \u2014 use concrete examples instead of vague claims. Keep it tight and natural. Write like you'd text a smart friend.\n\n## Output\nReturn a JSON object with a 'posts' array. Each post has 'text' and 'hashtags' (array without #).",
               "type": "string"
             }
           ]
@@ -142,11 +138,12 @@
     },
     {
       "parameters": {
-        "sendTo": "eric@agileadtesting.com",
+        "sendTo": "={{ $('set_platform_examples').item.json.recipient_email }}",
         "subject": "=Social Posts: {{ $('workflow_trigger').item.json.platform }}",
         "message": "=<h2 style=\"font-family:sans-serif;\">Social Posts for {{ $('workflow_trigger').item.json.platform }}</h2>\n<p style=\"color:#666;font-family:sans-serif;font-size:13px;\">Copy and paste each post below:</p>\n{{ $json.html }}",
         "options": {
-          "appendAttribution": false
+          "appendAttribution": false,
+          "bccList": "={{ $('set_platform_examples').item.json.bcc_email }}"
         }
       },
       "type": "n8n-nodes-base.gmail",

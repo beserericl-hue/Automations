@@ -97,6 +97,27 @@ CREATE INDEX IF NOT EXISTS idx_published_content_type ON published_content(conte
 ALTER TABLE published_content ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all for anon" ON published_content FOR ALL USING (true) WITH CHECK (true);
 
+-- Add 'scheduled' status for scheduled publishing
+ALTER TABLE published_content DROP CONSTRAINT IF EXISTS published_content_status_check;
+ALTER TABLE published_content ADD CONSTRAINT published_content_status_check
+  CHECK (status IN ('draft', 'approved', 'published', 'rejected', 'scheduled'));
+
+-- 6b. Content Version History
+CREATE TABLE IF NOT EXISTS content_versions (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  content_id UUID NOT NULL REFERENCES published_content(id) ON DELETE CASCADE,
+  version_number INTEGER NOT NULL,
+  content_text TEXT NOT NULL,
+  changed_by TEXT DEFAULT 'system',
+  change_note TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_content_versions_content_id ON content_versions(content_id);
+CREATE INDEX IF NOT EXISTS idx_content_versions_lookup ON content_versions(content_id, version_number);
+
+ALTER TABLE content_versions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all for anon" ON content_versions FOR ALL USING (true) WITH CHECK (true);
+
 -- 7. Content Metrics View
 CREATE VIEW content_metrics AS
 SELECT

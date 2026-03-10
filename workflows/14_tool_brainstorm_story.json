@@ -19,6 +19,12 @@
             },
             {
               "name": "project_title"
+            },
+            {
+              "name": "recipient_email"
+            },
+            {
+              "name": "bcc_email"
             }
           ]
         }
@@ -34,28 +40,12 @@
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "bs1",
-              "name": "SUPABASE_URL",
-              "value": "https://qsirioazmsmrrfoltrhn.supabase.co",
-              "type": "string"
-            },
-            {
-              "id": "bs2",
-              "name": "SUPABASE_API_KEY",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
+        "jsCode": "const SUPABASE_URL = 'https://qsirioazmsmrrfoltrhn.supabase.co';\nconst SUPABASE_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk';\nconst trigger = $('workflow_trigger').first().json;\n\n// Fetch email config from app_config (centralized source of truth)\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\nif (!recipient_email) {\n  try {\n    const rows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/app_config?key=in.(recipient_email,bcc_email)&select=key,value`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    for (const row of rows) {\n      if (row.key === 'recipient_email') recipient_email = row.value;\n      if (row.key === 'bcc_email') bcc_email = row.value;\n    }\n  } catch (e) {\n    recipient_email = 'eric@agileadtesting.com';\n    bcc_email = '';\n  }\n}\n\nreturn [{ json: { SUPABASE_URL, SUPABASE_API_KEY, recipient_email, bcc_email: bcc_email || '' } }];"
       },
       "id": "bs-settings",
       "name": "settings",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         220,
         0
@@ -131,7 +121,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const trigger = $('workflow_trigger').first().json;\nconst genre = $('get_genre_config').first().json;\nconst genreData = Array.isArray(genre) ? genre[0] : genre;\nconst research = $('research_concept').first().json.message || '';\nconst chapterCount = parseInt(trigger.target_chapter_count) || 10;\n\nconst prompt = `You are a master storyteller and book architect.\n\n## Genre: ${genreData?.genre_name || 'Fiction'}\n## Genre Guidelines: ${genreData?.writing_guidelines || ''}\n\n## Research\n${research}\n\n## Assignment\nCreate a detailed book outline for \"${trigger.project_title || 'Untitled'}\".\n\nCore concept: ${trigger.initial_concept}\nThemes: ${trigger.themes || 'To be determined'}\nTarget chapters: ${chapterCount}\n\n## Requirements\nGenerate a comprehensive outline including:\n1. A refined title and one-paragraph premise\n2. Core themes (3-5)\n3. Character profiles (at least 3 major characters) with name, role, character arc, and physical/personality description\n4. Chapter-by-chapter breakdown (${chapterCount} chapters) with:\n   - Chapter number and title\n   - 2-3 sentence brief of what happens\n   - Arc notes (character development, theme progression)\n   - Research topics that should be explored for this chapter\n\nReturn as JSON matching the output schema exactly.`;\n\nreturn [{ json: { prompt } }];"
+        "jsCode": "const trigger = $('workflow_trigger').first().json;\nconst genre = $('get_genre_config').first().json;\nconst genreData = Array.isArray(genre) ? genre[0] : genre;\nconst research = $('research_concept').first().json.message || '';\nconst chapterCount = parseInt(trigger.target_chapter_count) || 10;\n\nconst prompt = `You are a master storyteller and book architect.\n\n## Genre: ${genreData?.genre_name || 'Fiction'}\n## Genre Guidelines: ${genreData?.writing_guidelines || ''}\n\n## Writing Prime Directive\nWrite like a human, not a machine. Use clear, everyday language and short sentences. Cut cliches \u2014 no revolutionize, game-changing, unleash, or delve. Get to the point \u2014 remove filler words. No hype, just facts. Be genuine. Show, don't tell \u2014 use concrete examples instead of vague claims. Stay focused. Keep descriptions tight. Respect the reader's intelligence. Write like you'd pitch a story to a smart friend. Skip unnecessary adjectives and adverbs.\n\n## Research\n${research}\n\n## Assignment\nCreate a detailed book outline for \"${trigger.project_title || 'Untitled'}\".\n\nCore concept: ${trigger.initial_concept}\nThemes: ${trigger.themes || 'To be determined'}\nTarget chapters: ${chapterCount}\n\n## Requirements\nGenerate a comprehensive outline including:\n1. A refined title and one-paragraph premise\n2. Core themes (3-5)\n3. Character profiles (at least 3 major characters) with name, role, character arc, and physical/personality description\n4. Chapter-by-chapter breakdown (${chapterCount} chapters) with:\n   - Chapter number and title\n   - 2-3 sentence brief of what happens\n   - Arc notes (character development, theme progression)\n   - Research topics that should be explored for this chapter\n\nReturn as JSON matching the output schema exactly.`;\n\nreturn [{ json: { prompt } }];"
       },
       "id": "bs-prompt",
       "name": "build_outline_prompt",
@@ -214,11 +204,12 @@
     },
     {
       "parameters": {
-        "sendTo": "eric@agileadtesting.com",
+        "sendTo": "={{ $('settings').item.json.recipient_email }}",
         "subject": "=Book Outline: {{ $json.title }}",
         "message": "=<h2>{{ $json.title }}</h2>\n<p><strong>Premise:</strong> {{ $json.outline?.premise }}</p>\n<h3>Themes</h3>\n<ul>{{ ($json.outline?.themes || []).map(t => '<li>' + t + '</li>').join('') }}</ul>\n<h3>Characters</h3>\n<table style=\"border-collapse:collapse;width:100%;\"><tr style=\"background:#f5f5f5;\"><th style=\"padding:8px;border:1px solid #ddd;\">Name</th><th style=\"padding:8px;border:1px solid #ddd;\">Role</th><th style=\"padding:8px;border:1px solid #ddd;\">Arc</th></tr>{{ ($json.outline?.characters || []).map(c => '<tr><td style=\"padding:8px;border:1px solid #ddd;font-weight:bold;\">' + c.name + '</td><td style=\"padding:8px;border:1px solid #ddd;\">' + c.role + '</td><td style=\"padding:8px;border:1px solid #ddd;\">' + c.arc + '</td></tr>').join('') }}</table>\n<h3>Chapter Outline</h3>\n{{ ($json.outline?.chapters || []).map(ch => '<div style=\"margin:12px 0;padding:12px;background:#f9f9f9;border-left:4px solid #333;\"><strong>Ch ' + ch.number + ': ' + ch.title + '</strong><br>' + ch.brief + '<br><em style=\"color:#666;\">Arc: ' + (ch.arc_notes || '') + '</em></div>').join('') }}",
         "options": {
-          "appendAttribution": false
+          "appendAttribution": false,
+          "bccList": "={{ $('settings').item.json.bcc_email }}"
         }
       },
       "id": "bs-email",

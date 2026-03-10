@@ -22,6 +22,12 @@
             },
             {
               "name": "research_topics"
+            },
+            {
+              "name": "recipient_email"
+            },
+            {
+              "name": "bcc_email"
             }
           ]
         }
@@ -37,28 +43,12 @@
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "s1",
-              "name": "SUPABASE_URL",
-              "value": "https://qsirioazmsmrrfoltrhn.supabase.co",
-              "type": "string"
-            },
-            {
-              "id": "sapi",
-              "name": "SUPABASE_API_KEY",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
+        "jsCode": "const SUPABASE_URL = 'https://qsirioazmsmrrfoltrhn.supabase.co';\nconst SUPABASE_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk';\nconst trigger = $('workflow_trigger').first().json;\n\n// Fetch email config from app_config (centralized source of truth)\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\nif (!recipient_email) {\n  try {\n    const rows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/app_config?key=in.(recipient_email,bcc_email)&select=key,value`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    for (const row of rows) {\n      if (row.key === 'recipient_email') recipient_email = row.value;\n      if (row.key === 'bcc_email') bcc_email = row.value;\n    }\n  } catch (e) {\n    recipient_email = 'eric@agileadtesting.com';\n    bcc_email = '';\n  }\n}\n\nreturn [{ json: { SUPABASE_URL, SUPABASE_API_KEY, recipient_email, bcc_email: bcc_email || '' } }];"
       },
       "id": "ch-settings",
       "name": "settings",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         128,
         0
@@ -147,7 +137,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const trigger = $('workflow_trigger').first().json;\nconst genre = $('get_genre_config').first().json;\nconst genreData = Array.isArray(genre) ? genre[0] : genre;\nconst research = $('research_topic').first().json.message || '';\nconst projectData = $('get_project_data').first().json;\nconst storyBible = projectData.story_bible || [];\nconst writingSamples = projectData.writing_samples || '';\n\n// Auto-load outline: use trigger.outline if provided, otherwise fall back to stored outline\nconst storedOutline = projectData.outline;\nlet outlineText = trigger.outline || '';\n\nif (!outlineText && storedOutline) {\n  // Format the stored JSON outline into readable text for the prompt\n  if (typeof storedOutline === 'object') {\n    const parts = [];\n    if (storedOutline.premise) parts.push('PREMISE: ' + storedOutline.premise);\n    if (storedOutline.themes) parts.push('THEMES: ' + storedOutline.themes.join(', '));\n    if (storedOutline.characters) {\n      parts.push('CHARACTERS:\\n' + storedOutline.characters.map(c => \n        '- ' + c.name + ' (' + c.role + '): ' + c.arc + (c.description ? ' \u2014 ' + c.description : '')\n      ).join('\\n'));\n    }\n    if (storedOutline.chapters) {\n      parts.push('CHAPTER OUTLINE:\\n' + storedOutline.chapters.map(ch => \n        'Ch ' + ch.number + ' \u2014 ' + ch.title + ': ' + ch.brief + (ch.arc_notes ? ' [Arc: ' + ch.arc_notes + ']' : '')\n      ).join('\\n'));\n    }\n    outlineText = parts.join('\\n\\n');\n  } else {\n    outlineText = String(storedOutline);\n  }\n}\n\n// Format story bible for the prompt\nconst bibleText = storyBible.length > 0\n  ? storyBible.map(e => '[' + e.entry_type + '] ' + e.name + ': ' + e.description + ' (ch' + e.chapter_introduced + (e.last_chapter_seen > e.chapter_introduced ? '-ch' + e.last_chapter_seen : '') + ')').join('\\n')\n  : 'No story bible entries yet (this is likely the first chapter).';\n\nconst chapterNum = parseInt(trigger.chapter_number);\n\n// If we have a stored outline, extract this specific chapter's details\nlet chapterBrief = trigger.brief || '';\nlet chapterResearchTopics = '';\nif (storedOutline?.chapters && !trigger.brief) {\n  const thisChapter = storedOutline.chapters.find(ch => ch.number === chapterNum);\n  if (thisChapter) {\n    chapterBrief = thisChapter.brief + (thisChapter.arc_notes ? '\\nArc notes: ' + thisChapter.arc_notes : '');\n    if (thisChapter.research_topics) chapterResearchTopics = thisChapter.research_topics.join(', ');\n  }\n}\n\nconst prompt = 'You are a world-class novelist writing Chapter ' + chapterNum + ' of \"' + trigger.project_title + '\", a ' + (genreData?.genre_name || 'fiction') + ' novel.\\n\\n## Genre Guidelines\\n' + (genreData?.writing_guidelines || '') + '\\n\\n## Writing Style Reference\\n' + writingSamples + '\\n\\n## Research\\n' + research + '\\n\\n## Story Bible (established canon - DO NOT contradict)\\n' + bibleText + '\\n\\n## Book Outline\\n' + (outlineText || 'No outline provided.') + '\\n\\n## This Chapter\\'s Brief\\n' + (chapterBrief || trigger.brief || 'No specific brief provided.') + '\\n\\n## Requirements\\n- Maintain consistency with all story bible entries above\\n- Internal character arc within this chapter\\n- End on a compelling hook for the next chapter\\n- Track character development and relationships\\n- 3000-5000 words\\n- Include natural scene breaks (---)\\n- Reference established locations, characters, and plot threads where relevant\\n\\n## Output Format\\nReturn JSON with these fields:\\n- chapter_title: title for this chapter\\n- chapter_text: the full chapter text\\n- word_count: approximate word count\\n- chapter_summary: 2-3 sentence summary of what happens\\n- next_chapter_notes: suggestions for what should happen next\\n- new_story_bible_entries: array of new entries to add [{entry_type, name, description}] where entry_type is one of: character, location, plot_thread, item, event';\n\nreturn [{ json: { prompt: prompt, project_id: projectData.project?.id } }];"
+        "jsCode": "const trigger = $('workflow_trigger').first().json;\nconst genre = $('get_genre_config').first().json;\nconst genreData = Array.isArray(genre) ? genre[0] : genre;\nconst research = $('research_topic').first().json.message || '';\nconst projectData = $('get_project_data').first().json;\nconst storyBible = projectData.story_bible || [];\nconst writingSamples = projectData.writing_samples || '';\n\n// Auto-load outline: use trigger.outline if provided, otherwise fall back to stored outline\nconst storedOutline = projectData.outline;\nlet outlineText = trigger.outline || '';\n\nif (!outlineText && storedOutline) {\n  // Format the stored JSON outline into readable text for the prompt\n  if (typeof storedOutline === 'object') {\n    const parts = [];\n    if (storedOutline.premise) parts.push('PREMISE: ' + storedOutline.premise);\n    if (storedOutline.themes) parts.push('THEMES: ' + storedOutline.themes.join(', '));\n    if (storedOutline.characters) {\n      parts.push('CHARACTERS:\\n' + storedOutline.characters.map(c => \n        '- ' + c.name + ' (' + c.role + '): ' + c.arc + (c.description ? ' \u2014 ' + c.description : '')\n      ).join('\\n'));\n    }\n    if (storedOutline.chapters) {\n      parts.push('CHAPTER OUTLINE:\\n' + storedOutline.chapters.map(ch => \n        'Ch ' + ch.number + ' \u2014 ' + ch.title + ': ' + ch.brief + (ch.arc_notes ? ' [Arc: ' + ch.arc_notes + ']' : '')\n      ).join('\\n'));\n    }\n    outlineText = parts.join('\\n\\n');\n  } else {\n    outlineText = String(storedOutline);\n  }\n}\n\n// Format story bible for the prompt\nconst bibleText = storyBible.length > 0\n  ? storyBible.map(e => '[' + e.entry_type + '] ' + e.name + ': ' + e.description + ' (ch' + e.chapter_introduced + (e.last_chapter_seen > e.chapter_introduced ? '-ch' + e.last_chapter_seen : '') + ')').join('\\n')\n  : 'No story bible entries yet (this is likely the first chapter).';\n\nconst chapterNum = parseInt(trigger.chapter_number);\n\n// If we have a stored outline, extract this specific chapter's details\nlet chapterBrief = trigger.brief || '';\nlet chapterResearchTopics = '';\nif (storedOutline?.chapters && !trigger.brief) {\n  const thisChapter = storedOutline.chapters.find(ch => ch.number === chapterNum);\n  if (thisChapter) {\n    chapterBrief = thisChapter.brief + (thisChapter.arc_notes ? '\\nArc notes: ' + thisChapter.arc_notes : '');\n    if (thisChapter.research_topics) chapterResearchTopics = thisChapter.research_topics.join(', ');\n  }\n}\n\nconst prompt = 'You are a world-class novelist writing Chapter ' + chapterNum + ' of \"' + trigger.project_title + '\", a ' + (genreData?.genre_name || 'fiction') + ' novel.\\n\\n## Genre Guidelines\\n' + (genreData?.writing_guidelines || '') + '\\n\\n## Writing Prime Directive\\nWrite like a human, not a machine. Use clear, everyday language and short sentences. Cut cliches \u2014 no \"revolutionize,\" \"game-changing,\" \"unleash,\" or \"delve.\" Get to the point \u2014 remove filler words. No hype, just facts. Be genuine. Show, don\\'t tell \u2014 use concrete details and sensory moments instead of vague claims. Stay focused \u2014 one idea per paragraph. Keep paragraphs short. Respect the reader\\'s intelligence. Write like you\\'d tell a story to a smart friend. Skip unnecessary adjectives and adverbs. Relax about perfect grammar if it makes dialogue or narration sound more natural. After drafting, cut anything that doesn\\'t move the story forward.\\n\\n## Writing Style Reference\\n' + writingSamples + '\\n\\n## Research\\n' + research + '\\n\\n## Story Bible (established canon - DO NOT contradict)\\n' + bibleText + '\\n\\n## Book Outline\\n' + (outlineText || 'No outline provided.') + '\\n\\n## This Chapter\\'s Brief\\n' + (chapterBrief || trigger.brief || 'No specific brief provided.') + '\\n\\n## Requirements\\n- Maintain consistency with all story bible entries above\\n- Internal character arc within this chapter\\n- End on a compelling hook for the next chapter\\n- Track character development and relationships\\n- 3000-5000 words\\n- Include natural scene breaks (---)\\n- Reference established locations, characters, and plot threads where relevant\\n\\n## Output Format\\nReturn JSON with these fields:\\n- chapter_title: title for this chapter\\n- chapter_text: the full chapter text\\n- word_count: approximate word count\\n- chapter_summary: 2-3 sentence summary of what happens\\n- next_chapter_notes: suggestions for what should happen next\\n- new_story_bible_entries: array of new entries to add [{entry_type, name, description}] where entry_type is one of: character, location, plot_thread, item, event';\n\nreturn [{ json: { prompt: prompt, project_id: projectData.project?.id } }];"
       },
       "id": "ch-prompt",
       "name": "build_chapter_prompt",
@@ -266,11 +256,12 @@
     },
     {
       "parameters": {
-        "sendTo": "eric@agileadtesting.com",
+        "sendTo": "={{ $('settings').item.json.recipient_email }}",
         "subject": "={{ $('workflow_trigger').first().json.project_title }} - Chapter {{ $('workflow_trigger').first().json.chapter_number }}: {{ $('update_story_bible').first().json.output?.chapter_title || 'Draft' }}",
         "message": "={{ ($('update_story_bible').first().json.output?.chapter_text || '').replace(/\\n/g, '<br>') }}",
         "options": {
-          "appendAttribution": false
+          "appendAttribution": false,
+          "bccList": "={{ $('settings').item.json.bcc_email }}"
         }
       },
       "id": "ch-email",
@@ -299,7 +290,7 @@
           "mappingMode": "defineBelow",
           "value": {
             "story_title": "={{ $('workflow_trigger').first().json.project_title }} - Chapter {{ $('workflow_trigger').first().json.chapter_number }}",
-            "image_description": "=A cinematic cover image for Chapter {{ $('workflow_trigger').first().json.chapter_number }} of \"{{ $('workflow_trigger').first().json.project_title }}\".\n\nChapter synopsis: {{ $('workflow_trigger').first().json.brief }}\n\nOpening scene excerpt:\n{{ $('set_chapter_text').first().json.chapter_text?.substring(0, 1200) || 'No text available' }}\n\nCreate a single powerful visual scene capturing this chapter's key moment \u2014 the environment, lighting, character silhouettes, and atmospheric details. Do NOT include any text, titles, or words in the image.",
+            "image_description": "=A cinematic cover image for Chapter {{ $('workflow_trigger').first().json.chapter_number }} of \"{{ $('workflow_trigger').first().json.project_title }}\".\n\nChapter synopsis: {{ $('workflow_trigger').first().json.brief }}\n\nOpening scene excerpt:\n{{ $('update_story_bible').first().json.output?.chapter_text?.substring(0, 1200) || 'No text available' }}\n\nCreate a single powerful visual scene capturing this chapter's key moment \u2014 the environment, lighting, character silhouettes, and atmospheric details. Do NOT include any text, titles, or words in the image.",
             "genre_slug": "={{ $('workflow_trigger').first().json.genre_slug }}",
             "content_type": "Book Chapter"
           },

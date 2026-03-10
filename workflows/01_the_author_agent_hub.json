@@ -1,5 +1,7 @@
 {
+  "id": "RcHfwiB7uM2vFfJ3",
   "name": "The Author Agent",
+  "active": true,
   "nodes": [
     {
       "parameters": {
@@ -36,7 +38,7 @@
         "promptType": "define",
         "text": "={{ $json.chatInput || $json.body?.user_message_request || $json.body.user_message_request}}",
         "options": {
-          "systemMessage": "=You are The Author Agent, a specialized AI writing assistant. You help plan, research, write, and manage fiction and non-fiction content across multiple genres.\n\nToday's date is {{ $now.format('yyyy-MM-dd') }}. You are operating in the year {{ $now.format('yyyy') }}.\n\n## AVAILABLE GENRES\nEach genre has a slug you must pass to writing tools. Match the user's request to the best genre:\n\n| Genre Slug | Genre Name | Matches These Topics |\n|---|---|---|\n| post-apocalyptic | Post-Apocalyptic Sci-Fi | apocalypse, survival, wasteland, collapse, dystopian, extinction, plague, fallout |\n| political-scifi | Political Sci-Fi | politics in space, empire, republic, governance, revolution, propaganda, insurgency, diplomacy |\n| historical-time-travel | Historical Time Travel | time travel, past lives, romance across eras, historical periods, paradox, alternate history, reincarnation |\n| ai-marketing | AI & Marketing Technology | artificial intelligence, AI tools, marketing automation, LLM, martech, generative AI, content marketing |\n| political-history | Political & Historical Events | geopolitics, political history, revolution, democracy, elections, cold war, historical analysis |\n| ancient-history | Ancient History & Historical Novels | ancient Rome, Greece, Egypt, Mesopotamia, medieval, archaeology, classical antiquity, historical fiction |\n\n## INTERPRETING VOICE COMMANDS\nUsers often speak casually via voice. Interpret their intent:\n- Map loose descriptions to the closest genre_slug using the table above\n- If the topic spans multiple genres or doesn't clearly match one, ask: \"That sounds like it could fit [genre A] or [genre B]. Which genre would you like me to use?\"\n- If the user names a genre that doesn't exist yet, say: \"That genre isn't configured yet. The available genres are: [list]. Which is the closest fit, or would you like me to add a new genre?\"\n- Extract the core request even when the voice transcription is messy or repetitive\n\n## CRITICAL RULES FOR TOOL USAGE\n- When asked to research ANY topic, you MUST use the deep_research_topic tool. NEVER answer research questions from your own knowledge. Your training data is outdated \u2014 always use the tool for current information.\n- After completing research, ALWAYS save the report using manage_research_reports (operation: save) so it can be referenced and modified later.\n- When asked to modify, update, or expand a previous research report, use manage_research_reports (operation: get) to retrieve it, then update it (operation: update) after making changes.\n- When asked to write content, you MUST use the appropriate writing tool (write_blog_post, write_newsletter, write_short_story, write_chapter). Do NOT write content directly in chat.\n- When asked to send an email, you MUST use the email_report tool.\n- When asked to create images, you MUST use the generate_cover_art tool.\n- When asked to create social posts, you MUST use the repurpose_to_social tool.\n- When asked about a story bible, you MUST use the manage_story_bible tool.\n\n## Handling Empty or Error Results\n- If manage_story_bible returns empty or an error for a project, tell the user: \"This project doesn't exist in the database yet. To get started, I can help you brainstorm and outline your book. Once we have characters, locations, and plot threads defined, I'll save them to the story bible using manage_story_bible (operation: update). You can also ask me to write chapter 1, which will automatically create the project and begin populating the story bible.\"\n- If manage_research_reports returns empty on a list operation, tell the user: \"No research reports saved yet. Ask me to research any topic and I'll save the results automatically.\"\n- If a writing tool fails because genre_config is empty, tell the user the genre needs to be configured in the Supabase database first.\n- NEVER say \"there was an error\" without explaining what the user can do about it.\n\n## Your Capabilities\n- **Research**: Use deep_research_topic for comprehensive topic research with citations. Use manage_research_reports to save/retrieve/update/list research reports. Use email_report to deliver findings via email.\n- **Writing**: write_blog_post, write_newsletter, write_short_story, write_chapter for different formats\n- **Visual**: generate_cover_art for genre-specific book/story cover images\n- **Distribution**: repurpose_to_social for Twitter/LinkedIn/Instagram posts\n- **Continuity**: manage_story_bible to track characters, events, locations across chapters\n\n## Story Bible Workflow\nThe story bible tracks characters, locations, events, plot threads, timeline entries, and world rules for a book project. Here is how it works:\n1. **Starting a new book**: Brainstorm the concept in conversation. Once you have key elements, save them with manage_story_bible (operation: update) with entries like: [{\"entry_type\": \"character\", \"name\": \"...\", \"description\": \"...\", \"chapter_introduced\": 1}]\n2. **Before writing a chapter**: Always retrieve the story bible first with manage_story_bible (operation: get) to ensure continuity.\n3. **After writing a chapter**: Update the story bible with any new characters, locations, events, or plot developments introduced in that chapter.\n4. **Entry types**: character, event, location, timeline, plot_thread, world_rule\n\n## Workflow\n1. When asked to write, infer the genre from context using the genre table above. If ambiguous, ask which genre to use and present the options clearly.\n2. For fiction: brainstorm > outline > research > write\n3. For non-fiction: research > outline > write\n4. For books: create a project, establish story bible, then write chapter by chapter\n5. Always email results to eric@agileadtesting.com\n\n## Rules\n- Use Claude Sonnet for all writing tasks\n- Use deep_research_topic (Perplexity) for ALL factual research - it returns answers with citations\n- Always save research reports via manage_research_reports after completing research\n- Save all drafts to Supabase storage\n- Track content provenance (what sources informed what output)\n- Maintain story bible consistency across chapters"
+          "systemMessage": "=You are The Author Agent, a specialized AI writing assistant. You help plan, research, write, and manage fiction and non-fiction content across multiple genres.\n\nToday's date is {{ $now.format('yyyy-MM-dd') }}. You are operating in the year {{ $now.format('yyyy') }}.\n\n## AVAILABLE GENRES\nEach genre has a slug you must pass to writing tools. Match the user's request to the best genre:\n\n| Genre Slug | Genre Name | Matches These Topics |\n|---|---|---|\n| post-apocalyptic | Post-Apocalyptic Sci-Fi | apocalypse, survival, wasteland, collapse, dystopian, extinction, plague, fallout |\n| political-scifi | Political Sci-Fi | politics in space, empire, republic, governance, revolution, propaganda, insurgency, diplomacy |\n| historical-time-travel | Historical Time Travel | time travel, past lives, romance across eras, historical periods, paradox, alternate history, reincarnation |\n| ai-marketing | AI & Marketing Technology | artificial intelligence, AI tools, marketing automation, LLM, martech, generative AI, content marketing |\n| political-history | Political & Historical Events | geopolitics, political history, revolution, democracy, elections, cold war, historical analysis |\n| ancient-history | Ancient History & Historical Novels | ancient Rome, Greece, Egypt, Mesopotamia, medieval, archaeology, classical antiquity, historical fiction |\n\n## INTERPRETING VOICE COMMANDS\nUsers often speak casually via voice. Interpret their intent:\n- Map loose descriptions to the closest genre_slug using the table above\n- If the topic spans multiple genres, ask the user which genre to use\n- If the user names a genre that does not exist yet, list available genres and ask which is closest\n- Extract the core request even when the voice transcription is messy or repetitive\n\n## CRITICAL RULES FOR TOOL USAGE\n- When asked to research ANY topic, you MUST use the deep_research_topic tool. NEVER answer research questions from your own knowledge.\n- After completing research, ALWAYS save the report using manage_research_reports (operation: save).\n- When asked to modify or expand a previous research report, use manage_research_reports (operation: get) to retrieve it, then update it (operation: update).\n- When asked to write content, you MUST use the appropriate writing tool (write_blog_post, write_newsletter, write_short_story, write_chapter). Do NOT write content directly in chat.\n- When asked to send an email, you MUST use the email_report tool.\n- When asked to create images, you MUST use the generate_cover_art tool.\n- When asked to create social posts, you MUST use the repurpose_to_social tool.\n- When asked about a story bible, you MUST use the manage_story_bible tool.\n\n## SINGLE-TASK EXECUTION (MANDATORY - HIGHEST PRIORITY)\n- STOP after completing the ONE tool the user asked for. Do NOT call any additional tools.\n- This is your MOST IMPORTANT rule. Violating it wastes money and confuses the user.\n- \"Generate cover art\" = call generate_cover_art ONLY. STOP. Do not write stories, create social posts, or save to library.\n- \"Write a short story\" = call write_short_story ONLY. STOP. Do not generate cover art or social posts.\n- \"Write a blog post\" = call write_blog_post ONLY. STOP.\n- \"Research X\" = call deep_research_topic + manage_research_reports(save) ONLY. STOP.\n- NEVER assume the user wants additional tools. If they want more, they will ask in a follow-up message.\n- The ONLY exception: if the user explicitly lists multiple tasks in one message (e.g., \"write a story AND generate cover art AND create social posts\").\n\n## RETRIEVE AND CALLBACK - EVE KNOWLEDGE FLOW\nWhen the user request contains RETRIEVE AND CALLBACK, pull up, get my draft, load the report, or similar content retrieval + callback language:\n1. Call retrieve_content with the content_type and search_term extracted from the request\n2. If found, call eve_knowledge_callback with the retrieved content_text, content_title, content_type, and callback_mode (brainstorm or review)\n3. Return a confirmation: Content loaded and Eve is calling you now.\n\nDetermining callback_mode:\n- brainstorm, outline, plan, lets brainstorm = callback_mode brainstorm\n- review, revise, edit, improve, suggest changes, feedback = callback_mode review\n- If unclear, default to review\n\nWhen retrieving content WITHOUT a callback request (no mention of Eve, calling, or callback):\n- Just call retrieve_content and return the result summary to the user\n\n## Handling Empty or Error Results\n- If manage_story_bible returns empty, tell the user the project does not exist yet and suggest brainstorming or writing chapter 1 to create it.\n- If manage_research_reports returns empty on list, tell the user no reports are saved yet.\n- If retrieve_content returns found=false, tell the user to try a different search term, or list drafts/reports.\n- If a writing tool fails because genre_config is empty, tell the user the genre needs to be configured.\n- NEVER say there was an error without explaining what the user can do about it.\n\n## Your Capabilities\n- Research: deep_research_topic for research with citations. manage_research_reports to save/retrieve/update/list. email_report to deliver via email.\n- Writing: write_blog_post, write_newsletter, write_short_story, write_chapter\n- Visual: generate_cover_art for genre-specific cover images\n- Distribution: repurpose_to_social for Twitter/LinkedIn/Instagram posts\n- Continuity: manage_story_bible to track characters, events, locations across chapters\n- Content Library: manage_library to list drafts, approve, publish, or reject content\n- Content Retrieval: retrieve_content to search and fetch any saved content (research reports, stories, blog posts, newsletters, chapters)\n- Eve Callback: eve_knowledge_callback to load content into Eve knowledge base and trigger an outbound phone call for live discussion\n\n## Story Bible Workflow\n1. Starting a new book: Brainstorm, then save elements with manage_story_bible (operation: update)\n2. Before writing a chapter: Always retrieve the story bible first with manage_story_bible (operation: get)\n3. After writing a chapter: Update the story bible with new characters, locations, events, or plot developments\n4. Entry types: character, event, location, timeline, plot_thread, world_rule\n\n## Workflow\n1. When asked to write, infer the genre from context using the genre table above. If ambiguous, ask which genre to use.\n2. For fiction: brainstorm > outline > research > write\n3. For non-fiction: research > outline > write\n4. For books: create a project, establish story bible, then write chapter by chapter\n5. Always email results to the recipient configured in the system (do not hardcode email addresses)\n\n## Rules\n- Use Claude Sonnet for all writing tasks\n- Use deep_research_topic (Perplexity) for ALL factual research\n- Always save research reports via manage_research_reports after completing research\n- Save all drafts to Supabase storage\n- Track content provenance"
         }
       },
       "id": "hub-agent",
@@ -73,7 +75,9 @@
           "value": {
             "markdownReportContent": "={{ $fromAI('markdownReportContent', 'The full markdown content for the report', 'string') }}",
             "emailAddress": "={{ $fromAI('emailAddress', 'The email address to send to, default eric@agileadtesting.com', 'string') }}",
-            "subjectLine": "={{ $fromAI('subjectLine', 'The email subject line', 'string') }}"
+            "subjectLine": "={{ $fromAI('subjectLine', 'The email subject line', 'string') }}",
+            "recipient_email": "={{ $('hub_settings').first().json.recipient_email }}",
+            "bcc_email": "={{ $('hub_settings').first().json.bcc_email }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -98,6 +102,24 @@
             {
               "id": "subjectLine",
               "displayName": "subjectLine",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "recipient_email",
+              "displayName": "recipient_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "bcc_email",
+              "displayName": "bcc_email",
               "required": false,
               "defaultMatch": false,
               "display": true,
@@ -131,7 +153,9 @@
             "image_description": "={{ $fromAI('image_description', 'Detailed description of the image to generate', 'string') }}",
             "story_title": "={{ $fromAI('story_title', 'Title of the content this art is for', 'string') }}",
             "genre_slug": "={{ $fromAI('genre_slug', 'Genre slug from the available genres table in the system prompt', 'string') }}",
-            "content_type": "={{ $fromAI('content_type', 'Type of content: Blog Post, Short Story, Book Chapter, or Social Media Post', 'string') }}"
+            "content_type": "={{ $fromAI('content_type', 'Type of content: Blog Post, Short Story, Book Chapter, or Social Media Post', 'string') }}",
+            "recipient_email": "={{ $('hub_settings').first().json.recipient_email }}",
+            "bcc_email": "={{ $('hub_settings').first().json.bcc_email }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -170,6 +194,24 @@
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "recipient_email",
+              "displayName": "recipient_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "bcc_email",
+              "displayName": "bcc_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
             }
           ]
         }
@@ -197,7 +239,9 @@
           "value": {
             "content": "={{ $fromAI('content', 'The content to repurpose into social posts', 'string') }}",
             "platform": "={{ $fromAI('platform', 'Target platform: twitter, linkedin, facebook, or instagram', 'string') }}",
-            "genre_slug": "={{ $fromAI('genre_slug', 'Genre slug from the available genres table in the system prompt', 'string') }}"
+            "genre_slug": "={{ $fromAI('genre_slug', 'Genre slug from the available genres table in the system prompt', 'string') }}",
+            "recipient_email": "={{ $('hub_settings').first().json.recipient_email }}",
+            "bcc_email": "={{ $('hub_settings').first().json.bcc_email }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -222,6 +266,24 @@
             {
               "id": "genre_slug",
               "displayName": "genre_slug",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "recipient_email",
+              "displayName": "recipient_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "bcc_email",
+              "displayName": "bcc_email",
               "required": false,
               "defaultMatch": false,
               "display": true,
@@ -255,7 +317,9 @@
             "topic": "={{ $fromAI('topic', 'The blog post topic', 'string') }}",
             "genre_slug": "={{ $fromAI('genre_slug', 'Genre slug from the available genres table in the system prompt', 'string') }}",
             "keywords": "={{ $fromAI('keywords', 'Comma-separated SEO keywords', 'string') }}",
-            "target_length": "={{ $fromAI('target_length', 'Target word count', 'string') }}"
+            "target_length": "={{ $fromAI('target_length', 'Target word count', 'string') }}",
+            "recipient_email": "={{ $('hub_settings').first().json.recipient_email }}",
+            "bcc_email": "={{ $('hub_settings').first().json.bcc_email }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -294,6 +358,24 @@
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "recipient_email",
+              "displayName": "recipient_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "bcc_email",
+              "displayName": "bcc_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
             }
           ]
         }
@@ -321,7 +403,9 @@
           "value": {
             "topic": "={{ $fromAI('topic', 'The newsletter theme or topic', 'string') }}",
             "genre_slug": "={{ $fromAI('genre_slug', 'Genre slug from the available genres table in the system prompt', 'string') }}",
-            "date": "={{ $fromAI('date', 'Newsletter date in YYYY-MM-DD format', 'string') }}"
+            "date": "={{ $fromAI('date', 'Newsletter date in YYYY-MM-DD format', 'string') }}",
+            "recipient_email": "={{ $('hub_settings').first().json.recipient_email }}",
+            "bcc_email": "={{ $('hub_settings').first().json.bcc_email }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -346,6 +430,24 @@
             {
               "id": "date",
               "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "recipient_email",
+              "displayName": "recipient_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "bcc_email",
+              "displayName": "bcc_email",
               "required": false,
               "defaultMatch": false,
               "display": true,
@@ -380,7 +482,9 @@
             "premise": "={{ $fromAI('premise', 'The story premise and plot summary', 'string') }}",
             "tone": "={{ $fromAI('tone', 'Desired tone: literary, dark, hopeful, etc', 'string') }}",
             "length": "={{ $fromAI('length', 'Target word count', 'string') }}",
-            "research_topics": "={{ $fromAI('research_topics', 'JSON array of research topics for factual grounding', 'string') }}"
+            "research_topics": "={{ $fromAI('research_topics', 'JSON array of research topics for factual grounding', 'string') }}",
+            "recipient_email": "={{ $('hub_settings').first().json.recipient_email }}",
+            "bcc_email": "={{ $('hub_settings').first().json.bcc_email }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -428,6 +532,24 @@
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "recipient_email",
+              "displayName": "recipient_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "bcc_email",
+              "displayName": "bcc_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
             }
           ]
         }
@@ -458,7 +580,9 @@
             "chapter_number": "={{ $fromAI('chapter_number', 'Chapter number', 'string') }}",
             "brief": "={{ $fromAI('brief', 'Brief description of what happens in this chapter', 'string') }}",
             "outline": "={{ $fromAI('outline', 'Detailed chapter outline with scenes', 'string') }}",
-            "research_topics": "={{ $fromAI('research_topics', 'JSON array of research topics for factual grounding', 'string') }}"
+            "research_topics": "={{ $fromAI('research_topics', 'JSON array of research topics for factual grounding', 'string') }}",
+            "recipient_email": "={{ $('hub_settings').first().json.recipient_email }}",
+            "bcc_email": "={{ $('hub_settings').first().json.bcc_email }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -510,6 +634,24 @@
             {
               "id": "research_topics",
               "displayName": "research_topics",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "recipient_email",
+              "displayName": "recipient_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "bcc_email",
+              "displayName": "bcc_email",
               "required": false,
               "defaultMatch": false,
               "display": true,
@@ -619,8 +761,8 @@
       "type": "n8n-nodes-base.perplexityTool",
       "typeVersion": 1,
       "position": [
-        1632,
-        416
+        1616,
+        384
       ],
       "id": "6f2f51b6-61a4-4ba7-a6d6-3c36c2c88d3c",
       "name": "deep_research_topic",
@@ -809,7 +951,7 @@
     {
       "parameters": {
         "name": "manage_library",
-        "description": "Manage the content library. Operations: list_drafts, list_published, approve, publish, reject. Use content_id (UUID) for approve/publish/reject. Optional content_type_filter (short_story, blog_post, newsletter, chapter).",
+        "description": "Manage the content library. Operations: list_drafts, list_published, list_scheduled, approve, publish, reject, schedule, list_versions, get_version. Use content_id (UUID) for approve/publish/reject/schedule/version operations. Optional content_type_filter (short_story, blog_post, newsletter, chapter). schedule_date (ISO date like 2026-03-15) for schedule operation. version_number for get_version. Email notification sent on approve/publish/reject/schedule.",
         "workflowId": {
           "__rl": true,
           "value": "1JERh5yJ3yDJka8s",
@@ -819,9 +961,14 @@
         "workflowInputs": {
           "mappingMode": "defineBelow",
           "value": {
-            "operation": "={{ $fromAI('operation', 'Operation to perform: list_drafts, list_published, approve, publish, or reject') }}",
+            "operation": "={{ $fromAI('operation', 'Operation to perform: list_drafts, list_published, list_scheduled, approve, publish, reject, schedule, list_versions, or get_version') }}",
             "content_id": "={{ $fromAI('content_id', 'UUID of the content item (required for approve/publish/reject, empty for list operations)', 'string') }}",
-            "content_type_filter": "={{ $fromAI('content_type_filter', 'Optional filter: short_story, blog_post, newsletter, or chapter', 'string') }}"
+            "content_type_filter": "={{ $fromAI('content_type_filter', 'Optional filter: short_story, blog_post, newsletter, or chapter', 'string') }}",
+            "recipient_email": "={{ $('hub_settings').first().json.recipient_email }}",
+            "schedule_date": "={{ $fromAI('schedule_date', 'ISO date for scheduled publishing e.g. 2026-03-15. Empty for non-schedule operations.', 'string') }}",
+            "version_number": "={{ $fromAI('version_number', 'Version number to retrieve for get_version operation', 'string') }}",
+            "change_note": "={{ $fromAI('change_note', 'Optional note describing the change for version tracking', 'string') }}",
+            "bcc_email": "={{ $('hub_settings').first().json.bcc_email }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -854,6 +1001,42 @@
               "canBeUsedToMatch": true,
               "display": true,
               "removed": false
+            },
+            {
+              "id": "recipient_email",
+              "displayName": "recipient_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "schedule_date",
+              "displayName": "schedule_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "version_number",
+              "displayName": "version_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "change_note",
+              "displayName": "change_note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
             }
           ]
         }
@@ -884,7 +1067,9 @@
             "project_title": "={{ $fromAI('project_title', 'Title of the book project') }}",
             "initial_concept": "={{ $fromAI('initial_concept', 'The core concept or premise of the story') }}",
             "themes": "={{ $fromAI('themes', 'Themes to explore, comma-separated') }}",
-            "target_chapter_count": "={{ $fromAI('target_chapter_count', 'Target number of chapters, default 10', 'number') }}"
+            "target_chapter_count": "={{ $fromAI('target_chapter_count', 'Target number of chapters, default 10', 'number') }}",
+            "recipient_email": "={{ $('hub_settings').first().json.recipient_email }}",
+            "bcc_email": "={{ $('hub_settings').first().json.bcc_email }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -937,6 +1122,24 @@
               "canBeUsedToMatch": true,
               "display": true,
               "removed": false
+            },
+            {
+              "id": "recipient_email",
+              "displayName": "recipient_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "bcc_email",
+              "displayName": "bcc_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
             }
           ]
         }
@@ -949,6 +1152,65 @@
         1216,
         448
       ]
+    },
+    {
+      "parameters": {
+        "name": "retrieve_content",
+        "description": "Search for and retrieve any content from the system. Content types: research_report, short_story, blog_post, newsletter, chapter. If content_type is omitted, searches all types. Returns the full text content, title, and type. Use search_term to find content by title or topic keyword.",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "DQS2zIhVjyuxabcb"
+        }
+      },
+      "id": "hub-retrieve",
+      "name": "retrieve_content",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [
+        1488,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "name": "eve_knowledge_callback",
+        "description": "Load content into Eve's knowledge base and trigger a callback phone call. Use AFTER retrieving content that the user wants to discuss with Eve. Eve will call the user back on the phone with the content loaded for discussion. Set callback_mode to 'brainstorm' for creative outlining or 'review' for editorial feedback and revisions.",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PaFJlsxWq4BKt0iq"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "hub-eve-callback",
+      "name": "eve_knowledge_callback",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [
+        1744,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const SUPABASE_URL = 'https://qsirioazmsmrrfoltrhn.supabase.co';\nconst SUPABASE_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk';\n\nlet recipient_email = 'eric@agileadtesting.com';\nlet bcc_email = '';\n\ntry {\n  const rows = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${SUPABASE_URL}/rest/v1/app_config?key=in.(recipient_email,bcc_email)&select=key,value`,\n    headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n  });\n  for (const row of rows) {\n    if (row.key === 'recipient_email') recipient_email = row.value;\n    if (row.key === 'bcc_email') bcc_email = row.value;\n  }\n} catch (e) {\n  // fallback to defaults above\n}\n\nconst input = $input.first().json;\nreturn [{ json: { ...input, recipient_email, bcc_email } }];"
+      },
+      "id": "hub-settings",
+      "name": "hub_settings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        -288
+      ]
     }
   ],
   "connections": {
@@ -956,7 +1218,7 @@
       "main": [
         [
           {
-            "node": "Author Agent",
+            "node": "hub_settings",
             "type": "main",
             "index": 0
           }
@@ -967,7 +1229,7 @@
       "main": [
         [
           {
-            "node": "Author Agent",
+            "node": "hub_settings",
             "type": "main",
             "index": 0
           }
@@ -1152,44 +1414,44 @@
           }
         ]
       ]
+    },
+    "retrieve_content": {
+      "ai_tool": [
+        [
+          {
+            "node": "Author Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "eve_knowledge_callback": {
+      "ai_tool": [
+        [
+          {
+            "node": "Author Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "hub_settings": {
+      "main": [
+        [
+          {
+            "node": "Author Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
     "executionOrder": "v1",
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
-  },
-  "staticData": null,
-  "pinData": {
-    "webhook_trigger": [
-      {
-        "json": {
-          "headers": {
-            "host": "n8n.agileadautomation.com",
-            "user-agent": "ElevenLabs/1.0",
-            "content-length": "608",
-            "accept": "*/*",
-            "accept-encoding": "gzip, br",
-            "cdn-loop": "cloudflare; loops=1",
-            "cf-connecting-ip": "34.59.11.47",
-            "cf-ipcountry": "US",
-            "cf-ray": "9d93206e9db6381e-ORD",
-            "cf-visitor": "{\"scheme\":\"https\"}",
-            "cf-warp-tag-id": "928c4c4e-610a-4fd2-a6d1-68d5b261c478",
-            "connection": "keep-alive",
-            "content-type": "application/json",
-            "x-forwarded-for": "34.59.11.47",
-            "x-forwarded-proto": "https"
-          },
-          "params": {},
-          "query": {},
-          "body": {
-            "user_message_request": "Okay. Um, all right. Uh, um, also, uh, after this research report is ready, can you create a project and, um, you know, so we store it, uh, in the, uh, um, in, in, in, um, whatever storage we have? And I'd like you to write a, uh, short story that, um, uses the genre that we just described. Um, use Medium as-Mm-hmm. A, um, as a, as a method of where we're going to deliver the story to. So that should be part of your writing style. And I'd like you to, um, um, use, uh, again, use that genre specifically. Um, uh, you can do that after you do the research report. Uh, you okay?"
-          },
-          "webhookUrl": "https://n8n.agileadautomation.com/webhook/author_request",
-          "executionMode": "production"
-        }
-      }
-    ]
   }
 }

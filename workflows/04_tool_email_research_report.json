@@ -13,6 +13,12 @@
             },
             {
               "name": "subjectLine"
+            },
+            {
+              "name": "recipient_email"
+            },
+            {
+              "name": "bcc_email"
             }
           ]
         }
@@ -28,7 +34,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Ensure markdown tables have blank lines before/after so Showdown parses them\nlet md = $input.first().json.markdownReportContent || '';\n\n// Match table blocks: lines starting with | that include a separator row (|---|)\n// Add blank lines before and after table blocks if missing\nmd = md.replace(/(^|\\n)([^\\n]*\\|[^\\n]*\\n\\|[-| :]+\\|[^\\n]*(?:\\n\\|[^\\n]*)*)/g, (match, prefix, table) => {\n  return prefix + '\\n' + table + '\\n';\n});\n\nreturn [{\n  json: {\n    markdownReportContent: md,\n    emailAddress: $input.first().json.emailAddress,\n    subjectLine: $input.first().json.subjectLine\n  }\n}];"
+        "jsCode": "// Ensure markdown tables have blank lines before/after so Showdown parses them\nlet md = $input.first().json.markdownReportContent || '';\nmd = md.replace(/(^|\\n)([^\\n]*\\|[^\\n]*\\n\\|[-| :]+\\|[^\\n]*(?:\\n\\|[^\\n]*)*)/g, (match, prefix, table) => {\n  return prefix + '\\n' + table + '\\n';\n});\n\n// Fetch email config from app_config if trigger values are null\nconst SUPABASE_URL = 'https://qsirioazmsmrrfoltrhn.supabase.co';\nconst SUPABASE_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk';\nconst trigger = $input.first().json;\n\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\nif (!recipient_email) {\n  try {\n    const rows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/app_config?key=in.(recipient_email,bcc_email)&select=key,value`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    for (const row of rows) {\n      if (row.key === 'recipient_email') recipient_email = row.value;\n      if (row.key === 'bcc_email') bcc_email = row.value;\n    }\n  } catch (e) {\n    recipient_email = 'eric@agileadtesting.com';\n    bcc_email = '';\n  }\n}\n\nreturn [{\n  json: {\n    markdownReportContent: md,\n    emailAddress: trigger.emailAddress,\n    subjectLine: trigger.subjectLine,\n    recipient_email: recipient_email,\n    bcc_email: bcc_email || ''\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -62,11 +68,12 @@
     },
     {
       "parameters": {
-        "sendTo": "={{ $('workflow_trigger').item.json.emailAddress }}",
-        "subject": "={{ $('workflow_trigger').item.json.subjectLine }}",
+        "sendTo": "={{ $('fix_table_formatting').item.json.recipient_email || $('fix_table_formatting').item.json.emailAddress }}",
+        "subject": "={{ $('fix_table_formatting').item.json.subjectLine }}",
         "message": "={{ $json.data }}",
         "options": {
-          "appendAttribution": false
+          "appendAttribution": false,
+          "bccList": "={{ $('fix_table_formatting').item.json.bcc_email }}"
         }
       },
       "type": "n8n-nodes-base.gmail",

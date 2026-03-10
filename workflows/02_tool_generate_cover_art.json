@@ -16,6 +16,12 @@
             },
             {
               "name": "content_type"
+            },
+            {
+              "name": "recipient_email"
+            },
+            {
+              "name": "bcc_email"
             }
           ]
         }
@@ -31,20 +37,10 @@
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "b8fdb1d1",
-              "name": "art_guidelines",
-              "value": "={{ (() => {\nconst genre = $('workflow_trigger').item.json.genre_slug;\nconst guidelines = {\n  'post-apocalyptic': 'Cinematic digital painting. Muted earth tones with toxic greens and ember oranges. Crumbling infrastructure reclaimed by nature. Dramatic lighting through dust and haze. Lone figures silhouetted against vast ruined landscapes. No text.',\n  'political-scifi': 'Clean, geometric composition. Cold blues and institutional grays with strategic red accents. Architecture of power \\u2014 domes, corridors, council chambers. Figures in formation or confrontation. Propaganda poster aesthetic blended with photorealism. No text.',\n  'historical-time-travel': 'Split composition showing two eras. Warm sepia for historical elements, cool modern tones for present/future. Visible temporal distortion at the boundary. Period-accurate details. Anachronistic objects as focal points. No text.',\n  'ai-marketing': 'Clean, modern tech aesthetic. Gradient blues and purples. Circuit board patterns, neural network visualizations. Minimalist with high contrast. Data visualization elements. No text.',\n  'political-history': 'Documentary photography meets oil painting. Warm amber lighting on architecture of power \\u2014 parliaments, war rooms, protest squares. Figures in period dress. Maps and documents as compositional elements. No text.',\n  'ancient-history': 'Classical oil painting style. Warm golden light on marble and stone. Temples, amphitheaters, markets. Rich earth tones with lapis and gold accents. Archaeological texture \\u2014 weathered, layered, timeless. No text.'\n};\nreturn guidelines[genre] || guidelines['post-apocalyptic'];\n})() }}",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
+        "jsCode": "const SUPABASE_URL = 'https://qsirioazmsmrrfoltrhn.supabase.co';\nconst SUPABASE_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk';\nconst trigger = $('workflow_trigger').first().json;\n\n// Fetch email config from app_config (centralized source of truth)\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\nif (!recipient_email) {\n  try {\n    const rows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/app_config?key=in.(recipient_email,bcc_email)&select=key,value`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    for (const row of rows) {\n      if (row.key === 'recipient_email') recipient_email = row.value;\n      if (row.key === 'bcc_email') bcc_email = row.value;\n    }\n  } catch (e) {\n    recipient_email = 'eric@agileadtesting.com';\n    bcc_email = '';\n  }\n}\n\n// Genre-specific art guidelines\nconst genre = trigger.genre_slug || 'post-apocalyptic';\nconst guidelines = {\n  'post-apocalyptic': 'Muted earth tones, atmospheric haze, dramatic lighting. Overgrown ruins, crumbling infrastructure, vast empty landscapes. Mood: haunting beauty in decay. Style: cinematic concept art, digital matte painting.',\n  'political-scifi': 'Dark imposing structures, dramatic chiaroscuro lighting. Vast space stations, parliamentary chambers, propaganda aesthetics. Mood: cerebral tension. Style: retro-futurism meets brutalist architecture.',\n  'historical-time-travel': 'Rich period-accurate details, warm golden-hour lighting. Layered timelines shown through visual juxtaposition. Mood: nostalgic wonder. Style: romantic realism with subtle anachronisms.',\n  'ai-marketing': 'Clean minimalist tech aesthetic, gradient blues and purples. Circuit patterns, neural network visualizations, data streams. Mood: innovative and forward-looking. Style: modern digital art, sleek corporate futurism.',\n  'political-history': 'Documentary-style gravitas, amber and sepia tones. Architecture of power, crowds, pivotal moments. Mood: weight of history. Style: oil painting meets photojournalism.',\n  'ancient-history': 'Classical painting style, warm golden light, rich earth tones with lapis lazuli and gold accents. Marble, stone, papyrus textures. Mood: reverent immersion. Style: neoclassical oil painting, museum-quality detail.'\n};\nconst art_guidelines = guidelines[genre] || guidelines['post-apocalyptic'];\n\nreturn [{ json: { art_guidelines, recipient_email, bcc_email: bcc_email || '' } }];"
       },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         -752,
         96
@@ -110,11 +106,12 @@
     },
     {
       "parameters": {
-        "sendTo": "eric@agileadtesting.com",
+        "sendTo": "={{ $('set_art_guidelines').item.json.recipient_email }}",
         "subject": "=Cover Art: {{ $('workflow_trigger').item.json.content_type || 'Content' }} \u2014 {{ $('workflow_trigger').item.json.story_title }}",
         "message": "=<h2>Cover Art Generated</h2><table style=\"border-collapse:collapse;width:100%;max-width:500px;\"><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Content Type</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.content_type || 'Not specified' }}</td></tr><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Title</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.story_title }}</td></tr><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Genre</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.genre_slug }}</td></tr><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Description</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.image_description }}</td></tr></table>",
         "options": {
           "appendAttribution": false,
+          "bccList": "={{ $('set_art_guidelines').item.json.bcc_email }}",
           "attachmentsUi": {
             "attachmentsBinary": [
               {}

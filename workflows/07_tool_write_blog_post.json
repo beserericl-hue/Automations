@@ -16,6 +16,12 @@
             },
             {
               "name": "target_length"
+            },
+            {
+              "name": "recipient_email"
+            },
+            {
+              "name": "bcc_email"
             }
           ]
         }
@@ -31,28 +37,12 @@
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "s1",
-              "name": "SUPABASE_URL",
-              "value": "https://qsirioazmsmrrfoltrhn.supabase.co",
-              "type": "string"
-            },
-            {
-              "id": "sapi",
-              "name": "SUPABASE_API_KEY",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
+        "jsCode": "const SUPABASE_URL = 'https://qsirioazmsmrrfoltrhn.supabase.co';\nconst SUPABASE_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk';\nconst trigger = $('workflow_trigger').first().json;\n\n// Fetch email config from app_config (centralized source of truth)\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\nif (!recipient_email) {\n  try {\n    const rows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/app_config?key=in.(recipient_email,bcc_email)&select=key,value`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    for (const row of rows) {\n      if (row.key === 'recipient_email') recipient_email = row.value;\n      if (row.key === 'bcc_email') bcc_email = row.value;\n    }\n  } catch (e) {\n    recipient_email = 'eric@agileadtesting.com';\n    bcc_email = '';\n  }\n}\n\nreturn [{ json: { SUPABASE_URL, SUPABASE_API_KEY, recipient_email, bcc_email: bcc_email || '' } }];"
       },
       "id": "bp-settings",
       "name": "settings",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         128,
         0
@@ -105,7 +95,8 @@
       "position": [
         480,
         0
-      ]
+      ],
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -114,7 +105,7 @@
             {
               "id": "bpp1",
               "name": "prompt",
-              "value": "=You are a world-class science fiction blogger specializing in {{ $('get_genre_config').first().json[0]?.genre_name }}.\n\n## Genre Guidelines\n{{ $('get_genre_config').first().json[0]?.writing_guidelines }}\n\n## Recent Curated Content\n{{ JSON.stringify($('get_recent_content').first().json.data?.slice(0, 10)?.map(i => ({ title: i.title, source: i.source_type })) || []) }}\n\n## Assignment\nWrite a blog post about: {{ $('workflow_trigger').item.json.topic }}\nTarget length: {{ $('workflow_trigger').item.json.target_length || 1500 }} words\nSEO keywords: {{ $('workflow_trigger').item.json.keywords }}\n\n## Requirements\n- Attention-grabbing headline\n- Hook opening paragraph\n- 3-5 subheadings for scannability\n- Reference recent content from the genre\n- Include relevant book/movie recommendations\n- End with a discussion prompt\n- SEO-optimized without being keyword-stuffed\n\n## Output\nReturn JSON: { title, meta_description, body_markdown, tags }",
+              "value": "=You are a world-class science fiction blogger specializing in {{ $('get_genre_config').first().json[0]?.genre_name }}.\n\n## Genre Guidelines\n{{ $('get_genre_config').first().json[0]?.writing_guidelines }}\n\n## Recent Curated Content\n{{ JSON.stringify($('get_recent_content').first().json?.data?.slice(0, 10)?.map(i => ({ title: i.title, source: i.source_type })) || []) }}\n\n## Assignment\nWrite a blog post about: {{ $('workflow_trigger').item.json.topic }}\nTarget length: {{ $('workflow_trigger').item.json.target_length || 1500 }} words\nSEO keywords: {{ $('workflow_trigger').item.json.keywords }}\n\n## Writing Prime Directive\nWrite like a human, not a machine. Use clear, everyday language and short sentences. Cut cliches \u2014 no 'revolutionize,' 'game-changing,' 'unleash,' or 'delve.' Get to the point \u2014 remove filler words. No hype, just facts. Be genuine \u2014 don't fake excitement. Show, don't tell \u2014 use concrete examples instead of vague claims. Stay focused \u2014 one main idea per paragraph. Keep paragraphs short and scannable. Respect the reader's intelligence and time. Write like you'd explain something to a smart friend. Skip unnecessary adjectives and adverbs. After drafting, cut anything confusing or off-topic.\n\n## Requirements\n- Attention-grabbing headline\n- Hook opening paragraph\n- 3-5 subheadings for scannability\n- Reference recent content from the genre\n- Include relevant book/movie recommendations\n- End with a discussion prompt\n- SEO-optimized without being keyword-stuffed\n\n## Output\nReturn JSON: { title, meta_description, body_markdown, tags }",
               "type": "string"
             }
           ]
@@ -275,11 +266,12 @@
     },
     {
       "parameters": {
-        "sendTo": "eric@agileadtesting.com",
+        "sendTo": "={{ $('settings').item.json.recipient_email }}",
         "subject": "=Blog Draft: {{ $('write_blog').item.json.output?.title || 'Untitled' }}",
         "message": "={{ $('convert_to_html').item.json.data }}",
         "options": {
-          "appendAttribution": false
+          "appendAttribution": false,
+          "bccList": "={{ $('settings').item.json.bcc_email }}"
         }
       },
       "id": "bp-email",

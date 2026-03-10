@@ -1,5 +1,11 @@
 {
+  "updatedAt": "2026-03-09T15:02:33.640Z",
+  "createdAt": "2026-03-06T15:29:35.698Z",
+  "id": "cjIUEjrqvyGZyKwN",
   "name": "Tool - Write Newsletter",
+  "description": null,
+  "active": true,
+  "isArchived": false,
   "nodes": [
     {
       "parameters": {
@@ -13,6 +19,12 @@
             },
             {
               "name": "date"
+            },
+            {
+              "name": "recipient_email"
+            },
+            {
+              "name": "bcc_email"
             }
           ]
         }
@@ -28,28 +40,12 @@
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "s1",
-              "name": "SUPABASE_URL",
-              "value": "https://qsirioazmsmrrfoltrhn.supabase.co",
-              "type": "string"
-            },
-            {
-              "id": "sapi",
-              "name": "SUPABASE_API_KEY",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
+        "jsCode": "const SUPABASE_URL = 'https://qsirioazmsmrrfoltrhn.supabase.co';\nconst SUPABASE_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk';\nconst trigger = $('workflow_trigger').first().json;\n\n// Fetch email config from app_config (centralized source of truth)\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\nif (!recipient_email) {\n  try {\n    const rows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/app_config?key=in.(recipient_email,bcc_email)&select=key,value`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    for (const row of rows) {\n      if (row.key === 'recipient_email') recipient_email = row.value;\n      if (row.key === 'bcc_email') bcc_email = row.value;\n    }\n  } catch (e) {\n    recipient_email = 'eric@agileadtesting.com';\n    bcc_email = '';\n  }\n}\n\nreturn [{ json: { SUPABASE_URL, SUPABASE_API_KEY, recipient_email, bcc_email: bcc_email || '' } }];"
       },
       "id": "nl-settings",
       "name": "settings",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         128,
         0
@@ -102,18 +98,19 @@
       "position": [
         480,
         0
-      ]
+      ],
+      "alwaysOutputData": true
     },
     {
       "parameters": {
         "messages": {
           "message": [
             {
-              "content": "=You are a research assistant. Provide detailed, current information with citations.",
+              "content": "=You are a research assistant. Your job is to find real articles with working URLs. Return results in a strict format.",
               "role": "system"
             },
             {
-              "content": "=Research current developments in {{ $('get_genre_config').first().json[0].genre_name }} related to: {{ $('workflow_trigger').item.json.topic }}. Provide recent news, book releases, and notable discussions."
+              "content": "=Research the following topic: {{ $('workflow_trigger').item.json.topic }}.\n\nDomain: {{ $('get_genre_config').first().json[0].genre_name }}.\n\nReturn EXACTLY this format for each source (find 8-12 sources):\n\n---\nSOURCE 1:\nTitle: [article title]\nURL: [full https URL]\nAuthor: [author name or publication]\nDate: [publication date if available]\nSummary: [2-3 sentence summary of the key insight]\n---\nSOURCE 2:\n...\n\nRequirements:\n- Every source MUST have a working URL\n- Use reputable publications (major news, academic, industry)\n- Focus specifically on the topic requested\n- Include a mix of recent news, analysis, and expert commentary"
             }
           ]
         },
@@ -146,7 +143,7 @@
             {
               "id": "nlp1",
               "name": "prompt",
-              "value": "=You are a world-class science fiction newsletter editor specializing in {{ $('get_genre_config').first().json[0].genre_name }}.\n\n## Genre Guidelines\n{{ $('get_genre_config').first().json[0].writing_guidelines }}\n\n## Research Context\n{{ $('research_topic').item.json.message?.content || $('research_topic').item.json.choices?.[0]?.message?.content || '' }}\n\n## Recent Curated Content\n{{ JSON.stringify($('get_recent_content').first().json.data?.slice(0, 10)?.map(i => ({ title: i.title, source: i.source_type, url: i.source_url })) || []) }}\n\n## Assignment\nWrite a newsletter about: {{ $('workflow_trigger').item.json.topic }}\nDate: {{ $('workflow_trigger').item.json.date || $now.format('yyyy-MM-dd') }}\n\n## Requirements\n- Subject line: compelling, under 60 chars\n- Pre-header: teaser text, under 100 chars\n- Introduction: 2-3 sentences hooking the reader\n- 3-5 sections, each covering a different angle or story\n- Each section: headline + 2-3 paragraph analysis with links to sources\n- Outro: forward-looking thought + CTA\n- Tone: knowledgeable insider sharing discoveries with fellow enthusiasts\n- Include links to source content where available\n\n## Output\nReturn JSON with: subject_line, pre_header, intro, sections (array of {headline, body}), outro",
+              "value": "=You are a world-class newsletter editor and subject-matter expert specializing in {{ $('get_genre_config').first().json[0].genre_name }}.\n\n## Genre Guidelines\n{{ $('get_genre_config').first().json[0].writing_guidelines }}\n\n## SOURCE ARTICLES (embed links to these in your writing)\n{{ $('research_topic').item.json.message || '' }}\n\n## Recent Curated Content\n{{ JSON.stringify($('get_recent_content').first().json?.data?.slice(0, 10)?.map(i => ({ title: i.title, source: i.source_type, url: i.source_url })) || []) }}\n\n## Assignment\nWrite a newsletter about: {{ $('workflow_trigger').item.json.topic }}\nDate: {{ $('workflow_trigger').item.json.date || $now.format('yyyy-MM-dd') }}\n\nReturn ONLY valid JSON (no markdown code fences, no extra text) with this exact structure:\n{\n  \"subject_line\": \"compelling subject, under 60 chars\",\n  \"pre_header\": \"teaser text, under 100 chars\",\n  \"intro\": \"2-3 sentences hooking the reader\",\n  \"sections\": [\n    {\"headline\": \"section title\", \"body\": \"section content with [Source Title](https://url) links embedded naturally\"}\n  ],\n  \"outro\": \"forward-looking thought + CTA\"\n}\n\n## Writing Prime Directive\nWrite like a human, not a machine. Use clear, everyday language and short sentences. Cut cliches \u2014 no 'revolutionize,' 'game-changing,' 'unleash,' or 'delve.' Get to the point \u2014 remove filler words. No hype, just facts. Be genuine \u2014 don't fake excitement. Show, don't tell \u2014 use concrete examples instead of vague claims. Stay focused \u2014 one main idea per paragraph. Keep paragraphs short and scannable. Respect the reader's intelligence and time. Write like you'd explain something to a smart friend. Skip unnecessary adjectives and adverbs.\n\nRULES:\n- 3-5 sections, each covering a different angle of the topic\n- EMBED source links as markdown [Title](url) naturally within each section body\n- Each section MUST include at least one linked source from the research above\n- Tone: knowledgeable insider sharing discoveries\n- Stay focused on the specific topic\n- Do NOT wrap the JSON in code fences or add any text outside the JSON object",
               "type": "string"
             }
           ]
@@ -164,98 +161,63 @@
     },
     {
       "parameters": {
-        "promptType": "define",
-        "text": "={{ $json.prompt }}",
-        "hasOutputParser": true,
-        "batching": {}
+        "messages": {
+          "message": [
+            {
+              "content": "=You are a world-class newsletter writer. You always embed source links as markdown [Title](url) in your writing. You return only valid JSON, never markdown code fences.",
+              "role": "system"
+            },
+            {
+              "content": "={{ $json.prompt }}"
+            }
+          ]
+        },
+        "simplify": true,
+        "options": {
+          "temperature": 0.3
+        },
+        "requestOptions": {}
       },
       "id": "nl-write",
       "name": "write_newsletter",
-      "type": "@n8n/n8n-nodes-langchain.chainLlm",
-      "typeVersion": 1.7,
+      "type": "n8n-nodes-base.perplexity",
+      "typeVersion": 1,
       "position": [
         1136,
+        0
+      ],
+      "credentials": {
+        "perplexityApi": {
+          "id": "ggr9QCRobQVA6Lwb",
+          "name": "Perplexity account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the Perplexity response into structured newsletter JSON\nconst response = $('write_newsletter').first().json;\nconst text = response.message || response.content || '';\nconst writeCitations = response.citations || [];\n\nlet newsletter;\ntry {\n  // Try direct JSON parse\n  newsletter = JSON.parse(text);\n} catch (e) {\n  try {\n    // Try extracting from markdown code block\n    const jsonMatch = text.match(/```(?:json)?\\s*([\\s\\S]*?)```/);\n    if (jsonMatch) {\n      newsletter = JSON.parse(jsonMatch[1].trim());\n    } else {\n      // Try finding JSON object in text\n      const objMatch = text.match(/\\{[\\s\\S]*\\}/);\n      if (objMatch) {\n        newsletter = JSON.parse(objMatch[0]);\n      } else {\n        // Fallback: wrap raw text as single-section newsletter\n        newsletter = {\n          subject_line: $('workflow_trigger').first().json.topic || 'Newsletter',\n          pre_header: 'Your latest newsletter',\n          intro: '',\n          sections: [{ headline: 'Newsletter', body: text }],\n          outro: ''\n        };\n      }\n    }\n  } catch (e2) {\n    // Last resort fallback\n    newsletter = {\n      subject_line: $('workflow_trigger').first().json.topic || 'Newsletter',\n      pre_header: 'Your latest newsletter',\n      intro: '',\n      sections: [{ headline: 'Newsletter', body: text }],\n      outro: ''\n    };\n  }\n}\n\nreturn [{ json: { output: newsletter, citations: writeCitations } }];"
+      },
+      "id": "nl-parse",
+      "name": "parse_newsletter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
         0
       ]
     },
     {
       "parameters": {
-        "model": {
-          "__rl": true,
-          "value": "claude-sonnet-4-20250514",
-          "mode": "list",
-          "cachedResultName": "Claude Sonnet 4"
-        },
-        "options": {
-          "maxTokensToSample": 8000
-        }
+        "jsCode": "// Safety net: inject source links into sections that don't already have them\nconst researchData = $('research_topic').first().json;\nconst researchCitations = researchData.citations || [];\nconst writeCitations = $json.citations || [];\nconst researchText = researchData.message || '';\n\n// Parse SOURCE blocks from research text\nconst sources = [];\nconst sourceBlocks = researchText.split('---').filter(b => b.includes('SOURCE'));\nfor (const block of sourceBlocks) {\n  const titleMatch = block.match(/Title:\\s*(.+)/i);\n  const urlMatch = block.match(/URL:\\s*(https?:\\/\\/[^\\s]+)/i);\n  if (titleMatch && urlMatch) {\n    sources.push({ title: titleMatch[1].trim(), url: urlMatch[1].trim() });\n  }\n}\n\n// Fallback: use raw citations arrays\nif (sources.length === 0) {\n  const allCitations = [...new Set([...researchCitations, ...writeCitations])];\n  for (const url of allCitations) {\n    const domain = url.replace(/https?:\\/\\/(www\\.)?/, '').split('/')[0];\n    sources.push({ title: domain, url });\n  }\n}\n\nconst output = $json.output || {};\nconst sections = output.sections || [];\n\n// Only add links to sections that don't already have markdown links\nconst enrichedSections = sections.map((section, i) => {\n  if (section.body && /\\[.+?\\]\\(https?:\\/\\/.+?\\)/.test(section.body)) {\n    return section; // Already has links\n  }\n  const startIdx = (i * 2) % Math.max(sources.length, 1);\n  const sectionSources = sources.slice(startIdx, startIdx + 2);\n  if (sectionSources.length === 0) return section;\n\n  const links = sectionSources\n    .map(s => '[' + s.title + '](' + s.url + ')')\n    .join(' | ');\n\n  return {\n    ...section,\n    body: section.body + '\\n\\n**Read more:** ' + links\n  };\n});\n\nreturn [{\n  json: {\n    output: {\n      ...output,\n      sections: enrichedSections\n    }\n  }\n}];"
       },
-      "id": "nl-claude",
-      "name": "claude-sonnet",
-      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
-      "typeVersion": 1.3,
+      "id": "nl-inject-links",
+      "name": "inject_source_links",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
-        1200,
-        208
-      ],
-      "credentials": {
-        "anthropicApi": {
-          "id": "5LhCYKsaFO3fF7II",
-          "name": "Anthropic account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "schemaType": "manual",
-        "inputSchema": "{ \"type\": \"object\", \"properties\": { \"subject_line\": { \"type\": \"string\" }, \"pre_header\": { \"type\": \"string\" }, \"intro\": { \"type\": \"string\" }, \"sections\": { \"type\": \"array\", \"items\": { \"type\": \"object\", \"properties\": { \"headline\": { \"type\": \"string\" }, \"body\": { \"type\": \"string\" } } } }, \"outro\": { \"type\": \"string\" } }, \"required\": [\"subject_line\", \"pre_header\", \"intro\", \"sections\", \"outro\"] }"
-      },
-      "id": "nl-parser",
-      "name": "newsletter_parser",
-      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
-      "typeVersion": 1.3,
-      "position": [
-        1760,
-        432
+        1440,
+        0
       ]
-    },
-    {
-      "parameters": {
-        "options": {}
-      },
-      "id": "nl-autofix",
-      "name": "newsletter_auto_parser",
-      "type": "@n8n/n8n-nodes-langchain.outputParserAutofixing",
-      "typeVersion": 1,
-      "position": [
-        1584,
-        224
-      ]
-    },
-    {
-      "parameters": {
-        "model": {
-          "__rl": true,
-          "value": "claude-sonnet-4-20250514",
-          "mode": "list",
-          "cachedResultName": "Claude Sonnet 4"
-        },
-        "options": {}
-      },
-      "id": "nl-autofix-claude",
-      "name": "claude-sonnet-fix",
-      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
-      "typeVersion": 1.3,
-      "position": [
-        1616,
-        464
-      ],
-      "credentials": {
-        "anthropicApi": {
-          "id": "5LhCYKsaFO3fF7II",
-          "name": "Anthropic account"
-        }
-      }
     },
     {
       "parameters": {
@@ -282,7 +244,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1440,
+        1600,
         0
       ]
     },
@@ -297,7 +259,7 @@
       "type": "n8n-nodes-base.markdown",
       "typeVersion": 1,
       "position": [
-        1680,
+        1760,
         0
       ]
     },
@@ -339,11 +301,25 @@
     },
     {
       "parameters": {
-        "sendTo": "eric@agileadtesting.com",
+        "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\n\ntry {\n  const output = $('inject_source_links').first().json.output || {};\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: supabaseUrl + '/rest/v1/published_content',\n    headers,\n    body: {\n      title: output.subject_line || 'Newsletter',\n      content_type: 'newsletter',\n      genre_slug: $('workflow_trigger').first().json.genre_slug || 'post-apocalyptic',\n      content_text: $('set_full_newsletter').first().json.newsletter_md || '',\n      storage_path: $json.Key || '',\n      project_id: null,\n      chapter_number: null,\n      status: 'draft'\n    }\n  });\n} catch (e) {\n  // Don't fail the workflow if draft insert fails\n}\n\nreturn $input.all();"
+      },
+      "id": "nl-draft",
+      "name": "insert_draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('settings').item.json.recipient_email }}",
         "subject": "=Newsletter: {{ $('set_full_newsletter').item.json.subject_line }}",
         "message": "={{ $('convert_to_html').item.json.data }}",
         "options": {
-          "appendAttribution": false
+          "appendAttribution": false,
+          "bccList": "={{ $('settings').item.json.bcc_email }}"
         }
       },
       "id": "nl-email",
@@ -382,19 +358,6 @@
       "typeVersion": 3.4,
       "position": [
         2640,
-        0
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\n\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: supabaseUrl + '/rest/v1/published_content',\n    headers,\n    body: {\n      title: ($('write_newsletter').first().json.output?.title || $('write_newsletter').first().json.output?.subject || 'Newsletter'),\n      content_type: 'newsletter',\n      genre_slug: $('workflow_trigger').first().json.genre_slug || 'post-apocalyptic',\n      content_text: ($('write_newsletter').first().json.output?.body_markdown || $('write_newsletter').first().json.output?.body || ''),\n      storage_path: $json.Key || '',\n      project_id: null,\n      chapter_number: null,\n      status: 'draft'\n    }\n  });\n} catch (e) {\n  // Don't fail the workflow if draft insert fails\n}\n\nreturn $input.all();"
-      },
-      "id": "nl-draft",
-      "name": "insert_draft",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2160,
         0
       ]
     }
@@ -466,51 +429,29 @@
         ]
       ]
     },
-    "claude-sonnet": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "write_newsletter",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "newsletter_parser": {
-      "ai_outputParser": [
-        [
-          {
-            "node": "newsletter_auto_parser",
-            "type": "ai_outputParser",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "newsletter_auto_parser": {
-      "ai_outputParser": [
-        [
-          {
-            "node": "write_newsletter",
-            "type": "ai_outputParser",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "claude-sonnet-fix": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "newsletter_auto_parser",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "write_newsletter": {
+      "main": [
+        [
+          {
+            "node": "parse_newsletter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "parse_newsletter": {
+      "main": [
+        [
+          {
+            "node": "inject_source_links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "inject_source_links": {
       "main": [
         [
           {
@@ -554,22 +495,22 @@
         ]
       ]
     },
-    "send_email": {
+    "insert_draft": {
       "main": [
         [
           {
-            "node": "set_result",
+            "node": "send_email",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "insert_draft": {
+    "send_email": {
       "main": [
         [
           {
-            "node": "send_email",
+            "node": "set_result",
             "type": "main",
             "index": 0
           }
@@ -581,7 +522,5 @@
     "executionOrder": "v1",
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
-  },
-  "staticData": null,
-  "pinData": {}
+  }
 }

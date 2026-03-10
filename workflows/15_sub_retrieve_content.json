@@ -1,0 +1,83 @@
+{
+  "id": "DQS2zIhVjyuxabcb",
+  "name": "Sub - Retrieve Content",
+  "active": true,
+  "nodes": [
+    {
+      "id": "rc-trigger",
+      "name": "workflow_trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [0, 0],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "rc-settings",
+      "name": "settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 0],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "SUPABASE_URL",
+              "value": "https://qsirioazmsmrrfoltrhn.supabase.co",
+              "type": "string"
+            },
+            {
+              "id": "s2",
+              "name": "SUPABASE_API_KEY",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "rc-handler",
+      "name": "retrieve_content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 0],
+      "parameters": {
+        "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\nconst trigger = $('workflow_trigger').first().json;\nconst contentType = trigger.content_type || '';\nconst rawSearch = trigger.search_term || '';\n\nconst stopWords = ['the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'of', 'and', 'or', 'is', 'are', 'was', 'were', 'how', 'what', 'why', 'when', 'my', 'draft', 'about', 'called', 'titled', 'named', 'get', 'pull', 'up', 'blog', 'post', 'story', 'short', 'newsletter', 'chapter', 'report', 'research'];\nconst words = rawSearch.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/[ ]+/).filter(function(w) {\n  return w.length > 2 && stopWords.indexOf(w) === -1;\n});\nconst searchTerms = words.slice(0, 4);\n\nlet title = '';\nlet contentText = '';\nlet storagePath = '';\nlet contentId = '';\nlet foundType = contentType;\nconst self = this;\n\nasync function searchPublishedContent(type, terms) {\n  for (const term of terms) {\n    let url = supabaseUrl + '/rest/v1/published_content?title=ilike.*' + encodeURIComponent(term) + '*&order=created_at.desc&limit=5';\n    if (type) url += '&content_type=eq.' + type;\n    const resp = await self.helpers.httpRequest({ method: 'GET', url, headers });\n    const items = Array.isArray(resp) ? resp : [];\n    if (items.length > 0) {\n      const best = items.find(function(item) {\n        const t = (item.title || '').toLowerCase();\n        return terms.filter(function(kw) { return t.indexOf(kw) >= 0; }).length >= 2;\n      }) || items[0];\n      return best;\n    }\n  }\n  return null;\n}\n\nasync function searchResearchReports(terms) {\n  for (const term of terms) {\n    const url = supabaseUrl + '/rest/v1/research_reports?topic=ilike.*' + encodeURIComponent(term) + '*&order=updated_at.desc&limit=5';\n    const resp = await self.helpers.httpRequest({ method: 'GET', url, headers });\n    const items = Array.isArray(resp) ? resp : [];\n    if (items.length > 0) {\n      const best = items.find(function(item) {\n        const t = (item.topic || '').toLowerCase();\n        return terms.filter(function(kw) { return t.indexOf(kw) >= 0; }).length >= 2;\n      }) || items[0];\n      return best;\n    }\n  }\n  return null;\n}\n\ntry {\n  if (contentType === 'research_report') {\n    const item = await searchResearchReports(searchTerms);\n    if (item) {\n      title = item.topic || 'Research Report';\n      contentText = item.content || '';\n      contentId = item.id;\n    }\n  } else if (['short_story', 'blog_post', 'newsletter', 'chapter'].indexOf(contentType) >= 0) {\n    const item = await searchPublishedContent(contentType, searchTerms);\n    if (item) {\n      title = item.title || 'Untitled';\n      contentText = item.content_text || '';\n      storagePath = item.storage_path || '';\n      contentId = item.id;\n    }\n  } else {\n    var pcItem = await searchPublishedContent('', searchTerms);\n    if (pcItem) {\n      title = pcItem.title || 'Untitled';\n      contentText = pcItem.content_text || '';\n      storagePath = pcItem.storage_path || '';\n      contentId = pcItem.id;\n      foundType = pcItem.content_type || 'unknown';\n    } else {\n      var rrItem = await searchResearchReports(searchTerms);\n      if (rrItem) {\n        title = rrItem.topic || 'Research Report';\n        contentText = rrItem.content || '';\n        contentId = rrItem.id;\n        foundType = 'research_report';\n      }\n    }\n  }\n\n  if (contentText === '' && storagePath) {\n    const storageUrl = supabaseUrl + '/storage/v1/object/' + storagePath;\n    const sHeaders = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey };\n    try {\n      contentText = await self.helpers.httpRequest({ method: 'GET', url: storageUrl, headers: sHeaders, returnFullResponse: false });\n      if (typeof contentText !== 'string') contentText = JSON.stringify(contentText);\n    } catch (e) {\n      contentText = '[Error fetching from storage: ' + e.message + ']';\n    }\n  }\n\n  if (contentText === '' && title === '') {\n    return [{ json: { found: false, result: 'No content found for: ' + rawSearch + ' (type: ' + (contentType || 'any') + '). Keywords: ' + searchTerms.join(', ') } }];\n  }\n\n  var maxLen = 100000;\n  if (contentText.length > maxLen) {\n    contentText = contentText.substring(0, maxLen) + ' [Truncated]';\n  }\n\n  return [{ json: { found: true, title: title, content_text: contentText, content_type: foundType, content_id: contentId, result: 'Found: ' + title + ' (' + foundType + ', ' + contentText.length + ' chars)' } }];\n} catch (err) {\n  return [{ json: { found: false, result: 'Error: ' + err.message } }];\n}"
+      }
+    },
+    {
+      "id": "rc-result",
+      "name": "set_result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [700, 0],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "r1", "name": "result", "value": "={{ $json.result }}", "type": "string" },
+            { "id": "r2", "name": "found", "value": "={{ $json.found }}", "type": "boolean" },
+            { "id": "r3", "name": "title", "value": "={{ $json.title }}", "type": "string" },
+            { "id": "r4", "name": "content_text", "value": "={{ $json.content_text }}", "type": "string" },
+            { "id": "r5", "name": "content_type", "value": "={{ $json.content_type }}", "type": "string" },
+            { "id": "r6", "name": "content_id", "value": "={{ $json.content_id }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "workflow_trigger": { "main": [[{ "node": "settings", "type": "main", "index": 0 }]] },
+    "settings": { "main": [[{ "node": "retrieve_content", "type": "main", "index": 0 }]] },
+    "retrieve_content": { "main": [[{ "node": "set_result", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}
