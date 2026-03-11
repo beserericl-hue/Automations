@@ -771,6 +771,32 @@ value. Themes: preservation, sacrifice, legacy, nature vs. human destruction.
   - Chapter-by-chapter breakdowns (title, brief, arc notes, research topics)
 - The outline is saved to your writing projects for use with Write Chapter
 
+### 9.2 Revise or Expand an Outline
+
+After brainstorming, you can expand the chapter count or deepen character development. The system re-runs research and generates a new outline, saving it over the original.
+
+**Add more chapters:**
+```
+expand the outline for "The Seed Vault" to 16 chapters
+```
+
+**Develop characters:**
+```
+expand the outline for "The Seed Vault" to 16 chapters and develop 5 main characters with backstories
+```
+
+**Revise the story arc:**
+```
+revise the outline for "The Seed Vault" — shift the arc to focus more on the antagonist's motivation
+```
+
+**Voice:**
+> "Expand the outline for 'The Seed Vault' to sixteen chapters and add detailed backstories for the five main characters."
+
+**What you get:** A new email with the updated outline. The revised version is saved to your writing projects, replacing the previous outline for use by Write Chapter.
+
+> ⚠️ **Always include the project title** so the system knows which outline to update. The title must match what you used when you first brainstormed it.
+
 ---
 
 ## 10. Writing Chapters (Book Projects)
@@ -802,6 +828,40 @@ map fragment, and a tense encounter with a Roman centurion posing as a scholar.
 Research topics: ["Library of Alexandria daily operations", "Cleopatra's court structure
 and politics", "Roman military presence in Egypt 30 BC", "ancient Egyptian scribal practices"]
 ```
+
+### 10.3 Retrieve a Written Chapter
+
+After writing a chapter, retrieve it to review it or pass it to Eve for a voice callback session.
+
+**Step 1 — Check what's saved (if unsure of the exact title):**
+```
+show me my drafts
+```
+
+**Step 2 — Retrieve using the title from the list:**
+```
+retrieve my draft for The Seed Vault chapter 1
+```
+
+> ⚠️ **Retrieve only works after Write Chapter has run.** If you get "content not found," the chapter hasn't been written yet — run Write Chapter first (section 10.1), then retrieve.
+
+**Voice:**
+> "Pull up my draft for The Seed Vault chapter one."
+
+### 10.4 Book Project Workflow Order
+
+The correct sequence for writing a book:
+
+| Step | Command | What Happens |
+|------|---------|--------------|
+| 1 | Brainstorm the story | Outline saved to writing projects, emailed |
+| 2 | *(Optional)* Expand the outline | Updated outline saved, emailed |
+| 3 | Write chapter 1 | Chapter written using outline, saved as draft, emailed |
+| 4 | Write chapter 2, 3… | Each chapter uses stored outline for consistency |
+| 5 | Retrieve a chapter | Pull it up to review or load into Eve |
+| 6 | Approve / publish | Move through content library workflow |
+
+> **Common mistake:** Trying to retrieve chapter 1 before writing it. The brainstorm saves an *outline*, not a written chapter. You must run Write Chapter to produce the actual prose.
 
 ---
 
@@ -941,6 +1001,8 @@ Eve handles both:
 | "Content not found" when retrieving | Try listing your drafts first to see exact titles. Search terms need to roughly match. |
 | Eve didn't call back | Make sure you used callback language like "call me back" or "help me improve it." |
 | Story doesn't match brainstormed outline | Make sure the project title matches exactly what you used during brainstorming. |
+| "Content not found" when retrieving a chapter | The chapter hasn't been written yet — only the outline exists. Run Write Chapter first (section 10.1), then retrieve. |
+| Outline revision went to chat instead of email | Use exact phrasing: "expand the outline for [title]" or "revise the outline for [title]". Include the project title. |
 
 ---
 
