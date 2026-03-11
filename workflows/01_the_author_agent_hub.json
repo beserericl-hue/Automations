@@ -951,7 +951,7 @@
     {
       "parameters": {
         "name": "manage_library",
-        "description": "Manage the content library. Operations: list_drafts, list_published, list_scheduled, approve, publish, reject, schedule, list_versions, get_version. Use content_title (the exact title) OR content_id (UUID) to identify items for approve/publish/reject/schedule/version operations \u2014 prefer content_title when working from user requests. Optional content_type_filter (short_story, blog_post, newsletter, chapter). schedule_date (ISO date like 2026-03-15) for schedule operation. version_number for get_version. Email notification sent on approve/publish/reject/schedule.",
+        "description": "Manage the content library. Operations: list_drafts, list_approved, list_published, list_scheduled, approve, publish, reject, schedule, list_versions, get_version. Use list_approved for items with approved status (not yet published); list_published for live published items. Use content_title (the exact title) OR content_id (UUID) to identify items for approve/publish/reject/schedule/version operations \u2014 prefer content_title when working from user requests. Optional content_type_filter (short_story, blog_post, newsletter, chapter). schedule_date (ISO date like 2026-03-15) for schedule operation. version_number for get_version. Email notification sent on approve/publish/reject/schedule.",
         "workflowId": {
           "__rl": true,
           "value": "1JERh5yJ3yDJka8s",
@@ -961,7 +961,7 @@
         "workflowInputs": {
           "mappingMode": "defineBelow",
           "value": {
-            "operation": "={{ $fromAI('operation', 'Operation to perform: list_drafts, list_published, list_scheduled, approve, publish, reject, schedule, list_versions, or get_version') }}",
+            "operation": "={{ $fromAI('operation', 'Operation to perform: list_drafts, list_approved, list_published, list_scheduled, approve, publish, reject, schedule, list_versions, or get_version') }}",
             "content_title": "={{ $fromAI('content_title', 'Title of the content item. Use this instead of content_id when you know the title. Leave empty if providing content_id.', 'string', '') }}",
             "content_id": "={{ $fromAI('content_id', 'UUID of the content item. Leave empty if providing content_title instead.', 'string', '') }}",
             "content_type_filter": "={{ $fromAI('content_type_filter', 'Optional filter: short_story, blog_post, newsletter, or chapter. Leave empty for no filter.', 'string', '') }}",
