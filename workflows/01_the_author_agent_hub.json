@@ -1172,6 +1172,34 @@
           "__rl": true,
           "mode": "id",
           "value": "DQS2zIhVjyuxabcb"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "search_term": "={{ $fromAI('search_term', 'Title or keyword to search for — e.g. The Seed Vault chapter 1, post-apocalyptic blog, Roman aqueducts', 'string') }}",
+            "content_type": "={{ $fromAI('content_type', 'Optional: filter by type — chapter, blog_post, short_story, newsletter, research_report. Leave empty to search all types.', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "search_term",
+              "displayName": "search_term",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "content_type",
+              "displayName": "content_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
         }
       },
       "id": "hub-retrieve",
