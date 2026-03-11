@@ -1222,6 +1222,19 @@
         540,
         -288
       ]
+    },
+    {
+      "id": "preprocess-msg",
+      "name": "preprocess_message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        686,
+        -288
+      ],
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst msg = (input.chatInput || input.body?.user_message_request || '').toLowerCase();\n\n// Detect library operation keywords\nconst isLibraryOp = /\\b(approve|publish|reject|schedule|list\\s+(draft|published|scheduled)|content\\s+librar)/.test(msg);\n\nif (isLibraryOp) {\n  const original = input.chatInput || input.body?.user_message_request || '';\n  const directive = ' [MANDATORY: Call manage_library with content_title from my message right now. Do not respond with any text before calling the tool.]';\n  return [{ json: { ...input, chatInput: original + directive } }];\n}\n\nreturn [{ json: input }];"
+      }
     }
   ],
   "connections": {
@@ -1449,6 +1462,17 @@
       ]
     },
     "hub_settings": {
+      "main": [
+        [
+          {
+            "node": "preprocess_message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "preprocess_message": {
       "main": [
         [
           {
