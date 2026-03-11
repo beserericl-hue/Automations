@@ -951,7 +951,7 @@
     {
       "parameters": {
         "name": "manage_library",
-        "description": "Manage the content library. Operations: list_drafts, list_published, list_scheduled, approve, publish, reject, schedule, list_versions, get_version. Use content_id (UUID) for approve/publish/reject/schedule/version operations. Optional content_type_filter (short_story, blog_post, newsletter, chapter). schedule_date (ISO date like 2026-03-15) for schedule operation. version_number for get_version. Email notification sent on approve/publish/reject/schedule.",
+        "description": "Manage the content library. Operations: list_drafts, list_published, list_scheduled, approve, publish, reject, schedule, list_versions, get_version. Use content_title (the exact title) OR content_id (UUID) to identify items for approve/publish/reject/schedule/version operations — prefer content_title when working from user requests. Optional content_type_filter (short_story, blog_post, newsletter, chapter). schedule_date (ISO date like 2026-03-15) for schedule operation. version_number for get_version. Email notification sent on approve/publish/reject/schedule.",
         "workflowId": {
           "__rl": true,
           "value": "1JERh5yJ3yDJka8s",
@@ -962,10 +962,11 @@
           "mappingMode": "defineBelow",
           "value": {
             "operation": "={{ $fromAI('operation', 'Operation to perform: list_drafts, list_published, list_scheduled, approve, publish, reject, schedule, list_versions, or get_version') }}",
-            "content_id": "={{ $fromAI('content_id', 'UUID of the content item (required for approve/publish/reject, empty for list operations)', 'string') }}",
-            "content_type_filter": "={{ $fromAI('content_type_filter', 'Optional filter: short_story, blog_post, newsletter, or chapter', 'string') }}",
+            "content_title": "={{ $fromAI('content_title', 'Title of the content item. Use this instead of content_id when you know the title. Leave empty if providing content_id.', 'string', '') }}",
+            "content_id": "={{ $fromAI('content_id', 'UUID of the content item. Leave empty if providing content_title instead.', 'string', '') }}",
+            "content_type_filter": "={{ $fromAI('content_type_filter', 'Optional filter: short_story, blog_post, newsletter, or chapter. Leave empty for no filter.', 'string', '') }}",
             "recipient_email": "={{ $('hub_settings').first().json.recipient_email }}",
-            "schedule_date": "={{ $fromAI('schedule_date', 'ISO date for scheduled publishing e.g. 2026-03-15. Empty for non-schedule operations.', 'string') }}",
+            "schedule_date": "={{ $fromAI('schedule_date', 'ISO date for scheduled publishing e.g. 2026-03-15. Leave empty for non-schedule operations.', 'string', '') }}",
             "version_number": "={{ $fromAI('version_number', 'Version number for get_version operation. Leave empty for all other operations.', 'string', '') }}",
             "change_note": "={{ $fromAI('change_note', 'Note describing the change. Leave empty if not needed.', 'string', '') }}",
             "bcc_email": "={{ $('hub_settings').first().json.bcc_email }}"
@@ -975,6 +976,16 @@
             {
               "id": "operation",
               "displayName": "operation",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "content_title",
+              "displayName": "content_title",
               "type": "string",
               "required": false,
               "defaultMatch": false,
