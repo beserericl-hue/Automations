@@ -951,7 +951,7 @@
     {
       "parameters": {
         "name": "manage_library",
-        "description": "Manage the content library. Operations: list_all (all items any status), list_drafts, list_approved, list_published, list_rejected, list_scheduled, approve, publish, reject, unpublish (revert published→approved), schedule, list_versions, get_version. Use list_approved for items with approved status (not yet published); list_published for live published items; list_all to see everything. Use content_title (the exact title) OR content_id (UUID) to identify items for approve/publish/reject/unpublish/schedule/version operations \u2014 prefer content_title when working from user requests. Optional content_type_filter (short_story, blog_post, newsletter, chapter). schedule_date (ISO date like 2026-03-15) for schedule operation. version_number for get_version. Email notification sent on approve/publish/reject/unpublish/schedule.",
+        "description": "Manage the content library. Operations: list_all (all items any status), list_drafts, list_approved, list_published, list_rejected, list_scheduled, approve, publish, reject, unpublish (revert published→approved), schedule, unschedule (revert scheduled→draft), list_versions, get_version. Use list_approved for items with approved status (not yet published); list_published for live published items; list_all to see everything. Use content_title (the exact title) OR content_id (UUID) to identify items for approve/publish/reject/unpublish/schedule/unschedule/version operations \u2014 prefer content_title when working from user requests. Optional content_type_filter (short_story, blog_post, newsletter, chapter). schedule_date (ISO date like 2026-03-15) for schedule operation. version_number for get_version. Email notification sent on approve/publish/reject/unpublish/schedule/unschedule.",
         "workflowId": {
           "__rl": true,
           "value": "1JERh5yJ3yDJka8s",
@@ -961,7 +961,7 @@
         "workflowInputs": {
           "mappingMode": "defineBelow",
           "value": {
-            "operation": "={{ $fromAI('operation', 'Operation to perform: list_all, list_drafts, list_approved, list_published, list_rejected, list_scheduled, approve, publish, reject, unpublish, schedule, list_versions, or get_version') }}",
+            "operation": "={{ $fromAI('operation', 'Operation to perform: list_all, list_drafts, list_approved, list_published, list_rejected, list_scheduled, approve, publish, reject, unpublish, schedule, unschedule, list_versions, or get_version') }}",
             "content_title": "={{ $fromAI('content_title', 'Title of the content item. Use this instead of content_id when you know the title. Leave empty if providing content_id.', 'string', '') }}",
             "content_id": "={{ $fromAI('content_id', 'UUID of the content item. Leave empty if providing content_title instead.', 'string', '') }}",
             "content_type_filter": "={{ $fromAI('content_type_filter', 'Optional filter: short_story, blog_post, newsletter, or chapter. Leave empty for no filter.', 'string', '') }}",
@@ -1233,7 +1233,7 @@
         -288
       ],
       "parameters": {
-        "jsCode": "const input = $input.first().json;\nconst msg = (input.chatInput || input.body?.user_message_request || '').toLowerCase();\n\n// Detect library operation keywords (natural language variations)\nconst isLibraryOp = /\b(approve|unpublish|publish|reject|schedule|list\\s+(all|draft|published|scheduled|approved|rejected)|content\\s+librar|my\\s+(draft|post|content|article|newsletter|chapter|stor)|show\\s+(me\\s+)?(my|what|all)|what.{0,20}(written|published|draft|created)|show\\s+all|see\\s+all|all\\s+content|all\\s+(my\\s+)?(posts?|draft|items?|articles?))/.test(msg);\n\nif (isLibraryOp) {\n  const original = input.chatInput || input.body?.user_message_request || '';\n  const directive = ' [MANDATORY: Call manage_library with content_title from my message right now. Do not respond with any text before calling the tool.]';\n  return [{ json: { ...input, chatInput: original + directive } }];\n}\n\nreturn [{ json: input }];"
+        "jsCode": "const input = $input.first().json;\nconst msg = (input.chatInput || input.body?.user_message_request || '').toLowerCase();\n\n// Detect library operation keywords (natural language variations)\nconst isLibraryOp = /\b(approve|unschedule|unpublish|publish|reject|schedule|list\\s+(all|draft|published|scheduled|approved|rejected)|content\\s+librar|my\\s+(draft|post|content|article|newsletter|chapter|stor)|show\\s+(me\\s+)?(my|what|all)|what.{0,20}(written|published|draft|created)|show\\s+all|see\\s+all|all\\s+content|all\\s+(my\\s+)?(posts?|draft|items?|articles?)|remove.{0,20}(schedule|publish)|cancel.{0,20}schedule)/.test(msg);\n\nif (isLibraryOp) {\n  const original = input.chatInput || input.body?.user_message_request || '';\n  const directive = ' [MANDATORY: Call manage_library with content_title from my message right now. Do not respond with any text before calling the tool.]';\n  return [{ json: { ...input, chatInput: original + directive } }];\n}\n\nreturn [{ json: input }];"
       }
     }
   ],
