@@ -159,6 +159,19 @@
           "name": "Gmail account"
         }
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $('set_result').first().json;\nreturn [{ json: { result: r.result || '' } }];"
+      },
+      "id": "return-result",
+      "name": "return_result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        0
+      ]
     }
   ],
   "connections": {
@@ -215,7 +228,24 @@
             "index": 0
           }
         ],
-        []
+        [
+          {
+            "node": "return_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send_email": {
+      "main": [
+        [
+          {
+            "node": "return_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
