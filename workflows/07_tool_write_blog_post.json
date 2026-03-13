@@ -1,4 +1,5 @@
 {
+  "id": "iMBIWzO2PjsLNH9w",
   "name": "Tool - Write Blog Post",
   "nodes": [
     {
@@ -16,6 +17,9 @@
             },
             {
               "name": "target_length"
+            },
+            {
+              "name": "user_prompt"
             },
             {
               "name": "recipient_email"
@@ -105,7 +109,7 @@
             {
               "id": "bpp1",
               "name": "prompt",
-              "value": "=You are a world-class science fiction blogger specializing in {{ $('get_genre_config').first().json[0]?.genre_name }}.\n\n## Genre Guidelines\n{{ $('get_genre_config').first().json[0]?.writing_guidelines }}\n\n## Recent Curated Content\n{{ JSON.stringify($('get_recent_content').first().json?.data?.slice(0, 10)?.map(i => ({ title: i.title, source: i.source_type })) || []) }}\n\n## Assignment\nWrite a blog post about: {{ $('workflow_trigger').item.json.topic }}\nTarget length: {{ $('workflow_trigger').item.json.target_length || 1500 }} words\nSEO keywords: {{ $('workflow_trigger').item.json.keywords }}\n\n## Writing Prime Directive\nWrite like a human, not a machine. Use clear, everyday language and short sentences. Cut cliches \u2014 no 'revolutionize,' 'game-changing,' 'unleash,' or 'delve.' Get to the point \u2014 remove filler words. No hype, just facts. Be genuine \u2014 don't fake excitement. Show, don't tell \u2014 use concrete examples instead of vague claims. Stay focused \u2014 one main idea per paragraph. Keep paragraphs short and scannable. Respect the reader's intelligence and time. Write like you'd explain something to a smart friend. Skip unnecessary adjectives and adverbs. After drafting, cut anything confusing or off-topic.\n\n## Requirements\n- Attention-grabbing headline\n- Hook opening paragraph\n- 3-5 subheadings for scannability\n- Reference recent content from the genre\n- Include relevant book/movie recommendations\n- End with a discussion prompt\n- SEO-optimized without being keyword-stuffed\n\n## Output\nReturn JSON: { title, meta_description, body_markdown, tags }",
+              "value": "=You are a world-class science fiction blogger specializing in {{ $('get_genre_config').first().json.genre_name }}.\n\n## Genre Guidelines\n{{ $('get_genre_config').first().json.writing_guidelines }}\n\n## Recent Curated Content\n{{ JSON.stringify($('get_recent_content').first().json?.data?.slice(0, 10)?.map(i => ({ title: i.title, source: i.source_type })) || []) }}\n\n## Assignment\nWrite a blog post about: {{ $('workflow_trigger').item.json.topic }}\nTarget length: {{ $('workflow_trigger').item.json.target_length || 1500 }} words\nSEO keywords: {{ $('workflow_trigger').item.json.keywords }}\n\n## Writing Prime Directive\nWrite like a human, not a machine. Use clear, everyday language and short sentences. Cut cliches — no 'revolutionize,' 'game-changing,' 'unleash,' or 'delve.' Get to the point — remove filler words. No hype, just facts. Be genuine — don't fake excitement. Show, don't tell — use concrete examples instead of vague claims. Stay focused — one main idea per paragraph. Keep paragraphs short and scannable. Respect the reader's intelligence and time. Write like you'd explain something to a smart friend. Skip unnecessary adjectives and adverbs. After drafting, cut anything confusing or off-topic.\n\n## Requirements\n- Attention-grabbing headline\n- Hook opening paragraph\n- 3-5 subheadings for scannability\n- Reference recent content from the genre\n- Include relevant book/movie recommendations\n- End with a discussion prompt\n- SEO-optimized without being keyword-stuffed\n\n## Output\nReturn JSON: { title, meta_description, body_markdown, tags }",
               "type": "string"
             }
           ]
@@ -130,7 +134,7 @@
               "role": "system"
             },
             {
-              "content": "=Research current developments in {{ $('get_genre_config').first().json[0]?.genre_name }} related to: {{ $('workflow_trigger').item.json.topic }}. Provide recent news, book releases, and notable discussions."
+              "content": "=Research current developments in {{ $('get_genre_config').first().json.genre_name }} related to: {{ $('workflow_trigger').item.json.topic }}. Provide recent news, book releases, and notable discussions."
             }
           ]
         },
@@ -268,7 +272,7 @@
       "parameters": {
         "sendTo": "={{ $('settings').item.json.recipient_email }}",
         "subject": "=Blog Draft: {{ $('write_blog').item.json.output?.title || 'Untitled' }}",
-        "message": "={{ $('convert_to_html').item.json.data }}",
+        "message": "={{ ($('workflow_trigger').first().json.user_prompt ? '<div style=\"background:#f0f0f0; border-left:4px solid #666; padding:12px 16px; margin-bottom:24px; font-family:sans-serif; font-size:14px; color:#333;\"><strong>Command:</strong> ' + $('workflow_trigger').first().json.user_prompt + '</div>' : '') + $('convert_to_html').item.json.data }}",
         "options": {
           "appendAttribution": false,
           "bccList": "={{ $('settings').item.json.bcc_email }}"
@@ -322,7 +326,7 @@
           "mappingMode": "defineBelow",
           "value": {
             "story_title": "={{ $json.output?.title || $('workflow_trigger').item.json.topic }}",
-            "image_description": "=A blog header image for \"{{ $json.output?.title || $('workflow_trigger').item.json.topic }}\".\n\nBlog summary: {{ $json.output?.meta_description || '' }}\n\nOpening content:\n{{ ($json.output?.content || $json.text || '').substring(0, 1200) }}\n\nCreate a visually striking header image that captures the blog post's theme \u2014 conceptual, atmospheric, and modern. Do NOT include any text, titles, or words in the image.",
+            "image_description": "=A blog header image for \"{{ $json.output?.title || $('workflow_trigger').item.json.topic }}\".\n\nBlog summary: {{ $json.output?.meta_description || '' }}\n\nOpening content:\n{{ ($json.output?.content || $json.text || '').substring(0, 1200) }}\n\nCreate a visually striking header image that captures the blog post's theme — conceptual, atmospheric, and modern. Do NOT include any text, titles, or words in the image.",
             "genre_slug": "={{ $('workflow_trigger').item.json.genre_slug || 'post-apocalyptic' }}",
             "content_type": "Blog Post"
           },
@@ -549,6 +553,8 @@
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
   },
-  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
   "pinData": {}
 }

@@ -1,4 +1,5 @@
 {
+  "id": "ZhVhnuJkIbQrhhNr",
   "name": "Data: AI Scraping Pipeline",
   "nodes": [
     {
@@ -797,10 +798,6 @@
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
   },
-  "staticData": {
-    "node:schedule_trigger": {
-      "recurrenceRules": []
-    }
-  },
+  "meta": null,
   "pinData": {}
 }

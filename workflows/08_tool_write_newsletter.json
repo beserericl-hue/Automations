@@ -1,11 +1,6 @@
 {
-  "updatedAt": "2026-03-09T15:02:33.640Z",
-  "createdAt": "2026-03-06T15:29:35.698Z",
   "id": "cjIUEjrqvyGZyKwN",
   "name": "Tool - Write Newsletter",
-  "description": null,
-  "active": true,
-  "isArchived": false,
   "nodes": [
     {
       "parameters": {
@@ -19,6 +14,9 @@
             },
             {
               "name": "date"
+            },
+            {
+              "name": "user_prompt"
             },
             {
               "name": "recipient_email"
@@ -110,7 +108,7 @@
               "role": "system"
             },
             {
-              "content": "=Research the following topic: {{ $('workflow_trigger').item.json.topic }}.\n\nDomain: {{ $('get_genre_config').first().json[0].genre_name }}.\n\nReturn EXACTLY this format for each source (find 8-12 sources):\n\n---\nSOURCE 1:\nTitle: [article title]\nURL: [full https URL]\nAuthor: [author name or publication]\nDate: [publication date if available]\nSummary: [2-3 sentence summary of the key insight]\n---\nSOURCE 2:\n...\n\nRequirements:\n- Every source MUST have a working URL\n- Use reputable publications (major news, academic, industry)\n- Focus specifically on the topic requested\n- Include a mix of recent news, analysis, and expert commentary"
+              "content": "=Research the following topic: {{ $('workflow_trigger').item.json.topic }}.\n\nDomain: {{ $('get_genre_config').first().json.genre_name }}.\n\nReturn EXACTLY this format for each source (find 8-12 sources):\n\n---\nSOURCE 1:\nTitle: [article title]\nURL: [full https URL]\nAuthor: [author name or publication]\nDate: [publication date if available]\nSummary: [2-3 sentence summary of the key insight]\n---\nSOURCE 2:\n...\n\nRequirements:\n- Every source MUST have a working URL\n- Use reputable publications (major news, academic, industry)\n- Focus specifically on the topic requested\n- Include a mix of recent news, analysis, and expert commentary"
             }
           ]
         },
@@ -143,7 +141,7 @@
             {
               "id": "nlp1",
               "name": "prompt",
-              "value": "=You are a world-class newsletter editor and subject-matter expert specializing in {{ $('get_genre_config').first().json[0].genre_name }}.\n\n## Genre Guidelines\n{{ $('get_genre_config').first().json[0].writing_guidelines }}\n\n## SOURCE ARTICLES (embed links to these in your writing)\n{{ $('research_topic').item.json.message || '' }}\n\n## Recent Curated Content\n{{ JSON.stringify($('get_recent_content').first().json?.data?.slice(0, 10)?.map(i => ({ title: i.title, source: i.source_type, url: i.source_url })) || []) }}\n\n## Assignment\nWrite a newsletter about: {{ $('workflow_trigger').item.json.topic }}\nDate: {{ $('workflow_trigger').item.json.date || $now.format('yyyy-MM-dd') }}\n\nReturn ONLY valid JSON (no markdown code fences, no extra text) with this exact structure:\n{\n  \"subject_line\": \"compelling subject, under 60 chars\",\n  \"pre_header\": \"teaser text, under 100 chars\",\n  \"intro\": \"2-3 sentences hooking the reader\",\n  \"sections\": [\n    {\"headline\": \"section title\", \"body\": \"section content with [Source Title](https://url) links embedded naturally\"}\n  ],\n  \"outro\": \"forward-looking thought + CTA\"\n}\n\n## Writing Prime Directive\nWrite like a human, not a machine. Use clear, everyday language and short sentences. Cut cliches \u2014 no 'revolutionize,' 'game-changing,' 'unleash,' or 'delve.' Get to the point \u2014 remove filler words. No hype, just facts. Be genuine \u2014 don't fake excitement. Show, don't tell \u2014 use concrete examples instead of vague claims. Stay focused \u2014 one main idea per paragraph. Keep paragraphs short and scannable. Respect the reader's intelligence and time. Write like you'd explain something to a smart friend. Skip unnecessary adjectives and adverbs.\n\nRULES:\n- 3-5 sections, each covering a different angle of the topic\n- EMBED source links as markdown [Title](url) naturally within each section body\n- Each section MUST include at least one linked source from the research above\n- Tone: knowledgeable insider sharing discoveries\n- Stay focused on the specific topic\n- Do NOT wrap the JSON in code fences or add any text outside the JSON object",
+              "value": "=You are a world-class newsletter editor and subject-matter expert specializing in {{ $('get_genre_config').first().json.genre_name }}.\n\n## Genre Guidelines\n{{ $('get_genre_config').first().json.writing_guidelines }}\n\n## SOURCE ARTICLES (embed links to these in your writing)\n{{ $('research_topic').item.json.message || '' }}\n\n## Recent Curated Content\n{{ JSON.stringify($('get_recent_content').first().json?.data?.slice(0, 10)?.map(i => ({ title: i.title, source: i.source_type, url: i.source_url })) || []) }}\n\n## Assignment\nWrite a newsletter about: {{ $('workflow_trigger').item.json.topic }}\nDate: {{ $('workflow_trigger').item.json.date || $now.format('yyyy-MM-dd') }}\n\nReturn ONLY valid JSON (no markdown code fences, no extra text) with this exact structure:\n{\n  \"subject_line\": \"compelling subject, under 60 chars\",\n  \"pre_header\": \"teaser text, under 100 chars\",\n  \"intro\": \"2-3 sentences hooking the reader\",\n  \"sections\": [\n    {\"headline\": \"section title\", \"body\": \"section content with [Source Title](https://url) links embedded naturally\"}\n  ],\n  \"outro\": \"forward-looking thought + CTA\"\n}\n\n## Writing Prime Directive\nWrite like a human, not a machine. Use clear, everyday language and short sentences. Cut cliches — no 'revolutionize,' 'game-changing,' 'unleash,' or 'delve.' Get to the point — remove filler words. No hype, just facts. Be genuine — don't fake excitement. Show, don't tell — use concrete examples instead of vague claims. Stay focused — one main idea per paragraph. Keep paragraphs short and scannable. Respect the reader's intelligence and time. Write like you'd explain something to a smart friend. Skip unnecessary adjectives and adverbs.\n\nRULES:\n- 3-5 sections, each covering a different angle of the topic\n- EMBED source links as markdown [Title](url) naturally within each section body\n- Each section MUST include at least one linked source from the research above\n- Tone: knowledgeable insider sharing discoveries\n- Stay focused on the specific topic\n- Do NOT wrap the JSON in code fences or add any text outside the JSON object",
               "type": "string"
             }
           ]
@@ -316,7 +314,7 @@
       "parameters": {
         "sendTo": "={{ $('settings').item.json.recipient_email }}",
         "subject": "=Newsletter: {{ $('set_full_newsletter').item.json.subject_line }}",
-        "message": "={{ $('convert_to_html').item.json.data }}",
+        "message": "={{ ($('workflow_trigger').first().json.user_prompt ? '<div style=\"background:#f0f0f0; border-left:4px solid #666; padding:12px 16px; margin-bottom:24px; font-family:sans-serif; font-size:14px; color:#333;\"><strong>Command:</strong> ' + $('workflow_trigger').first().json.user_prompt + '</div>' : '') + $('convert_to_html').item.json.data }}",
         "options": {
           "appendAttribution": false,
           "bccList": "={{ $('settings').item.json.bcc_email }}"
@@ -522,5 +520,9 @@
     "executionOrder": "v1",
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
-  }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {}
 }

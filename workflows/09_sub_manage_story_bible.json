@@ -1,4 +1,5 @@
 {
+  "id": "9cvuhBS412AQRJxf",
   "name": "Sub - Manage Story Bible",
   "nodes": [
     {
@@ -251,6 +252,6 @@
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
   },
-  "staticData": null,
+  "meta": null,
   "pinData": {}
 }

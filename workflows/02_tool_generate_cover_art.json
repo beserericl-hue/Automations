@@ -1,4 +1,5 @@
 {
+  "id": "SxeLHxzvITEKyKc0",
   "name": "Tool - Generate Cover Art",
   "nodes": [
     {
@@ -16,6 +17,9 @@
             },
             {
               "name": "content_type"
+            },
+            {
+              "name": "user_prompt"
             },
             {
               "name": "recipient_email"
@@ -107,8 +111,8 @@
     {
       "parameters": {
         "sendTo": "={{ $('set_art_guidelines').item.json.recipient_email }}",
-        "subject": "=Cover Art: {{ $('workflow_trigger').item.json.content_type || 'Content' }} \u2014 {{ $('workflow_trigger').item.json.story_title }}",
-        "message": "=<h2>Cover Art Generated</h2><table style=\"border-collapse:collapse;width:100%;max-width:500px;\"><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Content Type</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.content_type || 'Not specified' }}</td></tr><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Title</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.story_title }}</td></tr><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Genre</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.genre_slug }}</td></tr><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Description</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.image_description }}</td></tr></table>",
+        "subject": "=Cover Art: {{ $('workflow_trigger').item.json.content_type || 'Content' }} — {{ $('workflow_trigger').item.json.story_title }}",
+        "message": "={{ $(\"workflow_trigger\").first().json.user_prompt ? '<div style=\"background:#f0f0f0; border-left:4px solid #666; padding:12px 16px; margin-bottom:24px; font-family:sans-serif; font-size:14px; color:#333;\"><strong>Command:</strong> ' + $(\"workflow_trigger\").first().json.user_prompt + '</div>' : '' }}<h2>Cover Art Generated</h2><table style=\"border-collapse:collapse;width:100%;max-width:500px;\"><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Content Type</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.content_type || 'Not specified' }}</td></tr><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Title</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.story_title }}</td></tr><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Genre</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.genre_slug }}</td></tr><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Description</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.image_description }}</td></tr></table>",
         "options": {
           "appendAttribution": false,
           "bccList": "={{ $('set_art_guidelines').item.json.bcc_email }}",
@@ -221,6 +225,8 @@
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
   },
-  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
   "pinData": {}
 }

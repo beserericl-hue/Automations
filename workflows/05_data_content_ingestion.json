@@ -1,4 +1,5 @@
 {
+  "id": "iLuMoCq0tNJJAH5n",
   "name": "Data: Content Ingestion",
   "nodes": [
     {
@@ -261,6 +262,6 @@
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
   },
-  "staticData": null,
-  "pinData": null
+  "meta": null,
+  "pinData": {}
 }

@@ -1,4 +1,5 @@
 {
+  "id": "MLjncwcdMSjBkS4Z",
   "name": "Sub - Manage Research Reports",
   "nodes": [
     {
@@ -65,168 +66,16 @@
       }
     },
     {
-      "id": "rr-switch",
-      "name": "check_operation",
+      "id": "rr-handler",
+      "name": "handle_operation",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        400,
+        440,
         0
       ],
       "parameters": {
-        "jsCode": "const operation = $('workflow_trigger').first().json.operation || 'save';\nconst item = { json: $input.first().json };\n// Output 0=save, 1=get, 2=list, 3=update\nconst outputs = [[], [], [], []];\nswitch (operation) {\n  case 'save': outputs[0].push(item); break;\n  case 'get': outputs[1].push(item); break;\n  case 'list': outputs[2].push(item); break;\n  case 'update': outputs[3].push(item); break;\n  default: outputs[0].push(item); break;\n}\nreturn outputs;"
-      }
-    },
-    {
-      "id": "rr-save",
-      "name": "save_report",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        700,
-        -200
-      ],
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/research_reports",
-        "sendBody": true,
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ topic: $('workflow_trigger').item.json.topic, genre_slug: $('workflow_trigger').item.json.genre_slug || null, content: $('workflow_trigger').item.json.content, status: $('workflow_trigger').item.json.status || 'draft' }) }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
-            },
-            {
-              "name": "Prefer",
-              "value": "return=representation"
-            }
-          ]
-        },
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
-        }
-      }
-    },
-    {
-      "id": "rr-get",
-      "name": "get_report",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        700,
-        -50
-      ],
-      "parameters": {
-        "method": "GET",
-        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/research_reports?id=eq.{{ $('workflow_trigger').item.json.report_id }}&limit=1",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
-            }
-          ]
-        },
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
-        }
-      }
-    },
-    {
-      "id": "rr-list",
-      "name": "list_reports",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        700,
-        100
-      ],
-      "parameters": {
-        "method": "GET",
-        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/research_reports?order=updated_at.desc&limit=20&select=id,topic,genre_slug,status,created_at,updated_at",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
-            }
-          ]
-        },
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
-        }
-      }
-    },
-    {
-      "id": "rr-update",
-      "name": "update_report",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        700,
-        250
-      ],
-      "parameters": {
-        "method": "PATCH",
-        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/research_reports?id=eq.{{ $('workflow_trigger').item.json.report_id }}",
-        "sendBody": true,
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "body": "={{ JSON.stringify(Object.assign({}, $('workflow_trigger').item.json.content ? { content: $('workflow_trigger').item.json.content } : {}, $('workflow_trigger').item.json.topic ? { topic: $('workflow_trigger').item.json.topic } : {}, $('workflow_trigger').item.json.status ? { status: $('workflow_trigger').item.json.status } : {}, { updated_at: new Date().toISOString() })) }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
-            },
-            {
-              "name": "Prefer",
-              "value": "return=representation"
-            }
-          ]
-        },
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
-        }
+        "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\nconst trigger = $('workflow_trigger').first().json;\nconst operation = trigger.operation || 'save';\n\nlet result = '';\n\nif (operation === 'save') {\n  const resp = await this.helpers.httpRequest({\n    method: 'POST',\n    url: supabaseUrl + '/rest/v1/research_reports',\n    headers: { ...headers, 'Prefer': 'return=representation' },\n    body: {\n      topic: trigger.topic,\n      genre_slug: trigger.genre_slug || null,\n      content: trigger.content,\n      status: trigger.status || 'draft'\n    }\n  });\n  result = JSON.stringify(Array.isArray(resp) ? resp[0] : resp);\n} else if (operation === 'get') {\n  const resp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: supabaseUrl + '/rest/v1/research_reports?id=eq.' + trigger.report_id + '&limit=1',\n    headers\n  });\n  result = JSON.stringify(Array.isArray(resp) && resp.length > 0 ? resp[0] : { error: 'Report not found' });\n} else if (operation === 'list') {\n  const resp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: supabaseUrl + '/rest/v1/research_reports?order=updated_at.desc&limit=20&select=id,topic,genre_slug,status,created_at,updated_at',\n    headers\n  });\n  const items = Array.isArray(resp) ? resp : [];\n  if (items.length === 0) {\n    result = 'No research reports found.';\n  } else {\n    result = 'Found ' + items.length + ' report(s):\\n' + items.map((item, i) =>\n      (i + 1) + '. ' + item.topic + ' (' + (item.genre_slug || 'no genre') + ', ' + item.status + ') [ID: ' + item.id + ']'\n    ).join('\\n');\n  }\n} else if (operation === 'update') {\n  const body = {};\n  if (trigger.content) body.content = trigger.content;\n  if (trigger.topic) body.topic = trigger.topic;\n  if (trigger.status) body.status = trigger.status;\n  body.updated_at = new Date().toISOString();\n  const resp = await this.helpers.httpRequest({\n    method: 'PATCH',\n    url: supabaseUrl + '/rest/v1/research_reports?id=eq.' + trigger.report_id,\n    headers: { ...headers, 'Prefer': 'return=representation' },\n    body\n  });\n  result = JSON.stringify(Array.isArray(resp) ? resp[0] : resp);\n} else {\n  result = 'Unknown operation: ' + operation + '. Valid: save, get, list, update';\n}\n\nreturn [{ json: { result } }];"
       }
     },
     {
@@ -235,7 +84,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1000,
+        700,
         0
       ],
       "parameters": {
@@ -244,7 +93,7 @@
             {
               "id": "r1",
               "name": "result",
-              "value": "={{ JSON.stringify($input.first().json) }}",
+              "value": "={{ $json.result }}",
               "type": "string"
             }
           ]
@@ -269,79 +118,14 @@
       "main": [
         [
           {
-            "node": "check_operation",
+            "node": "handle_operation",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "check_operation": {
-      "main": [
-        [
-          {
-            "node": "save_report",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "get_report",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "list_reports",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "update_report",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "save_report": {
-      "main": [
-        [
-          {
-            "node": "set_result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "get_report": {
-      "main": [
-        [
-          {
-            "node": "set_result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "list_reports": {
-      "main": [
-        [
-          {
-            "node": "set_result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "update_report": {
+    "handle_operation": {
       "main": [
         [
           {
@@ -358,6 +142,6 @@
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
   },
-  "staticData": null,
-  "pinData": null
+  "meta": null,
+  "pinData": {}
 }
