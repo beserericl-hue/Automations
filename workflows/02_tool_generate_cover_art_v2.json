@@ -1,121 +1,162 @@
 {
-  "id": "SxeLHxzvITEKyKc0",
-  "name": "Tool - Generate Cover Art",
+  "id": "iWIcj915TYJQkdmC",
+  "name": "Tool - Generate Cover Art V2",
   "nodes": [
     {
       "parameters": {
         "workflowInputs": {
           "values": [
-            {
-              "name": "image_description"
-            },
-            {
-              "name": "story_title"
-            },
-            {
-              "name": "genre_slug"
-            },
-            {
-              "name": "content_type"
-            },
-            {
-              "name": "user_prompt"
-            },
-            {
-              "name": "recipient_email"
-            },
-            {
-              "name": "bcc_email"
-            }
+            { "name": "image_description" },
+            { "name": "story_title" },
+            { "name": "genre_slug" },
+            { "name": "content_type" },
+            { "name": "user_prompt" },
+            { "name": "recipient_email" },
+            { "name": "bcc_email" },
+            { "name": "user_id" }
           ]
         }
       },
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
-      "position": [
-        -1008,
-        96
-      ],
+      "position": [-1200, 96],
       "id": "da66e06d",
       "name": "workflow_trigger"
     },
     {
       "parameters": {
-        "jsCode": "const SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_API_KEY = 'sb_publishable_HsIkelEZaIr0VauiB3GgIQ_59XJRoWc';\nconst trigger = $('workflow_trigger').first().json;\n\n// Fetch email config from app_config (centralized source of truth)\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\nif (!recipient_email) {\n  try {\n    const rows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/app_config_v2?key=in.(recipient_email,bcc_email)&select=key,value`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    for (const row of rows) {\n      if (row.key === 'recipient_email') recipient_email = row.value;\n      if (row.key === 'bcc_email') bcc_email = row.value;\n    }\n  } catch (e) {\n    recipient_email = 'eric@agileadtesting.com';\n    bcc_email = '';\n  }\n}\n\n// Genre-specific art guidelines\nconst genre = trigger.genre_slug || 'post-apocalyptic';\nconst guidelines = {\n  'post-apocalyptic': 'Muted earth tones, atmospheric haze, dramatic lighting. Overgrown ruins, crumbling infrastructure, vast empty landscapes. Mood: haunting beauty in decay. Style: cinematic concept art, digital matte painting.',\n  'political-scifi': 'Dark imposing structures, dramatic chiaroscuro lighting. Vast space stations, parliamentary chambers, propaganda aesthetics. Mood: cerebral tension. Style: retro-futurism meets brutalist architecture.',\n  'historical-time-travel': 'Rich period-accurate details, warm golden-hour lighting. Layered timelines shown through visual juxtaposition. Mood: nostalgic wonder. Style: romantic realism with subtle anachronisms.',\n  'ai-marketing': 'Clean minimalist tech aesthetic, gradient blues and purples. Circuit patterns, neural network visualizations, data streams. Mood: innovative and forward-looking. Style: modern digital art, sleek corporate futurism.',\n  'political-history': 'Documentary-style gravitas, amber and sepia tones. Architecture of power, crowds, pivotal moments. Mood: weight of history. Style: oil painting meets photojournalism.',\n  'ancient-history': 'Classical painting style, warm golden light, rich earth tones with lapis lazuli and gold accents. Marble, stone, papyrus textures. Mood: reverent immersion. Style: neoclassical oil painting, museum-quality detail.'\n};\nconst art_guidelines = guidelines[genre] || guidelines['post-apocalyptic'];\n\nreturn [{ json: { art_guidelines, recipient_email, bcc_email: bcc_email || '' } }];"
+        "jsCode": "const SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_API_KEY = 'sb_publishable_HsIkelEZaIr0VauiB3GgIQ_59XJRoWc';\nconst KIEAI_API_KEY = '706600fe6244dedaa3c72b71ffe52e97';\nconst trigger = $('workflow_trigger').first().json;\nconst userId = trigger.user_id || '';\n\n// Fetch email config from app_config (centralized source of truth)\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\nif (!recipient_email) {\n  try {\n    const rows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/app_config_v2?key=in.(recipient_email,bcc_email)&select=key,value&user_id=eq.${userId}`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    for (const row of rows) {\n      if (row.key === 'recipient_email') recipient_email = row.value;\n      if (row.key === 'bcc_email') bcc_email = row.value;\n    }\n  } catch (e) {\n    recipient_email = 'eric@agileadtesting.com';\n    bcc_email = '';\n  }\n}\n\n// Genre-specific art guidelines\nconst genre = trigger.genre_slug || 'post-apocalyptic';\nconst guidelines = {\n  'post-apocalyptic': 'Muted earth tones, atmospheric haze, dramatic lighting. Overgrown ruins, crumbling infrastructure, vast empty landscapes. Mood: haunting beauty in decay. Style: cinematic concept art, digital matte painting.',\n  'political-scifi': 'Dark imposing structures, dramatic chiaroscuro lighting. Vast space stations, parliamentary chambers, propaganda aesthetics. Mood: cerebral tension. Style: retro-futurism meets brutalist architecture.',\n  'historical-time-travel': 'Rich period-accurate details, warm golden-hour lighting. Layered timelines shown through visual juxtaposition. Mood: nostalgic wonder. Style: romantic realism with subtle anachronisms.',\n  'ai-marketing': 'Clean minimalist tech aesthetic, gradient blues and purples. Circuit patterns, neural network visualizations, data streams. Mood: innovative and forward-looking. Style: modern digital art, sleek corporate futurism.',\n  'political-history': 'Documentary-style gravitas, amber and sepia tones. Architecture of power, crowds, pivotal moments. Mood: weight of history. Style: oil painting meets photojournalism.',\n  'ancient-history': 'Classical painting style, warm golden light, rich earth tones with lapis lazuli and gold accents. Marble, stone, papyrus textures. Mood: reverent immersion. Style: neoclassical oil painting, museum-quality detail.',\n  'metaphysical-romance': 'Ethereal soft light, dreamlike atmosphere, warm pastels with deep jewel tones. Mist, glowing auras, intertwined silhouettes. Mood: transcendent longing and soul-deep connection. Style: surrealist romanticism, luminous digital painting.'\n};\nconst art_guidelines = guidelines[genre] || guidelines['post-apocalyptic'];\n\nreturn [{ json: { art_guidelines, recipient_email, bcc_email: bcc_email || '', KIEAI_API_KEY } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        -752,
-        96
-      ],
+      "position": [-960, 96],
       "id": "f96116e4",
-      "name": "set_art_guidelines"
+      "name": "settings"
+    },
+    {
+      "parameters": {
+        "jsCode": "const trigger = $('workflow_trigger').first().json;\nconst settings = $('settings').first().json;\n\nconst description = trigger.image_description || '';\nconst title = trigger.story_title || '';\nconst genre = trigger.genre_slug || '';\nconst artGuidelines = settings.art_guidelines || '';\n\n// Build a Midjourney-style prompt optimized for NanoBanana PRO\n// Combine the scene description with genre art direction\nconst prompt = `${description}. ${artGuidelines} Book cover composition, professional quality, highly detailed, 16:9 aspect ratio --ar 16:9 --stylize 750 --v 7`;\n\nreturn [{ json: { prompt, title, genre } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-700, 96],
+      "id": "build-prompt",
+      "name": "build_prompt"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.openai.com/v1/images/generations",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "openAiApi",
-        "sendBody": true,
-        "bodyParameters": {
+        "url": "https://api.kie.ai/api/v1/playground/createTask",
+        "sendHeaders": true,
+        "headerParameters": {
           "parameters": [
-            {
-              "name": "model",
-              "value": "gpt-image-1"
-            },
-            {
-              "name": "prompt",
-              "value": "=<prompt>\n{{ $('workflow_trigger').item.json.image_description }}\n</prompt>\n\n<art_direction>\n{{ $node[\"set_art_guidelines\"].json.art_guidelines }}\n</art_direction>"
-            },
-            {
-              "name": "size",
-              "value": "1536x1024"
-            }
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "=Bearer {{ $('settings').item.json.KIEAI_API_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"google/nano-banana\",\n  \"callBackUrl\": \"\",\n  \"input\": {\n    \"prompt\": {{ JSON.stringify($json.prompt) }},\n    \"image_urls\": []\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-440, 96],
+      "id": "submit-kieai",
+      "name": "submit_to_kieai"
+    },
+    {
+      "parameters": {
+        "amount": 5
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [-200, 96],
+      "id": "wait-poll",
+      "name": "wait",
+      "webhookId": "coverart-wait-poll"
+    },
+    {
+      "parameters": {
+        "url": "https://api.kie.ai/api/v1/playground/recordInfo",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "taskId", "value": "={{ $('submit_to_kieai').item.json.data.taskId }}" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "=Bearer {{ $('settings').item.json.KIEAI_API_KEY }}" }
           ]
         },
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        -496,
-        96
-      ],
-      "id": "e2007d0e",
-      "name": "generate_image",
-      "credentials": {
-        "openAiApi": {
-          "id": "xSzPIySN61drme77",
-          "name": "OpenAi account"
-        }
-      }
+      "position": [40, 96],
+      "id": "check-status",
+      "name": "check_status"
     },
     {
       "parameters": {
-        "operation": "toBinary",
-        "sourceProperty": "data[0].b64_json",
-        "binaryPropertyName": "=data",
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cov-art-check",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.data.state }}",
+              "rightValue": "success"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
         "options": {}
       },
-      "type": "n8n-nodes-base.convertToFile",
-      "typeVersion": 1.1,
-      "position": [
-        -256,
-        96
-      ],
-      "id": "8483c2b5",
-      "name": "convert_to_png"
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [280, 96],
+      "id": "if-complete",
+      "name": "if_complete"
     },
     {
       "parameters": {
-        "sendTo": "={{ $('set_art_guidelines').item.json.recipient_email }}",
+        "url": "={{ $json.data.resultJson }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 0],
+      "id": "download-img",
+      "name": "download_image"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('settings').item.json.recipient_email }}",
         "subject": "=Cover Art: {{ $('workflow_trigger').item.json.content_type || 'Content' }} — {{ $('workflow_trigger').item.json.story_title }}",
-        "message": "={{ $(\"workflow_trigger\").first().json.user_prompt ? '<div style=\"background:#f0f0f0; border-left:4px solid #666; padding:12px 16px; margin-bottom:24px; font-family:sans-serif; font-size:14px; color:#333;\"><strong>Command:</strong> ' + $(\"workflow_trigger\").first().json.user_prompt + '</div>' : '' }}<h2>Cover Art Generated</h2><table style=\"border-collapse:collapse;width:100%;max-width:500px;\"><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Content Type</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.content_type || 'Not specified' }}</td></tr><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Title</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.story_title }}</td></tr><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Genre</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.genre_slug }}</td></tr><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Description</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.image_description }}</td></tr></table>",
+        "message": "={{ $(\"workflow_trigger\").first().json.user_prompt ? '<div style=\"background:#f0f0f0; border-left:4px solid #666; padding:12px 16px; margin-bottom:24px; font-family:sans-serif; font-size:14px; color:#333;\"><strong>Command:</strong> ' + $(\"workflow_trigger\").first().json.user_prompt + '</div>' : '' }}<h2>Cover Art Generated</h2><table style=\"border-collapse:collapse;width:100%;max-width:500px;\"><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Content Type</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.content_type || 'Not specified' }}</td></tr><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Title</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.story_title }}</td></tr><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Genre</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.genre_slug }}</td></tr><tr><td style=\"padding:6px 12px;font-weight:bold;background:#f5f5f5;\">Description</td><td style=\"padding:6px 12px;\">{{ $('workflow_trigger').item.json.image_description }}</td></tr></table><p style=\"margin-top:16px;font-size:13px;color:#888;\">Generated with NanoBanana PRO via KIE.AI</p>",
         "options": {
           "appendAttribution": false,
-          "bccList": "={{ $('set_art_guidelines').item.json.bcc_email }}",
+          "bccList": "={{ $('settings').item.json.bcc_email }}",
           "attachmentsUi": {
             "attachmentsBinary": [
               {}
@@ -125,10 +166,7 @@
       },
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
-      "position": [
-        0,
-        96
-      ],
+      "position": [760, 0],
       "id": "8da9f9da",
       "name": "send_email_with_image",
       "webhookId": "336a6420-61b8-45c8-a953-e51b1294dddd",
@@ -155,67 +193,95 @@
       },
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [
-        256,
-        96
-      ],
+      "position": [1000, 0],
       "id": "7844368f",
       "name": "set_result"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "err-result",
+              "name": "result",
+              "value": "=Cover art generation failed for {{ $('workflow_trigger').item.json.story_title }}. The image could not be generated. Please try again.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [520, 240],
+      "id": "err-result",
+      "name": "error_result"
     }
   ],
   "connections": {
     "workflow_trigger": {
       "main": [
         [
-          {
-            "node": "set_art_guidelines",
-            "type": "main",
-            "index": 0
-          }
+          { "node": "settings", "type": "main", "index": 0 }
         ]
       ]
     },
-    "set_art_guidelines": {
+    "settings": {
       "main": [
         [
-          {
-            "node": "generate_image",
-            "type": "main",
-            "index": 0
-          }
+          { "node": "build_prompt", "type": "main", "index": 0 }
         ]
       ]
     },
-    "generate_image": {
+    "build_prompt": {
       "main": [
         [
-          {
-            "node": "convert_to_png",
-            "type": "main",
-            "index": 0
-          }
+          { "node": "submit_to_kieai", "type": "main", "index": 0 }
         ]
       ]
     },
-    "convert_to_png": {
+    "submit_to_kieai": {
       "main": [
         [
-          {
-            "node": "send_email_with_image",
-            "type": "main",
-            "index": 0
-          }
+          { "node": "wait", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "wait": {
+      "main": [
+        [
+          { "node": "check_status", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "check_status": {
+      "main": [
+        [
+          { "node": "if_complete", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "if_complete": {
+      "main": [
+        [
+          { "node": "download_image", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "wait", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "download_image": {
+      "main": [
+        [
+          { "node": "send_email_with_image", "type": "main", "index": 0 }
         ]
       ]
     },
     "send_email_with_image": {
       "main": [
         [
-          {
-            "node": "set_result",
-            "type": "main",
-            "index": 0
-          }
+          { "node": "set_result", "type": "main", "index": 0 }
         ]
       ]
     }

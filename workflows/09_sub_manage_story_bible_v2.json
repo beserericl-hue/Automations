@@ -14,6 +14,9 @@
             },
             {
               "name": "entries"
+            },
+            {
+              "name": "user_id"
             }
           ]
         }
@@ -58,7 +61,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\nconst projectTitle = $('workflow_trigger').first().json.project_title;\nconst operation = $('workflow_trigger').first().json.operation || 'get';\n\n// Find the project\nlet project = null;\ntry {\n  const resp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: supabaseUrl + '/rest/v1/writing_projects_v2?title=eq.' + encodeURIComponent(projectTitle) + '&limit=1',\n    headers: headers\n  });\n  const projects = Array.isArray(resp) ? resp : [resp];\n  if (projects.length > 0 && projects[0]?.id) {\n    project = projects[0];\n  }\n} catch (e) {}\n\nif (!project) {\n  return [{ json: { project: null, error: 'Project not found: ' + projectTitle, operation: operation } }];\n}\n\nreturn [{ json: { project: project, operation: operation } }];"
+        "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\nconst projectTitle = $('workflow_trigger').first().json.project_title;\nconst operation = $('workflow_trigger').first().json.operation || 'get';\nconst userId = $('workflow_trigger').first().json.user_id || '';\n\n// Find the project\nlet project = null;\ntry {\n  let projectUrl = supabaseUrl + '/rest/v1/writing_projects_v2?title=eq.' + encodeURIComponent(projectTitle) + '&limit=1';\n  if (userId) projectUrl += '&user_id=eq.' + userId;\n  const resp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: projectUrl,\n    headers: headers\n  });\n  const projects = Array.isArray(resp) ? resp : [resp];\n  if (projects.length > 0 && projects[0]?.id) {\n    project = projects[0];\n  }\n} catch (e) {}\n\nif (!project) {\n  return [{ json: { project: null, error: 'Project not found: ' + projectTitle, operation: operation, user_id: userId } }];\n}\n\nreturn [{ json: { project: project, operation: operation, user_id: userId } }];"
       },
       "id": "sb-project",
       "name": "get_project",
@@ -104,7 +107,7 @@
     },
     {
       "parameters": {
-        "url": "={{ $('settings').first().json.SUPABASE_URL }}/rest/v1/story_bible_v2?project_id=eq.{{ $('get_project').first().json.project?.id }}&order=entry_type,name",
+        "url": "={{ $('settings').first().json.SUPABASE_URL }}/rest/v1/story_bible_v2?project_id=eq.{{ $('get_project').first().json.project?.id }}&order=entry_type,name{{ $('get_project').first().json.user_id ? '&user_id=eq.' + $('get_project').first().json.user_id : '' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -137,7 +140,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\nconst projectId = $('get_project').first().json.project?.id;\n\nif (!projectId) {\n  return [{ json: { result: 'Error: Project not found. Cannot update story bible.' } }];\n}\n\nconst entriesStr = $('workflow_trigger').first().json.entries || '[]';\nlet entries = [];\ntry {\n  entries = JSON.parse(entriesStr);\n} catch (e) {\n  // entries might already be an array/object\n  entries = Array.isArray(entriesStr) ? entriesStr : [entriesStr];\n}\n\nconst enriched = entries.map(e => ({ ...e, project_id: projectId }));\n\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: supabaseUrl + '/rest/v1/story_bible_v2',\n    headers: headers,\n    body: enriched\n  });\n} catch (e) {\n  return [{ json: { result: 'Error updating story bible: ' + e.message } }];\n}\n\nreturn [{ json: { result: 'Story bible updated with ' + entries.length + ' entries for project ' + $('workflow_trigger').first().json.project_title } }];"
+        "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\nconst projectId = $('get_project').first().json.project?.id;\nconst userId = $('get_project').first().json.user_id || '';\n\nif (!projectId) {\n  return [{ json: { result: 'Error: Project not found. Cannot update story bible.' } }];\n}\n\nconst entriesStr = $('workflow_trigger').first().json.entries || '[]';\nlet entries = [];\ntry {\n  entries = JSON.parse(entriesStr);\n} catch (e) {\n  // entries might already be an array/object\n  entries = Array.isArray(entriesStr) ? entriesStr : [entriesStr];\n}\n\nconst enriched = entries.map(e => ({ ...e, project_id: projectId, ...(userId ? { user_id: userId } : {}) }));\n\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: supabaseUrl + '/rest/v1/story_bible_v2',\n    headers: headers,\n    body: enriched\n  });\n} catch (e) {\n  return [{ json: { result: 'Error updating story bible: ' + e.message } }];\n}\n\nreturn [{ json: { result: 'Story bible updated with ' + entries.length + ' entries for project ' + $('workflow_trigger').first().json.project_title } }];"
       },
       "id": "sb-update",
       "name": "update_story_bible",

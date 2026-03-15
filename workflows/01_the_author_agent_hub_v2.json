@@ -5,7 +5,7 @@
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "author_request",
+        "path": "author_request_v2",
         "options": {}
       },
       "id": "hub-webhook",
@@ -16,7 +16,7 @@
         256,
         -384
       ],
-      "webhookId": "87c552c6-3d64-47e4-898a-76d42d2bc30a"
+      "webhookId": "a45bc309-50c6-47e5-9086-73c50d2823e0"
     },
     {
       "parameters": {
@@ -30,14 +30,14 @@
         240,
         -160
       ],
-      "webhookId": "51ef2658-ee92-49bc-affd-03821bdcc4cb"
+      "webhookId": "e9c42b52-d8ad-45c3-b869-38e5ea487710"
     },
     {
       "parameters": {
         "promptType": "define",
         "text": "={{ $json.chatInput || $json.body?.user_message_request || $json.body.user_message_request}}",
         "options": {
-          "systemMessage": "=You are The Author Agent, a specialized AI writing assistant. You help plan, research, write, and manage fiction and non-fiction content across multiple genres.\n\nToday's date is {{ $now.format('yyyy-MM-dd') }}. You are operating in the year {{ $now.format('yyyy') }}.\n\n## AVAILABLE GENRES\nEach genre has a slug you must pass to writing tools. Match the user's request to the best genre:\n\n| Genre Slug | Genre Name | Matches These Topics |\n|---|---|---|\n| post-apocalyptic | Post-Apocalyptic Sci-Fi | apocalypse, survival, wasteland, collapse, dystopian, extinction, plague, fallout |\n| political-scifi | Political Sci-Fi | politics in space, empire, republic, governance, revolution, propaganda, insurgency, diplomacy |\n| historical-time-travel | Historical Time Travel | time travel, past lives, romance across eras, historical periods, paradox, alternate history, reincarnation |\n| ai-marketing | AI & Marketing Technology | artificial intelligence, AI tools, marketing automation, LLM, martech, generative AI, content marketing |\n| political-history | Political & Historical Events | geopolitics, political history, revolution, democracy, elections, cold war, historical analysis |\n| ancient-history | Ancient History & Historical Novels | ancient Rome, Greece, Egypt, Mesopotamia, medieval, archaeology, classical antiquity, historical fiction |\n| metaphysical-romance | Metaphysical Romance | soulmates, past lives, reincarnation, grief, caregiving, dementia, cancer, terminal illness, familiar souls, love across lifetimes, death and dying, second love |\n\n## AVAILABLE STORY ARCS\nWhen brainstorming, the user can request a specific story arc framework to structure the outline. Pass the arc name to brainstorm_story via the story_arc parameter. Available arcs:\n- **Freytags Pyramid** \u2014 Five-act tragic arc (Introduction, Rising Action, Climax, Falling Action, Catastrophe). Best for tragedies and dark fiction.\n- **Three-Act Structure** \u2014 Setup, Confrontation, Resolution. Universal framework for all genres.\n\nIf the user says \"using Freytags Pyramid\" or \"use the three-act structure\", pass the arc name. If they say \"list story arcs\" or \"what story arcs are available\", call retrieve_content with content_type=story_arc. If no arc is mentioned, leave story_arc empty (the workflow uses default guidelines).\n\n## INTERPRETING VOICE COMMANDS\nUsers often speak casually via voice. Interpret their intent:\n- Map loose descriptions to the closest genre_slug using the table above\n- If the topic spans multiple genres, ask the user which genre to use\n- If the user names a genre that does not exist yet, list available genres and ask which is closest\n- Extract the core request even when the voice transcription is messy or repetitive\n\n## CRITICAL RULES FOR TOOL USAGE\n- ALWAYS CALL TOOLS. Never respond with text describing what you would do.\n- NEVER FABRICATE TOOL RESULTS. You have NO ability to modify the database, outlines, or files directly. If you say \"I have updated the outline\" without actually calling a tool, the outline was NOT updated and you have LIED to the user. Even for small changes (ages, names, single words), you MUST call the appropriate tool. The tool does the work \u2014 you cannot.\n- ALWAYS RELAY TOOL OUTPUT VERBATIM. Copy every manage_library result word-for-word to your response \u2014 lists, empty results (e.g. \"No drafts found\"), confirmations, and errors alike. Never output an empty response after a tool call. Never summarize or paraphrase tool results.\n- CONTEXT RESOLUTION: When the user says \"that item\", \"this item\", \"it\", or any pronoun referring to recently discussed content, scan the conversation history for the most recently mentioned [ID:...] value and use it as content_id. NEVER ask the user for the ID when it appeared in the previous message.\n## LIBRARY OPERATIONS \u2014 CALL TOOL FIRST, NO EXCEPTIONS\nWhen the user says approve / publish / reject / schedule / list (anything library-related):\n- STEP 1: Call manage_library immediately with content_title set to what the user said. Do this BEFORE writing any response.\n- STEP 2: Read the tool result. Respond based only on the tool result.\n\u2713 CORRECT: User says \"approve X\" \u2192 call manage_library(operation=approve, content_title=X) \u2192 respond with result\n\u2717 WRONG: User says \"approve X\" \u2192 respond \"I see multiple drafts, please give me the ID\" (skipped tool call)\n\u2717 WRONG: User says \"approve X\" \u2192 respond \"Could you provide the ID?\" (asking before calling tool)\n- When manage_library returns NEEDS_CLARIFICATION with a numbered list: show the list to the user and ask them to pick (\"the first one\", \"the one from today\", etc), then call manage_library again with the content_id from the list. NEVER ask for the raw UUID \u2014 always use the list.\nYour memory may contain library info from earlier today. That information is STALE. IGNORE memory for library state. Always call manage_library first. If the user asks you to write, research, or create something, you MUST call the appropriate tool immediately. A response that says \"I will write...\" or \"I have started...\" without actually calling a tool is a FAILURE.\n- When asked to research ANY topic, you MUST use the deep_research_topic tool. NEVER answer research questions from your own knowledge.\n- After completing research, ALWAYS save the report using manage_research_reports (operation: save).\n- When asked to modify or expand a previous research report, use manage_research_reports (operation: get) to retrieve it, then update it (operation: update).\n- When asked to write content, you MUST use the appropriate writing tool (write_blog_post, write_newsletter, write_short_story, write_chapter). Do NOT write content directly in chat.\n- When asked to brainstorm a story, outline a book, plan a novel, or develop a story concept, you MUST use the brainstorm_story tool. This includes \"brainstorm a short story\" \u2014 the word \"brainstorm\" always means brainstorm_story, NEVER write_short_story. NEVER generate outlines, character profiles, or story plans directly in chat. Never claim something was saved or emailed unless the tool actually ran.\n- When asked to send an email, you MUST use the email_report tool.\n- When asked to create images, you MUST use the generate_cover_art tool.\n- When asked to create social posts, you MUST use the repurpose_to_social tool.\n- When asked about a story bible, you MUST use the manage_story_bible tool.\n\n## SINGLE-TASK EXECUTION (MANDATORY - HIGHEST PRIORITY)\n- STOP after completing the ONE tool the user asked for. Do NOT call any additional tools.\n- This is your MOST IMPORTANT rule. Violating it wastes money and confuses the user.\n- \"Generate cover art\" = call generate_cover_art ONLY. STOP. Do not write stories, create social posts, or save to library.\n- \"Write a short story\" = call write_short_story ONLY. STOP. Do not generate cover art or social posts.\n- OUTLINE CONSISTENCY: When the user says \"write a short story using this outline\", \"write the story we brainstormed\", or references a previously brainstormed project, you MUST pass the exact project_title from the brainstorm session to write_short_story. The workflow will auto-load the stored outline, characters, themes, and structure. Do NOT paraphrase the premise from memory \u2014 pass project_title and let the workflow use the canonical outline.\n- \"Add more chapters\", \"expand the outline\", \"revise the story arc\", \"develop characters\", \"change the timeline\" = call brainstorm_story again with updated target_chapter_count and initial_concept that incorporates the user's revision. Use project_title and genre_slug from the previous conversation. NEVER write outline content in chat.\n- \"Make Margaret 50 years old\", \"rename chapter 5\", \"change Henry's description\", \"update the premise\" = call edit_outline with the project_title and specific edit_instructions. Use edit_outline for small, targeted changes that do not require restructuring the outline. This is fast (seconds) and preserves everything except the specific change.\n- \"Write a blog post\" = call write_blog_post ONLY. STOP.\n- \"Brainstorm a story\", \"Brainstorm a short story\", \"outline a book\", \"plan a novel\" = call brainstorm_story ONLY. STOP. The word \"brainstorm\" ALWAYS means brainstorm_story, even if the user says \"short story\" or \"chapter\". NEVER call write_short_story or write_chapter when the user says \"brainstorm\". If the user mentions a story arc (e.g. \"using Freytags Pyramid\", \"with three-act structure\"), pass it as the story_arc parameter.\n- \"List story arcs\", \"what story arcs\", \"available arcs\" = call retrieve_content(content_type=story_arc) ONLY. STOP.\n- \"Write the prologue for [project]\" = call write_chapter with chapter_number='Prologue'. STOP.\n- \"Write the epilogue for [project]\" = call write_chapter with chapter_number='Epilogue'. STOP.\n- \"Research X\" = call deep_research_topic + manage_research_reports(save) ONLY. STOP.\n- \"List my projects\", \"what projects do I have\", \"all my projects\" = call manage_library(operation=list_projects) ONLY. STOP.\n- \"Retrieve all chapters from [project]\", \"get chapters from [project]\", \"chapters from [project]\" = call retrieve_content(search_term=[project name]) ONLY. STOP. Do NOT call manage_library.\n- NEVER assume the user wants additional tools. If they want more, they will ask in a follow-up message.\n- The ONLY exception: if the user explicitly lists multiple tasks in one message (e.g., \"write a story AND generate cover art AND create social posts\").\n\n## RETRIEVE AND CALLBACK - EVE KNOWLEDGE FLOW\nWhen the user request contains RETRIEVE AND CALLBACK, pull up, get my draft, load the report, or similar content retrieval + callback language:\n1. Call retrieve_content with the content_type and search_term extracted from the request\n2. If found, call eve_knowledge_callback with the retrieved content_text, content_title, content_type, and callback_mode (brainstorm or review)\n3. Return a confirmation: Content loaded and Eve is calling you now.\n\nDetermining callback_mode:\n- brainstorm, outline, plan, lets brainstorm = callback_mode brainstorm\n- review, revise, edit, improve, suggest changes, feedback = callback_mode review\n- If unclear, default to review\n\nWhen retrieving content WITHOUT a callback request (no mention of Eve, calling, or callback):\n- Just call retrieve_content and return the result summary to the user\n\n## Handling Empty or Error Results\n- If manage_story_bible returns empty, tell the user the project does not exist yet and suggest brainstorming or writing chapter 1 to create it.\n- If manage_research_reports returns empty on list, tell the user no reports are saved yet.\n- If retrieve_content returns found=false, tell the user to try a different search term, or list drafts/reports.\n- If a writing tool fails because genre_config is empty, tell the user the genre needs to be configured.\n- NEVER say there was an error without explaining what the user can do about it.\n\n## Your Capabilities\n- Research: deep_research_topic for research with citations. manage_research_reports to save/retrieve/update/list. email_report to deliver via email.\n- Writing: write_blog_post, write_newsletter, write_short_story, write_chapter\n- Visual: generate_cover_art for genre-specific cover images\n- Distribution: repurpose_to_social for Twitter/LinkedIn/Instagram posts\n- Continuity: manage_story_bible to track characters, events, locations across chapters\n- Content Library: manage_library to list drafts, approve, publish, reject content, or list writing projects (operation=list_projects)\n- Content Retrieval: retrieve_content to search and fetch any saved content (research reports, stories, blog posts, newsletters, chapters) \u2014 supports project-based lookup: search_term=[project name] returns all chapters for that project\n- Eve Callback: eve_knowledge_callback to load content into Eve knowledge base and trigger an outbound phone call for live discussion\n\n## NUMBERED LIST SELECTION\nAll list operations return numbered items (1. Title, 2. Title, ...). After showing a list, the user can select an item by number:\n- \"1\", \"show me 3\", \"#7\", \"the first one\", \"select 5\"\nWhen the user selects a number, find that item in the most recent list from conversation history and call the appropriate tool:\n- Outline list → call retrieve_content with the outline's title\n- Draft/content list → call manage_library with the item's title\n- Story arc list → call retrieve_content with content_type=story_arc and the arc name\n- Chapter list → call retrieve_content with the chapter title or project name\n- Project list → call retrieve_content or manage_library as appropriate\nNEVER ask the user to type the full title — the whole point is to let them pick by number.\n\n## Prologue and Epilogue\nThe write_chapter tool supports Prologue and Epilogue in addition to numbered chapters. Pass chapter_number='Prologue' or chapter_number='Epilogue' instead of a number. The workflow automatically adjusts the writing prompt, word count (1500-3000 words for prologue/epilogue vs 3000-5000 for chapters), and file naming.\n- Prologue: sets the stage, establishes tone and world, hooks the reader. May use a different time period, POV, or style.\n- Epilogue: provides closure, reflects on the journey, ties up remaining threads. May jump forward in time.\n- Brainstorm outlines may include a Prologue (section 0) and/or Epilogue automatically when the story arc calls for it.\n- When the user says 'write the prologue for [project]', use chapter_number='Prologue'. When they say 'write the epilogue', use chapter_number='Epilogue'.\n\n## Story Bible Workflow\n1. Starting a new book: Brainstorm, then save elements with manage_story_bible (operation: update)\n2. Before writing a chapter: Always retrieve the story bible first with manage_story_bible (operation: get)\n3. After writing a chapter: Update the story bible with new characters, locations, events, or plot developments\n4. Entry types: character, event, location, timeline, plot_thread, world_rule\n\n## Workflow\n1. When asked to write, infer the genre from context using the genre table above. If ambiguous, ask which genre to use.\n2. For fiction: brainstorm > outline > research > write\n3. For non-fiction: research > outline > write\n4. For books: create a project, establish story bible, then write chapter by chapter\n5. Always email results to the recipient configured in the system (do not hardcode email addresses)\n\n## Rules\n- Use Claude Sonnet for all writing tasks\n- Use deep_research_topic (Perplexity) for ALL factual research\n- Always save research reports via manage_research_reports after completing research\n- Save all drafts to Supabase storage\n- Track content provenance"
+          "systemMessage": "=You are The Author Agent, a specialized AI writing assistant. You help plan, research, write, and manage fiction and non-fiction content across multiple genres.\n\nToday's date is {{ $now.format('yyyy-MM-dd') }}. You are operating in the year {{ $now.format('yyyy') }}.\n\n## AVAILABLE GENRES\nEach genre has a slug you must pass to writing tools. Match the user's request to the best genre:\n\n| Genre Slug | Genre Name | Matches These Topics |\n|---|---|---|\n| post-apocalyptic | Post-Apocalyptic Sci-Fi | apocalypse, survival, wasteland, collapse, dystopian, extinction, plague, fallout |\n| political-scifi | Political Sci-Fi | politics in space, empire, republic, governance, revolution, propaganda, insurgency, diplomacy |\n| historical-time-travel | Historical Time Travel | time travel, past lives, romance across eras, historical periods, paradox, alternate history, reincarnation |\n| ai-marketing | AI & Marketing Technology | artificial intelligence, AI tools, marketing automation, LLM, martech, generative AI, content marketing |\n| political-history | Political & Historical Events | geopolitics, political history, revolution, democracy, elections, cold war, historical analysis |\n| ancient-history | Ancient History & Historical Novels | ancient Rome, Greece, Egypt, Mesopotamia, medieval, archaeology, classical antiquity, historical fiction |\n| metaphysical-romance | Metaphysical Romance | soulmates, past lives, reincarnation, grief, caregiving, dementia, cancer, terminal illness, familiar souls, love across lifetimes, death and dying, second love |\n\n## AVAILABLE STORY ARCS\nWhen brainstorming, the user can request a specific story arc framework to structure the outline. Pass the arc name to brainstorm_story via the story_arc parameter. Available arcs:\n- **Freytags Pyramid** \u2014 Five-act tragic arc (Introduction, Rising Action, Climax, Falling Action, Catastrophe). Best for tragedies and dark fiction.\n- **Three-Act Structure** \u2014 Setup, Confrontation, Resolution. Universal framework for all genres.\n\nIf the user says \"using Freytags Pyramid\" or \"use the three-act structure\", pass the arc name. If they say \"list story arcs\" or \"what story arcs are available\", call retrieve_content with content_type=story_arc. If no arc is mentioned, leave story_arc empty (the workflow uses default guidelines).\n\n## INTERPRETING VOICE COMMANDS\nUsers often speak casually via voice. Interpret their intent:\n- Map loose descriptions to the closest genre_slug using the table above\n- If the topic spans multiple genres, ask the user which genre to use\n- If the user names a genre that does not exist yet, list available genres and ask which is closest\n- Extract the core request even when the voice transcription is messy or repetitive\n\n## CRITICAL RULES FOR TOOL USAGE\n- ALWAYS CALL TOOLS. Never respond with text describing what you would do.\n- NEVER FABRICATE TOOL RESULTS. You have NO ability to modify the database, outlines, or files directly. If you say \"I have updated the outline\" without actually calling a tool, the outline was NOT updated and you have LIED to the user. Even for small changes (ages, names, single words), you MUST call the appropriate tool. The tool does the work \u2014 you cannot.\n- ALWAYS RELAY TOOL OUTPUT VERBATIM. Copy every manage_library result word-for-word to your response \u2014 lists, empty results (e.g. \"No drafts found\"), confirmations, and errors alike. Never output an empty response after a tool call. Never summarize or paraphrase tool results.\n- CONTEXT RESOLUTION: When the user says \"that item\", \"this item\", \"it\", or any pronoun referring to recently discussed content, scan the conversation history for the most recently mentioned [ID:...] value and use it as content_id. NEVER ask the user for the ID when it appeared in the previous message.\n## LIBRARY OPERATIONS \u2014 CALL TOOL FIRST, NO EXCEPTIONS\nWhen the user says approve / publish / reject / schedule / list (anything library-related):\n- STEP 1: Call manage_library immediately with content_title set to what the user said. Do this BEFORE writing any response.\n- STEP 2: Read the tool result. Respond based only on the tool result.\n\u2713 CORRECT: User says \"approve X\" \u2192 call manage_library(operation=approve, content_title=X) \u2192 respond with result\n\u2717 WRONG: User says \"approve X\" \u2192 respond \"I see multiple drafts, please give me the ID\" (skipped tool call)\n\u2717 WRONG: User says \"approve X\" \u2192 respond \"Could you provide the ID?\" (asking before calling tool)\n- When manage_library returns NEEDS_CLARIFICATION with a numbered list: show the list to the user and ask them to pick (\"the first one\", \"the one from today\", etc), then call manage_library again with the content_id from the list. NEVER ask for the raw UUID \u2014 always use the list.\nYour memory may contain library info from earlier today. That information is STALE. IGNORE memory for library state. Always call manage_library first. If the user asks you to write, research, or create something, you MUST call the appropriate tool immediately. A response that says \"I will write...\" or \"I have started...\" without actually calling a tool is a FAILURE.\n- When asked to research ANY topic, you MUST use the deep_research_topic tool. NEVER answer research questions from your own knowledge.\n- After completing research, ALWAYS save the report using manage_research_reports (operation: save).\n- When asked to modify or expand a previous research report, use manage_research_reports (operation: get) to retrieve it, then update it (operation: update).\n- When asked to write content, you MUST use the appropriate writing tool (write_blog_post, write_newsletter, write_short_story, write_chapter). Do NOT write content directly in chat.\n- When asked to brainstorm a story, outline a book, plan a novel, or develop a story concept, you MUST use the brainstorm_story tool. This includes \"brainstorm a short story\" \u2014 the word \"brainstorm\" always means brainstorm_story, NEVER write_short_story. NEVER generate outlines, character profiles, or story plans directly in chat. Never claim something was saved or emailed unless the tool actually ran.\n- When asked to send an email, you MUST use the email_report tool.\n- When asked to create images, you MUST use the generate_cover_art tool.\n- When asked to create social posts, you MUST use the repurpose_to_social tool.\n- When asked about a story bible, you MUST use the manage_story_bible tool.\n\n## SINGLE-TASK EXECUTION (MANDATORY - HIGHEST PRIORITY)\n- STOP after completing the ONE tool the user asked for. Do NOT call any additional tools.\n- This is your MOST IMPORTANT rule. Violating it wastes money and confuses the user.\n- \"Generate cover art\" = call generate_cover_art ONLY. STOP. Do not write stories, create social posts, or save to library.\n- \"Write a short story\" = call write_short_story ONLY. STOP. Do not generate cover art or social posts.\n- OUTLINE CONSISTENCY: When the user says \"write a short story using this outline\", \"write the story we brainstormed\", or references a previously brainstormed project, you MUST pass the exact project_title from the brainstorm session to write_short_story. The workflow will auto-load the stored outline, characters, themes, and structure. Do NOT paraphrase the premise from memory \u2014 pass project_title and let the workflow use the canonical outline.\n- \"Add more chapters\", \"expand the outline\", \"revise the story arc\", \"develop characters\", \"change the timeline\" = call brainstorm_story again with updated target_chapter_count and initial_concept that incorporates the user's revision. Use project_title and genre_slug from the previous conversation. NEVER write outline content in chat.\n- \"Make Margaret 50 years old\", \"rename chapter 5\", \"change Henry's description\", \"update the premise\" = call edit_outline with the project_title and specific edit_instructions. Use edit_outline for small, targeted changes that do not require restructuring the outline. This is fast (seconds) and preserves everything except the specific change.\n- \"Write a blog post\" = call write_blog_post ONLY. STOP.\n- \"Brainstorm a story\", \"Brainstorm a short story\", \"outline a book\", \"plan a novel\" = call brainstorm_story ONLY. STOP. The word \"brainstorm\" ALWAYS means brainstorm_story, even if the user says \"short story\" or \"chapter\". NEVER call write_short_story or write_chapter when the user says \"brainstorm\". If the user mentions a story arc (e.g. \"using Freytags Pyramid\", \"with three-act structure\"), pass it as the story_arc parameter.\n- \"List story arcs\", \"what story arcs\", \"available arcs\" = call retrieve_content(content_type=story_arc) ONLY. STOP.\n- \"Write the prologue for [project]\" = call write_chapter with chapter_number='Prologue'. STOP.\n- \"Write the epilogue for [project]\" = call write_chapter with chapter_number='Epilogue'. STOP.\n- \"Research X\" = call deep_research_topic + manage_research_reports(save) ONLY. STOP.\n- \"List my projects\", \"what projects do I have\", \"all my projects\" = call manage_library(operation=list_projects) ONLY. STOP.\n- \"Retrieve all chapters from [project]\", \"get chapters from [project]\", \"chapters from [project]\" = call retrieve_content(search_term=[project name]) ONLY. STOP. Do NOT call manage_library.\n- NEVER assume the user wants additional tools. If they want more, they will ask in a follow-up message.\n- The ONLY exception: if the user explicitly lists multiple tasks in one message (e.g., \"write a story AND generate cover art AND create social posts\").\n\n## RETRIEVE AND CALLBACK - EVE KNOWLEDGE FLOW\nWhen the user request contains RETRIEVE AND CALLBACK, pull up, get my draft, load the report, or similar content retrieval + callback language:\n1. Call retrieve_content with the content_type and search_term extracted from the request\n2. If found, call eve_knowledge_callback with the retrieved content_text, content_title, content_type, and callback_mode (brainstorm or review)\n3. Return a confirmation: Content loaded and Eve is calling you now.\n\nDetermining callback_mode:\n- brainstorm, outline, plan, lets brainstorm = callback_mode brainstorm\n- review, revise, edit, improve, suggest changes, feedback = callback_mode review\n- If unclear, default to review\n\nWhen retrieving content WITHOUT a callback request (no mention of Eve, calling, or callback):\n- Just call retrieve_content and return the result summary to the user\n\n## Handling Empty or Error Results\n- If manage_story_bible returns empty, tell the user the project does not exist yet and suggest brainstorming or writing chapter 1 to create it.\n- If manage_research_reports returns empty on list, tell the user no reports are saved yet.\n- If retrieve_content returns found=false, tell the user to try a different search term, or list drafts/reports.\n- If a writing tool fails because genre_config is empty, tell the user the genre needs to be configured.\n- NEVER say there was an error without explaining what the user can do about it.\n\n## Your Capabilities\n- Research: deep_research_topic for research with citations. manage_research_reports to save/retrieve/update/list. email_report to deliver via email.\n- Writing: write_blog_post, write_newsletter, write_short_story, write_chapter\n- Visual: generate_cover_art for genre-specific cover images\n- Distribution: repurpose_to_social for Twitter/LinkedIn/Instagram posts\n- Continuity: manage_story_bible to track characters, events, locations across chapters\n- Content Library: manage_library to list drafts, approve, publish, reject content, or list writing projects (operation=list_projects)\n- Content Retrieval: retrieve_content to search and fetch any saved content (research reports, stories, blog posts, newsletters, chapters) \u2014 supports project-based lookup: search_term=[project name] returns all chapters for that project\n- Eve Callback: eve_knowledge_callback to load content into Eve knowledge base and trigger an outbound phone call for live discussion\n\n## NUMBERED LIST SELECTION\nAll list operations return numbered items (1. Title, 2. Title, ...). After showing a list, the user can select an item by number:\n- \"1\", \"show me 3\", \"#7\", \"the first one\", \"select 5\"\nWhen the user selects a number, find that item in the most recent list from conversation history and call the appropriate tool:\n- Outline list \u2192 call retrieve_content with the outline's title\n- Draft/content list \u2192 call manage_library with the item's title\n- Story arc list \u2192 call retrieve_content with content_type=story_arc and the arc name\n- Chapter list \u2192 call retrieve_content with the chapter title or project name\n- Project list \u2192 call retrieve_content or manage_library as appropriate\nNEVER ask the user to type the full title \u2014 the whole point is to let them pick by number.\n\n## Prologue and Epilogue\nThe write_chapter tool supports Prologue and Epilogue in addition to numbered chapters. Pass chapter_number='Prologue' or chapter_number='Epilogue' instead of a number. The workflow automatically adjusts the writing prompt, word count (1500-3000 words for prologue/epilogue vs 3000-5000 for chapters), and file naming.\n- Prologue: sets the stage, establishes tone and world, hooks the reader. May use a different time period, POV, or style.\n- Epilogue: provides closure, reflects on the journey, ties up remaining threads. May jump forward in time.\n- Brainstorm outlines may include a Prologue (section 0) and/or Epilogue automatically when the story arc calls for it.\n- When the user says 'write the prologue for [project]', use chapter_number='Prologue'. When they say 'write the epilogue', use chapter_number='Epilogue'.\n\n## Story Bible Workflow\n1. Starting a new book: Brainstorm, then save elements with manage_story_bible (operation: update)\n2. Before writing a chapter: Always retrieve the story bible first with manage_story_bible (operation: get)\n3. After writing a chapter: Update the story bible with new characters, locations, events, or plot developments\n4. Entry types: character, event, location, timeline, plot_thread, world_rule\n\n## Workflow\n1. When asked to write, infer the genre from context using the genre table above. If ambiguous, ask which genre to use.\n2. For fiction: brainstorm > outline > research > write\n3. For non-fiction: research > outline > write\n4. For books: create a project, establish story bible, then write chapter by chapter\n5. Always email results to the recipient configured in the system (do not hardcode email addresses)\n\n## Rules\n- Use Claude Sonnet for all writing tasks\n- Use deep_research_topic (Perplexity) for ALL factual research\n- Always save research reports via manage_research_reports after completing research\n- Save all drafts to Supabase storage\n- Track content provenance"
         }
       },
       "id": "hub-agent",
@@ -66,7 +66,7 @@
         "description": "Send a markdown report via email. Input: markdownReportContent (the full markdown text), emailAddress (default: eric@agileadtesting.com), subjectLine (email subject).",
         "workflowId": {
           "__rl": true,
-          "value": "QAbYfOOd05lyesva",
+          "value": "NBNlHQ8kAy7nX8LO",
           "mode": "id"
         },
         "workflowInputs": {
@@ -77,7 +77,8 @@
             "subjectLine": "={{ $fromAI('subjectLine', 'The email subject line', 'string') }}",
             "recipient_email": "={{ $('hub_settings').first().json.recipient_email }}",
             "bcc_email": "={{ $('hub_settings').first().json.bcc_email }}",
-            "user_prompt": "={{ $('preprocess_message').first().json.originalUserPrompt || '' }}"
+            "user_prompt": "={{ $('preprocess_message').first().json.originalUserPrompt || '' }}",
+            "user_id": "={{ $json.body?.user_id || $json.user_id || '' }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -134,6 +135,15 @@
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
             }
           ]
         }
@@ -152,7 +162,7 @@
         "name": "generate_cover_art",
         "description": "Generate genre-specific cover art via DALL-E and email it. Input: image_description (description of the image), story_title (title for the content), content_type (Blog Post, Short Story, Book Chapter, Social Media Post), genre_slug (any active genre slug).",
         "workflowId": {
-          "value": "SxeLHxzvITEKyKc0",
+          "value": "iWIcj915TYJQkdmC",
           "__rl": true,
           "mode": "id"
         },
@@ -165,7 +175,8 @@
             "content_type": "={{ $fromAI('content_type', 'Type of content: Blog Post, Short Story, Book Chapter, or Social Media Post', 'string') }}",
             "recipient_email": "={{ $('hub_settings').first().json.recipient_email }}",
             "bcc_email": "={{ $('hub_settings').first().json.bcc_email }}",
-            "user_prompt": "={{ $('preprocess_message').first().json.originalUserPrompt || '' }}"
+            "user_prompt": "={{ $('preprocess_message').first().json.originalUserPrompt || '' }}",
+            "user_id": "={{ $json.body?.user_id || $json.user_id || '' }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -231,6 +242,15 @@
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
             }
           ]
         }
@@ -250,7 +270,7 @@
         "description": "Repurpose content into social media posts for Twitter, LinkedIn, Facebook, or Instagram. ALWAYS use this tool for social post creation \u2014 never write posts directly in chat. Input: content (text to repurpose), platform (twitter, linkedin, facebook, or instagram), genre_slug (optional, used for image generation).",
         "workflowId": {
           "__rl": true,
-          "value": "95z13RGuzJDHVNSw",
+          "value": "6cF3os8cvTT6Ie1d",
           "mode": "id"
         },
         "workflowInputs": {
@@ -261,7 +281,8 @@
             "genre_slug": "={{ $fromAI('genre_slug', 'Genre slug from the available genres table in the system prompt', 'string') }}",
             "recipient_email": "={{ $('hub_settings').first().json.recipient_email }}",
             "bcc_email": "={{ $('hub_settings').first().json.bcc_email }}",
-            "user_prompt": "={{ $('preprocess_message').first().json.originalUserPrompt || '' }}"
+            "user_prompt": "={{ $('preprocess_message').first().json.originalUserPrompt || '' }}",
+            "user_id": "={{ $json.body?.user_id || $json.user_id || '' }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -318,6 +339,15 @@
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
             }
           ]
         }
@@ -337,7 +367,7 @@
         "description": "Write an SEO-optimized blog post. Input: topic (blog post topic), genre_slug (any active genre slug), keywords (comma-separated SEO keywords), target_length (word count).",
         "workflowId": {
           "__rl": true,
-          "value": "iMBIWzO2PjsLNH9w",
+          "value": "G31zGaaG2vaTS1rw",
           "mode": "id"
         },
         "workflowInputs": {
@@ -349,7 +379,8 @@
             "target_length": "={{ $fromAI('target_length', 'Target word count', 'string') }}",
             "recipient_email": "={{ $('hub_settings').first().json.recipient_email }}",
             "bcc_email": "={{ $('hub_settings').first().json.bcc_email }}",
-            "user_prompt": "={{ $('preprocess_message').first().json.originalUserPrompt || '' }}"
+            "user_prompt": "={{ $('preprocess_message').first().json.originalUserPrompt || '' }}",
+            "user_id": "={{ $json.body?.user_id || $json.user_id || '' }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -415,6 +446,15 @@
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
             }
           ]
         }
@@ -434,7 +474,7 @@
         "description": "Write a genre-focused newsletter. Input: topic (newsletter theme), genre_slug (any active genre slug), date (YYYY-MM-DD).",
         "workflowId": {
           "__rl": true,
-          "value": "cjIUEjrqvyGZyKwN",
+          "value": "wdRZw4bjqPMOYd64",
           "mode": "id"
         },
         "workflowInputs": {
@@ -445,7 +485,8 @@
             "date": "={{ $fromAI('date', 'Newsletter date in YYYY-MM-DD format', 'string') }}",
             "recipient_email": "={{ $('hub_settings').first().json.recipient_email }}",
             "bcc_email": "={{ $('hub_settings').first().json.bcc_email }}",
-            "user_prompt": "={{ $('preprocess_message').first().json.originalUserPrompt || '' }}"
+            "user_prompt": "={{ $('preprocess_message').first().json.originalUserPrompt || '' }}",
+            "user_id": "={{ $json.body?.user_id || $json.user_id || '' }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -502,6 +543,15 @@
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
             }
           ]
         }
@@ -521,7 +571,7 @@
         "description": "Write a short story with style matching and scene-by-scene generation. Input: genre_slug (any active genre slug), premise (story premise), tone (e.g. literary, dark, hopeful), length (target word count), research_topics (JSON array of topics to research), project_title (REQUIRED when writing from a brainstormed outline \u2014 the exact project title from brainstorm_story so the workflow can load the stored outline, characters, and structure).",
         "workflowId": {
           "__rl": true,
-          "value": "LTZ63B2H0w8Sl4FW",
+          "value": "x7bJLdHw2Hd8Gyer",
           "mode": "id"
         },
         "workflowInputs": {
@@ -535,7 +585,8 @@
             "project_title": "={{ $fromAI('project_title', 'The exact project title from a previous brainstorm_story session \u2014 pass this so the workflow loads the stored outline', 'string', '') }}",
             "recipient_email": "={{ $('hub_settings').first().json.recipient_email }}",
             "bcc_email": "={{ $('hub_settings').first().json.bcc_email }}",
-            "user_prompt": "={{ $('preprocess_message').first().json.originalUserPrompt || '' }}"
+            "user_prompt": "={{ $('preprocess_message').first().json.originalUserPrompt || '' }}",
+            "user_id": "={{ $json.body?.user_id || $json.user_id || '' }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -619,6 +670,15 @@
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
             }
           ]
         }
@@ -638,7 +698,7 @@
         "description": "Write a book chapter, prologue, or epilogue with continuity tracking via story bible. Input: genre_slug (any active genre slug), project_title (book title), chapter_number (use 'Prologue' for prologue, 'Epilogue' for epilogue, or a number for regular chapters), brief (chapter description), outline (chapter outline), research_topics (JSON array of topics).",
         "workflowId": {
           "__rl": true,
-          "value": "tpj55Sf66jrBPNT8",
+          "value": "CQdwL0Wo1ZmelyXF",
           "mode": "id"
         },
         "workflowInputs": {
@@ -652,7 +712,8 @@
             "research_topics": "={{ $fromAI('research_topics', 'JSON array of research topics for factual grounding', 'string') }}",
             "recipient_email": "={{ $('hub_settings').first().json.recipient_email }}",
             "bcc_email": "={{ $('hub_settings').first().json.bcc_email }}",
-            "user_prompt": "={{ $('preprocess_message').first().json.originalUserPrompt || '' }}"
+            "user_prompt": "={{ $('preprocess_message').first().json.originalUserPrompt || '' }}",
+            "user_id": "={{ $json.body?.user_id || $json.user_id || '' }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -736,6 +797,15 @@
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
             }
           ]
         }
@@ -755,7 +825,7 @@
         "description": "Read or update the story bible for a book project. Input: operation (get or update), project_title (book title), entries (JSON array of story bible entries for updates, empty string for get).",
         "workflowId": {
           "__rl": true,
-          "value": "9cvuhBS412AQRJxf",
+          "value": "iDCqICsm4OpQNV6C",
           "mode": "id"
         },
         "workflowInputs": {
@@ -763,7 +833,8 @@
           "value": {
             "operation": "={{ $fromAI('operation', 'Operation: get or update', 'string') }}",
             "project_title": "={{ $fromAI('project_title', 'The book project title', 'string') }}",
-            "entries": "={{ $fromAI('entries', 'JSON array of story bible entries for update, or empty string for get', 'string') }}"
+            "entries": "={{ $fromAI('entries', 'JSON array of story bible entries for update, or empty string for get', 'string') }}",
+            "user_id": "={{ $json.body?.user_id || $json.user_id || '' }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -793,6 +864,15 @@
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
             }
           ]
         }
@@ -946,7 +1026,7 @@
         "description": "Save, retrieve, list, or update research reports in persistent storage. Operations: save (store new report), get (retrieve by report_id), list (show recent reports), update (modify existing report by report_id). Input: operation, report_id (for get/update), topic (for save/update), genre_slug (for save), content (report text for save/update), status (draft/final/archived for save/update).",
         "workflowId": {
           "__rl": true,
-          "value": "MLjncwcdMSjBkS4Z",
+          "value": "TVNfTVwOrCAnWBo7",
           "mode": "id"
         },
         "workflowInputs": {
@@ -957,7 +1037,8 @@
             "topic": "={{ $fromAI('topic', 'Research topic title', 'string') }}",
             "genre_slug": "={{ $fromAI('genre_slug', 'Genre slug if applicable, or empty', 'string') }}",
             "content": "={{ $fromAI('content', 'Full research report content in markdown', 'string') }}",
-            "status": "={{ $fromAI('status', 'Report status: draft, final, or archived', 'string') }}"
+            "status": "={{ $fromAI('status', 'Report status: draft, final, or archived', 'string') }}",
+            "user_id": "={{ $json.body?.user_id || $json.user_id || '' }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -1014,6 +1095,15 @@
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
             }
           ]
         }
@@ -1033,7 +1123,7 @@
         "description": "Manage the content library. Operations: list_all (all items any status), list_drafts, list_approved, list_published, list_rejected, list_scheduled, approve, publish, reject, unpublish (revert published\u2192approved), schedule, unschedule (revert scheduled\u2192draft), list_versions, get_version. Use list_approved for items with approved status (not yet published); list_published for live published items; list_all to see everything. Use content_title (the exact title) OR content_id (UUID) to identify items for approve/publish/reject/unpublish/schedule/unschedule/version operations \u2014 prefer content_title when working from user requests. Optional content_type_filter (short_story, blog_post, newsletter, chapter). schedule_date (ISO date like 2026-03-15) for schedule operation. version_number for get_version. Email notification sent on approve/publish/reject/unpublish/schedule/unschedule.",
         "workflowId": {
           "__rl": true,
-          "value": "1JERh5yJ3yDJka8s",
+          "value": "QJFwA21FgfRmrSap",
           "mode": "list",
           "cachedResultName": "Sub - Manage Library"
         },
@@ -1049,7 +1139,8 @@
             "version_number": "={{ $fromAI('version_number', 'Version number for get_version operation. Leave empty for all other operations.', 'string', '') }}",
             "change_note": "={{ $fromAI('change_note', 'Note describing the change. Leave empty if not needed.', 'string', '') }}",
             "bcc_email": "={{ $('hub_settings').first().json.bcc_email }}",
-            "user_prompt": "={{ $('preprocess_message').first().json.originalUserPrompt || '' }}"
+            "user_prompt": "={{ $('preprocess_message').first().json.originalUserPrompt || '' }}",
+            "user_id": "={{ $json.body?.user_id || $json.user_id || '' }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -1137,6 +1228,15 @@
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
             }
           ]
         }
@@ -1156,7 +1256,7 @@
         "description": "Brainstorm and outline a new book. Researches the concept, generates character profiles and a chapter-by-chapter outline. Saves the outline to writing_projects for automatic use by write_chapter. Input story_arc to specify a story arc framework (e.g. 'Freytags Pyramid', 'Three-Act Structure'). If the user mentions a story arc by name, pass it. If no arc specified, uses default guidelines.",
         "workflowId": {
           "__rl": true,
-          "value": "StwejB5GLFE26hmU",
+          "value": "RbKpigBMgbRG8EZn",
           "mode": "list",
           "cachedResultName": "Tool - Brainstorm Story"
         },
@@ -1171,7 +1271,8 @@
             "story_arc": "={{ $fromAI('story_arc', 'Name of the story arc framework to use for the outline structure, e.g. Freytags Pyramid or Three-Act Structure. Leave empty for default.', 'string', '') }}",
             "recipient_email": "={{ $('hub_settings').first().json.recipient_email }}",
             "bcc_email": "={{ $('hub_settings').first().json.bcc_email }}",
-            "user_prompt": "={{ $('preprocess_message').first().json.originalUserPrompt || '' }}"
+            "user_prompt": "={{ $('preprocess_message').first().json.originalUserPrompt || '' }}",
+            "user_id": "={{ $json.body?.user_id || $json.user_id || '' }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -1261,6 +1362,15 @@
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
             }
           ]
         }
@@ -1277,20 +1387,21 @@
     {
       "parameters": {
         "name": "edit_outline",
-        "description": "Make small, targeted edits to an existing story outline WITHOUT regenerating it. Use this for changes like: updating character ages, renaming a character, changing a chapter title, tweaking a description, or fixing small details. This is fast (seconds, not minutes) and preserves everything except the specific change requested. Do NOT use this for structural changes like adding chapters, changing the story arc, or major plot revisions — use brainstorm_story for those.",
+        "description": "Make small, targeted edits to an existing story outline WITHOUT regenerating it. Use this for changes like: updating character ages, renaming a character, changing a chapter title, tweaking a description, or fixing small details. This is fast (seconds, not minutes) and preserves everything except the specific change requested. Do NOT use this for structural changes like adding chapters, changing the story arc, or major plot revisions \u2014 use brainstorm_story for those.",
         "workflowId": {
           "__rl": true,
-          "value": "KfUTQZ7p1ZcDriDR",
+          "value": "GzCpOrWwXHYkEAeX",
           "mode": "id"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
           "value": {
             "project_title": "={{ $fromAI('project_title', 'The exact title of the project whose outline to edit', 'string') }}",
-            "edit_instructions": "={{ $fromAI('edit_instructions', 'Precise description of the edits to make — e.g. Make Margaret Blackwood 50 years old, Rename chapter 5 to The Arrival', 'string') }}",
+            "edit_instructions": "={{ $fromAI('edit_instructions', 'Precise description of the edits to make \u2014 e.g. Make Margaret Blackwood 50 years old, Rename chapter 5 to The Arrival', 'string') }}",
             "recipient_email": "={{ $('hub_settings').first().json.recipient_email }}",
             "bcc_email": "={{ $('hub_settings').first().json.bcc_email }}",
-            "user_prompt": "={{ $('preprocess_message').first().json.originalUserPrompt || '' }}"
+            "user_prompt": "={{ $('preprocess_message').first().json.originalUserPrompt || '' }}",
+            "user_id": "={{ $json.body?.user_id || $json.user_id || '' }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -1338,6 +1449,15 @@
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
             }
           ]
         }
@@ -1358,13 +1478,14 @@
         "workflowId": {
           "__rl": true,
           "mode": "id",
-          "value": "DQS2zIhVjyuxabcb"
+          "value": "2T7rElM5RqCKst51"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
           "value": {
             "search_term": "={{ $fromAI('search_term', 'Title or keyword to search for \u2014 e.g. The Seed Vault chapter 1, post-apocalyptic blog, Roman aqueducts', 'string') }}",
-            "content_type": "={{ $fromAI('content_type', 'Optional: filter by type \u2014 chapter, blog_post, short_story, newsletter, research_report. Leave empty to search all types.', 'string') }}"
+            "content_type": "={{ $fromAI('content_type', 'Optional: filter by type \u2014 chapter, blog_post, short_story, newsletter, research_report. Leave empty to search all types.', 'string') }}",
+            "user_id": "={{ $json.body?.user_id || $json.user_id || '' }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -1385,6 +1506,15 @@
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
             }
           ]
         }
@@ -1405,15 +1535,67 @@
         "workflowId": {
           "__rl": true,
           "mode": "id",
-          "value": "PaFJlsxWq4BKt0iq"
+          "value": "Q0K3aQrBMhw48lCB"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
-          "value": {},
+          "value": {
+            "content_text": "={{ $fromAI('content_text', 'The full text content to load into Eve knowledge base') }}",
+            "content_title": "={{ $fromAI('content_title', 'Title of the content being loaded') }}",
+            "content_type": "={{ $fromAI('content_type', 'Type of content: outline, chapter, short_story, blog, newsletter, research_report', 'content') }}",
+            "callback_mode": "={{ $fromAI('callback_mode', 'Mode for callback: review or brainstorm', 'review') }}",
+            "user_id": "={{ $json.body?.user_id || $json.user_id || '' }}"
+          },
           "matchingColumns": [],
-          "schema": [],
+          "schema": [
+            {
+              "id": "content_text",
+              "displayName": "content_text",
+              "required": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "content_title",
+              "displayName": "content_title",
+              "required": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "content_type",
+              "displayName": "content_type",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "callback_mode",
+              "displayName": "callback_mode",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            }
+          ],
           "attemptToConvertTypes": false,
-          "convertFieldsToString": false
+          "convertFieldsToString": true
         }
       },
       "id": "hub-eve-callback",
@@ -1427,7 +1609,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_API_KEY = 'sb_publishable_HsIkelEZaIr0VauiB3GgIQ_59XJRoWc';\n\nlet recipient_email = 'eric@agileadtesting.com';\nlet bcc_email = '';\n\ntry {\n  const rows = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${SUPABASE_URL}/rest/v1/app_config_v2?key=in.(recipient_email,bcc_email)&select=key,value`,\n    headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n  });\n  for (const row of rows) {\n    if (row.key === 'recipient_email') recipient_email = row.value;\n    if (row.key === 'bcc_email') bcc_email = row.value;\n  }\n} catch (e) {\n  // fallback to defaults above\n}\n\nconst input = $input.first().json;\nreturn [{ json: { ...input, recipient_email, bcc_email } }];"
+        "jsCode": "const SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_API_KEY = 'sb_publishable_HsIkelEZaIr0VauiB3GgIQ_59XJRoWc';\n\nconst input = $input.first().json;\nconst userId = input.body?.user_id || input.user_id || '';\n\nlet recipient_email = 'eric@agileadtesting.com';\nlet bcc_email = '';\n\ntry {\n  const userFilter = userId ? `&user_id=eq.${userId}` : '';\n  const rows = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${SUPABASE_URL}/rest/v1/app_config_v2?key=in.(recipient_email,bcc_email)&select=key,value${userFilter}`,\n    headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n  });\n  for (const row of rows) {\n    if (row.key === 'recipient_email') recipient_email = row.value;\n    if (row.key === 'bcc_email') bcc_email = row.value;\n  }\n} catch (e) {\n  // fallback to defaults above\n}\n\nreturn [{ json: { ...input, recipient_email, bcc_email } }];"
       },
       "id": "hub-settings",
       "name": "hub_settings",
@@ -1448,7 +1630,7 @@
         -288
       ],
       "parameters": {
-        "jsCode": "const input = $input.first().json;\nconst msg = (input.chatInput || input.body?.user_message_request || '').toLowerCase();\nconst original = input.chatInput || input.body?.user_message_request || '';\n\n// NUMBER REFERENCE — user picks an item from a previous list (e.g. \"1\", \"show me 3\", \"#7\", \"the first one\")\nconst ordinals = { 'first': '1', 'second': '2', 'third': '3', 'fourth': '4', 'fifth': '5', 'sixth': '6', 'seventh': '7', 'eighth': '8', 'ninth': '9', 'tenth': '10' };\nconst numberMatch = msg.trim().match(/^#?(\\d{1,2})$/) || msg.trim().match(/^(?:show\\s+(?:me\\s+)?|get\\s+|open\\s+|select\\s+|pick\\s+)?#?(\\d{1,2})\\s*$/) || msg.trim().match(/^(?:show\\s+(?:me\\s+)?|get\\s+|open\\s+|select\\s+|pick\\s+)?(?:the\\s+)?(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)(?:\\s+one)?\\s*$/);\nif (numberMatch) {\n  const num = numberMatch[1] && /^\\d+$/.test(numberMatch[1]) ? numberMatch[1] : ordinals[numberMatch[1]] || numberMatch[1];\n  return [{ json: { ...input, originalUserPrompt: original, chatInput: original + ' [LIST SELECTION: The user is selecting item #' + num + ' from the most recent numbered list in conversation history. Look at the last list you showed the user (outlines, projects, chapters, drafts, story arcs, etc). Find item #' + num + ' by its number. Then call the appropriate tool to retrieve that specific item by name/title. For outlines: call retrieve_content with the outline title. For drafts/published content: call manage_library. For story arcs: call retrieve_content with content_type=story_arc. For chapters: call retrieve_content with the chapter title. IMPORTANT: Do NOT ask the user to clarify — find the item from conversation history and retrieve it immediately.]' } }];\n}\n\n// RETRIEVE ops \u2014 content retrieval (must be checked BEFORE brainstorm to catch revert/version/list)\nconst isRetrieveOp = /\\b(retrieve|pull\\s+up|fetch\\s+my|find\\s+my|get\\s+my\\s+(draft|chapter|story|blog|newsletter|article|report)|chapters?\\s+from|all\\s+chapters?\\s+(from|of|in)|list\\s+(story\\s+)?arcs?|what\\s+story\\s+arcs?|available\\s+arcs?|(list|show|all)\\s+(my\\s+)?outlines?|outline\\s+(list|version|history)|revert.{0,20}outline|restore.{0,20}outline|outline.{0,20}version)/.test(msg);\n\n// EDIT OUTLINE ops \u2014 small targeted changes to an existing outline (ages, names, descriptions)\nconst isEditOutlineOp = !isRetrieveOp && /\\b(make\\s+\\w+.{0,20}(years?\\s+old|age\\s+\\d)|change.{0,20}(age|name|title|role|description)|rename\\s+(chapter|character)|update.{0,20}(age|description|premise|role)|using\\s+this\\s+outline.{0,20}(make|change|update|fix|set)|fix.{0,20}(chapter|brief|inconsisten|outline)|\\bcharacter\\s+role\\s+change|\\d+\\s+years?\\s+old)/.test(msg) && !/\\b(add.{0,10}chapter|new\\s+chapter|change.{0,15}(arc|structure|timeline)|restructure|expand|brainstorm|rework)/.test(msg);\n\n// BRAINSTORM ops \u2014 story planning, outline expansion, character development (checked AFTER retrieve and edit)\nconst isBrainstormOp = !isRetrieveOp && !isEditOutlineOp && /\\b(brainstorm|expand.{0,25}outline|add.{0,15}(more\\s+)?chapter|develop.{0,20}character|revis(e|ing).{0,20}(outline|story\\s+arc)|rework.{0,20}(outline|story)|outline\\s+(a|the|my|this)\\s+\\w|plan\\s+(a|the|my)\\s+(novel|book|story)|create\\s+(a|the|my)\\s+(outline|book))/.test(msg);\n\n// PROJECT LIST ops \u2014 must be before isLibraryOp to avoid misrouting\nconst isProjectOp = /\\b(list\\s+(my\\s+|all\\s+)?projects?|my\\s+projects?|all\\s+projects?|what\\s+projects?|show.{0,15}projects?)/.test(msg);\n\n// LIBRARY ops \u2014 content status management only\nconst isLibraryOp = /\\b(approve|unschedule|unpublish|publish|reject|schedule|list\\s+(all|draft|published|scheduled|approved|rejected)|content\\s+librar|my\\s+(draft|post|content|article|newsletter|chapter|stor)|show\\s+(me\\s+)?(my|what|all)|what.{0,20}(written|published|draft|created)|show\\s+all|see\\s+all|all\\s+content|all\\s+(my\\s+)?(posts?|draft|items?|articles?)|remove.{0,20}(schedule|publish)|cancel.{0,20}schedule|version\\s+histor|list\\s+version|get\\s+version|show.{0,15}version|version.{0,10}(this|that|it))/.test(msg);\n\n// WRITING ops \u2014 trigger writing sub-workflows\nconst isWritingOp = /\\b(write\\s+(a|the|my|an)\\s+(blog|newsletter|short\\s+stor|chapter|article)|write\\s+chapter)/.test(msg);\n\nif (isRetrieveOp) {\n  return [{ json: { ...input, originalUserPrompt: original, chatInput: '[TOOL OVERRIDE — retrieve_content] You MUST call retrieve_content RIGHT NOW. This is NOT optional. Do NOT call manage_library. Do NOT call brainstorm_story. You have NO ability to list or retrieve content yourself — only the retrieve_content tool can query the database. If you respond without calling retrieve_content, the user will receive nothing. Pass the FULL user message as search_term (do not extract keywords or shorten it). After the tool returns, relay its result verbatim.\\n\\n' + original } }];\n}\nif (isEditOutlineOp) {\n  return [{ json: { ...input, originalUserPrompt: original, chatInput: '[TOOL OVERRIDE \u2014 edit_outline] You MUST call edit_outline RIGHT NOW. This is NOT optional. You have NO ability to modify outlines yourself \u2014 only the edit_outline tool can read, modify, and save outlines in the database. Even for small changes (ages, names, roles, single details), you MUST call edit_outline. If you respond without calling edit_outline, the outline will NOT be updated and the user will receive false information. Extract project_title and edit_instructions from the request below. Do NOT call brainstorm_story. After the tool returns, relay its result verbatim.\\n\\n' + original } }];\n}\nif (isBrainstormOp) {\n  return [{ json: { ...input, originalUserPrompt: original, chatInput: '[TOOL OVERRIDE \u2014 brainstorm_story] You MUST call brainstorm_story RIGHT NOW. This is NOT optional. You have NO ability to modify outlines yourself \u2014 only the brainstorm_story tool can read, modify, and save outlines in the database. Even for small changes (ages, names, single details), you MUST call brainstorm_story. If you respond without calling brainstorm_story, the outline will NOT be updated and the user will receive false information. Do NOT call write_short_story or write_chapter. Extract project details from the request below. After the tool returns, relay its result verbatim.\\n\\n' + original } }];\n}\nif (isProjectOp) {\n  return [{ json: { ...input, originalUserPrompt: original, chatInput: original + ' [MANDATORY: Call manage_library with operation=list_projects RIGHT NOW. Do not respond with any text before calling the tool.]' } }];\n}\nif (isLibraryOp) {\n  return [{ json: { ...input, originalUserPrompt: original, chatInput: original + ' [MANDATORY: Call manage_library with content_title from my message right now. Do not respond with any text before calling the tool.]' } }];\n}\nif (isWritingOp) {\n  const usesOutline = /\\b(using\\s+(this|the|my|that)\\s+(outline|brainstorm)|from\\s+(the|my|that)\\s+outline|we\\s+brainstormed|story\\s+outline)/.test(msg);\n  const outlineHint = usesOutline ? ' IMPORTANT: The user is referencing a previously brainstormed outline. You MUST pass the project_title from the brainstorm session so the workflow loads the stored outline. Do NOT paraphrase the premise from memory.' : '';\n  return [{ json: { ...input, originalUserPrompt: original, chatInput: original + ' [MANDATORY: Call the appropriate writing tool (write_blog_post, write_newsletter, write_short_story, or write_chapter) right now. Do NOT write content in chat. Do not respond before calling the tool.' + outlineHint + ']' } }];\n}\n\nreturn [{ json: { ...input, originalUserPrompt: original } }];"
+        "jsCode": "const input = $input.first().json;\nconst userId = input.body?.user_id || input.user_id || '';\nconst msg = (input.chatInput || input.body?.user_message_request || '').toLowerCase();\nconst original = input.chatInput || input.body?.user_message_request || '';\n\n// NUMBER REFERENCE \u2014 user picks an item from a previous list (e.g. \"1\", \"show me 3\", \"#7\", \"the first one\")\nconst ordinals = { 'first': '1', 'second': '2', 'third': '3', 'fourth': '4', 'fifth': '5', 'sixth': '6', 'seventh': '7', 'eighth': '8', 'ninth': '9', 'tenth': '10' };\nconst numberMatch = msg.trim().match(/^#?(\\d{1,2})$/) || msg.trim().match(/^(?:show\\s+(?:me\\s+)?|get\\s+|open\\s+|select\\s+|pick\\s+)?#?(\\d{1,2})\\s*$/) || msg.trim().match(/^(?:show\\s+(?:me\\s+)?|get\\s+|open\\s+|select\\s+|pick\\s+)?(?:the\\s+)?(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)(?:\\s+one)?\\s*$/);\nif (numberMatch) {\n  const num = numberMatch[1] && /^\\d+$/.test(numberMatch[1]) ? numberMatch[1] : ordinals[numberMatch[1]] || numberMatch[1];\n  return [{ json: { ...input, user_id: userId, originalUserPrompt: original, chatInput: original + ' [LIST SELECTION: The user is selecting item #' + num + ' from the most recent numbered list in conversation history. Look at the last list you showed the user (outlines, projects, chapters, drafts, story arcs, etc). Find item #' + num + ' by its number. Then call the appropriate tool to retrieve that specific item by name/title. For outlines: call retrieve_content with the outline title. For drafts/published content: call manage_library. For story arcs: call retrieve_content with content_type=story_arc. For chapters: call retrieve_content with the chapter title. IMPORTANT: Do NOT ask the user to clarify \u2014 find the item from conversation history and retrieve it immediately.]' } }];\n}\n\n// RETRIEVE ops \u2014 content retrieval (must be checked BEFORE brainstorm to catch revert/version/list)\nconst isRetrieveOp = /\\b(retrieve|pull\\s+up|fetch\\s+my|find\\s+my|get\\s+my\\s+(draft|chapter|story|blog|newsletter|article|report)|chapters?\\s+from|all\\s+chapters?\\s+(from|of|in)|list\\s+(story\\s+)?arcs?|what\\s+story\\s+arcs?|available\\s+arcs?|(list|show|all)\\s+(my\\s+)?outlines?|outline\\s+(list|version|history)|revert.{0,20}outline|restore.{0,20}outline|outline.{0,20}version)/.test(msg);\n\n// EDIT OUTLINE ops \u2014 small targeted changes to an existing outline (ages, names, descriptions)\nconst isEditOutlineOp = !isRetrieveOp && /\\b(make\\s+\\w+.{0,20}(years?\\s+old|age\\s+\\d)|change.{0,20}(age|name|title|role|description)|rename\\s+(chapter|character)|update.{0,20}(age|description|premise|role)|using\\s+this\\s+outline.{0,20}(make|change|update|fix|set)|fix.{0,20}(chapter|brief|inconsisten|outline)|\\bcharacter\\s+role\\s+change|\\d+\\s+years?\\s+old)/.test(msg) && !/\\b(add.{0,10}chapter|new\\s+chapter|change.{0,15}(arc|structure|timeline)|restructure|expand|brainstorm|rework)/.test(msg);\n\n// BRAINSTORM ops \u2014 story planning, outline expansion, character development (checked AFTER retrieve and edit)\nconst isBrainstormOp = !isRetrieveOp && !isEditOutlineOp && /\\b(brainstorm|expand.{0,25}outline|add.{0,15}(more\\s+)?chapter|develop.{0,20}character|revis(e|ing).{0,20}(outline|story\\s+arc)|rework.{0,20}(outline|story)|outline\\s+(a|the|my|this)\\s+\\w|plan\\s+(a|the|my)\\s+(novel|book|story)|create\\s+(a|the|my)\\s+(outline|book))/.test(msg);\n\n// PROJECT LIST ops \u2014 must be before isLibraryOp to avoid misrouting\nconst isProjectOp = /\\b(list\\s+(my\\s+|all\\s+)?projects?|my\\s+projects?|all\\s+projects?|what\\s+projects?|show.{0,15}projects?)/.test(msg);\n\n// LIBRARY ops \u2014 content status management only\nconst isLibraryOp = /\\b(approve|unschedule|unpublish|publish|reject|schedule|list\\s+(all|draft|published|scheduled|approved|rejected)|content\\s+librar|my\\s+(draft|post|content|article|newsletter|chapter|stor)|show\\s+(me\\s+)?(my|what|all)|what.{0,20}(written|published|draft|created)|show\\s+all|see\\s+all|all\\s+content|all\\s+(my\\s+)?(posts?|draft|items?|articles?)|remove.{0,20}(schedule|publish)|cancel.{0,20}schedule|version\\s+histor|list\\s+version|get\\s+version|show.{0,15}version|version.{0,10}(this|that|it))/.test(msg);\n\n// WRITING ops \u2014 trigger writing sub-workflows\nconst isWritingOp = /\\b(write\\s+(a|the|my|an)\\s+(blog|newsletter|short\\s+stor|chapter|article)|write\\s+chapter)/.test(msg);\n\nif (isRetrieveOp) {\n  return [{ json: { ...input, user_id: userId, originalUserPrompt: original, chatInput: '[TOOL OVERRIDE \u2014 retrieve_content] You MUST call retrieve_content RIGHT NOW. This is NOT optional. Do NOT call manage_library. Do NOT call brainstorm_story. You have NO ability to list or retrieve content yourself \u2014 only the retrieve_content tool can query the database. If you respond without calling retrieve_content, the user will receive nothing. Pass the FULL user message as search_term (do not extract keywords or shorten it). After the tool returns, relay its result verbatim.\\n\\n' + original } }];\n}\nif (isEditOutlineOp) {\n  return [{ json: { ...input, user_id: userId, originalUserPrompt: original, chatInput: '[TOOL OVERRIDE \u2014 edit_outline] You MUST call edit_outline RIGHT NOW. This is NOT optional. You have NO ability to modify outlines yourself \u2014 only the edit_outline tool can read, modify, and save outlines in the database. Even for small changes (ages, names, roles, single details), you MUST call edit_outline. If you respond without calling edit_outline, the outline will NOT be updated and the user will receive false information. Extract project_title and edit_instructions from the request below. Do NOT call brainstorm_story. After the tool returns, relay its result verbatim.\\n\\n' + original } }];\n}\nif (isBrainstormOp) {\n  return [{ json: { ...input, user_id: userId, originalUserPrompt: original, chatInput: '[TOOL OVERRIDE \u2014 brainstorm_story] You MUST call brainstorm_story RIGHT NOW. This is NOT optional. You have NO ability to modify outlines yourself \u2014 only the brainstorm_story tool can read, modify, and save outlines in the database. Even for small changes (ages, names, single details), you MUST call brainstorm_story. If you respond without calling brainstorm_story, the outline will NOT be updated and the user will receive false information. Do NOT call write_short_story or write_chapter. Extract project details from the request below. After the tool returns, relay its result verbatim.\\n\\n' + original } }];\n}\nif (isProjectOp) {\n  return [{ json: { ...input, user_id: userId, originalUserPrompt: original, chatInput: original + ' [MANDATORY: Call manage_library with operation=list_projects RIGHT NOW. Do not respond with any text before calling the tool.]' } }];\n}\nif (isLibraryOp) {\n  return [{ json: { ...input, user_id: userId, originalUserPrompt: original, chatInput: original + ' [MANDATORY: Call manage_library with content_title from my message right now. Do not respond with any text before calling the tool.]' } }];\n}\nif (isWritingOp) {\n  const usesOutline = /\\b(using\\s+(this|the|my|that)\\s+(outline|brainstorm)|from\\s+(the|my|that)\\s+outline|we\\s+brainstormed|story\\s+outline)/.test(msg);\n  const outlineHint = usesOutline ? ' IMPORTANT: The user is referencing a previously brainstormed outline. You MUST pass the project_title from the brainstorm session so the workflow loads the stored outline. Do NOT paraphrase the premise from memory.' : '';\n  return [{ json: { ...input, user_id: userId, originalUserPrompt: original, chatInput: original + ' [MANDATORY: Call the appropriate writing tool (write_blog_post, write_newsletter, write_short_story, or write_chapter) right now. Do NOT write content in chat. Do not respond before calling the tool.' + outlineHint + ']' } }];\n}\n\nreturn [{ json: { ...input, user_id: userId, originalUserPrompt: original } }];"
       }
     }
   ],
