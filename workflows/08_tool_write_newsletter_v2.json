@@ -38,7 +38,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const SUPABASE_URL = 'https://qsirioazmsmrrfoltrhn.supabase.co';\nconst SUPABASE_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk';\nconst trigger = $('workflow_trigger').first().json;\n\n// Fetch email config from app_config (centralized source of truth)\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\nif (!recipient_email) {\n  try {\n    const rows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/app_config?key=in.(recipient_email,bcc_email)&select=key,value`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    for (const row of rows) {\n      if (row.key === 'recipient_email') recipient_email = row.value;\n      if (row.key === 'bcc_email') bcc_email = row.value;\n    }\n  } catch (e) {\n    recipient_email = 'eric@agileadtesting.com';\n    bcc_email = '';\n  }\n}\n\nreturn [{ json: { SUPABASE_URL, SUPABASE_API_KEY, recipient_email, bcc_email: bcc_email || '' } }];"
+        "jsCode": "const SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_API_KEY = 'sb_publishable_HsIkelEZaIr0VauiB3GgIQ_59XJRoWc';\nconst trigger = $('workflow_trigger').first().json;\n\n// Fetch email config from app_config (centralized source of truth)\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\nif (!recipient_email) {\n  try {\n    const rows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/app_config_v2?key=in.(recipient_email,bcc_email)&select=key,value`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    for (const row of rows) {\n      if (row.key === 'recipient_email') recipient_email = row.value;\n      if (row.key === 'bcc_email') bcc_email = row.value;\n    }\n  } catch (e) {\n    recipient_email = 'eric@agileadtesting.com';\n    bcc_email = '';\n  }\n}\n\nreturn [{ json: { SUPABASE_URL, SUPABASE_API_KEY, recipient_email, bcc_email: bcc_email || '' } }];"
       },
       "id": "nl-settings",
       "name": "settings",
@@ -51,7 +51,7 @@
     },
     {
       "parameters": {
-        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/genre_config?genre_slug=eq.{{ $('workflow_trigger').item.json.genre_slug }}&limit=1",
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/genre_config_v2?genre_slug=eq.{{ $('workflow_trigger').item.json.genre_slug }}&limit=1",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -299,7 +299,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\n\ntry {\n  const output = $('inject_source_links').first().json.output || {};\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: supabaseUrl + '/rest/v1/published_content',\n    headers,\n    body: {\n      title: output.subject_line || 'Newsletter',\n      content_type: 'newsletter',\n      genre_slug: $('workflow_trigger').first().json.genre_slug || 'post-apocalyptic',\n      content_text: $('set_full_newsletter').first().json.newsletter_md || '',\n      storage_path: $json.Key || '',\n      project_id: null,\n      chapter_number: null,\n      status: 'draft'\n    }\n  });\n} catch (e) {\n  // Don't fail the workflow if draft insert fails\n}\n\nreturn $input.all();"
+        "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\n\ntry {\n  const output = $('inject_source_links').first().json.output || {};\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: supabaseUrl + '/rest/v1/published_content_v2',\n    headers,\n    body: {\n      title: output.subject_line || 'Newsletter',\n      content_type: 'newsletter',\n      genre_slug: $('workflow_trigger').first().json.genre_slug || 'post-apocalyptic',\n      content_text: $('set_full_newsletter').first().json.newsletter_md || '',\n      storage_path: $json.Key || '',\n      project_id: null,\n      chapter_number: null,\n      status: 'draft'\n    }\n  });\n} catch (e) {\n  // Don't fail the workflow if draft insert fails\n}\n\nreturn $input.all();"
       },
       "id": "nl-draft",
       "name": "insert_draft",

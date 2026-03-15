@@ -1,0 +1,156 @@
+{
+  "id": "DQS2zIhVjyuxabcb",
+  "name": "Sub - Retrieve Content",
+  "nodes": [
+    {
+      "id": "rc-trigger",
+      "name": "workflow_trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "rc-settings",
+      "name": "settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "SUPABASE_URL",
+              "value": "https://faklxfakgzkpkbxfihzh.supabase.co",
+              "type": "string"
+            },
+            {
+              "id": "s2",
+              "name": "SUPABASE_API_KEY",
+              "value": "sb_publishable_HsIkelEZaIr0VauiB3GgIQ_59XJRoWc",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "rc-handler",
+      "name": "retrieve_content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\nconst trigger = $('workflow_trigger').first().json;\nconst contentType = trigger.content_type || '';\nconst rawSearch = trigger.search_term || '';\nconst rawLower = rawSearch.toLowerCase();\nconst httpSelf = this;\n\n// Special operation: list_story_arcs\nif (contentType === 'story_arc' || rawLower.indexOf('story arc') >= 0 || rawLower.indexOf('story arcs') >= 0 || trigger.operation === 'list_story_arcs') {\n  const resp = await httpSelf.helpers.httpRequest({\n    method: 'GET',\n    url: supabaseUrl + '/rest/v1/story_arcs_v2?order=name.asc&select=id,name,description',\n    headers\n  });\n  const arcs = Array.isArray(resp) ? resp : [];\n  if (arcs.length === 0) {\n    return [{ json: { found: false, result: 'No story arcs found. Add arcs to the story_arcs table.', content_type: 'story_arc_list', title: '', content_text: '', content_id: '' } }];\n  }\n  const list = arcs.map((a, i) => (i + 1) + '. **' + a.name + '** — ' + a.description).join('\\n');\n  return [{ json: { found: true, result: 'Available story arcs:\\n' + list, content_type: 'story_arc_list', title: 'Story Arcs', content_text: list, content_id: '' } }];\n}\n\n// Special operation: list_projects\nif (trigger.operation === 'list_projects' || rawLower.trim() === 'list_projects') {\n  const resp = await httpSelf.helpers.httpRequest({\n    method: 'GET',\n    url: supabaseUrl + '/rest/v1/writing_projects_v2?order=created_at.desc&select=id,title,genre_slug,created_at',\n    headers\n  });\n  const projects = Array.isArray(resp) ? resp : [];\n  if (projects.length === 0) {\n    return [{ json: { found: false, result: 'No writing projects found. Start by brainstorming a story.', content_type: 'project_list', title: '', content_text: '', content_id: '' } }];\n  }\n  const list = projects.map((p, i) => (i + 1) + '. ' + p.title + ' (' + (p.genre_slug || 'no genre') + ') — created ' + new Date(p.created_at).toLocaleDateString()).join('\\n');\n  return [{ json: { found: true, result: 'Found ' + projects.length + ' writing project(s):\\n' + list, content_type: 'project_list', title: 'Writing Projects', content_text: list, content_id: '' } }];\n}\n\n// Special operation: list_outlines — triggered by \"list outlines\", \"show outlines\", \"all outlines\", or content_type=outline with no specific title\nconst isListOutlines = trigger.operation === 'list_outlines' || /\\b(list|show|all)\\b.*\\boutline/i.test(rawSearch) || (contentType === 'outline' && /\\b(list|show|all)\\b/i.test(rawSearch)) || (contentType === 'outline' && /^\\s*outlines?\\s*$/i.test(rawSearch));\nif (isListOutlines) {\n  const resp = await httpSelf.helpers.httpRequest({\n    method: 'GET',\n    url: supabaseUrl + '/rest/v1/writing_projects_v2?outline=not.is.null&order=updated_at.desc&select=id,title,genre_slug,status,chapter_count,outline,updated_at',\n    headers\n  });\n  const projects = Array.isArray(resp) ? resp : [];\n  const withOutlines = projects.filter(function(p) { return p.title && p.outline && typeof p.outline === 'object' && Object.keys(p.outline).length > 0; });\n  if (withOutlines.length === 0) {\n    return [{ json: { found: false, result: 'No outlines found. Start by brainstorming a story.', content_type: 'outline_list', title: '', content_text: '', content_id: '' } }];\n  }\n  const list = withOutlines.map((p, i) => (i + 1) + '. **' + p.title + '** (' + (p.genre_slug || 'no genre') + ') — ' + (p.status || 'outlined') + ', ' + (p.chapter_count || 0) + ' chapters — updated ' + new Date(p.updated_at).toLocaleDateString()).join('\\n');\n  return [{ json: { found: true, result: 'Found ' + withOutlines.length + ' outline(s):\\n' + list, content_type: 'outline_list', title: 'Story Outlines', content_text: list, content_id: '' } }];\n}\n\n// Special operation: outline_versions — list version history for a project\nconst isOutlineVersions = trigger.operation === 'outline_versions' || /\\b(version|versions|history)\\b.*\\boutline/i.test(rawSearch) || /\\boutline\\b.*\\b(version|versions|history)\\b/i.test(rawSearch);\nif (isOutlineVersions) {\n  const vSearchTerms = rawLower.replace(/[^a-z0-9 ]/g, ' ').split(/[ ]+/).filter(function(w) { return w.length > 2 && ['the','outline','version','versions','history','show','list','for','get'].indexOf(w) === -1; }).slice(0, 4);\n  let projectId = null;\n  let projectTitle = '';\n  for (const term of vSearchTerms) {\n    const pResp = await httpSelf.helpers.httpRequest({ method: 'GET', url: supabaseUrl + '/rest/v1/writing_projects_v2?title=ilike.*' + encodeURIComponent(term) + '*&select=id,title&limit=1', headers });\n    if (Array.isArray(pResp) && pResp.length > 0) { projectId = pResp[0].id; projectTitle = pResp[0].title; break; }\n  }\n  if (!projectId) { return [{ json: { found: false, result: 'No project found matching: ' + rawSearch, content_type: 'outline_version_list', title: '', content_text: '', content_id: '' } }]; }\n  const verResp = await httpSelf.helpers.httpRequest({ method: 'GET', url: supabaseUrl + '/rest/v1/outline_versions_v2?project_id=eq.' + projectId + '&order=version_number.desc&select=id,version_number,revision_note,created_at', headers });\n  const versions = Array.isArray(verResp) ? verResp : [];\n  if (versions.length === 0) { return [{ json: { found: true, result: 'No version history found for \"' + projectTitle + '\". Versions are saved automatically on each revision going forward.', content_type: 'outline_version_list', title: projectTitle, content_text: '', content_id: '' } }]; }\n  const vList = versions.map(function(v, i) { return (i + 1) + '. Version ' + v.version_number + ' — ' + new Date(v.created_at).toLocaleString() + (v.revision_note ? ' (' + v.revision_note + ')' : ''); }).join('\\n');\n  return [{ json: { found: true, result: 'Outline versions for \"' + projectTitle + '\":\\n' + vList + '\\n\\nTo revert: \"revert outline for ' + projectTitle + ' to version N\"', content_type: 'outline_version_list', title: projectTitle, content_text: vList, content_id: '' } }];\n}\n\n// Special operation: revert_outline — revert outline to a specific version\nconst revertMatch = rawLower.match(/revert.*outline.*(?:to|version)\\s*(\\d+)/i) || (trigger.operation === 'revert_outline' ? [null, trigger.version_number] : null);\nif (revertMatch) {\n  const targetVersion = parseInt(revertMatch[1]);\n  const rSearchTerms = rawLower.replace(/[^a-z0-9 ]/g, ' ').split(/[ ]+/).filter(function(w) { return w.length > 2 && ['the','outline','version','revert','to','for','get','back'].indexOf(w) === -1 && !/^\\d+$/.test(w); }).slice(0, 4);\n  let rProjectId = null;\n  let rProjectTitle = '';\n  for (const term of rSearchTerms) {\n    const pResp = await httpSelf.helpers.httpRequest({ method: 'GET', url: supabaseUrl + '/rest/v1/writing_projects_v2?title=ilike.*' + encodeURIComponent(term) + '*&select=id,title&limit=1', headers });\n    if (Array.isArray(pResp) && pResp.length > 0) { rProjectId = pResp[0].id; rProjectTitle = pResp[0].title; break; }\n  }\n  if (!rProjectId) { return [{ json: { found: false, result: 'No project found matching: ' + rawSearch, content_type: 'outline_revert', title: '', content_text: '', content_id: '' } }]; }\n  const vResp = await httpSelf.helpers.httpRequest({ method: 'GET', url: supabaseUrl + '/rest/v1/outline_versions_v2?project_id=eq.' + rProjectId + '&version_number=eq.' + targetVersion + '&select=outline,version_number&limit=1', headers });\n  if (!Array.isArray(vResp) || vResp.length === 0) { return [{ json: { found: false, result: 'Version ' + targetVersion + ' not found for \"' + rProjectTitle + '\". Use \"outline version history for ' + rProjectTitle + '\" to see available versions.', content_type: 'outline_revert', title: rProjectTitle, content_text: '', content_id: '' } }]; }\n  const oldOutline = vResp[0].outline;\n  await httpSelf.helpers.httpRequest({ method: 'PATCH', url: supabaseUrl + '/rest/v1/writing_projects_v2?id=eq.' + rProjectId, headers: { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' }, body: { outline: oldOutline, updated_at: new Date().toISOString() } });\n  const chars = (oldOutline.characters || []).map(function(c) { return c.name; }).join(', ');\n  return [{ json: { found: true, result: 'Reverted \"' + rProjectTitle + '\" to version ' + targetVersion + '. Characters: ' + chars + '. Chapters: ' + (oldOutline.chapters || []).length, content_type: 'outline_revert', title: rProjectTitle, content_text: 'Reverted to version ' + targetVersion, content_id: rProjectId } }];\n}\n\nconst stopWords = ['the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'of', 'and', 'or', 'is', 'are', 'was', 'were', 'how', 'what', 'why', 'when', 'my', 'draft', 'about', 'called', 'titled', 'named', 'get', 'pull', 'up', 'blog', 'post', 'story', 'short', 'newsletter', 'chapter', 'report', 'research', 'all', 'chapters', 'from', 'project', 'retrieve', 'fetch', 'find', 'outline', 'outlines', 'list', 'show'];\nconst words = rawSearch.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/[ ]+/).filter(function(w) {\n  return w.length > 2 && stopWords.indexOf(w) === -1;\n});\nconst searchTerms = words.slice(0, 4);\n\nlet title = '';\nlet contentText = '';\nlet storagePath = '';\nlet contentId = '';\nlet foundType = contentType;\nasync function searchProjectChapters(terms) {\n  for (const term of terms) {\n    const url = supabaseUrl + '/rest/v1/writing_projects_v2?title=ilike.*' + encodeURIComponent(term) + '*&select=id,title,genre_slug&limit=5';\n    const resp = await httpSelf.helpers.httpRequest({ method: 'GET', url, headers });\n    const projects = Array.isArray(resp) ? resp : [];\n    if (projects.length > 0) {\n      const project = projects[0];\n      const chapUrl = supabaseUrl + '/rest/v1/published_content_v2?project_id=eq.' + project.id + '&content_type=eq.chapter&order=chapter_number.asc&select=id,title,content_type,status,chapter_number,created_at';\n      const chapResp = await httpSelf.helpers.httpRequest({ method: 'GET', url: chapUrl, headers });\n      const chapters = Array.isArray(chapResp) ? chapResp : [];\n      return { project, chapters };\n    }\n  }\n  return null;\n}\n\nasync function searchPublishedContent(type, terms) {\n  for (const term of terms) {\n    let url = supabaseUrl + '/rest/v1/published_content_v2?title=ilike.*' + encodeURIComponent(term) + '*&order=created_at.desc&limit=5';\n    if (type) url += '&content_type=eq.' + type;\n    const resp = await httpSelf.helpers.httpRequest({ method: 'GET', url, headers });\n    const items = Array.isArray(resp) ? resp : [];\n    if (items.length > 0) {\n      const best = items.find(function(item) {\n        const t = (item.title || '').toLowerCase();\n        return terms.filter(function(kw) { return t.indexOf(kw) >= 0; }).length >= 2;\n      }) || items[0];\n      return best;\n    }\n  }\n  return null;\n}\n\nasync function searchResearchReports(terms) {\n  for (const term of terms) {\n    const url = supabaseUrl + '/rest/v1/research_reports_v2?topic=ilike.*' + encodeURIComponent(term) + '*&order=updated_at.desc&limit=5';\n    const resp = await httpSelf.helpers.httpRequest({ method: 'GET', url, headers });\n    const items = Array.isArray(resp) ? resp : [];\n    if (items.length > 0) {\n      const best = items.find(function(item) {\n        const t = (item.topic || '').toLowerCase();\n        return terms.filter(function(kw) { return t.indexOf(kw) >= 0; }).length >= 2;\n      }) || items[0];\n      return best;\n    }\n  }\n  return null;\n}\n\ntry {\n  // Outline search: if content_type is outline or search mentions outline, look in writing_projects\n  if (contentType === 'outline' || contentType === '' || rawSearch.toLowerCase().indexOf('outline') >= 0) {\n    for (const term of searchTerms) {\n      const url = supabaseUrl + '/rest/v1/writing_projects_v2?title=ilike.*' + encodeURIComponent(term) + '*&select=id,title,genre_slug,outline,created_at&limit=5';\n      const resp = await httpSelf.helpers.httpRequest({ method: 'GET', url, headers });\n      const projects = Array.isArray(resp) ? resp : [];\n      const match = projects.find(function(p) { return p.outline && Object.keys(p.outline).length > 0; });\n      if (match) {\n        const o = match.outline;\n        const parts = [];\n        parts.push('# Story Outline: ' + (o.title || match.title));\n        if (o.premise) parts.push('\\n## Premise\\n' + o.premise);\n        if (o.themes) parts.push('\\n## Themes\\n' + (Array.isArray(o.themes) ? o.themes.join(', ') : o.themes));\n        if (o.characters) {\n          parts.push('\\n## Characters');\n          o.characters.forEach(function(c) { parts.push('- **' + c.name + '** (' + c.role + '): ' + c.arc + (c.description ? ' \\u2014 ' + c.description : '')); });\n        }\n        if (o.chapters) {\n          parts.push('\\n## Story Structure');\n          o.chapters.forEach(function(ch) { parts.push((ch.number || '?') + '. **' + ch.title + '**: ' + ch.brief + (ch.arc_notes ? ' _[Arc: ' + ch.arc_notes + ']_' : '')); });\n        }\n        const outlineText = parts.join('\\n');\n        return [{ json: { found: true, title: o.title || match.title, content_text: outlineText, content_type: 'outline', content_id: match.id, result: 'Found outline: ' + (o.title || match.title) + ' (' + outlineText.length + ' chars)' } }];\n      }\n    }\n    if (contentType === 'outline') {\n      return [{ json: { found: false, result: 'No outline found for: ' + rawSearch + '. Try brainstorming a story first.', content_type: 'outline', title: '', content_text: '', content_id: '' } }];\n    }\n  }\n\n  // Project-based chapter search: if content_type is chapter or unspecified, try to match a project first\n  if (contentType === '' || contentType === 'chapter') {\n    const projectResult = await searchProjectChapters(searchTerms);\n    if (projectResult) {\n      const { project, chapters } = projectResult;\n      if (chapters.length === 0) {\n        // Fallback: project_id may not be set on older chapters — search by genre_slug\n        if (project.genre_slug) {\n          const fallbackUrl = supabaseUrl + '/rest/v1/published_content_v2?content_type=eq.chapter&genre_slug=eq.' + encodeURIComponent(project.genre_slug) + '&order=created_at.desc&limit=10&select=id,title,content_type,status,chapter_number,created_at';\n          const fallbackResp = await httpSelf.helpers.httpRequest({ method: 'GET', url: fallbackUrl, headers });\n          const fallbackChapters = Array.isArray(fallbackResp) ? fallbackResp : [];\n          if (fallbackChapters.length > 0) {\n            const flist = fallbackChapters.map((c, i) =>\n              (i + 1) + '. Chapter ' + (c.chapter_number || '?') + ': ' + (c.title || 'Untitled') + ' — ' + (c.status || 'draft') + ' [ID: ' + c.id + ']'\n            ).join('\\n');\n            const fsummary = 'Project: ' + project.title + ' (' + project.genre_slug + ')\\nFound ' + fallbackChapters.length + ' chapter(s):\\n' + flist;\n            return [{ json: { found: true, result: fsummary, content_type: 'chapter_list', title: project.title, content_text: fsummary, content_id: '' } }];\n          }\n        }\n        return [{ json: { found: false, result: 'Project \"' + project.title + '\" found but no chapters written yet. Use Write Chapter to write the first chapter.', content_type: 'chapter_list', title: project.title, content_text: '', content_id: '' } }];\n      }\n      const list = chapters.map((c, i) =>\n        (i + 1) + '. Chapter ' + (c.chapter_number || '?') + ': ' + (c.title || 'Untitled') + ' — ' + (c.status || 'draft') + ' [ID: ' + c.id + ']'\n      ).join('\\n');\n      const summary = 'Project: ' + project.title + ' (' + (project.genre_slug || 'no genre') + ')\\nFound ' + chapters.length + ' chapter(s):\\n' + list;\n      return [{ json: { found: true, result: summary, content_type: 'chapter_list', title: project.title, content_text: summary, content_id: '' } }];\n    }\n  }\n\n  if (contentType === 'research_report') {\n    const item = await searchResearchReports(searchTerms);\n    if (item) {\n      title = item.topic || 'Research Report';\n      contentText = item.content || '';\n      contentId = item.id;\n    }\n  } else if (['short_story', 'blog_post', 'newsletter', 'chapter'].indexOf(contentType) >= 0) {\n    const item = await searchPublishedContent(contentType, searchTerms);\n    if (item) {\n      title = item.title || 'Untitled';\n      contentText = item.content_text || '';\n      storagePath = item.storage_path || '';\n      contentId = item.id;\n    }\n  } else {\n    var pcItem = await searchPublishedContent('', searchTerms);\n    if (pcItem) {\n      title = pcItem.title || 'Untitled';\n      contentText = pcItem.content_text || '';\n      storagePath = pcItem.storage_path || '';\n      contentId = pcItem.id;\n      foundType = pcItem.content_type || 'unknown';\n    } else {\n      var rrItem = await searchResearchReports(searchTerms);\n      if (rrItem) {\n        title = rrItem.topic || 'Research Report';\n        contentText = rrItem.content || '';\n        contentId = rrItem.id;\n        foundType = 'research_report';\n      }\n    }\n  }\n\n  if (contentText === '' && storagePath) {\n    const storageUrl = supabaseUrl + '/storage/v1/object/' + storagePath;\n    const sHeaders = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey };\n    try {\n      contentText = await httpSelf.helpers.httpRequest({ method: 'GET', url: storageUrl, headers: sHeaders, returnFullResponse: false });\n      if (typeof contentText !== 'string') contentText = JSON.stringify(contentText);\n    } catch (e) {\n      contentText = '[Error fetching from storage: ' + e.message + ']';\n    }\n  }\n\n  if (contentText === '' && title === '') {\n    return [{ json: { found: false, result: 'No content found for: ' + rawSearch + ' (type: ' + (contentType || 'any') + '). Keywords: ' + searchTerms.join(', ') } }];\n  }\n\n  var maxLen = 100000;\n  if (contentText.length > maxLen) {\n    contentText = contentText.substring(0, maxLen) + ' [Truncated]';\n  }\n\n  return [{ json: { found: true, title: title, content_text: contentText, content_type: foundType, content_id: contentId, result: 'Found: ' + title + ' (' + foundType + ', ' + contentText.length + ' chars)' } }];\n} catch (err) {\n  return [{ json: { found: false, result: 'Error: ' + err.message } }];\n}"
+      }
+    },
+    {
+      "id": "rc-result",
+      "name": "set_result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        700,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "result",
+              "value": "={{ $json.result }}",
+              "type": "string"
+            },
+            {
+              "id": "r2",
+              "name": "found",
+              "value": "={{ $json.found }}",
+              "type": "boolean"
+            },
+            {
+              "id": "r3",
+              "name": "title",
+              "value": "={{ $json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "r4",
+              "name": "content_text",
+              "value": "={{ $json.content_text }}",
+              "type": "string"
+            },
+            {
+              "id": "r5",
+              "name": "content_type",
+              "value": "={{ $json.content_type }}",
+              "type": "string"
+            },
+            {
+              "id": "r6",
+              "name": "content_id",
+              "value": "={{ $json.content_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "workflow_trigger": {
+      "main": [
+        [
+          {
+            "node": "settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "settings": {
+      "main": [
+        [
+          {
+            "node": "retrieve_content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "retrieve_content": {
+      "main": [
+        [
+          {
+            "node": "set_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "meta": null,
+  "pinData": {}
+}

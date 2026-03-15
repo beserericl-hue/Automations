@@ -1,0 +1,162 @@
+{
+  "id": "AtMuc7ZsL28LfU1b",
+  "name": "17 Cron: Scheduled Publisher",
+  "nodes": [
+    {
+      "id": "cron-trigger",
+      "name": "cron_trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "settings-node",
+      "name": "settings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_API_KEY = 'sb_publishable_HsIkelEZaIr0VauiB3GgIQ_59XJRoWc';\n\nlet RECIPIENT_EMAIL = 'eric@agileadtesting.com';\nlet BCC_EMAIL = '';\n\ntry {\n  const rows = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${SUPABASE_URL}/rest/v1/app_config_v2?key=in.(recipient_email,bcc_email)&select=key,value`,\n    headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n  });\n  for (const row of rows) {\n    if (row.key === 'recipient_email') RECIPIENT_EMAIL = row.value;\n    if (row.key === 'bcc_email') BCC_EMAIL = row.value;\n  }\n} catch (e) {\n  // fallback to defaults\n}\n\nreturn [{ json: { SUPABASE_URL, SUPABASE_API_KEY, RECIPIENT_EMAIL, BCC_EMAIL } }];"
+      }
+    },
+    {
+      "id": "check-publish-node",
+      "name": "check_and_publish",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const self = this;\nconst items = $input.all();\nconst settings = items[0].json;\n\nconst SUPABASE_URL = settings.SUPABASE_URL;\nconst SUPABASE_API_KEY = settings.SUPABASE_API_KEY;\nconst RECIPIENT_EMAIL = settings.RECIPIENT_EMAIL;\n\nconst now = new Date().toISOString();\n\n// 1. Query published_content where status = 'scheduled'\nconst scheduled = await self.helpers.httpRequest({\n  method: 'GET',\n  url: `${SUPABASE_URL}/rest/v1/published_content_v2?status=eq.scheduled&select=*`,\n  headers: {\n    'apikey': SUPABASE_API_KEY,\n    'Authorization': `Bearer ${SUPABASE_API_KEY}`,\n    'Content-Type': 'application/json'\n  }\n});\n\nconst publishedItems = [];\n\nfor (const item of scheduled) {\n  // 2. Check if schedule_date is due\n  const metadata = typeof item.metadata === 'string' ? JSON.parse(item.metadata) : (item.metadata || {});\n  const scheduleDate = metadata.schedule_date;\n\n  if (!scheduleDate) continue;\n\n  // Compare ISO date strings — if schedule_date <= now, it's due\n  if (scheduleDate <= now) {\n    // 3. Snapshot into content_versions before publishing\n    try {\n      const vResp = await self.helpers.httpRequest({\n        method: 'GET',\n        url: `${SUPABASE_URL}/rest/v1/content_versions_v2?content_id=eq.${item.id}&order=version_number.desc&limit=1&select=version_number`,\n        headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}`, 'Content-Type': 'application/json' }\n      });\n      const maxV = Array.isArray(vResp) && vResp.length > 0 ? vResp[0].version_number : 0;\n      await self.helpers.httpRequest({\n        method: 'POST',\n        url: `${SUPABASE_URL}/rest/v1/content_versions_v2`,\n        headers: {\n          'apikey': SUPABASE_API_KEY,\n          'Authorization': `Bearer ${SUPABASE_API_KEY}`,\n          'Content-Type': 'application/json',\n          'Prefer': 'return=minimal'\n        },\n        body: {\n          content_id: item.id,\n          version_number: maxV + 1,\n          content_text: item.content_text || '',\n          changed_by: 'scheduler',\n          change_note: 'Auto-snapshot before scheduled publish'\n        },\n        json: true\n      });\n    } catch (e) {\n      // Log but don't block publishing\n      console.log(`Version snapshot failed for ${item.id}: ${e.message}`);\n    }\n\n    // 4. PATCH status to 'published', set published_at, update metadata\n    const updatedMetadata = { ...metadata, auto_published: true, auto_published_at: now };\n    delete updatedMetadata.schedule_date;\n\n    await self.helpers.httpRequest({\n      method: 'PATCH',\n      url: `${SUPABASE_URL}/rest/v1/published_content_v2?id=eq.${item.id}`,\n      headers: {\n        'apikey': SUPABASE_API_KEY,\n        'Authorization': `Bearer ${SUPABASE_API_KEY}`,\n        'Content-Type': 'application/json',\n        'Prefer': 'return=minimal'\n      },\n      body: {\n        status: 'published',\n        published_at: now,\n        metadata: updatedMetadata\n      },\n      json: true\n    });\n\n    publishedItems.push({\n      id: item.id,\n      title: item.title || 'Untitled',\n      content_type: item.content_type || 'unknown',\n      schedule_date: scheduleDate\n    });\n  }\n}\n\n// 5. Build summary\nconst publishedCount = publishedItems.length;\nconst sendNotification = publishedCount > 0;\n\nlet notificationBody = '';\nlet notificationSubject = '';\nlet result = '';\n\nif (sendNotification) {\n  const listItems = publishedItems.map(p =>\n    `<li><strong>${p.title}</strong> (${p.content_type}) \\u2014 scheduled for ${p.schedule_date}</li>`\n  ).join('\\n  ');\n\n  notificationBody = `<h2>Scheduled Content Published</h2>\n<p>${publishedCount} item(s) automatically published:</p>\n<ul>\n  ${listItems}\n</ul>`;\n\n  notificationSubject = `Auto-Published: ${publishedCount} scheduled item(s)`;\n  result = `Published ${publishedCount} scheduled item(s): ${publishedItems.map(p => p.title).join(', ')}`;\n} else {\n  result = 'No scheduled content due for publishing.';\n  notificationSubject = '';\n  notificationBody = '';\n}\n\nreturn [{\n  json: {\n    result,\n    published_count: publishedCount,\n    send_notification: sendNotification,\n    notification_subject: notificationSubject,\n    notification_body: notificationBody,\n    recipient_email: RECIPIENT_EMAIL\n  }\n}];"
+      }
+    },
+    {
+      "id": "if-check-node",
+      "name": "check_if_published",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "condition-published",
+              "leftValue": "={{ $json.published_count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "gmail-cron",
+      "name": "send_notification",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "sendTo": "={{ $json.recipient_email }}",
+        "subject": "={{ $json.notification_subject }}",
+        "message": "={{ $json.notification_body }}",
+        "options": {
+          "appendAttribution": false,
+          "bccList": "={{ $('settings').first().json.BCC_EMAIL || '' }}"
+        }
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "CPCSZOInV8Zj1PI1",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "cron_trigger": {
+      "main": [
+        [
+          {
+            "node": "settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "settings": {
+      "main": [
+        [
+          {
+            "node": "check_and_publish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check_and_publish": {
+      "main": [
+        [
+          {
+            "node": "check_if_published",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check_if_published": {
+      "main": [
+        [
+          {
+            "node": "send_notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "meta": null,
+  "pinData": {}
+}

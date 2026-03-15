@@ -1,0 +1,260 @@
+{
+  "id": "1JERh5yJ3yDJka8s",
+  "name": "Sub - Manage Library",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "trigger-001",
+      "name": "workflow_trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "set-url",
+              "name": "SUPABASE_URL",
+              "value": "https://faklxfakgzkpkbxfihzh.supabase.co",
+              "type": "string"
+            },
+            {
+              "id": "set-key",
+              "name": "SUPABASE_API_KEY",
+              "value": "sb_publishable_HsIkelEZaIr0VauiB3GgIQ_59XJRoWc",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "set-001",
+      "name": "settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\nconst trigger = $('workflow_trigger').first().json;\nconst operation = trigger.operation || 'list_drafts';\nlet contentId = trigger.content_id || '';\nconst contentTitle = trigger.content_title || '';\nconst typeFilter = trigger.content_type_filter || '';\nconst scheduleDate = trigger.schedule_date || '';\n\n// Title → ID resolution: if content_title is provided but content_id is not, look it up\nif (!contentId && contentTitle && ['approve', 'publish', 'reject', 'schedule', 'unschedule', 'unpublish', 'list_versions', 'get_version', 'save_version'].includes(operation)) {\n  // Fetch all title matches, then filter by valid status in JS (PostgREST ignores status filter with ilike)\n  let lookupUrl = supabaseUrl + '/rest/v1/published_content_v2?title=ilike.' + encodeURIComponent(contentTitle) + '&order=created_at.desc&select=id,title,content_type,genre_slug,status,created_at';\n  if (typeFilter) lookupUrl += '&content_type=eq.' + typeFilter;\n  const allMatches = await this.helpers.httpRequest({ method: 'GET', url: lookupUrl, headers });\n  const validStatuses = operation === 'approve' ? ['draft']\n    : operation === 'publish' ? ['approved']\n    : operation === 'reject' ? ['draft', 'approved']\n    : operation === 'schedule' ? ['draft', 'approved']\n    : operation === 'unschedule' ? ['scheduled']\n    : operation === 'unpublish' ? ['published']\n    : null;\n  const matches = validStatuses\n    ? (Array.isArray(allMatches) ? allMatches.filter(m => validStatuses.includes(m.status)) : [])\n    : (Array.isArray(allMatches) ? allMatches : []);\n  if (!Array.isArray(matches) || matches.length === 0) {\n    const statusMsg = operation === 'approve' ? 'only drafts can be approved'\n      : operation === 'publish' ? 'only approved items can be published — use approve first'\n      : operation === 'reject' ? 'only draft or approved items can be rejected'\n      : operation === 'schedule' ? 'only draft or approved items can be scheduled'\n      : operation === 'unschedule' ? 'only scheduled items can be unscheduled'\n      : operation === 'unpublish' ? 'only published items can be unpublished'\n      : '';\n    return [{ json: { result: 'Error: No eligible content found with title \"' + contentTitle + '\"' + (statusMsg ? ' (' + statusMsg + ')' : '') + '. Use list_drafts or list_approved to see available items.', send_notification: false } }];\n  } else if (matches.length > 1) {\n    const uniqueTypes = [...new Set(matches.map(m => m.content_type))];\n    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';\n    const lines = matches.map((m, i) => letters[i] + '. ' + m.title + ' — ' + m.content_type + ' — ' + new Date(m.created_at || 0).toLocaleDateString() + ' — ' + m.status + ' [ID:' + m.id + ']');\n    const display = lines.join('\\n');\n    return [{ json: { result: 'NEEDS_CLARIFICATION — say this to the user word for word:\\nI found ' + matches.length + ' items with that title. Which one?\\n' + display + '\\nReply A, B, C etc. (agent: once user picks, call manage_library again with content_id from the matching [ID:...] above)', send_notification: false } }];\n  } else {\n    contentId = matches[0].id;\n  }\n}\nlet recipientEmail = trigger.recipient_email;\nlet bccEmail = trigger.bcc_email;\nif (!recipientEmail) {\n  try {\n    const emailRows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: supabaseUrl + '/rest/v1/app_config_v2?key=in.(recipient_email,bcc_email)&select=key,value',\n      headers: { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey }\n    });\n    for (const row of emailRows) {\n      if (row.key === 'recipient_email') recipientEmail = row.value;\n      if (row.key === 'bcc_email') bccEmail = row.value;\n    }\n  } catch (e) {\n    recipientEmail = 'eric@agileadtesting.com';\n    bccEmail = '';\n  }\n}\nrecipientEmail = recipientEmail || 'eric@agileadtesting.com';\nbccEmail = bccEmail || '';\n\nlet result = '';\nlet send_notification = false;\nlet notification_subject = '';\nlet notification_body = '';\nlet content_title = '';\n\n// Helper: save a version snapshot to content_versions\nasync function saveVersionSnapshot(cId, changedBy, changeNote) {\n  // GET current content_text and title\n  const contentResp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: supabaseUrl + '/rest/v1/published_content_v2?id=eq.' + cId + '&select=content_text,title',\n    headers\n  });\n  const contentRow = Array.isArray(contentResp) && contentResp.length > 0 ? contentResp[0] : null;\n  if (!contentRow) return null;\n\n  // GET max version_number\n  const versionsResp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: supabaseUrl + '/rest/v1/content_versions_v2?content_id=eq.' + cId + '&order=version_number.desc&limit=1&select=version_number',\n    headers\n  });\n  const maxVersion = Array.isArray(versionsResp) && versionsResp.length > 0 ? versionsResp[0].version_number : 0;\n  const newVersion = maxVersion + 1;\n\n  // POST new version\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: supabaseUrl + '/rest/v1/content_versions_v2',\n    headers: { ...headers, 'Prefer': 'return=minimal' },\n    body: {\n      content_id: cId,\n      version_number: newVersion,\n      content_text: contentRow.content_text || '',\n      changed_by: changedBy,\n      change_note: changeNote,\n      created_at: new Date().toISOString()\n    }\n  });\n  return { version_number: newVersion, title: contentRow.title };\n}\n\n// Helper: build notification HTML\nfunction buildNotification(op, title, newStatus) {\n  const now = new Date().toISOString();\n  notification_subject = 'Content Library: ' + op.charAt(0).toUpperCase() + op.slice(1) + ' - ' + (title || 'Untitled');\n  notification_body = '<h2>Content Library Update</h2>' +\n    '<p><strong>Action:</strong> ' + op + '</p>' +\n    '<p><strong>Title:</strong> ' + (title || 'Untitled') + '</p>' +\n    '<p><strong>New Status:</strong> ' + newStatus + '</p>' +\n    '<p><strong>Time:</strong> ' + now + '</p>';\n  send_notification = true;\n}\n\nif (operation === 'list_all') {\n  let url = supabaseUrl + '/rest/v1/published_content_v2?order=created_at.desc&limit=50&select=id,title,content_type,genre_slug,status,created_at,published_at';\n  if (typeFilter) url += '&content_type=eq.' + typeFilter;\n  const resp = await this.helpers.httpRequest({ method: 'GET', url, headers });\n  const items = Array.isArray(resp) ? resp : [];\n  if (items.length === 0) {\n    result = 'No content found in library.';\n  } else {\n    result = 'Found ' + items.length + ' item(s) total:\\n' + items.map((item, i) =>\n      (i + 1) + '. [' + item.status.toUpperCase() + '] ' + item.title + ' (' + item.content_type + ', ' + (item.genre_slug || 'no genre') + ') \\u2014 ' + new Date(item.created_at).toLocaleDateString() + ' [ID: ' + item.id + ']'\n    ).join('\\n');\n  }\n\n} else if (operation === 'list_drafts' || operation === 'list_published' || operation === 'list_approved' || operation === 'list_rejected') {\n  const status = operation === 'list_drafts' ? 'draft' : operation === 'list_approved' ? 'approved' : operation === 'list_rejected' ? 'rejected' : 'published';\n  let url = supabaseUrl + '/rest/v1/published_content_v2?status=eq.' + status + '&order=created_at.desc&limit=20&select=id,title,content_type,genre_slug,status,created_at,published_at';\n  if (typeFilter) url += '&content_type=eq.' + typeFilter;\n  const resp = await this.helpers.httpRequest({ method: 'GET', url, headers });\n  const items = Array.isArray(resp) ? resp : [];\n  if (items.length === 0) {\n    result = 'No ' + status + ' content found.';\n  } else {\n    result = 'Found ' + items.length + ' ' + status + ' item(s):\\n' + items.map((item, i) => \n      (i + 1) + '. ' + item.title + ' (' + item.content_type + ', ' + (item.genre_slug || 'no genre') + ') \\u2014 ' + new Date(item.created_at).toLocaleDateString() + ' [ID: ' + item.id + ']'\n    ).join('\\n');\n  }\n\n} else if (operation === 'list_scheduled') {\n  let url = supabaseUrl + '/rest/v1/published_content_v2?status=eq.scheduled&order=created_at.desc&limit=20&select=id,title,content_type,genre_slug,status,metadata,created_at';\n  if (typeFilter) url += '&content_type=eq.' + typeFilter;\n  const resp = await this.helpers.httpRequest({ method: 'GET', url, headers });\n  const items = Array.isArray(resp) ? resp : [];\n  if (items.length === 0) {\n    result = 'No scheduled content found.';\n  } else {\n    result = 'Found ' + items.length + ' scheduled item(s):\\n' + items.map((item, i) => {\n      const sd = item.metadata && item.metadata.schedule_date ? item.metadata.schedule_date : 'no date';\n      return (i + 1) + '. ' + item.title + ' (' + item.content_type + ', ' + (item.genre_slug || 'no genre') + ') \\u2014 Scheduled: ' + sd + ' [ID: ' + item.id + ']';\n    }).join('\\n');\n  }\n\n} else if (operation === 'list_versions') {\n  if (!contentId) {\n    result = 'Error: content_id is required for list_versions operation.';\n  } else {\n    const resp = await this.helpers.httpRequest({\n      method: 'GET',\n      url: supabaseUrl + '/rest/v1/content_versions_v2?content_id=eq.' + contentId + '&order=version_number.desc&select=version_number,changed_by,change_note,created_at',\n      headers\n    });\n    const items = Array.isArray(resp) ? resp : [];\n    if (items.length === 0) {\n      result = 'No versions found for content_id: ' + contentId;\n    } else {\n      result = 'Found ' + items.length + ' version(s):\\n' + items.map((v, i) =>\n        'v' + v.version_number + ' \\u2014 ' + (v.changed_by || 'unknown') + ' \\u2014 ' + (v.change_note || 'no note') + ' \\u2014 ' + new Date(v.created_at).toLocaleDateString()\n      ).join('\\n');\n    }\n  }\n\n} else if (operation === 'get_version') {\n  const versionNumber = trigger.version_number;\n  if (!contentId || !versionNumber) {\n    result = 'Error: content_id and version_number are required for get_version operation.';\n  } else {\n    const resp = await this.helpers.httpRequest({\n      method: 'GET',\n      url: supabaseUrl + '/rest/v1/content_versions_v2?content_id=eq.' + contentId + '&version_number=eq.' + versionNumber + '&select=version_number,content_text,changed_by,change_note,created_at',\n      headers\n    });\n    const items = Array.isArray(resp) ? resp : [];\n    if (items.length === 0) {\n      result = 'Version ' + versionNumber + ' not found for content_id: ' + contentId;\n    } else {\n      const v = items[0];\n      result = 'Version ' + v.version_number + ' by ' + (v.changed_by || 'unknown') + ':\\n' + (v.content_text || '(empty)');\n    }\n  }\n\n} else if (operation === 'save_version') {\n  if (!contentId) {\n    result = 'Error: content_id is required for save_version operation.';\n  } else {\n    const changedBy = trigger.changed_by || 'system';\n    const changeNote = trigger.change_note || 'Manual version snapshot';\n    const snapshot = await saveVersionSnapshot.call(this, contentId, changedBy, changeNote);\n    if (!snapshot) {\n      result = 'Error: content not found for content_id: ' + contentId;\n    } else {\n      result = 'Version ' + snapshot.version_number + ' saved for \"' + snapshot.title + '\".';\n    }\n  }\n\n} else if (operation === 'schedule') {\n  if (!contentId || !scheduleDate) {\n    result = 'Error: content_id and schedule_date are required for schedule operation.';\n  } else {\n    // GET existing metadata to merge\n    const existing = await this.helpers.httpRequest({\n      method: 'GET',\n      url: supabaseUrl + '/rest/v1/published_content_v2?id=eq.' + contentId + '&select=metadata,title',\n      headers\n    });\n    const row = Array.isArray(existing) && existing.length > 0 ? existing[0] : null;\n    if (!row) {\n      result = 'Error: content not found for content_id: ' + contentId;\n    } else {\n      content_title = row.title || 'Untitled';\n      const existingMeta = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};\n      const mergedMeta = { ...existingMeta, schedule_date: scheduleDate };\n      const body = { status: 'scheduled', metadata: mergedMeta, updated_at: new Date().toISOString() };\n      await this.helpers.httpRequest({\n        method: 'PATCH',\n        url: supabaseUrl + '/rest/v1/published_content_v2?id=eq.' + contentId,\n        headers: { ...headers, 'Prefer': 'return=representation' },\n        body\n      });\n      result = 'Content \"' + content_title + '\" scheduled for ' + scheduleDate + '. [ID: ' + contentId + '] (agent: use this content_id for the next operation on this item)';\n      buildNotification('schedule', content_title, 'scheduled');\n    }\n  }\n\n} else if (operation === 'unschedule') {\n  if (!contentId) {\n    result = 'Error: content_id required for unschedule.';\n  } else {\n    const existing = await this.helpers.httpRequest({ method: 'GET', url: supabaseUrl + '/rest/v1/published_content_v2?id=eq.' + contentId + '&select=title,metadata', headers });\n    const row = Array.isArray(existing) && existing.length > 0 ? existing[0] : null;\n    if (!row) { result = 'Error: content not found.'; } else {\n      content_title = row.title || 'Untitled';\n      const meta = row.metadata && typeof row.metadata === 'object' ? { ...row.metadata } : {};\n      delete meta.schedule_date;\n      await this.helpers.httpRequest({ method: 'PATCH', url: supabaseUrl + '/rest/v1/published_content_v2?id=eq.' + contentId, headers: { ...headers, 'Prefer': 'return=representation' }, body: { status: 'draft', metadata: meta, updated_at: new Date().toISOString() } });\n      result = 'Content \"' + content_title + '\" unscheduled \\u2014 status reverted to draft. [ID: ' + contentId + '] (agent: use this content_id for the next operation on this item)';\n      buildNotification('unschedule', content_title, 'draft');\n    }\n  }\n\n} else if (operation === 'unpublish') {\n  if (!contentId) {\n    result = 'Error: content_id is required for unpublish operation.';\n  } else {\n    const titleResp = await this.helpers.httpRequest({\n      method: 'GET',\n      url: supabaseUrl + '/rest/v1/published_content_v2?id=eq.' + contentId + '&select=title',\n      headers\n    });\n    content_title = Array.isArray(titleResp) && titleResp.length > 0 ? (titleResp[0].title || 'Untitled') : 'Untitled';\n    const body = { status: 'approved', published_at: null, updated_at: new Date().toISOString() };\n    await this.helpers.httpRequest({ method: 'PATCH', url: supabaseUrl + '/rest/v1/published_content_v2?id=eq.' + contentId, headers: { ...headers, 'Prefer': 'return=representation' }, body });\n    result = 'Content \"' + content_title + '\" unpublished \\u2014 status reverted to approved. [ID: ' + contentId + '] (agent: use this content_id for the next operation on this item)';\n    buildNotification('unpublish', content_title, 'approved');\n  }\n\n} else if (['approve', 'publish', 'reject'].includes(operation)) {\n  if (!contentId) {\n    result = 'Error: content_id is required for ' + operation + ' operation.';\n  } else {\n    // Auto-snapshot version before approve/publish\n    if (operation === 'approve' || operation === 'publish') {\n      const changeNote = 'Auto-snapshot before ' + operation;\n      await saveVersionSnapshot.call(this, contentId, 'system', changeNote);\n    }\n\n    // Get title for notification\n    const titleResp = await this.helpers.httpRequest({\n      method: 'GET',\n      url: supabaseUrl + '/rest/v1/published_content_v2?id=eq.' + contentId + '&select=title',\n      headers\n    });\n    content_title = Array.isArray(titleResp) && titleResp.length > 0 ? (titleResp[0].title || 'Untitled') : 'Untitled';\n\n    const newStatus = operation === 'approve' ? 'approved' : operation === 'publish' ? 'published' : 'rejected';\n    const body = { status: newStatus, updated_at: new Date().toISOString() };\n    if (operation === 'publish') body.published_at = new Date().toISOString();\n    await this.helpers.httpRequest({ method: 'PATCH', url: supabaseUrl + '/rest/v1/published_content_v2?id=eq.' + contentId, headers: { ...headers, 'Prefer': 'return=representation' }, body });\n    result = 'Content \"' + content_title + '\" ' + (operation === 'approve' ? 'approved' : operation === 'publish' ? 'published' : 'rejected') + ' successfully. [ID: ' + contentId + '] (agent: use this content_id for the next operation on this item)';\n\n    buildNotification(operation, content_title, newStatus);\n  }\n\n} else if (operation === 'list_projects') {\n  const resp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: supabaseUrl + '/rest/v1/writing_projects_v2?order=created_at.desc&select=id,title,genre_slug,created_at',\n    headers\n  });\n  const projects = Array.isArray(resp) ? resp : [];\n  if (projects.length === 0) {\n    result = 'No writing projects found. Start by brainstorming a story.';\n  } else {\n    result = 'Found ' + projects.length + ' writing project(s):\\n' + projects.map((p, i) =>\n      (i + 1) + '. ' + p.title + ' (' + (p.genre_slug || 'no genre') + ') \\u2014 created ' + new Date(p.created_at).toLocaleDateString()\n    ).join('\\n');\n  }\n\n} else {\n  result = 'Unknown operation: ' + operation + '. Valid operations: list_all, list_drafts, list_approved, list_published, list_rejected, list_scheduled, list_versions, get_version, save_version, schedule, unschedule, approve, publish, reject, unpublish, list_projects';\n}\n\nreturn [{ json: { result, send_notification, notification_subject, notification_body, recipient_email: recipientEmail, bcc_email: bccEmail } }];"
+      },
+      "id": "code-001",
+      "name": "handle_operation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "set-result",
+              "name": "result",
+              "value": "={{ $json.result }}",
+              "type": "string"
+            },
+            {
+              "id": "set-notify",
+              "name": "send_notification",
+              "value": "={{ $json.send_notification }}",
+              "type": "boolean"
+            },
+            {
+              "id": "set-recipient",
+              "name": "recipient_email",
+              "value": "={{ $json.recipient_email }}",
+              "type": "string"
+            },
+            {
+              "id": "set-subject",
+              "name": "notification_subject",
+              "value": "={{ $json.notification_subject }}",
+              "type": "string"
+            },
+            {
+              "id": "set-body",
+              "name": "notification_body",
+              "value": "={{ $json.notification_body }}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "set-002",
+      "name": "set_result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond-notify",
+              "leftValue": "={{ $json.send_notification }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-notify",
+      "name": "check_notification",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.recipient_email }}",
+        "subject": "={{ $json.notification_subject }}",
+        "message": "={{ $json.notification_body }}",
+        "options": {
+          "appendAttribution": false,
+          "bccList": "={{ $json.bcc_email || '' }}"
+        }
+      },
+      "id": "gmail-notify",
+      "name": "send_email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1100,
+        -100
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "CPCSZOInV8Zj1PI1",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $('set_result').first().json;\nreturn [{ json: { result: r.result || '' } }];"
+      },
+      "id": "return-result",
+      "name": "return_result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "workflow_trigger": {
+      "main": [
+        [
+          {
+            "node": "settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "settings": {
+      "main": [
+        [
+          {
+            "node": "handle_operation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "handle_operation": {
+      "main": [
+        [
+          {
+            "node": "set_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_result": {
+      "main": [
+        [
+          {
+            "node": "check_notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check_notification": {
+      "main": [
+        [
+          {
+            "node": "send_email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "return_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send_email": {
+      "main": [
+        [
+          {
+            "node": "return_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "meta": null,
+  "pinData": null
+}

@@ -1,0 +1,147 @@
+{
+  "id": "MLjncwcdMSjBkS4Z",
+  "name": "Sub - Manage Research Reports",
+  "nodes": [
+    {
+      "id": "rr-trigger",
+      "name": "workflow_trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "operation"
+            },
+            {
+              "name": "report_id"
+            },
+            {
+              "name": "topic"
+            },
+            {
+              "name": "genre_slug"
+            },
+            {
+              "name": "content"
+            },
+            {
+              "name": "status"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "rr-settings",
+      "name": "settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        200,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "SUPABASE_URL",
+              "value": "https://faklxfakgzkpkbxfihzh.supabase.co",
+              "type": "string"
+            },
+            {
+              "id": "s2",
+              "name": "SUPABASE_API_KEY",
+              "value": "sb_publishable_HsIkelEZaIr0VauiB3GgIQ_59XJRoWc",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "rr-handler",
+      "name": "handle_operation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\nconst trigger = $('workflow_trigger').first().json;\nconst operation = trigger.operation || 'save';\n\nlet result = '';\n\nif (operation === 'save') {\n  const resp = await this.helpers.httpRequest({\n    method: 'POST',\n    url: supabaseUrl + '/rest/v1/research_reports_v2',\n    headers: { ...headers, 'Prefer': 'return=representation' },\n    body: {\n      topic: trigger.topic,\n      genre_slug: trigger.genre_slug || null,\n      content: trigger.content,\n      status: trigger.status || 'draft'\n    }\n  });\n  result = JSON.stringify(Array.isArray(resp) ? resp[0] : resp);\n} else if (operation === 'get') {\n  const resp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: supabaseUrl + '/rest/v1/research_reports_v2?id=eq.' + trigger.report_id + '&limit=1',\n    headers\n  });\n  result = JSON.stringify(Array.isArray(resp) && resp.length > 0 ? resp[0] : { error: 'Report not found' });\n} else if (operation === 'list') {\n  const resp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: supabaseUrl + '/rest/v1/research_reports_v2?order=updated_at.desc&limit=20&select=id,topic,genre_slug,status,created_at,updated_at',\n    headers\n  });\n  const items = Array.isArray(resp) ? resp : [];\n  if (items.length === 0) {\n    result = 'No research reports found.';\n  } else {\n    result = 'Found ' + items.length + ' report(s):\\n' + items.map((item, i) =>\n      (i + 1) + '. ' + item.topic + ' (' + (item.genre_slug || 'no genre') + ', ' + item.status + ') [ID: ' + item.id + ']'\n    ).join('\\n');\n  }\n} else if (operation === 'update') {\n  const body = {};\n  if (trigger.content) body.content = trigger.content;\n  if (trigger.topic) body.topic = trigger.topic;\n  if (trigger.status) body.status = trigger.status;\n  body.updated_at = new Date().toISOString();\n  const resp = await this.helpers.httpRequest({\n    method: 'PATCH',\n    url: supabaseUrl + '/rest/v1/research_reports_v2?id=eq.' + trigger.report_id,\n    headers: { ...headers, 'Prefer': 'return=representation' },\n    body\n  });\n  result = JSON.stringify(Array.isArray(resp) ? resp[0] : resp);\n} else {\n  result = 'Unknown operation: ' + operation + '. Valid: save, get, list, update';\n}\n\nreturn [{ json: { result } }];"
+      }
+    },
+    {
+      "id": "rr-result",
+      "name": "set_result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        700,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "result",
+              "value": "={{ $json.result }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "workflow_trigger": {
+      "main": [
+        [
+          {
+            "node": "settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "settings": {
+      "main": [
+        [
+          {
+            "node": "handle_operation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "handle_operation": {
+      "main": [
+        [
+          {
+            "node": "set_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "meta": null,
+  "pinData": {}
+}

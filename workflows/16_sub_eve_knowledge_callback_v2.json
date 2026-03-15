@@ -30,13 +30,13 @@
             {
               "id": "s1",
               "name": "SUPABASE_URL",
-              "value": "https://qsirioazmsmrrfoltrhn.supabase.co",
+              "value": "https://faklxfakgzkpkbxfihzh.supabase.co",
               "type": "string"
             },
             {
               "id": "s2",
               "name": "SUPABASE_API_KEY",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzaXJpb2F6bXNtcnJmb2x0cmhuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgwOTU2MSwiZXhwIjoyMDg4Mzg1NTYxfQ.oqvzwBcCwYTI1pe1MPnNQn64Yc3e-mozT2yFOYi3iAk",
+              "value": "sb_publishable_HsIkelEZaIr0VauiB3GgIQ_59XJRoWc",
               "type": "string"
             },
             {
