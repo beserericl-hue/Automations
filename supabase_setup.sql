@@ -146,8 +146,36 @@ CREATE POLICY "Allow all for anon" ON writing_projects FOR ALL USING (true) WITH
 CREATE POLICY "Allow all for anon" ON content_usage FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all for anon" ON story_bible FOR ALL USING (true) WITH CHECK (true);
 
+-- 8. Story Arcs (brainstorm outline frameworks)
+CREATE TABLE IF NOT EXISTS story_arcs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  description TEXT NOT NULL,
+  prompt_text TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE story_arcs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all for anon" ON story_arcs FOR ALL USING (true) WITH CHECK (true);
+
+-- 9. Outline Versions (version history for brainstorm outlines)
+CREATE TABLE IF NOT EXISTS outline_versions (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  project_id UUID NOT NULL REFERENCES writing_projects(id) ON DELETE CASCADE,
+  version_number INTEGER NOT NULL DEFAULT 1,
+  outline JSONB NOT NULL,
+  revision_note TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_outline_versions_project ON outline_versions(project_id, version_number DESC);
+
+ALTER TABLE outline_versions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all for anon" ON outline_versions FOR ALL USING (true) WITH CHECK (true);
+
 -- ============================================
--- 8. Seed Genre Data
+-- 10. Seed Genre Data
 -- ============================================
 
 INSERT INTO genre_config (genre_name, genre_slug, description, keywords, rss_feed_urls, source_urls, subreddit_names, goodreads_shelves, writing_guidelines)
