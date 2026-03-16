@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-03-16T17:29:00.178Z",
+  "updatedAt": "2026-03-16T19:54:27.269Z",
   "createdAt": "2026-03-15T16:42:25.878Z",
   "id": "roMDypuMXHv6ugaZ",
   "name": "The Author Agent",
@@ -11,6 +11,7 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "author_request_v2",
+        "responseMode": "responseNode",
         "options": {}
       },
       "id": "hub-webhook",
@@ -2080,9 +2081,9 @@
   "staticData": null,
   "meta": null,
   "pinData": {},
-  "versionId": "d237dcd2-800a-47ea-aa89-bb8bd7565fc4",
-  "activeVersionId": "d237dcd2-800a-47ea-aa89-bb8bd7565fc4",
-  "versionCounter": 71,
+  "versionId": "ccb788a8-916c-423e-a958-dd4c404ae708",
+  "activeVersionId": "ccb788a8-916c-423e-a958-dd4c404ae708",
+  "versionCounter": 74,
   "triggerCount": 2,
   "shared": [
     {
@@ -2105,15 +2106,16 @@
   ],
   "tags": [],
   "activeVersion": {
-    "updatedAt": "2026-03-16T17:31:48.869Z",
-    "createdAt": "2026-03-16T17:29:00.183Z",
-    "versionId": "d237dcd2-800a-47ea-aa89-bb8bd7565fc4",
+    "updatedAt": "2026-03-16T19:54:41.203Z",
+    "createdAt": "2026-03-16T19:54:27.273Z",
+    "versionId": "ccb788a8-916c-423e-a958-dd4c404ae708",
     "workflowId": "roMDypuMXHv6ugaZ",
     "nodes": [
       {
         "parameters": {
           "httpMethod": "POST",
           "path": "author_request_v2",
+          "responseMode": "responseNode",
           "options": {}
         },
         "id": "hub-webhook",
@@ -4176,15 +4178,15 @@
       }
     },
     "authors": "Eric Beser",
-    "name": "Version d237dcd2",
-    "description": "changed layout",
+    "name": "Version ccb788a8",
+    "description": "changed web hook",
     "autosaved": true,
     "workflowPublishHistory": [
       {
-        "createdAt": "2026-03-16T17:31:48.864Z",
-        "id": 888,
+        "createdAt": "2026-03-16T19:54:41.198Z",
+        "id": 890,
         "workflowId": "roMDypuMXHv6ugaZ",
-        "versionId": "d237dcd2-800a-47ea-aa89-bb8bd7565fc4",
+        "versionId": "ccb788a8-916c-423e-a958-dd4c404ae708",
         "event": "activated",
         "userId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
       }
