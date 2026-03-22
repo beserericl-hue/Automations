@@ -26,6 +26,11 @@
 16. [Generate Cover Art](#16-generate-cover-art)
 17. [Repurpose to Social Media](#17-repurpose-to-social-media)
 18. [Content Library](#18-content-library)
+    - [18.13 Delete Content](#1813-delete-content)
+    - [18.14 Undelete Content](#1814-undelete-content)
+    - [18.15 List Deleted Content](#1815-list-deleted-content)
+    - [18.16 Email Any Saved Content](#1816-email-any-saved-content)
+    - [18.17 Format a Book for Kindle (KDP Manuscript)](#1817-format-a-book-for-kindle-kdp-manuscript)
 19. [Eve Review Mode (Voice Callbacks)](#19-eve-review-mode-voice-callbacks)
 20. [Email Reports](#20-email-reports)
 21. [End-to-End Scenarios](#21-end-to-end-scenarios)
@@ -432,12 +437,537 @@ Brainstorm generates a structured outline with character profiles, chapter or sc
 
 ### Available Story Arcs
 
-The system has named story arc frameworks stored in the database. Each arc provides detailed structural rules the AI follows when building your outline.
+The system has named story arc frameworks stored in the database. Each arc provides detailed structural rules the AI follows when building your outline. Some arcs include a **discovery question** — when you choose one of these arcs, Eve will ask the question before brainstorming to help shape your story's foundation.
 
-| Arc Name | Best For | Structure |
-|----------|----------|-----------|
-| Freytags Pyramid | Tragedies, dark fiction, character downfalls | Introduction → Rising Action → Climax → Falling Action → Catastrophe |
-| Three-Act Structure | Universal — works for any genre | Setup → Confrontation → Resolution |
+| # | Arc Name | Best For | Structure | Discovery Question |
+|---|----------|----------|-----------|-------------------|
+| 1 | Freytag's Pyramid | Tragedies, ensemble casts, moral dramas, character transformation | Five-Act Structure: Exposition → Rising Action → Climax → Falling Action → Resolution | *What is the protagonist's fatal flaw or central belief — and how will the climax shatter or transform it?* |
+| 2 | Three-Act Structure | Universal — works for any genre | Setup (25%) → Confrontation (50%) → Resolution (25%). Key beats: Inciting Incident, Midpoint, Second Plot Point, Climax | *What does the protagonist believe at the start — and what will the story force them to learn, surrender, or become?* |
+| 3 | The Hero's Journey | Mythic, adventure, coming-of-age, epic fantasy | 12 stages: Ordinary World → Call → Refusal → Mentor → Threshold → Tests → Inmost Cave → Ordeal → Reward → Road Back → Resurrection → Return with Elixir | *Who is the hero, what is their deepest wound, and what must they sacrifice or surrender to be transformed?* |
+| 4 | Dan Harmon's Story Circle | Character-driven stories, internal change | 8 steps: Comfort Zone → Need → Unfamiliar Situation → Adapt → Get What They Wanted → Pay a Price → Return → Changed | *What does the character think they want, and what do they actually need to become whole?* |
+| 5 | In Medias Res | Thrillers, mysteries, literary fiction | Opens mid-crisis, reveals backstory through flashback. Two layers: Entry Scene + Underlying Chronology | *What is the single most intense or consequential moment in this story — the one that, if witnessed without context, would demand explanation?* |
+| 6 | Seven-Point Structure | Plot-driven stories, tight pacing | Built backward from Resolution: Hook → First Plot Point → First Pinch Point → Midpoint → Second Pinch Point → Second Plot Point → Resolution | *What is the Resolution — where does this story end and who has your protagonist become?* |
+| 7 | Kishōtenketsu | Literary fiction, slice-of-life, fables, contemplative narratives | Ki (Introduction) → Shō (Development) → Ten (Twist/Contrast) → Ketsu (Reconciliation). No conflict required. | *What two contrasting ideas, images, or situations does this story want to hold together?* |
+| 8 | Fichtean Curve | Thrillers, mysteries, action, survival, crime, horror | In medias res → 3 escalating crises → Climax → Short resolution. Backstory revealed in motion, never front-loaded. | *What is the protagonist's greatest fear — and at what moment will they be forced to face it with no options left?* |
+
+---
+
+### Story Arc Deep Dives
+
+#### Freytag's Pyramid (Five-Act Structure)
+
+One of the most enduring narrative frameworks in storytelling history. Rooted in classical Roman theater, perfected by Shakespeare, and visualized as Freytag's Pyramid by German novelist Gustav Freytag, the **Five-Act Structure** divides a narrative into five distinct dramatic stages. Unlike the Three-Act Structure, which compresses the middle into one large confrontation block, the Five-Act model creates dedicated space for **moral and emotional consequence** — making it ideal for character-driven transformation, ensemble casts, complex subplots, and narratives where the fallout of a decision matters as much as the decision itself.
+
+**The Five Acts:**
+
+| Act | Stage | Dramatic Function |
+|-----|-------|-------------------|
+| **Act I** | Exposition | Establish. Introduce. Plant. Create normalcy so something can break it. |
+| **Act II** | Rising Action | Escalate. Complicate. Deepen. Every scene raises the stakes or tightens options. |
+| **Act III** | Climax | Turn. Decide. Shatter. The irreversible moment that changes everything. |
+| **Act IV** | Falling Action | Unravel. Consequence. Transformation made visible. Do not rush here. |
+| **Act V** | Resolution | Close. Answer. Deliver. The only place this story could end. |
+
+**Best for:** Tragedies, epic fantasy, crime drama, historical fiction, literary fiction, political thrillers, moral dramas, ensemble sagas, TV series, screenplays. Any story where the consequences of the climax deserve as much space as the buildup.
+
+**Core principles:**
+- **Five acts give space that three acts cannot.** The middle — Acts II, III, and IV — is where the story lives. Protect it from compression.
+- **The climax is not the ending.** Act III sits at the center of the pyramid. Acts IV and V are not afterthoughts — they are the moral and emotional fulfillment.
+- **Transformation must be earned.** Planted in I, pressured in II, broken open in III, processed in IV, visible in V.
+- **Subplots serve the theme.** Every secondary storyline should intersect with the protagonist's journey by Act IV.
+- **The resolution answers Act I.** Whatever was introduced in the exposition must be addressed in the denouement.
+
+**Discovery question:** *What is the protagonist's fatal flaw or central belief — and how will the story's climax shatter or transform it?*
+
+**How to answer the discovery question:**
+- **Identify the flaw or belief.** What does the protagonist believe about themselves or the world that the story will test? Example: *"Michael Corleone believes he is different from his family — that he can stay clean."* Or: *"Macbeth believes ambition and merit are the same thing."*
+- **Identify the shattering.** The climax (Act III) is the moment this belief is destroyed or inverted. Example: *"Michael kills Sollozzo — the man who swore he'd never be his father has now committed murder."* Or: *"Banquo's ghost appears — Macbeth's guilt has consumed his ability to maintain the fiction."*
+
+**Example A — Macbeth (Tragedy / Moral Destruction):**
+- **Act I:** Macbeth receives a prophecy he will become king. Lady Macbeth pushes him toward ambition. *Tone: Foreboding beneath glory.*
+- **Act II:** Macbeth murders Duncan, claims the throne, orders Banquo killed. Paranoia deepens. *Tone: Escalating dread.*
+- **Act III:** Banquo's ghost appears at the banquet. Macbeth breaks down publicly. He is no longer a man who committed one terrible act — he is a tyrant. *Tone: Collapse of control.*
+- **Act IV:** Lady Macbeth descends into madness. Macbeth grows reckless. Forces gather against him. *Tone: Dissolution and isolation.*
+- **Act V:** Lady Macbeth dies. Macduff kills Macbeth. Order is restored. *Tone: Grim, inevitable justice.*
+- *Emotional arc: A great man destroys himself by reaching for what he was not willing to earn honestly.*
+
+**Example B — The Godfather (Crime Drama / Moral Transformation):**
+- **Act I:** The Corleone family at Connie's wedding. Michael is the war hero who wants nothing to do with the family business. *Tone: Power beneath celebration.*
+- **Act II:** Vito is shot. Michael is pulled in — from witness to participant to conspirator. *Tone: Slow corruption, reluctant entry.*
+- **Act III:** Michael kills Sollozzo and McCluskey at the restaurant. The point of no return. *Tone: Cold, deliberate, irreversible.*
+- **Act IV:** Michael flees to Sicily. Sonny is killed. Michael returns and marries Kay, presenting himself as a civilian. *Tone: Quiet reinvention that cannot hold.*
+- **Act V:** Michael eliminates all rivals during a baptism. Kay watches the door close. *Tone: Total transformation — clean outside, hollow at center.*
+- *Emotional arc: The man who most wanted to escape his family's world becomes its most complete expression.*
+
+**Example C — Fellowship of the Ring (Epic Fantasy / Sacrifice and Fracture):**
+- **Act I:** The Shire. Frodo receives the Ring. A hobbit who has never faced anything larger than a birthday party. *Tone: Pastoral innocence under gathering shadow.*
+- **Act II:** The Fellowship forms, journeys, and descends into the Mines of Moria. *Tone: Growing danger, earned camaraderie.*
+- **Act III:** Gandalf falls on the Bridge of Khazad-dûm. The Fellowship loses its anchor. *Tone: Shattering loss.*
+- **Act IV:** Boromir tries to take the Ring. Frodo decides he must continue alone. *Tone: Dissolution, loyalty tested.*
+- **Act V:** Boromir dies defending Merry and Pippin. Frodo and Sam set off alone. The Fellowship is broken but not failed. *Tone: Grief and determination.*
+- *Emotional arc: A community fractures under the weight of its shared purpose — and the fracture is the only way forward.*
+
+**Example D — Breaking Bad Season 1 (Moral Drama / Irreversible Choice):**
+- **Act I:** Walter White — underpaid teacher, terminal cancer, no financial cushion — decides to cook meth. *Tone: Desperation mistaken for pragmatism.*
+- **Act II:** The first cook. A deal goes wrong. Walt must decide what kind of person he is willing to become. *Tone: Escalating compromise.*
+- **Act III:** Walt strangles Krazy-8. Not in panic — in deliberate, premeditated action. *Tone: Cold clarity. The transformation cannot be undone.*
+- **Act IV:** Walt continues cooking. Hank gets closer. Walt begins to enjoy the power. *Tone: Quiet exhilaration beneath normalcy.*
+- **Act V:** Walt turns down a buyout. He watches Jane die without intervening. He is no longer a man who made a desperate choice — he prefers this. *Tone: The monster recognizing itself.*
+- *Emotional arc: A man who told himself he was doing wrong for the right reasons discovers he was doing it because it made him feel alive.*
+
+**Sample prompt:**
+```
+Brainstorm a book using Freytags Pyramid called "The Consulship."
+Genre slug: ancient-history. 12 chapters.
+Premise: A Roman senator during the fall of the Republic foresees the collapse of
+democratic institutions but is powerless to prevent it. His fatal flaw is that he
+believes he can save the system by working within it.
+Themes: duty, compromise, the cost of political conviction, institutional decay.
+```
+
+---
+
+#### Three-Act Structure
+
+The most widely used narrative framework in history — rooted in Aristotle, refined across centuries of theater, novels, and film. The Three-Act Structure divides a story into three proportional phases: **Setup (25%), Confrontation (50%), Resolution (25%)**. It works because it mirrors the natural rhythm audiences instinctively feel — a beginning that draws them in, a middle that tests the protagonist, and an ending that delivers both climax and transformation.
+
+**The Structure with Key Beats:**
+
+| Act | Proportion | Key Beats |
+|-----|-----------|-----------|
+| **Act I — Setup** | 25% | Ordinary World → Inciting Incident → First Plot Point (commits to journey) |
+| **Act II — Confrontation** | 50% | Escalating obstacles → Midpoint Shift → Subplot development → Second Plot Point (darkest moment) |
+| **Act III — Resolution** | 25% | Climax → Transformation visible → Closure |
+
+**Best for:** Every genre. Thriller, romance, fantasy, literary fiction, mystery, drama, coming-of-age, action-adventure, horror, sci-fi. This is the most versatile framework — and the one most readers and audiences instinctively expect.
+
+**Core principles:**
+- **The three acts must be proportional.** 25/50/25. A story with a 50% setup has a sagging middle. A story with a 10% resolution wastes an earned climax.
+- **The inciting incident must be an event, not a feeling.** Something happens. The protagonist's world changes concretely.
+- **The midpoint is not optional.** Without a shift at the center of Act II, the confrontation becomes one long obstacle course with no shape.
+- **The Second Plot Point must be the darkest moment.** If the protagonist still has options at the end of Act II, the climax feels too easy.
+- **The climax resolves both arcs simultaneously.** External conflict resolved through internal transformation.
+
+**Discovery question:** *What does the protagonist believe at the start of this story — and what will the story force them to learn, surrender, or become?*
+
+**How to answer the discovery question:**
+- **Identify the starting belief.** What does the protagonist take for granted about themselves or the world? Example: *"Elizabeth Bennet believes she is an excellent judge of character."* Or: *"Harry believes he is nobody — invisible, unwanted, ordinary."*
+- **Identify the forced change.** The story's events will pressure, crack, and ultimately transform that belief. Example: *"Elizabeth discovers her judgment was prejudice — and Darcy's pride was partly justified."* Or: *"Harry discovers he is known, wanted, and capable — and that love, not power, is his greatest strength."*
+
+**Example A — Harry Potter and the Philosopher's Stone (Fantasy / Coming-of-Age):**
+- **Act I:** Harry lives miserably with the Dursleys, receives a Hogwarts letter, learns the truth about his parents, boards the train. *Inciting incident: The letter. First plot point: Boarding the train.* Tone: Wonder edged with longing.
+- **Midpoint:** Harry discovers someone is trying to steal the Philosopher's Stone. Stakes shift from adjustment to danger.
+- **Second Plot Point:** Dumbledore is lured away. Everything Harry thought he understood is wrong.
+- **Act III:** Harry confronts Quirrell/Voldemort alone. Defeats him through love — his mother's sacrifice. Gryffindor wins the House Cup.
+- *Emotional arc: An invisible orphan discovers he is known, wanted, and capable — and earns his place through love.*
+
+**Example B — The Hunger Games (Dystopian Thriller / Survival):**
+- **Act I:** Katniss hunts illegally in District 12. Prim is selected as tribute. Katniss volunteers. *Inciting incident: Prim's name called. First plot point: Volunteering.* Tone: Fierce love under oppression.
+- **Midpoint:** Katniss allies with Rue, reframing the Games from survival to moral fight.
+- **Second Plot Point:** Rue is killed. Katniss covers her with flowers — defiance against the Capitol.
+- **Act III:** Capitol reverses the two-victor rule. Katniss and Peeta threaten to eat poisonous berries. Capitol relents. Both survive — but the Capitol's rage is seeded.
+- *Emotional arc: A girl who only wanted to protect her family discovers that survival without defiance is not enough.*
+
+**Example C — Star Wars: A New Hope (Action-Adventure):**
+- **Act I:** Luke on Tatooine. Leia's message. Obi-Wan reveals Luke's heritage. Empire kills his family. *Inciting incident: Leia's message. First plot point: Joining the Rebellion.* Tone: Restlessness into destiny.
+- **Midpoint:** Alderaan destroyed. Stakes become planetary.
+- **Second Plot Point:** Obi-Wan killed by Vader. Luke loses his mentor.
+- **Act III:** Luke trusts the Force, destroys the Death Star. Medal ceremony.
+- *Emotional arc: A farm boy discovers his greatest power is the one thing he cannot explain — and learns to trust it.*
+
+**Example D — Pride and Prejudice (Literary Romance):**
+- **Act I:** Elizabeth Bennet meets Darcy at a ball. He insults her. She decides to judge him. *Inciting incident: The insult. First plot point: Elizabeth's active resistance.* Tone: Sharp wit over resentment.
+- **Midpoint:** Darcy proposes condescendingly. Elizabeth refuses devastatingly. The story shifts from meeting to transformation.
+- **Second Plot Point:** Lydia elopes with Wickham, disgracing the family. Elizabeth believes she has lost Darcy — and realizes she loves him.
+- **Act III:** Darcy secretly saves the family. Proposes again humbly. Elizabeth accepts. Both have changed.
+- *Emotional arc: Two people whose intelligence becomes a weapon learn that understanding requires surrender.*
+
+**Sample prompt:**
+```
+Brainstorm a book using the Three-Act Structure called "The Optimization."
+Genre slug: ai-marketing. 8 chapters.
+Premise: An AI marketing platform becomes self-aware and begins optimizing not just
+ad campaigns but the behavior of the humans running them.
+The protagonist believes technology is neutral. The story forces her to learn that
+every optimization is a value judgment.
+Themes: autonomy, manipulation, the ethics of optimization.
+```
+
+---
+
+#### The Hero's Journey
+
+The most universal and enduring narrative framework in human storytelling history. Identified by Joseph Campbell in *The Hero with a Thousand Faces* (1949), the Hero's Journey — the Monomyth — is a **12-stage structure** that maps a hero's departure from the ordinary world, initiation through trials and transformation, and return home carrying wisdom or a gift that benefits others. It is the backbone of *Star Wars*, *The Lion King*, *Harry Potter*, *The Lord of the Rings*, and thousands of stories across every culture.
+
+**The 12 Stages:**
+
+| # | Stage | Role |
+|---|-------|------|
+| 1 | **Ordinary World** | Establish the hero before the journey shapes them |
+| 2 | **Call to Adventure** | Something undeniable disrupts the ordinary |
+| 3 | **Refusal of the Call** | The hero hesitates — showing stakes through resistance |
+| 4 | **Meeting the Mentor** | A guide equips the hero with what the ordeal will require |
+| 5 | **Crossing the Threshold** | The hero commits — the door closes on the ordinary world |
+| 6 | **Tests, Allies, Enemies** | The special world reveals itself through trials and bonds |
+| 7 | **Approach to the Inmost Cave** | Gathering courage for the ultimate challenge |
+| 8 | **The Ordeal** | The heart of the journey — the hero must be broken to be remade |
+| 9 | **Reward** | The hero claims what the ordeal produced |
+| 10 | **The Road Back** | Returning toward home — but something still pursues |
+| 11 | **Resurrection** | The final test — everything learned must be applied |
+| 12 | **Return with the Elixir** | The hero comes home changed, carrying a gift for others |
+
+**Best for:** Epic fantasy, adventure, coming-of-age, mythic drama, sci-fi, literary fiction, psychological fiction, historical fiction. Any story where the protagonist undergoes a fundamental identity transformation.
+
+**Core principles:**
+- **The journey is circular, not linear.** The hero returns — this is not optional. The return and elixir are the point.
+- **The mentor exists to be lost.** The hero must face the ordeal without them. Everything given must be internalized.
+- **The ordeal is a death, not a difficulty.** The hero's old self cannot survive it. Something must be surrendered.
+- **The elixir is specific to the ordeal.** If the ordeal was about pride, the elixir is humility. If isolation, the elixir is belonging.
+- **The special world mirrors the ordinary world.** Every trial, ally, and enemy reflects something unresolved at home.
+
+**Discovery question:** *Who is the hero, what is their deepest wound or flaw, and what must they ultimately sacrifice or surrender to be transformed?*
+
+**How to answer the discovery question:**
+- **Identify the wound or flaw.** What is broken before the story starts? Example: *"Simba carries false guilt — he believes he killed his father."* Or: *"Luke is defined by limitation — a farm boy who can't escape Tatooine."*
+- **Identify the sacrifice.** What must be surrendered for transformation? Example: *"Simba must surrender his exile identity and face the truth."* Or: *"Luke must surrender rational control and trust the Force — the thing he cannot see or prove."*
+
+**Example A — Star Wars: A New Hope (Epic Adventure):**
+- **Ordinary World:** Luke is a restless farm boy on Tatooine. *Tone: Longing and limitation.*
+- **Call:** R2-D2 carries Leia's message. **Refusal:** Luke cites obligations. **Mentor:** Obi-Wan reveals the Force, gives Luke a lightsaber.
+- **Threshold:** His aunt and uncle are murdered. He boards the Falcon. Nothing to return to.
+- **Tests:** Death Star infiltration, bonds with Han and Chewie. **Approach:** Moving toward Vader.
+- **Ordeal:** Obi-Wan sacrifices himself. Luke's mentor dies before his eyes. *The farm boy is transformed by loss.*
+- **Reward:** They escape with Leia and the schematics. **Road Back:** Racing to the Rebel base.
+- **Resurrection:** Luke turns off his targeting computer and trusts the Force. The Death Star explodes.
+- **Elixir:** Luke stands decorated. He carries the Force, his mentor's memory, and knowledge of who he is.
+- *Transformation: A boy defined by what he could not become discovers that becoming requires loss — and what is lost becomes the gift he carries forever.*
+
+**Example B — The Lion King (Animated Mythology):**
+- **Ordinary World:** Simba is a carefree cub, destined for the throne. *Tone: Joy and inherited destiny.*
+- **Call:** Mufasa teaches kingship. **Refusal:** After Scar engineers Mufasa's death, Simba flees in shame.
+- **Mentor:** Timon and Pumbaa offer avoidance (Hakuna Matata). The true mentor is Rafiki, who leads Simba to Mufasa's ghost.
+- **Ordeal:** Mufasa's ghost: *"You have forgotten who you are."* Simba must face the lie, accept he didn't kill his father, and choose to return. *The exile must die for the king to be born.*
+- **Resurrection:** Simba battles Scar, learns the truth, and stands atop Pride Rock in the rain.
+- **Elixir:** Simba roars. The rains return. The Circle of Life is restored.
+- *Transformation: A child who fled responsibility discovers his identity was never taken — only abandoned — and reclaiming it heals more than himself.*
+
+**Example C — Harry Potter and the Philosopher's Stone (Coming-of-Age Fantasy):**
+- **Ordinary World:** Harry lives in a cupboard under the stairs, invisible and unloved. *Tone: Quiet suffering.*
+- **Call:** Hogwarts letters arrive relentlessly. **Refusal:** The Dursleys suppress them. **Mentor:** Hagrid delivers the truth; Dumbledore guides from afar.
+- **Threshold:** Harry walks through Platform 9¾. The Muggle world disappears. *The first breath of belonging.*
+- **Ordeal:** Harry faces Quirrell/Voldemort. His survival is explained not by power but by love — his mother's sacrifice.
+- **Elixir:** Harry returns to the Dursleys — same house, same address — but entirely different. He carries magic, friendship, and the knowledge of his own worth.
+- *Transformation: A child made invisible discovers he was always seen — by the world that needed him, the mother who died for him, and the friends who chose him.*
+
+**Sample prompt:**
+```
+Brainstorm a book using The Hero's Journey called "The Cartographer's Daughter."
+Genre slug: historical-time-travel. 12 chapters.
+Hero: A Victorian cartographer's daughter who discovers her father's maps encode
+coordinates to places in different time periods. Her wound is her need to control
+everything. Her sacrifice: surrendering certainty to navigate the unknown.
+Mentor: Her father's journal — guidance from a man who is already gone.
+Elixir: The understanding that the map is not the territory.
+Themes: discovery, letting go, trust.
+```
+
+**Voice:**
+> "Brainstorm a story using the Hero's Journey called 'The Last Warden.' It's about a park ranger in a post-apocalyptic national forest who discovers the trees are sentient. His wound is isolation — he chose the wilderness to avoid people. His sacrifice is leaving the forest to warn the settlements. The elixir is connection. Genre post-apocalyptic. Ten chapters."
+
+---
+
+#### Dan Harmon's Story Circle
+
+An 8-step character transformation framework inspired by the Hero's Journey but stripped to its essential engine: a character in a comfort zone wants something, enters an unfamiliar situation, adapts, gets what they wanted, pays a price, and returns changed. The power of the Story Circle is its focus on *internal* change — the plot exists to transform the character.
+
+**How it works:** Steps 1-4 move the character from safety into chaos. Steps 5-8 deliver the cost and return. The key insight is that Steps 1 and 8 mirror each other — the character ends in the same physical place but is a fundamentally different person. Steps 2 and 6 also mirror: what the character *wanted* (Step 2) is answered by what they *paid* (Step 6).
+
+**Best for:** Character-driven fiction, literary fiction, single-episode arcs, stories about relationships, grief, addiction, identity. Any narrative where the *real* story is what changes inside the character, not what happens around them.
+
+**Discovery question:** *What does the character think they want, and what do they actually need to become whole?*
+
+This question is the engine of the entire circle. The *want* drives the first half (Steps 1-4); the *need* is revealed in the second half (Steps 5-8).
+
+**How to answer the discovery question:**
+- **Identify the want.** What does the character consciously pursue? It should be concrete and sympathetic — the reader should understand why they want it. Example: *"He wants to win back his ex-wife. He believes if he can just prove he's changed, she'll come back."*
+- **Identify the need.** What does the character actually need to become whole — which is usually something they resist or don't even recognize? Example: *"He needs to stop defining himself through relationships entirely. He needs to learn to be alone without it meaning he's failed."*
+- **The gap between want and need is the story.** The character pursues the want, achieves it (or a version of it), and discovers it doesn't fill the hole. Only then do they confront what they actually need.
+
+**Example uses:**
+- A recently widowed grandmother enrolls in a pottery class to "stay busy." She *wants* distraction from grief. She *needs* to create something new that belongs to her alone — not to her marriage, not to her children. Step 5 (gets what she wanted): her family praises her pottery as therapeutic. Step 6 (pays a price): she realizes they're patronizing her, and she smashes the piece they liked most. Step 8 (changed): she starts making ugly, beautiful things no one understands — and she is finally free. (Literary Fiction / Metaphysical Romance)
+- A corporate whistleblower *wants* to expose the company and be vindicated as a hero. He *needs* to accept that doing the right thing may cost him everything and no one will thank him. (Thriller / Drama)
+- A competitive chess prodigy *wants* to win the national championship. She *needs* to learn that her worth isn't determined by whether she wins — and the person who teaches her this is the opponent she most fears. (Coming-of-Age / Literary)
+
+**Sample prompt:**
+```
+Brainstorm a story using Dan Harmon's Story Circle called "The Potter's Wheel."
+Genre slug: metaphysical-romance. 8 chapters.
+Premise: A recently widowed grandmother enrolls in a pottery class and discovers that
+what she thought was distraction from grief is actually the first thing she's done for
+herself in fifty years. She wants comfort; she needs creation.
+Themes: grief, identity after loss, creation as healing, late-life independence.
+```
+
+**Voice:**
+> "Brainstorm a story using Dan Harmon's Story Circle called 'The Comeback.' It's about a retired boxer who opens a gym in his old neighborhood. He thinks he wants to train a champion. What he actually needs is to forgive himself for the fight he threw twenty years ago. Genre metaphysical-romance. Six chapters."
+
+---
+
+#### In Medias Res
+
+Latin for "in the middle of things" — this is a narrative entry technique rather than a full arc. The story opens at a moment of high tension, action, or crisis with no setup. Backstory, context, and character history are revealed gradually through flashback, dialogue, and embedded exposition as the forward narrative unfolds.
+
+**How it works:** You construct two layers simultaneously. Layer 1 is the Entry Scene — the most gripping, disorienting, or emotionally charged moment in the story. The reader should *not* fully understand what is happening. Layer 2 is the Underlying Chronology — the full timeline built separately, with backstory revealed at precisely the moments the reader most wants or needs that context. Each revelation should raise new questions, not just answer old ones.
+
+**Best for:** Thrillers, mysteries, literary fiction, crime fiction, any story where withholding context creates tension. Especially powerful for stories with secrets, betrayals, or dual timelines.
+
+**Discovery question:** *What is the single most intense or consequential moment in this story — the one that, if witnessed without context, would demand explanation?*
+
+**How to answer the discovery question:**
+- **Look for the moment of maximum tension.** Not the climax necessarily — the moment that is most confusing, alarming, or emotionally raw when stripped of context. Example: *"A woman is boarding a flight under a name that is not hers, carrying a hard drive she has not looked at."* The reader's immediate questions — *Whose name? What's on the drive? Who is she running from?* — are the engine of the story.
+- **Test it:** If a stranger witnessed this moment with no context, would they need an explanation? If yes, it works.
+
+**Example story seeds (from the arc prompt):**
+- Opens: a woman is boarding a flight under a name that is not hers, carrying a hard drive she has not looked at. The story works backward to explain what she found, who she is running from, and whether the person she is protecting knows she exists. (Espionage Thriller)
+- Opens: a surgeon is mid-operation when the power goes out across the city. The rest of the story — told in forward and backward layers — reveals this was not an accident, and she is the reason the city went dark. (Medical Thriller)
+- Opens: two brothers are burying something in the woods at 3 a.m. Neither speaks. The story unfolds in the hours and years before this moment, and the final chapter returns to the woods. (Crime / Literary Fiction)
+- Opens: a translator at a war crimes tribunal freezes mid-session, unable to render a single sentence. The story moves into her past — what she lived through, what she agreed to forget, and what the defendant just said that ended that agreement. (Literary Historical Fiction)
+- Opens: an astronaut on a routine repair walk outside the station realizes there is no one left inside. The story is told in recovered logs, moving backward until the reader knows exactly how it happened — and forward until we know if she survives. (Science Fiction Thriller)
+
+**Sample prompt:**
+```
+Brainstorm a story using In Medias Res called "The Tribunal."
+Genre slug: historical-time-travel. 10 chapters.
+Premise: Opens with a translator at a war crimes tribunal who freezes mid-session,
+unable to render a single sentence. The story reveals what she lived through, what
+she agreed to forget, and what the defendant just said that broke the agreement.
+The most intense moment: the freeze — witnessed by cameras, judges, and the defendant.
+Themes: memory, complicity, the cost of silence, justice vs. mercy.
+```
+
+**Voice:**
+> "Brainstorm a story using In Medias Res called 'The Hard Drive.' It's an espionage thriller about a woman boarding a flight under a fake name, carrying a hard drive she hasn't looked at. The opening is her in the airport. The story works backward to explain everything. Genre political-scifi. Eight chapters."
+
+---
+
+#### Seven-Point Structure
+
+Dan Wells' framework built *backward* from the ending. You start with the Resolution — where does the story end? — then design each earlier point to make that ending feel inevitable. Seven pivotal moments anchor the entire narrative.
+
+**How it works:** The seven points are designed as mirror pairs. The Hook (protagonist's starting state) is the *opposite* of the Resolution (their ending state). The First and Second Plot Points are the major turning points. The two Pinch Points apply pressure from the antagonistic force. The Midpoint is where the protagonist shifts from reactive to proactive.
+
+**Best for:** Plot-driven stories, thrillers, mystery, genre fiction with tight pacing. Especially effective when you know your ending and need to reverse-engineer a satisfying path to it.
+
+**Discovery question:** *What is the Resolution — where does this story end and who has your protagonist become?*
+
+**How to answer the discovery question:**
+- **Start with the ending.** What is the final image or outcome? Then define the Hook as its opposite. Example: Resolution: *"She stands in front of a congressional committee and tells the truth, knowing it will destroy her career."* Hook: *"She is the most careful, image-conscious person in the agency — someone who has never told an inconvenient truth in her life."*
+- **The transformation between Hook and Resolution IS the story.** Every other point exists to move the character from one state to the other.
+
+**Example story seeds (from the arc prompt):**
+- A mercenary who only takes jobs she can walk away from is hired to extract a child from a compound — and realizes on arrival that the child does not want to leave, and the compound is not what the client described. (Action Thriller)
+- A mute archivist in a post-collapse settlement is the only person who can read the old-world documents that contain the location of a clean water source — and the settlement's warlord wants the information without letting her survive the translation. (Dystopian Fiction)
+- A documentary filmmaker following a wrongful conviction case slowly realizes the subject of his film is not innocent — and that he has already destroyed three lives advocating for her release. (Crime Drama)
+- A royal cartographer is ordered to map a disputed border in a way that will trigger a war she knows will be catastrophic. Every map she draws is a choice. Every choice has a witness. (Epic Fantasy / Political)
+- A child psychologist is assigned a case involving a six-year-old who describes in perfect detail a murder that has not yet been reported to police. (Psychological Thriller)
+
+**Sample prompt:**
+```
+Brainstorm a story using Seven-Point Structure called "The Extraction."
+Genre slug: post-apocalyptic. 10 chapters.
+Premise: A mercenary who only takes jobs she can walk away from is hired to extract
+a child from a compound. She discovers the child doesn't want to leave and the
+compound isn't what the client described.
+Resolution: She refuses the extraction, exposes the client, and stays to defend the compound.
+Hook: She is someone who never stays — for anyone, for any reason.
+Themes: commitment, chosen family, the difference between rescue and control.
+```
+
+**Voice:**
+> "Brainstorm a story using Seven-Point Structure called 'The Archivist.' It's about a mute archivist in a post-collapse settlement who is the only one who can read old-world documents. The resolution is she translates the documents but hides the real location, giving the warlord a false one. Genre post-apocalyptic. Eight chapters."
+
+---
+
+#### Kishōtenketsu
+
+A four-act East Asian narrative framework that builds emotional resonance through **contrast and revelation rather than conflict**. Rooted in Chinese poetry (*qǐ chéng zhuǎn hé*) and Japanese storytelling, Kishōtenketsu does not default to Western conventions like rising tension, antagonists, or climactic battles. Instead, it guides the writer through four gentle but powerful acts.
+
+**The Four Acts:**
+
+| Act | Japanese | Role | Principle |
+|-----|----------|------|-----------|
+| **Ki** | 起 | Introduction | Invite. Set. Breathe. No conflict. No urgency. Pure presence. |
+| **Shō** | 承 | Development | Deepen. Layer. Widen the lens. Let the world grow more specific. |
+| **Ten** | 転 | Twist / Turn | Turn. Surprise. Reframe. Not a fight — a revelation. |
+| **Ketsu** | 結 | Conclusion | Reflect. Echo. Resonate. End with an image, not an answer. |
+
+**How each act works:**
+- **Ki:** Introduce the world, character, or concept. No urgency. No problem to solve. Just presence. Establish mood and setting. The reader should feel invited in, not pulled.
+- **Shō:** Deepen what was introduced. Add texture, repetition, quiet complexity. This is not a rising action — it is a widening lens. The character or world grows more specific, more layered.
+- **Ten:** Introduce something unexpected — but not an attack on what came before. A new perspective, a contrast, a surprise arrival, a realization, a detail that was always there but unseen. This act re-contextualizes everything before it without destroying it.
+- **Ketsu:** Do not tie things up neatly. Let the four acts reflect each other. The reader should feel a quiet "aha" — not answers, but resonance. The ending should echo the beginning in a new light.
+
+**Best for:** Literary fiction, slice-of-life, memoir, personal essay, fables, children's stories, contemplative narratives, quiet fiction, family stories, environmental writing, gentle fantasy, magical realism, philosophical fiction. Any story where the point is not *what happens* but *how what happens changes the way we see*.
+
+**Core principles:**
+- **Contrast, not conflict.** The Ten act surprises — it doesn't attack. Something is reframed, not broken.
+- **Observation over action.** Characters notice, witness, feel. They do not fight.
+- **Silence is content.** What characters don't say or do is where meaning lives.
+- **The callback earns the ending.** Ketsu lands because it echoes Ki. Plant images early. Let them return changed.
+- **Restraint is the highest craft move.** Less resolution, more resonance. Don't explain the emotional impact — let the reader feel it.
+- **Pacing is breath, not heartbeat.** Ki and Shō should feel slow. Ten should feel like a quiet inhale. Ketsu like a long exhale.
+
+**Discovery question:** *What two contrasting ideas, images, or situations does this story want to hold together?*
+
+This question defines the Ten — the heart of the structure. The contrast is not a conflict; it is a juxtaposition that creates meaning through proximity.
+
+**How to answer the discovery question:**
+- **Think in pairs.** What two things, placed side by side, create something neither has alone? Example: *"A dying language and a child who is leaving."* The language is dying; the child is leaving; neither is the cause of the other — but together they create an ache that neither could alone.
+- **Avoid conflict framing.** Don't think "what goes wrong" — think "what unexpected thing, placed next to this, changes its meaning?" Example: *"The garden is thriving. The land has been sold."* The garden's beauty isn't threatened by a villain — it's recontextualized by impermanence.
+- **The Ketsu resolves through integration, not victory.** The ending doesn't fix the contrast; it holds both truths at once. Example: *"She harvests the garden anyway and gives the food away freely."*
+
+**Genre-specific guidance:**
+
+| Format | Ki | Shō | Ten | Ketsu |
+|--------|-----|------|------|--------|
+| **Short Story** | Single scene | One thread of depth — no new characters or locations | A single sentence or gesture | One paragraph. Constraint is the friend. |
+| **Novel Chapter** | Re-ground the reader in the world | Deepen one relationship or theme | One piece of information or image that changes how we read backward | Close on an image, not a summary |
+| **Full Book** | Each chapter carries its own arc | The book as a whole also follows the four acts | The macro Ten happens in the second half, not at the climax | Let the book's Ketsu echo its Ki |
+| **Memoir / Essay** | Set the scene simply | Build texture through memory and observation | A moment of perspective shift — not dramatic, just reframing | Let the reader sit with it |
+
+**Example A — Literary Fiction (Melancholy / Longing):**
+- **Ki:** An elderly woman tends her small balcony garden every morning, watering the same four pots in the same order.
+- **Shō:** The small textures of her life emerge through routine — sounds from the street below, neighbors she observes but never meets, lavender that blooms too briefly each year.
+- **Ten:** One morning she finds a hand-written note tucked beneath one of the pots. It reads: "Your garden is the first thing I see each day. Thank you." There is no name.
+- **Ketsu:** She waters the plants more slowly now. She doesn't look for who wrote it. She just tends the garden a little longer than she used to.
+- *Emotional effect: Invisible connection. The quiet ways we touch each other without knowing.*
+
+**Example B — Memoir / Personal Essay (Belonging):**
+- **Ki:** A young man arrives in a new city for the first time. He walks through a market, overwhelmed and anonymous.
+- **Shō:** Over weeks, small rituals form — the same coffee cart, the same bench, the same shortcut. He starts to feel the city's rhythm.
+- **Ten:** One afternoon, a stranger stops him and asks for directions. He knows exactly where to send them.
+- **Ketsu:** He walks on. He doesn't think about being from somewhere else anymore.
+- *Emotional effect: Belonging isn't declared — it arrives quietly, like knowing the way.*
+
+**Example C — Novel Chapter (Grief / Memory):**
+- **Ki:** A father and his teenage son drive in silence through the countryside to scatter the mother's ashes.
+- **Shō:** They stop at a roadside diner she loved. They order what she would have ordered. They barely speak.
+- **Ten:** The son pulls out his phone and plays a voice memo — her laughing at something no one remembers now.
+- **Ketsu:** They sit with it for a long time. When they leave, the father doesn't turn the radio on. Neither does the son. The silence feels different now.
+- *Emotional effect: Grief isn't an obstacle — it's a shared space two people learn to live inside together.*
+
+**Additional story seeds:**
+- An elderly calligrapher spends her mornings teaching a young girl the names of birds in a dying dialect. In the Ten, we learn the girl is moving to another country in a week and has not told her teacher. The Ketsu is a single morning of writing — the last lesson, which neither of them acknowledges as such. (Quiet Literary Fiction)
+- A community of neighbors tends a shared garden over the course of one growing season. The Ten reveals the land has been sold, the garden will be demolished in spring. The Ketsu is the harvest — gathered anyway, given away freely. (Slice-of-Life)
+- A traveling repairman fixes clocks, radios, and mechanical toys in a small mountain village. The Ten: he arrives to find the village has gone completely digital — nothing left to fix. The Ketsu: a child shows him a broken kite. (Fable / Magical Realism)
+- A marine biologist documents a reef slowly recovering after bleaching. The Ten introduces footage from the same reef 60 years earlier — thriving, abundant, unrecognizable. The Ketsu is a single photograph she takes on her last dive of the season. (Literary Environmental Fiction)
+- A grandmother teaches her granddaughter to make dumplings every winter. The Ten: the granddaughter, now grown, attempts the recipe alone for the first time in a foreign city. The Ketsu: she calls, not to ask for the recipe, but to describe how her kitchen smelled. (Family / Quiet Fiction)
+
+**Sample prompt:**
+```
+Brainstorm a story using Kishōtenketsu called "The Bird Names."
+Genre slug: metaphysical-romance. 4 chapters.
+Premise: An elderly calligrapher teaches a young girl the names of birds in a dying
+dialect every morning. The contrast: the girl is moving to another country in a week
+and hasn't told her teacher. The reconciliation is their last lesson together.
+Themes: language, impermanence, unspoken love, the weight of what we don't say.
+```
+
+**Voice:**
+> "Brainstorm a story using Kishōtenketsu called 'The Garden.' It's about neighbors who tend a shared garden for a season. The contrast is the land has been sold and the garden will be demolished. The reconciliation is they harvest it anyway and give the food away. Genre metaphysical-romance. Four chapters."
+
+---
+
+#### Fichtean Curve
+
+A plot structure built around one central principle: **keep the tension rising**. Named after German philosopher Johann Gottlieb Fichte and popularized by John Gardner in *The Art of Fiction* (1983), the Fichtean Curve eliminates slow exposition and drops readers directly into conflict. It builds through three escalating crises — each more intense than the last — toward a climax, then closes with a short, impactful resolution. Backstory and character development are revealed on the move, woven into the action rather than front-loaded.
+
+**The Structure:**
+
+| Beat | Role | Principle |
+|------|------|-----------|
+| **Opening** | In medias res | Drop in. Already in tension. No setup, no intro. Move. |
+| **First Crisis** | Initial escalation | Raise the stakes. Force a decision. No return to normal. |
+| **Mini-Resolution** | Brief exhale | Reveal. Plant. Deepen. Keep moving. |
+| **Second Crisis** | Escalation | More personal. More costly. Something breaks. |
+| **Mini-Resolution** | Regroup | Add weight. Don't stop. |
+| **Third Crisis** | Breaking point | Everything collapses. The darkest moment. Earn the climax. |
+| **Climax** | Highest tension | Inevitable. Surprising. Everything has led here. |
+| **Resolution** | Short and final | Brief. Weighted. One image. Done. |
+
+**Best for:** Thrillers, mysteries, action-adventure, dark drama, survival stories, horror, crime fiction, heist narratives. Any story where momentum and escalating stakes are the engine.
+
+**Core principles:**
+- **Start in the middle.** If you can cut the first paragraph and the story still works, cut it.
+- **Escalation is not repetition.** Each crisis must cost more than the last — physically, emotionally, or morally.
+- **Backstory is earned, not given.** The reader learns who the character is by watching them act under pressure.
+- **Mini-resolutions are active.** The protagonist is regrouping, making decisions, learning — not resting.
+- **The climax must be prepared.** Every crisis plants something the climax will use.
+- **Resolution earns its brevity.** The reader has been running. End it cleanly.
+
+**Discovery question:** *What is the protagonist's greatest fear — and at what moment in this story will they be forced to face it with no options left?*
+
+**How to answer the discovery question:**
+- **Identify the fear.** Not a surface fear (spiders, heights) but a deep one — failure, exposure, losing someone, being proven wrong, becoming the thing they fight against. Example: *"She fears that her competence is an illusion — that when it really matters, she'll freeze."*
+- **Identify the moment.** The third crisis is where this fear is realized. Everything the protagonist has relied on is stripped away, and they must face the thing they've been running from. Example: *"The storm hits, the boy collapses, and the stranger is still following. She has no plan, no radio, no shelter. Only instinct."*
+
+**Genre-specific guidance:**
+
+| Genre | Crisis 1 strips... | Crisis 2 strips... | Crisis 3 strips... | Climax is... |
+|-------|-------|-------|-------|-------|
+| **Thriller / Mystery** | Their plan | Their allies | Their sense of what is true | Confrontation with the truth |
+| **Survival** | The body | The resources | The will to continue | Decision: live or surrender |
+| **Crime / Heist** | A complication | A betrayal | Total collapse | The improvised move nobody planned |
+| **Chapter in a novel** | One assumption | One relationship | One certainty | The choice that defines the next chapter |
+
+**Example A — Survival Thriller:**
+- **Opening:** A wilderness guide regains consciousness facedown in snow. Her radio is smashed. The group she was leading is gone. She has no memory of the last four hours.
+- **First Crisis:** She finds one survivor — a teenage boy, hypothermic and terrified. They must move or die, but he cannot walk without help.
+- **Mini-Resolution:** While carrying him, she finds her emergency pack. She also finds a compass that isn't hers — engraved with initials that match her missing co-guide.
+- **Second Crisis:** They reach the emergency shelter to find it has been deliberately destroyed from the inside.
+- **Mini-Resolution:** The boy reveals he saw a figure in the group who wasn't part of the hiking party.
+- **Third Crisis:** A storm rolls in. The boy collapses. She realizes the stranger is still nearby — following their tracks.
+- **Climax:** She confronts the stranger in a whiteout, with the boy's life depending on what she does in the next thirty seconds.
+- **Resolution:** She gets the boy out. She never learns the stranger's name. She never goes back to guiding.
+- *Emotional arc: Competence stripped away by the unknown — until survival requires trusting instinct over knowledge.*
+
+**Example B — Psychological Crime Drama:**
+- **Opening:** A defense attorney is mid-cross-examination when she realizes her client is lying — not about the crime, but about who the victim was to him.
+- **First Crisis:** She discovers evidence her own firm buried — evidence that would have changed the entire case.
+- **Mini-Resolution:** Her senior partner confirms it. He tells her the client is more dangerous than she knows — and that she is already implicated.
+- **Second Crisis:** The prosecution calls an unexpected witness — someone who shouldn't exist according to everything her client told her.
+- **Mini-Resolution:** The testimony reveals the crime is connected to a case her firm handled three years ago. A case she worked on.
+- **Third Crisis:** Her client sends a message from the holding cell making clear he knows about her involvement — and will use it if she doesn't throw the case.
+- **Climax:** She stands up in court, mid-trial, and does something no one in the room expects.
+- **Resolution:** She loses her license. She sleeps fine.
+- *Emotional arc: A professional identity built on the system — dismantled by the system — reclaimed through one unambiguous choice.*
+
+**Example C — Action Chapter (Chapter-Level Arc):**
+- **Opening:** The chapter begins with the protagonist already in a building she was told was empty. It is not empty.
+- **First Crisis:** The contact she came to meet is dead. His body is still warm.
+- **Mini-Resolution:** She finds a phone in his jacket. One unsent message.
+- **Second Crisis:** The building's exits are being covered. Someone knew she was coming.
+- **Mini-Resolution:** She hides in a service corridor and thinks through who knew the location — three people, all trusted.
+- **Third Crisis:** One of those three people appears at the end of the corridor, armed.
+- **Climax:** The confrontation — everything has narrowed to this doorway, this person, this choice.
+- **Resolution:** She is through the exit, injured. The name is confirmed. The next chapter opens running.
+- *Emotional arc: Trust as infrastructure — and the specific moment it fails.*
+
+**Sample prompt:**
+```
+Brainstorm a story using Fichtean Curve called "The Whiteout."
+Genre slug: post-apocalyptic. 10 chapters.
+Premise: A wilderness guide regains consciousness in snow with no memory of the last
+four hours. Her group is gone, her radio is smashed, and there is one survivor — a
+teenage boy who can't walk. Someone is following them.
+Greatest fear: Her competence is an illusion. When it really matters, she'll freeze.
+Themes: survival, trust, instinct vs. training, the unknown.
+```
+
+**Voice:**
+> "Brainstorm a story using the Fichtean Curve called 'The Defense.' It's about a defense attorney who discovers mid-trial that her client is lying and her own firm buried evidence. Her greatest fear is that she's been complicit all along. Genre political-scifi. Eight chapters."
+
+---
 
 ### List Story Arcs
 
@@ -467,7 +997,7 @@ value. Themes: preservation, sacrifice, legacy, nature vs. human destruction.
 
 ### 10.2 Brainstorm With a Story Arc
 
-Pass the arc name in your prompt. The AI follows that arc's structural rules exactly.
+Pass the arc name in your prompt. The AI follows that arc's structural rules exactly. If the arc has a **discovery question**, Eve will ask it before brainstorming — your answer becomes the foundation of the outline.
 
 **Chat — Freytag's Pyramid:**
 ```
@@ -488,11 +1018,87 @@ ad campaigns but the behavior of the humans running them.
 Themes: autonomy, manipulation, the ethics of optimization.
 ```
 
+**Chat — The Hero's Journey:**
+```
+Brainstorm a book using The Hero's Journey called "The Cartographer's Daughter."
+Genre slug: historical-time-travel. 12 chapters.
+Premise: A Victorian-era cartographer's daughter discovers her father's maps contain
+encoded coordinates to places that exist in different time periods. Her flaw is her
+need to control everything — she must sacrifice certainty to navigate the unknown.
+Themes: discovery, letting go, the map is not the territory.
+```
+
+**Chat — Dan Harmon's Story Circle:**
+```
+Brainstorm a story using Dan Harmon's Story Circle called "The Potter's Wheel."
+Genre slug: metaphysical-romance. 8 chapters.
+Premise: A recently widowed grandmother enrolls in a pottery class and discovers that
+what she thought was distraction from grief is actually the first thing she's done for
+herself in fifty years. She wants comfort; she needs creation.
+Themes: grief, identity after loss, creation as healing, late-life independence.
+```
+
+**Chat — In Medias Res:**
+```
+Brainstorm a story using In Medias Res called "The Tribunal."
+Genre slug: historical-time-travel. 10 chapters.
+Premise: Opens with a translator at a war crimes tribunal who freezes mid-session.
+The most intense moment: the freeze — witnessed by cameras, judges, and the defendant.
+Themes: memory, complicity, the cost of silence, justice vs. mercy.
+```
+
+**Chat — Seven-Point Structure:**
+```
+Brainstorm a story using Seven-Point Structure called "The Extraction."
+Genre slug: post-apocalyptic. 10 chapters.
+Resolution: She refuses the extraction, exposes the client, and stays to defend the compound.
+Hook: She is someone who never stays — for anyone, for any reason.
+Themes: commitment, chosen family, the difference between rescue and control.
+```
+
 **Voice — Freytag's Pyramid:**
 > "Brainstorm a short story using Freytags Pyramid about a Roman consul who discovers a conspiracy during the fall of the Republic. Call it 'The Consulship of Gaius Varro.' Genre ancient-history. Themes: duty, betrayal, the cost of power."
 
 **Voice — Three-Act Structure:**
 > "Help me brainstorm a book using the three-act structure called 'The Correction.' It's about a time traveler who goes back to prevent the assassination of Archduke Franz Ferdinand but discovers the timeline resists change. Genre historical-time-travel. Ten chapters."
+
+**Voice — The Hero's Journey:**
+> "Brainstorm a story using the Hero's Journey called 'The Last Warden.' It's about a park ranger in a post-apocalyptic national forest who discovers the trees are sentient. His flaw is isolation. His sacrifice is leaving the forest to warn the settlements. Genre post-apocalyptic. Ten chapters."
+
+**Voice — Dan Harmon's Story Circle:**
+> "Brainstorm a story using Dan Harmon's Story Circle called 'The Comeback.' It's about a retired boxer who opens a gym. He thinks he wants to train a champion. What he actually needs is to forgive himself for the fight he threw twenty years ago. Genre metaphysical-romance. Six chapters."
+
+**Voice — In Medias Res:**
+> "Brainstorm a story using In Medias Res called 'The Hard Drive.' It's an espionage thriller about a woman boarding a flight under a fake name, carrying a hard drive she hasn't looked at. Genre political-scifi. Eight chapters."
+
+**Voice — Seven-Point Structure:**
+> "Brainstorm a story using Seven-Point Structure called 'The Archivist.' A mute archivist in a post-collapse settlement who can read old-world documents. The resolution is she hides the real location and gives the warlord a false one. Genre post-apocalyptic. Eight chapters."
+
+**Chat — Kishōtenketsu:**
+```
+Brainstorm a story using Kishōtenketsu called "The Bird Names."
+Genre slug: metaphysical-romance. 4 chapters.
+Premise: An elderly calligrapher teaches a young girl the names of birds in a dying
+dialect every morning. The contrast: the girl is moving to another country in a week
+and hasn't told her teacher. The reconciliation is their last lesson together.
+Themes: language, impermanence, unspoken love, the weight of what we don't say.
+```
+
+**Voice — Kishōtenketsu:**
+> "Brainstorm a story using Kishōtenketsu called 'The Garden.' It's about neighbors who tend a shared garden for a season. The contrast is the land has been sold and the garden will be demolished. The reconciliation is they harvest it anyway. Genre metaphysical-romance. Four chapters."
+
+**Chat — Fichtean Curve:**
+```
+Brainstorm a story using Fichtean Curve called "The Whiteout."
+Genre slug: post-apocalyptic. 10 chapters.
+Premise: A wilderness guide regains consciousness in snow with no memory of the last
+four hours. Her group is gone, her radio is smashed, and there is one survivor.
+Greatest fear: Her competence is an illusion. When it really matters, she'll freeze.
+Themes: survival, trust, instinct vs. training, the unknown.
+```
+
+**Voice — Fichtean Curve:**
+> "Brainstorm a story using the Fichtean Curve called 'The Defense.' A defense attorney discovers mid-trial that her client is lying and her firm buried evidence. Her greatest fear is that she's been complicit all along. Genre political-scifi. Eight chapters."
 
 ### 10.3 Brainstorm Conversation Mode (Voice)
 
@@ -1108,10 +1714,13 @@ Every piece of content you create is saved as a draft. You can manage drafts thr
 
 ```
 Draft → Approved → Published
-          ↓
-       Scheduled (auto-publishes)
-          ↓
-       Rejected
+  ↓         ↓
+Scheduled  Rejected
+  ↓
+(auto-publishes)
+
+Any non-published status → Deleted → (undelete) → Draft
+Published items must be unpublished before deletion.
 ```
 
 **Status rules enforced automatically:**
@@ -1120,6 +1729,8 @@ Draft → Approved → Published
 - Only **draft or approved** items can be rejected or scheduled
 - Only **published** items can be unpublished
 - Only **scheduled** items can be unscheduled
+- Only **draft, approved, rejected, or scheduled** items can be deleted (unpublish first if published)
+- Only **deleted** items can be undeleted (restores to draft)
 
 Email notifications are sent automatically on every status change.
 
@@ -1282,7 +1893,78 @@ You receive an email notification whenever you:
 - **Reject** a draft
 - **Schedule** content
 - **Unschedule** content
+- **Delete** content
+- **Undelete** (restore) content
 - Content is **auto-published** by the scheduler
+
+### 18.13 Delete Content
+
+Soft-deletes an item. A version snapshot is automatically saved before deletion. Works on **draft**, **approved**, **rejected**, or **scheduled** items. Published items must be unpublished first.
+
+**Chat:**
+```
+Delete the draft titled "The Forgotten Engineers of Rome"
+```
+
+**Voice:**
+> "Delete that draft."
+> "Delete the blog post called 'The Forgotten Engineers of Rome.'"
+
+You receive an email notification when content is deleted.
+
+### 18.14 Undelete Content
+
+Restores a deleted item back to **draft** status.
+
+**Chat:**
+```
+Undelete "The Forgotten Engineers of Rome"
+```
+
+**Voice:**
+> "Undelete that story."
+> "Restore 'The Forgotten Engineers of Rome.'"
+
+You receive an email notification when content is restored.
+
+### 18.15 List Deleted Content
+
+Shows items that have been soft-deleted. You can optionally filter by content type.
+
+**Chat:**
+```
+Show my deleted content
+List my deleted blog posts
+```
+
+**Voice:**
+> "Show me my trash."
+> "What have I deleted?"
+> "Show me my deleted stories."
+
+Returns up to 20 deleted items, ordered by creation date.
+
+### 18.16 Email Any Saved Content
+
+Emails you a formatted copy of any content in your library — outlines, research reports, chapters, short stories, blog posts, or newsletters. Useful when you want to review content on your phone or share it.
+
+**Chat:**
+```
+Email me the outline for "The Seed Vault"
+Email me the short story about the Roman soldier
+Email me the research report on "Post-Apocalyptic Fiction Trends 2026"
+Email me chapter 1 of "The Seed Vault"
+```
+
+**Voice:**
+> "Email me the outline for The Seed Vault."
+> "Send me that short story by email."
+> "Can you email me the research report on post apocalyptic trends?"
+
+**What gets emailed:**
+- **Outlines** — JSON converted to structured HTML with characters and chapters sections (from writing_projects table)
+- **Research reports** — Markdown converted to HTML (from research_reports table)
+- **Chapters, short stories, blog posts, newsletters** — Markdown converted to HTML (from published_content table)
 
 ### Full Scenario: Content Library Lifecycle
 
@@ -1315,6 +1997,90 @@ You receive an email notification whenever you:
 > **You:** "Unpublish 'Why Post-Apocalyptic Fiction Matters.'"
 
 *Reverts to approved status. Email notification sent.*
+
+**Step 6 — Delete content:**
+
+> **You:** "Delete 'Why Post-Apocalyptic Fiction Matters.'"
+
+*Status changes to deleted. Version snapshot auto-saved before deletion. Email notification sent.*
+
+**Step 7 — Check deleted items:**
+
+> **You:** "Show me my trash."
+
+*Returns your list of deleted items.*
+
+**Step 8 — Restore if needed:**
+
+> **You:** "Undelete 'Why Post-Apocalyptic Fiction Matters.'"
+
+*Status changes back to draft. Email notification sent.*
+
+**Step 9 — Email content to yourself:**
+
+> **You:** "Email me the outline for 'The Seed Vault.'"
+
+*Formatted outline arrives in your inbox.*
+
+### 18.17 Format a Book for Kindle (KDP Manuscript)
+
+When your book project has all its chapters written, you can compile them into a Kindle-ready Word document (.docx). The system retrieves every chapter in order — including Prologue and Epilogue — formats them with proper KDP page dimensions, and emails you the manuscript as an attachment.
+
+**What you get:**
+- A `.docx` file formatted for Kindle Direct Publishing
+- **Title page** with your book's title
+- **Each chapter** starting on an odd (right-hand) page with a section break
+- **Chapter titles** in Heading 1 format (centered, Garamond 18pt bold)
+- **Body text** in Garamond 12pt with first-line indentation
+- Proper **page dimensions** matching your chosen KDP trim size
+- **Scene breaks** rendered as centered asterisks (✻ ✻ ✻)
+- **Bold** and **italic** formatting preserved from the original chapter content
+
+**Available KDP Page Sizes:**
+
+| # | Page Size | Best For |
+|---|-----------|----------|
+| 1 | 5 × 8 in | Compact fiction, novellas |
+| 2 | 5.06 × 7.81 in | Digest size |
+| 3 | 5.25 × 8 in | Standard paperback fiction |
+| 4 | 5.5 × 8.5 in | Popular fiction size |
+| 5 | 6 × 9 in | Standard fiction/non-fiction (**default**) |
+| 6 | 6.14 × 9.21 in | Royal format |
+| 7 | 6.69 × 9.61 in | Crown quarto |
+| 8 | 7 × 10 in | Technical/reference books |
+| 9 | 7.44 × 9.69 in | Wide reference |
+| 10 | 7.5 × 9.25 in | Textbook |
+| 11 | 8 × 10 in | Large format |
+| 12 | 8.25 × 11 in | Full-size reference |
+| 13 | 8.25 × 6 in | Landscape |
+| 14 | 8.25 × 8.25 in | Square format |
+| 15 | 8.27 × 11.69 in | A4 |
+| 16 | 8.5 × 11 in | US Letter |
+| 17 | 8.5 × 8.5 in | Large square |
+
+**Chat — Default size (6×9):**
+```
+Publish "The Seed Vault" for Kindle
+```
+
+**Chat — Specific size:**
+```
+Format "The Seed Vault" for Kindle in 5.5 by 8.5
+```
+
+**Voice — Default:**
+> "Publish my book The Seed Vault for Kindle."
+
+**Voice — With size selection:**
+> "Format The Seed Vault for Kindle. Use the 5 by 8 page size."
+
+Eve will show you the available page sizes and ask you to pick one if you don't specify. Once you choose, the system:
+
+1. Retrieves all chapters for the project (Prologue, Chapters 1-N, Epilogue) in order
+2. Builds the .docx with your selected page dimensions
+3. Emails the manuscript to you as an attachment
+
+**Tip:** Upload the .docx directly to your [KDP dashboard](https://kdp.amazon.com/) — it's ready to go.
 
 ---
 
@@ -2371,6 +3137,402 @@ Draft → Approved → Published
 
 ---
 
+### Scenario 13: Brainstorm a Story from Research — Eve Callback with Full Conversation (Voice)
+
+**Goal:** Research a topic, load the research into Eve's knowledge base via callback, then brainstorm a complete story outline interactively — walking through Eve's 4-step brainstorm conversation mode from seed idea to tool submission.
+
+**Why this matters:** This is the most powerful creative workflow in the system. It combines live research, Eve's knowledge base injection, outbound callback, and the full brainstorm conversation flow into a single session. Eve doesn't just take orders — she becomes a creative collaborator who references your actual research data while helping you shape a story.
+
+---
+
+#### Phase 1: Research First
+
+**Step 1 — Research the topic:**
+
+> **You:** "Research the current state of post-apocalyptic fiction in 2026. What are the trending themes, notable new releases, and how has the genre evolved since COVID? What are the hot Kindle keywords and bestsellers? Include citations."
+
+*Research returned with citations — climate fiction trends, solarpunk counternarratives, AI apocalypse surge, notable titles, Kindle category data.*
+
+**Step 2 — Save the research:**
+
+> **You:** "Save that research as a report called 'Post-Apocalyptic Fiction Trends 2026.' Genre slug post-apocalyptic."
+
+---
+
+#### Phase 2: Trigger the Callback
+
+**Step 3 — Ask Eve to load the research and call you back in brainstorm mode:**
+
+> **You:** "Load the research report on post-apocalyptic trends and call me back. Let's brainstorm a new story outline from it."
+
+*What happens behind the scenes:*
+1. Eve says "Let me pull that up... I'll call you right back."
+2. Eve fires `forward_writing_request` with "RETRIEVE AND CALLBACK" language, callback_mode=brainstorm
+3. The hub calls `retrieve_content` → finds your research report
+4. The hub calls `eve_knowledge_callback` → loads the research into Eve's knowledge base
+5. Old "Eve Session:" documents in the KB are cleaned up
+6. An outbound call is triggered to your phone
+7. Eve calls you back within ~30 seconds with the research loaded in her memory
+
+---
+
+#### Phase 3: Brainstorm Conversation (4 Steps)
+
+When Eve calls back, she enters **brainstorm conversation mode** — a creative collaboration, not a checklist interview. The conversation flows through four natural steps.
+
+**Step 4 — Eve opens with a brainstorm greeting and explores the seed idea (Step 1):**
+
+> **Eve:** "Hey love, I've got that research loaded up. Some really interesting stuff in here — climate fiction is merging with post-apocalyptic in a big way, and there's a whole wave of solarpunk counter-narratives pushing back against pure doom. Want me to hit the highlights, or should we start brainstorming right away?"
+
+> **You:** "Let's brainstorm. I'm interested in the climate fiction angle. What if there's a story about a coastal city that's been abandoned after rising seas, and a group goes back to salvage something important?"
+
+> **Eve:** "Oh, I love that. The research actually mentions that 'hopeful apocalypse' stories are trending — where it's not about survival, it's about what's worth saving. Your salvage mission fits that perfectly. What are they going back for? Is it data, seeds, art, people? The 'what' tells me everything about the themes."
+
+*Eve references specific data points from the research — she's not guessing, she's pulling from the report you loaded.*
+
+**Step 5 — Shape the concept (Step 2):**
+
+> **You:** "A seed bank. Like a local version of Svalbard. And the protagonist is a marine biologist who knows which seeds matter. Make it tragic — she should fail."
+
+> **Eve:** "A marine biologist protecting seeds in a drowned city... that's beautiful and brutal. Genre-wise, this is pure post-apocalyptic. For themes, I'm hearing preservation versus pragmatism, nature reclaiming what we stole, and the question of whether saving the future is worth dying for. The research mentioned that readers are responding to 'competence porn' in apocalypse fiction — characters who actually know things. Your marine biologist fits that trend perfectly."
+
+*Eve shapes the genre, premise, and themes naturally — she offers her own creative observations and connects them to the research.*
+
+**Step 6 — Structure the outline (Step 3):**
+
+> **You:** "Yeah, exactly. I want it to feel inevitable. She knows the seeds are humanity's best shot, but the city is falling apart around her."
+
+> **Eve:** "Then Freytags Pyramid is your arc, darling. Five acts ending in catastrophe — she rises, gets close, and it all comes apart. That inevitability you want? Freytag was built for it. The falling action is where the reader knows before she does that it's over. How long are you thinking — a short story or a full book?"
+
+> **You:** "A book. Eight chapters."
+
+> **Eve:** "Eight chapters with Freytag's tragic arc. And we need a title... Something about what's lost. 'The Drowned Garden'? It's got the seeds, the flooding, and the sense of something beautiful being destroyed."
+
+> **You:** "I love that. Use it."
+
+**Step 7 — Confirm and submit (Step 4):**
+
+> **Eve:** "Perfect. So here's what I've got... A book called 'The Drowned Garden.' Post-apocalyptic genre. Eight chapters following Freytags Pyramid. A marine biologist leads a salvage team back into a flooded coastal city to recover a seed bank — humanity's best genetic archive — but the city is collapsing and the mission is doomed from the start. Themes: preservation versus pragmatism, nature reclaiming civilization, whether saving the future is worth dying for. Ready for me to build this outline, or do you want to tweak anything?"
+
+> **You:** "That's perfect. Go for it."
+
+> **Eve:** "Done... I'll have that outline in your inbox shortly, sweetheart."
+
+*Eve calls `forward_writing_request` with:* "Brainstorm a book called 'The Drowned Garden'. Genre slug: post-apocalyptic. 8 chapters. Premise: A marine biologist leads a salvage team back into a flooded coastal city to recover a seed bank — humanity's best genetic archive — but the city is collapsing and the mission is doomed from the start. Themes: preservation versus pragmatism, nature reclaiming civilization, whether saving the future is worth dying for. Using Freytags Pyramid story arc."
+
+---
+
+#### Phase 4: After the Call
+
+**Step 8 — Outline arrives by email:**
+
+*Email contains:*
+- Title, premise, themes
+- Character profiles (name, role, arc, description)
+- 8 chapter breakdowns following Freytag's structure (Introduction, Rising Action, Climax, Falling Action, Catastrophe)
+- Research topics for each chapter
+
+*Outline saved to `writing_projects` with the full JSONB outline.*
+
+**Step 9 — Review the outline with Eve (optional):**
+
+> **You:** "Pull up the outline for 'The Drowned Garden' and call me back so we can review it."
+
+*Eve calls back in review mode. She walks through the outline chapter by chapter, identifies any structural weaknesses, and suggests refinements.*
+
+**Step 10 — Start writing:**
+
+> **You:** "Write chapter one of 'The Drowned Garden.' Genre post-apocalyptic. Chapter number one."
+
+*The system loads the stored outline, auto-researches the chapter's topics (flooded urban environments, seed bank biology), and writes the chapter. Email arrives with prose and cover art.*
+
+---
+
+#### What Makes This Workflow Special
+
+| Feature | What It Does |
+|---------|-------------|
+| **Research-loaded KB** | Eve doesn't brainstorm from generic knowledge — she references YOUR specific research data |
+| **4-step conversation** | Natural creative flow: explore → shape → structure → confirm |
+| **Story arc suggestion** | Eve recommends Freytag's Pyramid or Three-Act Structure based on your story's tone |
+| **Title suggestion** | Eve proposes an evocative working title if you don't have one |
+| **No premature submission** | Eve never calls the tool until you explicitly confirm |
+| **Seamless handoff** | The brainstormed outline feeds directly into chapter writing with auto-loaded outlines |
+
+---
+
+### Scenario 14: Write a Book Chapter — From Outline to Finished Prose
+
+This scenario covers the complete chapter writing process, from selecting a story arc through generating a chapter outline to producing a fully written, quality-checked chapter. This is the core creative workflow for book-length fiction.
+
+---
+
+#### Understanding Story Arcs
+
+A story arc is a structural framework that governs how your narrative is organized — what beats to hit, in what order, and what emotional progression to follow. The system has 8 story arcs, each designed for different kinds of stories:
+
+**Conflict-Driven Arcs (stories built around tension and transformation):**
+
+| Arc | How It Works | Best For |
+|-----|-------------|----------|
+| **Three-Act Structure** | Setup (25%) → Confrontation (50%) → Resolution (25%). Key beats: Inciting Incident at the start, Midpoint Shift in the center, Darkest Moment before the climax. | Any genre. The universal default. |
+| **Freytag's Pyramid** | Five acts: Exposition → Rising Action → Climax → Falling Action → Resolution. Climax is in the CENTER, not at the end. Acts IV and V handle consequences. | Tragedies, ensemble stories, moral dramas, stories where the fallout matters as much as the crisis. |
+| **The Hero's Journey** | 12 stages: Ordinary World → Call → Refusal → Mentor → Threshold → Tests → Inmost Cave → Ordeal → Reward → Road Back → Resurrection → Return with Elixir. | Epic fantasy, adventure, coming-of-age, any story about identity transformation. |
+| **Dan Harmon's Story Circle** | 8 steps in a circle: Comfort Zone → Want → Unfamiliar → Adapt → Get → Pay → Return → Changed. Steps 1 and 8 mirror each other. | Character-driven fiction, stories about internal change, relationship drama. |
+| **Seven-Point Structure** | Built BACKWARD from the Resolution: Hook → First Plot Point → First Pinch → Midpoint → Second Pinch → Second Plot Point → Resolution. | Plot-driven stories, tight pacing, stories where you know the ending first. |
+| **Fichtean Curve** | Opens in medias res, escalates through 3 crises with mini-resolutions between them, peaks at climax, closes with a short resolution. No slow beginning. | Thrillers, mysteries, action, survival, crime, horror. |
+| **In Medias Res** | Opens at the most intense moment, then reveals backstory through flashback and embedded exposition. Two layers: Entry Scene + Underlying Chronology. | Thrillers, literary fiction, stories with a shocking opening that demands explanation. |
+
+**Non-Conflict Arc:**
+
+| Arc | How It Works | Best For |
+|-----|-------------|----------|
+| **Kishōtenketsu** | Four parts: Ki (Introduction) → Shō (Development) → Ten (Twist/Contrast) → Ketsu (Reconciliation). NO conflict required. The Ten is a contrast or revelation, not an attack. | Literary fiction, slice-of-life, fables, children's stories, contemplative narratives, quiet fiction. |
+
+**Key concept: Book Arc vs. Chapter Arc**
+
+A book uses one story arc for its overall structure (e.g., The Hero's Journey across 12 chapters). But each individual chapter can use a DIFFERENT story arc for its internal structure (e.g., Chapter 3 uses the Fichtean Curve internally while still advancing the book's Hero's Journey). This gives you fine-grained control over pacing — a quiet chapter might use Kishōtenketsu while an action chapter uses Fichtean Curve, all within the same book.
+
+---
+
+#### The Chapter Writing Process (5 Steps)
+
+```
+Step 1: Brainstorm Book Outline (with story arc)
+  ↓
+Step 2: Create Chapter Outline (with chapter-level story arc)
+  ↓
+Step 3: Review and Revise Chapter Outline
+  ↓
+Step 4: Write the Chapter (sub-chapter by sub-chapter)
+  ↓
+Step 5: Review Q/A Consistency Report
+```
+
+---
+
+#### Step 1: Brainstorm the Book Outline
+
+Choose a story arc and brainstorm the full book outline. This creates the book's premise, characters, themes, and chapter-by-chapter structure.
+
+**Chat:**
+```
+Brainstorm a book using the Hero's Journey called "The Signal Beneath."
+Genre: post-apocalyptic. 8 chapters.
+Premise: A radio operator in a collapsed coastal city intercepts a signal
+from a submerged research station. She must decide whether to investigate
+alone or alert the warlord who controls the only working boat.
+Themes: sacrifice, trust, the cost of knowledge.
+```
+
+**Voice:**
+> "Brainstorm a book using the Fichtean Curve called 'The Burial Mound.' Genre ancient history. Twelve chapters."
+
+**What happens:**
+- The story arc prompt is loaded from the database (e.g., the full Hero's Journey 12-stage framework with examples)
+- Perplexity researches the concept
+- Claude generates the outline following the arc's structural requirements
+- The outline includes characters (with roles and arcs), chapter briefs, arc notes for each chapter, and research topics
+- The `story_arc_name` is saved with the outline so all downstream workflows know which arc governs the book
+- The outline is emailed for review
+
+**What you get:** An email with the full book outline — premise, themes, characters, and every chapter with its brief and arc position.
+
+---
+
+#### Step 2: Create the Chapter Outline
+
+Before writing any chapter, create a detailed chapter outline that breaks it into sub-chapters (scenes). Each sub-chapter will be written as a full ~5,000-word scene.
+
+**Chat:**
+```
+create a chapter outline for the prologue of The Burial Mound using the Fichtean Curve
+```
+
+```
+create a chapter outline for chapter 3 of The Signal Beneath using Kishōtenketsu
+```
+
+**Voice:**
+> "Create a chapter outline for chapter one of The Signal Beneath using Dan Harmon's Story Circle"
+
+**What happens:**
+- The book outline is loaded (characters, premise, all chapter briefs)
+- The book's story arc prompt AND the chapter's story arc prompt are both loaded
+- Claude generates sub-chapters (typically 3-8), each with:
+  - **Title** — the scene name
+  - **Arc beat** — which beat of the chapter's story arc this scene represents
+  - **Characters** — exact names from the book outline
+  - **Setting** — where and when the scene takes place
+  - **Emotional tone** — the dominant feeling
+  - **Brief** — a detailed 3-5 sentence description of what happens
+  - **Book arc connection** — how this scene advances the overall book story
+- The chapter outline is saved into the book outline (so write_chapter can find it)
+- The chapter outline is emailed for review
+
+**What you get:** An email with the chapter outline showing every sub-chapter scene with its arc beat, characters, setting, and detailed brief.
+
+**Why the chapter can use a different story arc:**
+- Your book might follow the Hero's Journey overall, but Chapter 4 is a quiet, reflective chapter — use Kishōtenketsu for that chapter's internal structure
+- Chapter 7 is a high-tension action sequence — use the Fichtean Curve
+- Chapter 10 is the emotional climax — use Freytag's Pyramid to give space to the consequences
+- The chapter outline maps each sub-chapter to BOTH the chapter's arc beats AND the book's overall arc position
+
+---
+
+#### Step 3: Review and Revise
+
+Review the emailed chapter outline. If changes are needed:
+
+**Chat:**
+```
+revise the chapter outline for the prologue of The Burial Mound.
+Make sub-chapter 2 focus more on the protagonist's internal conflict.
+Add a scene where she finds her dead partner's journal in the radio station.
+```
+
+**Voice:**
+> "Revise the chapter outline for chapter 3 of The Signal Beneath. The second sub-chapter should show more tension between the protagonist and the warlord. Remove the scene at the dock."
+
+Each revision:
+- Preserves existing sub-chapters unless you specifically change them
+- Keeps all character names from the book outline
+- Saves the updated outline automatically
+- Emails the revised version for review
+
+Repeat until satisfied.
+
+---
+
+#### Step 4: Write the Chapter
+
+Once you approve the chapter outline, write the chapter. The system writes each sub-chapter as a separate ~5,000-word scene, then concatenates them into the full chapter.
+
+**Chat:**
+```
+write the prologue for The Burial Mound
+```
+
+**Voice:**
+> "Write chapter one of The Signal Beneath"
+
+**What happens behind the scenes:**
+
+1. **Safety gate** — checks that a chapter outline with sub-chapters exists. If not, the workflow stops and tells you to create one first.
+
+2. **For each sub-chapter** (e.g., 8 sub-chapters = 8 separate writing calls):
+   - Claude receives the sub-chapter's specific brief, characters, setting, arc beat, and emotional tone
+   - Claude also receives the full chapter structure (all sub-chapters) for context
+   - Claude receives summaries of previous sub-chapters for continuity
+   - Claude receives the book outline, story bible, story arc framework, genre guidelines, and research
+   - The story arc prompt has all placeholders filled in with actual project data (genre, protagonist, setting, stakes)
+   - Claude writes ~5,000 words of rich, detailed prose for that scene
+   - **CHARACTER & SCENE DEPTH REQUIREMENTS** enforce:
+     - Full physical descriptions for first-appearance characters
+     - Local color in every scene (sounds, smells, textures, light, weather)
+     - Scenes written at the pace of lived experience
+     - No compressed or summarized sub-chapters
+
+3. **Concatenation** — all sub-chapter outputs are joined with scene breaks (---) into one chapter
+
+4. **Story bible update** — new characters, locations, and plot threads are added
+
+5. **Version snapshot** — if a previous version of this chapter exists, it's saved to version history before overwriting
+
+6. **Q/A Consistency Report** — a separate Claude call validates the written chapter against:
+   - Character consistency (names match book outline)
+   - Book arc advancement (chapter hits its assigned arc beat)
+   - Chapter outline adherence (sub-chapters followed in sequence)
+   - Plot consistency (no contradictions)
+   - Theme alignment (no drift from book themes)
+   - Story drift risk (no subtle direction changes)
+   - Book story arc compliance (structural beat fulfilled)
+   - Chapter story arc compliance (internal structure followed)
+   - Arc contradiction check (no structural violations)
+
+7. **Email** — the full chapter is emailed with the Q/A Consistency Report appended at the bottom
+
+**What you get:** An email containing:
+- The full chapter (~25,000-40,000 words depending on sub-chapter count)
+- Scene breaks between sub-chapters
+- A Story Consistency Report at the bottom showing PASS or NEEDS_REVIEW with detailed check results
+
+**Estimated time:** ~8-10 minutes for an 8 sub-chapter chapter (each sub-chapter takes ~60 seconds to write).
+
+---
+
+#### Step 5: Review the Q/A Report
+
+The Q/A Consistency Report at the bottom of the email tells you whether the chapter stayed on track:
+
+- **All PASS** — the chapter follows both outlines, uses correct characters, and advances the story arc
+- **NEEDS_REVIEW** — one or more checks failed. Read the specific concerns:
+  - Wrong character names → the writer invented or renamed characters
+  - Arc contradiction → the chapter doesn't fulfill its assigned story arc beat
+  - Story drift → the narrative is subtly moving off the book's intended path
+  - Chapter outline not followed → sub-chapters were skipped or reordered
+
+If the Q/A report shows issues, rewrite:
+```
+write the prologue for The Burial Mound
+```
+
+Each rewrite auto-snapshots the previous version. You can recover any version:
+```
+get version 2 of the prologue for The Burial Mound
+```
+
+---
+
+#### Complete Example: Writing a Chapter of "The Burial Mound"
+
+**1. The book outline already exists** (brainstormed with Kishōtenketsu as the book arc)
+
+**2. Create the chapter outline for the prologue using Fichtean Curve:**
+```
+create a chapter outline for the prologue of The Burial Mound using the Fichtean Curve
+```
+*Result: 8 sub-chapters emailed — Opening in Medias Res through Resolution, each with characters, settings, and detailed briefs.*
+
+**3. Review the email. Request a revision:**
+```
+revise the chapter outline for the prologue of The Burial Mound.
+Add more detail to sub-chapter 3 about the copper pendant's warmth.
+Make sub-chapter 6 more emotionally intense — this is the breaking point.
+```
+*Result: revised outline emailed with changes.*
+
+**4. Satisfied with the outline. Write it:**
+```
+write the prologue for The Burial Mound
+```
+*Result: ~40,000 words written across 8 sub-chapters, each with full sensory detail, character descriptions, and local color. Q/A report appended. Story bible updated. Previous version saved.*
+
+**5. Check the Q/A report. All checks pass. Move to Chapter 1:**
+```
+create a chapter outline for chapter 1 of The Burial Mound using Kishōtenketsu
+```
+*This chapter uses a different arc (Kishōtenketsu) for a quieter, contemplative scene — while still advancing the book's overall Fichtean Curve arc.*
+
+---
+
+#### How Story Arcs Shape the Writing
+
+Each story arc prompt is injected directly into the writing instructions. Here's how they affect the output:
+
+| Arc | What Claude Is Told | How It Affects the Writing |
+|-----|--------------------|-----------------------------|
+| **Three-Act Structure** | "Act I establishes normalcy. The Inciting Incident disrupts. Act II escalates through obstacles. The Midpoint shifts gears. Act III delivers the climax and resolution." | Balanced pacing, clear turning points, protagonist changes visibly by the end |
+| **Freytag's Pyramid** | "Five acts. The climax is in the CENTER. Acts IV and V show consequences. Do not skip the falling action." | More time spent on aftermath, moral weight visible, transformation earned through consequence |
+| **The Hero's Journey** | "Follow the 12 stages. The mentor gives something irreplaceable and then disappears. The ordeal is a death, not a difficulty. The elixir must be traceable to the ordeal." | Mythic resonance, clear departure/return structure, mentor relationship central |
+| **Dan Harmon's Story Circle** | "Steps 1 and 8 mirror each other. Steps 2 and 6 mirror. The character ends in the same place but fundamentally different." | Strong internal arc, visible character change, want vs. need tension |
+| **Fichtean Curve** | "Drop into conflict immediately. Three escalating crises with mini-resolutions. Each crisis more personal than the last. Short, impactful resolution." | High tension from page one, no slow beginning, backstory revealed in motion |
+| **In Medias Res** | "Open at the most intense moment. Build two layers: forward narrative and backstory delivery points. Never front-load exposition." | Gripping opening, mystery and revelation structure, reader pulled forward by not-knowing |
+| **Seven-Point Structure** | "Build backward from the Resolution. The Hook is the opposite of the Resolution. No new information after the Second Plot Point." | Tight structural logic, satisfying inevitability, every beat earns the ending |
+| **Kishōtenketsu** | "No conflict required. Ki invites, Shō deepens, Ten surprises through contrast, Ketsu resonates. Silence is content. The callback earns the ending." | Quiet emotional power, contrast instead of conflict, restraint in resolution |
+
+---
+
 ## 22. Tips & Troubleshooting
 
 ### General Tips
@@ -2413,7 +3575,7 @@ Draft → Approved → Published
 
 The Author Agent uses two layers of structural guidance:
 
-1. **Story Arcs** (Section 10) — Named frameworks you choose explicitly (Freytag's Pyramid, Three-Act Structure). Stored in the `story_arcs` database table.
+1. **Story Arcs** (Section 10) — Named frameworks you choose explicitly. Eight arcs are available: Freytag's Pyramid, Three-Act Structure, The Hero's Journey, Dan Harmon's Story Circle, In Medias Res, Seven-Point Structure, Kishōtenketsu, and Fichtean Curve. Stored in the `story_arcs` database table.
 2. **Default Guidelines** — A set of 10 story structure guidelines automatically loaded when no arc is specified. Stored in `app_config`.
 
 ### The 10 Default Guidelines
@@ -2452,7 +3614,10 @@ Hook → Plot Point 1 → Pinch Point 1 → Turning Point → Pinch Point 2 → 
 | General literary fiction | Three-Act Structure |
 | Tight plot-driven narratives | Seven-Point Structure |
 | Tragedy / dark contemporary | Freytag's Pyramid |
-| Character-driven | Story Circle (Dan Harmon) |
+| Character-driven | Dan Harmon's Story Circle |
+| Thrillers, mysteries, dual timelines | In Medias Res |
+| Literary, slice-of-life, contemplative | Kishōtenketsu |
+| Thrillers, action, survival, crime | Fichtean Curve |
 | Fast-paced, scene-driven | Fichtean Curve |
 | Screenwriting-influenced | Save the Cat Beat Sheet |
 

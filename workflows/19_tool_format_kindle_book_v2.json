@@ -1,0 +1,247 @@
+{
+  "name": "Tool - Format Kindle Book V2",
+  "nodes": [
+    {
+      "id": "kb-trigger",
+      "name": "workflow_trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "project_title"
+            },
+            {
+              "name": "page_size"
+            },
+            {
+              "name": "user_id"
+            },
+            {
+              "name": "recipient_email"
+            },
+            {
+              "name": "bcc_email"
+            },
+            {
+              "name": "user_prompt"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "kb-settings",
+      "name": "settings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_API_KEY = 'REDACTED_SUPABASE_KEY';\nconst trigger = $('workflow_trigger').first().json;\nconst userId = trigger.user_id || '';\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\ntry {\n  const rows = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${SUPABASE_URL}/rest/v1/app_config_v2?key=in.(recipient_email,bcc_email)&select=key,value&user_id=eq.${encodeURIComponent(userId)}`,\n    headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n  });\n  for (const row of rows) {\n    if (row.key === 'recipient_email' && !recipient_email) recipient_email = row.value;\n    if (row.key === 'bcc_email' && !bcc_email) bcc_email = row.value;\n  }\n} catch (e) {\n  if (!recipient_email) recipient_email = 'eric@agileadtesting.com';\n}\nreturn [{ json: { SUPABASE_URL, SUPABASE_API_KEY, userId, recipient_email, bcc_email: bcc_email || '', page_size: trigger.page_size || '6x9', project_title: trigger.project_title || '', user_prompt: trigger.user_prompt || '' } }];"
+      }
+    },
+    {
+      "id": "kb-build",
+      "name": "build_kindle_manuscript",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        0
+      ],
+      "parameters": {
+        "jsCode": "let docx;\ntry { docx = require('docx'); } catch (e) {\n  return [{ json: { error: true, filename: '', result: 'The \"docx\" npm package is not available. Add \"docx\" to NODE_FUNCTION_ALLOW_EXTERNAL in n8n env settings and run: npm install docx in your n8n directory.' } }];\n}\nconst { Document, Packer, Paragraph, TextRun, HeadingLevel, SectionType, AlignmentType } = docx;\nconst settings = $('settings').first().json;\nconst SB = settings.SUPABASE_URL;\nconst AK = settings.SUPABASE_API_KEY;\nconst hd = { 'apikey': AK, 'Authorization': 'Bearer ' + AK };\nconst uf = settings.userId ? '&user_id=eq.' + encodeURIComponent(settings.userId) : '';\n\n// 1. Fetch project\nconst pr = await this.helpers.httpRequest({ method: 'GET', url: SB + '/rest/v1/writing_projects_v2?title=ilike.*' + encodeURIComponent(settings.project_title) + '*&select=id,title,genre_slug&limit=1' + uf, headers: hd });\nconst project = Array.isArray(pr) && pr.length > 0 ? pr[0] : null;\nif (!project) return [{ json: { error: true, filename: '', result: 'Project not found: ' + settings.project_title } }];\n\n// 2. Fetch all chapters (including prologue=0 and epilogue=999), ordered by chapter_number\nlet chapters = await this.helpers.httpRequest({ method: 'GET', url: SB + '/rest/v1/published_content_v2?project_id=eq.' + project.id + '&content_type=eq.chapter&order=chapter_number.asc&select=id,title,chapter_number,content_text,storage_path' + uf, headers: hd });\nchapters = Array.isArray(chapters) ? chapters : [];\n// Fallback: search by genre_slug if no chapters found by project_id\nif (chapters.length === 0 && project.genre_slug) {\n  const fb = await this.helpers.httpRequest({ method: 'GET', url: SB + '/rest/v1/published_content_v2?content_type=eq.chapter&genre_slug=eq.' + encodeURIComponent(project.genre_slug) + '&order=chapter_number.asc&select=id,title,chapter_number,content_text,storage_path&limit=100' + uf, headers: hd });\n  chapters = Array.isArray(fb) ? fb : [];\n}\nif (chapters.length === 0) return [{ json: { error: true, filename: '', result: 'No chapters found for \"' + project.title + '\". Write some chapters first.' } }];\n\n// 3. Fetch content from storage for chapters without content_text\nfor (const c of chapters) {\n  if (!c.content_text && c.storage_path) {\n    try {\n      const raw = await this.helpers.httpRequest({ method: 'GET', url: SB + '/storage/v1/object/' + c.storage_path, headers: hd });\n      c.content_text = typeof raw === 'string' ? raw : JSON.stringify(raw);\n    } catch (e) { c.content_text = ''; }\n  }\n}\n\n// 4. Page sizes in twips (1 inch = 1440 twips)\nconst PS = {\n  '5x8':{w:7200,h:11520},'5.06x7.81':{w:7286,h:11246},'5.25x8':{w:7560,h:11520},\n  '5.5x8.5':{w:7920,h:12240},'6x9':{w:8640,h:12960},'6.14x9.21':{w:8842,h:13262},\n  '6.69x9.61':{w:9634,h:13838},'7x10':{w:10080,h:14400},'7.44x9.69':{w:10714,h:13954},\n  '7.5x9.25':{w:10800,h:13320},'8x10':{w:11520,h:14400},'8.25x11':{w:11880,h:15840},\n  '8.25x6':{w:11880,h:8640},'8.25x8.25':{w:11880,h:11880},'8.27x11.69':{w:11909,h:16834},\n  '8.5x11':{w:12240,h:15840},'8.5x8.5':{w:12240,h:12240}\n};\nconst rawSz = (settings.page_size || '6x9').replace(/[\\s\\u00d7]/g, '').replace(/by/gi, 'x').toLowerCase();\nconst dm = PS[rawSz] || PS['6x9'];\nconst sz = rawSz in PS ? rawSz : '6x9';\nconst mg = { top: 1080, bottom: 720, left: 1080, right: 720 };\n\n// 5. HTML helpers\nfunction dec(t) {\n  return t.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'\"')\n    .replace(/&#39;/g,\"'\").replace(/&mdash;/g,'\\u2014').replace(/&ndash;/g,'\\u2013')\n    .replace(/&ldquo;/g,'\\u201C').replace(/&rdquo;/g,'\\u201D').replace(/&lsquo;/g,'\\u2018')\n    .replace(/&rsquo;/g,'\\u2019').replace(/&hellip;/g,'\\u2026').replace(/&nbsp;/g,' ')\n    .replace(/&#(\\d+);/g, function(m, c) { return String.fromCharCode(parseInt(c)); });\n}\n\nfunction pInline(html) {\n  const runs = [];\n  const parts = html.split(/(<\\/?(?:strong|b|em|i)>)/gi);\n  let bo = false, it = false;\n  for (const p of parts) {\n    const l = p.toLowerCase();\n    if (l === '<strong>' || l === '<b>') { bo = true; continue; }\n    if (l === '</strong>' || l === '</b>') { bo = false; continue; }\n    if (l === '<em>' || l === '<i>') { it = true; continue; }\n    if (l === '</em>' || l === '</i>') { it = false; continue; }\n    const cl = dec(p.replace(/<[^>]+>/g, ''));\n    if (cl) {\n      const o = { text: cl, font: 'Garamond', size: 24 };\n      if (bo) o.bold = true;\n      if (it) o.italics = true;\n      runs.push(new TextRun(o));\n    }\n  }\n  return runs.length ? runs : [new TextRun({ text: '', font: 'Garamond', size: 24 })];\n}\n\nfunction h2p(html) {\n  if (!html) return [new Paragraph({ children: [new TextRun({ text: '', font: 'Garamond', size: 24 })] })];\n  const pa = [];\n  const re = /<(h[1-6]|p|blockquote|li)[^>]*>([\\s\\S]*?)<\\/\\1>|<hr\\s*\\/?>/gi;\n  let m;\n  const bl = [];\n  while ((m = re.exec(html)) !== null) {\n    if (m[0].match(/^<hr/i)) bl.push({ t: 'hr', c: '' });\n    else bl.push({ t: m[1].toLowerCase(), c: m[2] || '' });\n  }\n  if (!bl.length) {\n    html.replace(/<[^>]+>/g, '').split(/\\n+/).filter(function(l) { return l.trim().length > 0; })\n      .forEach(function(l) { bl.push({ t: 'p', c: l.trim() }); });\n  }\n  for (const b of bl) {\n    if (b.t === 'h1') continue;\n    if (b.t === 'hr') {\n      pa.push(new Paragraph({ children: [new TextRun({ text: '* * *', font: 'Garamond', size: 24 })], alignment: AlignmentType.CENTER, spacing: { before: 360, after: 360 } }));\n      continue;\n    }\n    if (b.t === 'h2') {\n      pa.push(new Paragraph({ children: pInline(b.c), heading: HeadingLevel.HEADING_2, spacing: { before: 480, after: 240 } }));\n      continue;\n    }\n    if (b.t === 'h3') {\n      pa.push(new Paragraph({ children: pInline(b.c), heading: HeadingLevel.HEADING_3, spacing: { before: 360, after: 180 } }));\n      continue;\n    }\n    if (b.t === 'blockquote') {\n      pa.push(new Paragraph({ children: pInline(b.c), indent: { left: 720, right: 720 }, spacing: { before: 120, after: 120 } }));\n      continue;\n    }\n    pa.push(new Paragraph({ children: pInline(b.c), spacing: { after: 120, line: 276 }, indent: { firstLine: 360 } }));\n  }\n  return pa.length ? pa : [new Paragraph({ children: [new TextRun({ text: '', font: 'Garamond', size: 24 })] })];\n}\n\n// 6. Build document\nconst pp = { size: { width: dm.w, height: dm.h }, margin: mg };\n\n// Title page section\nconst titleSec = {\n  properties: { page: pp },\n  children: [\n    new Paragraph({ spacing: { before: 4800 } }),\n    new Paragraph({\n      children: [new TextRun({ text: project.title, font: 'Garamond', size: 56, bold: true })],\n      alignment: AlignmentType.CENTER,\n      spacing: { after: 1200 }\n    })\n  ]\n};\n\n// Chapter sections \u2014 each starts on odd page with Heading 1\nconst chapSecs = chapters.map(function(c) {\n  const cn = parseInt(c.chapter_number);\n  const titleLower = (c.title || '').toLowerCase();\n  let label;\n  if (cn === 0 || titleLower.indexOf('prologue') >= 0) label = c.title || 'Prologue';\n  else if (cn === 999 || titleLower.indexOf('epilogue') >= 0) label = c.title || 'Epilogue';\n  else label = c.title || ('Chapter ' + cn);\n\n  return {\n    properties: { type: SectionType.ODD_PAGE, page: pp },\n    children: [\n      new Paragraph({ spacing: { before: 2880 } }),\n      new Paragraph({\n        text: label,\n        heading: HeadingLevel.HEADING_1,\n        alignment: AlignmentType.CENTER,\n        spacing: { after: 720 }\n      }),\n      ...h2p(c.content_text || '')\n    ]\n  };\n});\n\nconst doc = new Document({\n  styles: {\n    default: { document: { run: { font: 'Garamond', size: 24 } } },\n    paragraphStyles: [\n      { id: 'Heading1', name: 'Heading 1', basedOn: 'Normal', next: 'Normal',\n        run: { font: 'Garamond', size: 36, bold: true },\n        paragraph: { alignment: AlignmentType.CENTER } },\n      { id: 'Heading2', name: 'Heading 2', basedOn: 'Normal', next: 'Normal',\n        run: { font: 'Garamond', size: 28, bold: true } }\n    ]\n  },\n  sections: [titleSec, ...chapSecs]\n});\n\nconst buf = await Packer.toBuffer(doc);\nconst safeName = project.title.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\\s+/g, '_');\nconst fn = safeName + '_KDP_' + sz + '.docx';\n\nreturn [{\n  json: {\n    error: false,\n    filename: fn,\n    title: project.title,\n    chapters_count: chapters.length,\n    page_size: sz,\n    result: 'Kindle manuscript created: ' + fn + ' (' + chapters.length + ' chapters, ' + sz + ' trim size)'\n  },\n  binary: {\n    data: await this.helpers.prepareBinaryData(buf, fn, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')\n  }\n}];"
+      }
+    },
+    {
+      "id": "kb-check",
+      "name": "check_error",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        700,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.filename }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "kb-email",
+      "name": "send_email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        940,
+        -100
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "CPCSZOInV8Zj1PI1",
+          "name": "Gmail account"
+        }
+      },
+      "parameters": {
+        "sendTo": "={{ $('settings').item.json.recipient_email }}",
+        "subject": "=Kindle Manuscript Ready: {{ $json.title }}",
+        "emailType": "html",
+        "message": "=<h2>Your Kindle Manuscript is Ready</h2><p>Attached is your formatted manuscript: <strong>{{ $json.filename }}</strong></p><ul><li>Chapters: {{ $json.chapters_count }}</li><li>Trim Size: {{ $json.page_size }}</li></ul><p>This file is formatted for Kindle Direct Publishing (KDP). Upload it directly to your KDP dashboard.</p><hr><p><em>Command: {{ $('settings').item.json.user_prompt }}</em></p>",
+        "options": {
+          "appendAttribution": false,
+          "bccList": "={{ $('settings').item.json.bcc_email }}"
+        },
+        "attachmentsUi": {
+          "attachmentsBinary": [
+            {
+              "property": "data"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "kb-success",
+      "name": "success_result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1180,
+        -100
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "result",
+              "value": "={{ $('build_kindle_manuscript').item.json.result + ' Email sent to ' + $('settings').item.json.recipient_email }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "kb-error",
+      "name": "error_result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        940,
+        100
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "result",
+              "value": "={{ $json.result }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "workflow_trigger": {
+      "main": [
+        [
+          {
+            "node": "settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "settings": {
+      "main": [
+        [
+          {
+            "node": "build_kindle_manuscript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "build_kindle_manuscript": {
+      "main": [
+        [
+          {
+            "node": "check_error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check_error": {
+      "main": [
+        [
+          {
+            "node": "send_email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "error_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send_email": {
+      "main": [
+        [
+          {
+            "node": "success_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "id": "WEzf89RwAbkBxmQZ"
+}
