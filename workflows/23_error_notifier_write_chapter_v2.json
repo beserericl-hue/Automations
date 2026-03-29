@@ -1,0 +1,161 @@
+{
+  "updatedAt": "2026-03-25T22:49:51.086Z",
+  "createdAt": "2026-03-25T22:49:51.086Z",
+  "id": "Ww4PZU1fJcuv9yrW",
+  "name": "Error Notifier - Write Chapter V2",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "err-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "err-email",
+      "name": "Send Error Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        200,
+        0
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "CPCSZOInV8Zj1PI1",
+          "name": "Gmail account"
+        }
+      },
+      "parameters": {
+        "sendTo": "eric@agileadtesting.com",
+        "subject": "=\u26a0\ufe0f Chapter Writing Failed",
+        "message": "<h2>Chapter Writing Error</h2><p><strong>Error:</strong> {{ $json.execution?.error?.message || \"Unknown error\" }}</p><p><strong>Workflow:</strong> {{ $json.workflow?.name || \"Unknown\" }}</p><p><strong>Time:</strong> {{ $now.format(\"yyyy-MM-dd HH:mm\") }}</p><p>Please retry by telling Eve: <em>\"rewrite chapter [number] of [book title]\"</em></p><p>If it keeps failing, wait 5-10 minutes \u2014 the writing service may be overloaded.</p>",
+        "options": {
+          "appendAttribution": false
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send Error Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "cee35e79-de8d-4b61-a26b-3b09ffaba354",
+  "activeVersionId": "cee35e79-de8d-4b61-a26b-3b09ffaba354",
+  "versionCounter": 4,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-03-25T22:49:51.086Z",
+      "createdAt": "2026-03-25T22:49:51.086Z",
+      "role": "workflow:owner",
+      "workflowId": "Ww4PZU1fJcuv9yrW",
+      "projectId": "so6FfyLmNOjnxEMJ",
+      "project": {
+        "updatedAt": "2026-01-12T16:36:13.622Z",
+        "createdAt": "2026-01-12T15:34:50.204Z",
+        "id": "so6FfyLmNOjnxEMJ",
+        "name": "Eric Beser <eric@agileadtesting.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-25T22:49:51.137Z",
+    "createdAt": "2026-03-25T22:49:51.137Z",
+    "versionId": "cee35e79-de8d-4b61-a26b-3b09ffaba354",
+    "workflowId": "Ww4PZU1fJcuv9yrW",
+    "nodes": [
+      {
+        "id": "err-trigger",
+        "name": "Error Trigger",
+        "type": "n8n-nodes-base.errorTrigger",
+        "typeVersion": 1,
+        "position": [
+          0,
+          0
+        ],
+        "parameters": {}
+      },
+      {
+        "id": "err-email",
+        "name": "Send Error Email",
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2.1,
+        "position": [
+          200,
+          0
+        ],
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "CPCSZOInV8Zj1PI1",
+            "name": "Gmail account"
+          }
+        },
+        "parameters": {
+          "sendTo": "eric@agileadtesting.com",
+          "subject": "=\u26a0\ufe0f Chapter Writing Failed",
+          "message": "<h2>Chapter Writing Error</h2><p><strong>Error:</strong> {{ $json.execution?.error?.message || \"Unknown error\" }}</p><p><strong>Workflow:</strong> {{ $json.workflow?.name || \"Unknown\" }}</p><p><strong>Time:</strong> {{ $now.format(\"yyyy-MM-dd HH:mm\") }}</p><p>Please retry by telling Eve: <em>\"rewrite chapter [number] of [book title]\"</em></p><p>If it keeps failing, wait 5-10 minutes \u2014 the writing service may be overloaded.</p>",
+          "options": {
+            "appendAttribution": false
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Error Trigger": {
+        "main": [
+          [
+            {
+              "node": "Send Error Email",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Eric Beser",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-25T22:49:51.697Z",
+        "id": 1216,
+        "workflowId": "Ww4PZU1fJcuv9yrW",
+        "versionId": "cee35e79-de8d-4b61-a26b-3b09ffaba354",
+        "event": "activated",
+        "userId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      }
+    ]
+  }
+}

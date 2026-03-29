@@ -1,0 +1,510 @@
+{
+  "updatedAt": "2026-03-29T16:28:36.380Z",
+  "createdAt": "2026-03-22T15:44:59.722Z",
+  "id": "DTjjVk51Z9aHgAg0",
+  "name": "Sub - Embed Project Data V2",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "embed-project-data-v2",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "embed-webhook",
+      "name": "webhook_trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        192
+      ],
+      "webhookId": "embed-proj-v2"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "project_id"
+            },
+            {
+              "name": "user_id"
+            },
+            {
+              "name": "openai_api_key"
+            }
+          ]
+        }
+      },
+      "id": "emb-trigger",
+      "name": "workflow_trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -208,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "n1",
+              "name": "project_id",
+              "value": "={{ $json.body?.project_id || $json.project_id }}",
+              "type": "string"
+            },
+            {
+              "id": "n2",
+              "name": "user_id",
+              "value": "={{ $json.body?.user_id || $json.user_id }}",
+              "type": "string"
+            },
+            {
+              "id": "n3",
+              "name": "openai_api_key",
+              "value": "={{ $json.body?.openai_api_key || $json.openai_api_key || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "embed-normalize",
+      "name": "normalize_input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        16,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare documents for embedding\nconst trigger = $input.first().json;\nconst projectId = trigger.project_id;\nconst userId = trigger.user_id || '';\n\nconst SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_API_KEY = 'REDACTED_SUPABASE_KEY';\nconst readHeaders = { 'apikey': SUPABASE_API_KEY, 'Authorization': 'Bearer ' + SUPABASE_API_KEY };\nconst writeHeaders = { ...readHeaders, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' };\n\nif (!projectId) return [{ json: { error: true, result: 'No project_id provided' } }];\n\n// Load project\nconst projResp = await this.helpers.httpRequest({\n  method: 'GET',\n  url: SUPABASE_URL + '/rest/v1/writing_projects_v2?id=eq.' + projectId + '&select=id,title,genre_slug,outline&user_id=eq.' + encodeURIComponent(userId),\n  headers: readHeaders\n});\nconst project = projResp[0];\nif (!project || !project.outline) return [{ json: { error: true, result: 'Project not found or no outline' } }];\nconst outline = project.outline;\n\n// Load story bible\nconst bible = await this.helpers.httpRequest({\n  method: 'GET',\n  url: SUPABASE_URL + '/rest/v1/story_bible_v2?project_id=eq.' + projectId + '&user_id=eq.' + encodeURIComponent(userId) + '&select=id,entry_type,name,description,chapter_introduced,last_chapter_seen',\n  headers: readHeaders\n});\n\n// Load genre\nlet genreConfig = {};\nif (project.genre_slug) {\n  const g = await this.helpers.httpRequest({\n    method: 'GET',\n    url: SUPABASE_URL + '/rest/v1/genre_config_v2?genre_slug=eq.' + encodeURIComponent(project.genre_slug) + '&limit=1',\n    headers: readHeaders\n  });\n  if (g && g.length > 0) genreConfig = g[0];\n}\n\n// Build documents\nconst docs = [];\n\nfor (const char of (outline.characters || [])) {\n  docs.push({\n    doc_type: 'character', doc_id: char.name,\n    doc_title: char.name + ' (' + char.role + ')',\n    content: 'Character: ' + char.name + '\\nRole: ' + char.role + '\\nArc: ' + char.arc + (char.description ? '\\nDescription: ' + char.description : '')\n  });\n}\n\nfor (const ch of (outline.chapters || [])) {\n  docs.push({\n    doc_type: 'chapter_brief', doc_id: 'ch_' + ch.number,\n    doc_title: 'Ch ' + ch.number + ' \u2014 ' + ch.title,\n    content: 'Chapter ' + ch.number + ': ' + ch.title + '\\nBrief: ' + ch.brief + (ch.arc_notes ? '\\nArc Notes: ' + ch.arc_notes : '')\n  });\n  if (ch.chapter_outline && ch.chapter_outline.sub_chapters) {\n    for (const sc of ch.chapter_outline.sub_chapters) {\n      docs.push({\n        doc_type: 'sub_chapter', doc_id: 'ch' + ch.number + '_sc' + sc.number,\n        doc_title: 'Ch' + ch.number + ' Sub' + sc.number + ': ' + sc.title,\n        content: 'Sub-chapter ' + sc.number + ' of Chapter ' + ch.number + ': ' + sc.title + '\\nBrief: ' + sc.brief + '\\nArc Beat: ' + (sc.arc_beat || '') + '\\nCharacters: ' + (sc.characters || []).join(', ')\n      });\n    }\n  }\n}\n\nfor (const entry of bible) {\n  docs.push({\n    doc_type: 'bible_entry', doc_id: entry.id,\n    doc_title: '[' + entry.entry_type + '] ' + entry.name,\n    content: entry.entry_type + ': ' + entry.name + '\\nDescription: ' + entry.description + '\\nIntroduced: Chapter ' + entry.chapter_introduced\n  });\n}\n\nif (genreConfig.genre_name) {\n  docs.push({\n    doc_type: 'genre_config', doc_id: project.genre_slug,\n    doc_title: 'Genre: ' + genreConfig.genre_name,\n    content: 'Genre: ' + genreConfig.genre_name + '\\nDescription: ' + (genreConfig.description || '') + '\\nStyle: ' + (genreConfig.style_notes || '')\n  });\n}\n\nif (outline.premise) {\n  docs.push({\n    doc_type: 'premise', doc_id: 'premise',\n    doc_title: 'Book Premise',\n    content: 'Premise: ' + outline.premise + '\\nThemes: ' + (outline.themes || []).join(', ')\n  });\n}\n\nif (outline.story_arc_name) {\n  docs.push({\n    doc_type: 'book_arc', doc_id: 'book_arc',\n    doc_title: 'Book Story Arc: ' + outline.story_arc_name,\n    content: 'Story Arc: ' + outline.story_arc_name\n  });\n}\n\n// Delete old embeddings\nawait this.helpers.httpRequest({\n  method: 'DELETE',\n  url: SUPABASE_URL + '/rest/v1/writing_embeddings_v2?project_id=eq.' + projectId + '&user_id=eq.' + encodeURIComponent(userId),\n  headers: readHeaders\n});\n\n// Output all docs as separate items for batching\nreturn docs.map(d => ({ json: { ...d, project_id: projectId, user_id: userId, project_title: project.title, total_docs: docs.length } }));\n"
+      },
+      "id": "embed-prepare",
+      "name": "prepare_documents",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/embeddings",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'text-embedding-3-small', input: $json.content }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "embed-openai",
+      "name": "get_embedding",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        464,
+        96
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "xSzPIySN61drme77",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Save all embeddings to Supabase\nconst SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_API_KEY = 'REDACTED_SUPABASE_KEY';\nconst headers = { 'apikey': SUPABASE_API_KEY, 'Authorization': 'Bearer ' + SUPABASE_API_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' };\n\nconst items = $input.all();\nconst prepItems = $('prepare_documents').all();\nlet saved = 0;\n\n// Batch insert in groups of 20\nconst rows = [];\nfor (let i = 0; i < items.length; i++) {\n  const embData = items[i].json.data ? items[i].json.data[0] : items[i].json;\n  const doc = prepItems[i].json;\n  if (!embData.embedding) continue;\n  rows.push({\n    user_id: doc.user_id,\n    project_id: doc.project_id,\n    doc_type: doc.doc_type,\n    doc_id: doc.doc_id,\n    doc_title: doc.doc_title,\n    content: doc.content,\n    metadata: {},\n    embedding: JSON.stringify(embData.embedding)\n  });\n}\n\nfor (let i = 0; i < rows.length; i += 20) {\n  const batch = rows.slice(i, i + 20);\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: SUPABASE_URL + '/rest/v1/writing_embeddings_v2',\n    headers,\n    body: JSON.stringify(batch)\n  });\n  saved += batch.length;\n}\n\nreturn [{ json: { result: 'Saved ' + saved + ' embeddings', saved_count: saved } }];\n"
+      },
+      "id": "embed-save",
+      "name": "save_embedding",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "result",
+              "value": "={{ 'Embedded ' + $input.all().length + ' documents' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "embed-result",
+      "name": "set_result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        912,
+        96
+      ]
+    }
+  ],
+  "connections": {
+    "webhook_trigger": {
+      "main": [
+        [
+          {
+            "node": "normalize_input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "workflow_trigger": {
+      "main": [
+        [
+          {
+            "node": "normalize_input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "normalize_input": {
+      "main": [
+        [
+          {
+            "node": "prepare_documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prepare_documents": {
+      "main": [
+        [
+          {
+            "node": "get_embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_embedding": {
+      "main": [
+        [
+          {
+            "node": "save_embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "save_embedding": {
+      "main": [
+        [
+          {
+            "node": "set_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "e1c84a66-a685-4df5-a0df-117fa76a25bb",
+  "activeVersionId": "e1c84a66-a685-4df5-a0df-117fa76a25bb",
+  "versionCounter": 29,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-22T15:44:59.722Z",
+      "createdAt": "2026-03-22T15:44:59.722Z",
+      "role": "workflow:owner",
+      "workflowId": "DTjjVk51Z9aHgAg0",
+      "projectId": "so6FfyLmNOjnxEMJ",
+      "project": {
+        "updatedAt": "2026-01-12T16:36:13.622Z",
+        "createdAt": "2026-01-12T15:34:50.204Z",
+        "id": "so6FfyLmNOjnxEMJ",
+        "name": "Eric Beser <eric@agileadtesting.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-29T16:28:46.836Z",
+    "createdAt": "2026-03-29T16:28:36.385Z",
+    "versionId": "e1c84a66-a685-4df5-a0df-117fa76a25bb",
+    "workflowId": "DTjjVk51Z9aHgAg0",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "embed-project-data-v2",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "id": "embed-webhook",
+        "name": "webhook_trigger",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          -208,
+          192
+        ],
+        "webhookId": "embed-proj-v2"
+      },
+      {
+        "parameters": {
+          "workflowInputs": {
+            "values": [
+              {
+                "name": "project_id"
+              },
+              {
+                "name": "user_id"
+              },
+              {
+                "name": "openai_api_key"
+              }
+            ]
+          }
+        },
+        "id": "emb-trigger",
+        "name": "workflow_trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [
+          -208,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "n1",
+                "name": "project_id",
+                "value": "={{ $json.body?.project_id || $json.project_id }}",
+                "type": "string"
+              },
+              {
+                "id": "n2",
+                "name": "user_id",
+                "value": "={{ $json.body?.user_id || $json.user_id }}",
+                "type": "string"
+              },
+              {
+                "id": "n3",
+                "name": "openai_api_key",
+                "value": "={{ $json.body?.openai_api_key || $json.openai_api_key || '' }}",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "embed-normalize",
+        "name": "normalize_input",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          16,
+          96
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// Prepare documents for embedding\nconst trigger = $input.first().json;\nconst projectId = trigger.project_id;\nconst userId = trigger.user_id || '';\n\nconst SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_API_KEY = 'REDACTED_SUPABASE_KEY';\nconst readHeaders = { 'apikey': SUPABASE_API_KEY, 'Authorization': 'Bearer ' + SUPABASE_API_KEY };\nconst writeHeaders = { ...readHeaders, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' };\n\nif (!projectId) return [{ json: { error: true, result: 'No project_id provided' } }];\n\n// Load project\nconst projResp = await this.helpers.httpRequest({\n  method: 'GET',\n  url: SUPABASE_URL + '/rest/v1/writing_projects_v2?id=eq.' + projectId + '&select=id,title,genre_slug,outline&user_id=eq.' + encodeURIComponent(userId),\n  headers: readHeaders\n});\nconst project = projResp[0];\nif (!project || !project.outline) return [{ json: { error: true, result: 'Project not found or no outline' } }];\nconst outline = project.outline;\n\n// Load story bible\nconst bible = await this.helpers.httpRequest({\n  method: 'GET',\n  url: SUPABASE_URL + '/rest/v1/story_bible_v2?project_id=eq.' + projectId + '&user_id=eq.' + encodeURIComponent(userId) + '&select=id,entry_type,name,description,chapter_introduced,last_chapter_seen',\n  headers: readHeaders\n});\n\n// Load genre\nlet genreConfig = {};\nif (project.genre_slug) {\n  const g = await this.helpers.httpRequest({\n    method: 'GET',\n    url: SUPABASE_URL + '/rest/v1/genre_config_v2?genre_slug=eq.' + encodeURIComponent(project.genre_slug) + '&limit=1',\n    headers: readHeaders\n  });\n  if (g && g.length > 0) genreConfig = g[0];\n}\n\n// Build documents\nconst docs = [];\n\nfor (const char of (outline.characters || [])) {\n  docs.push({\n    doc_type: 'character', doc_id: char.name,\n    doc_title: char.name + ' (' + char.role + ')',\n    content: 'Character: ' + char.name + '\\nRole: ' + char.role + '\\nArc: ' + char.arc + (char.description ? '\\nDescription: ' + char.description : '')\n  });\n}\n\nfor (const ch of (outline.chapters || [])) {\n  docs.push({\n    doc_type: 'chapter_brief', doc_id: 'ch_' + ch.number,\n    doc_title: 'Ch ' + ch.number + ' \u2014 ' + ch.title,\n    content: 'Chapter ' + ch.number + ': ' + ch.title + '\\nBrief: ' + ch.brief + (ch.arc_notes ? '\\nArc Notes: ' + ch.arc_notes : '')\n  });\n  if (ch.chapter_outline && ch.chapter_outline.sub_chapters) {\n    for (const sc of ch.chapter_outline.sub_chapters) {\n      docs.push({\n        doc_type: 'sub_chapter', doc_id: 'ch' + ch.number + '_sc' + sc.number,\n        doc_title: 'Ch' + ch.number + ' Sub' + sc.number + ': ' + sc.title,\n        content: 'Sub-chapter ' + sc.number + ' of Chapter ' + ch.number + ': ' + sc.title + '\\nBrief: ' + sc.brief + '\\nArc Beat: ' + (sc.arc_beat || '') + '\\nCharacters: ' + (sc.characters || []).join(', ')\n      });\n    }\n  }\n}\n\nfor (const entry of bible) {\n  docs.push({\n    doc_type: 'bible_entry', doc_id: entry.id,\n    doc_title: '[' + entry.entry_type + '] ' + entry.name,\n    content: entry.entry_type + ': ' + entry.name + '\\nDescription: ' + entry.description + '\\nIntroduced: Chapter ' + entry.chapter_introduced\n  });\n}\n\nif (genreConfig.genre_name) {\n  docs.push({\n    doc_type: 'genre_config', doc_id: project.genre_slug,\n    doc_title: 'Genre: ' + genreConfig.genre_name,\n    content: 'Genre: ' + genreConfig.genre_name + '\\nDescription: ' + (genreConfig.description || '') + '\\nStyle: ' + (genreConfig.style_notes || '')\n  });\n}\n\nif (outline.premise) {\n  docs.push({\n    doc_type: 'premise', doc_id: 'premise',\n    doc_title: 'Book Premise',\n    content: 'Premise: ' + outline.premise + '\\nThemes: ' + (outline.themes || []).join(', ')\n  });\n}\n\nif (outline.story_arc_name) {\n  docs.push({\n    doc_type: 'book_arc', doc_id: 'book_arc',\n    doc_title: 'Book Story Arc: ' + outline.story_arc_name,\n    content: 'Story Arc: ' + outline.story_arc_name\n  });\n}\n\n// Delete old embeddings\nawait this.helpers.httpRequest({\n  method: 'DELETE',\n  url: SUPABASE_URL + '/rest/v1/writing_embeddings_v2?project_id=eq.' + projectId + '&user_id=eq.' + encodeURIComponent(userId),\n  headers: readHeaders\n});\n\n// Output all docs as separate items for batching\nreturn docs.map(d => ({ json: { ...d, project_id: projectId, user_id: userId, project_title: project.title, total_docs: docs.length } }));\n"
+        },
+        "id": "embed-prepare",
+        "name": "prepare_documents",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          240,
+          96
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.openai.com/v1/embeddings",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "openAiApi",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ model: 'text-embedding-3-small', input: $json.content }) }}",
+          "options": {
+            "timeout": 30000
+          }
+        },
+        "id": "embed-openai",
+        "name": "get_embedding",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          464,
+          96
+        ],
+        "credentials": {
+          "openAiApi": {
+            "id": "xSzPIySN61drme77",
+            "name": "OpenAi account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// Save all embeddings to Supabase\nconst SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_API_KEY = 'REDACTED_SUPABASE_KEY';\nconst headers = { 'apikey': SUPABASE_API_KEY, 'Authorization': 'Bearer ' + SUPABASE_API_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' };\n\nconst items = $input.all();\nconst prepItems = $('prepare_documents').all();\nlet saved = 0;\n\n// Batch insert in groups of 20\nconst rows = [];\nfor (let i = 0; i < items.length; i++) {\n  const embData = items[i].json.data ? items[i].json.data[0] : items[i].json;\n  const doc = prepItems[i].json;\n  if (!embData.embedding) continue;\n  rows.push({\n    user_id: doc.user_id,\n    project_id: doc.project_id,\n    doc_type: doc.doc_type,\n    doc_id: doc.doc_id,\n    doc_title: doc.doc_title,\n    content: doc.content,\n    metadata: {},\n    embedding: JSON.stringify(embData.embedding)\n  });\n}\n\nfor (let i = 0; i < rows.length; i += 20) {\n  const batch = rows.slice(i, i + 20);\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: SUPABASE_URL + '/rest/v1/writing_embeddings_v2',\n    headers,\n    body: JSON.stringify(batch)\n  });\n  saved += batch.length;\n}\n\nreturn [{ json: { result: 'Saved ' + saved + ' embeddings', saved_count: saved } }];\n"
+        },
+        "id": "embed-save",
+        "name": "save_embedding",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          688,
+          96
+        ]
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "r1",
+                "name": "result",
+                "value": "={{ 'Embedded ' + $input.all().length + ' documents' }}",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "embed-result",
+        "name": "set_result",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          912,
+          96
+        ]
+      }
+    ],
+    "connections": {
+      "webhook_trigger": {
+        "main": [
+          [
+            {
+              "node": "normalize_input",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "workflow_trigger": {
+        "main": [
+          [
+            {
+              "node": "normalize_input",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "normalize_input": {
+        "main": [
+          [
+            {
+              "node": "prepare_documents",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "prepare_documents": {
+        "main": [
+          [
+            {
+              "node": "get_embedding",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "get_embedding": {
+        "main": [
+          [
+            {
+              "node": "save_embedding",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "save_embedding": {
+        "main": [
+          [
+            {
+              "node": "set_result",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Eric Beser",
+    "name": "Version e1c84a66",
+    "description": "changed layout",
+    "autosaved": true,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-29T16:28:46.829Z",
+        "id": 1381,
+        "workflowId": "DTjjVk51Z9aHgAg0",
+        "versionId": "e1c84a66-a685-4df5-a0df-117fa76a25bb",
+        "event": "activated",
+        "userId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      }
+    ]
+  }
+}

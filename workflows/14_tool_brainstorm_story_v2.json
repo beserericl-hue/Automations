@@ -1,6 +1,11 @@
 {
+  "updatedAt": "2026-03-28T20:17:11.305Z",
+  "createdAt": "2026-03-15T16:42:22.611Z",
   "id": "RbKpigBMgbRG8EZn",
   "name": "Tool - Brainstorm Story V2",
+  "description": null,
+  "active": true,
+  "isArchived": false,
   "nodes": [
     {
       "parameters": {
@@ -45,7 +50,7 @@
       "typeVersion": 1.1,
       "position": [
         0,
-        0
+        96
       ]
     },
     {
@@ -57,8 +62,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        220,
-        0
+        224,
+        96
       ]
     },
     {
@@ -90,8 +95,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        440,
-        0
+        448,
+        96
       ]
     },
     {
@@ -119,8 +124,8 @@
       "type": "n8n-nodes-base.perplexity",
       "typeVersion": 1,
       "position": [
-        660,
-        0
+        672,
+        96
       ],
       "credentials": {
         "perplexityApi": {
@@ -138,8 +143,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        880,
-        0
+        896,
+        96
       ]
     },
     {
@@ -154,8 +159,8 @@
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.7,
       "position": [
-        1100,
-        0
+        1120,
+        96
       ]
     },
     {
@@ -175,8 +180,8 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
       "position": [
-        1100,
-        208
+        1128,
+        320
       ],
       "credentials": {
         "anthropicApi": {
@@ -195,21 +200,21 @@
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.3,
       "position": [
-        1300,
-        208
+        1256,
+        320
       ]
     },
     {
       "parameters": {
-        "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst userId = $('settings').first().json.userId || '';\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };\nconst readHeaders = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey };\nconst trigger = $('workflow_trigger').first().json;\nconst outline = $input.first().json.output || {};\n// Inject story arc name into the outline so write_chapter knows which arc to follow\nconst storyArcName = $('settings').first().json.story_arc_name || '';\nif (storyArcName) outline.story_arc_name = storyArcName;\nconst title = outline.title || trigger.project_title || 'Untitled';\nconst genreSlug = trigger.genre_slug;\n\n// Try to find existing project\nlet project = null;\ntry {\n  const resp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: supabaseUrl + '/rest/v1/writing_projects_v2?title=eq.' + encodeURIComponent(title) + '&limit=1&user_id=eq.' + encodeURIComponent(userId),\n    headers: readHeaders\n  });\n  if (Array.isArray(resp) && resp.length > 0 && resp[0].id) project = resp[0];\n} catch (e) {}\n\nif (project) {\n  // Snapshot the existing outline before overwriting\n  if (project.outline && Object.keys(project.outline).length > 0) {\n    try {\n      // Get current max version number\n      const verResp = await this.helpers.httpRequest({\n        method: 'GET',\n        url: supabaseUrl + '/rest/v1/outline_versions_v2?project_id=eq.' + project.id + '&order=version_number.desc&limit=1&select=version_number&user_id=eq.' + encodeURIComponent(userId),\n        headers: readHeaders\n      });\n      const maxVersion = (Array.isArray(verResp) && verResp.length > 0) ? verResp[0].version_number : 0;\n      // Save snapshot of the PREVIOUS outline\n      await this.helpers.httpRequest({\n        method: 'POST',\n        url: supabaseUrl + '/rest/v1/outline_versions_v2',\n        headers,\n        body: {\n          project_id: project.id,\n          version_number: maxVersion + 1,\n          outline: project.outline,\n          revision_note: 'Auto-snapshot before revision',\n          user_id: userId\n        }\n      });\n    } catch (e) { /* outline_versions table may not exist yet \u2014 continue */ }\n  }\n  // Update existing project with new outline\n  await this.helpers.httpRequest({\n    method: 'PATCH',\n    url: supabaseUrl + '/rest/v1/writing_projects_v2?id=eq.' + project.id + '&user_id=eq.' + encodeURIComponent(userId),\n    headers,\n    body: { outline: outline, genre_slug: genreSlug, updated_at: new Date().toISOString() }\n  });\n} else {\n  // Create new project\n  const created = await this.helpers.httpRequest({\n    method: 'POST',\n    url: supabaseUrl + '/rest/v1/writing_projects_v2',\n    headers,\n    body: { title, genre_slug: genreSlug, project_type: 'story', status: 'outlined', outline: outline, chapter_count: (outline.chapters || []).length, user_id: userId }\n  });\n  project = Array.isArray(created) ? created[0] : created;\n}\n\nreturn [{ json: { outline, project_id: project?.id || null, title } }];"
+        "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst userId = $('settings').first().json.userId || '';\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };\nconst readHeaders = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey };\nconst trigger = $('workflow_trigger').first().json;\nconst outline = $input.first().json.output || {};\n// Inject story arc name into the outline so write_chapter knows which arc to follow\nconst storyArcName = $('settings').first().json.story_arc_name || outline.story_arc_name || 'Three-Act Structure';\noutline.story_arc_name = storyArcName;\nconst title = outline.title || trigger.project_title || 'Untitled';\nconst genreSlug = trigger.genre_slug;\n\n// Try to find existing project\nlet project = null;\ntry {\n  const resp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: supabaseUrl + '/rest/v1/writing_projects_v2?title=eq.' + encodeURIComponent(title) + '&limit=1&user_id=eq.' + encodeURIComponent(userId),\n    headers: readHeaders\n  });\n  if (Array.isArray(resp) && resp.length > 0 && resp[0].id) project = resp[0];\n} catch (e) {}\n\nif (project) {\n  // Snapshot the existing outline before overwriting\n  if (project.outline && Object.keys(project.outline).length > 0) {\n    try {\n      // Get current max version number\n      const verResp = await this.helpers.httpRequest({\n        method: 'GET',\n        url: supabaseUrl + '/rest/v1/outline_versions_v2?project_id=eq.' + project.id + '&order=version_number.desc&limit=1&select=version_number&user_id=eq.' + encodeURIComponent(userId),\n        headers: readHeaders\n      });\n      const maxVersion = (Array.isArray(verResp) && verResp.length > 0) ? verResp[0].version_number : 0;\n      // Save snapshot of the PREVIOUS outline\n      await this.helpers.httpRequest({\n        method: 'POST',\n        url: supabaseUrl + '/rest/v1/outline_versions_v2',\n        headers,\n        body: {\n          project_id: project.id,\n          version_number: maxVersion + 1,\n          outline: project.outline,\n          revision_note: 'Auto-snapshot before revision',\n          user_id: userId\n        }\n      });\n    } catch (e) { /* outline_versions table may not exist yet \u2014 continue */ }\n  }\n  // MERGE: preserve existing chapter_outline data that the new outline doesn't include\n  if (project.outline && project.outline.chapters && outline.chapters) {\n    const existingChapters = {};\n    for (const ch of project.outline.chapters) {\n      if (ch.chapter_outline && ch.chapter_outline.sub_chapters && ch.chapter_outline.sub_chapters.length > 0) {\n        existingChapters[ch.number] = ch.chapter_outline;\n      }\n    }\n    for (const ch of outline.chapters) {\n      if (!ch.chapter_outline || !ch.chapter_outline.sub_chapters || ch.chapter_outline.sub_chapters.length === 0) {\n        if (existingChapters[ch.number]) {\n          ch.chapter_outline = existingChapters[ch.number];\n        }\n      }\n    }\n  }\n\n  // Update existing project with merged outline\n  await this.helpers.httpRequest({\n    method: 'PATCH',\n    url: supabaseUrl + '/rest/v1/writing_projects_v2?id=eq.' + project.id + '&user_id=eq.' + encodeURIComponent(userId),\n    headers,\n    body: { outline: outline, genre_slug: genreSlug, updated_at: new Date().toISOString() }\n  });\n} else {\n  // Create new project\n  const created = await this.helpers.httpRequest({\n    method: 'POST',\n    url: supabaseUrl + '/rest/v1/writing_projects_v2',\n    headers,\n    body: { title, genre_slug: genreSlug, project_type: 'story', status: 'outlined', outline: outline, chapter_count: (outline.chapters || []).length, user_id: userId }\n  });\n  project = Array.isArray(created) ? created[0] : created;\n}\n\n// Trigger embedding pipeline (async, don't wait)\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: supabaseUrl + '/rest/v1/rpc/match_writing_documents',\n    headers: { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },\n    body: JSON.stringify({ query_embedding: Array(1536).fill(0), match_count: 0 })\n  });\n} catch (e) { /* just testing connection */ }\n\nreturn [{ json: { outline, project_id: project?.id || null, title, embed_needed: true } }];"
       },
       "id": "bs-save",
       "name": "save_outline",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1320,
-        0
+        1472,
+        96
       ]
     },
     {
@@ -227,9 +232,10 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        1540,
+        1696,
         0
       ],
+      "webhookId": "8c732a98-a20c-4fb2-ab14-0de390505729",
       "credentials": {
         "gmailOAuth2": {
           "id": "CPCSZOInV8Zj1PI1",
@@ -256,9 +262,121 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1760,
+        1920,
         0
       ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "DTjjVk51Z9aHgAg0",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "project_id": "={{ $json.project_id || '' }}",
+            "user_id": "={{ $('workflow_trigger').first().json.user_id || '' }}",
+            "openai_api_key": ""
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "project_id",
+              "displayName": "project_id",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "openai_api_key",
+              "displayName": "openai_api_key",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "embed-call",
+      "name": "re_embed_project",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1696,
+        192
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "dk75OYTASeu6NkTr",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "execution_id": "={{ $execution.id }}",
+            "source_workflow_name": "Brainstorm Story V2"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "source_workflow_name",
+              "displayName": "source_workflow_name",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            }
+          ]
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "tt-call",
+      "name": "track_token_usage",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2144,
+        0
+      ],
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -357,6 +475,11 @@
             "node": "send_email",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "re_embed_project",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -371,11 +494,571 @@
           }
         ]
       ]
+    },
+    "set_result": {
+      "main": [
+        [
+          {
+            "node": "track_token_usage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
     "executionOrder": "v1",
     "callerPolicy": "workflowsFromSameOwner",
-    "availableInMCP": false
+    "availableInMCP": false,
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "3c5f8cc9-5736-4853-87bf-dc381148f269",
+  "activeVersionId": "3c5f8cc9-5736-4853-87bf-dc381148f269",
+  "versionCounter": 53,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-03-15T16:42:22.611Z",
+      "createdAt": "2026-03-15T16:42:22.611Z",
+      "role": "workflow:owner",
+      "workflowId": "RbKpigBMgbRG8EZn",
+      "projectId": "so6FfyLmNOjnxEMJ",
+      "project": {
+        "updatedAt": "2026-01-12T16:36:13.622Z",
+        "createdAt": "2026-01-12T15:34:50.204Z",
+        "id": "so6FfyLmNOjnxEMJ",
+        "name": "Eric Beser <eric@agileadtesting.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-28T20:17:30.316Z",
+    "createdAt": "2026-03-28T20:17:11.312Z",
+    "versionId": "3c5f8cc9-5736-4853-87bf-dc381148f269",
+    "workflowId": "RbKpigBMgbRG8EZn",
+    "nodes": [
+      {
+        "parameters": {
+          "workflowInputs": {
+            "values": [
+              {
+                "name": "genre_slug"
+              },
+              {
+                "name": "initial_concept"
+              },
+              {
+                "name": "themes"
+              },
+              {
+                "name": "target_chapter_count"
+              },
+              {
+                "name": "project_title"
+              },
+              {
+                "name": "story_arc"
+              },
+              {
+                "name": "user_prompt"
+              },
+              {
+                "name": "recipient_email"
+              },
+              {
+                "name": "bcc_email"
+              },
+              {
+                "name": "user_id"
+              }
+            ]
+          }
+        },
+        "id": "bs-trigger",
+        "name": "workflow_trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [
+          0,
+          96
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_API_KEY = 'REDACTED_SUPABASE_KEY';\nconst trigger = $('workflow_trigger').first().json;\nconst userId = trigger.user_id || '';\n\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\nlet story_arc_prompt = '';\nlet story_arc_name = '';\ntry {\n  const rows = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${SUPABASE_URL}/rest/v1/app_config_v2?key=in.(recipient_email,bcc_email)&select=key,value&user_id=eq.${encodeURIComponent(userId)}`,\n    headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n  });\n  for (const row of rows) {\n    if (row.key === 'recipient_email' && !recipient_email) recipient_email = row.value;\n    if (row.key === 'bcc_email' && !bcc_email) bcc_email = row.value;\n  }\n} catch (e) {\n  if (!recipient_email) recipient_email = 'eric@agileadtesting.com';\n}\n\n// Load story arc from story_arcs table if specified (public table \u2014 no user_id filter)\nconst requestedArc = (trigger.story_arc || '').trim();\nif (requestedArc) {\n  try {\n    const arcs = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/story_arcs_v2?name=ilike.*${encodeURIComponent(requestedArc)}*&limit=1`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    if (Array.isArray(arcs) && arcs.length > 0) {\n      story_arc_prompt = arcs[0].prompt_text;\n      story_arc_name = arcs[0].name;\n    }\n  } catch (e) {}\n}\n\n// Fallback: if no arc specified or not found, load default from app_config\nif (!story_arc_prompt) {\n  try {\n    const cfgRows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/app_config_v2?key=eq.story_structure_guidelines&select=key,value&limit=1&user_id=eq.${encodeURIComponent(userId)}`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    if (Array.isArray(cfgRows) && cfgRows.length > 0) story_arc_prompt = cfgRows[0].value;\n  } catch (e) {}\n}\n\nreturn [{ json: { SUPABASE_URL, SUPABASE_API_KEY, userId, recipient_email, bcc_email: bcc_email || '', story_arc_prompt, story_arc_name } }];"
+        },
+        "id": "bs-settings",
+        "name": "settings",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          224,
+          96
+        ]
+      },
+      {
+        "parameters": {
+          "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/genre_config_v2?genre_slug=eq.{{ $('workflow_trigger').item.json.genre_slug }}&limit=1",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "apikey",
+                "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+              },
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+              }
+            ]
+          },
+          "options": {
+            "response": {
+              "response": {
+                "responseFormat": "json"
+              }
+            }
+          }
+        },
+        "id": "bs-genre",
+        "name": "get_genre_config",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          448,
+          96
+        ]
+      },
+      {
+        "parameters": {
+          "messages": {
+            "message": [
+              {
+                "content": "=You are a research assistant for fiction writing.",
+                "role": "system"
+              },
+              {
+                "content": "=Research for a {{ $('get_genre_config').first().json[0]?.genre_name || $('get_genre_config').first().json.genre_name || 'fiction' }} novel about: {{ $('workflow_trigger').item.json.initial_concept }}. Themes: {{ $('workflow_trigger').item.json.themes }}. Provide historical details, scientific accuracy, cultural context, real-world parallels, and inspiration sources."
+              }
+            ]
+          },
+          "simplify": true,
+          "options": {
+            "temperature": 0.1,
+            "searchRecency": "month"
+          },
+          "requestOptions": {}
+        },
+        "id": "bs-research",
+        "name": "research_concept",
+        "type": "n8n-nodes-base.perplexity",
+        "typeVersion": 1,
+        "position": [
+          672,
+          96
+        ],
+        "credentials": {
+          "perplexityApi": {
+            "id": "ggr9QCRobQVA6Lwb",
+            "name": "Perplexity account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const trigger = $('workflow_trigger').first().json;\nconst genre = $('get_genre_config').first().json;\nconst genreData = Array.isArray(genre) ? genre[0] : genre;\nconst research = $('research_concept').first().json.message || '';\nconst chapterCount = parseInt(trigger.target_chapter_count) || 10;\nconst storyArcPrompt = $('settings').first().json.story_arc_prompt || '';\nconst storyArcName = $('settings').first().json.story_arc_name || '';\nconst supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst userId = $('settings').first().json.userId || '';\n\n// Check for existing outline (this is a revision if one exists)\nlet existingOutline = null;\nlet isRevision = false;\nconst projectTitle = trigger.project_title || '';\nif (projectTitle) {\n  try {\n    const resp = await this.helpers.httpRequest({\n      method: 'GET',\n      url: supabaseUrl + '/rest/v1/writing_projects_v2?title=eq.' + encodeURIComponent(projectTitle) + '&select=outline&limit=1&user_id=eq.' + encodeURIComponent(userId),\n      headers: { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey }\n    });\n    if (Array.isArray(resp) && resp.length > 0 && resp[0].outline && Object.keys(resp[0].outline).length > 0) {\n      existingOutline = resp[0].outline;\n      isRevision = true;\n    }\n  } catch (e) {}\n}\n\nlet existingOutlineSection = '';\nif (isRevision && existingOutline) {\n  const charList = (existingOutline.characters || []).map(c => '- ' + c.name + ' (' + c.role + '): ' + (c.description || c.arc || '')).join('\\n');\n  const chapList = (existingOutline.chapters || []).map(ch => (ch.number || '?') + '. ' + ch.title + ': ' + ch.brief).join('\\n');\n  existingOutlineSection = `\\n\\n## EXISTING OUTLINE (THIS IS A REVISION)\\nThis story already has an outline. You are REVISING it, not creating from scratch.\\n\\n### \u26a0\ufe0f CHARACTER LOCK \u2014 DO NOT MODIFY \u26a0\ufe0f\\nThe following characters are LOCKED. You MUST include every single one of them in your revised outline with the SAME name, SAME role, and SAME arc description. Do NOT rename, merge, remove, replace, or rewrite any character. Do NOT change their role (Protagonist stays Protagonist, Antagonist stays Antagonist, etc.). The ONLY permitted character changes are:\\n- Adding NEW characters that the user explicitly requests\\n- Removing a character ONLY if the user explicitly says to remove them by name\\n- Modifying a character ONLY if the user explicitly names that character and describes the change\\n\\nIf the user asks to change the story arc, timeline, setting, chapter count, or plot structure, you MUST adapt the plot to fit these LOCKED characters \u2014 never the other way around.\\n\\n### LOCKED CHARACTERS (COPY THESE EXACTLY INTO YOUR OUTPUT)\\n${charList}\\n\\n### Existing Premise\\n${existingOutline.premise || ''}\\n\\n### Existing Themes\\n${Array.isArray(existingOutline.themes) ? existingOutline.themes.join(', ') : (existingOutline.themes || '')}\\n\\n### Existing Chapter Structure (may be restructured per user request)\\n${chapList}\\n`;\n}\n\nconst assignmentVerb = isRevision ? 'Revise the existing outline' : 'Create a detailed outline';\n\nconst prompt = `You are a master storyteller and book architect.\n\n## Genre: ${genreData?.genre_name || 'Fiction'}\n## Genre Guidelines: ${genreData?.writing_guidelines || ''}\n\n## Writing Prime Directive\nWrite like a human, not a machine. Use clear, everyday language and short sentences. Cut cliches \u2014 no revolutionize, game-changing, unleash, or delve. Get to the point \u2014 remove filler words. No hype, just facts. Be genuine. Show, don't tell \u2014 use concrete examples instead of vague claims. Stay focused. Keep descriptions tight. Respect the reader's intelligence. Write like you'd pitch a story to a smart friend. Skip unnecessary adjectives and adverbs.\n\n## Story Arc Framework${storyArcName ? ' \u2014 ' + storyArcName : ''}\nYou MUST use this story arc framework to structure the outline. Follow its acts, beats, and structural requirements exactly:\n\n${storyArcPrompt}\n\n## Research\n${research}${existingOutlineSection}\n\n## Assignment\n${assignmentVerb} for \"${projectTitle || 'Untitled'}\".\n\nCore concept / revision instructions: ${trigger.initial_concept}\nThemes: ${trigger.themes || 'To be determined'}\nTarget chapters/sections: ${chapterCount}\n\n## Requirements\nApply the Story Arc Framework above to design the plot. Follow the specified arc structure exactly \u2014 use its acts, beats, and structural requirements to shape every section of the outline. Include:\n1. story_arc_name: the name of the story arc framework being used (exactly: \"${storyArcName || 'Three-Act Structure'}\")\n2. A refined title and one-paragraph premise\n3. Core themes (3-5)\n4. Character profiles with clearly assigned roles (Protagonist, Antagonist, Dynamic, Static) with name, role, arc, and description${isRevision ? ' \u2014 START by copying every LOCKED CHARACTER from above exactly as listed (same name, role, arc), then add any new characters the user requested' : ''}\n5. Section/chapter breakdown with:\n   - Number and title (use 0 for Prologue, 1-N for chapters, and N+1 for Epilogue)\n   - 2-3 sentence brief of what happens\n   - Arc notes (which structural beat this represents, character development, theme progression)\n   - Research topics to explore for this section\n\nYou MUST include exactly ${chapterCount} numbered chapters (1 through ${chapterCount}). You MAY also include a Prologue (number: 0) before Chapter 1 and/or an Epilogue (number: ${chapterCount + 1}) after the final chapter if the story arc or premise calls for it. A Prologue works well for stories that need world-building context, a flash-forward hook, or historical framing. An Epilogue works well for stories that need closure beyond the climax, an epilogue jump in time, or a final twist. Do NOT force them \u2014 only include them when they serve the narrative.\n\nReturn as JSON matching the output schema exactly.${isRevision ? '\\n\\n## FINAL CHECK \u2014 CHARACTER VERIFICATION\\nBefore returning your JSON, verify that EVERY character listed in LOCKED CHARACTERS above appears in your output characters array with the same name and role. If any locked character is missing or renamed, you have made an error \u2014 go back and fix it. New characters may be added, but locked characters must never be removed or replaced.' : ''}`;\n\nreturn [{ json: { prompt } }];"
+        },
+        "id": "bs-prompt",
+        "name": "build_outline_prompt",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          896,
+          96
+        ]
+      },
+      {
+        "parameters": {
+          "promptType": "define",
+          "text": "={{ $json.prompt }}",
+          "hasOutputParser": true,
+          "batching": {}
+        },
+        "id": "bs-outline",
+        "name": "generate_outline",
+        "type": "@n8n/n8n-nodes-langchain.chainLlm",
+        "typeVersion": 1.7,
+        "position": [
+          1120,
+          96
+        ]
+      },
+      {
+        "parameters": {
+          "model": {
+            "__rl": true,
+            "value": "claude-sonnet-4-20250514",
+            "mode": "list",
+            "cachedResultName": "Claude Sonnet 4"
+          },
+          "options": {
+            "maxTokensToSample": 16000
+          }
+        },
+        "id": "bs-claude",
+        "name": "claude-sonnet",
+        "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+        "typeVersion": 1.3,
+        "position": [
+          1128,
+          320
+        ],
+        "credentials": {
+          "anthropicApi": {
+            "id": "5LhCYKsaFO3fF7II",
+            "name": "Anthropic account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "schemaType": "manual",
+          "inputSchema": "{\"type\": \"object\", \"properties\": {\"title\": {\"type\": \"string\"}, \"premise\": {\"type\": \"string\"}, \"themes\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}}, \"characters\": {\"type\": \"array\", \"items\": {\"type\": \"object\", \"properties\": {\"name\": {\"type\": \"string\"}, \"role\": {\"type\": \"string\"}, \"arc\": {\"type\": \"string\"}, \"description\": {\"type\": \"string\"}}}}, \"chapters\": {\"type\": \"array\", \"items\": {\"type\": \"object\", \"properties\": {\"number\": {\"type\": \"integer\"}, \"title\": {\"type\": \"string\"}, \"brief\": {\"type\": \"string\"}, \"arc_notes\": {\"type\": \"string\"}, \"research_topics\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}}}}}, \"story_arc_name\": {\"type\": \"string\"}}, \"required\": [\"title\", \"premise\", \"themes\", \"characters\", \"chapters\"]}"
+        },
+        "id": "bs-parser",
+        "name": "outline_parser",
+        "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+        "typeVersion": 1.3,
+        "position": [
+          1256,
+          320
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst userId = $('settings').first().json.userId || '';\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };\nconst readHeaders = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey };\nconst trigger = $('workflow_trigger').first().json;\nconst outline = $input.first().json.output || {};\n// Inject story arc name into the outline so write_chapter knows which arc to follow\nconst storyArcName = $('settings').first().json.story_arc_name || outline.story_arc_name || 'Three-Act Structure';\noutline.story_arc_name = storyArcName;\nconst title = outline.title || trigger.project_title || 'Untitled';\nconst genreSlug = trigger.genre_slug;\n\n// Try to find existing project\nlet project = null;\ntry {\n  const resp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: supabaseUrl + '/rest/v1/writing_projects_v2?title=eq.' + encodeURIComponent(title) + '&limit=1&user_id=eq.' + encodeURIComponent(userId),\n    headers: readHeaders\n  });\n  if (Array.isArray(resp) && resp.length > 0 && resp[0].id) project = resp[0];\n} catch (e) {}\n\nif (project) {\n  // Snapshot the existing outline before overwriting\n  if (project.outline && Object.keys(project.outline).length > 0) {\n    try {\n      // Get current max version number\n      const verResp = await this.helpers.httpRequest({\n        method: 'GET',\n        url: supabaseUrl + '/rest/v1/outline_versions_v2?project_id=eq.' + project.id + '&order=version_number.desc&limit=1&select=version_number&user_id=eq.' + encodeURIComponent(userId),\n        headers: readHeaders\n      });\n      const maxVersion = (Array.isArray(verResp) && verResp.length > 0) ? verResp[0].version_number : 0;\n      // Save snapshot of the PREVIOUS outline\n      await this.helpers.httpRequest({\n        method: 'POST',\n        url: supabaseUrl + '/rest/v1/outline_versions_v2',\n        headers,\n        body: {\n          project_id: project.id,\n          version_number: maxVersion + 1,\n          outline: project.outline,\n          revision_note: 'Auto-snapshot before revision',\n          user_id: userId\n        }\n      });\n    } catch (e) { /* outline_versions table may not exist yet \u2014 continue */ }\n  }\n  // MERGE: preserve existing chapter_outline data that the new outline doesn't include\n  if (project.outline && project.outline.chapters && outline.chapters) {\n    const existingChapters = {};\n    for (const ch of project.outline.chapters) {\n      if (ch.chapter_outline && ch.chapter_outline.sub_chapters && ch.chapter_outline.sub_chapters.length > 0) {\n        existingChapters[ch.number] = ch.chapter_outline;\n      }\n    }\n    for (const ch of outline.chapters) {\n      if (!ch.chapter_outline || !ch.chapter_outline.sub_chapters || ch.chapter_outline.sub_chapters.length === 0) {\n        if (existingChapters[ch.number]) {\n          ch.chapter_outline = existingChapters[ch.number];\n        }\n      }\n    }\n  }\n\n  // Update existing project with merged outline\n  await this.helpers.httpRequest({\n    method: 'PATCH',\n    url: supabaseUrl + '/rest/v1/writing_projects_v2?id=eq.' + project.id + '&user_id=eq.' + encodeURIComponent(userId),\n    headers,\n    body: { outline: outline, genre_slug: genreSlug, updated_at: new Date().toISOString() }\n  });\n} else {\n  // Create new project\n  const created = await this.helpers.httpRequest({\n    method: 'POST',\n    url: supabaseUrl + '/rest/v1/writing_projects_v2',\n    headers,\n    body: { title, genre_slug: genreSlug, project_type: 'story', status: 'outlined', outline: outline, chapter_count: (outline.chapters || []).length, user_id: userId }\n  });\n  project = Array.isArray(created) ? created[0] : created;\n}\n\n// Trigger embedding pipeline (async, don't wait)\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: supabaseUrl + '/rest/v1/rpc/match_writing_documents',\n    headers: { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },\n    body: JSON.stringify({ query_embedding: Array(1536).fill(0), match_count: 0 })\n  });\n} catch (e) { /* just testing connection */ }\n\nreturn [{ json: { outline, project_id: project?.id || null, title, embed_needed: true } }];"
+        },
+        "id": "bs-save",
+        "name": "save_outline",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1472,
+          96
+        ]
+      },
+      {
+        "parameters": {
+          "sendTo": "={{ $('settings').item.json.recipient_email }}",
+          "subject": "=Story Outline: {{ $('save_outline').item.json.title }}",
+          "message": "={{ $('workflow_trigger').first().json.user_prompt ? '<div style=\"background:#f0f0f0; border-left:4px solid #666; padding:12px 16px; margin-bottom:24px; font-family:sans-serif; font-size:14px; color:#333;\"><strong>Command:</strong> ' + $('workflow_trigger').first().json.user_prompt + '</div>' : '' }}<h2>{{ $json.title }}</h2>\n<p><strong>Premise:</strong> {{ $json.outline?.premise }}</p>\n<h3>Themes</h3>\n<ul>{{ ($json.outline?.themes || []).map(t => '<li>' + t + '</li>').join('') }}</ul>\n<h3>Characters</h3>\n<table style=\"border-collapse:collapse;width:100%;\"><tr style=\"background:#f5f5f5;\"><th style=\"padding:8px;border:1px solid #ddd;\">Name</th><th style=\"padding:8px;border:1px solid #ddd;\">Role</th><th style=\"padding:8px;border:1px solid #ddd;\">Arc</th></tr>{{ ($json.outline?.characters || []).map(c => '<tr><td style=\"padding:8px;border:1px solid #ddd;font-weight:bold;\">' + c.name + '</td><td style=\"padding:8px;border:1px solid #ddd;\">' + c.role + '</td><td style=\"padding:8px;border:1px solid #ddd;\">' + c.arc + '</td></tr>').join('') }}</table>\n<h3>Section Outline</h3>\n{{ ($json.outline?.chapters || []).map(ch => '<div style=\"margin:12px 0;padding:12px;background:#f9f9f9;border-left:4px solid #333;\"><strong>Section ' + ch.number + ': ' + ch.title + '</strong><br>' + ch.brief + '<br><em style=\"color:#666;\">Arc: ' + (ch.arc_notes || '') + '</em></div>').join('') }}",
+          "options": {
+            "appendAttribution": false,
+            "bccList": "={{ $('settings').item.json.bcc_email }}"
+          }
+        },
+        "id": "bs-email",
+        "name": "send_email",
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2.1,
+        "position": [
+          1696,
+          0
+        ],
+        "webhookId": "8c732a98-a20c-4fb2-ab14-0de390505729",
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "CPCSZOInV8Zj1PI1",
+            "name": "Gmail account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "bsr1",
+                "name": "result",
+                "value": "=Story outline created for \"{{ $('save_outline').item.json.title }}\" with {{ ($('save_outline').item.json.outline?.chapters || []).length }} sections and {{ ($('save_outline').item.json.outline?.characters || []).length }} characters. Emailed and saved to writing projects.",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "bs-result",
+        "name": "set_result",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          1920,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "workflowId": {
+            "__rl": true,
+            "value": "DTjjVk51Z9aHgAg0",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "project_id": "={{ $json.project_id || '' }}",
+              "user_id": "={{ $('workflow_trigger').first().json.user_id || '' }}",
+              "openai_api_key": ""
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "project_id",
+                "displayName": "project_id",
+                "type": "string",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "removed": false
+              },
+              {
+                "id": "user_id",
+                "displayName": "user_id",
+                "type": "string",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "removed": false
+              },
+              {
+                "id": "openai_api_key",
+                "displayName": "openai_api_key",
+                "type": "string",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "removed": false
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "embed-call",
+        "name": "re_embed_project",
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.2,
+        "position": [
+          1696,
+          192
+        ],
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "workflowId": {
+            "__rl": true,
+            "value": "dk75OYTASeu6NkTr",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "execution_id": "={{ $execution.id }}",
+              "source_workflow_name": "Brainstorm Story V2"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "execution_id",
+                "displayName": "execution_id",
+                "type": "string",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "removed": false
+              },
+              {
+                "id": "source_workflow_name",
+                "displayName": "source_workflow_name",
+                "type": "string",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "removed": false
+              }
+            ]
+          },
+          "mode": "each",
+          "options": {
+            "waitForSubWorkflow": false
+          }
+        },
+        "id": "tt-call",
+        "name": "track_token_usage",
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.2,
+        "position": [
+          2144,
+          0
+        ],
+        "onError": "continueRegularOutput"
+      }
+    ],
+    "connections": {
+      "workflow_trigger": {
+        "main": [
+          [
+            {
+              "node": "settings",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "settings": {
+        "main": [
+          [
+            {
+              "node": "get_genre_config",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "get_genre_config": {
+        "main": [
+          [
+            {
+              "node": "research_concept",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "research_concept": {
+        "main": [
+          [
+            {
+              "node": "build_outline_prompt",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "build_outline_prompt": {
+        "main": [
+          [
+            {
+              "node": "generate_outline",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "generate_outline": {
+        "main": [
+          [
+            {
+              "node": "save_outline",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "claude-sonnet": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "generate_outline",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "outline_parser": {
+        "ai_outputParser": [
+          [
+            {
+              "node": "generate_outline",
+              "type": "ai_outputParser",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "save_outline": {
+        "main": [
+          [
+            {
+              "node": "send_email",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "re_embed_project",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "send_email": {
+        "main": [
+          [
+            {
+              "node": "set_result",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "set_result": {
+        "main": [
+          [
+            {
+              "node": "track_token_usage",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Eric Beser",
+    "name": "Version 3c5f8cc9",
+    "description": "fixed layout",
+    "autosaved": true,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-28T20:17:30.310Z",
+        "id": 1339,
+        "workflowId": "RbKpigBMgbRG8EZn",
+        "versionId": "3c5f8cc9-5736-4853-87bf-dc381148f269",
+        "event": "activated",
+        "userId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      }
+    ]
   }
 }

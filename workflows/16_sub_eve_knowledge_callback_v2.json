@@ -1,6 +1,11 @@
 {
-  "id": "PaFJlsxWq4BKt0iq",
-  "name": "Sub - Eve Knowledge Callback",
+  "updatedAt": "2026-03-17T11:30:26.670Z",
+  "createdAt": "2026-03-15T16:42:23.252Z",
+  "id": "Q0K3aQrBMhw48lCB",
+  "name": "Sub - Eve Knowledge Callback V2",
+  "description": null,
+  "active": true,
+  "isArchived": false,
   "nodes": [
     {
       "id": "ek-trigger",
@@ -36,7 +41,7 @@
             {
               "id": "s2",
               "name": "SUPABASE_API_KEY",
-              "value": "sb_publishable_HsIkelEZaIr0VauiB3GgIQ_59XJRoWc",
+              "value": "REDACTED_SUPABASE_KEY",
               "type": "string"
             },
             {
@@ -72,7 +77,7 @@
         0
       ],
       "parameters": {
-        "jsCode": "const elApiKey = $('settings').first().json.ELEVENLABS_API_KEY;\nconst agentId = $('settings').first().json.EVE_AGENT_ID;\nconst phoneNumberId = $('settings').first().json.PHONE_NUMBER_ID;\nconst elHeaders = { 'xi-api-key': elApiKey, 'Content-Type': 'application/json' };\n\nconst trigger = $('workflow_trigger').first().json;\nconst contentText = trigger.content_text || '';\nconst contentTitle = trigger.content_title || 'Untitled';\nconst contentType = trigger.content_type || 'content';\nconst callbackMode = trigger.callback_mode || 'review';\nconst self = this;\n\nif (contentText === '') {\n  return [{ json: { result: 'Error: No content_text provided for knowledge base injection.' } }];\n}\n\ntry {\n  // Step 0: Get the caller's phone number from most recent COMPLETED inbound call\n  const convosResp = await self.helpers.httpRequest({\n    method: 'GET',\n    url: 'https://api.elevenlabs.io/v1/convai/conversations?agent_id=' + agentId + '&page_size=10',\n    headers: elHeaders\n  });\n\n  var callbackPhone = '';\n  var eveAgentNumber = '';\n  const convos = convosResp.conversations || [];\n  for (var i = 0; i < convos.length; i++) {\n    // Only check completed calls\n    if (convos[i].status !== 'done') continue;\n\n    var convoDetail = await self.helpers.httpRequest({\n      method: 'GET',\n      url: 'https://api.elevenlabs.io/v1/convai/conversations/' + convos[i].conversation_id,\n      headers: elHeaders\n    });\n    var phoneCall = (convoDetail.metadata || {}).phone_call || {};\n    if (phoneCall.direction === 'inbound' && phoneCall.external_number) {\n      callbackPhone = phoneCall.external_number;\n      eveAgentNumber = phoneCall.agent_number || '';\n      break;\n    }\n  }\n\n  if (callbackPhone === '') {\n    return [{ json: { result: 'Error: Could not find caller phone number from recent conversations.' } }];\n  }\n\n  // SAFETY: Never call Eve's own number (would create infinite loop)\n  if (eveAgentNumber && callbackPhone === eveAgentNumber) {\n    return [{ json: { result: 'Error: Callback phone matches Eve agent number. Aborting to prevent loop.' } }];\n  }\n\n  // Step 1: Get current agent config\n  const agentResp = await self.helpers.httpRequest({\n    method: 'GET',\n    url: 'https://api.elevenlabs.io/v1/convai/agents/' + agentId,\n    headers: elHeaders\n  });\n\n  var cc = agentResp.conversation_config || {};\n  var ag = cc.agent || {};\n  var pr = ag.prompt || {};\n  var existingKB = pr.knowledge_base || [];\n\n  var sessionDocs = existingKB.filter(function(doc) {\n    return doc.name && doc.name.indexOf('Eve Session:') === 0;\n  });\n  var remainingKB = existingKB.filter(function(doc) {\n    return !(doc.name && doc.name.indexOf('Eve Session:') === 0);\n  });\n\n  // Step 2: Detach old session docs then delete\n  if (sessionDocs.length > 0) {\n    await self.helpers.httpRequest({\n      method: 'PATCH',\n      url: 'https://api.elevenlabs.io/v1/convai/agents/' + agentId,\n      headers: elHeaders,\n      body: JSON.stringify({ conversation_config: { agent: { prompt: { knowledge_base: remainingKB } } } })\n    });\n    for (var d = 0; d < sessionDocs.length; d++) {\n      try {\n        await self.helpers.httpRequest({\n          method: 'DELETE',\n          url: 'https://api.elevenlabs.io/v1/convai/knowledge-base/' + sessionDocs[d].id,\n          headers: { 'xi-api-key': elApiKey }\n        });\n      } catch (delErr) {}\n    }\n  }\n\n  // Step 3: Create new KB document\n  var timestamp = new Date().toISOString().replace(/[:.]/g, '-');\n  var docName = 'Eve Session: ' + contentType + ' - ' + contentTitle + ' - ' + timestamp;\n  var fileName = contentTitle.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50) + '.txt';\n\n  var boundary = '----n8nFormBoundary' + Date.now();\n  var formBody = '--' + boundary + '\\r\\n';\n  formBody += 'Content-Disposition: form-data; name=\"name\"\\r\\n\\r\\n';\n  formBody += docName + '\\r\\n';\n  formBody += '--' + boundary + '\\r\\n';\n  formBody += 'Content-Disposition: form-data; name=\"file\"; filename=\"' + fileName + '\"\\r\\n';\n  formBody += 'Content-Type: text/plain\\r\\n\\r\\n';\n  formBody += contentText + '\\r\\n';\n  formBody += '--' + boundary + '--\\r\\n';\n\n  var kbResp = await self.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.elevenlabs.io/v1/convai/knowledge-base',\n    headers: {\n      'xi-api-key': elApiKey,\n      'Content-Type': 'multipart/form-data; boundary=' + boundary\n    },\n    body: formBody\n  });\n\n  var newDocId = kbResp.id || kbResp.document_id || '';\n  if (newDocId === '') {\n    return [{ json: { result: 'Error: Failed to create KB doc. Response: ' + JSON.stringify(kbResp) } }];\n  }\n\n  // Step 4: Attach new KB doc to agent\n  var updatedKB = remainingKB.slice();\n  updatedKB.push({ type: 'file', id: newDocId, name: docName });\n\n  await self.helpers.httpRequest({\n    method: 'PATCH',\n    url: 'https://api.elevenlabs.io/v1/convai/agents/' + agentId,\n    headers: elHeaders,\n    body: JSON.stringify({ conversation_config: { agent: { prompt: { knowledge_base: updatedKB } } } })\n  });\n\n  // Step 5: Update first_message\n  var firstMessage = '';\n  if (callbackMode === 'brainstorm') {\n    firstMessage = 'Hey darling, I have got that ' + contentType.replace(/_/g, ' ') + ' loaded up, ' + contentTitle + '. Want me to summarize the key points first, or should we dive straight into brainstorming?';\n  } else {\n    firstMessage = 'Hey darling, I have got your ' + contentType.replace(/_/g, ' ') + ' loaded up, ' + contentTitle + '. Want the highlights first, or should we dive straight into revisions?';\n  }\n\n  await self.helpers.httpRequest({\n    method: 'PATCH',\n    url: 'https://api.elevenlabs.io/v1/convai/agents/' + agentId,\n    headers: elHeaders,\n    body: JSON.stringify({ conversation_config: { agent: { first_message: firstMessage } } })\n  });\n\n  // Step 6: Make outbound call to the caller's phone\n  var callResp = await self.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.elevenlabs.io/v1/convai/twilio/outbound-call',\n    headers: elHeaders,\n    body: JSON.stringify({\n      agent_id: agentId,\n      agent_phone_number_id: phoneNumberId,\n      to_number: callbackPhone\n    })\n  });\n\n  var callId = callResp.call_id || callResp.id || 'initiated';\n  return [{ json: { result: 'KB updated with \"' + contentTitle + '\" (' + contentText.length + ' chars). Calling ' + callbackPhone + ' in ' + callbackMode + ' mode. Call ID: ' + callId, call_id: callId, kb_doc_id: newDocId, callback_phone: callbackPhone } }];\n\n} catch (err) {\n  return [{ json: { result: 'Error in Eve callback flow: ' + err.message } }];\n}"
+        "jsCode": "const elApiKey = $('settings').first().json.ELEVENLABS_API_KEY;\nconst agentId = $('settings').first().json.EVE_AGENT_ID;\nconst phoneNumberId = $('settings').first().json.PHONE_NUMBER_ID;\nconst elHeaders = { 'xi-api-key': elApiKey, 'Content-Type': 'application/json' };\n\nconst trigger = $('workflow_trigger').first().json;\nconst contentText = trigger.content_text || '';\nconst contentTitle = trigger.content_title || 'Untitled';\nconst contentType = trigger.content_type || 'content';\nconst callbackMode = trigger.callback_mode || 'review';\nconst self = this;\n\nif (contentText === '') {\n  return [{ json: { result: 'Error: No content_text provided for knowledge base injection.' } }];\n}\n\ntry {\n  const convosResp = await self.helpers.httpRequest({\n    method: 'GET',\n    url: 'https://api.elevenlabs.io/v1/convai/conversations?agent_id=' + agentId + '&page_size=10',\n    headers: elHeaders\n  });\n\n  var callbackPhone = '';\n  var eveAgentNumber = '';\n  const convos = convosResp.conversations || [];\n  for (var i = 0; i < convos.length; i++) {\n    if (convos[i].status !== 'done') continue;\n\n    var convoDetail = await self.helpers.httpRequest({\n      method: 'GET',\n      url: 'https://api.elevenlabs.io/v1/convai/conversations/' + convos[i].conversation_id,\n      headers: elHeaders\n    });\n    var phoneCall = (convoDetail.metadata || {}).phone_call || {};\n    if (phoneCall.direction === 'inbound' && phoneCall.external_number) {\n      callbackPhone = phoneCall.external_number;\n      eveAgentNumber = phoneCall.agent_number || '';\n      break;\n    }\n  }\n\n  if (callbackPhone === '') {\n    return [{ json: { result: 'Error: Could not find caller phone number from recent conversations.' } }];\n  }\n\n  if (eveAgentNumber && callbackPhone === eveAgentNumber) {\n    return [{ json: { result: 'Error: Callback phone matches Eve agent number. Aborting to prevent loop.' } }];\n  }\n\n  const agentResp = await self.helpers.httpRequest({\n    method: 'GET',\n    url: 'https://api.elevenlabs.io/v1/convai/agents/' + agentId,\n    headers: elHeaders\n  });\n\n  var cc = agentResp.conversation_config || {};\n  var ag = cc.agent || {};\n  var pr = ag.prompt || {};\n  var existingKB = pr.knowledge_base || [];\n\n  var sessionDocs = existingKB.filter(function(doc) {\n    return doc.name && doc.name.indexOf('Eve Session:') === 0;\n  });\n  var remainingKB = existingKB.filter(function(doc) {\n    return !(doc.name && doc.name.indexOf('Eve Session:') === 0);\n  });\n\n  if (sessionDocs.length > 0) {\n    await self.helpers.httpRequest({\n      method: 'PATCH',\n      url: 'https://api.elevenlabs.io/v1/convai/agents/' + agentId,\n      headers: elHeaders,\n      body: JSON.stringify({ conversation_config: { agent: { prompt: { knowledge_base: remainingKB } } } })\n    });\n    for (var d = 0; d < sessionDocs.length; d++) {\n      try {\n        await self.helpers.httpRequest({\n          method: 'DELETE',\n          url: 'https://api.elevenlabs.io/v1/convai/knowledge-base/' + sessionDocs[d].id,\n          headers: { 'xi-api-key': elApiKey }\n        });\n      } catch (delErr) {}\n    }\n  }\n\n  var timestamp = new Date().toISOString().replace(/[:.]/g, '-');\n  var docName = 'Eve Session: ' + contentType + ' - ' + contentTitle + ' - ' + timestamp;\n  var fileName = contentTitle.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50) + '.txt';\n\n  var boundary = '----n8nFormBoundary' + Date.now();\n  var formBody = '--' + boundary + '\\r\\n';\n  formBody += 'Content-Disposition: form-data; name=\"name\"\\r\\n\\r\\n';\n  formBody += docName + '\\r\\n';\n  formBody += '--' + boundary + '\\r\\n';\n  formBody += 'Content-Disposition: form-data; name=\"file\"; filename=\"' + fileName + '\"\\r\\n';\n  formBody += 'Content-Type: text/plain\\r\\n\\r\\n';\n  formBody += contentText + '\\r\\n';\n  formBody += '--' + boundary + '--\\r\\n';\n\n  var kbResp = await self.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.elevenlabs.io/v1/convai/knowledge-base',\n    headers: {\n      'xi-api-key': elApiKey,\n      'Content-Type': 'multipart/form-data; boundary=' + boundary\n    },\n    body: formBody\n  });\n\n  var newDocId = kbResp.id || kbResp.document_id || '';\n  if (newDocId === '') {\n    return [{ json: { result: 'Error: Failed to create KB doc. Response: ' + JSON.stringify(kbResp) } }];\n  }\n\n  var updatedKB = remainingKB.slice();\n  updatedKB.push({ type: 'file', id: newDocId, name: docName });\n\n  await self.helpers.httpRequest({\n    method: 'PATCH',\n    url: 'https://api.elevenlabs.io/v1/convai/agents/' + agentId,\n    headers: elHeaders,\n    body: JSON.stringify({ conversation_config: { agent: { prompt: { knowledge_base: updatedKB } } } })\n  });\n\n  var firstMessage = '';\n  if (callbackMode === 'brainstorm') {\n    firstMessage = 'Hey darling, I have got that ' + contentType.replace(/_/g, ' ') + ' loaded up, ' + contentTitle + '. Want me to summarize the key points first, or should we dive straight into brainstorming?';\n  } else {\n    firstMessage = 'Hey darling, I have got your ' + contentType.replace(/_/g, ' ') + ' loaded up, ' + contentTitle + '. Want the highlights first, or should we dive straight into revisions?';\n  }\n\n  await self.helpers.httpRequest({\n    method: 'PATCH',\n    url: 'https://api.elevenlabs.io/v1/convai/agents/' + agentId,\n    headers: elHeaders,\n    body: JSON.stringify({ conversation_config: { agent: { first_message: firstMessage } } })\n  });\n\n  var callResp = await self.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.elevenlabs.io/v1/convai/twilio/outbound-call',\n    headers: elHeaders,\n    body: JSON.stringify({\n      agent_id: agentId,\n      agent_phone_number_id: phoneNumberId,\n      to_number: callbackPhone\n    })\n  });\n\n  var callId = callResp.call_id || callResp.id || 'initiated';\n\n  try {\n    await self.helpers.httpRequest({\n      method: 'POST',\n      url: 'https://n8n.agileadautomation.com/webhook/reset-eve-greeting',\n      headers: { 'Content-Type': 'application/json' },\n      body: JSON.stringify({ agent_id: agentId, api_key: elApiKey })\n    });\n  } catch (resetErr) {}\n\n  return [{ json: { result: 'KB updated with \"' + contentTitle + '\" (' + contentText.length + ' chars). Calling ' + callbackPhone + ' in ' + callbackMode + ' mode. Call ID: ' + callId, call_id: callId, kb_doc_id: newDocId, callback_phone: callbackPhone } }];\n\n} catch (err) {\n  return [{ json: { result: 'Error in Eve callback flow: ' + err.message } }];\n}"
       }
     },
     {
@@ -139,6 +144,192 @@
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
   },
+  "staticData": null,
   "meta": null,
-  "pinData": {}
+  "pinData": null,
+  "versionId": "2d6061e8-3a82-4fd7-8b8f-5ddd7c114b6b",
+  "activeVersionId": "2d6061e8-3a82-4fd7-8b8f-5ddd7c114b6b",
+  "versionCounter": 29,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-03-15T16:42:23.252Z",
+      "createdAt": "2026-03-15T16:42:23.252Z",
+      "role": "workflow:owner",
+      "workflowId": "Q0K3aQrBMhw48lCB",
+      "projectId": "so6FfyLmNOjnxEMJ",
+      "project": {
+        "updatedAt": "2026-01-12T16:36:13.622Z",
+        "createdAt": "2026-01-12T15:34:50.204Z",
+        "id": "so6FfyLmNOjnxEMJ",
+        "name": "Eric Beser <eric@agileadtesting.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-17T11:30:26.673Z",
+    "createdAt": "2026-03-17T11:30:26.673Z",
+    "versionId": "2d6061e8-3a82-4fd7-8b8f-5ddd7c114b6b",
+    "workflowId": "Q0K3aQrBMhw48lCB",
+    "nodes": [
+      {
+        "id": "ek-trigger",
+        "name": "workflow_trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [
+          0,
+          0
+        ],
+        "parameters": {
+          "inputSource": "passthrough"
+        }
+      },
+      {
+        "id": "ek-settings",
+        "name": "settings",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          220,
+          0
+        ],
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "s1",
+                "name": "SUPABASE_URL",
+                "value": "https://faklxfakgzkpkbxfihzh.supabase.co",
+                "type": "string"
+              },
+              {
+                "id": "s2",
+                "name": "SUPABASE_API_KEY",
+                "value": "REDACTED_SUPABASE_KEY",
+                "type": "string"
+              },
+              {
+                "id": "s3",
+                "name": "ELEVENLABS_API_KEY",
+                "value": "03bdc156dc98ef157baf2090e148f6141952e6ba115b8ad4cc5c364ec5fbc9ff",
+                "type": "string"
+              },
+              {
+                "id": "s4",
+                "name": "EVE_AGENT_ID",
+                "value": "agent_2801kks580vnf5q80j3bd0n0x45v",
+                "type": "string"
+              },
+              {
+                "id": "s5",
+                "name": "PHONE_NUMBER_ID",
+                "value": "phnum_8201kectdg3ze30shnq7wsm8bm84",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "ek-handler",
+        "name": "eve_callback",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          480,
+          0
+        ],
+        "parameters": {
+          "jsCode": "const elApiKey = $('settings').first().json.ELEVENLABS_API_KEY;\nconst agentId = $('settings').first().json.EVE_AGENT_ID;\nconst phoneNumberId = $('settings').first().json.PHONE_NUMBER_ID;\nconst elHeaders = { 'xi-api-key': elApiKey, 'Content-Type': 'application/json' };\n\nconst trigger = $('workflow_trigger').first().json;\nconst contentText = trigger.content_text || '';\nconst contentTitle = trigger.content_title || 'Untitled';\nconst contentType = trigger.content_type || 'content';\nconst callbackMode = trigger.callback_mode || 'review';\nconst self = this;\n\nif (contentText === '') {\n  return [{ json: { result: 'Error: No content_text provided for knowledge base injection.' } }];\n}\n\ntry {\n  const convosResp = await self.helpers.httpRequest({\n    method: 'GET',\n    url: 'https://api.elevenlabs.io/v1/convai/conversations?agent_id=' + agentId + '&page_size=10',\n    headers: elHeaders\n  });\n\n  var callbackPhone = '';\n  var eveAgentNumber = '';\n  const convos = convosResp.conversations || [];\n  for (var i = 0; i < convos.length; i++) {\n    if (convos[i].status !== 'done') continue;\n\n    var convoDetail = await self.helpers.httpRequest({\n      method: 'GET',\n      url: 'https://api.elevenlabs.io/v1/convai/conversations/' + convos[i].conversation_id,\n      headers: elHeaders\n    });\n    var phoneCall = (convoDetail.metadata || {}).phone_call || {};\n    if (phoneCall.direction === 'inbound' && phoneCall.external_number) {\n      callbackPhone = phoneCall.external_number;\n      eveAgentNumber = phoneCall.agent_number || '';\n      break;\n    }\n  }\n\n  if (callbackPhone === '') {\n    return [{ json: { result: 'Error: Could not find caller phone number from recent conversations.' } }];\n  }\n\n  if (eveAgentNumber && callbackPhone === eveAgentNumber) {\n    return [{ json: { result: 'Error: Callback phone matches Eve agent number. Aborting to prevent loop.' } }];\n  }\n\n  const agentResp = await self.helpers.httpRequest({\n    method: 'GET',\n    url: 'https://api.elevenlabs.io/v1/convai/agents/' + agentId,\n    headers: elHeaders\n  });\n\n  var cc = agentResp.conversation_config || {};\n  var ag = cc.agent || {};\n  var pr = ag.prompt || {};\n  var existingKB = pr.knowledge_base || [];\n\n  var sessionDocs = existingKB.filter(function(doc) {\n    return doc.name && doc.name.indexOf('Eve Session:') === 0;\n  });\n  var remainingKB = existingKB.filter(function(doc) {\n    return !(doc.name && doc.name.indexOf('Eve Session:') === 0);\n  });\n\n  if (sessionDocs.length > 0) {\n    await self.helpers.httpRequest({\n      method: 'PATCH',\n      url: 'https://api.elevenlabs.io/v1/convai/agents/' + agentId,\n      headers: elHeaders,\n      body: JSON.stringify({ conversation_config: { agent: { prompt: { knowledge_base: remainingKB } } } })\n    });\n    for (var d = 0; d < sessionDocs.length; d++) {\n      try {\n        await self.helpers.httpRequest({\n          method: 'DELETE',\n          url: 'https://api.elevenlabs.io/v1/convai/knowledge-base/' + sessionDocs[d].id,\n          headers: { 'xi-api-key': elApiKey }\n        });\n      } catch (delErr) {}\n    }\n  }\n\n  var timestamp = new Date().toISOString().replace(/[:.]/g, '-');\n  var docName = 'Eve Session: ' + contentType + ' - ' + contentTitle + ' - ' + timestamp;\n  var fileName = contentTitle.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50) + '.txt';\n\n  var boundary = '----n8nFormBoundary' + Date.now();\n  var formBody = '--' + boundary + '\\r\\n';\n  formBody += 'Content-Disposition: form-data; name=\"name\"\\r\\n\\r\\n';\n  formBody += docName + '\\r\\n';\n  formBody += '--' + boundary + '\\r\\n';\n  formBody += 'Content-Disposition: form-data; name=\"file\"; filename=\"' + fileName + '\"\\r\\n';\n  formBody += 'Content-Type: text/plain\\r\\n\\r\\n';\n  formBody += contentText + '\\r\\n';\n  formBody += '--' + boundary + '--\\r\\n';\n\n  var kbResp = await self.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.elevenlabs.io/v1/convai/knowledge-base',\n    headers: {\n      'xi-api-key': elApiKey,\n      'Content-Type': 'multipart/form-data; boundary=' + boundary\n    },\n    body: formBody\n  });\n\n  var newDocId = kbResp.id || kbResp.document_id || '';\n  if (newDocId === '') {\n    return [{ json: { result: 'Error: Failed to create KB doc. Response: ' + JSON.stringify(kbResp) } }];\n  }\n\n  var updatedKB = remainingKB.slice();\n  updatedKB.push({ type: 'file', id: newDocId, name: docName });\n\n  await self.helpers.httpRequest({\n    method: 'PATCH',\n    url: 'https://api.elevenlabs.io/v1/convai/agents/' + agentId,\n    headers: elHeaders,\n    body: JSON.stringify({ conversation_config: { agent: { prompt: { knowledge_base: updatedKB } } } })\n  });\n\n  var firstMessage = '';\n  if (callbackMode === 'brainstorm') {\n    firstMessage = 'Hey darling, I have got that ' + contentType.replace(/_/g, ' ') + ' loaded up, ' + contentTitle + '. Want me to summarize the key points first, or should we dive straight into brainstorming?';\n  } else {\n    firstMessage = 'Hey darling, I have got your ' + contentType.replace(/_/g, ' ') + ' loaded up, ' + contentTitle + '. Want the highlights first, or should we dive straight into revisions?';\n  }\n\n  await self.helpers.httpRequest({\n    method: 'PATCH',\n    url: 'https://api.elevenlabs.io/v1/convai/agents/' + agentId,\n    headers: elHeaders,\n    body: JSON.stringify({ conversation_config: { agent: { first_message: firstMessage } } })\n  });\n\n  var callResp = await self.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.elevenlabs.io/v1/convai/twilio/outbound-call',\n    headers: elHeaders,\n    body: JSON.stringify({\n      agent_id: agentId,\n      agent_phone_number_id: phoneNumberId,\n      to_number: callbackPhone\n    })\n  });\n\n  var callId = callResp.call_id || callResp.id || 'initiated';\n\n  try {\n    await self.helpers.httpRequest({\n      method: 'POST',\n      url: 'https://n8n.agileadautomation.com/webhook/reset-eve-greeting',\n      headers: { 'Content-Type': 'application/json' },\n      body: JSON.stringify({ agent_id: agentId, api_key: elApiKey })\n    });\n  } catch (resetErr) {}\n\n  return [{ json: { result: 'KB updated with \"' + contentTitle + '\" (' + contentText.length + ' chars). Calling ' + callbackPhone + ' in ' + callbackMode + ' mode. Call ID: ' + callId, call_id: callId, kb_doc_id: newDocId, callback_phone: callbackPhone } }];\n\n} catch (err) {\n  return [{ json: { result: 'Error in Eve callback flow: ' + err.message } }];\n}"
+        }
+      },
+      {
+        "id": "ek-result",
+        "name": "set_result",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          740,
+          0
+        ],
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "r1",
+                "name": "result",
+                "value": "={{ $json.result }}",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        }
+      }
+    ],
+    "connections": {
+      "workflow_trigger": {
+        "main": [
+          [
+            {
+              "node": "settings",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "settings": {
+        "main": [
+          [
+            {
+              "node": "eve_callback",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "eve_callback": {
+        "main": [
+          [
+            {
+              "node": "set_result",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Eric Beser",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-17T11:30:26.755Z",
+        "id": 953,
+        "workflowId": "Q0K3aQrBMhw48lCB",
+        "versionId": "2d6061e8-3a82-4fd7-8b8f-5ddd7c114b6b",
+        "event": "deactivated",
+        "userId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      },
+      {
+        "createdAt": "2026-03-17T11:30:26.800Z",
+        "id": 954,
+        "workflowId": "Q0K3aQrBMhw48lCB",
+        "versionId": "2d6061e8-3a82-4fd7-8b8f-5ddd7c114b6b",
+        "event": "activated",
+        "userId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      }
+    ]
+  }
 }

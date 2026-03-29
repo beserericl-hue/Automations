@@ -1,5 +1,11 @@
 {
+  "updatedAt": "2026-03-29T16:11:26.205Z",
+  "createdAt": "2026-03-21T18:10:18.922Z",
+  "id": "0c4ZDWNScdmcOtr1",
   "name": "Tool - Brainstorm Chapter V2",
+  "description": null,
+  "active": true,
+  "isArchived": false,
   "nodes": [
     {
       "parameters": {
@@ -38,7 +44,7 @@
       "typeVersion": 1.1,
       "position": [
         0,
-        0
+        96
       ]
     },
     {
@@ -50,21 +56,21 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        220,
-        0
+        224,
+        96
       ]
     },
     {
       "parameters": {
-        "jsCode": "const trigger = $('workflow_trigger').first().json;\nconst s = $('settings').first().json;\n\nif (s.error) return [{ json: { error: true, result: s.result } }];\n\nconst bookOutline = s.bookOutline;\nconst genreData = s.genreData || {};\nconst bookArcName = s.bookArcName || 'Three-Act Structure';\nconst bookArcPrompt = s.bookArcPrompt || '';\nconst chapterArcName = s.chapterArcName || bookArcName;\nconst chapterArcPrompt = s.chapterArcPrompt || '';\n\n// Parse chapter number\nconst rawCh = (trigger.chapter_number || '').toString().trim();\nconst isProl = /^(prologue|prol|0)$/i.test(rawCh);\nconst isEpil = /^(epilogue|epil)$/i.test(rawCh);\nconst chNum = isProl ? 0 : (isEpil ? -1 : parseInt(rawCh));\nconst chLabel = isProl ? 'Prologue' : (isEpil ? 'Epilogue' : 'Chapter ' + chNum);\n\n// Find this chapter in the book outline\nlet thisChapter = null;\nif (bookOutline.chapters) {\n  if (isProl) {\n    thisChapter = bookOutline.chapters.find(ch => ch.number === 0 || /prologue/i.test(ch.title));\n  } else if (isEpil) {\n    thisChapter = bookOutline.chapters.find(ch => /epilogue/i.test(ch.title) || ch.number > bookOutline.chapters.length);\n  } else {\n    thisChapter = bookOutline.chapters.find(ch => ch.number === chNum);\n  }\n}\n\nif (!thisChapter) {\n  return [{ json: { error: true, result: 'Chapter ' + rawCh + ' not found in the book outline for \"' + bookOutline.title + '\". Available chapters: ' + bookOutline.chapters.map(ch => ch.number + ' - ' + ch.title).join(', ') } }];\n}\n\n// Format book outline context\nconst charList = (bookOutline.characters || []).map(c =>\n  '- ' + c.name + ' (' + c.role + '): ' + c.arc + (c.description ? ' \u2014 ' + c.description : '')\n).join('\\n');\n\nconst chapList = (bookOutline.chapters || []).map(ch =>\n  'Ch ' + ch.number + ' \u2014 ' + ch.title + ': ' + ch.brief + (ch.arc_notes ? ' [Book Arc Beat: ' + ch.arc_notes + ']' : '')\n).join('\\n');\n\n// Find surrounding chapters for context\nconst prevCh = bookOutline.chapters.find(ch => ch.number === (isProl ? -1 : chNum - 1));\nconst nextCh = bookOutline.chapters.find(ch => ch.number === (isEpil ? 999 : chNum + 1));\n\nconst instructions = trigger.instructions || '';\n\n// Fill story arc placeholders with actual project data\nconst protagonist = (bookOutline.characters || []).find(c => c.role === 'Protagonist');\nconst protagonistDesc = protagonist ? protagonist.name + ' \u2014 ' + protagonist.arc : 'See characters in book outline';\n\nfunction fillArcPlaceholders(arcText) {\n  if (!arcText) return '';\n  let filled = arcText;\n  filled = filled.replace(/\\[a full book[^\\]]*\\]/gi, 'a detailed chapter outline with sub-chapters');\n  filled = filled.replace(/\\[Book \\/ Chapter[^\\]]*\\]/gi, 'Chapter outline');\n  filled = filled.replace(/\\[e\\.g\\., thriller[^\\]]*\\]/gi, genreData.genre_name || 'fiction');\n  filled = filled.replace(/\\[Describe briefly[^\\]]*\\]/gi, protagonistDesc);\n  filled = filled.replace(/\\[What is the core[^\\]]*\\]/gi, bookOutline.premise || 'See premise');\n  filled = filled.replace(/\\[Where and when[^\\]]*\\]/gi, thisChapter ? thisChapter.brief.substring(0, 100) : 'See chapter brief');\n  filled = filled.replace(/\\[What does the protagonist[^\\]]*\\]/gi, 'See book outline character arcs');\n  filled = filled.replace(/\\[e\\.g\\., 1,000 words[^\\]]*\\]/gi, '3-8 sub-chapter outlines of 5000 words each');\n  filled = filled.replace(/\\[Hero[^\\]]*\\]/gi, protagonistDesc);\n  filled = filled.replace(/\\[.*?Main character[^\\]]*\\]/gi, protagonistDesc);\n  filled = filled.replace(/\\[.*?Setting[^\\]]*\\]/gi, 'See chapter brief');\n  filled = filled.replace(/\\[.*?Length goal[^\\]]*\\]/gi, '3-8 sub-chapter outlines');\n  filled = filled.replace(/\\[.*?Genre[^\\]]*\\]/gi, genreData.genre_name || 'fiction');\n  return filled;\n}\n\nconst filledBookArc = fillArcPlaceholders(bookArcPrompt);\nconst filledChapterArc = fillArcPlaceholders(chapterArcPrompt);\n\nconst prompt = `You are a skilled story architect creating a detailed CHAPTER OUTLINE for ${chLabel} of \"${bookOutline.title}\", a ${genreData.genre_name || 'fiction'} novel.\n\n## Your Task\nCreate a detailed chapter outline that breaks this chapter into SUB-CHAPTERS (mini-sections that together form the complete chapter). Each sub-chapter should be substantial enough to be a full scene or sequence. The chapter outline must serve TWO story arcs simultaneously:\n1. The BOOK's story arc (${bookArcName}) \u2014 this chapter must advance the book's overall plot\n2. The CHAPTER's story arc (${chapterArcName}) \u2014 this chapter has its own internal dramatic structure\n\n## Writing Prime Directive\nWrite like a human, not a machine. Use clear, everyday language and short sentences. Cut cliches. Get to the point \u2014 remove filler words. Be genuine. Show, don't tell. Stay focused. Respect the reader's intelligence.\n\n## BOOK STORY ARC \u2014 ${bookArcName}\nThis is the framework governing the entire book. This chapter must advance the book's position within this arc.\n${filledBookArc ? '\\n' + bookArcPrompt + '\\n' : '(No book arc prompt loaded \u2014 use the arc_notes from the book outline below.)'}\n\n## CHAPTER STORY ARC \u2014 ${chapterArcName}\nThis is the framework governing THIS CHAPTER's internal structure. Use it to organize the sub-chapters.\n${filledChapterArc ? '\\n' + chapterArcPrompt + '\\n' : '(Same as book arc.)'}\n\n## BOOK OUTLINE \u2014 MANDATORY CONTEXT\nYou MUST follow this outline. Use the EXACT character names, roles, and plot points listed.\n\n### Premise\n${bookOutline.premise || ''}\n\n### Themes\n${Array.isArray(bookOutline.themes) ? bookOutline.themes.join(', ') : (bookOutline.themes || '')}\n\n### Characters (USE THESE EXACT NAMES AND ROLES)\n${charList}\n\n### Full Chapter Structure\n${chapList}\n\n## THIS CHAPTER'S ASSIGNMENT\n**${chLabel}: ${thisChapter.title}**\nBook outline brief: ${thisChapter.brief}\n${thisChapter.arc_notes ? 'Book arc beat: ' + thisChapter.arc_notes : ''}\n${thisChapter.research_topics ? 'Research topics: ' + thisChapter.research_topics.join(', ') : ''}\n\n${prevCh ? '### Previous chapter context\\nCh ' + prevCh.number + ' \u2014 ' + prevCh.title + ': ' + prevCh.brief : '(This is the first chapter.)'}\n\n${nextCh ? '### Next chapter context\\nCh ' + nextCh.number + ' \u2014 ' + nextCh.title + ': ' + nextCh.brief : '(This is the final chapter.)'}\n\n${instructions ? '### User Instructions\\n' + instructions : ''}\n\n## Requirements\nCreate a chapter outline with the following:\n\n1. **chapter_number**: ${isProl ? 0 : (isEpil ? bookOutline.chapters.length : chNum)}\n2. **chapter_title**: The title for this chapter\n3. **chapter_story_arc**: \"${chapterArcName}\"\n4. **book_arc_beat**: Which beat/stage of the BOOK's story arc (${bookArcName}) this chapter represents\n5. **chapter_summary**: 2-3 sentence summary of the entire chapter\n6. **sub_chapters**: Array of sub-chapter outlines, each containing:\n   - **number**: Sequential number (1, 2, 3...)\n   - **title**: Sub-chapter title\n   - **brief**: Detailed 3-5 sentence description of what happens in this sub-chapter. Include specific character actions, dialogue direction, emotional beats, and plot progression. This must be detailed enough that a writer can produce the full scene from this brief alone.\n   - **arc_beat**: Which beat of the CHAPTER story arc (${chapterArcName}) this sub-chapter represents\n   - **characters**: Array of character names who appear in this sub-chapter (use EXACT names from the book outline)\n   - **setting**: Where this sub-chapter takes place\n   - **emotional_tone**: The dominant emotional quality of this sub-chapter\n   - **connects_to_book_arc**: How this sub-chapter advances the book's overall story arc\n\nCreate enough sub-chapters to fully realize the chapter's story \u2014 typically 3-7 sub-chapters depending on complexity. Each sub-chapter should be substantial (potentially 500-1500 words when written). Together they must cover:\n- The chapter's contribution to the BOOK arc (${bookArcName})\n- The chapter's own internal arc (${chapterArcName})\n- All character interactions noted in the book outline for this chapter\n- Scene transitions and emotional progression\n\nReturn as JSON matching the output schema exactly.`;\n\nreturn [{ json: { prompt, project_id: s.project?.id, chapter_number: isProl ? 0 : (isEpil ? -1 : chNum) } }];"
+        "jsCode": "const trigger = $('workflow_trigger').first().json;\nconst s = $('settings').first().json;\n\nif (s.error) return [{ json: { error: true, result: s.result } }];\n\nconst bookOutline = s.bookOutline;\nconst genreData = s.genreData || {};\nconst bookArcName = s.bookArcName || 'Three-Act Structure';\nconst bookArcPrompt = s.bookArcPrompt || '';\nconst chapterArcName = s.chapterArcName || bookArcName;\nconst chapterArcPrompt = s.chapterArcPrompt || '';\n\n// Parse chapter number\nconst rawCh = (trigger.chapter_number || '').toString().trim();\nlet isProl = /^(prologue|prol|0)$/i.test(rawCh);\nlet isEpil = /^(epilogue|epil)$/i.test(rawCh);\nlet chNum = isProl ? 0 : (isEpil ? -1 : parseInt(rawCh));\n\n// Find this chapter in the book outline\nlet thisChapter = null;\nif (bookOutline.chapters) {\n  if (isProl) {\n    // Prologue = first chapter in the outline\n    thisChapter = bookOutline.chapters[0];\n  } else if (isEpil) {\n    // Epilogue = last chapter in the outline\n    thisChapter = bookOutline.chapters[bookOutline.chapters.length - 1];\n  } else {\n    thisChapter = bookOutline.chapters.find(ch => ch.number === chNum);\n  }\n\n  // Auto-detect prologue/epilogue by position when found by number\n  if (thisChapter && !isProl && !isEpil) {\n    if (thisChapter === bookOutline.chapters[0] || thisChapter.number === 0) {\n      isProl = true;\n    } else if (thisChapter === bookOutline.chapters[bookOutline.chapters.length - 1]) {\n      isEpil = true;\n    }\n  }\n}\n\nif (!thisChapter) {\n  return [{ json: { error: true, result: 'Chapter ' + rawCh + ' not found in the book outline for \"' + bookOutline.title + '\". Available chapters: ' + bookOutline.chapters.map(ch => ch.number + ' - ' + ch.title).join(', ') } }];\n}\n\n// Update chNum from the actual chapter found\nchNum = thisChapter.number;\nconst chLabel = isProl ? 'Prologue' : (isEpil ? 'Epilogue' : 'Chapter ' + chNum);\n\n// Format book outline context\nconst charList = (bookOutline.characters || []).map(c =>\n  '- ' + c.name + ' (' + c.role + '): ' + c.arc + (c.description ? ' \u2014 ' + c.description : '')\n).join('\\n');\n\n// Only include surrounding chapters (\u00b12) to keep prompt focused\nconst allChapters = bookOutline.chapters || [];\nconst nearbyChapters = allChapters.filter(ch => \n  Math.abs(ch.number - chNum) <= 2 || ch.number === 0\n);\nconst chapList = 'Book has ' + allChapters.length + ' chapters total. Nearby chapters:\\n' + \n  nearbyChapters.map(ch =>\n    'Ch ' + ch.number + ' \u2014 ' + ch.title + ': ' + ch.brief + (ch.arc_notes ? ' [Book Arc Beat: ' + ch.arc_notes + ']' : '')\n  ).join('\\n');\n\n// Find surrounding chapters for context\nconst prevCh = bookOutline.chapters.find(ch => ch.number === chNum - 1);\nconst nextCh = bookOutline.chapters.find(ch => ch.number === chNum + 1);\n\nconst instructions = trigger.instructions || '';\n\n// Fill story arc placeholders with actual project data\nconst protagonist = (bookOutline.characters || []).find(c => c.role === 'Protagonist');\nconst protagonistDesc = protagonist ? protagonist.name + ' \u2014 ' + protagonist.arc : 'See characters in book outline';\n\nfunction fillArcPlaceholders(arcText) {\n  if (!arcText) return '';\n  let filled = arcText;\n  filled = filled.replace(/\\[a full book[^\\]]*\\]/gi, 'a detailed chapter outline with sub-chapters');\n  filled = filled.replace(/\\[Book \\/ Chapter[^\\]]*\\]/gi, 'Chapter outline');\n  filled = filled.replace(/\\[e\\.g\\., thriller[^\\]]*\\]/gi, genreData.genre_name || 'fiction');\n  filled = filled.replace(/\\[Describe briefly[^\\]]*\\]/gi, protagonistDesc);\n  filled = filled.replace(/\\[What is the core[^\\]]*\\]/gi, bookOutline.premise || 'See premise');\n  filled = filled.replace(/\\[Where and when[^\\]]*\\]/gi, thisChapter ? thisChapter.brief.substring(0, 100) : 'See chapter brief');\n  filled = filled.replace(/\\[What does the protagonist[^\\]]*\\]/gi, 'See book outline character arcs');\n  filled = filled.replace(/\\[e\\.g\\., 1,000 words[^\\]]*\\]/gi, '3-8 sub-chapter outlines of 5000 words each');\n  filled = filled.replace(/\\[Hero[^\\]]*\\]/gi, protagonistDesc);\n  filled = filled.replace(/\\[.*?Main character[^\\]]*\\]/gi, protagonistDesc);\n  filled = filled.replace(/\\[.*?Setting[^\\]]*\\]/gi, 'See chapter brief');\n  filled = filled.replace(/\\[.*?Length goal[^\\]]*\\]/gi, '3-8 sub-chapter outlines');\n  filled = filled.replace(/\\[.*?Genre[^\\]]*\\]/gi, genreData.genre_name || 'fiction');\n  return filled;\n}\n\nconst filledBookArc = fillArcPlaceholders(bookArcPrompt);\nconst filledChapterArc = fillArcPlaceholders(chapterArcPrompt);\n\nconst prompt = `You are a skilled story architect creating a detailed CHAPTER OUTLINE for ${chLabel} of \"${bookOutline.title}\", a ${genreData.genre_name || 'fiction'} novel.\n\n## Your Task\nCreate a detailed chapter outline that breaks this chapter into SUB-CHAPTERS (mini-sections that together form the complete chapter). Each sub-chapter should be substantial enough to be a full scene or sequence. The chapter outline must serve TWO story arcs simultaneously:\n1. The BOOK's story arc (${bookArcName}) \u2014 this chapter must advance the book's overall plot\n2. The CHAPTER's story arc (${chapterArcName}) \u2014 this chapter has its own internal dramatic structure\n\n${instructions ? '## MANDATORY USER INSTRUCTIONS \u2014 FOLLOW EXACTLY\\nThe user has provided specific instructions that OVERRIDE any default structure or framework below. You MUST follow these instructions precisely, even if they conflict with the arc framework or other guidelines.\\n\\n' + instructions + '\\n' : ''}\n\n## Writing Prime Directive\nWrite like a human, not a machine. Use clear, everyday language and short sentences. Cut cliches. Get to the point \u2014 remove filler words. Be genuine. Show, don't tell. Stay focused. Respect the reader's intelligence.\n\n## BOOK STORY ARC \u2014 ${bookArcName}\nThis is the framework governing the entire book. This chapter must advance the book's position within this arc.\n${filledBookArc ? '\\nThis chapter must advance the book\\'s position within the ' + bookArcName + ' framework. See arc_notes on each chapter for guidance.\\n' : '(No book arc prompt loaded \u2014 use the arc_notes from the book outline below.)'}\n\n## CHAPTER STORY ARC \u2014 ${chapterArcName}\nThis is the framework governing THIS CHAPTER's internal structure. Use it to organize the sub-chapters.\n${filledChapterArc ? '\\nUse the ' + chapterArcName + ' structure to organize sub-chapters. Assign arc beats from this framework to each sub-chapter.\\n' : '(Same as book arc.)'}\n\n## BOOK OUTLINE \u2014 MANDATORY CONTEXT\nYou MUST follow this outline. Use the EXACT character names, roles, and plot points listed.\n\n### Premise\n${bookOutline.premise || ''}\n\n### Themes\n${Array.isArray(bookOutline.themes) ? bookOutline.themes.join(', ') : (bookOutline.themes || '')}\n\n### Characters (USE THESE EXACT NAMES AND ROLES)\n${charList}\n\n### Full Chapter Structure\n${chapList}\n\n## THIS CHAPTER'S ASSIGNMENT\n**${chLabel}: ${thisChapter.title}**\nBook outline brief: ${thisChapter.brief}\n${thisChapter.arc_notes ? 'Book arc beat: ' + thisChapter.arc_notes : ''}\n${thisChapter.research_topics ? 'Research topics: ' + thisChapter.research_topics.join(', ') : ''}\n\n${prevCh ? '### Previous chapter context\\nCh ' + prevCh.number + ' \u2014 ' + prevCh.title + ': ' + prevCh.brief : '(This is the first chapter.)'}\n\n${nextCh ? '### Next chapter context\\nCh ' + nextCh.number + ' \u2014 ' + nextCh.title + ': ' + nextCh.brief : '(This is the final chapter.)'}\n\n## Requirements\nCreate a chapter outline with the following:\n\n1. **chapter_number**: ${chNum}\n2. **chapter_title**: The title for this chapter\n3. **chapter_story_arc**: \"${chapterArcName}\"\n4. **book_arc_beat**: Which beat/stage of the BOOK's story arc (${bookArcName}) this chapter represents\n5. **chapter_summary**: 2-3 sentence summary of the entire chapter\n6. **sub_chapters**: Array of sub-chapter outlines, each containing:\n   - **number**: Sequential number (1, 2, 3...)\n   - **title**: Sub-chapter title\n   - **brief**: Detailed 3-5 sentence description of what happens in this sub-chapter. Include specific character actions, dialogue direction, emotional beats, and plot progression. This must be detailed enough that a writer can produce the full scene from this brief alone.\n   - **arc_beat**: Which beat of the CHAPTER story arc (${chapterArcName}) this sub-chapter represents\n   - **characters**: Array of character names who appear in this sub-chapter (use EXACT names from the book outline)\n   - **setting**: Where this sub-chapter takes place\n   - **emotional_tone**: The dominant emotional quality of this sub-chapter\n   - **connects_to_book_arc**: How this sub-chapter advances the book's overall story arc\n\nCreate enough sub-chapters to fully realize the chapter's story \u2014 typically 3-7 sub-chapters depending on complexity. Each sub-chapter should be substantial (potentially 500-1500 words when written). Together they must cover:\n- The chapter's contribution to the BOOK arc (${bookArcName})\n- The chapter's own internal arc (${chapterArcName})\n- All character interactions noted in the book outline for this chapter\n- Scene transitions and emotional progression\n\n${instructions ? '\\n## REMINDER \u2014 USER INSTRUCTIONS (HIGHEST PRIORITY)\\nYou MUST follow these instructions. They OVERRIDE everything above:\\n' + instructions + '\\n' : ''}\nReturn as JSON matching the output schema exactly.`;\n\nreturn [{ json: { prompt, project_id: s.project?.id, chapter_number: chNum } }];"
       },
       "id": "bc-prompt",
       "name": "build_chapter_outline_prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        440,
-        0
+        448,
+        96
       ]
     },
     {
@@ -77,8 +83,8 @@
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
       "position": [
-        660,
-        0
+        672,
+        96
       ]
     },
     {
@@ -94,13 +100,13 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.2,
       "position": [
-        660,
-        220
+        528,
+        352
       ],
       "credentials": {
         "anthropicApi": {
           "id": "5LhCYKsaFO3fF7II",
-          "name": "Anthropic"
+          "name": "Anthropic account"
         }
       }
     },
@@ -114,28 +120,27 @@
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.2,
       "position": [
-        860,
-        220
+        768,
+        336
       ]
     },
     {
       "parameters": {
-        "jsCode": "const s = $('settings').first().json;\nconst supabaseUrl = s.SUPABASE_URL;\nconst apiKey = s.SUPABASE_API_KEY;\nconst userId = s.userId || '';\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };\nconst readHeaders = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey };\n\n// Handle both parsed output (from parser) and raw text (parser fallback)\nlet chapterOutline = $input.first().json.output || {};\nif (!chapterOutline.sub_chapters || chapterOutline.sub_chapters.length === 0) {\n  // Parser may have failed \u2014 try extracting JSON from raw text\n  const rawText = $input.first().json.text || $input.first().json.output?.text || '';\n  if (rawText) {\n    try {\n      const jsonMatch = rawText.match(/```json\\n?([\\s\\S]*?)```/) || rawText.match(/\\{[\\s\\S]*\\}/);\n      if (jsonMatch) {\n        const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);\n        if (parsed.sub_chapters) chapterOutline = parsed;\n      }\n    } catch (e) { /* parse failed, continue with empty */ }\n  }\n}\nconst promptData = $('build_chapter_outline_prompt').first().json;\nconst projectId = s.project?.id;\n// Use LLM output chapter_number, fallback to prompt data's chapter_number\nconst promptChNum = $('build_chapter_outline_prompt').first().json.chapter_number;\nlet chNum = chapterOutline.chapter_number;\nif (chNum === undefined || chNum === null) chNum = promptChNum;\n// Handle string \"0\" or \"Prologue\"\nif (typeof chNum === 'string') {\n  if (/^(prologue|prol)$/i.test(chNum)) chNum = 0;\n  else if (/^(epilogue|epil)$/i.test(chNum)) chNum = -1;\n  else chNum = parseInt(chNum);\n}\n\nif (!projectId) {\n  return [{ json: { error: true, result: 'No project ID found.' } }];\n}\n\n// Get current outline from project\nconst project = s.project;\nconst bookOutline = s.bookOutline;\n\n// Find the matching chapter in the book outline and add chapter_outline to it\nlet updated = false;\nif (bookOutline && bookOutline.chapters) {\n  for (let i = 0; i < bookOutline.chapters.length; i++) {\n    const ch = bookOutline.chapters[i];\n    if (ch.number === chNum || ch.number === parseInt(chNum) || (chNum === 0 && (ch.number === 0 || /prologue/i.test(ch.title))) || (chNum === -1 && /epilogue/i.test(ch.title))) {\n      bookOutline.chapters[i].chapter_outline = chapterOutline;\n      updated = true;\n      break;\n    }\n  }\n}\n\nif (!updated) {\n  return [{ json: {\n  error: true,\n  result: 'Could not find chapter ' + chNum + ' in the book outline to save chapter outline. Available chapters: ' + bookOutline.chapters.map(ch => ch.number + '-' + ch.title).join(', '),\n  chapterOutline: chapterOutline,\n  emailBody: '<h2>Error: Chapter ' + chNum + ' not found in book outline</h2><p>Available chapters: ' + bookOutline.chapters.map(ch => ch.number + ' - ' + ch.title).join(', ') + '</p>',\n  title: bookOutline.title || '',\n  chapterTitle: 'Error',\n  subChapterCount: 0\n} }];\n}\n\n// Save updated outline back to project\nawait this.helpers.httpRequest({\n  method: 'PATCH',\n  url: supabaseUrl + '/rest/v1/writing_projects_v2?id=eq.' + projectId + '&user_id=eq.' + encodeURIComponent(userId),\n  headers,\n  body: { outline: bookOutline, updated_at: new Date().toISOString() }\n});\n\n// Format for email\nconst subChList = (chapterOutline.sub_chapters || []).map(sc =>\n  '<h3>Sub-chapter ' + sc.number + ': ' + sc.title + '</h3>' +\n  '<p><strong>Arc Beat (' + (chapterOutline.chapter_story_arc || '') + '):</strong> ' + (sc.arc_beat || '') + '</p>' +\n  '<p><strong>Characters:</strong> ' + (sc.characters || []).join(', ') + '</p>' +\n  '<p><strong>Setting:</strong> ' + (sc.setting || '') + '</p>' +\n  '<p><strong>Emotional Tone:</strong> ' + (sc.emotional_tone || '') + '</p>' +\n  '<p>' + (sc.brief || '') + '</p>' +\n  '<p><em>Book Arc Connection:</em> ' + (sc.connects_to_book_arc || '') + '</p>'\n).join('<hr>');\n\nconst emailBody = '<h1>Chapter Outline: ' + (chapterOutline.chapter_title || 'Chapter ' + chNum) + '</h1>' +\n  '<p><strong>Book:</strong> ' + bookOutline.title + '</p>' +\n  '<p><strong>Book Story Arc:</strong> ' + (s.bookArcName || 'Not specified') + '</p>' +\n  '<p><strong>Chapter Story Arc:</strong> ' + (chapterOutline.chapter_story_arc || 'Same as book') + '</p>' +\n  '<p><strong>Book Arc Beat:</strong> ' + (chapterOutline.book_arc_beat || '') + '</p>' +\n  '<h2>Chapter Summary</h2><p>' + (chapterOutline.chapter_summary || '') + '</p>' +\n  '<h2>Sub-Chapters (' + (chapterOutline.sub_chapters || []).length + ')</h2>' + subChList;\n\nreturn [{ json: { \n  chapterOutline, \n  emailBody, \n  title: bookOutline.title,\n  chapterTitle: chapterOutline.chapter_title || 'Chapter ' + chNum,\n  subChapterCount: (chapterOutline.sub_chapters || []).length,\n  result: 'Chapter outline created for \"' + (chapterOutline.chapter_title || 'Chapter ' + chNum) + '\" with ' + (chapterOutline.sub_chapters || []).length + ' sub-chapters using ' + (chapterOutline.chapter_story_arc || 'default') + ' story arc. Saved to project outline and emailed for review.'\n} }];"
+        "jsCode": "const s = $('settings').first().json;\nconst supabaseUrl = s.SUPABASE_URL;\nconst apiKey = s.SUPABASE_API_KEY;\nconst userId = s.userId || '';\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };\nconst readHeaders = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey };\n\n// Handle both parsed output (from parser) and raw text (parser fallback)\nlet chapterOutline = $input.first().json.output || {};\nif (!chapterOutline.sub_chapters || chapterOutline.sub_chapters.length === 0) {\n  const rawText = $input.first().json.text || $input.first().json.output?.text || '';\n  if (rawText) {\n    try {\n      const jsonMatch = rawText.match(/```json\\n?([\\s\\S]*?)```/) || rawText.match(/\\{[\\s\\S]*\\}/);\n      if (jsonMatch) {\n        const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);\n        if (parsed.sub_chapters) chapterOutline = parsed;\n      }\n    } catch (e) { /* parse failed, continue with empty */ }\n  }\n}\nconst promptData = $('build_chapter_outline_prompt').first().json;\nconst projectId = s.project?.id;\nconst promptChNum = $('build_chapter_outline_prompt').first().json.chapter_number;\nlet chNum = chapterOutline.chapter_number;\nif (chNum === undefined || chNum === null) chNum = promptChNum;\nif (typeof chNum === 'string') {\n  if (/^(prologue|prol)$/i.test(chNum)) chNum = 0;\n  else if (/^(epilogue|epil)$/i.test(chNum)) chNum = -1;\n  else chNum = parseInt(chNum);\n}\n\nif (!projectId) {\n  return [{ json: { error: true, result: 'No project ID found.' } }];\n}\n\nconst project = s.project;\nconst bookOutline = s.bookOutline;\n\n// Find the matching chapter in the book outline and add chapter_outline to it\nlet updated = false;\nlet targetIdx = -1;\nif (bookOutline && bookOutline.chapters) {\n  if (chNum === -1) {\n    // Epilogue explicitly requested \u2014 always use last chapter\n    targetIdx = bookOutline.chapters.length - 1;\n  } else {\n    // Find by chapter number\n    targetIdx = bookOutline.chapters.findIndex(ch => ch.number === chNum || ch.number === parseInt(chNum));\n  }\n\n  if (targetIdx >= 0) {\n    // Update chNum to actual chapter number\n    chNum = bookOutline.chapters[targetIdx].number;\n    const triggerArc = $('workflow_trigger').first().json.chapter_story_arc || '';\n    if (triggerArc) chapterOutline.chapter_story_arc = triggerArc;\n    bookOutline.chapters[targetIdx].chapter_outline = chapterOutline;\n    updated = true;\n  }\n}\n\nif (!updated) {\n  return [{ json: {\n  error: true,\n  result: 'Could not find chapter ' + chNum + ' in the book outline to save chapter outline. Available chapters: ' + bookOutline.chapters.map(ch => ch.number + '-' + ch.title).join(', '),\n  chapterOutline: chapterOutline,\n  emailBody: '<h2>Error: Chapter ' + chNum + ' not found in book outline</h2><p>Available chapters: ' + bookOutline.chapters.map(ch => ch.number + ' - ' + ch.title).join(', ') + '</p>',\n  title: bookOutline.title || '',\n  chapterTitle: 'Error',\n  subChapterCount: 0\n} }];\n}\n\n// Detect prologue/epilogue by position\nconst isPrologue = (targetIdx === 0);\nconst isEpilogue = (targetIdx === bookOutline.chapters.length - 1);\nconst chLabel = isPrologue ? 'Prologue' : (isEpilogue ? 'Epilogue' : 'Chapter ' + chNum);\n\nawait this.helpers.httpRequest({\n  method: 'PATCH',\n  url: supabaseUrl + '/rest/v1/writing_projects_v2?id=eq.' + projectId + '&user_id=eq.' + encodeURIComponent(userId),\n  headers,\n  body: { outline: bookOutline, updated_at: new Date().toISOString() }\n});\n\n// Format for email\nconst subChList = (chapterOutline.sub_chapters || []).map(sc =>\n  '<h3>Sub-chapter ' + sc.number + ': ' + sc.title + '</h3>' +\n  '<p><strong>Arc Beat (' + (chapterOutline.chapter_story_arc || '') + '):</strong> ' + (sc.arc_beat || '') + '</p>' +\n  '<p><strong>Characters:</strong> ' + (sc.characters || []).join(', ') + '</p>' +\n  '<p><strong>Setting:</strong> ' + (sc.setting || '') + '</p>' +\n  '<p><strong>Emotional Tone:</strong> ' + (sc.emotional_tone || '') + '</p>' +\n  '<p>' + (sc.brief || '') + '</p>' +\n  '<p><em>Book Arc Connection:</em> ' + (sc.connects_to_book_arc || '') + '</p>'\n).join('<hr>');\n\nconst displayTitle = chLabel + ' \\u2014 ' + (chapterOutline.chapter_title || bookOutline.chapters[targetIdx].title || chLabel);\n\nconst emailBody = '<h1>Chapter Outline: ' + displayTitle + '</h1>' +\n  '<p><strong>Book:</strong> ' + bookOutline.title + '</p>' +\n  '<p><strong>Book Story Arc:</strong> ' + (s.bookArcName || 'Not specified') + '</p>' +\n  '<p><strong>Chapter Story Arc:</strong> ' + (chapterOutline.chapter_story_arc || 'Same as book') + '</p>' +\n  '<p><strong>Book Arc Beat:</strong> ' + (chapterOutline.book_arc_beat || '') + '</p>' +\n  '<h2>Chapter Summary</h2><p>' + (chapterOutline.chapter_summary || '') + '</p>' +\n  '<h2>Sub-Chapters (' + (chapterOutline.sub_chapters || []).length + ')</h2>' + subChList;\n\nreturn [{ json: { \n  chapterOutline, \n  emailBody, \n  title: bookOutline.title,\n  chapterTitle: displayTitle,\n  subChapterCount: (chapterOutline.sub_chapters || []).length,\n  embed_needed: true,\n  result: 'Chapter outline created for \"' + displayTitle + '\" with ' + (chapterOutline.sub_chapters || []).length + ' sub-chapters using ' + (chapterOutline.chapter_story_arc || 'default') + ' story arc. Saved to project outline and emailed for review.'\n} }];"
       },
       "id": "bc-save",
       "name": "save_chapter_outline",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        880,
-        0
+        1024,
+        96
       ]
     },
     {
       "parameters": {
         "sendTo": "={{ $('settings').item.json.recipient_email }}",
         "subject": "=Chapter Outline: {{ $json.chapterTitle }} \u2014 {{ $json.title }}",
-        "emailType": "html",
         "message": "={{ $json.emailBody }}",
         "options": {
           "appendAttribution": false,
@@ -147,13 +152,14 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        1100,
+        1248,
         0
       ],
+      "webhookId": "3cfbd625-88eb-4bcd-ac2b-db994b1ec9d6",
       "credentials": {
         "gmailOAuth2": {
           "id": "CPCSZOInV8Zj1PI1",
-          "name": "Gmail"
+          "name": "Gmail account"
         }
       }
     },
@@ -168,16 +174,129 @@
               "type": "string"
             }
           ]
-        }
+        },
+        "options": {}
       },
       "id": "bc-result",
       "name": "set_result",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1320,
+        1472,
         0
       ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "DTjjVk51Z9aHgAg0",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "project_id": "={{ $('settings').first().json.project?.id || '' }}",
+            "user_id": "={{ $('workflow_trigger').first().json.user_id || '' }}",
+            "openai_api_key": ""
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "project_id",
+              "displayName": "project_id",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "openai_api_key",
+              "displayName": "openai_api_key",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "embed-call",
+      "name": "re_embed_project",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1248,
+        192
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "dk75OYTASeu6NkTr",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "execution_id": "={{ $execution.id }}",
+            "source_workflow_name": "Brainstorm Chapter V2"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "source_workflow_name",
+              "displayName": "source_workflow_name",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            }
+          ]
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "tt-call",
+      "name": "track_token_usage",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1696,
+        0
+      ],
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -254,6 +373,11 @@
             "node": "send_email",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "re_embed_project",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -268,10 +392,531 @@
           }
         ]
       ]
+    },
+    "set_result": {
+      "main": [
+        [
+          {
+            "node": "track_token_usage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "re_embed_project": {
+      "main": [
+        [
+          {
+            "node": "track_token_usage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
     "executionOrder": "v1",
-    "callerPolicy": "workflowsFromSameOwner"
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "fa810441-5de8-49fb-b4b0-3737a75b7793",
+  "activeVersionId": "fa810441-5de8-49fb-b4b0-3737a75b7793",
+  "versionCounter": 82,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-03-21T18:10:18.922Z",
+      "createdAt": "2026-03-21T18:10:18.922Z",
+      "role": "workflow:owner",
+      "workflowId": "0c4ZDWNScdmcOtr1",
+      "projectId": "so6FfyLmNOjnxEMJ",
+      "project": {
+        "updatedAt": "2026-01-12T16:36:13.622Z",
+        "createdAt": "2026-01-12T15:34:50.204Z",
+        "id": "so6FfyLmNOjnxEMJ",
+        "name": "Eric Beser <eric@agileadtesting.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-29T16:07:01.054Z",
+    "createdAt": "2026-03-29T16:07:01.054Z",
+    "versionId": "fa810441-5de8-49fb-b4b0-3737a75b7793",
+    "workflowId": "0c4ZDWNScdmcOtr1",
+    "nodes": [
+      {
+        "parameters": {
+          "workflowInputs": {
+            "values": [
+              {
+                "name": "project_title"
+              },
+              {
+                "name": "chapter_number"
+              },
+              {
+                "name": "chapter_story_arc"
+              },
+              {
+                "name": "instructions"
+              },
+              {
+                "name": "user_prompt"
+              },
+              {
+                "name": "recipient_email"
+              },
+              {
+                "name": "bcc_email"
+              },
+              {
+                "name": "user_id"
+              }
+            ]
+          }
+        },
+        "id": "bc-trigger",
+        "name": "workflow_trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [
+          0,
+          96
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_API_KEY = 'REDACTED_SUPABASE_KEY';\nconst trigger = $('workflow_trigger').first().json;\nconst userId = trigger.user_id || '';\n\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\ntry {\n  const rows = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${SUPABASE_URL}/rest/v1/app_config_v2?key=in.(recipient_email,bcc_email)&select=key,value&user_id=eq.${encodeURIComponent(userId)}`,\n    headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n  });\n  for (const row of rows) {\n    if (row.key === 'recipient_email' && !recipient_email) recipient_email = row.value;\n    if (row.key === 'bcc_email' && !bcc_email) bcc_email = row.value;\n  }\n} catch (e) {\n  if (!recipient_email) recipient_email = 'eric@agileadtesting.com';\n}\n\n// Load project with outline\nconst projectTitle = trigger.project_title || '';\nlet project = null;\nlet bookOutline = null;\ntry {\n  const resp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${SUPABASE_URL}/rest/v1/writing_projects_v2?title=ilike.*${encodeURIComponent(projectTitle)}*&select=id,title,genre_slug,outline&limit=1&user_id=eq.${encodeURIComponent(userId)}`,\n    headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n  });\n  if (Array.isArray(resp) && resp.length > 0) {\n    project = resp[0];\n    bookOutline = resp[0].outline;\n  }\n} catch (e) {}\n\nif (!project || !bookOutline || !bookOutline.chapters) {\n  return [{ json: { error: true, result: 'Project \"' + projectTitle + '\" not found or has no book outline. Run brainstorm_story first.' } }];\n}\n\n// Load chapter story arc (may differ from book arc)\nconst chapterArcName = (trigger.chapter_story_arc || '').trim();\nconst bookArcName = bookOutline.story_arc_name || '';\nconst arcToLoad = chapterArcName || bookArcName;\nlet chapterArcPrompt = '';\nlet resolvedChapterArcName = '';\nif (arcToLoad) {\n  try {\n    const arcs = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/story_arcs_v2?name=ilike.*${encodeURIComponent(arcToLoad)}*&limit=1`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    if (Array.isArray(arcs) && arcs.length > 0) {\n      chapterArcPrompt = arcs[0].prompt_text;\n      resolvedChapterArcName = arcs[0].name;\n    }\n  } catch (e) {}\n}\n\n// Also load the book's story arc if different\nlet bookArcPrompt = '';\nif (bookArcName && bookArcName !== resolvedChapterArcName) {\n  try {\n    const arcs = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/story_arcs_v2?name=ilike.*${encodeURIComponent(bookArcName)}*&limit=1`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    if (Array.isArray(arcs) && arcs.length > 0) {\n      bookArcPrompt = arcs[0].prompt_text;\n    }\n  } catch (e) {}\n}\n\n// Load genre config\nlet genreData = {};\nif (project.genre_slug) {\n  try {\n    const g = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/genres_v2?genre_slug=eq.${encodeURIComponent(project.genre_slug)}&limit=1&user_id=eq.${encodeURIComponent(userId)}`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    if (Array.isArray(g) && g.length > 0) genreData = g[0];\n  } catch (e) {}\n}\n\nreturn [{ json: {\n  SUPABASE_URL, SUPABASE_API_KEY, userId,\n  recipient_email, bcc_email: bcc_email || '',\n  project, bookOutline, genreData,\n  bookArcName, bookArcPrompt,\n  chapterArcName: resolvedChapterArcName, chapterArcPrompt\n} }];"
+        },
+        "id": "bc-settings",
+        "name": "settings",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          224,
+          96
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const trigger = $('workflow_trigger').first().json;\nconst s = $('settings').first().json;\n\nif (s.error) return [{ json: { error: true, result: s.result } }];\n\nconst bookOutline = s.bookOutline;\nconst genreData = s.genreData || {};\nconst bookArcName = s.bookArcName || 'Three-Act Structure';\nconst bookArcPrompt = s.bookArcPrompt || '';\nconst chapterArcName = s.chapterArcName || bookArcName;\nconst chapterArcPrompt = s.chapterArcPrompt || '';\n\n// Parse chapter number\nconst rawCh = (trigger.chapter_number || '').toString().trim();\nlet isProl = /^(prologue|prol|0)$/i.test(rawCh);\nlet isEpil = /^(epilogue|epil)$/i.test(rawCh);\nlet chNum = isProl ? 0 : (isEpil ? -1 : parseInt(rawCh));\n\n// Find this chapter in the book outline\nlet thisChapter = null;\nif (bookOutline.chapters) {\n  if (isProl) {\n    // Prologue = first chapter in the outline\n    thisChapter = bookOutline.chapters[0];\n  } else if (isEpil) {\n    // Epilogue = last chapter in the outline\n    thisChapter = bookOutline.chapters[bookOutline.chapters.length - 1];\n  } else {\n    thisChapter = bookOutline.chapters.find(ch => ch.number === chNum);\n  }\n\n  // Auto-detect prologue/epilogue by position when found by number\n  if (thisChapter && !isProl && !isEpil) {\n    if (thisChapter === bookOutline.chapters[0] || thisChapter.number === 0) {\n      isProl = true;\n    } else if (thisChapter === bookOutline.chapters[bookOutline.chapters.length - 1]) {\n      isEpil = true;\n    }\n  }\n}\n\nif (!thisChapter) {\n  return [{ json: { error: true, result: 'Chapter ' + rawCh + ' not found in the book outline for \"' + bookOutline.title + '\". Available chapters: ' + bookOutline.chapters.map(ch => ch.number + ' - ' + ch.title).join(', ') } }];\n}\n\n// Update chNum from the actual chapter found\nchNum = thisChapter.number;\nconst chLabel = isProl ? 'Prologue' : (isEpil ? 'Epilogue' : 'Chapter ' + chNum);\n\n// Format book outline context\nconst charList = (bookOutline.characters || []).map(c =>\n  '- ' + c.name + ' (' + c.role + '): ' + c.arc + (c.description ? ' \u2014 ' + c.description : '')\n).join('\\n');\n\n// Only include surrounding chapters (\u00b12) to keep prompt focused\nconst allChapters = bookOutline.chapters || [];\nconst nearbyChapters = allChapters.filter(ch => \n  Math.abs(ch.number - chNum) <= 2 || ch.number === 0\n);\nconst chapList = 'Book has ' + allChapters.length + ' chapters total. Nearby chapters:\\n' + \n  nearbyChapters.map(ch =>\n    'Ch ' + ch.number + ' \u2014 ' + ch.title + ': ' + ch.brief + (ch.arc_notes ? ' [Book Arc Beat: ' + ch.arc_notes + ']' : '')\n  ).join('\\n');\n\n// Find surrounding chapters for context\nconst prevCh = bookOutline.chapters.find(ch => ch.number === chNum - 1);\nconst nextCh = bookOutline.chapters.find(ch => ch.number === chNum + 1);\n\nconst instructions = trigger.instructions || '';\n\n// Fill story arc placeholders with actual project data\nconst protagonist = (bookOutline.characters || []).find(c => c.role === 'Protagonist');\nconst protagonistDesc = protagonist ? protagonist.name + ' \u2014 ' + protagonist.arc : 'See characters in book outline';\n\nfunction fillArcPlaceholders(arcText) {\n  if (!arcText) return '';\n  let filled = arcText;\n  filled = filled.replace(/\\[a full book[^\\]]*\\]/gi, 'a detailed chapter outline with sub-chapters');\n  filled = filled.replace(/\\[Book \\/ Chapter[^\\]]*\\]/gi, 'Chapter outline');\n  filled = filled.replace(/\\[e\\.g\\., thriller[^\\]]*\\]/gi, genreData.genre_name || 'fiction');\n  filled = filled.replace(/\\[Describe briefly[^\\]]*\\]/gi, protagonistDesc);\n  filled = filled.replace(/\\[What is the core[^\\]]*\\]/gi, bookOutline.premise || 'See premise');\n  filled = filled.replace(/\\[Where and when[^\\]]*\\]/gi, thisChapter ? thisChapter.brief.substring(0, 100) : 'See chapter brief');\n  filled = filled.replace(/\\[What does the protagonist[^\\]]*\\]/gi, 'See book outline character arcs');\n  filled = filled.replace(/\\[e\\.g\\., 1,000 words[^\\]]*\\]/gi, '3-8 sub-chapter outlines of 5000 words each');\n  filled = filled.replace(/\\[Hero[^\\]]*\\]/gi, protagonistDesc);\n  filled = filled.replace(/\\[.*?Main character[^\\]]*\\]/gi, protagonistDesc);\n  filled = filled.replace(/\\[.*?Setting[^\\]]*\\]/gi, 'See chapter brief');\n  filled = filled.replace(/\\[.*?Length goal[^\\]]*\\]/gi, '3-8 sub-chapter outlines');\n  filled = filled.replace(/\\[.*?Genre[^\\]]*\\]/gi, genreData.genre_name || 'fiction');\n  return filled;\n}\n\nconst filledBookArc = fillArcPlaceholders(bookArcPrompt);\nconst filledChapterArc = fillArcPlaceholders(chapterArcPrompt);\n\nconst prompt = `You are a skilled story architect creating a detailed CHAPTER OUTLINE for ${chLabel} of \"${bookOutline.title}\", a ${genreData.genre_name || 'fiction'} novel.\n\n## Your Task\nCreate a detailed chapter outline that breaks this chapter into SUB-CHAPTERS (mini-sections that together form the complete chapter). Each sub-chapter should be substantial enough to be a full scene or sequence. The chapter outline must serve TWO story arcs simultaneously:\n1. The BOOK's story arc (${bookArcName}) \u2014 this chapter must advance the book's overall plot\n2. The CHAPTER's story arc (${chapterArcName}) \u2014 this chapter has its own internal dramatic structure\n\n${instructions ? '## MANDATORY USER INSTRUCTIONS \u2014 FOLLOW EXACTLY\\nThe user has provided specific instructions that OVERRIDE any default structure or framework below. You MUST follow these instructions precisely, even if they conflict with the arc framework or other guidelines.\\n\\n' + instructions + '\\n' : ''}\n\n## Writing Prime Directive\nWrite like a human, not a machine. Use clear, everyday language and short sentences. Cut cliches. Get to the point \u2014 remove filler words. Be genuine. Show, don't tell. Stay focused. Respect the reader's intelligence.\n\n## BOOK STORY ARC \u2014 ${bookArcName}\nThis is the framework governing the entire book. This chapter must advance the book's position within this arc.\n${filledBookArc ? '\\nThis chapter must advance the book\\'s position within the ' + bookArcName + ' framework. See arc_notes on each chapter for guidance.\\n' : '(No book arc prompt loaded \u2014 use the arc_notes from the book outline below.)'}\n\n## CHAPTER STORY ARC \u2014 ${chapterArcName}\nThis is the framework governing THIS CHAPTER's internal structure. Use it to organize the sub-chapters.\n${filledChapterArc ? '\\nUse the ' + chapterArcName + ' structure to organize sub-chapters. Assign arc beats from this framework to each sub-chapter.\\n' : '(Same as book arc.)'}\n\n## BOOK OUTLINE \u2014 MANDATORY CONTEXT\nYou MUST follow this outline. Use the EXACT character names, roles, and plot points listed.\n\n### Premise\n${bookOutline.premise || ''}\n\n### Themes\n${Array.isArray(bookOutline.themes) ? bookOutline.themes.join(', ') : (bookOutline.themes || '')}\n\n### Characters (USE THESE EXACT NAMES AND ROLES)\n${charList}\n\n### Full Chapter Structure\n${chapList}\n\n## THIS CHAPTER'S ASSIGNMENT\n**${chLabel}: ${thisChapter.title}**\nBook outline brief: ${thisChapter.brief}\n${thisChapter.arc_notes ? 'Book arc beat: ' + thisChapter.arc_notes : ''}\n${thisChapter.research_topics ? 'Research topics: ' + thisChapter.research_topics.join(', ') : ''}\n\n${prevCh ? '### Previous chapter context\\nCh ' + prevCh.number + ' \u2014 ' + prevCh.title + ': ' + prevCh.brief : '(This is the first chapter.)'}\n\n${nextCh ? '### Next chapter context\\nCh ' + nextCh.number + ' \u2014 ' + nextCh.title + ': ' + nextCh.brief : '(This is the final chapter.)'}\n\n## Requirements\nCreate a chapter outline with the following:\n\n1. **chapter_number**: ${chNum}\n2. **chapter_title**: The title for this chapter\n3. **chapter_story_arc**: \"${chapterArcName}\"\n4. **book_arc_beat**: Which beat/stage of the BOOK's story arc (${bookArcName}) this chapter represents\n5. **chapter_summary**: 2-3 sentence summary of the entire chapter\n6. **sub_chapters**: Array of sub-chapter outlines, each containing:\n   - **number**: Sequential number (1, 2, 3...)\n   - **title**: Sub-chapter title\n   - **brief**: Detailed 3-5 sentence description of what happens in this sub-chapter. Include specific character actions, dialogue direction, emotional beats, and plot progression. This must be detailed enough that a writer can produce the full scene from this brief alone.\n   - **arc_beat**: Which beat of the CHAPTER story arc (${chapterArcName}) this sub-chapter represents\n   - **characters**: Array of character names who appear in this sub-chapter (use EXACT names from the book outline)\n   - **setting**: Where this sub-chapter takes place\n   - **emotional_tone**: The dominant emotional quality of this sub-chapter\n   - **connects_to_book_arc**: How this sub-chapter advances the book's overall story arc\n\nCreate enough sub-chapters to fully realize the chapter's story \u2014 typically 3-7 sub-chapters depending on complexity. Each sub-chapter should be substantial (potentially 500-1500 words when written). Together they must cover:\n- The chapter's contribution to the BOOK arc (${bookArcName})\n- The chapter's own internal arc (${chapterArcName})\n- All character interactions noted in the book outline for this chapter\n- Scene transitions and emotional progression\n\n${instructions ? '\\n## REMINDER \u2014 USER INSTRUCTIONS (HIGHEST PRIORITY)\\nYou MUST follow these instructions. They OVERRIDE everything above:\\n' + instructions + '\\n' : ''}\nReturn as JSON matching the output schema exactly.`;\n\nreturn [{ json: { prompt, project_id: s.project?.id, chapter_number: chNum } }];"
+        },
+        "id": "bc-prompt",
+        "name": "build_chapter_outline_prompt",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          448,
+          96
+        ]
+      },
+      {
+        "parameters": {
+          "promptType": "define",
+          "text": "={{ $json.prompt }}"
+        },
+        "id": "bc-generate",
+        "name": "generate_chapter_outline",
+        "type": "@n8n/n8n-nodes-langchain.chainLlm",
+        "typeVersion": 1.4,
+        "position": [
+          672,
+          96
+        ]
+      },
+      {
+        "parameters": {
+          "model": "claude-sonnet-4-20250514",
+          "options": {
+            "maxTokensToSample": 8192,
+            "temperature": 0.7
+          }
+        },
+        "id": "bc-claude",
+        "name": "claude-sonnet",
+        "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+        "typeVersion": 1.2,
+        "position": [
+          528,
+          352
+        ],
+        "credentials": {
+          "anthropicApi": {
+            "id": "5LhCYKsaFO3fF7II",
+            "name": "Anthropic account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "schemaType": "manual",
+          "inputSchema": "{\"type\": \"object\", \"properties\": {\"chapter_number\": {\"type\": \"integer\"}, \"chapter_title\": {\"type\": \"string\"}, \"chapter_story_arc\": {\"type\": \"string\"}, \"book_arc_beat\": {\"type\": \"string\"}, \"chapter_summary\": {\"type\": \"string\"}, \"sub_chapters\": {\"type\": \"array\", \"items\": {\"type\": \"object\", \"properties\": {\"number\": {\"type\": \"integer\"}, \"title\": {\"type\": \"string\"}, \"brief\": {\"type\": \"string\"}, \"arc_beat\": {\"type\": \"string\"}, \"characters\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}}, \"setting\": {\"type\": \"string\"}, \"emotional_tone\": {\"type\": \"string\"}, \"connects_to_book_arc\": {\"type\": \"string\"}}}}}, \"required\": [\"chapter_number\", \"chapter_title\", \"chapter_story_arc\", \"book_arc_beat\", \"chapter_summary\", \"sub_chapters\"]}"
+        },
+        "id": "bc-parser",
+        "name": "chapter_outline_parser",
+        "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+        "typeVersion": 1.2,
+        "position": [
+          768,
+          336
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const s = $('settings').first().json;\nconst supabaseUrl = s.SUPABASE_URL;\nconst apiKey = s.SUPABASE_API_KEY;\nconst userId = s.userId || '';\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };\nconst readHeaders = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey };\n\n// Handle both parsed output (from parser) and raw text (parser fallback)\nlet chapterOutline = $input.first().json.output || {};\nif (!chapterOutline.sub_chapters || chapterOutline.sub_chapters.length === 0) {\n  const rawText = $input.first().json.text || $input.first().json.output?.text || '';\n  if (rawText) {\n    try {\n      const jsonMatch = rawText.match(/```json\\n?([\\s\\S]*?)```/) || rawText.match(/\\{[\\s\\S]*\\}/);\n      if (jsonMatch) {\n        const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);\n        if (parsed.sub_chapters) chapterOutline = parsed;\n      }\n    } catch (e) { /* parse failed, continue with empty */ }\n  }\n}\nconst promptData = $('build_chapter_outline_prompt').first().json;\nconst projectId = s.project?.id;\nconst promptChNum = $('build_chapter_outline_prompt').first().json.chapter_number;\nlet chNum = chapterOutline.chapter_number;\nif (chNum === undefined || chNum === null) chNum = promptChNum;\nif (typeof chNum === 'string') {\n  if (/^(prologue|prol)$/i.test(chNum)) chNum = 0;\n  else if (/^(epilogue|epil)$/i.test(chNum)) chNum = -1;\n  else chNum = parseInt(chNum);\n}\n\nif (!projectId) {\n  return [{ json: { error: true, result: 'No project ID found.' } }];\n}\n\nconst project = s.project;\nconst bookOutline = s.bookOutline;\n\n// Find the matching chapter in the book outline and add chapter_outline to it\nlet updated = false;\nlet targetIdx = -1;\nif (bookOutline && bookOutline.chapters) {\n  if (chNum === -1) {\n    // Epilogue explicitly requested \u2014 always use last chapter\n    targetIdx = bookOutline.chapters.length - 1;\n  } else {\n    // Find by chapter number\n    targetIdx = bookOutline.chapters.findIndex(ch => ch.number === chNum || ch.number === parseInt(chNum));\n  }\n\n  if (targetIdx >= 0) {\n    // Update chNum to actual chapter number\n    chNum = bookOutline.chapters[targetIdx].number;\n    const triggerArc = $('workflow_trigger').first().json.chapter_story_arc || '';\n    if (triggerArc) chapterOutline.chapter_story_arc = triggerArc;\n    bookOutline.chapters[targetIdx].chapter_outline = chapterOutline;\n    updated = true;\n  }\n}\n\nif (!updated) {\n  return [{ json: {\n  error: true,\n  result: 'Could not find chapter ' + chNum + ' in the book outline to save chapter outline. Available chapters: ' + bookOutline.chapters.map(ch => ch.number + '-' + ch.title).join(', '),\n  chapterOutline: chapterOutline,\n  emailBody: '<h2>Error: Chapter ' + chNum + ' not found in book outline</h2><p>Available chapters: ' + bookOutline.chapters.map(ch => ch.number + ' - ' + ch.title).join(', ') + '</p>',\n  title: bookOutline.title || '',\n  chapterTitle: 'Error',\n  subChapterCount: 0\n} }];\n}\n\n// Detect prologue/epilogue by position\nconst isPrologue = (targetIdx === 0);\nconst isEpilogue = (targetIdx === bookOutline.chapters.length - 1);\nconst chLabel = isPrologue ? 'Prologue' : (isEpilogue ? 'Epilogue' : 'Chapter ' + chNum);\n\nawait this.helpers.httpRequest({\n  method: 'PATCH',\n  url: supabaseUrl + '/rest/v1/writing_projects_v2?id=eq.' + projectId + '&user_id=eq.' + encodeURIComponent(userId),\n  headers,\n  body: { outline: bookOutline, updated_at: new Date().toISOString() }\n});\n\n// Format for email\nconst subChList = (chapterOutline.sub_chapters || []).map(sc =>\n  '<h3>Sub-chapter ' + sc.number + ': ' + sc.title + '</h3>' +\n  '<p><strong>Arc Beat (' + (chapterOutline.chapter_story_arc || '') + '):</strong> ' + (sc.arc_beat || '') + '</p>' +\n  '<p><strong>Characters:</strong> ' + (sc.characters || []).join(', ') + '</p>' +\n  '<p><strong>Setting:</strong> ' + (sc.setting || '') + '</p>' +\n  '<p><strong>Emotional Tone:</strong> ' + (sc.emotional_tone || '') + '</p>' +\n  '<p>' + (sc.brief || '') + '</p>' +\n  '<p><em>Book Arc Connection:</em> ' + (sc.connects_to_book_arc || '') + '</p>'\n).join('<hr>');\n\nconst displayTitle = chLabel + ' \\u2014 ' + (chapterOutline.chapter_title || bookOutline.chapters[targetIdx].title || chLabel);\n\nconst emailBody = '<h1>Chapter Outline: ' + displayTitle + '</h1>' +\n  '<p><strong>Book:</strong> ' + bookOutline.title + '</p>' +\n  '<p><strong>Book Story Arc:</strong> ' + (s.bookArcName || 'Not specified') + '</p>' +\n  '<p><strong>Chapter Story Arc:</strong> ' + (chapterOutline.chapter_story_arc || 'Same as book') + '</p>' +\n  '<p><strong>Book Arc Beat:</strong> ' + (chapterOutline.book_arc_beat || '') + '</p>' +\n  '<h2>Chapter Summary</h2><p>' + (chapterOutline.chapter_summary || '') + '</p>' +\n  '<h2>Sub-Chapters (' + (chapterOutline.sub_chapters || []).length + ')</h2>' + subChList;\n\nreturn [{ json: { \n  chapterOutline, \n  emailBody, \n  title: bookOutline.title,\n  chapterTitle: displayTitle,\n  subChapterCount: (chapterOutline.sub_chapters || []).length,\n  embed_needed: true,\n  result: 'Chapter outline created for \"' + displayTitle + '\" with ' + (chapterOutline.sub_chapters || []).length + ' sub-chapters using ' + (chapterOutline.chapter_story_arc || 'default') + ' story arc. Saved to project outline and emailed for review.'\n} }];"
+        },
+        "id": "bc-save",
+        "name": "save_chapter_outline",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1024,
+          96
+        ]
+      },
+      {
+        "parameters": {
+          "sendTo": "={{ $('settings').item.json.recipient_email }}",
+          "subject": "=Chapter Outline: {{ $json.chapterTitle }} \u2014 {{ $json.title }}",
+          "message": "={{ $json.emailBody }}",
+          "options": {
+            "appendAttribution": false,
+            "bccList": "={{ $('settings').item.json.bcc_email }}"
+          }
+        },
+        "id": "bc-email",
+        "name": "send_email",
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2.1,
+        "position": [
+          1248,
+          0
+        ],
+        "webhookId": "3cfbd625-88eb-4bcd-ac2b-db994b1ec9d6",
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "CPCSZOInV8Zj1PI1",
+            "name": "Gmail account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "r1",
+                "name": "result",
+                "value": "={{ $('save_chapter_outline').item.json.result }}",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "bc-result",
+        "name": "set_result",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          1472,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "workflowId": {
+            "__rl": true,
+            "value": "DTjjVk51Z9aHgAg0",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "project_id": "={{ $('settings').first().json.project?.id || '' }}",
+              "user_id": "={{ $('workflow_trigger').first().json.user_id || '' }}",
+              "openai_api_key": ""
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "project_id",
+                "displayName": "project_id",
+                "type": "string",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "removed": false
+              },
+              {
+                "id": "user_id",
+                "displayName": "user_id",
+                "type": "string",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "removed": false
+              },
+              {
+                "id": "openai_api_key",
+                "displayName": "openai_api_key",
+                "type": "string",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "removed": false
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "embed-call",
+        "name": "re_embed_project",
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.2,
+        "position": [
+          1248,
+          192
+        ],
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "workflowId": {
+            "__rl": true,
+            "value": "dk75OYTASeu6NkTr",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "execution_id": "={{ $execution.id }}",
+              "source_workflow_name": "Brainstorm Chapter V2"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "execution_id",
+                "displayName": "execution_id",
+                "type": "string",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "removed": false
+              },
+              {
+                "id": "source_workflow_name",
+                "displayName": "source_workflow_name",
+                "type": "string",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "removed": false
+              }
+            ]
+          },
+          "mode": "each",
+          "options": {
+            "waitForSubWorkflow": false
+          }
+        },
+        "id": "tt-call",
+        "name": "track_token_usage",
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.2,
+        "position": [
+          1696,
+          0
+        ],
+        "onError": "continueRegularOutput"
+      }
+    ],
+    "connections": {
+      "workflow_trigger": {
+        "main": [
+          [
+            {
+              "node": "settings",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "settings": {
+        "main": [
+          [
+            {
+              "node": "build_chapter_outline_prompt",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "build_chapter_outline_prompt": {
+        "main": [
+          [
+            {
+              "node": "generate_chapter_outline",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "generate_chapter_outline": {
+        "main": [
+          [
+            {
+              "node": "save_chapter_outline",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "claude-sonnet": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "generate_chapter_outline",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "chapter_outline_parser": {
+        "ai_outputParser": [
+          [
+            {
+              "node": "generate_chapter_outline",
+              "type": "ai_outputParser",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "save_chapter_outline": {
+        "main": [
+          [
+            {
+              "node": "send_email",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "re_embed_project",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "send_email": {
+        "main": [
+          [
+            {
+              "node": "set_result",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "set_result": {
+        "main": [
+          [
+            {
+              "node": "track_token_usage",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "re_embed_project": {
+        "main": [
+          [
+            {
+              "node": "track_token_usage",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Eric Beser",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-29T16:07:01.255Z",
+        "id": 1360,
+        "workflowId": "0c4ZDWNScdmcOtr1",
+        "versionId": "fa810441-5de8-49fb-b4b0-3737a75b7793",
+        "event": "deactivated",
+        "userId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      },
+      {
+        "createdAt": "2026-03-29T16:07:01.310Z",
+        "id": 1361,
+        "workflowId": "0c4ZDWNScdmcOtr1",
+        "versionId": "fa810441-5de8-49fb-b4b0-3737a75b7793",
+        "event": "activated",
+        "userId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      },
+      {
+        "createdAt": "2026-03-29T16:11:26.314Z",
+        "id": 1368,
+        "workflowId": "0c4ZDWNScdmcOtr1",
+        "versionId": "fa810441-5de8-49fb-b4b0-3737a75b7793",
+        "event": "deactivated",
+        "userId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      },
+      {
+        "createdAt": "2026-03-29T16:11:26.361Z",
+        "id": 1369,
+        "workflowId": "0c4ZDWNScdmcOtr1",
+        "versionId": "fa810441-5de8-49fb-b4b0-3737a75b7793",
+        "event": "activated",
+        "userId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      },
+      {
+        "createdAt": "2026-03-29T16:11:26.648Z",
+        "id": 1370,
+        "workflowId": "0c4ZDWNScdmcOtr1",
+        "versionId": "fa810441-5de8-49fb-b4b0-3737a75b7793",
+        "event": "deactivated",
+        "userId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      },
+      {
+        "createdAt": "2026-03-29T16:11:26.695Z",
+        "id": 1371,
+        "workflowId": "0c4ZDWNScdmcOtr1",
+        "versionId": "fa810441-5de8-49fb-b4b0-3737a75b7793",
+        "event": "activated",
+        "userId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      }
+    ]
   }
 }

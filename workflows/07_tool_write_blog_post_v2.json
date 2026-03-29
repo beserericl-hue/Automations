@@ -1,6 +1,11 @@
 {
-  "id": "iMBIWzO2PjsLNH9w",
-  "name": "Tool - Write Blog Post",
+  "updatedAt": "2026-03-29T16:34:09.390Z",
+  "createdAt": "2026-03-15T16:42:19.814Z",
+  "id": "G31zGaaG2vaTS1rw",
+  "name": "Tool - Write Blog Post V2",
+  "description": null,
+  "active": true,
+  "isArchived": false,
   "nodes": [
     {
       "parameters": {
@@ -39,20 +44,20 @@
       "typeVersion": 1.1,
       "position": [
         0,
-        0
+        96
       ]
     },
     {
       "parameters": {
-        "jsCode": "const SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_API_KEY = 'sb_publishable_HsIkelEZaIr0VauiB3GgIQ_59XJRoWc';\nconst trigger = $('workflow_trigger').first().json;\nconst userId = trigger.user_id || '';\n\n// Fetch email config from app_config (centralized source of truth)\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\nif (!recipient_email) {\n  try {\n    const rows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/app_config_v2?key=in.(recipient_email,bcc_email)&select=key,value&user_id=eq.${userId}`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    for (const row of rows) {\n      if (row.key === 'recipient_email') recipient_email = row.value;\n      if (row.key === 'bcc_email') bcc_email = row.value;\n    }\n  } catch (e) {\n    recipient_email = 'eric@agileadtesting.com';\n    bcc_email = '';\n  }\n}\n\nreturn [{ json: { SUPABASE_URL, SUPABASE_API_KEY, recipient_email, bcc_email: bcc_email || '', userId } }];"
+        "jsCode": "const SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_SERVICE_KEY = 'REDACTED_SUPABASE_KEY';\nconst SUPABASE_API_KEY = 'REDACTED_SUPABASE_KEY';\nconst trigger = $('workflow_trigger').first().json;\nconst userId = trigger.user_id || '';\n\n// Fetch email config from app_config (centralized source of truth)\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\nif (!recipient_email) {\n  try {\n    const rows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/app_config_v2?key=in.(recipient_email,bcc_email)&select=key,value&user_id=eq.${encodeURIComponent(userId)}`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    for (const row of rows) {\n      if (row.key === 'recipient_email') recipient_email = row.value;\n      if (row.key === 'bcc_email') bcc_email = row.value;\n    }\n  } catch (e) {\n    recipient_email = 'eric@agileadtesting.com';\n    bcc_email = '';\n  }\n}\n\nreturn [{ json: { SUPABASE_SERVICE_KEY, SUPABASE_URL, SUPABASE_API_KEY, recipient_email, bcc_email: bcc_email || '', userId } }];"
       },
       "id": "bp-settings",
       "name": "settings",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        128,
-        0
+        224,
+        96
       ]
     },
     {
@@ -84,8 +89,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        288,
-        0
+        448,
+        96
       ]
     },
     {
@@ -100,8 +105,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        480,
-        0
+        672,
+        96
       ],
       "alwaysOutputData": true
     },
@@ -124,8 +129,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        720,
-        0
+        896,
+        96
       ]
     },
     {
@@ -153,8 +158,8 @@
       "type": "n8n-nodes-base.perplexity",
       "typeVersion": 1,
       "position": [
-        960,
-        0
+        1120,
+        96
       ],
       "credentials": {
         "perplexityApi": {
@@ -175,8 +180,8 @@
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.7,
       "position": [
-        1152,
-        0
+        1344,
+        96
       ]
     },
     {
@@ -196,8 +201,8 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
       "position": [
-        1200,
-        208
+        1352,
+        320
       ],
       "credentials": {
         "anthropicApi": {
@@ -216,8 +221,8 @@
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.3,
       "position": [
-        1392,
-        208
+        1480,
+        320
       ]
     },
     {
@@ -231,7 +236,7 @@
       "type": "n8n-nodes-base.markdown",
       "typeVersion": 1,
       "position": [
-        1440,
+        1696,
         0
       ]
     },
@@ -244,11 +249,11 @@
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+              "value": "={{ $('settings').item.json.SUPABASE_SERVICE_KEY }}"
             },
             {
               "name": "Authorization",
-              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+              "value": "=Bearer {{ $('settings').item.json.SUPABASE_SERVICE_KEY }}"
             },
             {
               "name": "x-upsert",
@@ -267,7 +272,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1680,
+        1920,
         0
       ]
     },
@@ -286,9 +291,10 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        2160,
+        2368,
         0
       ],
+      "webhookId": "7fc8de38-4959-428e-b167-d03e66dce5c8",
       "credentials": {
         "gmailOAuth2": {
           "id": "CPCSZOInV8Zj1PI1",
@@ -315,7 +321,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        2400,
+        2592,
         0
       ]
     },
@@ -324,7 +330,6 @@
         "workflowId": {
           "value": "iWIcj915TYJQkdmC"
         },
-        "options": {},
         "workflowInputs": {
           "mappingMode": "defineBelow",
           "value": {
@@ -387,15 +392,16 @@
               "removed": false
             }
           ]
-        }
+        },
+        "options": {}
       },
       "id": "bp-image",
       "name": "generate_blog_image",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        1440,
-        300
+        1696,
+        192
       ]
     },
     {
@@ -407,9 +413,61 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1920,
+        2144,
         0
       ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "dk75OYTASeu6NkTr",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "execution_id": "={{ $execution.id }}",
+            "source_workflow_name": "Write Blog Post V2"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            },
+            {
+              "id": "source_workflow_name",
+              "displayName": "source_workflow_name",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "removed": false
+            }
+          ]
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "tt-call",
+      "name": "track_token_usage",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2816,
+        0
+      ],
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -560,15 +618,695 @@
           }
         ]
       ]
+    },
+    "set_result": {
+      "main": [
+        [
+          {
+            "node": "track_token_usage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
     "executionOrder": "v1",
     "callerPolicy": "workflowsFromSameOwner",
-    "availableInMCP": false
+    "availableInMCP": false,
+    "binaryMode": "separate"
   },
-  "meta": {
-    "templateCredsSetupCompleted": true
-  },
-  "pinData": {}
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "b781ad13-7fe3-4033-b4b5-57ef6bb469d3",
+  "activeVersionId": "b781ad13-7fe3-4033-b4b5-57ef6bb469d3",
+  "versionCounter": 39,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-03-15T16:42:19.814Z",
+      "createdAt": "2026-03-15T16:42:19.814Z",
+      "role": "workflow:owner",
+      "workflowId": "G31zGaaG2vaTS1rw",
+      "projectId": "so6FfyLmNOjnxEMJ",
+      "project": {
+        "updatedAt": "2026-01-12T16:36:13.622Z",
+        "createdAt": "2026-01-12T15:34:50.204Z",
+        "id": "so6FfyLmNOjnxEMJ",
+        "name": "Eric Beser <eric@agileadtesting.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-29T16:34:23.819Z",
+    "createdAt": "2026-03-29T16:34:09.395Z",
+    "versionId": "b781ad13-7fe3-4033-b4b5-57ef6bb469d3",
+    "workflowId": "G31zGaaG2vaTS1rw",
+    "nodes": [
+      {
+        "parameters": {
+          "workflowInputs": {
+            "values": [
+              {
+                "name": "topic"
+              },
+              {
+                "name": "genre_slug"
+              },
+              {
+                "name": "keywords"
+              },
+              {
+                "name": "target_length"
+              },
+              {
+                "name": "user_prompt"
+              },
+              {
+                "name": "recipient_email"
+              },
+              {
+                "name": "bcc_email"
+              },
+              {
+                "name": "user_id"
+              }
+            ]
+          }
+        },
+        "id": "bp-trigger",
+        "name": "workflow_trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [
+          0,
+          96
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_SERVICE_KEY = 'REDACTED_SUPABASE_KEY';\nconst SUPABASE_API_KEY = 'REDACTED_SUPABASE_KEY';\nconst trigger = $('workflow_trigger').first().json;\nconst userId = trigger.user_id || '';\n\n// Fetch email config from app_config (centralized source of truth)\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\nif (!recipient_email) {\n  try {\n    const rows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/app_config_v2?key=in.(recipient_email,bcc_email)&select=key,value&user_id=eq.${encodeURIComponent(userId)}`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    for (const row of rows) {\n      if (row.key === 'recipient_email') recipient_email = row.value;\n      if (row.key === 'bcc_email') bcc_email = row.value;\n    }\n  } catch (e) {\n    recipient_email = 'eric@agileadtesting.com';\n    bcc_email = '';\n  }\n}\n\nreturn [{ json: { SUPABASE_SERVICE_KEY, SUPABASE_URL, SUPABASE_API_KEY, recipient_email, bcc_email: bcc_email || '', userId } }];"
+        },
+        "id": "bp-settings",
+        "name": "settings",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          224,
+          96
+        ]
+      },
+      {
+        "parameters": {
+          "url": "={{ $('settings').first().json.SUPABASE_URL }}/rest/v1/genre_config_v2?genre_slug=eq.{{ $('workflow_trigger').first().json.genre_slug }}&limit=1",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "apikey",
+                "value": "={{ $('settings').first().json.SUPABASE_API_KEY }}"
+              },
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $('settings').first().json.SUPABASE_API_KEY }}"
+              }
+            ]
+          },
+          "options": {
+            "response": {
+              "response": {
+                "responseFormat": "json"
+              }
+            }
+          }
+        },
+        "id": "bp-genre",
+        "name": "get_genre_config",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          448,
+          96
+        ]
+      },
+      {
+        "parameters": {
+          "workflowId": {
+            "value": "z9E2vmG8sZux4aNH"
+          },
+          "options": {}
+        },
+        "id": "bp-content",
+        "name": "get_recent_content",
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.2,
+        "position": [
+          672,
+          96
+        ],
+        "alwaysOutputData": true
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "bpp1",
+                "name": "prompt",
+                "value": "=You are a world-class science fiction blogger specializing in {{ $('get_genre_config').first().json.genre_name }}.\n\n## Genre Guidelines\n{{ $('get_genre_config').first().json.writing_guidelines }}\n\n## Recent Curated Content\n{{ JSON.stringify($('get_recent_content').first().json?.data?.slice(0, 10)?.map(i => ({ title: i.title, source: i.source_type })) || []) }}\n\n## Assignment\nWrite a blog post about: {{ $('workflow_trigger').item.json.topic }}\nTarget length: {{ $('workflow_trigger').item.json.target_length || 1500 }} words\nSEO keywords: {{ $('workflow_trigger').item.json.keywords }}\n\n## Writing Prime Directive\nWrite like a human, not a machine. Use clear, everyday language and short sentences. Cut cliches \u2014 no 'revolutionize,' 'game-changing,' 'unleash,' or 'delve.' Get to the point \u2014 remove filler words. No hype, just facts. Be genuine \u2014 don't fake excitement. Show, don't tell \u2014 use concrete examples instead of vague claims. Stay focused \u2014 one main idea per paragraph. Keep paragraphs short and scannable. Respect the reader's intelligence and time. Write like you'd explain something to a smart friend. Skip unnecessary adjectives and adverbs. After drafting, cut anything confusing or off-topic.\n\n## Requirements\n- Attention-grabbing headline\n- Hook opening paragraph\n- 3-5 subheadings for scannability\n- Reference recent content from the genre\n- Include relevant book/movie recommendations\n- End with a discussion prompt\n- SEO-optimized without being keyword-stuffed\n\n## Output\nReturn JSON: { title, meta_description, body_markdown, tags }",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "bp-prompt",
+        "name": "build_prompt",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          896,
+          96
+        ]
+      },
+      {
+        "parameters": {
+          "messages": {
+            "message": [
+              {
+                "content": "=You are a research assistant. Provide detailed, current information with citations.",
+                "role": "system"
+              },
+              {
+                "content": "=Research current developments in {{ $('get_genre_config').first().json.genre_name }} related to: {{ $('workflow_trigger').item.json.topic }}. Provide recent news, book releases, and notable discussions."
+              }
+            ]
+          },
+          "simplify": true,
+          "options": {
+            "temperature": 0.1,
+            "searchRecency": "month"
+          },
+          "requestOptions": {}
+        },
+        "id": "bp-research",
+        "name": "research_topic",
+        "type": "n8n-nodes-base.perplexity",
+        "typeVersion": 1,
+        "position": [
+          1120,
+          96
+        ],
+        "credentials": {
+          "perplexityApi": {
+            "id": "ggr9QCRobQVA6Lwb",
+            "name": "Perplexity account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "promptType": "define",
+          "text": "={{ $('build_prompt').item.json.prompt }}\n\n## Research Context\n{{ $json.message?.content || $json.choices?.[0]?.message?.content || '' }}",
+          "hasOutputParser": true,
+          "batching": {}
+        },
+        "id": "bp-write",
+        "name": "write_blog",
+        "type": "@n8n/n8n-nodes-langchain.chainLlm",
+        "typeVersion": 1.7,
+        "position": [
+          1344,
+          96
+        ]
+      },
+      {
+        "parameters": {
+          "model": {
+            "__rl": true,
+            "value": "claude-sonnet-4-20250514",
+            "mode": "list",
+            "cachedResultName": "Claude Sonnet 4"
+          },
+          "options": {
+            "maxTokensToSample": 8000
+          }
+        },
+        "id": "bp-claude",
+        "name": "claude-sonnet",
+        "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+        "typeVersion": 1.3,
+        "position": [
+          1352,
+          320
+        ],
+        "credentials": {
+          "anthropicApi": {
+            "id": "5LhCYKsaFO3fF7II",
+            "name": "Anthropic account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "schemaType": "manual",
+          "inputSchema": "{ \"type\": \"object\", \"properties\": { \"title\": { \"type\": \"string\" }, \"meta_description\": { \"type\": \"string\" }, \"body_markdown\": { \"type\": \"string\" }, \"tags\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } } }, \"required\": [\"title\", \"body_markdown\"] }"
+        },
+        "id": "bp-parser",
+        "name": "blog_output_parser",
+        "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+        "typeVersion": 1.3,
+        "position": [
+          1480,
+          320
+        ]
+      },
+      {
+        "parameters": {
+          "mode": "markdownToHtml",
+          "markdown": "={{ $json.output?.body_markdown || '' }}",
+          "options": {}
+        },
+        "id": "bp-html",
+        "name": "convert_to_html",
+        "type": "n8n-nodes-base.markdown",
+        "typeVersion": 1,
+        "position": [
+          1696,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "={{ $('settings').item.json.SUPABASE_URL }}/storage/v1/object/author-content/drafts/blog_{{ $now.format('yyyy-MM-dd_HHmmss') }}.md",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "apikey",
+                "value": "={{ $('settings').item.json.SUPABASE_SERVICE_KEY }}"
+              },
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $('settings').item.json.SUPABASE_SERVICE_KEY }}"
+              },
+              {
+                "name": "x-upsert",
+                "value": "true"
+              }
+            ]
+          },
+          "sendBody": true,
+          "contentType": "raw",
+          "rawContentType": "text/markdown",
+          "body": "={{ $('write_blog').item.json.output?.body_markdown || '' }}",
+          "options": {}
+        },
+        "id": "bp-save",
+        "name": "save_draft",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1920,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "sendTo": "={{ $('settings').item.json.recipient_email }}",
+          "subject": "=Blog Draft: {{ $('write_blog').item.json.output?.title || 'Untitled' }}",
+          "message": "={{ ($('workflow_trigger').first().json.user_prompt ? '<div style=\"background:#f0f0f0; border-left:4px solid #666; padding:12px 16px; margin-bottom:24px; font-family:sans-serif; font-size:14px; color:#333;\"><strong>Command:</strong> ' + $('workflow_trigger').first().json.user_prompt + '</div>' : '') + $('convert_to_html').item.json.data }}",
+          "options": {
+            "appendAttribution": false,
+            "bccList": "={{ $('settings').item.json.bcc_email }}"
+          }
+        },
+        "id": "bp-email",
+        "name": "send_email",
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2.1,
+        "position": [
+          2368,
+          0
+        ],
+        "webhookId": "7fc8de38-4959-428e-b167-d03e66dce5c8",
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "CPCSZOInV8Zj1PI1",
+            "name": "Gmail account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "bpr1",
+                "name": "result",
+                "value": "=Blog post written and emailed: {{ $('write_blog').item.json.output?.title || 'Untitled' }}",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "bp-result",
+        "name": "set_result",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          2592,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "workflowId": {
+            "value": "iWIcj915TYJQkdmC"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "story_title": "={{ $json.output?.title || $('workflow_trigger').item.json.topic }}",
+              "image_description": "=A blog header image for \"{{ $json.output?.title || $('workflow_trigger').item.json.topic }}\".\n\nBlog summary: {{ $json.output?.meta_description || '' }}\n\nOpening content:\n{{ ($json.output?.content || $json.text || '').substring(0, 1200) }}\n\nCreate a visually striking header image that captures the blog post's theme \u2014 conceptual, atmospheric, and modern. Do NOT include any text, titles, or words in the image.",
+              "genre_slug": "={{ $('workflow_trigger').item.json.genre_slug || 'post-apocalyptic' }}",
+              "content_type": "Blog Post",
+              "user_id": "={{ $('settings').item.json.userId }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "image_description",
+                "displayName": "image_description",
+                "type": "string",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "removed": false
+              },
+              {
+                "id": "story_title",
+                "displayName": "story_title",
+                "type": "string",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "removed": false
+              },
+              {
+                "id": "genre_slug",
+                "displayName": "genre_slug",
+                "type": "string",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "removed": false
+              },
+              {
+                "id": "content_type",
+                "displayName": "content_type",
+                "type": "string",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "removed": false
+              },
+              {
+                "id": "user_id",
+                "displayName": "user_id",
+                "type": "string",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "removed": false
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "bp-image",
+        "name": "generate_blog_image",
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.2,
+        "position": [
+          1696,
+          192
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\nconst apiKey = $('settings').first().json.SUPABASE_API_KEY;\nconst userId = $('settings').first().json.userId;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\n\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: supabaseUrl + '/rest/v1/published_content_v2',\n    headers,\n    body: {\n      title: ($('write_blog').item.json.output?.title || 'Untitled Blog Post'),\n      content_type: 'blog_post',\n      genre_slug: $('workflow_trigger').first().json.genre_slug,\n      content_text: ($('write_blog').item.json.output?.body_markdown || ''),\n      storage_path: $json.Key || '',\n      project_id: null,\n      chapter_number: null,\n      status: 'draft',\n      user_id: userId\n    }\n  });\n} catch (e) {\n  // Don't fail the workflow if draft insert fails\n}\n\nreturn $input.all();"
+        },
+        "id": "bp-draft",
+        "name": "insert_draft",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2144,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "workflowId": {
+            "__rl": true,
+            "value": "dk75OYTASeu6NkTr",
+            "mode": "id"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "execution_id": "={{ $execution.id }}",
+              "source_workflow_name": "Write Blog Post V2"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "execution_id",
+                "displayName": "execution_id",
+                "type": "string",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "removed": false
+              },
+              {
+                "id": "source_workflow_name",
+                "displayName": "source_workflow_name",
+                "type": "string",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "removed": false
+              }
+            ]
+          },
+          "mode": "each",
+          "options": {
+            "waitForSubWorkflow": false
+          }
+        },
+        "id": "tt-call",
+        "name": "track_token_usage",
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.2,
+        "position": [
+          2816,
+          0
+        ],
+        "onError": "continueRegularOutput"
+      }
+    ],
+    "connections": {
+      "workflow_trigger": {
+        "main": [
+          [
+            {
+              "node": "settings",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "settings": {
+        "main": [
+          [
+            {
+              "node": "get_genre_config",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "get_genre_config": {
+        "main": [
+          [
+            {
+              "node": "get_recent_content",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "get_recent_content": {
+        "main": [
+          [
+            {
+              "node": "build_prompt",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "build_prompt": {
+        "main": [
+          [
+            {
+              "node": "research_topic",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "research_topic": {
+        "main": [
+          [
+            {
+              "node": "write_blog",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "claude-sonnet": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "write_blog",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "blog_output_parser": {
+        "ai_outputParser": [
+          [
+            {
+              "node": "write_blog",
+              "type": "ai_outputParser",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "write_blog": {
+        "main": [
+          [
+            {
+              "node": "convert_to_html",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "generate_blog_image",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "convert_to_html": {
+        "main": [
+          [
+            {
+              "node": "save_draft",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "save_draft": {
+        "main": [
+          [
+            {
+              "node": "insert_draft",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "send_email": {
+        "main": [
+          [
+            {
+              "node": "set_result",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "insert_draft": {
+        "main": [
+          [
+            {
+              "node": "send_email",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "set_result": {
+        "main": [
+          [
+            {
+              "node": "track_token_usage",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Eric Beser",
+    "name": "Version b781ad13",
+    "description": "changed layout",
+    "autosaved": true,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-29T16:34:23.814Z",
+        "id": 1401,
+        "workflowId": "G31zGaaG2vaTS1rw",
+        "versionId": "b781ad13-7fe3-4033-b4b5-57ef6bb469d3",
+        "event": "activated",
+        "userId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      }
+    ]
+  }
 }

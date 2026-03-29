@@ -1,6 +1,11 @@
 {
-  "id": "95z13RGuzJDHVNSw",
-  "name": "Tool - Repurpose to Social Posts",
+  "updatedAt": "2026-03-17T11:28:17.548Z",
+  "createdAt": "2026-03-15T16:42:18.205Z",
+  "id": "6cF3os8cvTT6Ie1d",
+  "name": "Tool - Repurpose to Social Posts V2",
+  "description": null,
+  "active": true,
+  "isArchived": false,
   "nodes": [
     {
       "parameters": {
@@ -41,7 +46,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_API_KEY = 'sb_publishable_HsIkelEZaIr0VauiB3GgIQ_59XJRoWc';\nconst trigger = $('workflow_trigger').first().json;\nconst userId = trigger.user_id || '';\n\n// Fetch email config from app_config (centralized source of truth)\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\nif (!recipient_email) {\n  try {\n    const rows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/app_config_v2?key=in.(recipient_email,bcc_email)&select=key,value&user_id=eq.${userId}`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    for (const row of rows) {\n      if (row.key === 'recipient_email') recipient_email = row.value;\n      if (row.key === 'bcc_email') bcc_email = row.value;\n    }\n  } catch (e) {\n    recipient_email = 'eric@agileadtesting.com';\n    bcc_email = '';\n  }\n}\n\n// Platform config\nconst platform = trigger.platform || 'twitter';\nconst configs = {\n  twitter: { name: 'Twitter/X', charLimit: 280, format: 'Thread of numbered tweets (1/, 2/, etc.). Each tweet max 280 chars.', example: '1/ Big news in sci-fi this week...' },\n  linkedin: { name: 'LinkedIn', charLimit: 3000, format: 'Single post, max 3000 chars. Professional tone. Hook in first line. Include 3-5 hashtags.', example: 'The future of [topic] is changing fast.' },\n  facebook: { name: 'Facebook', charLimit: 63206, format: 'Single post or short series. Conversational, community-engaging tone. Can use emojis. Include 3-5 hashtags.', example: 'Have you read this yet? Let me tell you why this matters...' },\n  instagram: { name: 'Instagram', charLimit: 2200, format: 'Caption style, max 2200 chars. Conversational tone. 20-30 hashtags at end.', example: 'This blew my mind.' }\n};\nconst platform_config = JSON.stringify(configs[platform] || configs.twitter);\n\nreturn [{ json: { platform_config, recipient_email, bcc_email: bcc_email || '' } }];"
+        "jsCode": "const SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_API_KEY = 'REDACTED_SUPABASE_KEY';\nconst trigger = $('workflow_trigger').first().json;\nconst userId = trigger.user_id || '';\n\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\nif (!recipient_email) {\n  try {\n    const rows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/app_config_v2?key=in.(recipient_email,bcc_email)&select=key,value&user_id=eq.${encodeURIComponent(userId)}`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    for (const row of rows) {\n      if (row.key === 'recipient_email') recipient_email = row.value;\n      if (row.key === 'bcc_email') bcc_email = row.value;\n    }\n  } catch (e) {\n    recipient_email = 'eric@agileadtesting.com';\n    bcc_email = '';\n  }\n}\n\nconst platform = trigger.platform || 'twitter';\nconst configs = {\n  twitter: { name: 'Twitter/X', charLimit: 280, format: 'Thread of numbered tweets (1/, 2/, etc.). Each tweet max 280 chars.', example: '1/ Big news in sci-fi this week...' },\n  linkedin: { name: 'LinkedIn', charLimit: 3000, format: 'Single post, max 3000 chars. Professional tone. Hook in first line. Include 3-5 hashtags.', example: 'The future of [topic] is changing fast.' },\n  facebook: { name: 'Facebook', charLimit: 63206, format: 'Single post or short series. Conversational, community-engaging tone. Can use emojis. Include 3-5 hashtags.', example: 'Have you read this yet? Let me tell you why this matters...' },\n  instagram: { name: 'Instagram', charLimit: 2200, format: 'Caption style, max 2200 chars. Conversational tone. 20-30 hashtags at end.', example: 'This blew my mind.' }\n};\nconst platform_config = JSON.stringify(configs[platform] || configs.twitter);\n\nreturn [{ json: { platform_config, recipient_email, bcc_email: bcc_email || '' } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -59,7 +64,7 @@
             {
               "id": "605dbce8",
               "name": "prompt",
-              "value": "=# Repurpose Content to Social Posts\n\n## Platform\n{{ JSON.parse($('set_platform_examples').item.json.platform_config).name }}\n\n## Platform Rules\n- Character limit: {{ JSON.parse($('set_platform_examples').item.json.platform_config).charLimit }}\n- Format: {{ JSON.parse($('set_platform_examples').item.json.platform_config).format }}\n\n## Source Content\n{{ $('workflow_trigger').item.json.content }}\n\n## Writing Prime Directive\nWrite like a human, not a machine. Use clear, everyday language and short sentences. Cut cliches — no 'revolutionize,' 'game-changing,' 'unleash,' or 'delve.' Get to the point — remove filler words. No hype, just facts. Be genuine — don't fake excitement. Show, don't tell — use concrete examples instead of vague claims. Keep it tight and natural. Write like you'd text a smart friend.\n\n## Output\nReturn a JSON object with a 'posts' array. Each post has 'text' and 'hashtags' (array without #).",
+              "value": "=# Repurpose Content to Social Posts\n\n## Platform\n{{ JSON.parse($('set_platform_examples').item.json.platform_config).name }}\n\n## Platform Rules\n- Character limit: {{ JSON.parse($('set_platform_examples').item.json.platform_config).charLimit }}\n- Format: {{ JSON.parse($('set_platform_examples').item.json.platform_config).format }}\n\n## Source Content\n{{ $('workflow_trigger').item.json.content }}\n\n## Writing Prime Directive\nWrite like a human, not a machine. Use clear, everyday language and short sentences. Cut cliches \u2014 no 'revolutionize,' 'game-changing,' 'unleash,' or 'delve.' Get to the point \u2014 remove filler words. No hype, just facts. Be genuine \u2014 don't fake excitement. Show, don't tell \u2014 use concrete examples instead of vague claims. Keep it tight and natural. Write like you'd text a smart friend.\n\n## Output\nReturn a JSON object with a 'posts' array. Each post has 'text' and 'hashtags' (array without #).",
               "type": "string"
             }
           ]
@@ -178,7 +183,7 @@
           "mappingMode": "defineBelow",
           "value": {
             "story_title": "=Social Post ({{ $('workflow_trigger').item.json.platform }})",
-            "image_description": "=A social media image for {{ $('workflow_trigger').item.json.platform }}.\n\nContent being promoted:\n{{ $('workflow_trigger').item.json.content?.substring(0, 800) || '' }}\n\nGenerated posts:\n{{ ($('write_posts').first().json.output || $('write_posts').first().json.text || '').substring(0, 600) }}\n\nCreate an eye-catching, shareable image that captures the essence of this content — bold, atmospheric, platform-appropriate. Do NOT include any text, titles, or words in the image.",
+            "image_description": "=A social media image for {{ $('workflow_trigger').item.json.platform }}.\n\nContent being promoted:\n{{ $('workflow_trigger').item.json.content?.substring(0, 800) || '' }}\n\nGenerated posts:\n{{ ($('write_posts').first().json.output || $('write_posts').first().json.text || '').substring(0, 600) }}\n\nCreate an eye-catching, shareable image that captures the essence of this content \u2014 bold, atmospheric, platform-appropriate. Do NOT include any text, titles, or words in the image.",
             "genre_slug": "={{ $('workflow_trigger').item.json.genre_slug || 'post-apocalyptic' }}",
             "content_type": "Social Media Post",
             "user_id": "={{ $('workflow_trigger').item.json.user_id }}"
@@ -337,8 +342,390 @@
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
   },
-  "meta": {
-    "templateCredsSetupCompleted": true
-  },
-  "pinData": {}
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "77758322-fd1a-44a4-89da-0be062aa58af",
+  "activeVersionId": "77758322-fd1a-44a4-89da-0be062aa58af",
+  "versionCounter": 22,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-03-15T16:42:18.205Z",
+      "createdAt": "2026-03-15T16:42:18.205Z",
+      "role": "workflow:owner",
+      "workflowId": "6cF3os8cvTT6Ie1d",
+      "projectId": "so6FfyLmNOjnxEMJ",
+      "project": {
+        "updatedAt": "2026-01-12T16:36:13.622Z",
+        "createdAt": "2026-01-12T15:34:50.204Z",
+        "id": "so6FfyLmNOjnxEMJ",
+        "name": "Eric Beser <eric@agileadtesting.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-17T11:28:17.551Z",
+    "createdAt": "2026-03-17T11:28:17.551Z",
+    "versionId": "77758322-fd1a-44a4-89da-0be062aa58af",
+    "workflowId": "6cF3os8cvTT6Ie1d",
+    "nodes": [
+      {
+        "parameters": {
+          "workflowInputs": {
+            "values": [
+              {
+                "name": "content"
+              },
+              {
+                "name": "platform"
+              },
+              {
+                "name": "genre_slug"
+              },
+              {
+                "name": "user_prompt"
+              },
+              {
+                "name": "recipient_email"
+              },
+              {
+                "name": "bcc_email"
+              },
+              {
+                "name": "user_id"
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [
+          0,
+          0
+        ],
+        "id": "956e6883",
+        "name": "workflow_trigger"
+      },
+      {
+        "parameters": {
+          "jsCode": "const SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_API_KEY = 'REDACTED_SUPABASE_KEY';\nconst trigger = $('workflow_trigger').first().json;\nconst userId = trigger.user_id || '';\n\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\nif (!recipient_email) {\n  try {\n    const rows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/app_config_v2?key=in.(recipient_email,bcc_email)&select=key,value&user_id=eq.${encodeURIComponent(userId)}`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    for (const row of rows) {\n      if (row.key === 'recipient_email') recipient_email = row.value;\n      if (row.key === 'bcc_email') bcc_email = row.value;\n    }\n  } catch (e) {\n    recipient_email = 'eric@agileadtesting.com';\n    bcc_email = '';\n  }\n}\n\nconst platform = trigger.platform || 'twitter';\nconst configs = {\n  twitter: { name: 'Twitter/X', charLimit: 280, format: 'Thread of numbered tweets (1/, 2/, etc.). Each tweet max 280 chars.', example: '1/ Big news in sci-fi this week...' },\n  linkedin: { name: 'LinkedIn', charLimit: 3000, format: 'Single post, max 3000 chars. Professional tone. Hook in first line. Include 3-5 hashtags.', example: 'The future of [topic] is changing fast.' },\n  facebook: { name: 'Facebook', charLimit: 63206, format: 'Single post or short series. Conversational, community-engaging tone. Can use emojis. Include 3-5 hashtags.', example: 'Have you read this yet? Let me tell you why this matters...' },\n  instagram: { name: 'Instagram', charLimit: 2200, format: 'Caption style, max 2200 chars. Conversational tone. 20-30 hashtags at end.', example: 'This blew my mind.' }\n};\nconst platform_config = JSON.stringify(configs[platform] || configs.twitter);\n\nreturn [{ json: { platform_config, recipient_email, bcc_email: bcc_email || '' } }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          240,
+          0
+        ],
+        "id": "ff80061d",
+        "name": "set_platform_examples"
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "605dbce8",
+                "name": "prompt",
+                "value": "=# Repurpose Content to Social Posts\n\n## Platform\n{{ JSON.parse($('set_platform_examples').item.json.platform_config).name }}\n\n## Platform Rules\n- Character limit: {{ JSON.parse($('set_platform_examples').item.json.platform_config).charLimit }}\n- Format: {{ JSON.parse($('set_platform_examples').item.json.platform_config).format }}\n\n## Source Content\n{{ $('workflow_trigger').item.json.content }}\n\n## Writing Prime Directive\nWrite like a human, not a machine. Use clear, everyday language and short sentences. Cut cliches \u2014 no 'revolutionize,' 'game-changing,' 'unleash,' or 'delve.' Get to the point \u2014 remove filler words. No hype, just facts. Be genuine \u2014 don't fake excitement. Show, don't tell \u2014 use concrete examples instead of vague claims. Keep it tight and natural. Write like you'd text a smart friend.\n\n## Output\nReturn a JSON object with a 'posts' array. Each post has 'text' and 'hashtags' (array without #).",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          480,
+          0
+        ],
+        "id": "89016beb",
+        "name": "build_prompt"
+      },
+      {
+        "parameters": {
+          "promptType": "define",
+          "text": "={{ $json.prompt }}",
+          "hasOutputParser": true,
+          "batching": {}
+        },
+        "type": "@n8n/n8n-nodes-langchain.chainLlm",
+        "typeVersion": 1.7,
+        "position": [
+          704,
+          0
+        ],
+        "id": "142ad298",
+        "name": "write_posts"
+      },
+      {
+        "parameters": {
+          "model": {
+            "__rl": true,
+            "value": "claude-sonnet-4-20250514",
+            "mode": "list",
+            "cachedResultName": "Claude Sonnet 4"
+          },
+          "options": {}
+        },
+        "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+        "typeVersion": 1.3,
+        "position": [
+          704,
+          208
+        ],
+        "id": "2db6dc77",
+        "name": "claude-sonnet-4",
+        "credentials": {
+          "anthropicApi": {
+            "id": "5LhCYKsaFO3fF7II",
+            "name": "Anthropic account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "schemaType": "manual",
+          "inputSchema": "{\"type\":\"object\",\"properties\":{\"posts\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\"},\"hashtags\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}}}}}}"
+        },
+        "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+        "typeVersion": 1.3,
+        "position": [
+          896,
+          208
+        ],
+        "id": "c80a8168",
+        "name": "posts_parser"
+      },
+      {
+        "parameters": {
+          "jsCode": "const posts = $input.first().json.output?.posts || [];\nconst platform = $('workflow_trigger').item.json.platform || 'social';\n\nconst html = posts.map((p, i) => {\n  const tags = (p.hashtags || []).map(h => `#${h}`).join(' ');\n  return `<div style=\"background:#f5f5f5;border-left:4px solid #333;padding:12px 16px;margin:12px 0;border-radius:4px;\">\n    <p style=\"font-size:15px;line-height:1.5;margin:0 0 8px 0;white-space:pre-wrap;\">${p.text}</p>\n    ${tags ? `<p style=\"color:#1a73e8;font-size:13px;margin:0;\">${tags}</p>` : ''}\n  </div>`;\n}).join('');\n\nconst result = posts.map(p => {\n  const tags = (p.hashtags || []).map(h => `#${h}`).join(' ');\n  return p.text + (tags ? '\\n' + tags : '');\n}).join('\\n\\n---\\n\\n');\n\nreturn [{ json: { result, html, platform } }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1136,
+          0
+        ],
+        "id": "f36113a8",
+        "name": "set_result"
+      },
+      {
+        "parameters": {
+          "sendTo": "={{ $('set_platform_examples').item.json.recipient_email }}",
+          "subject": "=Social Posts: {{ $('workflow_trigger').item.json.platform }}",
+          "message": "={{ $(\"workflow_trigger\").first().json.user_prompt ? '<div style=\"background:#f0f0f0; border-left:4px solid #666; padding:12px 16px; margin-bottom:24px; font-family:sans-serif; font-size:14px; color:#333;\"><strong>Command:</strong> ' + $(\"workflow_trigger\").first().json.user_prompt + '</div>' : '' }}<h2 style=\"font-family:sans-serif;\">Social Posts for {{ $('workflow_trigger').item.json.platform }}</h2>\n<p style=\"color:#666;font-family:sans-serif;font-size:13px;\">Copy and paste each post below:</p>\n{{ $json.html }}",
+          "options": {
+            "appendAttribution": false,
+            "bccList": "={{ $('set_platform_examples').item.json.bcc_email }}"
+          }
+        },
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2.1,
+        "position": [
+          1392,
+          0
+        ],
+        "id": "8d279d12",
+        "name": "send_email",
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "CPCSZOInV8Zj1PI1",
+            "name": "Gmail account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "workflowId": {
+            "value": "iWIcj915TYJQkdmC"
+          },
+          "options": {},
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "story_title": "=Social Post ({{ $('workflow_trigger').item.json.platform }})",
+              "image_description": "=A social media image for {{ $('workflow_trigger').item.json.platform }}.\n\nContent being promoted:\n{{ $('workflow_trigger').item.json.content?.substring(0, 800) || '' }}\n\nGenerated posts:\n{{ ($('write_posts').first().json.output || $('write_posts').first().json.text || '').substring(0, 600) }}\n\nCreate an eye-catching, shareable image that captures the essence of this content \u2014 bold, atmospheric, platform-appropriate. Do NOT include any text, titles, or words in the image.",
+              "genre_slug": "={{ $('workflow_trigger').item.json.genre_slug || 'post-apocalyptic' }}",
+              "content_type": "Social Media Post",
+              "user_id": "={{ $('workflow_trigger').item.json.user_id }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "image_description",
+                "displayName": "image_description",
+                "type": "string",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "removed": false
+              },
+              {
+                "id": "story_title",
+                "displayName": "story_title",
+                "type": "string",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "removed": false
+              },
+              {
+                "id": "genre_slug",
+                "displayName": "genre_slug",
+                "type": "string",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "removed": false
+              },
+              {
+                "id": "content_type",
+                "displayName": "content_type",
+                "type": "string",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "removed": false
+              },
+              {
+                "id": "user_id",
+                "displayName": "user_id",
+                "type": "string",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "removed": false
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.2,
+        "position": [
+          1136,
+          240
+        ],
+        "id": "sp-image",
+        "name": "generate_post_image"
+      }
+    ],
+    "connections": {
+      "workflow_trigger": {
+        "main": [
+          [
+            {
+              "node": "set_platform_examples",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "set_platform_examples": {
+        "main": [
+          [
+            {
+              "node": "build_prompt",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "build_prompt": {
+        "main": [
+          [
+            {
+              "node": "write_posts",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "claude-sonnet-4": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "write_posts",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "posts_parser": {
+        "ai_outputParser": [
+          [
+            {
+              "node": "write_posts",
+              "type": "ai_outputParser",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "write_posts": {
+        "main": [
+          [
+            {
+              "node": "set_result",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "generate_post_image",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "set_result": {
+        "main": [
+          [
+            {
+              "node": "send_email",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Eric Beser",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-17T11:28:17.625Z",
+        "id": 949,
+        "workflowId": "6cF3os8cvTT6Ie1d",
+        "versionId": "77758322-fd1a-44a4-89da-0be062aa58af",
+        "event": "deactivated",
+        "userId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      },
+      {
+        "createdAt": "2026-03-17T11:28:17.661Z",
+        "id": 950,
+        "workflowId": "6cF3os8cvTT6Ie1d",
+        "versionId": "77758322-fd1a-44a4-89da-0be062aa58af",
+        "event": "activated",
+        "userId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      }
+    ]
+  }
 }

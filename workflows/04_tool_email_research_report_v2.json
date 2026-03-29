@@ -1,6 +1,11 @@
 {
-  "id": "QAbYfOOd05lyesva",
-  "name": "Tool - Email Research Report",
+  "updatedAt": "2026-03-16T22:17:21.610Z",
+  "createdAt": "2026-03-15T16:42:18.606Z",
+  "id": "NBNlHQ8kAy7nX8LO",
+  "name": "Tool - Email Research Report V2",
+  "description": null,
+  "active": true,
+  "isArchived": false,
   "nodes": [
     {
       "parameters": {
@@ -41,7 +46,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Ensure markdown tables have blank lines before/after so Showdown parses them\nlet md = $input.first().json.markdownReportContent || '';\nmd = md.replace(/(^|\\n)([^\\n]*\\|[^\\n]*\\n\\|[-| :]+\\|[^\\n]*(?:\\n\\|[^\\n]*)*)/g, (match, prefix, table) => {\n  return prefix + '\\n' + table + '\\n';\n});\n\n// Fetch email config from app_config if trigger values are null\nconst SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_API_KEY = 'sb_publishable_HsIkelEZaIr0VauiB3GgIQ_59XJRoWc';\nconst trigger = $input.first().json;\nconst userId = trigger.user_id || '';\n\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\nif (!recipient_email) {\n  try {\n    const rows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/app_config_v2?key=in.(recipient_email,bcc_email)&select=key,value&user_id=eq.${userId}`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    for (const row of rows) {\n      if (row.key === 'recipient_email') recipient_email = row.value;\n      if (row.key === 'bcc_email') bcc_email = row.value;\n    }\n  } catch (e) {\n    recipient_email = 'eric@agileadtesting.com';\n    bcc_email = '';\n  }\n}\n\nreturn [{\n  json: {\n    markdownReportContent: md,\n    emailAddress: trigger.emailAddress,\n    subjectLine: trigger.subjectLine,\n    recipient_email: recipient_email,\n    bcc_email: bcc_email || ''\n  }\n}];"
+        "jsCode": "// Ensure markdown tables have blank lines before/after so Showdown parses them\nlet md = $input.first().json.markdownReportContent || '';\nmd = md.replace(/(^|\\n)([^\\n]*\\|[^\\n]*\\n\\|[-| :]+\\|[^\\n]*(?:\\n\\|[^\\n]*)*)/g, (match, prefix, table) => {\n  return prefix + '\\n' + table + '\\n';\n});\n\n// Fetch email config from app_config if trigger values are null\nconst SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_API_KEY = 'REDACTED_SUPABASE_KEY';\nconst trigger = $input.first().json;\nconst userId = trigger.user_id || '';\n\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\nif (!recipient_email) {\n  try {\n    const rows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/app_config_v2?key=in.(recipient_email,bcc_email)&select=key,value&user_id=eq.${encodeURIComponent(userId)}`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    for (const row of rows) {\n      if (row.key === 'recipient_email') recipient_email = row.value;\n      if (row.key === 'bcc_email') bcc_email = row.value;\n    }\n  } catch (e) {\n    recipient_email = 'eric@agileadtesting.com';\n    bcc_email = '';\n  }\n}\n\n// Build command header HTML\nlet commandHeader = '';\nconst userPrompt = trigger.user_prompt || '';\nif (userPrompt) {\n  commandHeader = '<div style=\"background:#f0f0f0; border-left:4px solid #666; padding:12px 16px; margin-bottom:24px; font-family:sans-serif; font-size:14px; color:#333;\"><strong>Command:</strong> ' + userPrompt + '</div>';\n}\n\nreturn [{\n  json: {\n    markdownReportContent: md,\n    emailAddress: trigger.emailAddress,\n    subjectLine: trigger.subjectLine,\n    recipient_email: recipient_email,\n    bcc_email: bcc_email || '',\n    commandHeader: commandHeader\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -77,7 +82,7 @@
       "parameters": {
         "sendTo": "={{ $('fix_table_formatting').item.json.recipient_email || $('fix_table_formatting').item.json.emailAddress }}",
         "subject": "={{ $('fix_table_formatting').item.json.subjectLine }}",
-        "message": "={{ ($('workflow_trigger').first().json.user_prompt ? '<div style=\"background:#f0f0f0; border-left:4px solid #666; padding:12px 16px; margin-bottom:24px; font-family:sans-serif; font-size:14px; color:#333;\"><strong>Command:</strong> ' + $('workflow_trigger').first().json.user_prompt + '</div>' : '') + ( $json.data ",
+        "message": "={{ $('fix_table_formatting').item.json.commandHeader + $json.data }}",
         "options": {
           "appendAttribution": false,
           "bccList": "={{ $('fix_table_formatting').item.json.bcc_email }}"
@@ -91,7 +96,6 @@
       ],
       "id": "5f5a2242-ab3f-47be-a787-f5d2ac7794bd",
       "name": "send_email",
-      "webhookId": "0a57613f-f954-4777-a8e7-7e3445829329",
       "credentials": {
         "gmailOAuth2": {
           "id": "CPCSZOInV8Zj1PI1",
@@ -140,8 +144,184 @@
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
   },
-  "meta": {
-    "templateCredsSetupCompleted": true
-  },
-  "pinData": {}
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "4c4ed088-c100-4b96-94eb-c40f9a4fc4ec",
+  "activeVersionId": "4c4ed088-c100-4b96-94eb-c40f9a4fc4ec",
+  "versionCounter": 31,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-03-15T16:42:18.606Z",
+      "createdAt": "2026-03-15T16:42:18.606Z",
+      "role": "workflow:owner",
+      "workflowId": "NBNlHQ8kAy7nX8LO",
+      "projectId": "so6FfyLmNOjnxEMJ",
+      "project": {
+        "updatedAt": "2026-01-12T16:36:13.622Z",
+        "createdAt": "2026-01-12T15:34:50.204Z",
+        "id": "so6FfyLmNOjnxEMJ",
+        "name": "Eric Beser <eric@agileadtesting.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-16T22:17:21.615Z",
+    "createdAt": "2026-03-16T22:17:21.615Z",
+    "versionId": "4c4ed088-c100-4b96-94eb-c40f9a4fc4ec",
+    "workflowId": "NBNlHQ8kAy7nX8LO",
+    "nodes": [
+      {
+        "parameters": {
+          "workflowInputs": {
+            "values": [
+              {
+                "name": "markdownReportContent"
+              },
+              {
+                "name": "emailAddress"
+              },
+              {
+                "name": "subjectLine"
+              },
+              {
+                "name": "user_prompt"
+              },
+              {
+                "name": "recipient_email"
+              },
+              {
+                "name": "bcc_email"
+              },
+              {
+                "name": "user_id"
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [
+          640,
+          -272
+        ],
+        "id": "559da46a-0c14-46f7-bdb2-c60e4e7bb4db",
+        "name": "workflow_trigger"
+      },
+      {
+        "parameters": {
+          "jsCode": "// Ensure markdown tables have blank lines before/after so Showdown parses them\nlet md = $input.first().json.markdownReportContent || '';\nmd = md.replace(/(^|\\n)([^\\n]*\\|[^\\n]*\\n\\|[-| :]+\\|[^\\n]*(?:\\n\\|[^\\n]*)*)/g, (match, prefix, table) => {\n  return prefix + '\\n' + table + '\\n';\n});\n\n// Fetch email config from app_config if trigger values are null\nconst SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_API_KEY = 'REDACTED_SUPABASE_KEY';\nconst trigger = $input.first().json;\nconst userId = trigger.user_id || '';\n\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\nif (!recipient_email) {\n  try {\n    const rows = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${SUPABASE_URL}/rest/v1/app_config_v2?key=in.(recipient_email,bcc_email)&select=key,value&user_id=eq.${encodeURIComponent(userId)}`,\n      headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n    });\n    for (const row of rows) {\n      if (row.key === 'recipient_email') recipient_email = row.value;\n      if (row.key === 'bcc_email') bcc_email = row.value;\n    }\n  } catch (e) {\n    recipient_email = 'eric@agileadtesting.com';\n    bcc_email = '';\n  }\n}\n\n// Build command header HTML\nlet commandHeader = '';\nconst userPrompt = trigger.user_prompt || '';\nif (userPrompt) {\n  commandHeader = '<div style=\"background:#f0f0f0; border-left:4px solid #666; padding:12px 16px; margin-bottom:24px; font-family:sans-serif; font-size:14px; color:#333;\"><strong>Command:</strong> ' + userPrompt + '</div>';\n}\n\nreturn [{\n  json: {\n    markdownReportContent: md,\n    emailAddress: trigger.emailAddress,\n    subjectLine: trigger.subjectLine,\n    recipient_email: recipient_email,\n    bcc_email: bcc_email || '',\n    commandHeader: commandHeader\n  }\n}];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          800,
+          -272
+        ],
+        "id": "fix-tables",
+        "name": "fix_table_formatting"
+      },
+      {
+        "parameters": {
+          "mode": "markdownToHtml",
+          "markdown": "={{ $json.markdownReportContent }}",
+          "options": {
+            "simplifiedAutoLink": true,
+            "ghCodeBlocks": true,
+            "simpleLineBreaks": false,
+            "strikethrough": true,
+            "tables": true
+          }
+        },
+        "type": "n8n-nodes-base.markdown",
+        "typeVersion": 1,
+        "position": [
+          992,
+          -272
+        ],
+        "id": "8b5341da-e09a-4de2-93e1-e0ec67d84507",
+        "name": "convert_to_html"
+      },
+      {
+        "parameters": {
+          "sendTo": "={{ $('fix_table_formatting').item.json.recipient_email || $('fix_table_formatting').item.json.emailAddress }}",
+          "subject": "={{ $('fix_table_formatting').item.json.subjectLine }}",
+          "message": "={{ $('fix_table_formatting').item.json.commandHeader + $json.data }}",
+          "options": {
+            "appendAttribution": false,
+            "bccList": "={{ $('fix_table_formatting').item.json.bcc_email }}"
+          }
+        },
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2.1,
+        "position": [
+          1200,
+          -272
+        ],
+        "id": "5f5a2242-ab3f-47be-a787-f5d2ac7794bd",
+        "name": "send_email",
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "CPCSZOInV8Zj1PI1",
+            "name": "Gmail account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "workflow_trigger": {
+        "main": [
+          [
+            {
+              "node": "fix_table_formatting",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "fix_table_formatting": {
+        "main": [
+          [
+            {
+              "node": "convert_to_html",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "convert_to_html": {
+        "main": [
+          [
+            {
+              "node": "send_email",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Eric Beser",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-16T22:17:21.946Z",
+        "id": 932,
+        "workflowId": "NBNlHQ8kAy7nX8LO",
+        "versionId": "4c4ed088-c100-4b96-94eb-c40f9a4fc4ec",
+        "event": "activated",
+        "userId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      }
+    ]
+  }
 }
