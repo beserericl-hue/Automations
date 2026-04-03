@@ -1,11 +1,9 @@
 {
-  "updatedAt": "2026-03-20T16:03:43.681Z",
+  "updatedAt": "2026-04-02T17:51:21.283Z",
   "createdAt": "2026-03-20T15:05:35.578Z",
   "id": "WEzf89RwAbkBxmQZ",
   "name": "Tool - Format Kindle Book V2",
-  "description": null,
   "active": true,
-  "isArchived": false,
   "nodes": [
     {
       "id": "kb-trigger",
@@ -64,14 +62,14 @@
         0
       ],
       "parameters": {
-        "jsCode": "let docx;\ntry { docx = require('docx'); } catch (e) {\n  return [{ json: { error: true, filename: '', result: 'The \"docx\" npm package is not available. Add \"docx\" to NODE_FUNCTION_ALLOW_EXTERNAL in n8n env settings and run: npm install docx in your n8n directory.' } }];\n}\nconst { Document, Packer, Paragraph, TextRun, HeadingLevel, SectionType, AlignmentType } = docx;\nconst settings = $('settings').first().json;\nconst SB = settings.SUPABASE_URL;\nconst AK = settings.SUPABASE_API_KEY;\nconst hd = { 'apikey': AK, 'Authorization': 'Bearer ' + AK };\nconst uf = settings.userId ? '&user_id=eq.' + encodeURIComponent(settings.userId) : '';\n\n// 1. Fetch project\nconst pr = await this.helpers.httpRequest({ method: 'GET', url: SB + '/rest/v1/writing_projects_v2?title=ilike.*' + encodeURIComponent(settings.project_title) + '*&select=id,title,genre_slug&limit=1' + uf, headers: hd });\nconst project = Array.isArray(pr) && pr.length > 0 ? pr[0] : null;\nif (!project) return [{ json: { error: true, filename: '', result: 'Project not found: ' + settings.project_title } }];\n\n// 2. Fetch all chapters (including prologue=0 and epilogue=999), ordered by chapter_number\nlet chapters = await this.helpers.httpRequest({ method: 'GET', url: SB + '/rest/v1/published_content_v2?project_id=eq.' + project.id + '&content_type=eq.chapter&order=chapter_number.asc&select=id,title,chapter_number,content_text,storage_path' + uf, headers: hd });\nchapters = Array.isArray(chapters) ? chapters : [];\n// Fallback: search by genre_slug if no chapters found by project_id\nif (chapters.length === 0 && project.genre_slug) {\n  const fb = await this.helpers.httpRequest({ method: 'GET', url: SB + '/rest/v1/published_content_v2?content_type=eq.chapter&genre_slug=eq.' + encodeURIComponent(project.genre_slug) + '&order=chapter_number.asc&select=id,title,chapter_number,content_text,storage_path&limit=100' + uf, headers: hd });\n  chapters = Array.isArray(fb) ? fb : [];\n}\nif (chapters.length === 0) return [{ json: { error: true, filename: '', result: 'No chapters found for \"' + project.title + '\". Write some chapters first.' } }];\n\n// 3. Fetch content from storage for chapters without content_text\nfor (const c of chapters) {\n  if (!c.content_text && c.storage_path) {\n    try {\n      const raw = await this.helpers.httpRequest({ method: 'GET', url: SB + '/storage/v1/object/' + c.storage_path, headers: hd });\n      c.content_text = typeof raw === 'string' ? raw : JSON.stringify(raw);\n    } catch (e) { c.content_text = ''; }\n  }\n}\n\n// 4. Page sizes in twips (1 inch = 1440 twips)\nconst PS = {\n  '5x8':{w:7200,h:11520},'5.06x7.81':{w:7286,h:11246},'5.25x8':{w:7560,h:11520},\n  '5.5x8.5':{w:7920,h:12240},'6x9':{w:8640,h:12960},'6.14x9.21':{w:8842,h:13262},\n  '6.69x9.61':{w:9634,h:13838},'7x10':{w:10080,h:14400},'7.44x9.69':{w:10714,h:13954},\n  '7.5x9.25':{w:10800,h:13320},'8x10':{w:11520,h:14400},'8.25x11':{w:11880,h:15840},\n  '8.25x6':{w:11880,h:8640},'8.25x8.25':{w:11880,h:11880},'8.27x11.69':{w:11909,h:16834},\n  '8.5x11':{w:12240,h:15840},'8.5x8.5':{w:12240,h:12240}\n};\nconst rawSz = (settings.page_size || '6x9').replace(/[\\s\\u00d7]/g, '').replace(/by/gi, 'x').toLowerCase();\nconst dm = PS[rawSz] || PS['6x9'];\nconst sz = rawSz in PS ? rawSz : '6x9';\nconst mg = { top: 1080, bottom: 720, left: 1080, right: 720 };\n\n// 5. HTML helpers\nfunction dec(t) {\n  return t.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'\"')\n    .replace(/&#39;/g,\"'\").replace(/&mdash;/g,'\\u2014').replace(/&ndash;/g,'\\u2013')\n    .replace(/&ldquo;/g,'\\u201C').replace(/&rdquo;/g,'\\u201D').replace(/&lsquo;/g,'\\u2018')\n    .replace(/&rsquo;/g,'\\u2019').replace(/&hellip;/g,'\\u2026').replace(/&nbsp;/g,' ')\n    .replace(/&#(\\d+);/g, function(m, c) { return String.fromCharCode(parseInt(c)); });\n}\n\nfunction pInline(html) {\n  const runs = [];\n  const parts = html.split(/(<\\/?(?:strong|b|em|i)>)/gi);\n  let bo = false, it = false;\n  for (const p of parts) {\n    const l = p.toLowerCase();\n    if (l === '<strong>' || l === '<b>') { bo = true; continue; }\n    if (l === '</strong>' || l === '</b>') { bo = false; continue; }\n    if (l === '<em>' || l === '<i>') { it = true; continue; }\n    if (l === '</em>' || l === '</i>') { it = false; continue; }\n    const cl = dec(p.replace(/<[^>]+>/g, ''));\n    if (cl) {\n      const o = { text: cl, font: 'Garamond', size: 24 };\n      if (bo) o.bold = true;\n      if (it) o.italics = true;\n      runs.push(new TextRun(o));\n    }\n  }\n  return runs.length ? runs : [new TextRun({ text: '', font: 'Garamond', size: 24 })];\n}\n\nfunction h2p(html) {\n  if (!html) return [new Paragraph({ children: [new TextRun({ text: '', font: 'Garamond', size: 24 })] })];\n  const pa = [];\n  const re = /<(h[1-6]|p|blockquote|li)[^>]*>([\\s\\S]*?)<\\/\\1>|<hr\\s*\\/?>/gi;\n  let m;\n  const bl = [];\n  while ((m = re.exec(html)) !== null) {\n    if (m[0].match(/^<hr/i)) bl.push({ t: 'hr', c: '' });\n    else bl.push({ t: m[1].toLowerCase(), c: m[2] || '' });\n  }\n  if (!bl.length) {\n    html.replace(/<[^>]+>/g, '').split(/\\n+/).filter(function(l) { return l.trim().length > 0; })\n      .forEach(function(l) { bl.push({ t: 'p', c: l.trim() }); });\n  }\n  for (const b of bl) {\n    if (b.t === 'h1') continue;\n    if (b.t === 'hr') {\n      pa.push(new Paragraph({ children: [new TextRun({ text: '* * *', font: 'Garamond', size: 24 })], alignment: AlignmentType.CENTER, spacing: { before: 360, after: 360 } }));\n      continue;\n    }\n    if (b.t === 'h2') {\n      pa.push(new Paragraph({ children: pInline(b.c), heading: HeadingLevel.HEADING_2, spacing: { before: 480, after: 240 } }));\n      continue;\n    }\n    if (b.t === 'h3') {\n      pa.push(new Paragraph({ children: pInline(b.c), heading: HeadingLevel.HEADING_3, spacing: { before: 360, after: 180 } }));\n      continue;\n    }\n    if (b.t === 'blockquote') {\n      pa.push(new Paragraph({ children: pInline(b.c), indent: { left: 720, right: 720 }, spacing: { before: 120, after: 120 } }));\n      continue;\n    }\n    pa.push(new Paragraph({ children: pInline(b.c), spacing: { after: 120, line: 276 }, indent: { firstLine: 360 } }));\n  }\n  return pa.length ? pa : [new Paragraph({ children: [new TextRun({ text: '', font: 'Garamond', size: 24 })] })];\n}\n\n// 6. Build document\nconst pp = { size: { width: dm.w, height: dm.h }, margin: mg };\n\n// Title page section\nconst titleSec = {\n  properties: { page: pp },\n  children: [\n    new Paragraph({ spacing: { before: 4800 } }),\n    new Paragraph({\n      children: [new TextRun({ text: project.title, font: 'Garamond', size: 56, bold: true })],\n      alignment: AlignmentType.CENTER,\n      spacing: { after: 1200 }\n    })\n  ]\n};\n\n// Chapter sections \u2014 each starts on odd page with Heading 1\nconst chapSecs = chapters.map(function(c) {\n  const cn = parseInt(c.chapter_number);\n  const titleLower = (c.title || '').toLowerCase();\n  let label;\n  if (cn === 0 || titleLower.indexOf('prologue') >= 0) label = c.title || 'Prologue';\n  else if (cn === 999 || titleLower.indexOf('epilogue') >= 0) label = c.title || 'Epilogue';\n  else label = c.title || ('Chapter ' + cn);\n\n  return {\n    properties: { type: SectionType.ODD_PAGE, page: pp },\n    children: [\n      new Paragraph({ spacing: { before: 2880 } }),\n      new Paragraph({\n        text: label,\n        heading: HeadingLevel.HEADING_1,\n        alignment: AlignmentType.CENTER,\n        spacing: { after: 720 }\n      }),\n      ...h2p(c.content_text || '')\n    ]\n  };\n});\n\nconst doc = new Document({\n  styles: {\n    default: { document: { run: { font: 'Garamond', size: 24 } } },\n    paragraphStyles: [\n      { id: 'Heading1', name: 'Heading 1', basedOn: 'Normal', next: 'Normal',\n        run: { font: 'Garamond', size: 36, bold: true },\n        paragraph: { alignment: AlignmentType.CENTER } },\n      { id: 'Heading2', name: 'Heading 2', basedOn: 'Normal', next: 'Normal',\n        run: { font: 'Garamond', size: 28, bold: true } }\n    ]\n  },\n  sections: [titleSec, ...chapSecs]\n});\n\nconst buf = await Packer.toBuffer(doc);\nconst safeName = project.title.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\\s+/g, '_');\nconst fn = safeName + '_KDP_' + sz + '.docx';\n\nreturn [{\n  json: {\n    error: false,\n    filename: fn,\n    title: project.title,\n    chapters_count: chapters.length,\n    page_size: sz,\n    result: 'Kindle manuscript created: ' + fn + ' (' + chapters.length + ' chapters, ' + sz + ' trim size)'\n  },\n  binary: {\n    data: await this.helpers.prepareBinaryData(buf, fn, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')\n  }\n}];"
+        "jsCode": "const settings = $('settings').first().json;\nconst SB = settings.SUPABASE_URL;\nconst AK = settings.SUPABASE_API_KEY;\nconst hd = { 'apikey': AK, 'Authorization': 'Bearer ' + AK };\nconst uf = settings.userId ? '&user_id=eq.' + encodeURIComponent(settings.userId) : '';\n\nconst pr = await this.helpers.httpRequest({\n  method: 'GET',\n  url: SB + '/rest/v1/writing_projects_v2?title=ilike.*' + encodeURIComponent(settings.project_title) + '*&select=id,title,genre_slug&limit=1' + uf,\n  headers: hd\n});\nconst project = Array.isArray(pr) && pr.length > 0 ? pr[0] : null;\nif (!project) {\n  return [{ json: { error: true, result: 'Project not found: ' + settings.project_title } }];\n}\n\nlet chapters = await this.helpers.httpRequest({\n  method: 'GET',\n  url: SB + '/rest/v1/published_content_v2?project_id=eq.' + project.id + '&content_type=eq.chapter&order=chapter_number.asc&select=id,title,chapter_number,content_text,storage_path' + uf,\n  headers: hd\n});\nchapters = Array.isArray(chapters) ? chapters : [];\n\nif (chapters.length === 0 && project.genre_slug) {\n  const fb = await this.helpers.httpRequest({\n    method: 'GET',\n    url: SB + '/rest/v1/published_content_v2?content_type=eq.chapter&genre_slug=eq.' + encodeURIComponent(project.genre_slug) + '&order=chapter_number.asc&select=id,title,chapter_number,content_text,storage_path&limit=100' + uf,\n    headers: hd\n  });\n  chapters = Array.isArray(fb) ? fb : [];\n}\nif (chapters.length === 0) {\n  return [{ json: { error: true, result: 'No chapters found for \"' + project.title + '\". Write and approve some chapters first.' } }];\n}\n\nfor (const c of chapters) {\n  if (!c.content_text && c.storage_path) {\n    try {\n      const raw = await this.helpers.httpRequest({\n        method: 'GET',\n        url: SB + '/storage/v1/object/' + c.storage_path,\n        headers: hd\n      });\n      c.content_text = typeof raw === 'string' ? raw : JSON.stringify(raw);\n    } catch (e) {\n      c.content_text = '';\n    }\n  }\n}\n\nreturn [{\n  json: {\n    error: false,\n    project_title: project.title,\n    project_id: project.id,\n    chapters_count: chapters.length,\n    page_size: settings.page_size || '6x9',\n    doc_title: project.title + ' - KDP Manuscript',\n    chapters: chapters\n  }\n}];"
       }
     },
     {
       "id": "kb-check",
       "name": "check_error",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
+      "typeVersion": 2.3,
       "position": [
         700,
         0
@@ -87,11 +85,11 @@
           "conditions": [
             {
               "id": "c1",
-              "leftValue": "={{ $json.filename }}",
-              "rightValue": "",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": false,
               "operator": {
-                "type": "string",
-                "operation": "notEmpty"
+                "type": "boolean",
+                "operation": "equals"
               }
             }
           ],
@@ -101,12 +99,222 @@
       }
     },
     {
+      "id": "kb-text",
+      "name": "build_text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        -100
+      ],
+      "parameters": {
+        "jsCode": "const prev = $('build_kindle_manuscript').first().json;\nconst chapters = prev.chapters;\nconst projectTitle = prev.project_title;\n\nfunction chapterLabel(c) {\n  const cn = parseInt(c.chapter_number);\n  const titleLower = (c.title || '').toLowerCase();\n  if (cn === 0 || titleLower.indexOf('prologue') >= 0) return 'Prologue - ' + (c.title || 'Prologue');\n  if (cn === 999 || titleLower.indexOf('epilogue') >= 0) return 'Epilogue - ' + (c.title || 'Epilogue');\n  return 'Chapter ' + cn + ': ' + (c.title || '');\n}\n\nfunction stripHtml(html) {\n  if (!html) return '';\n  let text = html;\n  text = text.replace(/<\\/(p|div|h[1-6]|blockquote|li|tr)>/gi, '\\n\\n');\n  text = text.replace(/<br\\s*\\/?>/gi, '\\n');\n  text = text.replace(/<hr\\s*\\/?>/gi, '\\n\\n* * *\\n\\n');\n  text = text.replace(/<[^>]+>/g, '');\n  text = text.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');\n  text = text.replace(/&quot;/g, '\"').replace(/&#39;/g, \"'\");\n  text = text.replace(/&mdash;/g, '\\u2014').replace(/&ndash;/g, '\\u2013');\n  text = text.replace(/&ldquo;/g, '\\u201C').replace(/&rdquo;/g, '\\u201D');\n  text = text.replace(/&lsquo;/g, '\\u2018').replace(/&rsquo;/g, '\\u2019');\n  text = text.replace(/&hellip;/g, '\\u2026').replace(/&nbsp;/g, ' ');\n  text = text.replace(/&#(\\d+);/g, function(m, c) { return String.fromCharCode(parseInt(c)); });\n  text = text.replace(/\\n{3,}/g, '\\n\\n');\n  return text.trim();\n}\n\nconst midpoint = Math.ceil(chapters.length / 2);\nconst parts = [chapters.slice(0, midpoint), chapters.slice(midpoint)];\nconst results = [];\n\nfor (let p = 0; p < parts.length; p++) {\n  const partChapters = parts[p];\n  if (partChapters.length === 0) continue;\n  const partNum = p + 1;\n  let fullText = '\\n\\n\\n' + projectTitle + '\\n\\n\\n\\n';\n  for (let i = 0; i < partChapters.length; i++) {\n    const c = partChapters[i];\n    const label = chapterLabel(c);\n    const content = stripHtml(c.content_text || '');\n    if (i > 0) fullText += '\\n\\n\\n';\n    fullText += label + '\\n\\n';\n    if (content) fullText += content + '\\n';\n  }\n  const insertRequestBody = JSON.stringify({\n    requests: [{ insertText: { text: fullText, endOfSegmentLocation: {} } }]\n  });\n  const firstCh = partChapters[0];\n  const lastCh = partChapters[partChapters.length - 1];\n  const fn = parseInt(firstCh.chapter_number);\n  const ln = parseInt(lastCh.chapter_number);\n  const fl = (fn === 0) ? 'Prologue' : (fn === 999) ? 'Epilogue' : 'Ch ' + fn;\n  const ll = (ln === 0) ? 'Prologue' : (ln === 999) ? 'Epilogue' : 'Ch ' + ln;\n  results.push({\n    json: {\n      part: partNum, project_title: projectTitle, chapters_count: partChapters.length,\n      page_size: prev.page_size || '6x9',\n      doc_title: projectTitle + ' - Part ' + partNum + ' (' + fl + ' to ' + ll + ')',\n      textContent: fullText, insertRequestBody: insertRequestBody, chapters: partChapters\n    }\n  });\n}\n\nreturn results;"
+      }
+    },
+    {
+      "id": "kb-create",
+      "name": "create_document",
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        1160,
+        -100
+      ],
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "udmAq1p19OoSzjQP",
+          "name": "Google Docs account"
+        }
+      },
+      "parameters": {
+        "operation": "create",
+        "title": "={{ $json.doc_title }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "myDrive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "root"
+        }
+      }
+    },
+    {
+      "id": "kb-insert",
+      "name": "insert_text",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1380,
+        -100
+      ],
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "udmAq1p19OoSzjQP",
+          "name": "Google Docs account"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "=https://docs.googleapis.com/v1/documents/{{ $json.id }}:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDocsOAuth2Api",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $('build_text').item.json.insertRequestBody }}",
+        "options": {
+          "timeout": 120000
+        }
+      }
+    },
+    {
+      "id": "kb-read",
+      "name": "read_document",
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        -100
+      ],
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "udmAq1p19OoSzjQP",
+          "name": "Google Docs account"
+        }
+      },
+      "parameters": {
+        "operation": "get",
+        "documentURL": "={{ $('create_document').item.json.id }}",
+        "simple": false
+      }
+    },
+    {
+      "id": "kb-find",
+      "name": "find_headings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1820,
+        -100
+      ],
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst buildTextItems = $('build_text').all();\nconst results = [];\n\nfor (let idx = 0; idx < items.length; idx++) {\n  const doc = items[idx].json;\n  const bt = buildTextItems[idx].json;\n  const bodyContent = doc.body.content;\n  const projectTitle = bt.project_title;\n  const chapters = bt.chapters;\n\n  function chapterLabel(c) {\n    const cn = parseInt(c.chapter_number);\n    const titleLower = (c.title || '').toLowerCase();\n    if (cn === 0 || titleLower.indexOf('prologue') >= 0) return 'Prologue - ' + (c.title || 'Prologue');\n    if (cn === 999 || titleLower.indexOf('epilogue') >= 0) return 'Epilogue - ' + (c.title || 'Epilogue');\n    return 'Chapter ' + cn + ': ' + (c.title || '');\n  }\n\n  const expectedHeadings = [{ text: projectTitle, style: 'TITLE' }];\n  for (const c of chapters) {\n    expectedHeadings.push({ text: chapterLabel(c), style: 'HEADING_1' });\n  }\n\n  const foundHeadings = [];\n  for (const element of bodyContent) {\n    if (!element.paragraph) continue;\n    const para = element.paragraph;\n    let paraText = '';\n    for (const el of (para.elements || [])) {\n      if (el.textRun && el.textRun.content) paraText += el.textRun.content;\n    }\n    const trimmedText = paraText.replace(/\\n/g, '').trim();\n    if (!trimmedText) continue;\n\n    if (trimmedText.charAt(0) === '#' && trimmedText.charAt(1) === ' ') {\n      foundHeadings.push({\n        startIndex: element.startIndex,\n        endIndex: element.endIndex - 1,\n        style: 'HEADING_2',\n        isSubchapter: true\n      });\n      continue;\n    }\n\n    for (const h of expectedHeadings) {\n      if (trimmedText === h.text) {\n        foundHeadings.push({\n          startIndex: element.startIndex,\n          endIndex: element.endIndex - 1,\n          style: h.style,\n          isSubchapter: false\n        });\n        break;\n      }\n    }\n  }\n\n  // Style requests for all headings\n  const styleReqs = [];\n  for (const h of foundHeadings) {\n    styleReqs.push({\n      updateParagraphStyle: {\n        range: { startIndex: h.startIndex, endIndex: h.endIndex },\n        paragraphStyle: {\n          namedStyleType: h.style,\n          alignment: (h.style === 'TITLE' || h.style === 'HEADING_1') ? 'CENTER' : 'START'\n        },\n        fields: 'namedStyleType,alignment'\n      }\n    });\n  }\n\n  // Combine page breaks (HEADING_1 only) and # deletions (HEADING_2)\n  // Both sorted by descending startIndex so shifts don't conflict\n  const modReqs = [];\n  for (const h of foundHeadings) {\n    if (h.style === 'HEADING_1') {\n      modReqs.push({ startIndex: h.startIndex, type: 'pageBreak' });\n    }\n    if (h.isSubchapter) {\n      modReqs.push({ startIndex: h.startIndex, type: 'deleteHash' });\n    }\n  }\n  modReqs.sort(function(a, b) { return b.startIndex - a.startIndex; });\n\n  const pbAndDelReqs = [];\n  for (const m of modReqs) {\n    if (m.type === 'pageBreak') {\n      pbAndDelReqs.push({ insertPageBreak: { location: { index: m.startIndex } } });\n    } else {\n      pbAndDelReqs.push({ deleteContentRange: { range: { startIndex: m.startIndex, endIndex: m.startIndex + 2 } } });\n    }\n  }\n\n  results.push({\n    json: {\n      documentId: doc.documentId, project_title: bt.project_title, part: bt.part,\n      doc_title: bt.doc_title, chapters_count: bt.chapters_count, page_size: bt.page_size,\n      headingsFound: foundHeadings.length,\n      styleRequestsBody: JSON.stringify({ requests: styleReqs }),\n      pageBreakRequestsBody: JSON.stringify({ requests: pbAndDelReqs })\n    }\n  });\n}\n\nreturn results;"
+      }
+    },
+    {
+      "id": "kb-styles",
+      "name": "apply_styles",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2040,
+        -100
+      ],
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "udmAq1p19OoSzjQP",
+          "name": "Google Docs account"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "=https://docs.googleapis.com/v1/documents/{{ $json.documentId }}:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDocsOAuth2Api",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.styleRequestsBody }}",
+        "options": {
+          "timeout": 30000
+        }
+      }
+    },
+    {
+      "id": "kb-pagebreaks",
+      "name": "apply_page_breaks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2260,
+        -100
+      ],
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "udmAq1p19OoSzjQP",
+          "name": "Google Docs account"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "=https://docs.googleapis.com/v1/documents/{{ $('find_headings').item.json.documentId }}:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDocsOAuth2Api",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $('find_headings').item.json.pageBreakRequestsBody }}",
+        "options": {
+          "timeout": 30000
+        }
+      }
+    },
+    {
+      "id": "kb-share",
+      "name": "share_document",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2480,
+        -100
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "fxs2RYo9w3wS5gvm",
+          "name": "Google Drive account"
+        }
+      },
+      "parameters": {
+        "resource": "file",
+        "operation": "share",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('find_headings').item.json.documentId }}"
+        },
+        "permissionsUi": {
+          "permissionsValues": {
+            "role": "writer",
+            "type": "anyone",
+            "allowFileDiscovery": false
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "kb-combine",
+      "name": "combine_results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2700,
+        -100
+      ],
+      "parameters": {
+        "jsCode": "const fhItems = $('find_headings').all();\nconst btItems = $('build_text').all();\nconst settings = $('settings').first().json;\nconst docs = [];\nfor (let i = 0; i < fhItems.length; i++) {\n  docs.push({\n    documentId: fhItems[i].json.documentId,\n    doc_title: fhItems[i].json.doc_title || btItems[i].json.doc_title,\n    chapters_count: fhItems[i].json.chapters_count,\n    part: fhItems[i].json.part\n  });\n}\nreturn [{\n  json: {\n    project_title: fhItems[0].json.project_title,\n    page_size: fhItems[0].json.page_size,\n    docs: docs,\n    total_chapters: docs.reduce(function(sum, d) { return sum + d.chapters_count; }, 0),\n    recipient_email: settings.recipient_email,\n    bcc_email: settings.bcc_email,\n    user_prompt: settings.user_prompt\n  }\n}];"
+      }
+    },
+    {
       "id": "kb-email",
       "name": "send_email",
       "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2.1,
+      "typeVersion": 2.2,
       "position": [
-        940,
+        2920,
         -100
       ],
       "credentials": {
@@ -116,20 +324,15 @@
         }
       },
       "parameters": {
-        "sendTo": "={{ $('settings').item.json.recipient_email }}",
-        "subject": "=Kindle Manuscript Ready: {{ $json.title }}",
+        "sendTo": "={{ $json.recipient_email }}",
+        "subject": "=Kindle Manuscript Ready: {{ $json.project_title }}",
         "emailType": "html",
-        "message": "=<h2>Your Kindle Manuscript is Ready</h2><p>Attached is your formatted manuscript: <strong>{{ $json.filename }}</strong></p><ul><li>Chapters: {{ $json.chapters_count }}</li><li>Trim Size: {{ $json.page_size }}</li></ul><p>This file is formatted for Kindle Direct Publishing (KDP). Upload it directly to your KDP dashboard.</p><hr><p><em>Command: {{ $('settings').item.json.user_prompt }}</em></p>",
+        "message": "=<h2>Your Kindle Manuscript is Ready</h2><p>Your formatted manuscript has been created as two Google Docs:</p><p><strong><a href=\"https://docs.google.com/document/d/{{ $json.docs[0].documentId }}/edit\">{{ $json.docs[0].doc_title }}</a></strong> ({{ $json.docs[0].chapters_count }} chapters)</p><p><strong><a href=\"https://docs.google.com/document/d/{{ $json.docs[1].documentId }}/edit\">{{ $json.docs[1].doc_title }}</a></strong> ({{ $json.docs[1].chapters_count }} chapters)</p><ul><li>Total Chapters: {{ $json.total_chapters }}</li><li>Trim Size: {{ $json.page_size }}</li></ul><p>From Google Docs you can:</p><ul><li>Download as .docx for KDP upload (File &rarr; Download &rarr; Microsoft Word)</li><li>Download as PDF for review (File &rarr; Download &rarr; PDF)</li><li>Edit formatting, fonts, and styles directly</li></ul><hr><p><em>Command: {{ $json.user_prompt }}</em></p>",
+        "resource": "message",
+        "operation": "send",
         "options": {
           "appendAttribution": false,
-          "bccList": "={{ $('settings').item.json.bcc_email }}"
-        },
-        "attachmentsUi": {
-          "attachmentsBinary": [
-            {
-              "property": "data"
-            }
-          ]
+          "bccList": "={{ $json.bcc_email }}"
         }
       }
     },
@@ -139,7 +342,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1180,
+        3140,
         -100
       ],
       "parameters": {
@@ -148,7 +351,7 @@
             {
               "id": "r1",
               "name": "result",
-              "value": "={{ $('build_kindle_manuscript').item.json.result + ' Email sent to ' + $('settings').item.json.recipient_email }}",
+              "value": "=Kindle manuscript created as 2 Google Docs: {{ $json.project_title }} ({{ $json.total_chapters }} chapters). Part 1: https://docs.google.com/document/d/{{ $json.docs[0].documentId }}/edit Part 2: https://docs.google.com/document/d/{{ $json.docs[1].documentId }}/edit Emailed to {{ $json.recipient_email }}.",
               "type": "string"
             }
           ]
@@ -177,6 +380,25 @@
           ]
         },
         "options": {}
+      }
+    },
+    {
+      "id": "kb-cleanup",
+      "name": "cleanup_old_docs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1050,
+        -100
+      ],
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nfor (const item of items) {\n  const docTitle = item.json.doc_title;\n  const query = \"name='\" + docTitle.replace(/'/g, \"\\\\'\") + \"' and mimeType='application/vnd.google-apps.document' and trashed=false\";\n  const searchUrl = 'https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(query) + '&fields=files(id,name)';\n  try {\n    const searchResult = await this.helpers.httpRequestWithAuthentication.call(this, 'googleDriveOAuth2Api', {\n      method: 'GET',\n      url: searchUrl,\n      json: true\n    });\n    if (searchResult.files && searchResult.files.length > 0) {\n      for (const file of searchResult.files) {\n        try {\n          await this.helpers.httpRequestWithAuthentication.call(this, 'googleDriveOAuth2Api', {\n            method: 'DELETE',\n            url: 'https://www.googleapis.com/drive/v3/files/' + file.id\n          });\n        } catch (delErr) {\n          // ignore delete errors\n        }\n      }\n    }\n  } catch (e) {\n    // ignore search errors - proceed with creation\n  }\n}\n\nreturn items;"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "fxs2RYo9w3wS5gvm",
+          "name": "Google Drive account"
+        }
       }
     }
   ],
@@ -218,7 +440,7 @@
       "main": [
         [
           {
-            "node": "send_email",
+            "node": "build_text",
             "type": "main",
             "index": 0
           }
@@ -226,6 +448,105 @@
         [
           {
             "node": "error_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "build_text": {
+      "main": [
+        [
+          {
+            "node": "cleanup_old_docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create_document": {
+      "main": [
+        [
+          {
+            "node": "insert_text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "insert_text": {
+      "main": [
+        [
+          {
+            "node": "read_document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "read_document": {
+      "main": [
+        [
+          {
+            "node": "find_headings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "find_headings": {
+      "main": [
+        [
+          {
+            "node": "apply_styles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "apply_styles": {
+      "main": [
+        [
+          {
+            "node": "apply_page_breaks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "apply_page_breaks": {
+      "main": [
+        [
+          {
+            "node": "share_document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "share_document": {
+      "main": [
+        [
+          {
+            "node": "combine_results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "combine_results": {
+      "main": [
+        [
+          {
+            "node": "send_email",
             "type": "main",
             "index": 0
           }
@@ -242,6 +563,17 @@
           }
         ]
       ]
+    },
+    "cleanup_old_docs": {
+      "main": [
+        [
+          {
+            "node": "create_document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -250,288 +582,6 @@
     "availableInMCP": false
   },
   "staticData": null,
-  "meta": null,
   "pinData": {},
-  "versionId": "84f4b0f2-49f0-49ea-bd07-63c6d2beb634",
-  "activeVersionId": "84f4b0f2-49f0-49ea-bd07-63c6d2beb634",
-  "versionCounter": 11,
-  "triggerCount": 0,
-  "shared": [
-    {
-      "updatedAt": "2026-03-20T15:05:35.578Z",
-      "createdAt": "2026-03-20T15:05:35.578Z",
-      "role": "workflow:owner",
-      "workflowId": "WEzf89RwAbkBxmQZ",
-      "projectId": "so6FfyLmNOjnxEMJ",
-      "project": {
-        "updatedAt": "2026-01-12T16:36:13.622Z",
-        "createdAt": "2026-01-12T15:34:50.204Z",
-        "id": "so6FfyLmNOjnxEMJ",
-        "name": "Eric Beser <eric@agileadtesting.com>",
-        "type": "personal",
-        "icon": null,
-        "description": null,
-        "creatorId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
-      }
-    }
-  ],
-  "tags": [],
-  "activeVersion": {
-    "updatedAt": "2026-03-20T16:03:43.686Z",
-    "createdAt": "2026-03-20T16:03:43.686Z",
-    "versionId": "84f4b0f2-49f0-49ea-bd07-63c6d2beb634",
-    "workflowId": "WEzf89RwAbkBxmQZ",
-    "nodes": [
-      {
-        "id": "kb-trigger",
-        "name": "workflow_trigger",
-        "type": "n8n-nodes-base.executeWorkflowTrigger",
-        "typeVersion": 1.1,
-        "position": [
-          0,
-          0
-        ],
-        "parameters": {
-          "workflowInputs": {
-            "values": [
-              {
-                "name": "project_title"
-              },
-              {
-                "name": "page_size"
-              },
-              {
-                "name": "user_id"
-              },
-              {
-                "name": "recipient_email"
-              },
-              {
-                "name": "bcc_email"
-              },
-              {
-                "name": "user_prompt"
-              }
-            ]
-          }
-        }
-      },
-      {
-        "id": "kb-settings",
-        "name": "settings",
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          220,
-          0
-        ],
-        "parameters": {
-          "jsCode": "const SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_API_KEY = 'REDACTED_SUPABASE_KEY';\nconst trigger = $('workflow_trigger').first().json;\nconst userId = trigger.user_id || '';\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\ntry {\n  const rows = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${SUPABASE_URL}/rest/v1/app_config_v2?key=in.(recipient_email,bcc_email)&select=key,value&user_id=eq.${encodeURIComponent(userId)}`,\n    headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': `Bearer ${SUPABASE_API_KEY}` }\n  });\n  for (const row of rows) {\n    if (row.key === 'recipient_email' && !recipient_email) recipient_email = row.value;\n    if (row.key === 'bcc_email' && !bcc_email) bcc_email = row.value;\n  }\n} catch (e) {\n  if (!recipient_email) recipient_email = 'eric@agileadtesting.com';\n}\nreturn [{ json: { SUPABASE_URL, SUPABASE_API_KEY, userId, recipient_email, bcc_email: bcc_email || '', page_size: trigger.page_size || '6x9', project_title: trigger.project_title || '', user_prompt: trigger.user_prompt || '' } }];"
-        }
-      },
-      {
-        "id": "kb-build",
-        "name": "build_kindle_manuscript",
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          460,
-          0
-        ],
-        "parameters": {
-          "jsCode": "let docx;\ntry { docx = require('docx'); } catch (e) {\n  return [{ json: { error: true, filename: '', result: 'The \"docx\" npm package is not available. Add \"docx\" to NODE_FUNCTION_ALLOW_EXTERNAL in n8n env settings and run: npm install docx in your n8n directory.' } }];\n}\nconst { Document, Packer, Paragraph, TextRun, HeadingLevel, SectionType, AlignmentType } = docx;\nconst settings = $('settings').first().json;\nconst SB = settings.SUPABASE_URL;\nconst AK = settings.SUPABASE_API_KEY;\nconst hd = { 'apikey': AK, 'Authorization': 'Bearer ' + AK };\nconst uf = settings.userId ? '&user_id=eq.' + encodeURIComponent(settings.userId) : '';\n\n// 1. Fetch project\nconst pr = await this.helpers.httpRequest({ method: 'GET', url: SB + '/rest/v1/writing_projects_v2?title=ilike.*' + encodeURIComponent(settings.project_title) + '*&select=id,title,genre_slug&limit=1' + uf, headers: hd });\nconst project = Array.isArray(pr) && pr.length > 0 ? pr[0] : null;\nif (!project) return [{ json: { error: true, filename: '', result: 'Project not found: ' + settings.project_title } }];\n\n// 2. Fetch all chapters (including prologue=0 and epilogue=999), ordered by chapter_number\nlet chapters = await this.helpers.httpRequest({ method: 'GET', url: SB + '/rest/v1/published_content_v2?project_id=eq.' + project.id + '&content_type=eq.chapter&order=chapter_number.asc&select=id,title,chapter_number,content_text,storage_path' + uf, headers: hd });\nchapters = Array.isArray(chapters) ? chapters : [];\n// Fallback: search by genre_slug if no chapters found by project_id\nif (chapters.length === 0 && project.genre_slug) {\n  const fb = await this.helpers.httpRequest({ method: 'GET', url: SB + '/rest/v1/published_content_v2?content_type=eq.chapter&genre_slug=eq.' + encodeURIComponent(project.genre_slug) + '&order=chapter_number.asc&select=id,title,chapter_number,content_text,storage_path&limit=100' + uf, headers: hd });\n  chapters = Array.isArray(fb) ? fb : [];\n}\nif (chapters.length === 0) return [{ json: { error: true, filename: '', result: 'No chapters found for \"' + project.title + '\". Write some chapters first.' } }];\n\n// 3. Fetch content from storage for chapters without content_text\nfor (const c of chapters) {\n  if (!c.content_text && c.storage_path) {\n    try {\n      const raw = await this.helpers.httpRequest({ method: 'GET', url: SB + '/storage/v1/object/' + c.storage_path, headers: hd });\n      c.content_text = typeof raw === 'string' ? raw : JSON.stringify(raw);\n    } catch (e) { c.content_text = ''; }\n  }\n}\n\n// 4. Page sizes in twips (1 inch = 1440 twips)\nconst PS = {\n  '5x8':{w:7200,h:11520},'5.06x7.81':{w:7286,h:11246},'5.25x8':{w:7560,h:11520},\n  '5.5x8.5':{w:7920,h:12240},'6x9':{w:8640,h:12960},'6.14x9.21':{w:8842,h:13262},\n  '6.69x9.61':{w:9634,h:13838},'7x10':{w:10080,h:14400},'7.44x9.69':{w:10714,h:13954},\n  '7.5x9.25':{w:10800,h:13320},'8x10':{w:11520,h:14400},'8.25x11':{w:11880,h:15840},\n  '8.25x6':{w:11880,h:8640},'8.25x8.25':{w:11880,h:11880},'8.27x11.69':{w:11909,h:16834},\n  '8.5x11':{w:12240,h:15840},'8.5x8.5':{w:12240,h:12240}\n};\nconst rawSz = (settings.page_size || '6x9').replace(/[\\s\\u00d7]/g, '').replace(/by/gi, 'x').toLowerCase();\nconst dm = PS[rawSz] || PS['6x9'];\nconst sz = rawSz in PS ? rawSz : '6x9';\nconst mg = { top: 1080, bottom: 720, left: 1080, right: 720 };\n\n// 5. HTML helpers\nfunction dec(t) {\n  return t.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'\"')\n    .replace(/&#39;/g,\"'\").replace(/&mdash;/g,'\\u2014').replace(/&ndash;/g,'\\u2013')\n    .replace(/&ldquo;/g,'\\u201C').replace(/&rdquo;/g,'\\u201D').replace(/&lsquo;/g,'\\u2018')\n    .replace(/&rsquo;/g,'\\u2019').replace(/&hellip;/g,'\\u2026').replace(/&nbsp;/g,' ')\n    .replace(/&#(\\d+);/g, function(m, c) { return String.fromCharCode(parseInt(c)); });\n}\n\nfunction pInline(html) {\n  const runs = [];\n  const parts = html.split(/(<\\/?(?:strong|b|em|i)>)/gi);\n  let bo = false, it = false;\n  for (const p of parts) {\n    const l = p.toLowerCase();\n    if (l === '<strong>' || l === '<b>') { bo = true; continue; }\n    if (l === '</strong>' || l === '</b>') { bo = false; continue; }\n    if (l === '<em>' || l === '<i>') { it = true; continue; }\n    if (l === '</em>' || l === '</i>') { it = false; continue; }\n    const cl = dec(p.replace(/<[^>]+>/g, ''));\n    if (cl) {\n      const o = { text: cl, font: 'Garamond', size: 24 };\n      if (bo) o.bold = true;\n      if (it) o.italics = true;\n      runs.push(new TextRun(o));\n    }\n  }\n  return runs.length ? runs : [new TextRun({ text: '', font: 'Garamond', size: 24 })];\n}\n\nfunction h2p(html) {\n  if (!html) return [new Paragraph({ children: [new TextRun({ text: '', font: 'Garamond', size: 24 })] })];\n  const pa = [];\n  const re = /<(h[1-6]|p|blockquote|li)[^>]*>([\\s\\S]*?)<\\/\\1>|<hr\\s*\\/?>/gi;\n  let m;\n  const bl = [];\n  while ((m = re.exec(html)) !== null) {\n    if (m[0].match(/^<hr/i)) bl.push({ t: 'hr', c: '' });\n    else bl.push({ t: m[1].toLowerCase(), c: m[2] || '' });\n  }\n  if (!bl.length) {\n    html.replace(/<[^>]+>/g, '').split(/\\n+/).filter(function(l) { return l.trim().length > 0; })\n      .forEach(function(l) { bl.push({ t: 'p', c: l.trim() }); });\n  }\n  for (const b of bl) {\n    if (b.t === 'h1') continue;\n    if (b.t === 'hr') {\n      pa.push(new Paragraph({ children: [new TextRun({ text: '* * *', font: 'Garamond', size: 24 })], alignment: AlignmentType.CENTER, spacing: { before: 360, after: 360 } }));\n      continue;\n    }\n    if (b.t === 'h2') {\n      pa.push(new Paragraph({ children: pInline(b.c), heading: HeadingLevel.HEADING_2, spacing: { before: 480, after: 240 } }));\n      continue;\n    }\n    if (b.t === 'h3') {\n      pa.push(new Paragraph({ children: pInline(b.c), heading: HeadingLevel.HEADING_3, spacing: { before: 360, after: 180 } }));\n      continue;\n    }\n    if (b.t === 'blockquote') {\n      pa.push(new Paragraph({ children: pInline(b.c), indent: { left: 720, right: 720 }, spacing: { before: 120, after: 120 } }));\n      continue;\n    }\n    pa.push(new Paragraph({ children: pInline(b.c), spacing: { after: 120, line: 276 }, indent: { firstLine: 360 } }));\n  }\n  return pa.length ? pa : [new Paragraph({ children: [new TextRun({ text: '', font: 'Garamond', size: 24 })] })];\n}\n\n// 6. Build document\nconst pp = { size: { width: dm.w, height: dm.h }, margin: mg };\n\n// Title page section\nconst titleSec = {\n  properties: { page: pp },\n  children: [\n    new Paragraph({ spacing: { before: 4800 } }),\n    new Paragraph({\n      children: [new TextRun({ text: project.title, font: 'Garamond', size: 56, bold: true })],\n      alignment: AlignmentType.CENTER,\n      spacing: { after: 1200 }\n    })\n  ]\n};\n\n// Chapter sections \u2014 each starts on odd page with Heading 1\nconst chapSecs = chapters.map(function(c) {\n  const cn = parseInt(c.chapter_number);\n  const titleLower = (c.title || '').toLowerCase();\n  let label;\n  if (cn === 0 || titleLower.indexOf('prologue') >= 0) label = c.title || 'Prologue';\n  else if (cn === 999 || titleLower.indexOf('epilogue') >= 0) label = c.title || 'Epilogue';\n  else label = c.title || ('Chapter ' + cn);\n\n  return {\n    properties: { type: SectionType.ODD_PAGE, page: pp },\n    children: [\n      new Paragraph({ spacing: { before: 2880 } }),\n      new Paragraph({\n        text: label,\n        heading: HeadingLevel.HEADING_1,\n        alignment: AlignmentType.CENTER,\n        spacing: { after: 720 }\n      }),\n      ...h2p(c.content_text || '')\n    ]\n  };\n});\n\nconst doc = new Document({\n  styles: {\n    default: { document: { run: { font: 'Garamond', size: 24 } } },\n    paragraphStyles: [\n      { id: 'Heading1', name: 'Heading 1', basedOn: 'Normal', next: 'Normal',\n        run: { font: 'Garamond', size: 36, bold: true },\n        paragraph: { alignment: AlignmentType.CENTER } },\n      { id: 'Heading2', name: 'Heading 2', basedOn: 'Normal', next: 'Normal',\n        run: { font: 'Garamond', size: 28, bold: true } }\n    ]\n  },\n  sections: [titleSec, ...chapSecs]\n});\n\nconst buf = await Packer.toBuffer(doc);\nconst safeName = project.title.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\\s+/g, '_');\nconst fn = safeName + '_KDP_' + sz + '.docx';\n\nreturn [{\n  json: {\n    error: false,\n    filename: fn,\n    title: project.title,\n    chapters_count: chapters.length,\n    page_size: sz,\n    result: 'Kindle manuscript created: ' + fn + ' (' + chapters.length + ' chapters, ' + sz + ' trim size)'\n  },\n  binary: {\n    data: await this.helpers.prepareBinaryData(buf, fn, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')\n  }\n}];"
-        }
-      },
-      {
-        "id": "kb-check",
-        "name": "check_error",
-        "type": "n8n-nodes-base.if",
-        "typeVersion": 2.2,
-        "position": [
-          700,
-          0
-        ],
-        "parameters": {
-          "conditions": {
-            "options": {
-              "caseSensitive": true,
-              "leftValue": "",
-              "typeValidation": "loose",
-              "version": 2
-            },
-            "conditions": [
-              {
-                "id": "c1",
-                "leftValue": "={{ $json.filename }}",
-                "rightValue": "",
-                "operator": {
-                  "type": "string",
-                  "operation": "notEmpty"
-                }
-              }
-            ],
-            "combinator": "and"
-          },
-          "options": {}
-        }
-      },
-      {
-        "id": "kb-email",
-        "name": "send_email",
-        "type": "n8n-nodes-base.gmail",
-        "typeVersion": 2.1,
-        "position": [
-          940,
-          -100
-        ],
-        "credentials": {
-          "gmailOAuth2": {
-            "id": "CPCSZOInV8Zj1PI1",
-            "name": "Gmail account"
-          }
-        },
-        "parameters": {
-          "sendTo": "={{ $('settings').item.json.recipient_email }}",
-          "subject": "=Kindle Manuscript Ready: {{ $json.title }}",
-          "emailType": "html",
-          "message": "=<h2>Your Kindle Manuscript is Ready</h2><p>Attached is your formatted manuscript: <strong>{{ $json.filename }}</strong></p><ul><li>Chapters: {{ $json.chapters_count }}</li><li>Trim Size: {{ $json.page_size }}</li></ul><p>This file is formatted for Kindle Direct Publishing (KDP). Upload it directly to your KDP dashboard.</p><hr><p><em>Command: {{ $('settings').item.json.user_prompt }}</em></p>",
-          "options": {
-            "appendAttribution": false,
-            "bccList": "={{ $('settings').item.json.bcc_email }}"
-          },
-          "attachmentsUi": {
-            "attachmentsBinary": [
-              {
-                "property": "data"
-              }
-            ]
-          }
-        }
-      },
-      {
-        "id": "kb-success",
-        "name": "success_result",
-        "type": "n8n-nodes-base.set",
-        "typeVersion": 3.4,
-        "position": [
-          1180,
-          -100
-        ],
-        "parameters": {
-          "assignments": {
-            "assignments": [
-              {
-                "id": "r1",
-                "name": "result",
-                "value": "={{ $('build_kindle_manuscript').item.json.result + ' Email sent to ' + $('settings').item.json.recipient_email }}",
-                "type": "string"
-              }
-            ]
-          },
-          "options": {}
-        }
-      },
-      {
-        "id": "kb-error",
-        "name": "error_result",
-        "type": "n8n-nodes-base.set",
-        "typeVersion": 3.4,
-        "position": [
-          940,
-          100
-        ],
-        "parameters": {
-          "assignments": {
-            "assignments": [
-              {
-                "id": "r1",
-                "name": "result",
-                "value": "={{ $json.result }}",
-                "type": "string"
-              }
-            ]
-          },
-          "options": {}
-        }
-      }
-    ],
-    "connections": {
-      "workflow_trigger": {
-        "main": [
-          [
-            {
-              "node": "settings",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "settings": {
-        "main": [
-          [
-            {
-              "node": "build_kindle_manuscript",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "build_kindle_manuscript": {
-        "main": [
-          [
-            {
-              "node": "check_error",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "check_error": {
-        "main": [
-          [
-            {
-              "node": "send_email",
-              "type": "main",
-              "index": 0
-            }
-          ],
-          [
-            {
-              "node": "error_result",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "send_email": {
-        "main": [
-          [
-            {
-              "node": "success_result",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      }
-    },
-    "authors": "Eric Beser",
-    "name": null,
-    "description": null,
-    "autosaved": false,
-    "workflowPublishHistory": [
-      {
-        "createdAt": "2026-03-20T16:03:44.099Z",
-        "id": 991,
-        "workflowId": "WEzf89RwAbkBxmQZ",
-        "versionId": "84f4b0f2-49f0-49ea-bd07-63c6d2beb634",
-        "event": "activated",
-        "userId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
-      }
-    ]
-  }
+  "versionId": "587aabce-5ae4-4711-9856-e010ddb081c4"
 }
