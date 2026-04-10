@@ -15,7 +15,12 @@ export interface RecentItem {
   type: 'project' | 'chapter' | 'short_story' | 'blog_post' | 'newsletter' | 'research';
   status: string | null;
   genre_slug: string | null;
+  story_arc: string | null;
+  word_count: number | null;
+  chapter_number: number | null;
+  project_title: string | null;
   updated_at: string;
+  path: string; // navigation path
 }
 
 export function useDashboardCounts() {
@@ -59,6 +64,11 @@ export function useDashboardCounts() {
   });
 }
 
+function estimateWordCount(text: string | null): number | null {
+  if (!text) return null;
+  return text.split(/\s+/).filter(Boolean).length;
+}
+
 export function useRecentItems() {
   const { profile } = useUser();
   const userId = profile?.user_id;
@@ -68,39 +78,74 @@ export function useRecentItems() {
     queryFn: async (): Promise<RecentItem[]> => {
       if (!userId) return [];
 
-      // Fetch recent content and projects in parallel, then merge & sort
       const [contentRes, projectsRes, researchRes] = await Promise.all([
         supabase
           .from('published_content_v2')
-          .select('id, title, content_type, status, genre_slug, updated_at')
+          .select('id, title, content_type, status, genre_slug, content_text, chapter_number, project_id, updated_at')
           .eq('user_id', userId)
           .order('updated_at', { ascending: false })
           .limit(10),
         supabase
           .from('writing_projects_v2')
-          .select('id, title, status, genre_slug, updated_at')
+          .select('id, title, status, genre_slug, outline, updated_at')
           .eq('user_id', userId)
           .order('updated_at', { ascending: false })
           .limit(5),
         supabase
           .from('research_reports_v2')
-          .select('id, topic, status, genre_slug, updated_at')
+          .select('id, topic, status, genre_slug, content, updated_at')
           .eq('user_id', userId)
           .order('updated_at', { ascending: false })
           .limit(5),
       ]);
 
+      // Build a map of project_id -> project title & arc for content items
+      const projectIds = new Set<string>();
+      if (contentRes.data) {
+        for (const c of contentRes.data) {
+          if (c.project_id) projectIds.add(c.project_id);
+        }
+      }
+
+      let projectMap: Record<string, { title: string; story_arc: string | null }> = {};
+      if (projectIds.size > 0) {
+        const { data: projects } = await supabase
+          .from('writing_projects_v2')
+          .select('id, title, outline')
+          .in('id', Array.from(projectIds));
+        if (projects) {
+          for (const p of projects) {
+            projectMap[p.id] = {
+              title: p.title,
+              story_arc: p.outline?.story_arc_name || null,
+            };
+          }
+        }
+      }
+
       const items: RecentItem[] = [];
 
       if (contentRes.data) {
         for (const c of contentRes.data) {
+          const proj = c.project_id ? projectMap[c.project_id] : null;
+          const typePaths: Record<string, string> = {
+            chapter: '/chapters',
+            short_story: '/short-stories',
+            blog_post: '/blog-posts',
+            newsletter: '/newsletters',
+          };
           items.push({
             id: c.id,
             title: c.title,
             type: c.content_type as RecentItem['type'],
             status: c.status,
             genre_slug: c.genre_slug,
+            story_arc: proj?.story_arc || null,
+            word_count: estimateWordCount(c.content_text),
+            chapter_number: c.chapter_number,
+            project_title: proj?.title || null,
             updated_at: c.updated_at,
+            path: typePaths[c.content_type] || '/',
           });
         }
       }
@@ -113,7 +158,12 @@ export function useRecentItems() {
             type: 'project',
             status: p.status,
             genre_slug: p.genre_slug,
+            story_arc: p.outline?.story_arc_name || null,
+            word_count: null,
+            chapter_number: null,
+            project_title: null,
             updated_at: p.updated_at,
+            path: '/projects',
           });
         }
       }
@@ -126,12 +176,16 @@ export function useRecentItems() {
             type: 'research',
             status: r.status,
             genre_slug: r.genre_slug,
+            story_arc: null,
+            word_count: estimateWordCount(r.content),
+            chapter_number: null,
+            project_title: null,
             updated_at: r.updated_at,
+            path: '/research',
           });
         }
       }
 
-      // Sort by updated_at descending, take top 10
       items.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
       return items.slice(0, 10);
     },

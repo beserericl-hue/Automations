@@ -21,127 +21,113 @@ export default function Dashboard() {
 
       {/* Quick stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Projects"
-          value={countsLoading ? '...' : String(counts?.projects ?? 0)}
-          icon={<FolderIcon />}
-        />
-        <StatCard
-          label="Drafts"
-          value={countsLoading ? '...' : String(counts?.drafts ?? 0)}
-          icon={<PencilIcon />}
-        />
-        <StatCard
-          label="Published"
-          value={countsLoading ? '...' : String(counts?.published ?? 0)}
-          icon={<CheckIcon />}
-        />
-        <StatCard
-          label="Research"
-          value={countsLoading ? '...' : String(counts?.research ?? 0)}
-          icon={<SearchIcon />}
-        />
+        <StatCard label="Projects" value={countsLoading ? '...' : String(counts?.projects ?? 0)} icon={<FolderIcon />} />
+        <StatCard label="Drafts" value={countsLoading ? '...' : String(counts?.drafts ?? 0)} icon={<PencilIcon />} />
+        <StatCard label="Published" value={countsLoading ? '...' : String(counts?.published ?? 0)} icon={<CheckIcon />} />
+        <StatCard label="Research" value={countsLoading ? '...' : String(counts?.research ?? 0)} icon={<SearchIcon />} />
       </div>
 
-      {/* Recent activity */}
-      <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+      {/* Recent activity table */}
+      <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 overflow-hidden">
         <div className="border-b border-gray-200 px-6 py-4 dark:border-gray-800">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Activity</h2>
         </div>
         {recentLoading ? (
-          <div className="px-6 py-8 text-center text-sm text-gray-500">Loading...</div>
+          <div className="px-6 py-12 text-center text-sm text-gray-500">Loading...</div>
         ) : !recentItems?.length ? (
-          <div className="px-6 py-8 text-center text-sm text-gray-500">
+          <div className="px-6 py-12 text-center text-sm text-gray-500">
             No content yet. Use the chat or Eve to start creating.
           </div>
         ) : (
-          <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-            {recentItems.map((item) => (
-              <RecentItemRow key={`${item.type}-${item.id}`} item={item} />
-            ))}
-          </ul>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Type</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Title</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Project</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Genre</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Arc</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Words</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Modified</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                {recentItems.map((item) => (
+                  <RecentRow key={`${item.type}-${item.id}`} item={item} />
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
   );
 }
 
-function RecentItemRow({ item }: { item: RecentItem }) {
+function RecentRow({ item }: { item: RecentItem }) {
   const navigate = useNavigate();
 
-  const getPath = (item: RecentItem): string => {
-    switch (item.type) {
-      case 'project': return `/projects`;
-      case 'chapter': return `/chapters`;
-      case 'short_story': return `/short-stories`;
-      case 'blog_post': return `/blog-posts`;
-      case 'newsletter': return `/newsletters`;
-      case 'research': return `/research`;
-      default: return '/';
-    }
+  const typeLabels: Record<string, string> = {
+    project: 'Project',
+    chapter: 'Chapter',
+    short_story: 'Story',
+    blog_post: 'Blog',
+    newsletter: 'Newsletter',
+    research: 'Research',
   };
 
-  const getTypeLabel = (type: RecentItem['type']): string => {
-    switch (type) {
-      case 'project': return 'Project';
-      case 'chapter': return 'Chapter';
-      case 'short_story': return 'Short Story';
-      case 'blog_post': return 'Blog Post';
-      case 'newsletter': return 'Newsletter';
-      case 'research': return 'Research';
-      default: return type;
-    }
+  const statusColors: Record<string, string> = {
+    published: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
+    approved: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
+    draft: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
+    rejected: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
+    scheduled: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300',
   };
 
-  const getStatusColor = (status: string | null): string => {
-    switch (status) {
-      case 'published': return 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300';
-      case 'approved': return 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300';
-      case 'draft': return 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300';
-      case 'rejected': return 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300';
-      case 'scheduled': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300';
-      default: return 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300';
-    }
+  const formatWords = (count: number | null): string => {
+    if (count == null) return '—';
+    if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
+    return String(count);
   };
 
-  const timeAgo = (dateStr: string): string => {
-    const now = new Date();
-    const date = new Date(dateStr);
-    const diffMs = now.getTime() - date.getTime();
-    const diffMin = Math.floor(diffMs / 60000);
-    if (diffMin < 1) return 'just now';
-    if (diffMin < 60) return `${diffMin}m ago`;
-    const diffHrs = Math.floor(diffMin / 60);
-    if (diffHrs < 24) return `${diffHrs}h ago`;
-    const diffDays = Math.floor(diffHrs / 24);
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+  const formatGenre = (slug: string | null): string => {
+    if (!slug) return '—';
+    return slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   };
 
   return (
-    <li
-      onClick={() => navigate(getPath(item))}
-      className="flex items-center justify-between px-6 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+    <tr
+      onClick={() => navigate(item.path)}
+      className="hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
     >
-      <div className="flex items-center gap-3 min-w-0">
-        <span className="text-xs font-medium text-gray-400 uppercase w-20 shrink-0">
-          {getTypeLabel(item.type)}
-        </span>
-        <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
-          {item.title}
-        </span>
-      </div>
-      <div className="flex items-center gap-3 shrink-0">
+      <td className="px-4 py-3">
+        <span className="text-xs font-medium text-gray-400 uppercase">{typeLabels[item.type] || item.type}</span>
+      </td>
+      <td className="px-4 py-3">
+        <span className="text-sm font-medium text-gray-900 dark:text-white">{item.title}</span>
+        {item.chapter_number != null && (
+          <span className="ml-1.5 text-xs text-gray-400">Ch. {item.chapter_number}</span>
+        )}
+      </td>
+      <td className="px-4 py-3 text-sm text-gray-500 max-w-[150px] truncate">
+        {item.project_title || '—'}
+      </td>
+      <td className="px-4 py-3 text-sm text-gray-500">{formatGenre(item.genre_slug)}</td>
+      <td className="px-4 py-3 text-sm text-gray-500">{item.story_arc || '—'}</td>
+      <td className="px-4 py-3 text-sm text-gray-500 text-right">{formatWords(item.word_count)}</td>
+      <td className="px-4 py-3">
         {item.status && (
-          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${getStatusColor(item.status)}`}>
+          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[item.status] || ''}`}>
             {item.status}
           </span>
         )}
-        <span className="text-xs text-gray-400 w-16 text-right">
-          {timeAgo(item.updated_at)}
-        </span>
-      </div>
-    </li>
+      </td>
+      <td className="px-4 py-3 text-sm text-gray-400 whitespace-nowrap">
+        {new Date(item.updated_at).toLocaleDateString()}
+      </td>
+    </tr>
   );
 }
 
