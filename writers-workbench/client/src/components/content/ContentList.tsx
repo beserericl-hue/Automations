@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
@@ -127,6 +128,7 @@ export default function ContentList({ contentType, title }: ContentListProps) {
 }
 
 function ContentRow({ item }: { item: PublishedContent }) {
+  const navigate = useNavigate();
   const statusColors: Record<string, string> = {
     published: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
     approved: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
@@ -136,7 +138,10 @@ function ContentRow({ item }: { item: PublishedContent }) {
   };
 
   return (
-    <tr className="hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors">
+    <tr
+      onClick={() => navigate(`/content/${item.id}`)}
+      className="hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
+    >
       <td className="px-6 py-3">
         <span className="text-sm font-medium text-gray-900 dark:text-white">{item.title}</span>
         {item.chapter_number != null && (

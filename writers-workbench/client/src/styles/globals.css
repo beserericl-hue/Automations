@@ -7,3 +7,31 @@
     @apply bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100;
   }
 }
+
+/* TipTap editor prose styles */
+.ProseMirror {
+  outline: none;
+}
+
+.ProseMirror h1 { @apply text-2xl font-bold mt-6 mb-3; }
+.ProseMirror h2 { @apply text-xl font-semibold mt-5 mb-2; }
+.ProseMirror h3 { @apply text-lg font-medium mt-4 mb-2; }
+.ProseMirror p { @apply my-2 leading-relaxed; }
+.ProseMirror ul { @apply list-disc pl-6 my-2; }
+.ProseMirror ol { @apply list-decimal pl-6 my-2; }
+.ProseMirror li { @apply my-1; }
+.ProseMirror blockquote {
+  @apply border-l-4 border-gray-300 pl-4 italic text-gray-600 my-3
+    dark:border-gray-600 dark:text-gray-400;
+}
+.ProseMirror hr { @apply my-6 border-gray-200 dark:border-gray-700; }
+.ProseMirror code { @apply bg-gray-100 px-1 py-0.5 rounded text-sm dark:bg-gray-800; }
+.ProseMirror pre { @apply bg-gray-100 p-4 rounded-lg overflow-x-auto my-3 dark:bg-gray-800; }
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #adb5bd;
+  pointer-events: none;
+  height: 0;
+}

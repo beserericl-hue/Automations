@@ -11,6 +11,7 @@ import AppShell from './components/layout/AppShell';
 import Dashboard from './components/dashboard/Dashboard';
 import ProjectList from './components/projects/ProjectList';
 import ContentList from './components/content/ContentList';
+import ContentDetail from './components/content/ContentDetail';
 import ResearchList from './components/research/ResearchList';
 
 export default function App() {
@@ -35,6 +36,7 @@ export default function App() {
                     <Route path="short-stories" element={<ContentList contentType="short_story" title="Short Stories" />} />
                     <Route path="blog-posts" element={<ContentList contentType="blog_post" title="Blog Posts" />} />
                     <Route path="newsletters" element={<ContentList contentType="newsletter" title="Newsletters" />} />
+                    <Route path="content/:id" element={<ContentDetail />} />
                     <Route path="research" element={<ResearchList />} />
                     <Route path="social" element={<Placeholder name="Social Posts" />} />
                     <Route path="cover-art" element={<Placeholder name="Cover Art" />} />
