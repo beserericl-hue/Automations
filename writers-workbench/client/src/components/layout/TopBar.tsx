@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUser } from '../../contexts/UserContext';
 
@@ -10,14 +10,29 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
   const { signOut } = useAuth();
   const { profile } = useUser();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!userMenuOpen) return;
+
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [userMenuOpen]);
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-gray-200 bg-white px-4 dark:border-gray-800 dark:bg-gray-950">
-      {/* Left: hamburger + breadcrumb */}
+      {/* Left: hamburger */}
       <div className="flex items-center gap-3">
         <button
           onClick={onMenuClick}
-          className="rounded p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+          className="rounded p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 lg:hidden"
           aria-label="Toggle sidebar"
         >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -27,7 +42,7 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
       </div>
 
       {/* Right: user menu */}
-      <div className="relative">
+      <div className="relative" ref={menuRef}>
         <button
           onClick={() => setUserMenuOpen(!userMenuOpen)}
           className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
@@ -39,7 +54,7 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
         </button>
 
         {userMenuOpen && (
-          <div className="absolute right-0 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+          <div className="absolute right-0 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900 z-50">
             <button
               onClick={() => { signOut(); setUserMenuOpen(false); }}
               className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
