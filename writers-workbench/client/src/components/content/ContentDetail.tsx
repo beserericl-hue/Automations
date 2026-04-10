@@ -1,9 +1,10 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useMemo } from 'react';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
 import RichTextEditor from '../editor/RichTextEditor';
+import { contentToHtml } from '../../lib/content-utils';
 import type { PublishedContent } from '../../types/database';
 
 export default function ContentDetail() {
@@ -116,6 +117,9 @@ export default function ContentDetail() {
 
   const statusActions = getStatusActions(item.status);
 
+  // Convert markdown/plain text to HTML for TipTap on first load
+  const editorContent = useMemo(() => contentToHtml(item.content_text), [item.content_text]);
+
   return (
     <div className="flex flex-col h-full gap-4">
       {/* Header */}
@@ -155,7 +159,7 @@ export default function ContentDetail() {
       {/* Editor */}
       <div className="flex-1 min-h-0">
         <RichTextEditor
-          content={item.content_text || ''}
+          content={editorContent}
           onChange={handleSave}
         />
       </div>
