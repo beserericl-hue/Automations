@@ -3,6 +3,9 @@ import { AuthProvider } from './contexts/AuthContext';
 import { UserProvider } from './contexts/UserContext';
 import LoginPage from './components/auth/LoginPage';
 import SignupPage from './components/auth/SignupPage';
+import ForgotPasswordPage from './components/auth/ForgotPasswordPage';
+import ResetPasswordPage from './components/auth/ResetPasswordPage';
+import OnboardingPage from './components/auth/OnboardingPage';
 import AuthGuard from './components/auth/AuthGuard';
 import AppShell from './components/layout/AppShell';
 import Dashboard from './components/dashboard/Dashboard';
@@ -14,6 +17,9 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/onboarding" element={<OnboardingPage />} />
           <Route
             path="/*"
             element={

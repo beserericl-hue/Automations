@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 
 export default function AuthGuard({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth();
-  const { loading: userLoading } = useUser();
+  const { loading: userLoading, needsOnboarding } = useUser();
 
   if (authLoading || userLoading) {
     return (
@@ -20,6 +20,10 @@ export default function AuthGuard({ children }: { children: ReactNode }) {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (needsOnboarding) {
+    return <Navigate to="/onboarding" replace />;
   }
 
   return <>{children}</>;
