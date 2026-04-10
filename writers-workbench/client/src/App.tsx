@@ -10,9 +10,13 @@ import AuthGuard from './components/auth/AuthGuard';
 import AppShell from './components/layout/AppShell';
 import Dashboard from './components/dashboard/Dashboard';
 import ProjectList from './components/projects/ProjectList';
+import ProjectDetail from './components/projects/ProjectDetail';
 import ContentList from './components/content/ContentList';
 import ContentDetail from './components/content/ContentDetail';
 import ResearchList from './components/research/ResearchList';
+import StoryBiblePanel from './components/story-bible/StoryBiblePanel';
+import StoryArcBrowser from './components/story-arcs/StoryArcBrowser';
+import OutlineList from './components/outlines/OutlineList';
 
 export default function App() {
   return (
@@ -32,16 +36,18 @@ export default function App() {
                   <Routes>
                     <Route index element={<Dashboard />} />
                     <Route path="projects" element={<ProjectList />} />
+                    <Route path="projects/:id" element={<ProjectDetail />} />
+                    <Route path="projects/:id/bible" element={<StoryBiblePanel />} />
                     <Route path="chapters" element={<ContentList contentType="chapter" title="Chapters" />} />
                     <Route path="short-stories" element={<ContentList contentType="short_story" title="Short Stories" />} />
                     <Route path="blog-posts" element={<ContentList contentType="blog_post" title="Blog Posts" />} />
                     <Route path="newsletters" element={<ContentList contentType="newsletter" title="Newsletters" />} />
                     <Route path="content/:id" element={<ContentDetail />} />
                     <Route path="research" element={<ResearchList />} />
+                    <Route path="outlines" element={<OutlineList />} />
+                    <Route path="story-arcs" element={<StoryArcBrowser />} />
                     <Route path="social" element={<Placeholder name="Social Posts" />} />
                     <Route path="cover-art" element={<Placeholder name="Cover Art" />} />
-                    <Route path="outlines" element={<Placeholder name="Outlines" />} />
-                    <Route path="story-arcs" element={<Placeholder name="Story Arcs" />} />
                     <Route path="genres" element={<Placeholder name="Genres" />} />
                     <Route path="settings" element={<Placeholder name="Settings" />} />
                     <Route path="admin/*" element={<Placeholder name="Admin" />} />

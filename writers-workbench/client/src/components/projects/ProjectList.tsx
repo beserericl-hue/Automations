@@ -1,9 +1,11 @@
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
 import type { WritingProject } from '../../types/database';
 
 export default function ProjectList() {
+  const navigate = useNavigate();
   const { profile } = useUser();
   const userId = profile?.user_id;
 
@@ -46,7 +48,7 @@ export default function ProjectList() {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {projects.map((project) => (
-                <tr key={project.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors">
+                <tr key={project.id} onClick={() => navigate(`/projects/${project.id}`)} className="hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors">
                   <td className="px-6 py-3">
                     <span className="text-sm font-medium text-gray-900 dark:text-white">{project.title}</span>
                     {project.outline?.story_arc_name && (
