@@ -9,6 +9,9 @@ import OnboardingPage from './components/auth/OnboardingPage';
 import AuthGuard from './components/auth/AuthGuard';
 import AppShell from './components/layout/AppShell';
 import Dashboard from './components/dashboard/Dashboard';
+import ProjectList from './components/projects/ProjectList';
+import ContentList from './components/content/ContentList';
+import ResearchList from './components/research/ResearchList';
 
 export default function App() {
   return (
@@ -27,12 +30,12 @@ export default function App() {
                 <AppShell>
                   <Routes>
                     <Route index element={<Dashboard />} />
-                    <Route path="projects" element={<Placeholder name="Projects" />} />
-                    <Route path="chapters" element={<Placeholder name="Chapters" />} />
-                    <Route path="short-stories" element={<Placeholder name="Short Stories" />} />
-                    <Route path="blog-posts" element={<Placeholder name="Blog Posts" />} />
-                    <Route path="newsletters" element={<Placeholder name="Newsletters" />} />
-                    <Route path="research" element={<Placeholder name="Research" />} />
+                    <Route path="projects" element={<ProjectList />} />
+                    <Route path="chapters" element={<ContentList contentType="chapter" title="Chapters" />} />
+                    <Route path="short-stories" element={<ContentList contentType="short_story" title="Short Stories" />} />
+                    <Route path="blog-posts" element={<ContentList contentType="blog_post" title="Blog Posts" />} />
+                    <Route path="newsletters" element={<ContentList contentType="newsletter" title="Newsletters" />} />
+                    <Route path="research" element={<ResearchList />} />
                     <Route path="social" element={<Placeholder name="Social Posts" />} />
                     <Route path="cover-art" element={<Placeholder name="Cover Art" />} />
                     <Route path="outlines" element={<Placeholder name="Outlines" />} />
