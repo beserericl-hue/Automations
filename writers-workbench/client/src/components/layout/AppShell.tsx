@@ -2,7 +2,6 @@ import { useState, type ReactNode } from 'react';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import ChatDrawer from '../chat/ChatDrawer';
-import EveOrb from '../eve/EveOrb';
 
 interface AppShellProps {
   children: ReactNode;
@@ -35,9 +34,6 @@ export default function AppShell({ children }: AppShellProps) {
 
       {/* Chat drawer */}
       <ChatDrawer open={chatOpen} onClose={() => setChatOpen(false)} />
-
-      {/* Eve voice orb */}
-      <EveOrb />
     </div>
   );
 }
