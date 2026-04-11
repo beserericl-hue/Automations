@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { UserProvider } from './contexts/UserContext';
+import ErrorBoundary from './components/ErrorBoundary';
 import LoginPage from './components/auth/LoginPage';
 import SignupPage from './components/auth/SignupPage';
 import ForgotPasswordPage from './components/auth/ForgotPasswordPage';
@@ -23,6 +24,7 @@ import AdminPanel from './components/admin/AdminPanel';
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <AuthProvider>
       <UserProvider>
         <Routes>
@@ -63,6 +65,7 @@ export default function App() {
         </Routes>
       </UserProvider>
     </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

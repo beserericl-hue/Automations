@@ -60,7 +60,7 @@ export default function GenreForm({ genre, onClose }: GenreFormProps) {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['genres'] });
+      queryClient.invalidateQueries({ queryKey: ['genres', userId] });
       onClose();
     },
     onError: (err: Error) => setError(err.message),

@@ -13,7 +13,7 @@ export default function ProjectDetail() {
   const [exportOpen, setExportOpen] = useState(false);
   const userId = profile?.user_id;
 
-  const { data: project, isLoading } = useQuery({
+  const { data: project, isLoading, isError, error } = useQuery({
     queryKey: ['project-detail', id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -47,6 +47,14 @@ export default function ProjectDetail() {
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64 text-sm text-gray-500">Loading...</div>;
+  }
+
+  if (isError) {
+    return (
+      <div className="flex items-center justify-center h-64 text-sm text-red-600 dark:text-red-400">
+        Failed to load project: {error?.message || 'Unknown error'}
+      </div>
+    );
   }
 
   if (!project) {

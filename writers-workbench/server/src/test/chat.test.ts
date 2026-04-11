@@ -10,10 +10,7 @@ function createApp() {
 }
 
 describe('Chat proxy endpoint', () => {
-  it('returns 500 when N8N_API_URL is not configured', async () => {
-    // Ensure env var is not set
-    delete process.env.N8N_API_URL;
-
+  it('returns 401 when no auth token is provided', async () => {
     const app = createApp();
     const server = app.listen(0);
     const addr = server.address();
@@ -25,10 +22,11 @@ describe('Chat proxy endpoint', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_message_request: 'test', user_id: '+1234' }),
       });
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(401);
 
-      const body = await res.json();
-      expect(body.error).toBe('N8N_API_URL not configured');
+      const body = (await res.json()) as { success: boolean; error: { code: string } };
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe('UNAUTHORIZED');
     } finally {
       server.close();
     }

@@ -8,6 +8,7 @@ export interface UserProfile {
   email: string | null;
   bcc_email: string | null;
   preferences: Record<string, unknown>;
+  role: 'user' | 'admin' | 'editor' | 'viewer';
   supabase_auth_uid: string | null;
   created_at: string;
   updated_at: string;

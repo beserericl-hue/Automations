@@ -45,7 +45,7 @@ export default function StoryBiblePanel() {
     enabled: !!id && !!userId,
   });
 
-  const { data: entries, isLoading } = useQuery({
+  const { data: entries, isLoading, isError, error } = useQuery({
     queryKey: ['story-bible', id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -77,6 +77,10 @@ export default function StoryBiblePanel() {
 
       {isLoading ? (
         <div className="text-sm text-gray-500">Loading...</div>
+      ) : isError ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-center dark:border-red-800 dark:bg-red-950">
+          <p className="text-sm text-red-600 dark:text-red-400">Failed to load story bible: {error?.message || 'Unknown error'}</p>
+        </div>
       ) : !entries?.length ? (
         <div className="rounded-lg border border-gray-200 bg-white p-8 text-center dark:border-gray-800 dark:bg-gray-900">
           <p className="text-sm text-gray-500">No story bible entries yet.</p>

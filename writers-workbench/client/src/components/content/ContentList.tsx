@@ -19,7 +19,7 @@ export default function ContentList({ contentType, title }: ContentListProps) {
   const [sortAsc, setSortAsc] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  const { data: items, isLoading } = useQuery({
+  const { data: items, isLoading, isError, error } = useQuery({
     queryKey: ['content-list', contentType, userId, sortField, sortAsc, statusFilter],
     queryFn: async () => {
       let query = supabase
@@ -79,6 +79,10 @@ export default function ContentList({ contentType, title }: ContentListProps) {
       <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 overflow-hidden">
         {isLoading ? (
           <div className="px-6 py-12 text-center text-sm text-gray-500">Loading...</div>
+        ) : isError ? (
+          <div className="px-6 py-12 text-center text-sm text-red-600 dark:text-red-400">
+            Failed to load {title.toLowerCase()}: {error?.message || 'Unknown error'}
+          </div>
         ) : !items?.length ? (
           <div className="px-6 py-12 text-center text-sm text-gray-500">
             No {title.toLowerCase()} found.

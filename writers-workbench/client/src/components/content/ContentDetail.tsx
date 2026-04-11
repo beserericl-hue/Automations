@@ -15,7 +15,7 @@ export default function ContentDetail() {
   const userId = profile?.user_id;
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | null>(null);
 
-  const { data: item, isLoading } = useQuery({
+  const { data: item, isLoading, isError, error } = useQuery({
     queryKey: ['content-detail', id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -104,6 +104,14 @@ export default function ContentDetail() {
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64 text-sm text-gray-500">Loading...</div>;
+  }
+
+  if (isError) {
+    return (
+      <div className="flex items-center justify-center h-64 text-sm text-red-600 dark:text-red-400">
+        Failed to load content: {error?.message || 'Unknown error'}
+      </div>
+    );
   }
 
   if (!item) {

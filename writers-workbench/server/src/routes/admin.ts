@@ -1,15 +1,18 @@
 import { Router } from 'express';
+import { validateBody } from '../middleware/validate.js';
+import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { AdminUserSchema } from '../schemas.js';
 
 export const adminRouter = Router();
 
-// TODO: Phase 9 — implement admin routes
-// All routes require JWT + admin role check
+// All admin routes require JWT + admin role
+adminRouter.use(requireAuth, requireAdmin);
 
 adminRouter.get('/users', (_req, res) => {
   res.status(501).json({ error: 'Not implemented yet — coming in Phase 9' });
 });
 
-adminRouter.post('/users', (_req, res) => {
+adminRouter.post('/users', validateBody(AdminUserSchema), (_req, res) => {
   res.status(501).json({ error: 'Not implemented yet — coming in Phase 9' });
 });
 

@@ -10,6 +10,7 @@ interface UserProfile {
   email: string | null;
   bcc_email: string | null;
   preferences: Record<string, unknown>;
+  role: string;
   isAdmin: boolean;
 }
 
@@ -66,7 +67,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
       email: data.email,
       bcc_email: data.bcc_email,
       preferences: data.preferences || {},
-      isAdmin: data.preferences?.role === 'admin',
+      role: data.role || 'user',
+      isAdmin: data.role === 'admin',
     });
     setNeedsOnboarding(false);
     setLoading(false);

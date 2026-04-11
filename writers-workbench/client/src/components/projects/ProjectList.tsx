@@ -9,7 +9,7 @@ export default function ProjectList() {
   const { profile } = useUser();
   const userId = profile?.user_id;
 
-  const { data: projects, isLoading } = useQuery({
+  const { data: projects, isLoading, isError, error } = useQuery({
     queryKey: ['projects', userId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -30,6 +30,10 @@ export default function ProjectList() {
       <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 overflow-hidden">
         {isLoading ? (
           <div className="px-6 py-12 text-center text-sm text-gray-500">Loading...</div>
+        ) : isError ? (
+          <div className="px-6 py-12 text-center text-sm text-red-600 dark:text-red-400">
+            Failed to load projects: {error?.message || 'Unknown error'}
+          </div>
         ) : !projects?.length ? (
           <div className="px-6 py-12 text-center text-sm text-gray-500">
             No projects yet. Use the chat or Eve to brainstorm a story.

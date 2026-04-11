@@ -4,8 +4,8 @@ import { useDashboardCounts, useRecentItems, type RecentItem } from '../../hooks
 
 export default function Dashboard() {
   const { profile } = useUser();
-  const { data: counts, isLoading: countsLoading } = useDashboardCounts();
-  const { data: recentItems, isLoading: recentLoading } = useRecentItems();
+  const { data: counts, isLoading: countsLoading, isError: countsError } = useDashboardCounts();
+  const { data: recentItems, isLoading: recentLoading, isError: recentError, error: recentErrorObj } = useRecentItems();
 
   return (
     <div className="space-y-6">
@@ -21,10 +21,10 @@ export default function Dashboard() {
 
       {/* Quick stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Projects" value={countsLoading ? '...' : String(counts?.projects ?? 0)} icon={<FolderIcon />} />
-        <StatCard label="Drafts" value={countsLoading ? '...' : String(counts?.drafts ?? 0)} icon={<PencilIcon />} />
-        <StatCard label="Published" value={countsLoading ? '...' : String(counts?.published ?? 0)} icon={<CheckIcon />} />
-        <StatCard label="Research" value={countsLoading ? '...' : String(counts?.research ?? 0)} icon={<SearchIcon />} />
+        <StatCard label="Projects" value={countsLoading ? '...' : countsError ? '!' : String(counts?.projects ?? 0)} icon={<FolderIcon />} />
+        <StatCard label="Drafts" value={countsLoading ? '...' : countsError ? '!' : String(counts?.drafts ?? 0)} icon={<PencilIcon />} />
+        <StatCard label="Published" value={countsLoading ? '...' : countsError ? '!' : String(counts?.published ?? 0)} icon={<CheckIcon />} />
+        <StatCard label="Research" value={countsLoading ? '...' : countsError ? '!' : String(counts?.research ?? 0)} icon={<SearchIcon />} />
       </div>
 
       {/* Recent activity table */}
@@ -34,6 +34,10 @@ export default function Dashboard() {
         </div>
         {recentLoading ? (
           <div className="px-6 py-12 text-center text-sm text-gray-500">Loading...</div>
+        ) : recentError ? (
+          <div className="px-6 py-12 text-center text-sm text-red-600 dark:text-red-400">
+            Failed to load recent activity: {recentErrorObj?.message || 'Unknown error'}
+          </div>
         ) : !recentItems?.length ? (
           <div className="px-6 py-12 text-center text-sm text-gray-500">
             No content yet. Use the chat or Eve to start creating.

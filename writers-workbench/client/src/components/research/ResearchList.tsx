@@ -7,7 +7,7 @@ export default function ResearchList() {
   const { profile } = useUser();
   const userId = profile?.user_id;
 
-  const { data: reports, isLoading } = useQuery({
+  const { data: reports, isLoading, isError, error } = useQuery({
     queryKey: ['research', userId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -28,6 +28,10 @@ export default function ResearchList() {
       <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 overflow-hidden">
         {isLoading ? (
           <div className="px-6 py-12 text-center text-sm text-gray-500">Loading...</div>
+        ) : isError ? (
+          <div className="px-6 py-12 text-center text-sm text-red-600 dark:text-red-400">
+            Failed to load research reports: {error?.message || 'Unknown error'}
+          </div>
         ) : !reports?.length ? (
           <div className="px-6 py-12 text-center text-sm text-gray-500">
             No research reports yet. Ask Eve or use the chat to research a topic.

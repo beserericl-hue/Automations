@@ -8,7 +8,7 @@ export default function OutlineList() {
   const { profile } = useUser();
   const userId = profile?.user_id;
 
-  const { data: projects, isLoading } = useQuery({
+  const { data: projects, isLoading, isError, error } = useQuery({
     queryKey: ['outlines', userId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -30,6 +30,10 @@ export default function OutlineList() {
 
       {isLoading ? (
         <div className="text-sm text-gray-500">Loading...</div>
+      ) : isError ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-center dark:border-red-800 dark:bg-red-950">
+          <p className="text-sm text-red-600 dark:text-red-400">Failed to load outlines: {error?.message || 'Unknown error'}</p>
+        </div>
       ) : !projects?.length ? (
         <div className="rounded-lg border border-gray-200 bg-white p-8 text-center dark:border-gray-800 dark:bg-gray-900">
           <p className="text-sm text-gray-500">No outlines yet. Use Eve or the chat to brainstorm a story.</p>

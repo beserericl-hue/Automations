@@ -12,7 +12,7 @@ export default function GenreList() {
   const [editingGenre, setEditingGenre] = useState<GenreConfig | null>(null);
   const [creating, setCreating] = useState(false);
 
-  const { data: genres, isLoading } = useQuery({
+  const { data: genres, isLoading, isError, error } = useQuery({
     queryKey: ['genres', userId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -31,7 +31,7 @@ export default function GenreList() {
       const { error } = await supabase.from('genre_config_v2').delete().eq('id', id).eq('user_id', userId!);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['genres'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['genres', userId] }),
   });
 
   const publicGenres = genres?.filter(g => g.user_id === null) || [];
@@ -60,6 +60,10 @@ export default function GenreList() {
 
       {isLoading ? (
         <div className="text-sm text-gray-500">Loading...</div>
+      ) : isError ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-center dark:border-red-800 dark:bg-red-950">
+          <p className="text-sm text-red-600 dark:text-red-400">Failed to load genres: {error?.message || 'Unknown error'}</p>
+        </div>
       ) : (
         <>
           {/* Private genres */}

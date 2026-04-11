@@ -9,7 +9,7 @@ export default function StoryArcBrowser() {
   const userId = profile?.user_id;
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const { data: arcs, isLoading } = useQuery({
+  const { data: arcs, isLoading, isError, error } = useQuery({
     queryKey: ['story-arcs', userId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -32,6 +32,10 @@ export default function StoryArcBrowser() {
 
       {isLoading ? (
         <div className="text-sm text-gray-500">Loading...</div>
+      ) : isError ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-center dark:border-red-800 dark:bg-red-950">
+          <p className="text-sm text-red-600 dark:text-red-400">Failed to load story arcs: {error?.message || 'Unknown error'}</p>
+        </div>
       ) : !arcs?.length ? (
         <div className="rounded-lg border border-gray-200 bg-white p-8 text-center dark:border-gray-800 dark:bg-gray-900">
           <p className="text-sm text-gray-500">No story arcs available.</p>
