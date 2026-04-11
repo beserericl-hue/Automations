@@ -175,19 +175,19 @@ Before any sprint work begins, the following testing infrastructure must be in p
 
 ---
 
-#### S0-7: Fix Dockerfile port mismatch and add graceful shutdown
-**Points:** 2 | **Priority:** P1 | **Audit Ref:** 6.1, 6.5
+#### S0-7: Add graceful shutdown and clean up Dockerfile
+**Points:** 2 | **Priority:** P1 | **Audit Ref:** 6.1
 
 **Developer Tasks:**
-- [ ] Update Dockerfile `ENV PORT=3000` and server default to `3000`
 - [ ] Add SIGTERM/SIGINT handlers in `server/src/index.ts` with connection draining
-- [ ] Add `server.close()` with 10-second timeout
-- [ ] Test Docker build locally: `docker build -t writers-workbench .`
+- [ ] Add `server.close()` with 10-second timeout for in-flight requests (e.g., .docx export)
+- [ ] Remove hardcoded `ENV PORT=3000` from Dockerfile — Railway sets `PORT` automatically
+- [ ] Server already reads `process.env.PORT` — no code change needed
 
 **QA Tasks:**
-- [ ] Test: Docker container starts on port 3000
-- [ ] Test: `docker stop` triggers graceful shutdown (logs "shutting down")
-- [ ] Test: health check works from inside Docker container
+- [ ] Test: server logs "shutting down" on SIGTERM
+- [ ] Test: in-flight requests complete before shutdown
+- [ ] Test: Railway deployment uses correct port (verify health check passes after deploy)
 
 ---
 
