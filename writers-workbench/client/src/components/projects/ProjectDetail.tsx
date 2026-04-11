@@ -1,13 +1,16 @@
+import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
+import ExportDialog from '../export/ExportDialog';
 import type { WritingProject, PublishedContent, OutlineCharacter, OutlineChapter } from '../../types/database';
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { profile } = useUser();
+  const [exportOpen, setExportOpen] = useState(false);
   const userId = profile?.user_id;
 
   const { data: project, isLoading } = useQuery({
@@ -163,8 +166,22 @@ export default function ProjectDetail() {
                 <BookIcon />
                 Story Bible
               </Link>
+              <button
+                onClick={() => setExportOpen(true)}
+                className="flex w-full items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+              >
+                <DownloadIcon />
+                Export to Word
+              </button>
             </div>
           </Section>
+
+          <ExportDialog
+            projectId={id!}
+            projectTitle={project.title}
+            open={exportOpen}
+            onClose={() => setExportOpen(false)}
+          />
         </div>
       </div>
     </div>
@@ -190,6 +207,14 @@ function StatusDot({ status }: { status: string }) {
   };
   return (
     <span className={`h-2 w-2 rounded-full ${colors[status] || 'bg-gray-400'}`} title={status} />
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+    </svg>
   );
 }
 

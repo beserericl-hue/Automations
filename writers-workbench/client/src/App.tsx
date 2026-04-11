@@ -17,6 +17,9 @@ import ResearchList from './components/research/ResearchList';
 import StoryBiblePanel from './components/story-bible/StoryBiblePanel';
 import StoryArcBrowser from './components/story-arcs/StoryArcBrowser';
 import OutlineList from './components/outlines/OutlineList';
+import GenreList from './components/genres/GenreList';
+import UserSettings from './components/settings/UserSettings';
+import AdminPanel from './components/admin/AdminPanel';
 
 export default function App() {
   return (
@@ -48,9 +51,9 @@ export default function App() {
                     <Route path="story-arcs" element={<StoryArcBrowser />} />
                     <Route path="social" element={<Placeholder name="Social Posts" />} />
                     <Route path="cover-art" element={<Placeholder name="Cover Art" />} />
-                    <Route path="genres" element={<Placeholder name="Genres" />} />
-                    <Route path="settings" element={<Placeholder name="Settings" />} />
-                    <Route path="admin/*" element={<Placeholder name="Admin" />} />
+                    <Route path="genres" element={<GenreList />} />
+                    <Route path="settings" element={<UserSettings />} />
+                    <Route path="admin/*" element={<AdminPanel />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
                 </AppShell>
