@@ -323,7 +323,94 @@ The chat drawer and Eve orb should be prominent:
 
 ---
 
-## Part 8: Database Schema Changes Required
+## Part 8: Web Callback Architecture (Eve Channel Routing)
+
+### Problem
+
+When Eve is accessed via phone, the `eve_knowledge_callback` workflow retrieves content, injects it into Eve's Knowledge Base, and triggers an **outbound phone call** back to the user. But when the user is connected via the **web widget**, there is no phone to call. n8n receives the same webhook payload from Eve regardless of channel — it has no way to know whether the user is on the phone or in the web UI.
+
+### Recommended Solution: Session Registration + Web Webhook
+
+```
+Web Widget connects to Eve
+    ↓
+Web app registers active session:
+POST /api/session/register  { user_id: "+14105914612", channel: "web" }
+    ↓ (stored in memory or Redis)
+
+User says: "Pull up my outline for The Burial Mound"
+    ↓
+Eve → n8n hub → retrieve_content → eve_knowledge_callback
+    ↓
+BEFORE outbound call decision, n8n checks:
+GET https://writers-workbench.railway.app/api/session/active?user_id=+14105914612
+    ↓
+Response: { active: true, channel: "web" }  OR  { active: false }
+    ↓
+IF web session active:
+    n8n POSTs content to:
+    POST https://writers-workbench.railway.app/api/callback/content-ready
+    Body: { user_id, content_title, content_text, content_type, callback_mode }
+        ↓
+    Express server pushes to client via Server-Sent Events (SSE)
+        ↓
+    Web UI shows notification: "Eve has loaded 'The Burial Mound' outline"
+    User can now ask Eve about it in the existing widget session
+
+IF no web session:
+    n8n triggers outbound phone call (existing behavior, unchanged)
+```
+
+### Implementation Components
+
+**Web App (Express server) — 3 new endpoints:**
+
+1. `POST /api/session/register` — called by web UI when Eve widget opens
+   - Stores `{ user_id, channel, connected_at }` in memory Map or Redis
+   - Called from EveOrb component on widget mount
+
+2. `GET /api/session/active?user_id=X` — called by n8n to check channel
+   - Returns `{ active: true, channel: "web" }` or `{ active: false }`
+   - n8n adds an HTTP Request node before the callback decision
+
+3. `POST /api/callback/content-ready` — called by n8n when content is loaded
+   - Receives content payload from n8n
+   - Pushes to connected client via SSE
+
+4. `GET /api/callback/events?user_id=X` — SSE stream for the client
+   - Client opens this on page load, listens for push notifications
+   - Server sends events when content is ready
+
+**Web UI (React) — client-side:**
+
+- EveOrb calls `/api/session/register` on mount, `/api/session/unregister` on unmount
+- EventSource connection to `/api/callback/events` listens for content-ready notifications
+- On notification: show toast "Eve has loaded [title] — ask her about it"
+- Optionally: auto-inject context into chat drawer
+
+**n8n Workflow (eve_knowledge_callback) — small change:**
+
+- Add HTTP Request node before the outbound call decision
+- `GET /api/session/active?user_id={{ $json.user_id }}`
+- IF response.active === true AND response.channel === "web":
+  - POST content to `/api/callback/content-ready`
+  - Skip outbound phone call
+  - Skip first_message change (not needed for web)
+- ELSE:
+  - Existing phone callback flow (unchanged)
+
+### Why This Approach
+
+- **No changes to Eve's agent configuration** — same agent serves both channels
+- **No changes to the embed widget** — works with the drop-in `<elevenlabs-convai>` component
+- **n8n makes one simple HTTP check** — minimal workflow change
+- **Works for multiple users simultaneously** — one on phone, one on web, each gets the right callback
+- **SSE is simpler than WebSocket** — one-direction push (server → client), built into browsers, no library needed
+- **Session cleanup is automatic** — web app removes session on widget unmount or on timeout
+
+---
+
+## Part 9: Database Schema Changes Required
 
 All changes from V1 review plus new findings:
 
@@ -392,7 +479,7 @@ Merged from Quality Audit (AUDIT_REPORT.md), Architecture Review V1, and this V2
 | 17 | Add delete operations for projects with cascade cleanup (children warning dialog) | 6h |
 | 18 | Add soft delete columns and trash/restore UI | 4h |
 | 19 | Build version history viewer (list, diff, restore) in content editor | 8h |
-| 20 | Make Eve voice orb functional with status feedback and error handling | 4h |
+| 20 | ~~Make Eve voice orb functional~~ DONE — using ElevenLabs embed widget | -- |
 | 21 | Build research report detail page with editor | 4h |
 | 22 | Add unsaved changes warning (beforeunload + route prompt) | 2h |
 | 23 | Create `social_posts_v2` table and update repurpose workflow to persist posts | 4h |
@@ -405,61 +492,63 @@ Merged from Quality Audit (AUDIT_REPORT.md), Architecture Review V1, and this V2
 | 30 | Add discovery_question column to story_arcs_v2 | 30m |
 | 31 | Add confirmation dialogs for all destructive actions (custom modals) | 4h |
 | 32 | Implement admin server routes with auth (replace 501 stubs) | 6h |
+| 33 | Build web callback architecture: session registration, SSE push, content-ready webhook | 8h |
+| 34 | Update n8n eve_knowledge_callback workflow: add channel check before phone/web routing | 3h |
 
 ### MEDIUM — Feature Completeness (22 items)
 
 | # | Task | Est. |
 |---|------|------|
-| 33 | Build token/cost tracking dashboard (per-project, per-model, per-day) | 8h |
-| 34 | Build content provenance panel ("Sources used" on content detail) | 4h |
-| 35 | Build scheduled publishing date picker and calendar | 6h |
-| 36 | Display Q/A consistency reports on chapter detail pages | 4h |
-| 37 | Add chapter progress visualization on project overview (written/total, word counts) | 4h |
-| 38 | Add outline-to-chapter mapping (which outlined chapters are written vs pending) | 4h |
-| 39 | Add next/previous chapter navigation in editor | 2h |
-| 40 | Build story bible entry CRUD (create, edit, delete) | 6h |
-| 41 | Build story arc create/edit for custom arcs | 4h |
-| 42 | Build source library browser (browse content_index by genre/source) | 4h |
-| 43 | Add context-aware chat (pre-fill commands from current project context) | 4h |
-| 44 | Add dark mode toggle in Settings | 2h |
-| 45 | Add pagination to all list pages | 4h |
-| 46 | Add bulk actions (multi-select approve, publish, delete) | 4h |
-| 47 | Fix breadcrumb to show content title instead of UUID | 2h |
-| 48 | Auto-collapse sidebar on mobile | 1h |
-| 49 | Add toast notification system | 3h |
-| 50 | Add loading skeleton components | 3h |
-| 51 | Fix Dockerfile port mismatch (3000 vs 3001) | 15m |
-| 52 | Add graceful server shutdown handlers | 2h |
-| 53 | Add structured logging (pino/winston) | 4h |
-| 54 | Add health check that verifies Supabase connectivity | 1h |
+| 35 | Build token/cost tracking dashboard (per-project, per-model, per-day) | 8h |
+| 36 | Build content provenance panel ("Sources used" on content detail) | 4h |
+| 37 | Build scheduled publishing date picker and calendar | 6h |
+| 38 | Display Q/A consistency reports on chapter detail pages | 4h |
+| 39 | Add chapter progress visualization on project overview (written/total, word counts) | 4h |
+| 40 | Add outline-to-chapter mapping (which outlined chapters are written vs pending) | 4h |
+| 41 | Add next/previous chapter navigation in editor | 2h |
+| 42 | Build story bible entry CRUD (create, edit, delete) | 6h |
+| 43 | Build story arc create/edit for custom arcs | 4h |
+| 44 | Build source library browser (browse content_index by genre/source) | 4h |
+| 45 | Add context-aware chat (pre-fill commands from current project context) | 4h |
+| 46 | Add dark mode toggle in Settings | 2h |
+| 47 | Add pagination to all list pages | 4h |
+| 48 | Add bulk actions (multi-select approve, publish, delete) | 4h |
+| 49 | Fix breadcrumb to show content title instead of UUID | 2h |
+| 50 | Auto-collapse sidebar on mobile | 1h |
+| 51 | Add toast notification system | 3h |
+| 52 | Add loading skeleton components | 3h |
+| 53 | Fix Dockerfile port mismatch (3000 vs 3001) | 15m |
+| 54 | Add graceful server shutdown handlers | 2h |
+| 55 | Add structured logging (pino/winston) | 4h |
+| 56 | Add health check that verifies Supabase connectivity | 1h |
 
 ### LOW — Polish & Future (19 items)
 
 | # | Task | Est. |
 |---|------|------|
-| 55 | Add writing sample upload UI in Settings | 4h |
-| 56 | Create Supabase Storage buckets (cover-images, social-images, writing-samples) | 1h |
-| 57 | Add keyboard shortcuts (Ctrl+S, Cmd+K search) | 3h |
-| 58 | Add table row keyboard navigation (accessibility) | 2h |
-| 59 | Add status badge differentiation for colorblind users | 1h |
-| 60 | Add aria-labels to Eve and story bible icons | 1h |
-| 61 | Add content preview mode | 4h |
-| 62 | Add content duplication (clone project/chapter) | 3h |
-| 63 | Add content import (.txt/.md/.docx upload) | 6h |
-| 64 | Add activity log / audit trail | 8h |
-| 65 | Add in-app notifications | 6h |
-| 66 | Add onboarding tutorial for new users | 4h |
-| 67 | Add API versioning prefix (/api/v1/) | 1h |
-| 68 | Add OpenAPI documentation | 4h |
-| 69 | Add E2E test suite (Playwright) | 12h |
-| 70 | Add request logging middleware with request IDs | 2h |
-| 71 | Add centralized Express error handler | 2h |
-| 72 | Configure KDP export to use S3-stored .docx template | 3h |
-| 73 | Add genre reference count (show "12 projects use this genre") | 2h |
+| 57 | Add writing sample upload UI in Settings | 4h |
+| 58 | Create Supabase Storage buckets (cover-images, social-images, writing-samples) | 1h |
+| 59 | Add keyboard shortcuts (Ctrl+S, Cmd+K search) | 3h |
+| 60 | Add table row keyboard navigation (accessibility) | 2h |
+| 61 | Add status badge differentiation for colorblind users | 1h |
+| 62 | Add aria-labels to Eve and story bible icons | 1h |
+| 63 | Add content preview mode | 4h |
+| 64 | Add content duplication (clone project/chapter) | 3h |
+| 65 | Add content import (.txt/.md/.docx upload) | 6h |
+| 66 | Add activity log / audit trail | 8h |
+| 67 | Add in-app notifications | 6h |
+| 68 | Add onboarding tutorial for new users | 4h |
+| 69 | Add API versioning prefix (/api/v1/) | 1h |
+| 70 | Add OpenAPI documentation | 4h |
+| 71 | Add E2E test suite (Playwright) | 12h |
+| 72 | Add request logging middleware with request IDs | 2h |
+| 73 | Add centralized Express error handler | 2h |
+| 74 | Configure KDP export to use S3-stored .docx template | 3h |
+| 75 | Add genre reference count (show "12 projects use this genre") | 2h |
 
-**Total: 73 items** (deduplicated from 89 in V1 by merging overlapping items)
+**Total: 75 items** (73 original + 2 callback architecture items, minus 1 completed Eve item)
 
-**Estimated total effort: ~280 hours**
+**Estimated total effort: ~291 hours**
 
 ---
 
@@ -470,7 +559,8 @@ Given the command-interface model (chat/voice primary):
 | Requirement | Priority | Status |
 |---|---|---|
 | Chat drawer works and connects to n8n hub | CRITICAL | Implemented (needs CORS testing) |
-| Eve voice orb works with status feedback | CRITICAL | **BROKEN** — no visible response |
+| Eve voice widget works (embed widget) | CRITICAL | **FIXED** — using ElevenLabs embed widget |
+| Eve web callback routing (phone vs web channel) | HIGH | **MISSING** — needs session registration + SSE push |
 | All generated data visible in UI (content, images, social, research) | HIGH | **PARTIAL** — images and social posts are ephemeral |
 | Project workspace shows complete hierarchy | HIGH | **MISSING** — flat sidebar, no hierarchy |
 | Content editable with version history | HIGH | **PARTIAL** — editor works, versions hidden |
