@@ -13,6 +13,7 @@
     "dev:server": "npm -w server run dev",
     "build": "npm -w client run build && npm -w server run build",
     "start": "npm -w server run start",
+    "test": "npm -w client run test && npm -w server run test",
     "lint": "npm -w client run lint && npm -w server run lint",
     "typecheck": "npm -w client run typecheck && npm -w server run typecheck"
   },
