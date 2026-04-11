@@ -208,6 +208,21 @@ Before any sprint work begins, the following testing infrastructure must be in p
 
 ---
 
+#### S0-9: Fix code quality issues (silent failures, cache keys, stale state)
+**Points:** 3 | **Priority:** P1 | **Audit Ref:** 7.1, 7.2, 7.6
+
+**Developer Tasks:**
+- [ ] Add `isError` and `error` handling to all `useQuery` calls across components (ProjectDetail, ContentList, ResearchList, StoryArcBrowser, OutlineList, Dashboard) — show error message instead of empty state
+- [ ] Fix GenreForm cache invalidation: change `queryClient.invalidateQueries({ queryKey: ['genres'] })` to use `['genres', userId]` to match GenreList query key
+- [ ] Fix EveWidget: remove embed widget creates fresh instance each time — no stale user_id issue with embed approach (document as resolved)
+
+**QA Tasks:**
+- [ ] Test: simulate Supabase query failure → verify error message shown (not empty state)
+- [ ] Test: create/edit a genre → verify genre list refreshes immediately
+- [ ] Test: opening Eve widget with different user profiles uses correct user context
+
+---
+
 ### Sprint 0 Completion Criteria
 - [ ] All 31 existing unit tests pass
 - [ ] 1 new E2E test passes (login page)
@@ -430,7 +445,7 @@ Before any sprint work begins, the following testing infrastructure must be in p
 - [ ] **Art tab:** placeholder for now (image gallery in Sprint 4)
 - [ ] **Research tab:** research reports filtered by this project's genre
 - [ ] **Cost tab:** placeholder for now (token tracking in Sprint 5)
-- [ ] **Export tab:** existing ExportDialog integrated as a tab
+- [ ] **Export tab:** existing ExportDialog integrated as a tab, add explanatory text: which chapters are included (all with status approved/published, ordered Prologue→Ch1-N→Epilogue), word count total, chapter count
 
 **QA Tasks:**
 - [ ] Test: all tabs render without errors
@@ -460,6 +475,27 @@ Before any sprint work begins, the following testing infrastructure must be in p
 
 ---
 
+#### S2-5: Add pagination to all list pages
+**Points:** 5 | **Priority:** P1 | **Arch Ref:** Task 47
+
+**Developer Tasks:**
+- [ ] Create reusable `Pagination.tsx` component (page numbers, prev/next, page size selector)
+- [ ] Add pagination to Content Library (default 25 per page)
+- [ ] Add pagination to ProjectList
+- [ ] Add pagination to ResearchList
+- [ ] Add pagination to GenreList (public genres may grow large)
+- [ ] Use Supabase `.range(from, to)` for server-side pagination
+- [ ] Show total count and current range ("Showing 1-25 of 142")
+
+**QA Tasks:**
+- [ ] Test: pagination controls appear when items exceed page size
+- [ ] Test: clicking next/prev loads correct page
+- [ ] Test: page size selector changes number of items
+- [ ] Test: pagination persists when navigating away and returning
+- [ ] Test: no pagination controls when items fit on one page
+
+---
+
 ### Sprint 2 Completion Criteria
 - [ ] Sidebar restructured with project-centric navigation
 - [ ] Content Library replaces 4 separate pages
@@ -467,6 +503,7 @@ Before any sprint work begins, the following testing infrastructure must be in p
 - [ ] Search works across all content types
 - [ ] Breadcrumb shows titles instead of UUIDs
 - [ ] Mobile sidebar auto-collapses
+- [ ] Pagination working on all list pages
 - [ ] All E2E tests pass
 
 ---
@@ -714,17 +751,22 @@ Before any sprint work begins, the following testing infrastructure must be in p
 
 ---
 
-#### S4-6: Add content creation forms
-**Points:** 2 | **Priority:** P1 | **Arch Ref:** Part 5.1
+#### S4-6: Add content creation forms including project creation
+**Points:** 5 | **Priority:** P1 | **Arch Ref:** Part 5.1 | **Audit Ref:** 5.3
 
 **Developer Tasks:**
 - [ ] Add "Create" button to TopBar or sidebar
-- [ ] Dropdown menu: New Blog Post, New Research, Generate Cover Art
-- [ ] Each option opens a simple form that POSTs to n8n webhook via chat proxy
-- [ ] Show "Request submitted" confirmation
+- [ ] Dropdown menu: New Project (Brainstorm), New Blog Post, New Research, Generate Cover Art
+- [ ] **New Project wizard:** title, genre (dropdown), chapter count, story arc (dropdown with discovery question display), premise (textarea) → POSTs brainstorm_story command to n8n webhook
+- [ ] New Blog Post form: topic, genre, keywords, target length → POSTs write_blog_post command
+- [ ] New Research form: topic, genre → POSTs deep_research command
+- [ ] Generate Cover Art form: description, genre, content type → POSTs generate_cover_art command
+- [ ] Each form POSTs via chat proxy with structured parameters
+- [ ] Show "Request submitted — you'll receive an email when complete" confirmation
 
 **QA Tasks:**
-- [ ] Test: create menu opens with correct options
+- [ ] Test: create menu opens with all options
+- [ ] Test: New Project wizard collects all required fields
 - [ ] Test: submitting form sends correct payload to webhook
 - [ ] Test: confirmation shown after submission
 
@@ -1128,21 +1170,21 @@ Before any sprint work begins, the following testing infrastructure must be in p
 
 ## Summary
 
-| Sprint | Focus | Points | Duration |
-|--------|-------|--------|----------|
-| 0 | Testing Infrastructure & Security | 34 | 2 weeks |
-| 1 | Data Integrity & Core CRUD | 34 | 2 weeks |
-| 2 | UI Restructure & Navigation | 34 | 2 weeks |
-| 3 | CRUD Completeness & Data Management | 34 | 2 weeks |
-| 4 | Image & Social Media Management | 34 | 2 weeks |
-| 5 | Observability & Advanced Features | 34 | 2 weeks |
-| 6 | Admin, Settings & Polish | 34 | 2 weeks |
-| 7 | Testing, Documentation & Deployment | 28 | 2 weeks |
-| **Total** | | **266 points** | **16 weeks** |
+| Sprint | Focus | Stories | Points | Duration |
+|--------|-------|---------|--------|----------|
+| 0 | Testing Infrastructure & Security | 9 | 37 | 2 weeks |
+| 1 | Data Integrity & Core CRUD | 7 | 34 | 2 weeks |
+| 2 | UI Restructure & Navigation | 5 | 39 | 2 weeks |
+| 3 | CRUD Completeness & Data Management | 7 | 34 | 2 weeks |
+| 4 | Image & Social Media Management | 6 | 37 | 2 weeks |
+| 5 | Observability & Advanced Features | 6 | 34 | 2 weeks |
+| 6 | Admin, Settings & Polish | 7 | 34 | 2 weeks |
+| 7 | Testing, Documentation & Deployment | 5 | 28 | 2 weeks |
+| **Total** | | **52 stories** | **277 points** | **16 weeks** |
 
 ### Velocity Assumption
 - 1 developer agent + 1 QA agent
-- 34 points per sprint (sustainable pace)
+- ~35 points per sprint (sustainable pace)
 - 2-week sprints
 - 8 sprints = 16 weeks to completion
 
@@ -1152,9 +1194,20 @@ Before any sprint work begins, the following testing infrastructure must be in p
 - Supabase RLS changes require careful migration to avoid breaking n8n service role access
 - KIE.AI image persistence requires workflow deployment coordination
 
+### Deferred to Post-Launch (explicitly out of scope)
+- Collaborative editing / multi-user shared projects (Audit 5.6) — requires significant architecture change
+- Real-time collaborative cursors — not needed for initial SaaS launch
+
+### Coverage Verification
+All items from the following sources are accounted for in this sprint plan:
+- AUDIT_REPORT.md: 127 deficiencies — **100% covered** (63 explicit items + consolidated categories)
+- ARCHITECTURE_REVIEW_V2.md: 75 tasks — **100% covered** (Task 20 marked done, all others assigned)
+- Conversation items: 9 items — **100% covered** (2 architectural decisions documented, 7 in sprints)
+- Collaborative features (Audit 5.6) — **explicitly deferred** to post-launch
+
 ### Definition of "Done" for Product
-- [ ] All 75 task list items completed
-- [ ] All unit tests passing (80%+ coverage)
+- [ ] All 52 stories completed and QA-verified
+- [ ] All unit tests passing (80%+ coverage on new code)
 - [ ] All E2E tests passing on Chromium and Firefox
 - [ ] All 12 acceptance criteria from design spec marked PASS
 - [ ] Security audit re-run with zero CRITICAL findings
