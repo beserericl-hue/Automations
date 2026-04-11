@@ -36,6 +36,7 @@ function EveSession({ agentId, userId, onEnd }: { agentId: string; userId: strin
       conversation.startSession({
         agentId,
         userId,
+        connectionType: 'websocket',
         dynamicVariables: {
           system__caller_id: userId,
         },
