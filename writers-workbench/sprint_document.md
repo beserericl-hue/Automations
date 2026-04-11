@@ -751,24 +751,36 @@ Before any sprint work begins, the following testing infrastructure must be in p
 
 ---
 
-#### S4-6: Add content creation forms including project creation
-**Points:** 5 | **Priority:** P1 | **Arch Ref:** Part 5.1 | **Audit Ref:** 5.3
+#### S4-6: Enhance chat drawer as primary creation interface
+**Points:** 5 | **Priority:** P0 | **Audit Ref:** 5.3 | **Design Principle: all content creation via chat/voice**
+
+**Rationale:** Content creation (new projects, blog posts, chapters, research, cover art, social posts) is done through the chat or Eve voice interface — NOT through UI forms. The chat drawer is the primary creation tool and must be polished accordingly.
 
 **Developer Tasks:**
-- [ ] Add "Create" button to TopBar or sidebar
-- [ ] Dropdown menu: New Project (Brainstorm), New Blog Post, New Research, Generate Cover Art
-- [ ] **New Project wizard:** title, genre (dropdown), chapter count, story arc (dropdown with discovery question display), premise (textarea) → POSTs brainstorm_story command to n8n webhook
-- [ ] New Blog Post form: topic, genre, keywords, target length → POSTs write_blog_post command
-- [ ] New Research form: topic, genre → POSTs deep_research command
-- [ ] Generate Cover Art form: description, genre, content type → POSTs generate_cover_art command
-- [ ] Each form POSTs via chat proxy with structured parameters
-- [ ] Show "Request submitted — you'll receive an email when complete" confirmation
+- [ ] Make chat drawer wider (480px) with resizable drag handle
+- [ ] Add persistent chat history (store in `localStorage`, restore on reopen)
+- [ ] Add message timestamps display
+- [ ] Limit chat history to 100 messages (trim oldest)
+- [ ] Add "Quick Commands" helper panel — shows common commands users can click to pre-fill:
+  - "Brainstorm a book called..."
+  - "Write chapter X of [project]..."
+  - "Research [topic]..."
+  - "Generate cover art for..."
+  - "List my projects"
+  - "Approve [title]"
+- [ ] Add context-aware suggestions: if user is viewing a project, show "Write next chapter of [project name]" as a quick command
+- [ ] Add typing indicator for async responses
+- [ ] Add "Command sent — results will appear in your content library" confirmation for async operations
+- [ ] Add link in empty state: "Start by telling the AI what you'd like to create" with example commands
 
 **QA Tasks:**
-- [ ] Test: create menu opens with all options
-- [ ] Test: New Project wizard collects all required fields
-- [ ] Test: submitting form sends correct payload to webhook
-- [ ] Test: confirmation shown after submission
+- [ ] Test: chat drawer opens at correct width
+- [ ] Test: chat history persists across drawer close/reopen
+- [ ] Test: quick commands pre-fill the input field correctly
+- [ ] Test: context-aware commands reference the current project name
+- [ ] Test: async operations show appropriate confirmation
+- [ ] Test: chat handles both sync (list) and async (write) responses correctly
+- [ ] E2E: send "list my projects" via chat → verify response displays project list
 
 ---
 
@@ -778,6 +790,7 @@ Before any sprint work begins, the following testing infrastructure must be in p
 - [ ] Social Media management showing posts by platform
 - [ ] n8n workflows updated to save images and social posts
 - [ ] Content detail shows cover image
+- [ ] Chat drawer polished as primary creation interface with quick commands
 - [ ] All E2E tests pass
 
 ---
@@ -996,7 +1009,7 @@ Before any sprint work begins, the following testing infrastructure must be in p
 - [ ] Create `Skeleton.tsx` component (pulsing gray rectangles)
 - [ ] Replace "Loading..." text with skeletons in: Dashboard, ContentList, ProjectList, ResearchList
 - [ ] Add empty state illustrations with call-to-action buttons
-- [ ] Empty states should guide user to create content via chat
+- [ ] Empty states should guide user to create content via chat (e.g., "No projects yet. Open the chat and tell Eve what you'd like to write." with button to open chat drawer)
 
 **QA Tasks:**
 - [ ] Test: skeleton appears during data loading
