@@ -13,7 +13,6 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@elevenlabs/react": "^1.1.0",
     "@supabase/supabase-js": "^2.49.4",
     "@tanstack/react-query": "^5.75.5",
     "@tiptap/extension-character-count": "^3.22.3",
