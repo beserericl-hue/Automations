@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -37,10 +37,16 @@ export default function UserSettings() {
 
   const [recipientEmail, setRecipientEmail] = useState('');
   const [bccEmail, setBccEmail] = useState('');
+  const [configLoaded, setConfigLoaded] = useState(false);
 
-  // Initialize from config when loaded
-  if (config && !recipientEmail && config.recipient_email) setRecipientEmail(config.recipient_email);
-  if (config && !bccEmail && config.bcc_email !== undefined) setBccEmail(config.bcc_email);
+  // Initialize email fields from config ONCE when config loads
+  useEffect(() => {
+    if (config && !configLoaded) {
+      setRecipientEmail(config.recipient_email || '');
+      setBccEmail(config.bcc_email || '');
+      setConfigLoaded(true);
+    }
+  }, [config, configLoaded]);
 
   const saveProfile = async () => {
     setSaving(true);

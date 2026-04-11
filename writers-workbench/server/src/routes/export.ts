@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx';
-import { supabaseAdmin } from '../services/supabase-admin.js';
+import { getSupabaseAdmin } from '../services/supabase-admin.js';
 
 export const exportRouter = Router();
 
@@ -34,7 +34,7 @@ exportRouter.post('/docx', async (req, res) => {
     }
 
     // Fetch project
-    const { data: project, error: projError } = await supabaseAdmin
+    const { data: project, error: projError } = await getSupabaseAdmin()
       .from('writing_projects_v2')
       .select('title, genre_slug, outline')
       .eq('id', project_id)
@@ -47,7 +47,7 @@ exportRouter.post('/docx', async (req, res) => {
     }
 
     // Fetch all chapters ordered
-    const { data: chapters, error: chapError } = await supabaseAdmin
+    const { data: chapters, error: chapError } = await getSupabaseAdmin()
       .from('published_content_v2')
       .select('title, chapter_number, content_text')
       .eq('project_id', project_id)
