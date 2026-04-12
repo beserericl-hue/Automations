@@ -4,6 +4,8 @@ import { useCallback, useState, useMemo } from 'react';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
 import RichTextEditor from '../editor/RichTextEditor';
+import ConfirmDialog from '../shared/ConfirmDialog';
+import VersionHistory from './VersionHistory';
 import { contentToHtml } from '../../lib/content-utils';
 import type { PublishedContent } from '../../types/database';
 
@@ -14,6 +16,9 @@ export default function ContentDetail() {
   const { profile } = useUser();
   const userId = profile?.user_id;
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [versionCount, setVersionCount] = useState(0);
+  const [pendingStatus, setPendingStatus] = useState<string | null>(null);
 
   const { data: item, isLoading, isError, error } = useQuery({
     queryKey: ['content-detail', id],
@@ -23,6 +28,7 @@ export default function ContentDetail() {
         .select('*')
         .eq('id', id!)
         .eq('user_id', userId!)
+        .is('deleted_at', null)
         .single();
       if (error) throw error;
       return data as PublishedContent;
@@ -98,6 +104,34 @@ export default function ContentDetail() {
     },
   });
 
+  // Soft delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('published_content_v2')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', id!)
+        .eq('user_id', userId!);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['content-list'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-recent'] });
+      navigate(-1);
+    },
+  });
+
+  const handleDeleteClick = async () => {
+    // Get cascade count (content versions)
+    const { count } = await supabase
+      .from('content_versions_v2')
+      .select('id', { count: 'exact', head: true })
+      .eq('content_id', id!);
+    setVersionCount(count ?? 0);
+    setShowDeleteConfirm(true);
+  };
+
   const handleSave = useCallback((html: string) => {
     saveMutation.mutate(html);
   }, [saveMutation]);
@@ -154,23 +188,69 @@ export default function ContentDetail() {
           {statusActions.map((action) => (
             <button
               key={action.status}
-              onClick={() => statusMutation.mutate(action.status)}
+              onClick={() => {
+                if (action.needsConfirm) {
+                  setPendingStatus(action.status);
+                } else {
+                  statusMutation.mutate(action.status);
+                }
+              }}
               disabled={statusMutation.isPending}
               className={`rounded-lg px-3 py-1.5 text-xs font-medium ${action.className}`}
             >
               {action.label}
             </button>
           ))}
+
+          <button
+            onClick={handleDeleteClick}
+            className="rounded-lg px-3 py-1.5 text-xs font-medium border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950"
+          >
+            Delete
+          </button>
         </div>
       </div>
 
-      {/* Editor */}
-      <div className="flex-1 min-h-0">
-        <RichTextEditor
-          content={editorContent}
-          onChange={handleSave}
+      {/* Editor + Version History */}
+      <div className="flex flex-1 min-h-0 gap-4">
+        <div className="flex-1 min-w-0">
+          <RichTextEditor
+            content={editorContent}
+            onChange={handleSave}
+          />
+        </div>
+        <VersionHistory
+          contentId={id!}
+          onRestore={() => {
+            queryClient.invalidateQueries({ queryKey: ['content-detail', id] });
+          }}
         />
       </div>
+
+      <ConfirmDialog
+        open={!!pendingStatus}
+        onClose={() => setPendingStatus(null)}
+        onConfirm={() => {
+          if (pendingStatus) statusMutation.mutate(pendingStatus);
+          setPendingStatus(null);
+        }}
+        title="Change Status"
+        message={`Are you sure you want to ${pendingStatus === 'rejected' ? 'reject' : pendingStatus === 'approved' ? 'unpublish' : 'unschedule'} "${item.title}"?`}
+        confirmLabel="Confirm"
+        variant="warning"
+      />
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={() => deleteMutation.mutate()}
+        title="Delete Content"
+        message={`Are you sure you want to delete "${item.title}"?`}
+        cascadeInfo={versionCount > 0 ? [`${versionCount} version history entries will be deleted`] : undefined}
+        confirmLabel="Delete"
+        variant="danger"
+        loading={deleteMutation.isPending}
+      />
     </div>
   );
 }
@@ -195,6 +275,7 @@ interface StatusAction {
   label: string;
   status: string;
   className: string;
+  needsConfirm?: boolean;
 }
 
 function getStatusActions(currentStatus: string): StatusAction[] {
@@ -202,7 +283,7 @@ function getStatusActions(currentStatus: string): StatusAction[] {
     case 'draft':
       return [
         { label: 'Approve', status: 'approved', className: 'bg-blue-600 text-white hover:bg-blue-700' },
-        { label: 'Reject', status: 'rejected', className: 'border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400' },
+        { label: 'Reject', status: 'rejected', className: 'border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400', needsConfirm: true },
       ];
     case 'approved':
       return [
@@ -211,7 +292,7 @@ function getStatusActions(currentStatus: string): StatusAction[] {
       ];
     case 'published':
       return [
-        { label: 'Unpublish', status: 'approved', className: 'border border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400' },
+        { label: 'Unpublish', status: 'approved', className: 'border border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400', needsConfirm: true },
       ];
     case 'rejected':
       return [
@@ -219,7 +300,7 @@ function getStatusActions(currentStatus: string): StatusAction[] {
       ];
     case 'scheduled':
       return [
-        { label: 'Unschedule', status: 'draft', className: 'border border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400' },
+        { label: 'Unschedule', status: 'draft', className: 'border border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400', needsConfirm: true },
         { label: 'Publish Now', status: 'published', className: 'bg-green-600 text-white hover:bg-green-700' },
       ];
     default:

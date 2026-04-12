@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
+import ConfirmDialog from '../shared/ConfirmDialog';
 import type { StoryBibleEntry, WritingProject } from '../../types/database';
 
 const ENTRY_TYPES = ['character', 'location', 'event', 'timeline', 'plot_thread', 'world_rule'] as const;
@@ -27,8 +29,10 @@ const typeIcons: Record<string, string> = {
 export default function StoryBiblePanel() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { profile } = useUser();
   const userId = profile?.user_id;
+  const [deletingEntry, setDeletingEntry] = useState<StoryBibleEntry | null>(null);
 
   const { data: project } = useQuery({
     queryKey: ['project-detail', id],
@@ -53,6 +57,7 @@ export default function StoryBiblePanel() {
         .select('*')
         .eq('project_id', id!)
         .eq('user_id', userId!)
+        .is('deleted_at', null)
         .order('entry_type')
         .order('name');
       if (error) throw error;
@@ -66,6 +71,21 @@ export default function StoryBiblePanel() {
     acc[type] = entries?.filter(e => e.entry_type === type) || [];
     return acc;
   }, {} as Record<string, StoryBibleEntry[]>);
+
+  const deleteMutation = useMutation({
+    mutationFn: async (entryId: string) => {
+      const { error } = await supabase
+        .from('story_bible_v2')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', entryId)
+        .eq('user_id', userId!);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['story-bible', id] });
+      setDeletingEntry(null);
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -101,16 +121,24 @@ export default function StoryBiblePanel() {
                 <div className="divide-y divide-gray-100 dark:divide-gray-800">
                   {typeEntries.map(entry => (
                     <div key={entry.id} className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{entry.name}</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">{entry.name}</span>
                         {entry.chapter_introduced != null && (
-                          <span className="text-xs text-gray-400">
-                            Introduced Ch. {entry.chapter_introduced}
-                            {entry.last_chapter_seen != null && entry.last_chapter_seen !== entry.chapter_introduced
-                              ? ` \u2013 Last seen Ch. ${entry.last_chapter_seen}`
-                              : ''}
-                          </span>
-                        )}
+                            <span className="text-xs text-gray-400">
+                              Introduced Ch. {entry.chapter_introduced}
+                              {entry.last_chapter_seen != null && entry.last_chapter_seen !== entry.chapter_introduced
+                                ? ` \u2013 Last seen Ch. ${entry.last_chapter_seen}`
+                                : ''}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => setDeletingEntry(entry)}
+                          className="text-xs text-red-500 hover:text-red-600 shrink-0"
+                        >
+                          Delete
+                        </button>
                       </div>
                       <p className="mt-1 text-xs text-gray-500 leading-relaxed">{entry.description}</p>
                       {entry.metadata && Object.keys(entry.metadata).length > 0 && (
@@ -130,6 +158,17 @@ export default function StoryBiblePanel() {
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!deletingEntry}
+        onClose={() => setDeletingEntry(null)}
+        onConfirm={() => { if (deletingEntry) deleteMutation.mutate(deletingEntry.id); }}
+        title="Delete Story Bible Entry"
+        message={`Are you sure you want to delete "${deletingEntry?.name}"?`}
+        confirmLabel="Delete"
+        variant="danger"
+        loading={deleteMutation.isPending}
+      />
     </div>
   );
 }

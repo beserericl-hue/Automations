@@ -36,4 +36,4 @@ export function renderWithProviders(
 }
 
 export { render } from '@testing-library/react';
-export { screen, waitFor, within } from '@testing-library/react';
+export { screen, waitFor, within, fireEvent } from '@testing-library/react';

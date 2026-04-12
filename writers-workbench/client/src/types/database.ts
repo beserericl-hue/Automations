@@ -54,6 +54,7 @@ export interface WritingProject {
   draft_path: string | null;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
 }
 
 export interface ProjectOutline {
@@ -99,6 +100,7 @@ export interface StoryBibleEntry {
   last_chapter_seen: number | null;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
 }
 
 export interface PublishedContent {
@@ -117,6 +119,7 @@ export interface PublishedContent {
   created_at: string;
   updated_at: string;
   published_at: string | null;
+  deleted_at: string | null;
 }
 
 export interface ContentVersion {
@@ -149,6 +152,7 @@ export interface ResearchReport {
   status: string;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
 }
 
 export interface AppConfig {
@@ -158,6 +162,19 @@ export interface AppConfig {
   value: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface TokenUsage {
+  id: string;
+  user_id: string;
+  workflow_name: string;
+  model: string | null;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  cost_usd: number;
+  metadata: Record<string, unknown>;
+  created_at: string;
 }
 
 export interface ContentIndex {

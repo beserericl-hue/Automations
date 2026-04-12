@@ -3,6 +3,8 @@ import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { UNSAFE_DataRouterContext } from 'react-router-dom';
+import { useContext } from 'react';
 import EditorToolbar from './EditorToolbar';
 
 interface RichTextEditorProps {
@@ -15,6 +17,7 @@ interface RichTextEditorProps {
 export default function RichTextEditor({ content, onChange, editable = true, placeholder = 'Start writing...' }: RichTextEditorProps) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [wordCount, setWordCount] = useState(0);
+  const [isDirty, setIsDirty] = useState(false);
 
   const editor = useEditor({
     extensions: [
@@ -35,11 +38,13 @@ export default function RichTextEditor({ content, onChange, editable = true, pla
       setWordCount(text.split(/\s+/).filter(Boolean).length);
     },
     onUpdate: ({ editor }) => {
+      setIsDirty(true);
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         const text = editor.getText();
         setWordCount(text.split(/\s+/).filter(Boolean).length);
         onChange(editor.getHTML());
+        setIsDirty(false);
       }, 2000);
     },
     editorProps: {
@@ -57,8 +62,39 @@ export default function RichTextEditor({ content, onChange, editable = true, pla
       editor.commands.setContent(content, { emitUpdate: false });
       const text = editor.getText();
       setWordCount(text.split(/\s+/).filter(Boolean).length);
+      setIsDirty(false);
     }
   }, [content, editor]);
+
+  // Warn on browser tab close with unsaved changes
+  useEffect(() => {
+    if (!isDirty) return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
+
+  // Warn on in-app navigation with unsaved changes
+  // useBlocker requires a data router — fall back to beforeunload-only if unavailable
+  const dataRouterContext = useContext(UNSAFE_DataRouterContext);
+  useEffect(() => {
+    if (!isDirty || !dataRouterContext) return;
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const anchor = target.closest('a[href]');
+      if (anchor && isDirty) {
+        const leave = window.confirm('You have unsaved changes. Are you sure you want to leave?');
+        if (!leave) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }
+    };
+    document.addEventListener('click', handleClick, true);
+    return () => document.removeEventListener('click', handleClick, true);
+  }, [isDirty, dataRouterContext]);
 
   // Flush pending save on unmount
   useEffect(() => {
@@ -74,6 +110,7 @@ export default function RichTextEditor({ content, onChange, editable = true, pla
     }
     if (editor) {
       onChange(editor.getHTML());
+      setIsDirty(false);
     }
   }, [editor, onChange]);
 

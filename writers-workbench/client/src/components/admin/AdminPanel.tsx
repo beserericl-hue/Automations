@@ -141,8 +141,8 @@ function SystemMetrics() {
     queryFn: async () => {
       const [usersRes, contentRes, projectsRes] = await Promise.all([
         supabase.from('users_v2').select('id', { count: 'exact', head: true }),
-        supabase.from('published_content_v2').select('id', { count: 'exact', head: true }),
-        supabase.from('writing_projects_v2').select('id', { count: 'exact', head: true }),
+        supabase.from('published_content_v2').select('id', { count: 'exact', head: true }).is('deleted_at', null),
+        supabase.from('writing_projects_v2').select('id', { count: 'exact', head: true }).is('deleted_at', null),
       ]);
       return {
         totalUsers: usersRes.count ?? 0,

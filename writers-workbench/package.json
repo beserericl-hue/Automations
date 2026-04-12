@@ -19,10 +19,14 @@
     "typecheck": "npm -w client run typecheck && npm -w server run typecheck"
   },
   "devDependencies": {
+    "@types/diff": "^7.0.2",
     "concurrently": "^9.1.2"
   },
   "engines": {
     "node": ">=20.0.0",
     "npm": ">=9.0.0"
+  },
+  "dependencies": {
+    "diff": "^8.0.4"
   }
 }

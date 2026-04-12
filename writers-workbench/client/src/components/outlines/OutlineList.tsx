@@ -16,6 +16,7 @@ export default function OutlineList() {
         .select('*')
         .eq('user_id', userId!)
         .not('outline', 'is', null)
+        .is('deleted_at', null)
         .order('updated_at', { ascending: false });
       if (error) throw error;
       // Filter out empty outlines ({})

@@ -7,51 +7,47 @@ afterEach(() => {
 });
 
 // Mock Supabase client — prevents real API calls during tests
+// Uses a recursive proxy-based chain builder so any .method().method() chain resolves
 vi.mock('../config/supabase', () => {
-  const mockFrom = () => ({
-    select: () => ({
-      eq: () => ({
-        eq: () => ({
-          single: () => Promise.resolve({ data: null, error: null }),
-          maybeSingle: () => Promise.resolve({ data: null, error: null }),
-          order: () => ({
-            limit: () => Promise.resolve({ data: [], error: null }),
-          }),
-          limit: () => Promise.resolve({ data: [], error: null }),
-        }),
-        or: () => ({
-          order: () => Promise.resolve({ data: [], error: null }),
-        }),
-        order: () => ({
-          limit: () => Promise.resolve({ data: [], error: null }),
-        }),
-        not: () => ({
-          order: () => Promise.resolve({ data: [], error: null }),
-        }),
-        in: () => Promise.resolve({ data: [], error: null }),
-        maybeSingle: () => Promise.resolve({ data: null, error: null }),
-      }),
-      or: () => ({
-        order: () => Promise.resolve({ data: [], error: null }),
-      }),
-    }),
-    insert: () => Promise.resolve({ data: null, error: null }),
-    update: () => ({
-      eq: () => ({
-        eq: () => Promise.resolve({ data: null, error: null }),
-      }),
-    }),
-    upsert: () => Promise.resolve({ data: null, error: null }),
-    delete: () => ({
-      eq: () => ({
-        eq: () => Promise.resolve({ data: null, error: null }),
-      }),
-    }),
-  });
+  const emptyResult = { data: [], error: null, count: 0 };
+  const nullResult = { data: null, error: null };
+
+  // Builds a chainable object: any method call returns the same chainable,
+  // and .then() resolves to the default result (making it thenable/awaitable)
+  const buildChain = (result: unknown = emptyResult): Record<string, unknown> => {
+    const chain: Record<string, unknown> = {};
+    const handler = (..._args: unknown[]) => buildChain(result);
+
+    // All Supabase query builder methods
+    const methods = [
+      'select', 'eq', 'neq', 'gt', 'gte', 'lt', 'lte',
+      'like', 'ilike', 'is', 'in', 'not',
+      'or', 'and', 'filter', 'match',
+      'order', 'limit', 'range', 'offset',
+      'single', 'maybeSingle',
+      'insert', 'update', 'upsert', 'delete',
+      'contains', 'containedBy', 'overlaps',
+      'textSearch',
+    ];
+
+    for (const method of methods) {
+      chain[method] = handler;
+    }
+
+    // single/maybeSingle resolve to {data: null} not {data: []}
+    chain.single = (..._args: unknown[]) => buildChain(nullResult);
+    chain.maybeSingle = (..._args: unknown[]) => buildChain(nullResult);
+
+    // Make the chain thenable (awaitable)
+    chain.then = (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve(result).then(resolve, reject);
+
+    return chain;
+  };
 
   return {
     supabase: {
-      from: mockFrom,
+      from: () => buildChain(),
       auth: {
         getSession: () => Promise.resolve({ data: { session: null } }),
         onAuthStateChange: () => ({ data: { subscription: { unsubscribe: vi.fn() } } }),

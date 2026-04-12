@@ -27,6 +27,7 @@ export default function ContentList({ contentType, title }: ContentListProps) {
         .select('*')
         .eq('user_id', userId!)
         .eq('content_type', contentType)
+        .is('deleted_at', null)
         .order(sortField, { ascending: sortAsc });
 
       if (statusFilter !== 'all') {
