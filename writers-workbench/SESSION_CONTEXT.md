@@ -287,6 +287,7 @@ Vite proxies `/api/*` to `localhost:3001` during dev.
 7. **Run `npm run test` before every commit** — all 31 tests must pass
 8. **Sprint execution: don't ask, just start.** When beginning a sprint, select the optimal implementation order based on dependencies and begin coding immediately. Do not ask the user to confirm the order.
 9. **Sprint completion: update this document.** At the end of each sprint, append a sprint status section below documenting: stories completed, QA test results, any open issues, and what the next agent should pick up. This ensures continuity across sessions.
+10. **E2E tests must cover every screen element.** Every sprint must include authenticated E2E tests that exercise every page, button, dialog, link, tab, dropdown, and data display. Test for `[object Object]` on every page. Test error states render human-readable messages. Shallow redirect-only tests are insufficient. See `e2e/authenticated.spec.ts` for the pattern. Set `E2E_TEST_EMAIL` and `E2E_TEST_PASSWORD` in `.env` for authenticated tests.
 
 ---
 

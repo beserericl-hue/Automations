@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useUser } from '../../contexts/UserContext';
+import { supabase } from '../../config/supabase';
 
 const PAGE_SIZES = [
   { value: '5x8', label: '5 x 8 in', note: 'Compact fiction' },
@@ -29,7 +29,6 @@ interface ExportDialogProps {
 }
 
 export default function ExportDialog({ projectId, projectTitle, open, onClose }: ExportDialogProps) {
-  const { profile } = useUser();
   const [pageSize, setPageSize] = useState('6x9');
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
@@ -40,19 +39,29 @@ export default function ExportDialog({ projectId, projectTitle, open, onClose }:
     setExporting(true);
     setError('');
     try {
+      // Get the current session JWT for authenticated request
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
       const response = await fetch('/api/export/docx', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           project_id: projectId,
           page_size: pageSize,
-          user_id: profile?.user_id,
         }),
       });
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'Export failed');
+        // data.error may be a string or an object { code, message }
+        const errMsg = typeof data.error === 'string'
+          ? data.error
+          : data.error?.message || data.message || 'Export failed';
+        throw new Error(errMsg);
       }
 
       const blob = await response.blob();

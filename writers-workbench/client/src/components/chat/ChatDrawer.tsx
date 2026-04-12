@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useUser } from '../../contexts/UserContext';
+import { supabase } from '../../config/supabase';
 import { N8N_WEBHOOK_URL } from '../../config/constants';
 
 interface Message {
@@ -55,9 +56,14 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
         });
       } catch {
         // CORS likely blocked — use proxy
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
         response = await fetch('/api/chat/proxy', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify({
             user_message_request: text,
             user_id: profile?.user_id || '',
