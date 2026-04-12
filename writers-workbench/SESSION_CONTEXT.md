@@ -285,3 +285,94 @@ Vite proxies `/api/*` to `localhost:3001` during dev.
 5. **Never use single quotes inside `$fromAI()` descriptions** (n8n bug)
 6. **Content creation is via chat/Eve only** — no UI creation forms
 7. **Run `npm run test` before every commit** — all 31 tests must pass
+8. **Sprint execution: don't ask, just start.** When beginning a sprint, select the optimal implementation order based on dependencies and begin coding immediately. Do not ask the user to confirm the order.
+9. **Sprint completion: update this document.** At the end of each sprint, append a sprint status section below documenting: stories completed, QA test results, any open issues, and what the next agent should pick up. This ensures continuity across sessions.
+
+---
+
+## Sprint Status Log
+
+### Sprint 0 — Testing Infrastructure & Security Foundation
+**Status:** COMPLETE (committed: `9cbe005`)
+**Date:** 2026-04-11
+
+All 9 stories delivered (34 points). Playwright installed, JWT auth middleware, CORS/helmet/rate-limiting, admin role column, zod validation, DOMPurify, test infrastructure.
+
+---
+
+### Sprint 1 — Data Integrity & Delete Operations
+**Status:** COMPLETE (in working tree, uncommitted)
+**Date:** 2026-04-11
+
+All 7 stories delivered (34 points):
+- S1-1: FK cascades fixed (SET NULL), soft delete columns added, discovery_question column added. Migration: `migrations/002_sprint1_data_integrity.sql`
+- S1-2: Content delete with soft delete + cascade info in ConfirmDialog
+- S1-3: Project delete with cascade impact display + TrashView with restore
+- S1-4: Research report and story bible delete operations
+- S1-5: VersionHistory.tsx — list/view/compare/restore modes with diff visualization
+- S1-6: Reusable ConfirmDialog.tsx (danger/warning/default variants, keyboard support)
+- S1-7: Unsaved changes warning (beforeunload + React Router useBlocker)
+
+QA: `sprint1-qa.test.ts` exists. All soft delete queries filter `.is('deleted_at', null)`. Indexes created for `deleted_at` columns.
+
+---
+
+### Sprint 2 — UI Restructure & Navigation
+**Status:** COMPLETE (in working tree, uncommitted)
+**Date:** 2026-04-11
+
+All 5 stories delivered (34 points):
+- S2-1: Sidebar restructured — project-centric with expandable "My Projects" (live Supabase query, project count badge, status dots), "Content Library" link, collapsible "Reference" section (Genres, Story Arcs, Research). Removed 8 old flat nav items (Chapters, Short Stories, Blog Posts, Newsletters, Social Posts, Cover Art, Outlines, Story Bible). Collapsed (icon-only) mode preserved.
+- S2-2: Content Library (`ContentLibrary.tsx`) — consolidated view replacing 4 content type pages. Filter bar: type, status, genre, project. Sortable columns. Bulk selection with checkboxes. Bulk actions: approve, publish, delete. URL param `?type=` for deep-linking. Legacy routes (`/chapters`, `/short-stories`, `/blog-posts`, `/newsletters`) redirect to `/library?type=X`.
+- S2-3: Project Workspace tabs in `ProjectDetail.tsx` — 8 tabs: Overview (progress bar, word count, character cards, premise/themes), Outline (chapter list with sub-chapter outlines), Chapters (table with word counts, status badges, prev/next navigation), Story Bible (grouped by entry type), Art (placeholder), Research (filtered by project genre), Cost (placeholder), Export (exportable chapter count, word count, page size selector). Tab state persisted via URL `?tab=` param.
+- S2-4: Breadcrumb resolves entity titles from Supabase (content and project UUIDs show actual titles). Global search bar in TopBar with Cmd/Ctrl+K shortcut — searches across projects, content, research with type icons and click-to-navigate. Mobile sidebar auto-collapses below `lg` breakpoint via `matchMedia` listener.
+- S2-5: Reusable `Pagination.tsx` component with page numbers, ellipsis for large page counts, prev/next buttons, page size selector. Applied to: Content Library (default 25/page), ProjectList, ResearchList, GenreList (public genres section).
+
+**Files created:**
+- `client/src/components/content/ContentLibrary.tsx` (lazy-loaded via `React.lazy`)
+- `client/src/components/shared/Pagination.tsx`
+- `client/src/test/sprint2-qa.test.ts` (7 unit tests)
+- `e2e/sprint2-navigation.spec.ts` (13 E2E tests)
+
+**Files modified:**
+- `client/src/App.tsx` — added `/library` route, legacy redirects, removed `Placeholder` component, added `Suspense` wrapper
+- `client/src/components/layout/Sidebar.tsx` — complete rewrite with project-centric sections
+- `client/src/components/layout/TopBar.tsx` — breadcrumb title resolution, global search, Cmd+K shortcut
+- `client/src/components/layout/AppShell.tsx` — mobile-responsive sidebar default
+- `client/src/components/projects/ProjectDetail.tsx` — complete rewrite as tabbed workspace
+- `client/src/components/projects/ProjectList.tsx` — pagination added
+- `client/src/components/research/ResearchList.tsx` — pagination added
+- `client/src/components/genres/GenreList.tsx` — pagination added
+- `client/src/hooks/useDashboardData.ts` — updated content type paths to `/library?type=X`
+
+**QA Results (final run 2026-04-12):**
+
+| Suite | Tests | Status |
+|-------|-------|--------|
+| Client unit tests (`npm run test --workspace=client`) | 80 (21 files) | All passing |
+| Server unit tests (`npm run test --workspace=server`) | 46 (6 files) | All passing |
+| E2E Chromium (`npx playwright test --project=chromium`) | 18 | All passing |
+| E2E Firefox (`npx playwright test --project=firefox`) | 18 | All passing |
+| TypeScript (`npx tsc -p client/tsconfig.json --noEmit`) | — | 0 errors |
+| Production build (`npm run build`) | — | Succeeds |
+| **Total** | **162** | **All passing** |
+
+Sprint 2 unit tests (`client/src/test/sprint2-qa.test.ts`):
+- Pagination `getPageNumbers` — small total, large total with ellipsis
+- Content type label mapping (chapter, short_story, blog_post, newsletter)
+- Breadcrumb labels — new nav labels present, old labels removed
+- Tab definitions — all 8 Project Workspace tabs exist
+- Route structure — 4 legacy routes map to `/library?type=X`
+
+Sprint 2 E2E tests (`e2e/sprint2-navigation.spec.ts`):
+- Unauthenticated user redirected to `/login`
+- Legacy routes `/chapters`, `/short-stories`, `/blog-posts`, `/newsletters` redirect through auth guard
+- New routes `/library`, `/projects`, `/genres`, `/story-arcs`, `/research`, `/trash` all exist
+- Unknown route redirects to login
+- Login page renders correctly
+
+**What the next agent should do:**
+- Sprint 2 work is uncommitted — commit to `develop` when ready
+- Sprint 3 (CRUD Completeness & Data Management) is next: project edit form, story bible CRUD, story arc editor, research detail page, project metadata editing
+- The `ContentList.tsx` component is now unused (replaced by `ContentLibrary.tsx`) — can be removed after confirming no imports
+- Art tab and Cost tab are placeholders — they get filled in Sprint 4 and Sprint 5 respectively

@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
 import GenreForm from './GenreForm';
+import ConfirmDialog from '../shared/ConfirmDialog';
+import Pagination from '../shared/Pagination';
 import type { GenreConfig } from '../../types/database';
 
 export default function GenreList() {
@@ -11,6 +13,9 @@ export default function GenreList() {
   const queryClient = useQueryClient();
   const [editingGenre, setEditingGenre] = useState<GenreConfig | null>(null);
   const [creating, setCreating] = useState(false);
+  const [deletingGenre, setDeletingGenre] = useState<GenreConfig | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   const { data: genres, isLoading, isError, error } = useQuery({
     queryKey: ['genres', userId],
@@ -36,6 +41,11 @@ export default function GenreList() {
 
   const publicGenres = genres?.filter(g => g.user_id === null) || [];
   const privateGenres = genres?.filter(g => g.user_id !== null) || [];
+
+  const paginatedPublicGenres = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return publicGenres.slice(start, start + pageSize);
+  }, [publicGenres, currentPage, pageSize]);
 
   if (editingGenre || creating) {
     return (
@@ -77,7 +87,7 @@ export default function GenreList() {
                     genre={genre}
                     editable
                     onEdit={() => setEditingGenre(genre)}
-                    onDelete={() => { if (confirm(`Delete "${genre.genre_name}"?`)) deleteMutation.mutate(genre.id); }}
+                    onDelete={() => setDeletingGenre(genre)}
                   />
                 ))}
               </div>
@@ -88,13 +98,35 @@ export default function GenreList() {
           <div>
             <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Public Genres ({publicGenres.length})</h2>
             <div className="space-y-3">
-              {publicGenres.map(genre => (
+              {paginatedPublicGenres.map(genre => (
                 <GenreCard key={genre.id} genre={genre} editable={false} />
               ))}
+            </div>
+            <div className="mt-4">
+              <Pagination
+                currentPage={currentPage}
+                totalItems={publicGenres.length}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+              />
             </div>
           </div>
         </>
       )}
+
+      <ConfirmDialog
+        open={!!deletingGenre}
+        onClose={() => setDeletingGenre(null)}
+        onConfirm={() => {
+          if (deletingGenre) deleteMutation.mutate(deletingGenre.id);
+          setDeletingGenre(null);
+        }}
+        title="Delete Genre"
+        message={`Are you sure you want to delete "${deletingGenre?.genre_name}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+      />
     </div>
   );
 }

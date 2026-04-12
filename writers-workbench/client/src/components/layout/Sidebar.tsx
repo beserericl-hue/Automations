@@ -1,33 +1,48 @@
-import { NavLink } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
 import EveOrb from '../eve/EveOrb';
+import type { WritingProject } from '../../types/database';
 
 interface SidebarProps {
   open: boolean;
   onToggle: () => void;
 }
 
-const navItems = [
-  { label: 'Dashboard', path: '/', icon: DashboardIcon },
-  { label: 'Projects', path: '/projects', icon: ProjectsIcon },
-  { label: 'Chapters', path: '/chapters', icon: ChaptersIcon },
-  { label: 'Short Stories', path: '/short-stories', icon: StoriesIcon },
-  { label: 'Blog Posts', path: '/blog-posts', icon: BlogIcon },
-  { label: 'Newsletters', path: '/newsletters', icon: NewsletterIcon },
-  { label: 'Research', path: '/research', icon: ResearchIcon },
-  { label: 'Social Posts', path: '/social', icon: SocialIcon },
-  { label: 'Cover Art', path: '/cover-art', icon: CoverArtIcon },
-  { label: 'Outlines', path: '/outlines', icon: OutlineIcon },
-  { label: 'Story Arcs', path: '/story-arcs', icon: StoryArcIcon },
-  { label: 'Genres', path: '/genres', icon: GenreIcon },
-];
-
-const bottomItems = [
-  { label: 'Settings', path: '/settings', icon: SettingsIcon },
-];
-
 export default function Sidebar({ open, onToggle }: SidebarProps) {
   const { profile } = useUser();
+  const userId = profile?.user_id;
+  const location = useLocation();
+  const [projectsExpanded, setProjectsExpanded] = useState(true);
+  const [referenceExpanded, setReferenceExpanded] = useState(false);
+
+  // Fetch projects for expandable sidebar section
+  const { data: projects } = useQuery({
+    queryKey: ['sidebar-projects', userId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('writing_projects_v2')
+        .select('id, title, status, updated_at')
+        .eq('user_id', userId!)
+        .is('deleted_at', null)
+        .order('updated_at', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return data as Pick<WritingProject, 'id' | 'title' | 'status' | 'updated_at'>[];
+    },
+    enabled: !!userId,
+    staleTime: 30_000,
+  });
+
+  const projectCount = projects?.length ?? 0;
+  const isProjectRoute = location.pathname.startsWith('/projects');
+  const isReferenceRoute = ['/genres', '/story-arcs', '/research'].some(p => location.pathname.startsWith(p));
+
+  // Auto-expand sections when navigating into them
+  if (isProjectRoute && !projectsExpanded) setProjectsExpanded(true);
+  if (isReferenceRoute && !referenceExpanded) setReferenceExpanded(true);
 
   return (
     <aside
@@ -54,31 +69,151 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-2">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            end={item.path === '/'}
-            title={!open ? item.label : undefined}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2 text-sm whitespace-nowrap ${
-                open ? '' : 'justify-center'
-              } ${
-                isActive
-                  ? 'bg-brand-50 text-brand-700 font-medium dark:bg-brand-950 dark:text-brand-300'
-                  : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
-              }`
-            }
+        {/* Dashboard */}
+        <SidebarLink to="/" icon={DashboardIcon} label="Dashboard" open={open} end />
+
+        {/* My Projects — expandable */}
+        <div>
+          <button
+            onClick={() => open ? setProjectsExpanded(!projectsExpanded) : undefined}
+            className={`flex w-full items-center gap-3 px-3 py-2 text-sm whitespace-nowrap ${
+              open ? '' : 'justify-center'
+            } ${
+              isProjectRoute
+                ? 'bg-brand-50 text-brand-700 font-medium dark:bg-brand-950 dark:text-brand-300'
+                : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+            }`}
+            title={!open ? `Projects (${projectCount})` : undefined}
           >
-            <item.icon className="h-5 w-5 shrink-0" />
-            {open && <span className="truncate">{item.label}</span>}
-          </NavLink>
-        ))}
+            <ProjectsIcon className="h-5 w-5 shrink-0" />
+            {open && (
+              <>
+                <span className="flex-1 text-left truncate">My Projects</span>
+                {projectCount > 0 && (
+                  <span className="rounded-full bg-gray-200 px-1.5 text-[10px] font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                    {projectCount}
+                  </span>
+                )}
+                <ChevronIcon expanded={projectsExpanded} />
+              </>
+            )}
+          </button>
+
+          {/* Project sub-items */}
+          {open && projectsExpanded && (
+            <div className="ml-4 border-l border-gray-200 dark:border-gray-700">
+              <NavLink
+                to="/projects"
+                end
+                className={({ isActive }) =>
+                  `flex items-center gap-2 px-3 py-1.5 text-xs whitespace-nowrap ${
+                    isActive
+                      ? 'text-brand-700 font-medium dark:text-brand-300'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  }`
+                }
+              >
+                All Projects
+              </NavLink>
+              {projects?.map((project) => (
+                <NavLink
+                  key={project.id}
+                  to={`/projects/${project.id}`}
+                  className={({ isActive }) =>
+                    `flex items-center gap-2 px-3 py-1.5 text-xs whitespace-nowrap ${
+                      isActive
+                        ? 'text-brand-700 font-medium dark:text-brand-300'
+                        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                    }`
+                  }
+                >
+                  <span className="truncate">{project.title}</span>
+                  <StatusDot status={project.status} />
+                </NavLink>
+              ))}
+              {projectCount === 0 && (
+                <div className="px-3 py-1.5 text-xs text-gray-400 italic">No projects yet</div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Content Library */}
+        <SidebarLink to="/library" icon={LibraryIcon} label="Content Library" open={open} />
+
+        {/* Outlines */}
+        <SidebarLink to="/outlines" icon={OutlineIcon} label="Outlines" open={open} />
+
+        {/* Divider */}
+        <div className="my-2 mx-3 border-t border-gray-200 dark:border-gray-700" />
+
+        {/* Reference — collapsible section */}
+        <div>
+          <button
+            onClick={() => open ? setReferenceExpanded(!referenceExpanded) : undefined}
+            className={`flex w-full items-center gap-3 px-3 py-2 text-sm whitespace-nowrap ${
+              open ? '' : 'justify-center'
+            } ${
+              isReferenceRoute
+                ? 'bg-brand-50 text-brand-700 font-medium dark:bg-brand-950 dark:text-brand-300'
+                : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+            }`}
+            title={!open ? 'Reference' : undefined}
+          >
+            <ReferenceIcon className="h-5 w-5 shrink-0" />
+            {open && (
+              <>
+                <span className="flex-1 text-left truncate">Reference</span>
+                <ChevronIcon expanded={referenceExpanded} />
+              </>
+            )}
+          </button>
+
+          {open && referenceExpanded && (
+            <div className="ml-4 border-l border-gray-200 dark:border-gray-700">
+              <NavLink
+                to="/genres"
+                className={({ isActive }) =>
+                  `flex items-center gap-2 px-3 py-1.5 text-xs whitespace-nowrap ${
+                    isActive
+                      ? 'text-brand-700 font-medium dark:text-brand-300'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  }`
+                }
+              >
+                Genres
+              </NavLink>
+              <NavLink
+                to="/story-arcs"
+                className={({ isActive }) =>
+                  `flex items-center gap-2 px-3 py-1.5 text-xs whitespace-nowrap ${
+                    isActive
+                      ? 'text-brand-700 font-medium dark:text-brand-300'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  }`
+                }
+              >
+                Story Arcs
+              </NavLink>
+              <NavLink
+                to="/research"
+                className={({ isActive }) =>
+                  `flex items-center gap-2 px-3 py-1.5 text-xs whitespace-nowrap ${
+                    isActive
+                      ? 'text-brand-700 font-medium dark:text-brand-300'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  }`
+                }
+              >
+                Research
+              </NavLink>
+            </div>
+          )}
+        </div>
       </nav>
 
       {/* Bottom section */}
       <div className="border-t border-gray-200 py-2 dark:border-gray-800">
-        {/* Eve voice — talk to AI assistant */}
         {open && <EveOrb />}
         {!open && (
           <div className="flex justify-center py-2" title="Talk to Eve">
@@ -87,49 +222,81 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
             </svg>
           </div>
         )}
-        {bottomItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            title={!open ? item.label : undefined}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2 text-sm whitespace-nowrap ${
-                open ? '' : 'justify-center'
-              } ${
-                isActive
-                  ? 'bg-brand-50 text-brand-700 font-medium dark:bg-brand-950 dark:text-brand-300'
-                  : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
-              }`
-            }
-          >
-            <item.icon className="h-5 w-5 shrink-0" />
-            {open && <span className="truncate">{item.label}</span>}
-          </NavLink>
-        ))}
+        <SidebarLink to="/trash" icon={TrashIcon} label="Trash" open={open} />
+        <SidebarLink to="/settings" icon={SettingsIcon} label="Settings" open={open} />
         {profile?.isAdmin && (
-          <NavLink
-            to="/admin"
-            title={!open ? 'Admin' : undefined}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2 text-sm whitespace-nowrap ${
-                open ? '' : 'justify-center'
-              } ${
-                isActive
-                  ? 'bg-brand-50 text-brand-700 font-medium dark:bg-brand-950 dark:text-brand-300'
-                  : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
-              }`
-            }
-          >
-            <AdminIcon className="h-5 w-5 shrink-0" />
-            {open && <span className="truncate">Admin</span>}
-          </NavLink>
+          <SidebarLink to="/admin" icon={AdminIcon} label="Admin" open={open} />
         )}
       </div>
     </aside>
   );
 }
 
-// ---- Icons (inline SVGs) ----
+// ---- Reusable link component ----
+
+function SidebarLink({
+  to,
+  icon: Icon,
+  label,
+  open,
+  end,
+}: {
+  to: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  open: boolean;
+  end?: boolean;
+}) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      title={!open ? label : undefined}
+      className={({ isActive }) =>
+        `flex items-center gap-3 px-3 py-2 text-sm whitespace-nowrap ${
+          open ? '' : 'justify-center'
+        } ${
+          isActive
+            ? 'bg-brand-50 text-brand-700 font-medium dark:bg-brand-950 dark:text-brand-300'
+            : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+        }`
+      }
+    >
+      <Icon className="h-5 w-5 shrink-0" />
+      {open && <span className="truncate">{label}</span>}
+    </NavLink>
+  );
+}
+
+// ---- Small components ----
+
+function StatusDot({ status }: { status: string }) {
+  const colors: Record<string, string> = {
+    published: 'bg-green-500',
+    approved: 'bg-blue-500',
+    draft: 'bg-gray-400',
+    rejected: 'bg-red-500',
+    scheduled: 'bg-yellow-500',
+    in_progress: 'bg-brand-500',
+  };
+  return <span className={`ml-auto h-1.5 w-1.5 rounded-full shrink-0 ${colors[status] || 'bg-gray-400'}`} />;
+}
+
+function ChevronIcon({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      className={`h-3 w-3 shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+    </svg>
+  );
+}
+
+// ---- Icons ----
 
 function DashboardIcon({ className }: { className?: string }) {
   return (
@@ -147,58 +314,10 @@ function ProjectsIcon({ className }: { className?: string }) {
   );
 }
 
-function ChaptersIcon({ className }: { className?: string }) {
+function LibraryIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.331 0 4.472.89 6.064 2.346m0-14.304a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.346" />
-    </svg>
-  );
-}
-
-function StoriesIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-    </svg>
-  );
-}
-
-function BlogIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18V7.875c0-.621.504-1.125 1.125-1.125H7.5" />
-    </svg>
-  );
-}
-
-function NewsletterIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-    </svg>
-  );
-}
-
-function ResearchIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-    </svg>
-  );
-}
-
-function SocialIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
-    </svg>
-  );
-}
-
-function CoverArtIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
     </svg>
   );
 }
@@ -211,19 +330,18 @@ function OutlineIcon({ className }: { className?: string }) {
   );
 }
 
-function StoryArcIcon({ className }: { className?: string }) {
+function ReferenceIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0012 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75z" />
     </svg>
   );
 }
 
-function GenreIcon({ className }: { className?: string }) {
+function TrashIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
     </svg>
   );
 }

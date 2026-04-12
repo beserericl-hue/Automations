@@ -1,13 +1,17 @@
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
+import Pagination from '../shared/Pagination';
 import type { WritingProject } from '../../types/database';
 
 export default function ProjectList() {
   const navigate = useNavigate();
   const { profile } = useUser();
   const userId = profile?.user_id;
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   const { data: projects, isLoading, isError, error } = useQuery({
     queryKey: ['projects', userId],
@@ -16,12 +20,19 @@ export default function ProjectList() {
         .from('writing_projects_v2')
         .select('*')
         .eq('user_id', userId!)
+        .is('deleted_at', null)
         .order('updated_at', { ascending: false });
       if (error) throw error;
       return data as WritingProject[];
     },
     enabled: !!userId,
   });
+
+  const paginatedProjects = useMemo(() => {
+    if (!projects) return [];
+    const start = (currentPage - 1) * pageSize;
+    return projects.slice(start, start + pageSize);
+  }, [projects, currentPage, pageSize]);
 
   return (
     <div className="space-y-4">
@@ -51,7 +62,7 @@ export default function ProjectList() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {projects.map((project) => (
+              {paginatedProjects.map((project) => (
                 <tr key={project.id} onClick={() => navigate(`/projects/${project.id}`)} className="hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors">
                   <td className="px-6 py-3">
                     <span className="text-sm font-medium text-gray-900 dark:text-white">{project.title}</span>
@@ -59,7 +70,7 @@ export default function ProjectList() {
                       <span className="ml-2 text-xs text-gray-400">({project.outline.story_arc_name})</span>
                     )}
                   </td>
-                  <td className="px-6 py-3 text-sm text-gray-500">{project.genre_slug || '—'}</td>
+                  <td className="px-6 py-3 text-sm text-gray-500">{project.genre_slug || '\u2014'}</td>
                   <td className="px-6 py-3 text-sm text-gray-500">{project.project_type}</td>
                   <td className="px-6 py-3 text-sm text-gray-500">{project.chapter_count}</td>
                   <td className="px-6 py-3">
@@ -77,9 +88,13 @@ export default function ProjectList() {
         )}
       </div>
 
-      {projects && projects.length > 0 && (
-        <p className="text-xs text-gray-400">{projects.length} project{projects.length !== 1 ? 's' : ''}</p>
-      )}
+      <Pagination
+        currentPage={currentPage}
+        totalItems={projects?.length ?? 0}
+        pageSize={pageSize}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+      />
     </div>
   );
 }

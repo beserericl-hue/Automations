@@ -36,21 +36,25 @@ export function useDashboardCounts() {
         supabase
           .from('writing_projects_v2')
           .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId),
+          .eq('user_id', userId)
+          .is('deleted_at', null),
         supabase
           .from('published_content_v2')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', userId)
-          .eq('status', 'draft'),
+          .eq('status', 'draft')
+          .is('deleted_at', null),
         supabase
           .from('published_content_v2')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', userId)
-          .eq('status', 'published'),
+          .eq('status', 'published')
+          .is('deleted_at', null),
         supabase
           .from('research_reports_v2')
           .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId),
+          .eq('user_id', userId)
+          .is('deleted_at', null),
       ]);
 
       return {
@@ -83,18 +87,21 @@ export function useRecentItems() {
           .from('published_content_v2')
           .select('id, title, content_type, status, genre_slug, content_text, chapter_number, project_id, updated_at')
           .eq('user_id', userId)
+          .is('deleted_at', null)
           .order('updated_at', { ascending: false })
           .limit(10),
         supabase
           .from('writing_projects_v2')
           .select('id, title, status, genre_slug, outline, updated_at')
           .eq('user_id', userId)
+          .is('deleted_at', null)
           .order('updated_at', { ascending: false })
           .limit(5),
         supabase
           .from('research_reports_v2')
           .select('id, topic, status, genre_slug, content, updated_at')
           .eq('user_id', userId)
+          .is('deleted_at', null)
           .order('updated_at', { ascending: false })
           .limit(5),
       ]);
@@ -129,10 +136,10 @@ export function useRecentItems() {
         for (const c of contentRes.data) {
           const proj = c.project_id ? projectMap[c.project_id] : null;
           const typePaths: Record<string, string> = {
-            chapter: '/chapters',
-            short_story: '/short-stories',
-            blog_post: '/blog-posts',
-            newsletter: '/newsletters',
+            chapter: '/library?type=chapter',
+            short_story: '/library?type=short_story',
+            blog_post: '/library?type=blog_post',
+            newsletter: '/library?type=newsletter',
           };
           items.push({
             id: c.id,

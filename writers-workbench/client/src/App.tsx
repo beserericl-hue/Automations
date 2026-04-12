@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { UserProvider } from './contexts/UserContext';
@@ -12,7 +13,6 @@ import AppShell from './components/layout/AppShell';
 import Dashboard from './components/dashboard/Dashboard';
 import ProjectList from './components/projects/ProjectList';
 import ProjectDetail from './components/projects/ProjectDetail';
-import ContentList from './components/content/ContentList';
 import ContentDetail from './components/content/ContentDetail';
 import ResearchList from './components/research/ResearchList';
 import StoryBiblePanel from './components/story-bible/StoryBiblePanel';
@@ -20,7 +20,10 @@ import StoryArcBrowser from './components/story-arcs/StoryArcBrowser';
 import OutlineList from './components/outlines/OutlineList';
 import GenreList from './components/genres/GenreList';
 import UserSettings from './components/settings/UserSettings';
+import TrashView from './components/projects/TrashView';
 import AdminPanel from './components/admin/AdminPanel';
+
+const ContentLibrary = lazy(() => import('./components/content/ContentLibrary'));
 
 export default function App() {
   return (
@@ -38,26 +41,29 @@ export default function App() {
             element={
               <AuthGuard>
                 <AppShell>
+                  <Suspense fallback={<div className="flex items-center justify-center h-64 text-sm text-gray-500">Loading...</div>}>
                   <Routes>
                     <Route index element={<Dashboard />} />
                     <Route path="projects" element={<ProjectList />} />
                     <Route path="projects/:id" element={<ProjectDetail />} />
                     <Route path="projects/:id/bible" element={<StoryBiblePanel />} />
-                    <Route path="chapters" element={<ContentList contentType="chapter" title="Chapters" />} />
-                    <Route path="short-stories" element={<ContentList contentType="short_story" title="Short Stories" />} />
-                    <Route path="blog-posts" element={<ContentList contentType="blog_post" title="Blog Posts" />} />
-                    <Route path="newsletters" element={<ContentList contentType="newsletter" title="Newsletters" />} />
+                    <Route path="trash" element={<TrashView />} />
+                    <Route path="library" element={<ContentLibrary />} />
+                    {/* Legacy routes redirect to Content Library with filter */}
+                    <Route path="chapters" element={<Navigate to="/library?type=chapter" replace />} />
+                    <Route path="short-stories" element={<Navigate to="/library?type=short_story" replace />} />
+                    <Route path="blog-posts" element={<Navigate to="/library?type=blog_post" replace />} />
+                    <Route path="newsletters" element={<Navigate to="/library?type=newsletter" replace />} />
                     <Route path="content/:id" element={<ContentDetail />} />
                     <Route path="research" element={<ResearchList />} />
                     <Route path="outlines" element={<OutlineList />} />
                     <Route path="story-arcs" element={<StoryArcBrowser />} />
-                    <Route path="social" element={<Placeholder name="Social Posts" />} />
-                    <Route path="cover-art" element={<Placeholder name="Cover Art" />} />
                     <Route path="genres" element={<GenreList />} />
                     <Route path="settings" element={<UserSettings />} />
                     <Route path="admin/*" element={<AdminPanel />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
+                  </Suspense>
                 </AppShell>
               </AuthGuard>
             }
@@ -69,13 +75,3 @@ export default function App() {
   );
 }
 
-function Placeholder({ name }: { name: string }) {
-  return (
-    <div className="flex items-center justify-center h-full">
-      <div className="text-center">
-        <h2 className="text-2xl font-semibold text-gray-700 dark:text-gray-300">{name}</h2>
-        <p className="mt-2 text-gray-500">Coming soon</p>
-      </div>
-    </div>
-  );
-}

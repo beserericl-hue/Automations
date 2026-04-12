@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import ChatDrawer from '../chat/ChatDrawer';
@@ -7,8 +7,22 @@ interface AppShellProps {
   children: ReactNode;
 }
 
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
+  );
+  useEffect(() => {
+    const mql = window.matchMedia('(min-width: 1024px)');
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+  return isDesktop;
+}
+
 export default function AppShell({ children }: AppShellProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const isDesktop = useIsDesktop();
+  const [sidebarOpen, setSidebarOpen] = useState(isDesktop);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
 
