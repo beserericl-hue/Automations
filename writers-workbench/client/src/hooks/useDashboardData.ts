@@ -65,6 +65,7 @@ export function useDashboardCounts() {
       };
     },
     enabled: !!userId,
+    refetchInterval: 30_000, // Auto-refresh every 30 seconds
   });
 }
 
@@ -197,5 +198,6 @@ export function useRecentItems() {
       return items.slice(0, 10);
     },
     enabled: !!userId,
+    refetchInterval: 30_000, // Auto-refresh every 30 seconds
   });
 }

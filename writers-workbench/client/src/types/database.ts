@@ -77,15 +77,33 @@ export interface OutlineChapter {
   number: number | string; // can be "Prologue" or "Epilogue"
   title: string;
   brief: string;
-  chapter_outline?: SubChapter[];
+  arc_notes?: string;
+  research_topics?: string[];
+  // chapter_outline can be either:
+  // - an object with sub_chapters array (from brainstorm_chapter workflow)
+  // - an array of SubChapter (legacy format)
+  chapter_outline?: ChapterOutline | SubChapter[];
+}
+
+export interface ChapterOutline {
+  chapter_title?: string;
+  chapter_number?: number | string;
+  chapter_summary?: string;
+  chapter_story_arc?: string;
+  book_arc_beat?: string;
+  sub_chapters: SubChapter[];
 }
 
 export interface SubChapter {
-  section_number: number;
+  number?: number;
+  section_number?: number; // legacy field
   title: string;
   brief: string;
   characters?: string[];
   arc_beat?: string;
+  setting?: string;
+  emotional_tone?: string;
+  connects_to_book_arc?: string;
 }
 
 export interface StoryBibleEntry {
@@ -175,6 +193,70 @@ export interface TokenUsage {
   cost_usd: number;
   metadata: Record<string, unknown>;
   created_at: string;
+}
+
+export interface GeneratedImage {
+  id: string;
+  user_id: string;
+  content_id: string | null;
+  project_id: string | null;
+  image_type: 'cover_art' | 'chapter_art' | 'social_media' | 'newsletter_section';
+  platform: 'twitter' | 'linkedin' | 'instagram' | 'facebook' | null;
+  storage_path: string;
+  thumbnail_path: string | null;
+  original_prompt: string | null;
+  genre_slug: string | null;
+  image_format: string;
+  width: number | null;
+  height: number | null;
+  file_size_bytes: number | null;
+  generation_model: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface SocialPost {
+  id: string;
+  user_id: string;
+  source_content_id: string | null;
+  project_id: string | null;
+  platform: 'twitter' | 'linkedin' | 'instagram' | 'facebook';
+  post_text: string;
+  hashtags: string[];
+  image_id: string | null;
+  status: 'draft' | 'published' | 'scheduled';
+  scheduled_at: string | null;
+  published_at: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface ContentUsage {
+  id: string;
+  user_id: string;
+  content_id: string;
+  output_type: string;
+  output_title: string;
+  output_date: string;
+  project_id: string | null;
+  created_at: string;
+  // Joined from content_index
+  source_title?: string;
+  source_type?: string;
+  source_url?: string;
+  scraped_at?: string;
+}
+
+export interface QACheck {
+  name: string;
+  status: 'PASS' | 'NEEDS_REVIEW';
+  details: string;
+}
+
+export interface QAReport {
+  generated_at: string;
+  overall_status: 'PASS' | 'NEEDS_REVIEW';
+  checks: QACheck[];
 }
 
 export interface ContentIndex {

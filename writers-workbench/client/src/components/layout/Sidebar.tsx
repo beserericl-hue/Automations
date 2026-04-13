@@ -38,7 +38,7 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
 
   const projectCount = projects?.length ?? 0;
   const isProjectRoute = location.pathname.startsWith('/projects');
-  const isReferenceRoute = ['/genres', '/story-arcs', '/research'].some(p => location.pathname.startsWith(p));
+  const isReferenceRoute = ['/genres', '/story-arcs', '/research', '/sources', '/cost'].some(p => location.pathname.startsWith(p));
 
   // Auto-expand sections when navigating into them
   if (isProjectRoute && !projectsExpanded) setProjectsExpanded(true);
@@ -141,6 +141,9 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
         {/* Content Library */}
         <SidebarLink to="/library" icon={LibraryIcon} label="Content Library" open={open} />
 
+        {/* Brainstorm */}
+        <SidebarLink to="/brainstorm" icon={BrainstormIcon} label="Brainstorm" open={open} />
+
         {/* Outlines */}
         <SidebarLink to="/outlines" icon={OutlineIcon} label="Outlines" open={open} />
 
@@ -206,6 +209,30 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
                 }
               >
                 Research
+              </NavLink>
+              <NavLink
+                to="/sources"
+                className={({ isActive }) =>
+                  `flex items-center gap-2 px-3 py-1.5 text-xs whitespace-nowrap ${
+                    isActive
+                      ? 'text-brand-700 font-medium dark:text-brand-300'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  }`
+                }
+              >
+                Sources
+              </NavLink>
+              <NavLink
+                to="/cost"
+                className={({ isActive }) =>
+                  `flex items-center gap-2 px-3 py-1.5 text-xs whitespace-nowrap ${
+                    isActive
+                      ? 'text-brand-700 font-medium dark:text-brand-300'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  }`
+                }
+              >
+                Cost Tracking
               </NavLink>
             </div>
           )}
@@ -318,6 +345,14 @@ function LibraryIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.331 0 4.472.89 6.064 2.346m0-14.304a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.346" />
+    </svg>
+  );
+}
+
+function BrainstormIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" />
     </svg>
   );
 }

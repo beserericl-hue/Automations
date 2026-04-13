@@ -33,7 +33,7 @@ export default defineConfig({
     // Authenticated tests — depend on setup, reuse saved auth state
     {
       name: 'chromium',
-      testMatch: /authenticated\.spec\.ts/,
+      testMatch: /authenticated\.spec\.ts|sprint3-crud\.spec\.ts|sprint5-observability\.spec\.ts/,
       dependencies: ['setup'],
       use: {
         ...devices['Desktop Chrome'],

@@ -14,6 +14,7 @@ export default function GenreList() {
   const [editingGenre, setEditingGenre] = useState<GenreConfig | null>(null);
   const [creating, setCreating] = useState(false);
   const [deletingGenre, setDeletingGenre] = useState<GenreConfig | null>(null);
+  const [deleteCascadeInfo, setDeleteCascadeInfo] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
@@ -38,6 +39,28 @@ export default function GenreList() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['genres', userId] }),
   });
+
+  const handleDeleteClick = async (genre: GenreConfig) => {
+    const info: string[] = [];
+    const { count: projectCount } = await supabase
+      .from('writing_projects_v2')
+      .select('id', { count: 'exact', head: true })
+      .eq('genre_slug', genre.genre_slug)
+      .eq('user_id', userId!)
+      .is('deleted_at', null);
+    if (projectCount) info.push(`${projectCount} project(s) reference this genre`);
+
+    const { count: contentCount } = await supabase
+      .from('published_content_v2')
+      .select('id', { count: 'exact', head: true })
+      .eq('genre_slug', genre.genre_slug)
+      .eq('user_id', userId!)
+      .is('deleted_at', null);
+    if (contentCount) info.push(`${contentCount} content item(s) reference this genre`);
+
+    setDeleteCascadeInfo(info);
+    setDeletingGenre(genre);
+  };
 
   const publicGenres = genres?.filter(g => g.user_id === null) || [];
   const privateGenres = genres?.filter(g => g.user_id !== null) || [];
@@ -87,7 +110,7 @@ export default function GenreList() {
                     genre={genre}
                     editable
                     onEdit={() => setEditingGenre(genre)}
-                    onDelete={() => setDeletingGenre(genre)}
+                    onDelete={() => handleDeleteClick(genre)}
                   />
                 ))}
               </div>
@@ -117,15 +140,18 @@ export default function GenreList() {
 
       <ConfirmDialog
         open={!!deletingGenre}
-        onClose={() => setDeletingGenre(null)}
+        onClose={() => { setDeletingGenre(null); setDeleteCascadeInfo([]); }}
         onConfirm={() => {
           if (deletingGenre) deleteMutation.mutate(deletingGenre.id);
           setDeletingGenre(null);
+          setDeleteCascadeInfo([]);
         }}
         title="Delete Genre"
         message={`Are you sure you want to delete "${deletingGenre?.genre_name}"? This cannot be undone.`}
+        cascadeInfo={deleteCascadeInfo.length > 0 ? [...deleteCascadeInfo, 'These items will NOT be deleted but will lose their genre reference.'] : undefined}
         confirmLabel="Delete"
         variant="danger"
+        loading={deleteMutation.isPending}
       />
     </div>
   );
@@ -140,6 +166,22 @@ function GenreCard({
   onDelete?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const { profile } = useUser();
+
+  const { data: refCount } = useQuery({
+    queryKey: ['genre-ref-count', genre.genre_slug, profile?.user_id],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from('writing_projects_v2')
+        .select('id', { count: 'exact', head: true })
+        .eq('genre_slug', genre.genre_slug)
+        .eq('user_id', profile!.user_id)
+        .is('deleted_at', null);
+      return count ?? 0;
+    },
+    enabled: !!profile?.user_id,
+    staleTime: 60_000,
+  });
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
@@ -154,6 +196,12 @@ function GenreCard({
             {!genre.active && <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-600">Inactive</span>}
           </div>
           <p className="mt-0.5 text-xs text-gray-500 line-clamp-1">{genre.description}</p>
+          <div className="mt-1 flex flex-wrap gap-2">
+            {refCount != null && refCount > 0 && <span className="text-[10px] text-brand-600 dark:text-brand-400">{refCount} project{refCount !== 1 ? 's' : ''}</span>}
+            {genre.rss_feed_urls.length > 0 && <span className="text-[10px] text-gray-400">{genre.rss_feed_urls.length} RSS feeds</span>}
+            {genre.source_urls.length > 0 && <span className="text-[10px] text-gray-400">{genre.source_urls.length} sources</span>}
+            {genre.subreddit_names.length > 0 && <span className="text-[10px] text-gray-400">{genre.subreddit_names.length} subreddits</span>}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {editable && (

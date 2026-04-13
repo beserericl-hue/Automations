@@ -92,8 +92,8 @@ export default function GenreForm({ genre, onClose }: GenreFormProps) {
           <input value={keywords} onChange={e => setKeywords(e.target.value)} className={inputClass} placeholder="post-apocalyptic, dystopian, survival" />
         </Field>
 
-        <ArrayField label="RSS Feed URLs" values={rssFeeds} onChange={setRssFeeds} placeholder="https://medium.com/feed/tag/..." />
-        <ArrayField label="Source URLs" values={sourceUrls} onChange={setSourceUrls} placeholder="https://www.reddit.com/r/..." />
+        <ArrayField label="RSS Feed URLs" values={rssFeeds} onChange={setRssFeeds} placeholder="https://medium.com/feed/tag/..." validateUrl />
+        <ArrayField label="Source URLs" values={sourceUrls} onChange={setSourceUrls} placeholder="https://www.reddit.com/r/..." validateUrl />
         <ArrayField label="Subreddit Names" values={subreddits} onChange={setSubreddits} placeholder="PostApocalypticFiction" />
         <ArrayField label="Goodreads Shelves" values={goodreads} onChange={setGoodreads} placeholder="post-apocalyptic" />
 
@@ -138,7 +138,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
   );
 }
 
-function ArrayField({ label, values, onChange, placeholder }: { label: string; values: string[]; onChange: (v: string[]) => void; placeholder: string }) {
+function ArrayField({ label, values, onChange, placeholder, validateUrl }: { label: string; values: string[]; onChange: (v: string[]) => void; placeholder: string; validateUrl?: boolean }) {
   const addItem = () => onChange([...values, '']);
   const removeItem = (i: number) => onChange(values.filter((_, idx) => idx !== i));
   const updateItem = (i: number, val: string) => {
@@ -146,25 +146,71 @@ function ArrayField({ label, values, onChange, placeholder }: { label: string; v
     next[i] = val;
     onChange(next);
   };
+  const moveItem = (from: number, to: number) => {
+    if (to < 0 || to >= values.length) return;
+    const next = [...values];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    onChange(next);
+  };
+
+  const isValidUrl = (url: string) => {
+    if (!url.trim()) return true; // empty is ok
+    try { new URL(url); return true; } catch { return false; }
+  };
+
+  const filledCount = values.filter(v => v.trim()).length;
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{label}</label>
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        {label}
+        {filledCount > 0 && <span className="ml-1 text-xs text-gray-400">({filledCount})</span>}
+      </label>
       <div className="space-y-2">
         {values.map((val, i) => (
-          <div key={i} className="flex gap-2">
-            <input
-              value={val}
-              onChange={e => updateItem(i, e.target.value)}
-              className={inputClass + ' flex-1'}
-              placeholder={placeholder}
-            />
-            <button onClick={() => removeItem(i)} className="text-xs text-red-500 hover:text-red-600 px-2" title="Remove">
-              &times;
-            </button>
+          <div key={i} className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 w-5 text-right shrink-0">{i + 1}.</span>
+            <div className="flex-1">
+              <input
+                value={val}
+                onChange={e => updateItem(i, e.target.value)}
+                className={inputClass + (validateUrl && val.trim() && !isValidUrl(val) ? ' border-red-400 dark:border-red-600' : '')}
+                placeholder={placeholder}
+              />
+              {validateUrl && val.trim() && !isValidUrl(val) && (
+                <p className="text-[10px] text-red-500 mt-0.5">Invalid URL</p>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => moveItem(i, i - 1)}
+                disabled={i === 0}
+                className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-30 px-1"
+                title="Move up"
+              >
+                &uarr;
+              </button>
+              <button
+                onClick={() => moveItem(i, i + 1)}
+                disabled={i === values.length - 1}
+                className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-30 px-1"
+                title="Move down"
+              >
+                &darr;
+              </button>
+              <button onClick={() => removeItem(i)} className="text-xs text-red-500 hover:text-red-600 px-1" title="Remove">
+                &times;
+              </button>
+            </div>
           </div>
         ))}
-        <button onClick={addItem} className="text-xs text-brand-600 hover:text-brand-700">+ Add</button>
+        <button
+          onClick={addItem}
+          className="flex items-center gap-1 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-sm text-brand-600 hover:bg-brand-50 hover:border-brand-400 dark:border-gray-600 dark:hover:bg-brand-950 transition-colors w-full justify-center"
+        >
+          + Add {label.replace(/s$/, '').toLowerCase()}
+        </button>
       </div>
     </div>
   );

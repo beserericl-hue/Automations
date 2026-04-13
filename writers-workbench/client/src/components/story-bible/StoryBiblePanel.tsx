@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
 import ConfirmDialog from '../shared/ConfirmDialog';
+import EntryForm from './EntryForm';
 import type { StoryBibleEntry, WritingProject } from '../../types/database';
 
 const ENTRY_TYPES = ['character', 'location', 'event', 'timeline', 'plot_thread', 'world_rule'] as const;
@@ -33,6 +34,8 @@ export default function StoryBiblePanel() {
   const { profile } = useUser();
   const userId = profile?.user_id;
   const [deletingEntry, setDeletingEntry] = useState<StoryBibleEntry | null>(null);
+  const [editingEntry, setEditingEntry] = useState<StoryBibleEntry | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
 
   const { data: project } = useQuery({
     queryKey: ['project-detail', id],
@@ -83,16 +86,42 @@ export default function StoryBiblePanel() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['story-bible', id] });
+      queryClient.invalidateQueries({ queryKey: ['project-bible', id] });
       setDeletingEntry(null);
     },
   });
 
+  // Show entry form if adding or editing
+  if (showAddForm || editingEntry) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <button onClick={() => navigate(`/projects/${id}`)} className="text-xs text-gray-400 hover:text-gray-600 mb-1">&larr; Back to {project?.title || 'Project'}</button>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Story Bible</h1>
+        </div>
+        <EntryForm
+          projectId={id!}
+          entry={editingEntry}
+          onClose={() => { setShowAddForm(false); setEditingEntry(null); }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <button onClick={() => navigate(`/projects/${id}`)} className="text-xs text-gray-400 hover:text-gray-600 mb-1">&larr; Back to {project?.title || 'Project'}</button>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Story Bible</h1>
-        {project && <p className="mt-1 text-sm text-gray-500">{project.title}</p>}
+      <div className="flex items-center justify-between">
+        <div>
+          <button onClick={() => navigate(`/projects/${id}`)} className="text-xs text-gray-400 hover:text-gray-600 mb-1">&larr; Back to {project?.title || 'Project'}</button>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Story Bible</h1>
+          {project && <p className="mt-1 text-sm text-gray-500">{project.title}</p>}
+        </div>
+        <button
+          onClick={() => setShowAddForm(true)}
+          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+        >
+          + Add Entry
+        </button>
       </div>
 
       {isLoading ? (
@@ -105,6 +134,12 @@ export default function StoryBiblePanel() {
         <div className="rounded-lg border border-gray-200 bg-white p-8 text-center dark:border-gray-800 dark:bg-gray-900">
           <p className="text-sm text-gray-500">No story bible entries yet.</p>
           <p className="mt-1 text-xs text-gray-400">Write chapters to automatically build the story bible, or use Eve to manage entries.</p>
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="mt-3 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          >
+            + Add First Entry
+          </button>
         </div>
       ) : (
         <div className="space-y-6">
@@ -133,12 +168,20 @@ export default function StoryBiblePanel() {
                             </span>
                           )}
                         </div>
-                        <button
-                          onClick={() => setDeletingEntry(entry)}
-                          className="text-xs text-red-500 hover:text-red-600 shrink-0"
-                        >
-                          Delete
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setEditingEntry(entry)}
+                            className="text-xs text-brand-600 hover:text-brand-700"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => setDeletingEntry(entry)}
+                            className="text-xs text-red-500 hover:text-red-600 shrink-0"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
                       <p className="mt-1 text-xs text-gray-500 leading-relaxed">{entry.description}</p>
                       {entry.metadata && Object.keys(entry.metadata).length > 0 && (

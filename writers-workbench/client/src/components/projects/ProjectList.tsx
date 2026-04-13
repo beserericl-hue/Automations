@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
 import Pagination from '../shared/Pagination';
+import { TableSkeleton, EmptyState } from '../shared/Skeleton';
 import type { WritingProject } from '../../types/database';
 
 export default function ProjectList() {
@@ -38,18 +39,22 @@ export default function ProjectList() {
     <div className="space-y-4">
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Projects</h1>
 
-      <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 overflow-hidden">
-        {isLoading ? (
-          <div className="px-6 py-12 text-center text-sm text-gray-500">Loading...</div>
-        ) : isError ? (
-          <div className="px-6 py-12 text-center text-sm text-red-600 dark:text-red-400">
-            Failed to load projects: {error?.message || 'Unknown error'}
-          </div>
-        ) : !projects?.length ? (
-          <div className="px-6 py-12 text-center text-sm text-gray-500">
-            No projects yet. Use the chat or Eve to brainstorm a story.
-          </div>
-        ) : (
+      {isLoading ? (
+        <TableSkeleton rows={6} columns={6} />
+      ) : isError ? (
+        <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 px-6 py-12 text-center text-sm text-red-600 dark:text-red-400">
+          Failed to load projects: {error?.message || 'Unknown error'}
+        </div>
+      ) : !projects?.length ? (
+        <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+          <EmptyState
+            title="No projects yet"
+            description="Open the chat drawer and tell Eve what you'd like to write. She'll help you brainstorm and outline your story."
+          />
+        </div>
+      ) : (
+        <>
+        <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 overflow-hidden">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
@@ -63,7 +68,7 @@ export default function ProjectList() {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {paginatedProjects.map((project) => (
-                <tr key={project.id} onClick={() => navigate(`/projects/${project.id}`)} className="hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors">
+                <tr key={project.id} onClick={() => navigate(`/projects/${project.id}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/projects/${project.id}`); } }} tabIndex={0} role="button" aria-label={`Open project ${project.title}`} className="hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-inset">
                   <td className="px-6 py-3">
                     <span className="text-sm font-medium text-gray-900 dark:text-white">{project.title}</span>
                     {project.outline?.story_arc_name && (
@@ -85,16 +90,17 @@ export default function ProjectList() {
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
 
-      <Pagination
+        <Pagination
         currentPage={currentPage}
         totalItems={projects?.length ?? 0}
         pageSize={pageSize}
         onPageChange={setCurrentPage}
         onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
       />
+        </>
+      )}
     </div>
   );
 }

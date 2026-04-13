@@ -22,6 +22,7 @@
 12. [Write a Chapter, Prologue, or Epilogue](#12-write-a-chapter)
 13. [Revise a Short Story](#13-revise-a-short-story)
 14. [Revise a Chapter](#14-revise-a-chapter)
+14b. [Q/A a Chapter](#14b-qa-a-chapter)
 15. [Story Bible](#15-story-bible)
 16. [Generate Cover Art](#16-generate-cover-art)
 17. [Repurpose to Social Media](#17-repurpose-to-social-media)
@@ -108,7 +109,7 @@ Eve is your ElevenLabs voice assistant. She speaks naturally, understands casual
 
 ## 3. Your Genres
 
-You have seven genres available. Each genre has its own writing tone, style guidelines, and cover art aesthetic.
+You have eight genres available. Each genre has its own writing tone, style guidelines, and cover art aesthetic.
 
 | Genre | Genre Slug | Tone | Cover Art Style |
 |-------|-----------|------|-----------------|
@@ -119,12 +120,13 @@ You have seven genres available. Each genre has its own writing tone, style guid
 | Political & Historical Events | `political-history` | Analytical, layered, draws parallels to today | Documentary/oil painting style, amber lighting |
 | Ancient History & Historical Novels | `ancient-history` | Immersive, sensory-rich, reverent of detail | Classical painting, warm golden light, earth tones |
 | Metaphysical Romance | `metaphysical-romance` | Intimate, emotionally honest, spiritually grounded | Soft light, layered timelines, ethereal warmth |
+| Sci-Fi Romance & Dark Sci-Fi | `scifi-romance` | Intense, emotionally charged, sensory-rich | Neon-lit cityscapes, cyberpunk warmth, space vistas |
 
 ### What Is a "Genre Slug"?
 
-A genre slug is the short identifier the system uses to look up your genre's settings. The seven slugs are:
+A genre slug is the short identifier the system uses to look up your genre's settings. The eight slugs are:
 
-`post-apocalyptic` · `political-scifi` · `historical-time-travel` · `ai-marketing` · `political-history` · `ancient-history` · `metaphysical-romance`
+`post-apocalyptic` · `political-scifi` · `historical-time-travel` · `ai-marketing` · `political-history` · `ancient-history` · `metaphysical-romance` · `scifi-romance`
 
 ---
 
@@ -1345,6 +1347,17 @@ Write chapter 1 of "The Seed Vault". Genre slug: post-apocalyptic. Chapter numbe
 
 You don't need to re-describe the story — the agent loads the outline you brainstormed.
 
+**Optional: Control sub-chapter word count:**
+
+By default each sub-chapter is written at ~5,000 words. You can override this:
+
+```
+Write chapter 3 of "The Seed Vault". Genre slug: post-apocalyptic. Chapter number: 3. Words per section: 3000.
+```
+
+**Voice:**
+> "Write chapter three of The Seed Vault. Genre post-apocalyptic. Words per section three thousand."
+
 ### 12.2 Write a Prologue
 
 A prologue sets the stage before Chapter 1 — a different time period, a flash-forward, a mythic framing, or historical context. Prologues are 1,500–3,000 words (shorter than a standard chapter).
@@ -1590,6 +1603,39 @@ Retrieve "The Overheard Fragment"
 
 ---
 
+## 14b. Q/A a Chapter
+
+After writing a chapter, you can run a standalone Q/A consistency check. This uses a separate Claude call to analyze the chapter for duplicate content and character name inconsistencies, then auto-corrects any issues found.
+
+**What it checks:**
+- **Duplicate content** — 5-gram cross-sub-chapter analysis to detect repeated passages
+- **Character name inconsistencies** — catches wrong names, misspellings, and surname confusion (e.g. "Miss Kellerton" flagged when "Mary Kellerton" is the correct character)
+
+**What it does:**
+- Claude fixes ONLY the detected issues while preserving your author voice
+- Saves the corrected version (with a version snapshot of the original)
+- Emails you the corrected chapter + a diff report + the Q/A findings
+
+**Chat:**
+```
+Q/A chapter 3 of The Clockwork Rebellion
+```
+```
+Clean up the prologue of The Clockwork Rebellion
+```
+```
+Fix duplicates in chapter 5 of The Seed Vault
+```
+
+**Voice:**
+> "Q/A chapter three of The Clockwork Rebellion."
+> "Clean up the epilogue of The Clockwork Rebellion."
+> "Fix the names in chapter five of The Seed Vault."
+
+**Note:** The Q/A check also runs automatically at the end of every chapter write. This standalone command is for re-running it on chapters that have already been written.
+
+---
+
 ## 15. Story Bible
 
 The story bible tracks characters, locations, plot threads, and world-building details across chapters. It's updated automatically when you write chapters.
@@ -1789,14 +1835,30 @@ List my projects
 
 Moves an item from **draft** to **approved**. A version snapshot is automatically saved.
 
-**Chat:**
+**Chat — By title:**
 ```
 Approve the draft titled "Why Post-Apocalyptic Fiction Matters More Than Ever in 2026"
 ```
 
+**Chat — By chapter number:**
+```
+Approve chapter 3 of The Clockwork Rebellion
+```
+
+**Chat — Prologue or Epilogue:**
+```
+Approve the prologue of The Clockwork Rebellion
+```
+
+**Chat — Bulk approve all chapters:**
+```
+Approve all chapters of The Clockwork Rebellion
+```
+
 **Voice:**
 > "Approve the draft called 'Why Post-Apocalyptic Fiction Matters.'"
-> "Approve my latest blog post."
+> "Approve chapter five of The Clockwork Rebellion."
+> "Approve all chapters of The Clockwork Rebellion."
 
 ### 18.6 Publish Content
 
@@ -2024,43 +2086,21 @@ Email me chapter 1 of "The Seed Vault"
 
 ### 18.17 Format a Book for Kindle (KDP Manuscript)
 
-When your book project has all its chapters written, you can compile them into a Kindle-ready Word document (.docx). The system retrieves every chapter in order — including Prologue and Epilogue — formats them with proper KDP page dimensions, and emails you the manuscript as an attachment.
+When your book project has all its chapters written, you can compile them into formatted Google Docs ready for Kindle Direct Publishing. The system retrieves every chapter in order — including Prologue and Epilogue — splits them into two documents, and emails you links to both.
 
 **What you get:**
-- A `.docx` file formatted for Kindle Direct Publishing
-- **Title page** with your book's title
-- **Each chapter** starting on an odd (right-hand) page with a section break
-- **Chapter titles** in Heading 1 format (centered, Garamond 18pt bold)
-- **Body text** in Garamond 12pt with first-line indentation
-- Proper **page dimensions** matching your chosen KDP trim size
-- **Scene breaks** rendered as centered asterisks (✻ ✻ ✻)
-- **Bold** and **italic** formatting preserved from the original chapter content
-
-**Available KDP Page Sizes:**
-
-| # | Page Size | Best For |
-|---|-----------|----------|
-| 1 | 5 × 8 in | Compact fiction, novellas |
-| 2 | 5.06 × 7.81 in | Digest size |
-| 3 | 5.25 × 8 in | Standard paperback fiction |
-| 4 | 5.5 × 8.5 in | Popular fiction size |
-| 5 | 6 × 9 in | Standard fiction/non-fiction (**default**) |
-| 6 | 6.14 × 9.21 in | Royal format |
-| 7 | 6.69 × 9.61 in | Crown quarto |
-| 8 | 7 × 10 in | Technical/reference books |
-| 9 | 7.44 × 9.69 in | Wide reference |
-| 10 | 7.5 × 9.25 in | Textbook |
-| 11 | 8 × 10 in | Large format |
-| 12 | 8.25 × 11 in | Full-size reference |
-| 13 | 8.25 × 6 in | Landscape |
-| 14 | 8.25 × 8.25 in | Square format |
-| 15 | 8.27 × 11.69 in | A4 |
-| 16 | 8.5 × 11 in | US Letter |
-| 17 | 8.5 × 8.5 in | Large square |
+- **Two Google Docs** (Part 1 and Part 2) — the manuscript is split at the chapter midpoint to stay within Google Docs' size limits
+- **Title page** with your book's title in each part
+- **Prologue** labeled as "Prologue - [Title]" and **Epilogue** labeled as "Epilogue - [Title]"
+- **Chapter titles** in Heading 1 format (centered)
+- **Sub-chapter headings** (from `#` markers) in Heading 2 format (left-aligned), with the `#` prefix removed
+- **Page breaks** before each chapter (not before sub-chapter headings)
+- **Shared links** — both docs are shared so you can access them immediately
+- **Auto-replacement** — re-running the command deletes the previous Part 1 and Part 2 docs and creates fresh ones
 
 **Chat — Default size (6×9):**
 ```
-Publish "The Seed Vault" for Kindle
+Format "The Seed Vault" for Kindle
 ```
 
 **Chat — Specific size:**
@@ -2069,18 +2109,24 @@ Format "The Seed Vault" for Kindle in 5.5 by 8.5
 ```
 
 **Voice — Default:**
-> "Publish my book The Seed Vault for Kindle."
+> "Format my book The Seed Vault for Kindle."
 
 **Voice — With size selection:**
 > "Format The Seed Vault for Kindle. Use the 5 by 8 page size."
 
-Eve will show you the available page sizes and ask you to pick one if you don't specify. Once you choose, the system:
+Once you request it, the system:
 
 1. Retrieves all chapters for the project (Prologue, Chapters 1-N, Epilogue) in order
-2. Builds the .docx with your selected page dimensions
-3. Emails the manuscript to you as an attachment
+2. Splits at the midpoint into Part 1 and Part 2
+3. Creates two Google Docs with formatted headings, page breaks, and sub-chapter headers
+4. Shares both docs and emails you the links
 
-**Tip:** Upload the .docx directly to your [KDP dashboard](https://kdp.amazon.com/) — it's ready to go.
+**From Google Docs you can:**
+- Download as `.docx` for KDP upload (File > Download > Microsoft Word)
+- Download as PDF for review
+- Edit formatting, fonts, and styles directly
+
+**Tip:** Download as `.docx` and upload directly to your [KDP dashboard](https://kdp.amazon.com/).
 
 ---
 

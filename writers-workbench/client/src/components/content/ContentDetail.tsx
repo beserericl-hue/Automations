@@ -1,13 +1,16 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useState, useMemo } from 'react';
+import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
 import RichTextEditor from '../editor/RichTextEditor';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import VersionHistory from './VersionHistory';
+import ImageGallery from '../images/ImageGallery';
 import { contentToHtml } from '../../lib/content-utils';
-import type { PublishedContent } from '../../types/database';
+import QAReportPanel from './QAReportPanel';
+import ProvenancePanel from './ProvenancePanel';
+import type { PublishedContent, GeneratedImage } from '../../types/database';
 
 export default function ContentDetail() {
   const { id } = useParams<{ id: string }>();
@@ -19,6 +22,9 @@ export default function ContentDetail() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [versionCount, setVersionCount] = useState(0);
   const [pendingStatus, setPendingStatus] = useState<string | null>(null);
+  const [showSchedulePicker, setShowSchedulePicker] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [showImagePicker, setShowImagePicker] = useState(false);
 
   const { data: item, isLoading, isError, error } = useQuery({
     queryKey: ['content-detail', id],
@@ -89,6 +95,12 @@ export default function ContentDetail() {
       if (newStatus === 'published') {
         updates.published_at = new Date().toISOString();
       }
+      // Clear schedule_date when unscheduling
+      if (newStatus !== 'scheduled' && item?.status === 'scheduled') {
+        const meta = { ...(item.metadata || {}) };
+        delete meta.schedule_date;
+        updates.metadata = meta;
+      }
       const { error } = await supabase
         .from('published_content_v2')
         .update(updates)
@@ -97,6 +109,31 @@ export default function ContentDetail() {
       if (error) throw error;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['content-detail', id] });
+      queryClient.invalidateQueries({ queryKey: ['content-list'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-recent'] });
+    },
+  });
+
+  // Schedule mutation
+  const scheduleMutation = useMutation({
+    mutationFn: async (dateStr: string) => {
+      const meta = { ...(item?.metadata || {}), schedule_date: dateStr };
+      const { error } = await supabase
+        .from('published_content_v2')
+        .update({
+          status: 'scheduled',
+          metadata: meta,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id!)
+        .eq('user_id', userId!);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setShowSchedulePicker(false);
+      setScheduleDate('');
       queryClient.invalidateQueries({ queryKey: ['content-detail', id] });
       queryClient.invalidateQueries({ queryKey: ['content-list'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-counts'] });
@@ -122,6 +159,26 @@ export default function ContentDetail() {
     },
   });
 
+  // Cover image mutation
+  const coverImageMutation = useMutation({
+    mutationFn: async (imagePath: string | null) => {
+      const { error } = await supabase
+        .from('published_content_v2')
+        .update({ cover_image_path: imagePath, updated_at: new Date().toISOString() })
+        .eq('id', id!)
+        .eq('user_id', userId!);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['content-detail', id] });
+      setShowImagePicker(false);
+    },
+  });
+
+  const handleSelectCoverImage = (image: GeneratedImage) => {
+    coverImageMutation.mutate(image.storage_path);
+  };
+
   const handleDeleteClick = async () => {
     // Get cascade count (content versions)
     const { count } = await supabase
@@ -132,9 +189,30 @@ export default function ContentDetail() {
     setShowDeleteConfirm(true);
   };
 
+  const latestContentRef = useRef<string | null>(null);
+
   const handleSave = useCallback((html: string) => {
+    latestContentRef.current = html;
     saveMutation.mutate(html);
   }, [saveMutation]);
+
+  // Ctrl+S / Cmd+S to save immediately
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        if (latestContentRef.current) {
+          saveMutation.mutate(latestContentRef.current);
+        }
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [saveMutation]);
+
+  // Convert markdown/plain text to HTML for TipTap on first load
+  // Must be before early returns to maintain consistent hook order
+  const editorContent = useMemo(() => contentToHtml(item?.content_text ?? null), [item?.content_text]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64 text-sm text-gray-500">Loading...</div>;
@@ -158,9 +236,6 @@ export default function ContentDetail() {
   }
 
   const statusActions = getStatusActions(item.status);
-
-  // Convert markdown/plain text to HTML for TipTap on first load
-  const editorContent = useMemo(() => contentToHtml(item.content_text), [item.content_text]);
 
   return (
     <div className="flex flex-col h-full gap-4">
@@ -202,6 +277,16 @@ export default function ContentDetail() {
             </button>
           ))}
 
+          {/* Schedule button — available for draft and approved content */}
+          {item.status !== 'scheduled' && item.status !== 'published' && (
+            <button
+              onClick={() => setShowSchedulePicker(!showSchedulePicker)}
+              className="rounded-lg px-3 py-1.5 text-xs font-medium border border-yellow-300 text-yellow-700 hover:bg-yellow-50 dark:border-yellow-700 dark:text-yellow-400 dark:hover:bg-yellow-950"
+            >
+              Schedule
+            </button>
+          )}
+
           <button
             onClick={handleDeleteClick}
             className="rounded-lg px-3 py-1.5 text-xs font-medium border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950"
@@ -210,6 +295,105 @@ export default function ContentDetail() {
           </button>
         </div>
       </div>
+
+      {/* Cover image banner */}
+      {item.cover_image_path ? (
+        <div className="relative overflow-hidden rounded-lg">
+          <img
+            src={supabase.storage.from('cover-images').getPublicUrl(item.cover_image_path).data.publicUrl}
+            alt={`Cover for ${item.title}`}
+            className="h-48 w-full object-cover"
+          />
+          <div className="absolute bottom-2 right-2 flex gap-1">
+            <button
+              onClick={() => setShowImagePicker(true)}
+              className="rounded bg-black/60 px-2 py-1 text-xs text-white hover:bg-black/80"
+            >
+              Change Cover
+            </button>
+            <button
+              onClick={() => coverImageMutation.mutate(null)}
+              className="rounded bg-black/60 px-2 py-1 text-xs text-white hover:bg-black/80"
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 rounded-lg border border-dashed border-gray-300 px-4 py-3 dark:border-gray-700">
+          <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+          </svg>
+          <span className="text-sm text-gray-500">No cover image</span>
+          <button
+            onClick={() => setShowImagePicker(true)}
+            className="ml-auto rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
+          >
+            Choose from Gallery
+          </button>
+        </div>
+      )}
+
+      {/* Image picker modal */}
+      {showImagePicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowImagePicker(false)}>
+          <div className="max-h-[80vh] w-full max-w-4xl overflow-y-auto rounded-lg bg-white p-6 shadow-2xl dark:bg-gray-900" onClick={e => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Select Cover Image</h3>
+              <button onClick={() => setShowImagePicker(false)} className="rounded p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <ImageGallery onSelectImage={handleSelectCoverImage} />
+          </div>
+        </div>
+      )}
+
+      {/* Scheduled date display */}
+      {item.status === 'scheduled' && typeof item.metadata?.schedule_date === 'string' && (
+        <div className="flex items-center gap-2 rounded-lg bg-yellow-50 border border-yellow-200 px-4 py-2 dark:bg-yellow-900/20 dark:border-yellow-800">
+          <span className="text-xs text-yellow-700 dark:text-yellow-400">
+            Scheduled for: {new Date(item.metadata.schedule_date).toLocaleString()}
+          </span>
+        </div>
+      )}
+
+      {/* Schedule date picker */}
+      {showSchedulePicker && (
+        <div className="flex items-center gap-3 rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3 dark:bg-yellow-900/20 dark:border-yellow-800">
+          <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Publish on:</label>
+          <input
+            type="datetime-local"
+            value={scheduleDate}
+            onChange={e => setScheduleDate(e.target.value)}
+            min={new Date().toISOString().slice(0, 16)}
+            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+          />
+          <button
+            onClick={() => { if (scheduleDate) scheduleMutation.mutate(new Date(scheduleDate).toISOString()); }}
+            disabled={!scheduleDate || scheduleMutation.isPending}
+            className="rounded-lg bg-yellow-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-yellow-700 disabled:opacity-50"
+          >
+            {scheduleMutation.isPending ? 'Scheduling...' : 'Confirm Schedule'}
+          </button>
+          <button
+            onClick={() => { setShowSchedulePicker(false); setScheduleDate(''); }}
+            className="text-xs text-gray-500 hover:text-gray-700"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Q/A Report (for chapters) */}
+      {item.content_type === 'chapter' && (
+        <QAReportPanel metadata={item.metadata} />
+      )}
+
+      {/* Sources / Provenance */}
+      <ProvenancePanel contentId={id!} />
 
       {/* Editor + Version History */}
       <div className="flex flex-1 min-h-0 gap-4">

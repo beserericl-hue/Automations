@@ -1,11 +1,14 @@
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../../contexts/UserContext';
 import { useDashboardCounts, useRecentItems, type RecentItem } from '../../hooks/useDashboardData';
+import { DashboardSkeleton } from '../shared/Skeleton';
 
 export default function Dashboard() {
   const { profile } = useUser();
   const { data: counts, isLoading: countsLoading, isError: countsError } = useDashboardCounts();
   const { data: recentItems, isLoading: recentLoading, isError: recentError, error: recentErrorObj } = useRecentItems();
+
+  if (countsLoading && recentLoading) return <DashboardSkeleton />;
 
   return (
     <div className="space-y-6">
@@ -33,7 +36,11 @@ export default function Dashboard() {
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Activity</h2>
         </div>
         {recentLoading ? (
-          <div className="px-6 py-12 text-center text-sm text-gray-500">Loading...</div>
+          <div className="space-y-2 p-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-10 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
+            ))}
+          </div>
         ) : recentError ? (
           <div className="px-6 py-12 text-center text-sm text-red-600 dark:text-red-400">
             Failed to load recent activity: {recentErrorObj?.message || 'Unknown error'}
@@ -104,7 +111,11 @@ function RecentRow({ item }: { item: RecentItem }) {
   return (
     <tr
       onClick={() => navigate(item.path)}
-      className="hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(item.path); } }}
+      tabIndex={0}
+      role="button"
+      aria-label={`View ${item.title}`}
+      className="hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-inset"
     >
       <td className="px-4 py-3">
         <span className="text-xs font-medium text-gray-400 uppercase">{typeLabels[item.type] || item.type}</span>
@@ -123,7 +134,8 @@ function RecentRow({ item }: { item: RecentItem }) {
       <td className="px-4 py-3 text-sm text-gray-500 text-right">{formatWords(item.word_count)}</td>
       <td className="px-4 py-3">
         {item.status && (
-          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[item.status] || ''}`}>
+          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[item.status] || ''}`}>
+            <StatusBadgeIcon status={item.status} />
             {item.status}
           </span>
         )}
@@ -133,6 +145,24 @@ function RecentRow({ item }: { item: RecentItem }) {
       </td>
     </tr>
   );
+}
+
+function StatusBadgeIcon({ status }: { status: string }) {
+  const cls = 'h-3 w-3 shrink-0';
+  switch (status) {
+    case 'published':
+      return <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>;
+    case 'approved':
+      return <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75" /></svg>;
+    case 'scheduled':
+      return <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+    case 'rejected':
+      return <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;
+    case 'draft':
+      return <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" /></svg>;
+    default:
+      return null;
+  }
 }
 
 function StatCard({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {

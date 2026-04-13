@@ -1,24 +1,35 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUser } from '../../contexts/UserContext';
+import { useTheme } from '../../hooks/useTheme';
+import { useToast } from '../../contexts/ToastContext';
 
 export default function UserSettings() {
   const { user } = useAuth();
   const { profile, refreshProfile } = useUser();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { theme, setTheme } = useTheme();
+  const { addToast } = useToast();
 
   const [displayName, setDisplayName] = useState(profile?.display_name || '');
   const [email, setEmail] = useState(profile?.email || '');
   const phone = profile?.phone_number || '';
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   // Password change
   const [newPassword, setNewPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
-  const [passwordSaved, setPasswordSaved] = useState(false);
+
+  // Account deletion
+  const [showDeleteSection, setShowDeleteSection] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [cascadeInfo, setCascadeInfo] = useState<{ label: string; count: number }[]>([]);
 
   // App config
   const { data: config } = useQuery({
@@ -65,8 +76,58 @@ export default function UserSettings() {
     await refreshProfile();
     queryClient.invalidateQueries({ queryKey: ['app-config'] });
     setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    addToast('Settings saved', 'success');
+  };
+
+  const loadCascadeInfo = async () => {
+    try {
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      const res = await fetch('/api/account/cascade-info', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (json.success) setCascadeInfo(json.data);
+    } catch {
+      // silently fail — cascade info is informational
+    }
+  };
+
+  const handleShowDelete = () => {
+    setShowDeleteSection(true);
+    loadCascadeInfo();
+  };
+
+  const deleteAccount = async () => {
+    setDeleteError('');
+    if (deleteConfirmation !== 'DELETE') {
+      setDeleteError('You must type DELETE to confirm.');
+      return;
+    }
+    setDeleting(true);
+    try {
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      const res = await fetch('/api/account', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ confirmation: 'DELETE' }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        setDeleteError(json.error?.message || 'Failed to delete account');
+        setDeleting(false);
+        return;
+      }
+      await supabase.auth.signOut();
+      navigate('/login');
+    } catch (err) {
+      setDeleteError('Network error. Please try again.');
+      setDeleting(false);
+    }
   };
 
   const changePassword = async () => {
@@ -74,9 +135,8 @@ export default function UserSettings() {
     if (newPassword.length < 8) { setPasswordError('Password must be at least 8 characters'); return; }
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) { setPasswordError(error.message); return; }
-    setPasswordSaved(true);
     setNewPassword('');
-    setTimeout(() => setPasswordSaved(false), 3000);
+    addToast('Password updated', 'success');
   };
 
   return (
@@ -114,8 +174,28 @@ export default function UserSettings() {
         <button onClick={saveProfile} disabled={saving} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
           {saving ? 'Saving...' : 'Save Changes'}
         </button>
-        {saved && <span className="text-sm text-green-500">Saved</span>}
       </div>
+
+      {/* Appearance */}
+      <Section title="Appearance">
+        <Field label="Theme">
+          <div className="flex gap-2">
+            {(['light', 'dark', 'system'] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTheme(t)}
+                className={`rounded-lg px-4 py-2 text-sm font-medium capitalize ${
+                  theme === t
+                    ? 'bg-brand-600 text-white'
+                    : 'border border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </Field>
+      </Section>
 
       {/* Password */}
       <Section title="Change Password">
@@ -126,8 +206,67 @@ export default function UserSettings() {
         <button onClick={changePassword} className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400">
           Update Password
         </button>
-        {passwordSaved && <span className="ml-3 text-sm text-green-500">Password updated</span>}
       </Section>
+
+      {/* Delete Account */}
+      <div className="rounded-lg border border-red-200 bg-red-50/50 p-4 space-y-4 dark:border-red-800 dark:bg-red-950/20">
+        <h2 className="text-sm font-semibold text-red-700 dark:text-red-400">Danger Zone</h2>
+        {!showDeleteSection ? (
+          <button
+            onClick={handleShowDelete}
+            className="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-600 hover:bg-red-100 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900"
+          >
+            Delete Account
+          </button>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-red-600 dark:text-red-400 font-medium">
+              This will permanently delete your account and all associated data. This action cannot be undone.
+            </p>
+
+            {cascadeInfo.length > 0 && (
+              <div className="rounded-lg bg-red-100 p-3 dark:bg-red-900/30">
+                <p className="text-xs font-medium text-red-800 dark:text-red-300 mb-1">
+                  The following data will be permanently deleted:
+                </p>
+                <ul className="list-disc pl-4 text-xs text-red-700 dark:text-red-400 space-y-0.5">
+                  {cascadeInfo.map((item, i) => (
+                    <li key={i}>{item.count} {item.label}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <Field label='Type "DELETE" to confirm'>
+              <input
+                value={deleteConfirmation}
+                onChange={e => setDeleteConfirmation(e.target.value)}
+                className={inputClass + ' border-red-300 dark:border-red-700'}
+                placeholder="DELETE"
+                autoComplete="off"
+              />
+            </Field>
+
+            {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
+
+            <div className="flex gap-3">
+              <button
+                onClick={deleteAccount}
+                disabled={deleting || deleteConfirmation !== 'DELETE'}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? 'Deleting...' : 'Permanently Delete Account'}
+              </button>
+              <button
+                onClick={() => { setShowDeleteSection(false); setDeleteConfirmation(''); setDeleteError(''); }}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

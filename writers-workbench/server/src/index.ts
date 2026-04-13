@@ -13,6 +13,9 @@ import { healthRouter } from './routes/health.js';
 import { chatRouter } from './routes/chat.js';
 import { exportRouter } from './routes/export.js';
 import { adminRouter } from './routes/admin.js';
+import { brainstormRouter } from './routes/brainstorm.js';
+import { accountRouter } from './routes/account.js';
+import { sessionRouter } from './routes/session.js';
 
 // Load .env from workspace root
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -84,9 +87,18 @@ const generalLimiter = rateLimit({
   message: { error: 'Too many requests, please try again later' },
 });
 
+const brainstormLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many brainstorm requests, please try again later' },
+});
+
 // Apply rate limits
 app.use('/api/chat', chatLimiter);
 app.use('/api/export', exportLimiter);
+app.use('/api/brainstorm', brainstormLimiter);
 app.use('/api/admin', generalLimiter);
 
 app.use(express.json({ limit: '10mb' }));
@@ -96,6 +108,13 @@ app.use('/api/health', healthRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/export', exportRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/brainstorm', brainstormRouter);
+app.use('/api/account', generalLimiter);
+app.use('/api/account', accountRouter);
+app.use('/api/session', generalLimiter);
+app.use('/api/session', sessionRouter);
+app.use('/api/callback', generalLimiter);
+app.use('/api/callback', sessionRouter);
 
 // Centralized error handler (must be after routes)
 app.use(errorHandler);

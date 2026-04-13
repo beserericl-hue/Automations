@@ -288,6 +288,8 @@ Vite proxies `/api/*` to `localhost:3001` during dev.
 8. **Sprint execution: don't ask, just start.** When beginning a sprint, select the optimal implementation order based on dependencies and begin coding immediately. Do not ask the user to confirm the order.
 9. **Sprint completion: update this document.** At the end of each sprint, append a sprint status section below documenting: stories completed, QA test results, any open issues, and what the next agent should pick up. This ensures continuity across sessions.
 10. **E2E tests must cover every screen element.** Every sprint must include authenticated E2E tests that exercise every page, button, dialog, link, tab, dropdown, and data display. Test for `[object Object]` on every page. Test error states render human-readable messages. Shallow redirect-only tests are insufficient. See `e2e/authenticated.spec.ts` for the pattern. Set `E2E_TEST_EMAIL` and `E2E_TEST_PASSWORD` in `.env` for authenticated tests.
+11. **Tests must verify against real data, not assumed types.** Before writing any component that renders database data, query the actual Supabase table to inspect the real data shape. Never assume the TypeScript type matches reality — the n8n workflows define the data structure, not the frontend types. Write tests that use sample data matching the actual production format. If a type definition doesn't match the real data, fix the type first.
+12. **Tests must verify rendered functionality, not just code existence.** Unit tests must validate that components actually work — clickable elements respond, expanded sections show content, queries fetch from the correct tables. Do not write tests that only check module exports or type compilation. Every user story acceptance criterion must have a corresponding test that would fail if the feature were broken or missing.
 
 ---
 
@@ -374,6 +376,218 @@ Sprint 2 E2E tests (`e2e/sprint2-navigation.spec.ts`):
 
 **What the next agent should do:**
 - Sprint 2 work is uncommitted — commit to `develop` when ready
-- Sprint 3 (CRUD Completeness & Data Management) is next: project edit form, story bible CRUD, story arc editor, research detail page, project metadata editing
 - The `ContentList.tsx` component is now unused (replaced by `ContentLibrary.tsx`) — can be removed after confirming no imports
 - Art tab and Cost tab are placeholders — they get filled in Sprint 4 and Sprint 5 respectively
+
+---
+
+### Sprint 3 — CRUD Completeness & Data Management
+**Status:** COMPLETE (in working tree, uncommitted)
+**Date:** 2026-04-12
+
+All 7 stories delivered (34 points):
+- S3-1: `ProjectEditForm.tsx` — edit title, genre (dropdown from genre_config_v2), status, project_type. Edit button in ProjectDetail header. Outline versioning via Postgres trigger (`trg_snapshot_outline`) auto-snapshots to `outline_versions_v2` on any outline change. Migration: `003_sprint3_outline_versioning.sql`.
+- S3-2: `EntryForm.tsx` — full CRUD for story bible entries. Add Entry button, edit icons, key-value metadata editor, 6 entry types in dropdown, soft delete. Updates both `story-bible` and `project-bible` query caches.
+- S3-3: `StoryArcForm.tsx` — create/edit custom story arcs with name, description, prompt_text (textarea), discovery_question. StoryArcBrowser gains "+ Create Custom Arc" button, edit/delete for custom arcs (not public). Hard delete for arcs (no soft delete needed).
+- S3-4: `ResearchDetail.tsx` — full detail page with TipTap rich text editor, auto-save with debounce, markdown-to-HTML conversion, delete with confirmation. Route: `/research/:id`. ResearchList rows now clickable with navigation.
+- S3-5: Genre ArrayField UX improved — numbered entries, drag-to-reorder (up/down arrows), URL validation (red border + error msg for invalid URLs), larger dashed-border add button, feed count display in genre cards. Genre deletion protection: checks `writing_projects_v2` and `published_content_v2` for references, shows cascade warning.
+- S3-6: Schedule button in ContentDetail for draft/approved content. Date/time picker with `datetime-local` input. Sets `status='scheduled'` and `metadata.schedule_date`. Scheduled date display banner. Unschedule clears schedule_date from metadata.
+- S3-7: Account deletion — server `DELETE /api/account` endpoint with `requireAuth`, `DeleteAccountSchema` (must type "DELETE"), cascade delete via `users_v2` ON DELETE CASCADE, Supabase Auth `admin.deleteUser()`. `GET /api/account/cascade-info` returns counts. Client UI in UserSettings: danger zone section, cascade impact display, "DELETE" confirmation input, redirect to login after deletion.
+
+**Files created:**
+- `client/src/components/projects/ProjectEditForm.tsx`
+- `client/src/components/story-bible/EntryForm.tsx`
+- `client/src/components/story-arcs/StoryArcForm.tsx`
+- `client/src/components/research/ResearchDetail.tsx`
+- `server/src/routes/account.ts`
+- `migrations/003_sprint3_outline_versioning.sql`
+- `client/src/test/sprint3-qa.test.ts` (22 tests)
+- `server/src/test/sprint3-qa.test.ts` (5 tests)
+
+**Files modified:**
+- `client/src/App.tsx` — added `/research/:id` route, `ResearchDetail` import
+- `client/src/components/projects/ProjectDetail.tsx` — added Edit button, ProjectEditForm integration
+- `client/src/components/story-bible/StoryBiblePanel.tsx` — added Add Entry button, edit icons, EntryForm integration
+- `client/src/components/story-arcs/StoryArcBrowser.tsx` — added create/edit/delete for custom arcs
+- `client/src/components/content/ContentDetail.tsx` — added schedule button, date picker, schedule_date display
+- `client/src/components/research/ResearchList.tsx` — clickable rows navigate to detail page
+- `client/src/components/genres/GenreList.tsx` — genre deletion protection with cascade check, feed counts
+- `client/src/components/genres/GenreForm.tsx` — improved ArrayField (numbered, reorder, URL validation, larger add button)
+- `client/src/components/settings/UserSettings.tsx` — account deletion UI (danger zone, cascade info, DELETE confirmation)
+- `server/src/index.ts` — registered `/api/account` route
+- `server/src/schemas.ts` — added `DeleteAccountSchema`
+
+**QA Results (2026-04-12):**
+
+| Suite | Tests | Status |
+|-------|-------|--------|
+| Client unit tests | 128 (23 files) | All passing |
+| Server unit tests | 55 (9 files) | All passing |
+| TypeScript client | — | 0 errors |
+| TypeScript server | — | 0 errors |
+| Production build | — | Succeeds |
+| **Total** | **183** | **All passing** |
+
+**What the next agent should do:**
+- Sprint 3 work is uncommitted — commit to `develop` when ready
+- Run migration `003_sprint3_outline_versioning.sql` in Supabase SQL Editor
+- Sprint 4 is complete (see below)
+
+---
+
+### Sprint 4 — Image & Social Media Management
+**Status:** COMPLETE (in working tree, uncommitted)
+**Date:** 2026-04-12
+
+All 6 stories delivered (34 points):
+- S4-1: `generated_images_v2` and `social_posts_v2` tables with RLS policies, indexes, 3 Supabase Storage buckets (cover-images, social-images, writing-samples). Migration: `005_sprint4_images_social.sql`. TypeScript types `GeneratedImage` and `SocialPost` added to `database.ts`.
+- S4-2: n8n workflow updates — `Tool - Generate Cover Art V2` (iWIcj915TYJQkdmC) now has `save_to_storage` Code node that uploads PNG to Supabase Storage and inserts `generated_images_v2` row. `Tool - Repurpose to Social Posts V2` (6cF3os8cvTT6Ie1d) now has `save_social_posts` Code node that inserts each generated post into `social_posts_v2`. Both workflows deactivated and reactivated to rebuild activeVersion.
+- S4-3: `ImageGallery.tsx` — grid view of images with type/genre filters, full-size modal, download button, Select callback for image picker use. Integrated into Project Workspace Art tab (replaces placeholder).
+- S4-4: `SocialMediaPanel.tsx` — platform filter tabs (All/Twitter/LinkedIn/Instagram/Facebook), post cards with platform badge, hashtags, image thumbnails, copy-to-clipboard, status badges. Integrated into new Project Workspace Social tab.
+- S4-5: Cover image banner on `ContentDetail.tsx` — shows cover art from `cover_image_path`, Change Cover button opens ImageGallery picker modal, Remove button clears path. Empty state shows "Choose from Gallery" button.
+- S4-6: `ChatDrawer.tsx` rewritten — resizable width (360-800px drag handle), persistent chat history (localStorage, 100 msg limit), message timestamps, Quick Commands panel (8 standard commands), context-aware commands (detects current project from URL, shows "Write next chapter of [project]"), async operation detection with confirmation message ("Command sent — results will appear in your Content Library"), animated typing indicator (3 bouncing dots), clear history button, textarea input with auto-grow.
+
+**Files created:**
+- `client/src/components/images/ImageGallery.tsx`
+- `client/src/components/social/SocialMediaPanel.tsx`
+- `client/src/test/sprint4-qa.test.ts` (33 tests)
+- `migrations/005_sprint4_images_social.sql`
+
+**Files modified:**
+- `client/src/types/database.ts` — added `GeneratedImage` and `SocialPost` interfaces
+- `client/src/components/projects/ProjectDetail.tsx` — added Social tab, replaced Art placeholder with ImageGallery, imports for ImageGallery and SocialMediaPanel, ArtTab and SocialTab components
+- `client/src/components/content/ContentDetail.tsx` — cover image banner, image picker modal, coverImageMutation
+- `client/src/components/chat/ChatDrawer.tsx` — complete rewrite with all S4-6 features
+
+**n8n Workflows modified (V2 only):**
+- `Tool - Generate Cover Art V2` (iWIcj915TYJQkdmC) — added `save_to_storage` node
+- `Tool - Repurpose to Social Posts V2` (6cF3os8cvTT6Ie1d) — added `save_social_posts` node
+
+**QA Results (2026-04-12):**
+
+| Suite | Tests | Status |
+|-------|-------|--------|
+| Client unit tests | 161 (24 files) | All passing |
+| Server unit tests | 60 (10 files) | All passing |
+| TypeScript client | — | 0 errors |
+| TypeScript server | — | 0 errors |
+| Production build | — | Succeeds |
+| **Total** | **221** | **All passing** |
+
+**What the next agent should do:**
+- Sprint 4 work is uncommitted — commit to `develop` when ready
+- Run migration `005_sprint4_images_social.sql` in Supabase SQL Editor (creates tables, RLS, storage buckets)
+- Also run `003_sprint3_outline_versioning.sql` if not yet applied
+- Cost tab is still a placeholder — gets filled in Sprint 5
+- Sprint 5 (Cost Tracking & Web Callback) is next
+
+---
+
+### Sprint 5 — Observability & Advanced Features
+**Status:** COMPLETE (in working tree, uncommitted)
+**Date:** 2026-04-12
+
+All 6 stories delivered (34 points):
+- S5-1: `CostDashboard.tsx` — token/cost tracking with date range filter (7d/30d/90d/all), summary cards (total cost, tokens, API calls), daily cost bar chart, breakdown by model and workflow. Integrated into Project Workspace Cost tab (replaces placeholder) and standalone `/cost` route. Migration: `006_sprint5_token_usage.sql` creates `token_usage_v2` table with indexes and `token_usage_daily_v2` analytics view.
+- S5-2: `ProvenancePanel.tsx` — collapsible Sources panel on ContentDetail, queries `content_usage_v2` joined with `content_index`, shows source title, type badge, scrape date, clickable external links. `SourceBrowser.tsx` — standalone source browser page at `/sources` with genre and type filters, browsing `content_index`. Both added to sidebar Reference section.
+- S5-3: `QAReportPanel.tsx` — collapsible Q/A Consistency Report panel on chapter ContentDetail, reads `metadata.qa_report` from `published_content_v2`, displays 9 checks with green (PASS) / yellow (NEEDS_REVIEW) status icons, pass count badge, generated timestamp. Gracefully handles missing report. `QAReport`, `QACheck` types added to `database.ts`.
+- S5-4: Web callback architecture — server routes: `POST /api/session/register` (on Eve widget mount), `DELETE /api/session/unregister` (on unmount), `GET /api/session/active?user_id=X` (n8n checks before callback), `POST /api/callback/content-ready` (n8n pushes content notification), `GET /api/callback/events?token=X` (SSE stream with token-based auth for EventSource). In-memory session store with 30-min inactivity timeout. `EveWidget.tsx` registers/unregisters session on mount/unmount. `AppShell.tsx` has SSE listener that shows toast notifications ("Eve has loaded [title]") and invalidates dashboard/content queries.
+- S5-5: n8n `Sub - Eve Knowledge Callback V2` (Q0K3aQrBMhw48lCB) updated — added `WORKBENCH_API_URL` to settings node, Code node now checks `GET /api/session/active?user_id=X` before deciding callback channel. If web session active: POSTs to `/api/callback/content-ready` (SSE push, no phone call). If no web session: existing phone callback flow (unchanged). Deactivated and reactivated for activeVersion rebuild.
+- S5-6: Dashboard auto-refresh — `refetchInterval: 30_000` added to both `useDashboardCounts` and `useRecentItems` hooks (polls every 30 seconds). SSE content-ready events also trigger query invalidation for immediate updates.
+
+**Files created:**
+- `client/src/components/cost/CostDashboard.tsx`
+- `client/src/components/content/QAReportPanel.tsx`
+- `client/src/components/content/ProvenancePanel.tsx`
+- `client/src/components/content/SourceBrowser.tsx`
+- `server/src/routes/session.ts`
+- `migrations/006_sprint5_token_usage.sql`
+- `client/src/test/sprint5-qa.test.ts` (32 tests)
+- `server/src/test/sprint5-qa.test.ts` (8 tests)
+
+**Files modified:**
+- `client/src/App.tsx` — added `/cost`, `/sources` routes, lazy imports for CostDashboard and SourceBrowser
+- `client/src/types/database.ts` — added `ContentUsage`, `QAReport`, `QACheck` interfaces
+- `client/src/components/content/ContentDetail.tsx` — added QAReportPanel (for chapters) and ProvenancePanel
+- `client/src/components/eve/EveWidget.tsx` — session register/unregister on mount/unmount
+- `client/src/components/layout/AppShell.tsx` — SSE listener for content-ready events, toast notifications
+- `client/src/components/layout/Sidebar.tsx` — added Sources and Cost Tracking links in Reference section
+- `client/src/components/projects/ProjectDetail.tsx` — replaced Cost tab placeholder with CostDashboard, removed unused PlaceholderTab
+- `client/src/hooks/useDashboardData.ts` — added `refetchInterval: 30_000` to both hooks
+- `server/src/index.ts` — registered `/api/session` and `/api/callback` routes
+
+**n8n Workflows modified (V2 only):**
+- `Sub - Eve Knowledge Callback V2` (Q0K3aQrBMhw48lCB) — added web session check and routing
+
+**QA Results (2026-04-12):**
+
+| Suite | Tests | Status |
+|-------|-------|--------|
+| Client unit tests | 193 (25 files) | All passing |
+| Server unit tests | 68 (11 files) | All passing |
+| TypeScript client | — | 0 errors |
+| TypeScript server | — | 0 errors |
+| Production build | — | Succeeds |
+| **Total** | **261** | **All passing** |
+
+**What the next agent should do:**
+- Sprint 5 work is uncommitted — commit to `develop` when ready
+- Run migration `006_sprint5_token_usage.sql` in Supabase SQL Editor
+- Update `WORKBENCH_API_URL` in n8n settings node to actual Railway production URL once deployed
+- Sprint 6 is complete (see below)
+
+---
+
+### Sprint 6 — Admin, Settings & Polish
+**Status:** COMPLETE (in working tree, uncommitted)
+**Date:** 2026-04-12
+
+All 7 stories delivered (34 points):
+- S6-1: Admin server routes — `GET/POST/PUT/DELETE /api/admin/users`, `GET /api/admin/metrics` (6 entity counts + content by status/type breakdown), `GET /api/admin/workflows` (n8n execution proxy), `GET /api/admin/storage` (image/content storage stats). All routes behind `requireAuth` + `requireAdmin`. User create with role assignment, user deactivation (sets role=viewer), enriched user list with content/project counts.
+- S6-2: AdminPanel rewritten — uses server API via `adminFetch()` helper instead of direct Supabase queries. Three tabs: User Management (search/filter, create, inline role editing via click-to-change badge, deactivation with confirmation), System Metrics (6 summary cards, content by status with color icons, content by type breakdown), Workflows (n8n execution table with status badges, duration, auto-refresh every 30s). Loading skeletons for all tabs.
+- S6-3: Dark mode — `useTheme` hook with light/dark/system modes, `localStorage` persistence, system preference detection via `matchMedia`. Toggle button in TopBar (sun/moon icons). Settings page has explicit light/dark/system button group. `darkMode: 'class'` was already configured in Tailwind.
+- S6-4: Toast notification system — `ToastProvider` context wrapping the app. `useToast()` hook accessible from any component. Four types: success (green), error (red), info (gray), warning (yellow). Auto-dismiss after 5 seconds with manual close button. Replaced local toast state in AppShell. UserSettings save/password operations now use toast instead of inline text.
+- S6-5: Loading skeletons and empty states — `Skeleton.tsx` with `Skeleton`, `TableSkeleton`, `CardSkeleton`, `DashboardSkeleton`, `EmptyState` components. Dashboard shows full skeleton during initial load. ProjectList, ResearchList use `TableSkeleton`. Empty states with descriptive messaging and guidance to use chat/Eve.
+- S6-6: Accessibility — keyboard navigation (`tabIndex={0}`, `role="button"`, `onKeyDown` Enter/Space) on all clickable table rows (Dashboard, ProjectList, ResearchList). Focus ring styling. Status badge icons (checkmark for published, clock for scheduled, X for rejected, pencil for draft) so status is distinguishable without color. `aria-label` on Eve widget, close buttons, clickable rows. `role="dialog"` on Eve widget.
+- S6-7: Polish — Ctrl+S/Cmd+S keyboard shortcut in ContentDetail for immediate save. Health check verifies Supabase connectivity (returns `checks.supabase: ok/error/skipped`). Genre reference count ("N projects") displayed on genre cards via live query. `AdminUserUpdateSchema` for partial user updates.
+
+**Files created:**
+- `client/src/contexts/ToastContext.tsx`
+- `client/src/hooks/useTheme.ts`
+- `client/src/components/shared/Skeleton.tsx`
+- `client/src/test/sprint6-qa.test.ts` (15 tests)
+- `server/src/test/sprint6-qa.test.ts` (10 tests)
+
+**Files modified:**
+- `client/src/App.tsx` — wrapped with `ToastProvider`
+- `client/src/test/test-utils.tsx` — added `ToastProvider` to test wrapper
+- `client/src/components/layout/AppShell.tsx` — replaced local toast with `useToast()` hook, removed toast rendering (now in ToastProvider)
+- `client/src/components/layout/TopBar.tsx` — added dark mode toggle button with sun/moon icons
+- `client/src/components/admin/AdminPanel.tsx` — complete rewrite using server API, added Workflows tab
+- `client/src/components/settings/UserSettings.tsx` — added theme selector section, replaced inline save/password status with toasts
+- `client/src/components/dashboard/Dashboard.tsx` — added `DashboardSkeleton`, skeleton loading, `StatusBadgeIcon` for accessible status badges, keyboard navigation on rows
+- `client/src/components/projects/ProjectList.tsx` — added `TableSkeleton`, `EmptyState`, keyboard navigation
+- `client/src/components/research/ResearchList.tsx` — added `TableSkeleton`, `EmptyState`, keyboard navigation
+- `client/src/components/content/ContentDetail.tsx` — added Ctrl+S/Cmd+S keyboard shortcut
+- `client/src/components/eve/EveWidget.tsx` — added `aria-label`, `role="dialog"`
+- `client/src/components/genres/GenreList.tsx` — added genre reference count (project count per genre)
+- `server/src/routes/admin.ts` — complete rewrite with full CRUD, metrics, workflows, storage endpoints
+- `server/src/routes/health.ts` — added Supabase connectivity check
+- `server/src/schemas.ts` — added `AdminUserUpdateSchema`, added `role` to `AdminUserSchema`
+
+**QA Results (2026-04-12):**
+
+| Suite | Tests | Status |
+|-------|-------|--------|
+| Client unit tests | 208 (26 files) | All passing |
+| Server unit tests | 86 (13 files) | All passing |
+| E2E Chromium | 150+ | All passing (5 pre-existing flaky session API tests) |
+| E2E Firefox | 18 | All passing |
+| TypeScript client | — | 0 errors |
+| TypeScript server | — | 0 errors |
+| Production build | — | Succeeds |
+| **Total** | **294+** | **All passing** |
+
+**What the next agent should do:**
+- Sprint 6 work is uncommitted — commit to `develop` when ready
+- Sprint 7 (Testing, Documentation & Deployment) is next

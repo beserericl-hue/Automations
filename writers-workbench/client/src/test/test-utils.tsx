@@ -3,6 +3,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../contexts/AuthContext';
 import { UserProvider } from '../contexts/UserContext';
+import { ToastProvider } from '../contexts/ToastContext';
 import type { ReactElement } from 'react';
 
 const createTestQueryClient = () =>
@@ -18,11 +19,13 @@ function AllProviders({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <ToastProvider>
         <AuthProvider>
           <UserProvider>
             {children}
           </UserProvider>
         </AuthProvider>
+        </ToastProvider>
       </BrowserRouter>
     </QueryClientProvider>
   );
