@@ -2,7 +2,7 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 
-# Copy workspace root package files (lock file is here)
+# Copy workspace root package files (lock file lives here)
 COPY package.json package-lock.json ./
 COPY client/package.json ./client/
 COPY server/package.json ./server/
@@ -23,21 +23,28 @@ RUN npm -w client run build
 # Build server
 RUN npm -w server run build
 
-# ---- Stage 2: Production image ----
+# ---- Stage 2: Production deps only ----
+FROM node:20-alpine AS deps
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY client/package.json ./client/
+COPY server/package.json ./server/
+
+RUN npm ci --omit=dev
+
+# ---- Stage 3: Production image ----
 FROM node:20-alpine
 WORKDIR /app
 
-# Copy workspace root package files for production install
-COPY package.json package-lock.json ./
-COPY server/package.json ./server/
+# Production node_modules (hoisted at root)
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/package.json ./
 
-# Install production deps only (workspace-aware)
-RUN npm ci --omit=dev --workspace=server
-
-# Copy server build output
+# Server compiled output
 COPY --from=build /app/server/dist ./dist
 
-# Copy client build into public directory (served by Express)
+# Client build (served as static files by Express)
 COPY --from=build /app/client/dist ./public
 
 ENV NODE_ENV=production
