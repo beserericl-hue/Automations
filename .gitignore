@@ -8,5 +8,7 @@ elevenlabs-mcp/
 # Generated artifacts
 *.pdf
 *.ps
-*.html
 image.png
+
+# HTML reports (but NOT client/index.html)
+/*.html
