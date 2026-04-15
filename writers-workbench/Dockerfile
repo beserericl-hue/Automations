@@ -13,14 +13,15 @@ RUN npm ci
 COPY client/ ./client/
 COPY server/ ./server/
 
-# Debug: verify index.html was copied
-RUN ls -la client/index.html || echo "INDEX.HTML MISSING"
-
-# Build client (needs VITE_ env vars at build time)
+# Build client — VITE_ vars must be ARG + ENV so Vite sees them at build time
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
 ARG VITE_N8N_WEBHOOK_URL
 ARG VITE_ELEVENLABS_AGENT_ID
+ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+ENV VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+ENV VITE_N8N_WEBHOOK_URL=${VITE_N8N_WEBHOOK_URL}
+ENV VITE_ELEVENLABS_AGENT_ID=${VITE_ELEVENLABS_AGENT_ID}
 
 WORKDIR /app/client
 RUN npm run build
