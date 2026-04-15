@@ -24,7 +24,11 @@ ENV VITE_N8N_WEBHOOK_URL=${VITE_N8N_WEBHOOK_URL}
 ENV VITE_ELEVENLABS_AGENT_ID=${VITE_ELEVENLABS_AGENT_ID}
 
 WORKDIR /app/client
-RUN npm run build
+RUN echo "=== DEBUG: pwd ===" && pwd && \
+    echo "=== DEBUG: ls -la ===" && ls -la && \
+    echo "=== DEBUG: cat vite.config.ts ===" && cat vite.config.ts && \
+    echo "=== DEBUG: index.html exists? ===" && ls -la index.html && \
+    echo "=== DEBUG: starting build ===" && npm run build
 
 # Build server
 WORKDIR /app/server
