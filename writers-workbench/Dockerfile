@@ -18,10 +18,10 @@ ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
 ARG VITE_N8N_WEBHOOK_URL
 ARG VITE_ELEVENLABS_AGENT_ID
-RUN npm -w client run build
+RUN cd client && npm run build
 
 # Build server
-RUN npm -w server run build
+RUN cd server && npm run build
 
 # ---- Stage 2: Production deps only ----
 FROM node:20-alpine AS deps
