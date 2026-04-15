@@ -13,15 +13,23 @@ RUN npm ci
 COPY client/ ./client/
 COPY server/ ./server/
 
+# Debug: verify index.html was copied
+RUN ls -la client/index.html || echo "INDEX.HTML MISSING"
+
 # Build client (needs VITE_ env vars at build time)
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
 ARG VITE_N8N_WEBHOOK_URL
 ARG VITE_ELEVENLABS_AGENT_ID
-RUN cd client && npm run build
+
+WORKDIR /app/client
+RUN npm run build
 
 # Build server
-RUN cd server && npm run build
+WORKDIR /app/server
+RUN npm run build
+
+WORKDIR /app
 
 # ---- Stage 2: Production deps only ----
 FROM node:20-alpine AS deps
