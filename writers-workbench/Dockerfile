@@ -1,35 +1,44 @@
-# ---- Stage 1: Build React client ----
-FROM node:20-alpine AS client-build
-WORKDIR /app/client
-COPY client/package*.json ./
+# ---- Stage 1: Install all deps + build everything ----
+FROM node:20-alpine AS build
+WORKDIR /app
+
+# Copy workspace root package files (lock file is here)
+COPY package.json package-lock.json ./
+COPY client/package.json ./client/
+COPY server/package.json ./server/
+
 RUN npm ci
-COPY client/ ./
+
+# Copy source code
+COPY client/ ./client/
+COPY server/ ./server/
+
+# Build client (needs VITE_ env vars at build time)
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
 ARG VITE_N8N_WEBHOOK_URL
 ARG VITE_ELEVENLABS_AGENT_ID
-RUN npm run build
+RUN npm -w client run build
 
-# ---- Stage 2: Build Node server ----
-FROM node:20-alpine AS server-build
-WORKDIR /app/server
-COPY server/package*.json ./
-RUN npm ci
-COPY server/ ./
-RUN npm run build
+# Build server
+RUN npm -w server run build
 
-# ---- Stage 3: Production image ----
+# ---- Stage 2: Production image ----
 FROM node:20-alpine
 WORKDIR /app
 
-# Copy server build + production deps only
-COPY server/package*.json ./
-RUN npm ci --omit=dev
+# Copy workspace root package files for production install
+COPY package.json package-lock.json ./
+COPY server/package.json ./server/
 
-COPY --from=server-build /app/server/dist ./dist
+# Install production deps only (workspace-aware)
+RUN npm ci --omit=dev --workspace=server
+
+# Copy server build output
+COPY --from=build /app/server/dist ./dist
 
 # Copy client build into public directory (served by Express)
-COPY --from=client-build /app/client/dist ./public
+COPY --from=build /app/client/dist ./public
 
 ENV NODE_ENV=production
 
