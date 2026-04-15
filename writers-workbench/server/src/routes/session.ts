@@ -37,9 +37,19 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 /**
- * POST /api/session/register
- * Register an active web session for the current user.
- * Called when Eve widget opens.
+ * @openapi
+ * /session/register:
+ *   post:
+ *     tags: [Session]
+ *     summary: Register active web session
+ *     description: Called when the Eve widget opens. Tells n8n to use web callback instead of phone.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Session registered
+ *       401:
+ *         description: Missing or invalid auth token
  */
 router.post('/register', requireAuth, (req: Request, res: Response) => {
   const userId = req.userId!;
@@ -57,9 +67,19 @@ router.post('/register', requireAuth, (req: Request, res: Response) => {
 });
 
 /**
- * DELETE /api/session/unregister
- * Remove the web session for the current user.
- * Called when Eve widget closes.
+ * @openapi
+ * /session/unregister:
+ *   delete:
+ *     tags: [Session]
+ *     summary: Unregister web session
+ *     description: Called when the Eve widget closes.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Session removed
+ *       401:
+ *         description: Missing or invalid auth token
  */
 router.delete('/unregister', requireAuth, (req: Request, res: Response) => {
   const userId = req.userId!;
@@ -69,10 +89,28 @@ router.delete('/unregister', requireAuth, (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/session/active?user_id=X
- * Check if a user has an active web session.
- * Called by n8n eve_knowledge_callback before deciding phone vs web.
- * No auth required — n8n calls this server-to-server.
+ * @openapi
+ * /session/active:
+ *   get:
+ *     tags: [Session]
+ *     summary: Check if user has active web session
+ *     description: Called by n8n eve_knowledge_callback to decide phone vs web callback. No auth required (server-to-server).
+ *     parameters:
+ *       - in: query
+ *         name: user_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Phone number (E.164)
+ *     responses:
+ *       200:
+ *         description: Session status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SessionActiveResponse'
+ *       400:
+ *         description: Missing user_id parameter
  */
 router.get('/active', (req: Request, res: Response) => {
   const userId = req.query.user_id as string;
@@ -96,10 +134,23 @@ router.get('/active', (req: Request, res: Response) => {
 });
 
 /**
- * POST /api/callback/content-ready
- * Receives content from n8n when Eve has loaded content for a web user.
- * Pushes to SSE stream for that user.
- * No auth — n8n calls this server-to-server.
+ * @openapi
+ * /callback/content-ready:
+ *   post:
+ *     tags: [Callback]
+ *     summary: Push content-ready notification from n8n
+ *     description: Called by n8n when Eve has loaded content for a web user. Pushes to SSE stream. No auth (server-to-server).
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ContentReadyRequest'
+ *     responses:
+ *       200:
+ *         description: Event pushed to SSE clients
+ *       400:
+ *         description: Missing user_id
  */
 router.post('/content-ready', (req: Request, res: Response) => {
   const { user_id, content_title, content_type, content_id } = req.body;
@@ -131,10 +182,24 @@ router.post('/content-ready', (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/callback/events?token=X
- * SSE stream for push notifications.
- * Called by the web client to receive real-time events.
- * Uses query param auth because EventSource doesn't support custom headers.
+ * @openapi
+ * /callback/events:
+ *   get:
+ *     tags: [Callback]
+ *     summary: SSE stream for real-time push notifications
+ *     description: EventSource endpoint. Uses token query param for auth (EventSource cannot send headers).
+ *     parameters:
+ *       - in: query
+ *         name: token
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Supabase Auth access token
+ *     responses:
+ *       200:
+ *         description: SSE event stream (text/event-stream)
+ *       401:
+ *         description: Invalid or missing token
  */
 router.get('/events', async (req: Request, res: Response) => {
   const token = req.query.token as string;

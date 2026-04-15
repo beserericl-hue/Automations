@@ -10,7 +10,128 @@ export const adminRouter = Router();
 // All admin routes require JWT + admin role
 adminRouter.use(requireAuth, requireAdmin);
 
-// GET /api/admin/users — list all users
+/**
+ * @openapi
+ * /admin/users:
+ *   get:
+ *     tags: [Admin]
+ *     summary: List all users
+ *     description: Returns all users with content and project counts. Admin only.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/AdminUser'
+ *       403:
+ *         description: Not an admin
+ *   post:
+ *     tags: [Admin]
+ *     summary: Create a new user
+ *     description: Pre-create a user record with phone, name, email, and role. Admin only.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AdminCreateUserRequest'
+ *     responses:
+ *       201:
+ *         description: User created
+ *       400:
+ *         description: Validation error
+ *       403:
+ *         description: Not an admin
+ * /admin/users/{id}:
+ *   put:
+ *     tags: [Admin]
+ *     summary: Update user profile and role
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User updated
+ *       403:
+ *         description: Not an admin
+ *       404:
+ *         description: User not found
+ *   delete:
+ *     tags: [Admin]
+ *     summary: Deactivate a user
+ *     description: Sets user role to viewer (soft deactivation).
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User deactivated
+ *       403:
+ *         description: Not an admin
+ * /admin/metrics:
+ *   get:
+ *     tags: [Admin]
+ *     summary: System-wide metrics
+ *     description: Returns entity counts and content breakdowns by status/type.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Metrics data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   $ref: '#/components/schemas/AdminMetrics'
+ *       403:
+ *         description: Not an admin
+ * /admin/workflows:
+ *   get:
+ *     tags: [Admin]
+ *     summary: n8n workflow execution status
+ *     description: Proxies to n8n API for recent execution data.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Workflow execution list
+ *       403:
+ *         description: Not an admin
+ * /admin/storage:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Storage usage statistics
+ *     description: Returns image and content storage usage from Supabase.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Storage stats
+ *       403:
+ *         description: Not an admin
+ */
 adminRouter.get('/users', async (_req: Request, res: Response) => {
   try {
     const supabase = getSupabaseAdmin();

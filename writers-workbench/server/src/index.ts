@@ -16,6 +16,9 @@ import { adminRouter } from './routes/admin.js';
 import { brainstormRouter } from './routes/brainstorm.js';
 import { accountRouter } from './routes/account.js';
 import { sessionRouter } from './routes/session.js';
+import { imagesRouter } from './routes/images.js';
+import { swaggerSpec } from './swagger.js';
+import swaggerUi from 'swagger-ui-express';
 
 // Load .env from workspace root
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -103,6 +106,13 @@ app.use('/api/admin', generalLimiter);
 
 app.use(express.json({ limit: '10mb' }));
 
+// API documentation
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customSiteTitle: 'Writers Workbench API',
+  customCss: '.swagger-ui .topbar { display: none }',
+}));
+app.get('/api/docs.json', (_req, res) => res.json(swaggerSpec));
+
 // API routes
 app.use('/api/health', healthRouter);
 app.use('/api/chat', chatRouter);
@@ -113,6 +123,8 @@ app.use('/api/account', generalLimiter);
 app.use('/api/account', accountRouter);
 app.use('/api/session', generalLimiter);
 app.use('/api/session', sessionRouter);
+app.use('/api/images', generalLimiter);
+app.use('/api/images', imagesRouter);
 app.use('/api/callback', generalLimiter);
 app.use('/api/callback', sessionRouter);
 

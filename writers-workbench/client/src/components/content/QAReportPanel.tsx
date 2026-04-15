@@ -1,23 +1,84 @@
 import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../../config/supabase';
+import { sendWebhookCommand } from '../../lib/webhook';
 import type { QAReport, QACheck } from '../../types/database';
 
 interface QAReportPanelProps {
   metadata: Record<string, unknown>;
+  contentId: string;
+  contentTitle: string;
+  chapterNumber: number | null;
+  projectId: string | null;
+  userId: string;
 }
 
-export default function QAReportPanel({ metadata }: QAReportPanelProps) {
+async function triggerQA(userId: string, contentTitle: string, chapterNumber: number | null, projectId: string | null) {
+  let projectTitle = '';
+  if (projectId) {
+    const { data } = await supabase
+      .from('writing_projects_v2')
+      .select('title')
+      .eq('id', projectId)
+      .single();
+    projectTitle = data?.title || '';
+  }
+
+  const chapterLabel = chapterNumber != null ? `chapter ${chapterNumber}` : contentTitle;
+  const message = projectTitle
+    ? `q/a ${chapterLabel} of ${projectTitle}`
+    : `q/a ${chapterLabel}`;
+
+  return sendWebhookCommand(userId, message);
+}
+
+export default function QAReportPanel({ metadata, contentId, contentTitle, chapterNumber, projectId, userId }: QAReportPanelProps) {
   const [expanded, setExpanded] = useState(false);
+  const queryClient = useQueryClient();
   const report = metadata?.qa_report as QAReport | undefined;
+
+  const runQA = useMutation({
+    mutationFn: () => triggerQA(userId, contentTitle, chapterNumber, projectId),
+    onSuccess: () => {
+      // The Q/A workflow is async — it will update metadata.qa_report in the DB.
+      // Poll for the result after a delay.
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['content-detail', contentId] });
+      }, 15_000);
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['content-detail', contentId] });
+      }, 45_000);
+    },
+  });
 
   if (!report || !report.checks?.length) {
     return (
       <div className="rounded-lg border border-gray-200 px-4 py-3 dark:border-gray-700">
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          No consistency report available
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            No consistency report available
+          </div>
+          <button
+            onClick={() => runQA.mutate()}
+            disabled={runQA.isPending}
+            className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+          >
+            {runQA.isPending ? 'Running...' : 'Run Q/A Check'}
+          </button>
         </div>
+        {runQA.isSuccess && (
+          <p className="mt-2 text-xs text-green-600 dark:text-green-400">
+            Q/A check started — results will appear here shortly.
+          </p>
+        )}
+        {runQA.isError && (
+          <p className="mt-2 text-xs text-red-500">
+            Failed to start Q/A check. Try again.
+          </p>
+        )}
       </div>
     );
   }
@@ -46,13 +107,28 @@ export default function QAReportPanel({ metadata }: QAReportPanelProps) {
             {passCount}/{totalCount} passed
           </span>
         </div>
-        <svg
-          className={`h-4 w-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
-          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={(e) => { e.stopPropagation(); runQA.mutate(); }}
+            disabled={runQA.isPending}
+            className="rounded px-2 py-1 text-[10px] font-medium border border-gray-300 text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800 disabled:opacity-50"
+          >
+            {runQA.isPending ? 'Running...' : 'Re-run'}
+          </button>
+          <svg
+            className={`h-4 w-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
       </button>
+
+      {runQA.isSuccess && (
+        <div className="px-4 py-2 text-xs text-green-600 dark:text-green-400 border-t border-gray-200 dark:border-gray-700 bg-green-50 dark:bg-green-950/20">
+          Q/A re-check started — results will refresh shortly.
+        </div>
+      )}
 
       {/* Expanded checks list */}
       {expanded && (

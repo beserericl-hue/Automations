@@ -44,7 +44,7 @@ test.describe('S5-1: Cost Tracking Dashboard', () => {
     if (await projectLink.isVisible().catch(() => false)) {
       await projectLink.click();
       await page.waitForTimeout(1000);
-      const costTab = page.getByText('Cost');
+      const costTab = page.getByRole('button', { name: 'Cost' });
       if (await costTab.isVisible()) {
         await costTab.click();
         await page.waitForTimeout(1000);

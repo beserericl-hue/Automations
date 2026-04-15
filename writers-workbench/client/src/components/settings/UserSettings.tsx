@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useUser } from '../../contexts/UserContext';
 import { useTheme } from '../../hooks/useTheme';
 import { useToast } from '../../contexts/ToastContext';
+import { resetTutorial } from '../onboarding/OnboardingTutorial';
 
 export default function UserSettings() {
   const { user } = useAuth();
@@ -205,6 +206,24 @@ export default function UserSettings() {
         {passwordError && <p className="text-sm text-red-600">{passwordError}</p>}
         <button onClick={changePassword} className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400">
           Update Password
+        </button>
+      </Section>
+
+      {/* Replay Tutorial */}
+      <Section title="Help">
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+          Replay the onboarding tutorial to see a quick overview of the app features.
+        </p>
+        <button
+          onClick={async () => {
+            if (profile?.user_id) {
+              await resetTutorial(profile.user_id);
+              addToast('Tutorial reset — it will appear on your next page load.', 'info');
+            }
+          }}
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
+        >
+          Replay Tutorial
         </button>
       </Section>
 

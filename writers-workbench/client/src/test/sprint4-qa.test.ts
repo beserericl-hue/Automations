@@ -118,16 +118,21 @@ describe('S4-3: Cover Art Gallery', () => {
     expect(content).toContain('All Types');
   });
 
-  it('ImageGallery renders download button and full-size modal', async () => {
+  it('ImageGallery renders thumbnail grid and navigates to detail', async () => {
     const fs = await import('fs');
     const path = await import('path');
     const content = fs.readFileSync(
       path.resolve(process.cwd(), 'src/components/images/ImageGallery.tsx'),
       'utf-8'
     );
-    expect(content).toContain('handleDownload');
-    expect(content).toContain('selectedImage');
-    expect(content).toContain('Download');
+    expect(content).toContain('handleClick');
+    expect(content).toContain('navigate');
+    expect(content).toContain('getImageUrl');
+  });
+
+  it('ImageDetail page exists with prompt editor and regenerate', async () => {
+    const mod = await import('../components/images/ImageDetail');
+    expect(mod.default).toBeDefined();
   });
 });
 

@@ -11,9 +11,27 @@ export const accountRouter = Router();
 accountRouter.use(requireAuth);
 
 /**
- * DELETE /api/account — delete the authenticated user's own account.
- * Requires body: { confirmation: "DELETE" }
- * Cascade: users_v2 ON DELETE CASCADE handles all child tables.
+ * @openapi
+ * /account:
+ *   delete:
+ *     tags: [Account]
+ *     summary: Delete authenticated user's own account
+ *     description: Permanently deletes the user and all associated data via CASCADE. Requires typing "DELETE" to confirm.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/DeleteAccountRequest'
+ *     responses:
+ *       200:
+ *         description: Account deleted successfully
+ *       400:
+ *         description: Invalid confirmation text
+ *       401:
+ *         description: Missing or invalid auth token
  */
 accountRouter.delete('/', validateBody(DeleteAccountSchema), async (req, res, next) => {
   try {
@@ -63,7 +81,23 @@ accountRouter.delete('/', validateBody(DeleteAccountSchema), async (req, res, ne
 });
 
 /**
- * GET /api/account/cascade-info — get counts of data that will be deleted
+ * @openapi
+ * /account/cascade-info:
+ *   get:
+ *     tags: [Account]
+ *     summary: Get cascade impact counts
+ *     description: Returns counts of all data that will be deleted if the account is deleted.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Cascade impact counts
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CascadeInfo'
+ *       401:
+ *         description: Missing or invalid auth token
  */
 accountRouter.get('/cascade-info', async (req, res, next) => {
   try {

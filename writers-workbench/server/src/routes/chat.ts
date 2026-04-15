@@ -6,7 +6,29 @@ import { logger } from '../lib/logger.js';
 
 export const chatRouter = Router();
 
-// CORS proxy for n8n webhook — used if direct browser calls are blocked
+/**
+ * @openapi
+ * /chat/proxy:
+ *   post:
+ *     tags: [Chat]
+ *     summary: Proxy chat message to n8n webhook
+ *     description: CORS proxy for the n8n author_request_v2 webhook. Forwards the user message and returns the workflow response.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ChatProxyRequest'
+ *     responses:
+ *       200:
+ *         description: Webhook response (sync or async acknowledgement)
+ *       401:
+ *         description: Missing or invalid auth token
+ *       502:
+ *         description: Failed to reach n8n webhook
+ */
 chatRouter.post('/proxy', requireAuth, validateBody(ChatProxySchema), async (req, res) => {
   const webhookUrl = process.env.N8N_API_URL
     ? `${process.env.N8N_API_URL}/webhook/author_request_v2`

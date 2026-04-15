@@ -109,7 +109,9 @@ export default function ResearchDetail() {
           <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-400">
             {report.genre_slug && <span className="capitalize">{report.genre_slug.replace(/-/g, ' ')}</span>}
             <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">{report.status}</span>
-            <span>Updated {new Date(report.updated_at).toLocaleDateString()}</span>
+            <span>Created {new Date(report.created_at).toLocaleDateString()}</span>
+            <span>Updated {new Date(report.updated_at).toLocaleString()}</span>
+            <span className="rounded bg-gray-100 px-1 py-0.5 text-[10px] text-gray-400 dark:bg-gray-700">{report.id.substring(0, 8)}</span>
           </div>
         </div>
 

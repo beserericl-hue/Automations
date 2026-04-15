@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import ChatDrawer from '../chat/ChatDrawer';
+import OnboardingTutorial from '../onboarding/OnboardingTutorial';
 import { useUser } from '../../contexts/UserContext';
 import { useToast } from '../../contexts/ToastContext';
 import { supabase } from '../../config/supabase';
@@ -97,6 +98,9 @@ export default function AppShell({ children }: AppShellProps) {
 
       {/* Chat drawer */}
       <ChatDrawer open={chatOpen} onClose={() => setChatOpen(false)} />
+
+      {/* Onboarding tutorial overlay (first visit) */}
+      <OnboardingTutorial />
     </div>
   );
 }

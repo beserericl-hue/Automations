@@ -2,6 +2,23 @@ import { Router } from 'express';
 
 export const healthRouter = Router();
 
+/**
+ * @openapi
+ * /health:
+ *   get:
+ *     tags: [Health]
+ *     summary: Service health check
+ *     description: Returns service status and component health checks (Supabase connectivity).
+ *     responses:
+ *       200:
+ *         description: All systems healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/HealthResponse'
+ *       503:
+ *         description: One or more components degraded
+ */
 healthRouter.get('/', async (_req, res) => {
   const checks: Record<string, 'ok' | 'error' | 'skipped'> = {};
 

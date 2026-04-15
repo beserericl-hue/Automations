@@ -28,6 +28,36 @@ const PAGE_SIZES: Record<string, { width: number; height: number }> = {
   '8.5x8.5': { width: 12240, height: 12240 },
 };
 
+/**
+ * @openapi
+ * /export/docx:
+ *   post:
+ *     tags: [Export]
+ *     summary: Export project to .docx
+ *     description: Generates a Word document with all approved/published chapters ordered Prologue → Ch1-N → Epilogue.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ExportDocxRequest'
+ *     responses:
+ *       200:
+ *         description: .docx file download
+ *         content:
+ *           application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       400:
+ *         description: Invalid project_id or page_size
+ *       401:
+ *         description: Missing or invalid auth token
+ *       404:
+ *         description: Project not found or no exportable chapters
+ */
 exportRouter.post('/docx', requireAuth, validateBody(ExportRequestSchema), async (req, res) => {
   try {
     const { project_id, page_size } = req.body;

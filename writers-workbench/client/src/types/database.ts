@@ -92,6 +92,9 @@ export interface ChapterOutline {
   chapter_story_arc?: string;
   book_arc_beat?: string;
   sub_chapters: SubChapter[];
+  created_at?: string;
+  updated_at?: string;
+  version?: number;
 }
 
 export interface SubChapter {

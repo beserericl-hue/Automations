@@ -25,6 +25,7 @@ import UserSettings from './components/settings/UserSettings';
 import TrashView from './components/projects/TrashView';
 import AdminPanel from './components/admin/AdminPanel';
 import BrainstormForm from './components/brainstorm/BrainstormForm';
+import ImageDetail from './components/images/ImageDetail';
 
 const ContentLibrary = lazy(() => import('./components/content/ContentLibrary'));
 const CostDashboard = lazy(() => import('./components/cost/CostDashboard'));
@@ -61,6 +62,7 @@ export default function App() {
                     <Route path="blog-posts" element={<Navigate to="/library?type=blog_post" replace />} />
                     <Route path="newsletters" element={<Navigate to="/library?type=newsletter" replace />} />
                     <Route path="content/:id" element={<ContentDetail />} />
+                    <Route path="images/:id" element={<ImageDetail />} />
                     <Route path="research" element={<ResearchList />} />
                     <Route path="research/:id" element={<ResearchDetail />} />
                     <Route path="brainstorm" element={<BrainstormForm />} />

@@ -23,6 +23,8 @@ export default function ProjectEditForm({ project, onClose }: ProjectEditFormPro
   const [genreSlug, setGenreSlug] = useState(project.genre_slug || '');
   const [status, setStatus] = useState(project.status);
   const [projectType, setProjectType] = useState(project.project_type);
+  const [premise, setPremise] = useState(project.outline?.premise || '');
+  const [themes, setThemes] = useState((project.outline?.themes || []).join(', '));
   const [error, setError] = useState('');
 
   // Load genres for dropdown
@@ -43,6 +45,13 @@ export default function ProjectEditForm({ project, onClose }: ProjectEditFormPro
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      // Merge premise/themes into the existing outline without overwriting other fields
+      const updatedOutline = {
+        ...(project.outline || {}),
+        premise: premise.trim(),
+        themes: themes.split(',').map(t => t.trim()).filter(Boolean),
+      };
+
       const { error } = await supabase
         .from('writing_projects_v2')
         .update({
@@ -50,6 +59,7 @@ export default function ProjectEditForm({ project, onClose }: ProjectEditFormPro
           genre_slug: genreSlug || null,
           status,
           project_type: projectType,
+          outline: updatedOutline,
           updated_at: new Date().toISOString(),
         })
         .eq('id', project.id)
@@ -79,6 +89,29 @@ export default function ProjectEditForm({ project, onClose }: ProjectEditFormPro
           className={inputClass}
           placeholder="Project title"
         />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Premise</label>
+        <textarea
+          value={premise}
+          onChange={e => setPremise(e.target.value)}
+          className={inputClass}
+          rows={4}
+          placeholder="The book's premise — who, what, where, why"
+        />
+        <p className="mt-1 text-[10px] text-gray-400">This is the core story concept used by the AI when writing chapters.</p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Themes</label>
+        <input
+          value={themes}
+          onChange={e => setThemes(e.target.value)}
+          className={inputClass}
+          placeholder="Comma-separated themes (e.g. identity, power, redemption)"
+        />
+        <p className="mt-1 text-[10px] text-gray-400">Separate themes with commas.</p>
       </div>
 
       <div>

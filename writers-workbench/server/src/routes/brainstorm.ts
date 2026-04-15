@@ -83,7 +83,34 @@ ${text.substring(0, 40000)}`,
   return JSON.parse(jsonMatch[0]);
 }
 
-// ---- Endpoint 1: Parse text/file to extract fields ----
+/**
+ * @openapi
+ * /brainstorm/parse:
+ *   post:
+ *     tags: [Brainstorm]
+ *     summary: Parse book proposal text or file
+ *     description: Extracts title, genre, story arc, themes, and summary from uploaded text or .docx/.pdf file using AI.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               content_text:
+ *                 type: string
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Parsed proposal fields
+ *       400:
+ *         description: Content too short
+ *       401:
+ *         description: Missing or invalid auth token
+ */
 brainstormRouter.post(
   '/parse',
   requireAuth,
@@ -117,7 +144,38 @@ brainstormRouter.post(
   }
 );
 
-// ---- Endpoint 2: Submit brainstorm to n8n workflow ----
+/**
+ * @openapi
+ * /brainstorm/submit:
+ *   post:
+ *     tags: [Brainstorm]
+ *     summary: Submit brainstorm to n8n workflow
+ *     description: Sends the brainstorm data to the n8n brainstorm_story workflow for outline generation.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               content_text:
+ *                 type: string
+ *               title:
+ *                 type: string
+ *               genre_slug:
+ *                 type: string
+ *               story_arc:
+ *                 type: string
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Brainstorm submitted to workflow
+ *       401:
+ *         description: Missing or invalid auth token
+ */
 brainstormRouter.post(
   '/submit',
   requireAuth,

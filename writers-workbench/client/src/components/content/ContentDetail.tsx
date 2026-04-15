@@ -248,7 +248,11 @@ export default function ContentDetail() {
             <span className="capitalize">{item.content_type.replace('_', ' ')}</span>
             {item.genre_slug && <span>{item.genre_slug.replace(/-/g, ' ')}</span>}
             {item.chapter_number != null && <span>Chapter {item.chapter_number}</span>}
-            <span>Updated {new Date(item.updated_at).toLocaleDateString()}</span>
+            <span>Created {new Date(item.created_at).toLocaleDateString()}</span>
+            <span>Updated {new Date(item.updated_at).toLocaleString()}</span>
+            <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+              ID: {item.id.substring(0, 8)}
+            </span>
           </div>
         </div>
 
@@ -300,7 +304,7 @@ export default function ContentDetail() {
       {item.cover_image_path ? (
         <div className="relative overflow-hidden rounded-lg">
           <img
-            src={supabase.storage.from('cover-images').getPublicUrl(item.cover_image_path).data.publicUrl}
+            src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/cover-images/${item.cover_image_path.split('/').map(s => encodeURIComponent(s)).join('/')}`}
             alt={`Cover for ${item.title}`}
             className="h-48 w-full object-cover"
           />
@@ -389,7 +393,14 @@ export default function ContentDetail() {
 
       {/* Q/A Report (for chapters) */}
       {item.content_type === 'chapter' && (
-        <QAReportPanel metadata={item.metadata} />
+        <QAReportPanel
+          metadata={item.metadata}
+          contentId={id!}
+          contentTitle={item.title}
+          chapterNumber={item.chapter_number}
+          projectId={item.project_id}
+          userId={userId!}
+        />
       )}
 
       {/* Sources / Provenance */}

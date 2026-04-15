@@ -290,6 +290,8 @@ Vite proxies `/api/*` to `localhost:3001` during dev.
 10. **E2E tests must cover every screen element.** Every sprint must include authenticated E2E tests that exercise every page, button, dialog, link, tab, dropdown, and data display. Test for `[object Object]` on every page. Test error states render human-readable messages. Shallow redirect-only tests are insufficient. See `e2e/authenticated.spec.ts` for the pattern. Set `E2E_TEST_EMAIL` and `E2E_TEST_PASSWORD` in `.env` for authenticated tests.
 11. **Tests must verify against real data, not assumed types.** Before writing any component that renders database data, query the actual Supabase table to inspect the real data shape. Never assume the TypeScript type matches reality — the n8n workflows define the data structure, not the frontend types. Write tests that use sample data matching the actual production format. If a type definition doesn't match the real data, fix the type first.
 12. **Tests must verify rendered functionality, not just code existence.** Unit tests must validate that components actually work — clickable elements respond, expanded sections show content, queries fetch from the correct tables. Do not write tests that only check module exports or type compilation. Every user story acceptance criterion must have a corresponding test that would fail if the feature were broken or missing.
+13. **Every UI change must be E2E tested for visual correctness.** When adding metadata (version numbers, dates, IDs, badges) to any screen, write an E2E test that navigates to that screen, scrolls to the element, and asserts the text is visible — not just that TypeScript compiles. Take a screenshot in the test for manual verification. If the element could be scrolled off-screen, the test must scroll to it. TypeScript compilation and unit tests do NOT verify that users can see what was built.
+14. **Version info must appear on every versioned object.** Every screen that displays a versioned entity (outlines, content, projects, story bible entries, research reports, images) must show: created date, last updated timestamp, version number or revision count (if applicable), and a short ID. This metadata must be visible without scrolling to a different section or expanding a collapsed panel.
 
 ---
 
@@ -590,4 +592,53 @@ All 7 stories delivered (34 points):
 
 **What the next agent should do:**
 - Sprint 6 work is uncommitted — commit to `develop` when ready
-- Sprint 7 (Testing, Documentation & Deployment) is next
+- Sprint 7 is complete (see below)
+
+---
+
+### Sprint 7 — Testing, Documentation & Deployment
+**Status:** COMPLETE (in working tree, uncommitted)
+**Date:** 2026-04-15
+
+All 5 stories delivered (28 points):
+- S7-1: `e2e/sprint7-critical-paths.spec.ts` — 60+ E2E tests across 9 critical path groups: login/dashboard flow, genre CRUD, project→chapter editing, delete/trash/restore, chat drawer, Eve widget, admin panel, export, mobile responsive. Cross-cutting: error-free navigation on all 11 routes, dark mode, accessibility, story arcs/outlines. Added to Playwright config authenticated project.
+- S7-2: OpenAPI 3.0.3 documentation via `swagger-jsdoc` + `swagger-ui-express`. Swagger UI served at `/api/docs`, JSON spec at `/api/docs.json`. All 24 endpoints across 8 route files annotated with JSDoc `@openapi` tags. Component schemas for all request/response types. `server/src/swagger.ts` defines spec options.
+- S7-3: GitHub Actions CI pipeline at `.github/workflows/ci.yml`. Jobs: lint-and-typecheck, unit-tests, build (parallel), e2e-tests (on PR to main). Supports authenticated E2E via secrets. Playwright report uploaded as artifact on failure.
+- S7-4: Production deployment config verified — Dockerfile (3-stage: client build, server build, production), railway.toml (health check at /api/health), .env.example updated with KIEAI_API_KEY and E2E test vars.
+- S7-5: `OnboardingTutorial.tsx` — 5-step modal overlay on first login (Welcome, Sidebar, Eve, Chat, First Project). Tutorial completion persisted in `app_config_v2` + localStorage. "Replay Tutorial" button added to UserSettings help section. Integrated into AppShell.
+
+**Files created:**
+- `e2e/sprint7-critical-paths.spec.ts`
+- `server/src/swagger.ts`
+- `server/src/test/sprint7-qa.test.ts` (14 tests)
+- `client/src/components/onboarding/OnboardingTutorial.tsx`
+- `client/src/test/sprint7-qa.test.ts` (5 tests)
+- `.github/workflows/ci.yml`
+
+**Files modified:**
+- `playwright.config.ts` — added sprint7-critical-paths.spec.ts to authenticated project
+- `server/src/index.ts` — added swagger-ui-express at /api/docs
+- `server/src/routes/health.ts` — added @openapi annotation
+- `server/src/routes/chat.ts` — added @openapi annotation
+- `server/src/routes/export.ts` — added @openapi annotation
+- `server/src/routes/admin.ts` — added @openapi annotations (7 endpoints)
+- `server/src/routes/account.ts` — added @openapi annotations
+- `server/src/routes/session.ts` — added @openapi annotations
+- `server/src/routes/brainstorm.ts` — added @openapi annotations
+- `server/src/routes/images.ts` — added @openapi annotations
+- `client/src/components/layout/AppShell.tsx` — added OnboardingTutorial
+- `client/src/components/settings/UserSettings.tsx` — added "Replay Tutorial" button
+- `.env.example` — added KIEAI_API_KEY, NODE_ENV, E2E test vars
+
+**QA Results (2026-04-15):**
+
+| Suite | Tests | Status |
+|-------|-------|--------|
+| Client unit tests | 214 (27 files) | All passing |
+| Server unit tests | 124 (16 files) | All passing |
+| TypeScript client | — | 0 errors |
+| TypeScript server | — | 0 errors |
+| Production build | — | Succeeds |
+| **Total** | **338** | **All passing** |
+
+**ALL 52 STORIES COMPLETE. PRODUCT READY FOR CUSTOMER ACCEPTANCE REVIEW.**

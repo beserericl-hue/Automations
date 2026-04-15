@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
@@ -6,7 +7,7 @@ import type { GeneratedImage } from '../../types/database';
 
 interface ImageGalleryProps {
   projectId?: string;
-  onSelectImage?: (image: GeneratedImage) => void;
+  onSelectImage?: (image: GeneratedImage) => void; // Picker mode (cover image selector)
 }
 
 const IMAGE_TYPES = [
@@ -17,17 +18,19 @@ const IMAGE_TYPES = [
   { value: 'newsletter_section', label: 'Newsletter' },
 ] as const;
 
-function getImageUrl(storagePath: string): string {
-  const { data } = supabase.storage.from('cover-images').getPublicUrl(storagePath);
-  return data.publicUrl;
+export function getImageUrl(storagePath: string): string {
+  // Build URL manually — Supabase getPublicUrl can mangle paths with special chars like +
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const encodedPath = storagePath.split('/').map(s => encodeURIComponent(s)).join('/');
+  return `${supabaseUrl}/storage/v1/object/public/cover-images/${encodedPath}`;
 }
 
 export default function ImageGallery({ projectId, onSelectImage }: ImageGalleryProps) {
   const { profile } = useUser();
   const userId = profile?.user_id;
+  const navigate = useNavigate();
   const [typeFilter, setTypeFilter] = useState('');
   const [genreFilter, setGenreFilter] = useState('');
-  const [selectedImage, setSelectedImage] = useState<GeneratedImage | null>(null);
 
   const { data: images, isLoading } = useQuery({
     queryKey: ['generated-images', userId, projectId, typeFilter, genreFilter],
@@ -64,17 +67,14 @@ export default function ImageGallery({ projectId, onSelectImage }: ImageGalleryP
     enabled: !!userId,
   });
 
-  const handleDownload = async (image: GeneratedImage) => {
-    const url = getImageUrl(image.storage_path);
-    const response = await fetch(url);
-    const blob = await response.blob();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${image.storage_path.split('/').pop() || 'image'}.${image.image_format || 'png'}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(a.href);
+  const handleClick = (image: GeneratedImage) => {
+    if (onSelectImage) {
+      // Picker mode — select and return
+      onSelectImage(image);
+    } else {
+      // Gallery mode — navigate to detail page
+      navigate(`/images/${image.id}`);
+    }
   };
 
   if (isLoading) {
@@ -87,34 +87,38 @@ export default function ImageGallery({ projectId, onSelectImage }: ImageGalleryP
 
   return (
     <div>
-      {/* Filters */}
+      {/* Header with filters */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <select
-          value={typeFilter}
-          onChange={e => setTypeFilter(e.target.value)}
-          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-        >
-          {IMAGE_TYPES.map(t => (
-            <option key={t.value} value={t.value}>{t.label}</option>
-          ))}
-        </select>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Cover Art & Images</h2>
 
-        {genres && genres.length > 0 && (
+        <div className="ml-auto flex items-center gap-3">
           <select
-            value={genreFilter}
-            onChange={e => setGenreFilter(e.target.value)}
+            value={typeFilter}
+            onChange={e => setTypeFilter(e.target.value)}
             className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
           >
-            <option value="">All Genres</option>
-            {genres.map(g => (
-              <option key={g} value={g}>{g}</option>
+            {IMAGE_TYPES.map(t => (
+              <option key={t.value} value={t.value}>{t.label}</option>
             ))}
           </select>
-        )}
 
-        <span className="ml-auto text-sm text-gray-500">
-          {images?.length ?? 0} image{images?.length !== 1 ? 's' : ''}
-        </span>
+          {genres && genres.length > 0 && (
+            <select
+              value={genreFilter}
+              onChange={e => setGenreFilter(e.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            >
+              <option value="">All Genres</option>
+              {genres.map(g => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+            </select>
+          )}
+
+          <span className="text-sm text-gray-400">
+            {images?.length ?? 0} image{images?.length !== 1 ? 's' : ''}
+          </span>
+        </div>
       </div>
 
       {/* Empty state */}
@@ -125,109 +129,45 @@ export default function ImageGallery({ projectId, onSelectImage }: ImageGalleryP
           </svg>
           <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No images yet</h3>
           <p className="mt-1 text-sm text-gray-500">
-            Use the chat or Eve to generate cover art. Try: "Generate cover art for [project name]"
+            Use the chat or Eve to generate cover art, or click a chapter's cover art button.
           </p>
         </div>
       )}
 
-      {/* Grid */}
+      {/* Thumbnail grid */}
       {images && images.length > 0 && (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {images.map(image => (
             <div
               key={image.id}
-              className="group cursor-pointer overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-900"
-              onClick={() => setSelectedImage(image)}
+              className="group cursor-pointer overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-all hover:shadow-lg hover:border-brand-300 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-brand-600"
+              onClick={() => handleClick(image)}
             >
-              <div className="aspect-square overflow-hidden bg-gray-100 dark:bg-gray-800">
+              <div className="aspect-video overflow-hidden bg-gray-100 dark:bg-gray-800">
                 <img
                   src={getImageUrl(image.thumbnail_path || image.storage_path)}
-                  alt={image.original_prompt || 'Generated image'}
+                  alt={image.original_prompt?.substring(0, 100) || 'Generated image'}
                   className="h-full w-full object-cover transition-transform group-hover:scale-105"
                   loading="lazy"
                 />
               </div>
               <div className="p-2">
-                <span className="inline-block rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                  {image.image_type.replace('_', ' ')}
-                </span>
-                {image.genre_slug && (
-                  <span className="ml-1 inline-block rounded bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700 dark:bg-brand-900/20 dark:text-brand-300">
-                    {image.genre_slug}
-                  </span>
-                )}
-                <p className="mt-1 truncate text-xs text-gray-500">
-                  {new Date(image.created_at).toLocaleDateString()}
+                <p className="truncate text-xs font-medium text-gray-700 dark:text-gray-300">
+                  {(image.metadata as Record<string, string>)?.title || (image.metadata as Record<string, string>)?.story_title || image.image_type.replace('_', ' ')}
                 </p>
+                <div className="mt-0.5 flex items-center gap-1.5">
+                  <span className="text-[10px] text-gray-400">
+                    {new Date(image.created_at).toLocaleDateString()}
+                  </span>
+                  {image.genre_slug && (
+                    <span className="rounded bg-gray-100 px-1 py-0.5 text-[9px] text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                      {image.genre_slug.replace(/-/g, ' ')}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* Full-size modal */}
-      {selectedImage && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setSelectedImage(null)}
-        >
-          <div
-            className="relative max-h-[90vh] max-w-4xl overflow-hidden rounded-lg bg-white shadow-2xl dark:bg-gray-900"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Close button */}
-            <button
-              onClick={() => setSelectedImage(null)}
-              className="absolute right-2 top-2 z-10 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"
-            >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-
-            <img
-              src={getImageUrl(selectedImage.storage_path)}
-              alt={selectedImage.original_prompt || 'Generated image'}
-              className="max-h-[70vh] w-full object-contain"
-            />
-
-            <div className="border-t border-gray-200 p-4 dark:border-gray-700">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  {selectedImage.original_prompt && (
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                      <span className="font-medium">Prompt:</span> {selectedImage.original_prompt}
-                    </p>
-                  )}
-                  <div className="mt-1 flex flex-wrap gap-2 text-xs text-gray-500">
-                    <span>{selectedImage.image_type.replace('_', ' ')}</span>
-                    {selectedImage.genre_slug && <span>| {selectedImage.genre_slug}</span>}
-                    {selectedImage.width && selectedImage.height && (
-                      <span>| {selectedImage.width}x{selectedImage.height}</span>
-                    )}
-                    <span>| {new Date(selectedImage.created_at).toLocaleDateString()}</span>
-                    <span>| {selectedImage.generation_model}</span>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  {onSelectImage && (
-                    <button
-                      onClick={() => { onSelectImage(selectedImage); setSelectedImage(null); }}
-                      className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
-                    >
-                      Select
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleDownload(selectedImage)}
-                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
-                  >
-                    Download
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       )}
     </div>
