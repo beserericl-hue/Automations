@@ -29,7 +29,9 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
       <div className="w-full max-w-sm space-y-6 rounded-xl border border-gray-200 bg-white p-8 shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">The Writers Workbench</h1>
+          <img src="/assets/logo-blue.png" alt="Course Worx Media" className="mx-auto h-16 dark:hidden" />
+          <img src="/assets/logo-white.png" alt="Course Worx Media" className="mx-auto h-16 hidden dark:block" />
+          <h1 className="mt-4 text-2xl font-bold text-gray-900 dark:text-white">The Writers Workbench</h1>
           <p className="mt-1 text-sm text-gray-500">Sign in to your account</p>
         </div>
 
