@@ -53,12 +53,12 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
       {/* Logo + collapse toggle */}
       <div className="flex h-14 items-center justify-between border-b border-gray-200 dark:border-gray-800 px-3">
         {open ? (
-          <div className="flex items-center gap-2 min-w-0">
-            <img src="/assets/logo-blue.png" alt="Course Worx" className="h-8 shrink-0 dark:hidden" />
-            <img src="/assets/logo-white.png" alt="Course Worx" className="h-8 shrink-0 hidden dark:block" />
+          <div className="flex items-center min-w-0 flex-1">
+            <img src="/assets/logo-blue.png" alt="Course Worx" className="h-10 max-w-[160px] object-contain brightness-110 dark:hidden" />
+            <img src="/assets/logo-white.png" alt="Course Worx" className="h-10 max-w-[160px] object-contain brightness-125 hidden dark:block" />
           </div>
         ) : (
-          <img src="/assets/favicon.png" alt="CW" className="h-6 shrink-0" />
+          <img src="/assets/favicon.png" alt="CW" className="h-7 shrink-0 brightness-110 dark:brightness-125" />
         )}
         <button
           onClick={onToggle}
