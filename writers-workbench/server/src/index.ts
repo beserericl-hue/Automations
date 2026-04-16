@@ -133,8 +133,19 @@ app.use(errorHandler);
 
 // In production, serve the React build
 const publicPath = path.resolve(__dirname, '../public');
-app.use(express.static(publicPath));
+
+// Static assets (JS/CSS chunks) are immutable — cache aggressively
+app.use('/assets', express.static(path.join(publicPath, 'assets'), {
+  maxAge: '1y',
+  immutable: true,
+}));
+
+// Everything else (non-asset static files)
+app.use(express.static(publicPath, { maxAge: '1h' }));
+
+// SPA fallback — index.html must never be cached to prevent stale chunk errors after deploys
 app.get('*', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(publicPath, 'index.html'));
 });
 
