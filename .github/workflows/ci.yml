@@ -2,12 +2,12 @@ name: Writers Workbench CI
 
 on:
   push:
-    branches: [develop]
+    branches: [main, develop]
     paths:
       - 'writers-workbench/**'
       - '.github/workflows/ci.yml'
   pull_request:
-    branches: [main]
+    branches: [main, develop]
     paths:
       - 'writers-workbench/**'
       - '.github/workflows/ci.yml'

@@ -18,5 +18,11 @@ All development work goes on **V2/Beta resources only**:
 
 ## Git Branching
 
-- `main` = stable release baseline. Only updated via PR after testing.
-- `develop` = all active development. Commit here by default.
+- `main` = stable release baseline. Production Railway deploys from here. Only updated via PR from `release/*` or `hotfix/*` — direct push is blocked by branch protection.
+- `develop` = active integration branch. Dev Railway deploys from here. All feature work commits here (or via PR from `feature/*`).
+- Feature work: branch `feature/<name>` from `develop`, PR to `develop`.
+- Hotfix: branch `hotfix/<name>` from `main`, PR to `main`, cherry-pick the merge commit to `develop`.
+- Release: branch `release/vX.Y` from `develop`, PR to `main`, tag `vX.Y.0` on merge, merge `main` back into `develop` to sync.
+- Full guide: [CONTRIBUTING.md](CONTRIBUTING.md)
+
+**Never bypass branch protection with admin override unless explicitly authorized by the user.**
