@@ -1,6 +1,7 @@
-import { lazy, Suspense, useState } from 'react';
+import { Suspense, useState } from 'react';
+import { lazyRetry } from '../../lib/lazyRetry';
 
-const EveWidget = lazy(() => import('./EveWidget'));
+const EveWidget = lazyRetry(() => import('./EveWidget'));
 
 export default function EveOrb() {
   const [active, setActive] = useState(false);

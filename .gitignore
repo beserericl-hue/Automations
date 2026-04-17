@@ -2,6 +2,10 @@
 .mcp.json
 .claude/
 
+# macOS
+.DS_Store
+**/.DS_Store
+
 # Local MCP server source
 elevenlabs-mcp/
 

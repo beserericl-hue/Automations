@@ -1197,6 +1197,1062 @@ Before any sprint work begins, the following testing infrastructure must be in p
 
 ---
 
+## Sprint 8: Multi-Tenant RBAC, Subscription Tiers & Credits (2 weeks)
+
+**Goal:** Transform the application into a multi-tenant SaaS product with role-based access control, subscription tiers, credit system, superuser impersonation, and account lifecycle management.
+**Total Points:** 55
+
+### Architecture Overview
+
+Sprint 8 separates two orthogonal concerns:
+
+1. **Role** (system access level) — what a user can *do* in the application:
+   - `superuser` — full system access, configuration, impersonation
+   - `admin` — account management, billing, can lock/create accounts
+   - `user` — standard authenticated user (all content features)
+
+2. **Subscription Tier** (billing/credits) — what a user *gets*:
+   - `free_full` — all features, no charge (admin-provisioned), limited monthly credits, can purchase more
+   - `paid_full` — all features, monthly or annual billing, high monthly credits, can purchase more
+   - `trial` — all features for 30 days, then converts to paid or locks, limited credits, can purchase more
+   - `pro` — higher monthly credits, priority support, advanced features, can purchase more
+   - `standard` — base credits, core features only, can purchase more
+
+**Credit model:** The superuser sets the monthly credit allowance for each tier via the Tier Management UI. All tiers receive a finite number of credits that reset monthly. All users — regardless of tier — can purchase additional credits at any time. There is no "unlimited" tier; even free_full and paid_full have a superuser-configured credit cap.
+
+The role column on `users_v2` controls access. The new `subscriptions` table controls billing and credits. A user's effective permissions = role permissions ∩ tier entitlements.
+
+### Feature Matrix
+
+| Feature | Superuser | Admin | Pro User | Standard User | Trial User |
+|---------|-----------|-------|----------|---------------|------------|
+| Content creation (chat/Eve) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Project management | ✓ | ✓ | ✓ | ✓ | ✓ |
+| KDP export | ✓ | ✓ | ✓ | ✗ | ✓ (limited) |
+| Cover art generation | ✓ | ✓ | ✓ | ✗ | ✓ (limited) |
+| Social media repurposing | ✓ | ✓ | ✓ | ✗ | ✓ (limited) |
+| Monthly credits (superuser-configured) | 1000* | 1000* | 500 | 100 | 200 |
+| Purchase additional credits | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Impersonate users | ✓ | ✗ | ✗ | ✗ | ✗ |
+| System configuration | ✓ | ✗ | ✗ | ✗ | ✗ |
+| Manage accounts | ✓ | ✓ | ✗ | ✗ | ✗ |
+| Lock/unlock accounts | ✓ | ✓ | ✗ | ✗ | ✗ |
+| View all user data | ✓ | ✓ | ✗ | ✗ | ✗ |
+| Billing management | ✓ | ✓ | ✗ | ✗ | ✗ |
+
+*\* Default seed values — superuser can change credit allowances for any tier at any time via Tier Management.*
+
+### Stories
+
+---
+
+#### S8-1: Database schema — roles, subscriptions, credits
+**Points:** 8 | **Priority:** P0
+
+Expand the role system, create subscription and credit tables, update RLS policies.
+
+**Developer Tasks:**
+- [ ] SQL migration `008_sprint8_rbac_subscriptions.sql`:
+  - ALTER `users_v2.role` CHECK constraint: `role IN ('superuser', 'admin', 'user')` (drop 'editor', 'viewer' — these become tier-based feature flags)
+  - Add `users_v2.account_status TEXT DEFAULT 'active' CHECK (account_status IN ('active', 'locked', 'suspended', 'pending'))` — locked accounts cannot log in
+  - Add `users_v2.locked_at TIMESTAMPTZ`, `users_v2.locked_by TEXT` (admin user_id who locked)
+  - Add `users_v2.locked_reason TEXT`
+- [ ] Create `subscription_tiers` table:
+  ```sql
+  CREATE TABLE subscription_tiers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT UNIQUE NOT NULL,           -- 'free_full', 'paid_full', 'trial', 'pro', 'standard'
+    display_name TEXT NOT NULL,          -- 'Free (Full Access)', 'Professional', etc.
+    description TEXT,
+    monthly_credits INTEGER NOT NULL,    -- credits reset monthly
+    monthly_price_cents INTEGER DEFAULT 0,
+    annual_price_cents INTEGER DEFAULT 0,
+    features JSONB NOT NULL DEFAULT '{}', -- { "kdp_export": true, "cover_art": true, "social_media": true, "max_projects": 50 }
+    is_default BOOLEAN DEFAULT false,    -- new signups get this tier
+    trial_days INTEGER DEFAULT 0,        -- 0 = not a trial tier
+    sort_order INTEGER DEFAULT 0,
+    active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+  );
+  ```
+- [ ] Add `credit_purchase_price_cents INTEGER DEFAULT 100` to `subscription_tiers` — price per credit when purchasing additional credits (default $1.00 per credit, superuser-configurable per tier)
+- [ ] Seed `subscription_tiers` with 5 tiers (all credit values are superuser-configurable defaults):
+  - `standard` (default, 100 credits/mo, $19.99/mo, $199/yr, core features)
+  - `pro` (500 credits/mo, $49.99/mo, $499/yr, all features)
+  - `trial` (200 credits/mo, $0, 30 trial_days, all features)
+  - `paid_full` (1000 credits/mo, $49.99/mo, $499/yr, all features)
+  - `free_full` (1000 credits/mo, $0, all features, NOT default, admin-provisioned only)
+- [ ] Create `user_subscriptions` table:
+  ```sql
+  CREATE TABLE user_subscriptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id TEXT NOT NULL REFERENCES users_v2(user_id) ON DELETE CASCADE,
+    tier_id UUID NOT NULL REFERENCES subscription_tiers(id),
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'expired', 'cancelled', 'past_due')),
+    billing_cycle TEXT CHECK (billing_cycle IN ('monthly', 'annual', 'none')),
+    current_period_start TIMESTAMPTZ NOT NULL DEFAULT now(),
+    current_period_end TIMESTAMPTZ,      -- NULL = never expires
+    trial_start TIMESTAMPTZ,
+    trial_end TIMESTAMPTZ,               -- trial_start + tier.trial_days
+    credits_remaining INTEGER NOT NULL DEFAULT 0,
+    credits_used_this_period INTEGER NOT NULL DEFAULT 0,
+    auto_renew BOOLEAN DEFAULT true,
+    created_by TEXT,                      -- admin user_id who created
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(user_id)                       -- one active subscription per user
+  );
+  ```
+- [ ] Create `credit_transactions` table:
+  ```sql
+  CREATE TABLE credit_transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id TEXT NOT NULL REFERENCES users_v2(user_id) ON DELETE CASCADE,
+    amount INTEGER NOT NULL,              -- positive = credit, negative = debit
+    balance_after INTEGER NOT NULL,
+    transaction_type TEXT NOT NULL CHECK (transaction_type IN ('monthly_reset', 'usage', 'admin_adjustment', 'purchase', 'refund')),
+    description TEXT,
+    reference_id TEXT,                    -- e.g., content ID, workflow execution ID
+    created_at TIMESTAMPTZ DEFAULT now()
+  );
+  ```
+- [ ] Create `impersonation_log` table:
+  ```sql
+  CREATE TABLE impersonation_log (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    superuser_id TEXT NOT NULL REFERENCES users_v2(user_id),
+    target_user_id TEXT NOT NULL REFERENCES users_v2(user_id),
+    started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    ended_at TIMESTAMPTZ,
+    reason TEXT,
+    actions_taken JSONB DEFAULT '[]'      -- audit trail of actions during impersonation
+  );
+  ```
+- [ ] RLS policies:
+  - `subscription_tiers`: SELECT for all authenticated, INSERT/UPDATE/DELETE for superuser/admin only
+  - `user_subscriptions`: users see own, admins see all, superusers see all
+  - `credit_transactions`: users see own, admins see all
+  - `impersonation_log`: superusers only
+- [ ] Update `is_admin()` function to include superuser: `role IN ('admin', 'superuser')`
+- [ ] Create `is_superuser()` function: `role = 'superuser'`
+- [ ] Update `prevent_role_escalation()` trigger: only superusers can set role to 'admin' or 'superuser'
+- [ ] Update `get_current_user_id()` to support impersonation: check `impersonation_log` for active session, return target_user_id if found
+- [ ] **Superuser account seeding:**
+  - `UPDATE users_v2 SET role = 'superuser' WHERE user_id = '+14105914612';` — Eric Beser (eric@agileadtesting.com) is the system superuser
+  - All existing projects, content, research, story bible entries, outlines, images, social posts, and other objects under `user_id='+14105914612'` remain intact — no data migration or deletion
+  - This account retains its own content AND gains superuser privileges (impersonation, tier management, system config)
+  - The previous `role='admin'` from migration 001 is upgraded in-place to `role='superuser'`
+  - Create a `free_full` subscription for the superuser account (superuser should not be charged)
+- [ ] TypeScript types: `SubscriptionTier`, `UserSubscription`, `CreditTransaction`, `ImpersonationLog`, update `UserProfile.role` to `'superuser' | 'admin' | 'user'`
+
+**QA Tasks:**
+- [ ] Test: role CHECK constraint rejects invalid roles
+- [ ] Test: account_status='locked' user cannot query any RLS-protected table
+- [ ] Test: subscription_tiers readable by all authenticated users
+- [ ] Test: credit_transactions only visible to owning user and admins
+- [ ] Test: impersonation_log only visible to superusers
+- [ ] Test: prevent_role_escalation blocks admin from setting role='superuser'
+- [ ] Test: superuser CAN set any role
+- [ ] Test: service role (n8n) still bypasses all RLS
+- [ ] Test: Eric's account (`+14105914612`) has role='superuser' after migration
+- [ ] Test: all existing projects/content under Eric's user_id are preserved and accessible
+- [ ] Test: Eric's superuser account has a free_full subscription with correct credits
+
+---
+
+#### S8-2: Server middleware — role hierarchy, tier enforcement, impersonation
+**Points:** 8 | **Priority:** P0
+
+Expand auth middleware to support the full role hierarchy, subscription checks, credit enforcement, and impersonation.
+
+**Developer Tasks:**
+- [ ] Update `auth.ts` middleware:
+  - `requireAuth`: also fetch `account_status` and `user_subscriptions` (joined). Block if `account_status !== 'active'` (return 403 with "Account locked" or "Account suspended")
+  - Attach `req.subscriptionTier`, `req.creditsRemaining` to request
+  - Check for active impersonation: if `X-Impersonate-User` header present AND requester is superuser, swap `req.userId` to target user, log to `impersonation_log`
+- [ ] Create `requireSuperuser` middleware: checks `req.userRole === 'superuser'`
+- [ ] Update `requireAdmin`: accept both 'admin' and 'superuser'
+- [ ] Create `requireTierFeature(feature: string)` middleware factory:
+  - Checks `subscription_tiers.features[feature]` for the user's tier
+  - Returns 403 with "This feature requires a Pro subscription" if not entitled
+  - Apply to: export (.docx → `kdp_export`), cover art generation (`cover_art`), social repurposing (`social_media`)
+- [ ] Create `requireCredits(amount: number)` middleware factory:
+  - Checks `user_subscriptions.credits_remaining >= amount`
+  - Returns 402 with "Insufficient credits. Purchase more credits or wait for monthly reset." if not enough
+  - Superuser/admin roles bypass credit checks (they are not credit-limited)
+- [ ] Create `deductCredits(userId, amount, description, referenceId)` service function:
+  - Decrements `user_subscriptions.credits_remaining`
+  - Increments `credits_used_this_period`
+  - Inserts `credit_transactions` row
+  - Returns new balance
+- [ ] Create `purchaseCredits(userId, amount)` service function:
+  - Increments `user_subscriptions.credits_remaining` by purchased amount
+  - Inserts `credit_transactions` row with type `purchase`
+  - Returns new balance
+- [ ] Create server routes for credit purchase:
+  - `POST /api/credits/purchase` — purchase additional credits (any authenticated user). Accepts `{ amount: number }`. Validates against tier's `credit_purchase_price_cents`. Returns new balance and charge amount. (Actual payment processing deferred — this records the intent and updates balance)
+  - `GET /api/credits/pricing` — returns the user's tier credit purchase price
+- [ ] Create server routes for impersonation:
+  - `POST /api/superuser/impersonate` — start impersonation session (requires superuser, logs to `impersonation_log`)
+  - `DELETE /api/superuser/impersonate` — end impersonation session
+  - `GET /api/superuser/impersonate/active` — check if currently impersonating
+- [ ] Add `requireSuperuser` to system configuration routes (future)
+- [ ] Update OpenAPI annotations for all new/modified endpoints
+
+**QA Tasks:**
+- [ ] Test: locked account returns 403 on any authenticated request
+- [ ] Test: superuser with `X-Impersonate-User` header gets target user's data
+- [ ] Test: non-superuser with `X-Impersonate-User` header is ignored (gets own data)
+- [ ] Test: `requireTierFeature('kdp_export')` blocks standard tier, passes pro tier
+- [ ] Test: `requireCredits(1)` blocks user with 0 credits
+- [ ] Test: `deductCredits` correctly updates balance and creates transaction
+- [ ] Test: superuser/admin bypass credit checks
+- [ ] Test: `purchaseCredits` adds credits and creates purchase transaction
+- [ ] Test: credit purchase route validates amount > 0
+- [ ] Test: impersonation start/end logged with timestamps
+
+---
+
+#### S8-3: Account lifecycle management — admin panel
+**Points:** 8 | **Priority:** P0
+
+Expand the admin panel to support creating accounts with subscription tiers, locking/unlocking accounts, and managing billing.
+
+**Developer Tasks:**
+- [ ] New server routes:
+  - `POST /api/admin/users` — updated: now accepts `tier`, `billing_cycle`, `is_free` fields. Creates `users_v2` row + `user_subscriptions` row in transaction. If `is_free=true`, creates `free_full` subscription with no billing
+  - `PUT /api/admin/users/:id/lock` — sets `account_status='locked'`, `locked_at=now()`, `locked_by`, `locked_reason`. Optionally sends email notification
+  - `PUT /api/admin/users/:id/unlock` — sets `account_status='active'`, clears lock fields
+  - `PUT /api/admin/users/:id/subscription` — change tier, billing cycle, reset credits
+  - `POST /api/admin/users/:id/credits` — admin credit adjustment (add/remove credits with reason)
+  - `GET /api/admin/subscriptions` — list all subscriptions with user info, filterable by tier/status
+  - `GET /api/admin/revenue` — aggregate billing stats (MRR, active paid users, trial conversions)
+- [ ] Update AdminPanel User Management tab:
+  - Create user form: add tier dropdown (from `subscription_tiers`), billing cycle radio (monthly/annual/none), "Free account" checkbox
+  - User list: show tier badge, account status badge (active/locked/suspended), credits remaining, billing cycle
+  - Inline actions: Lock (with reason modal), Unlock, Change Tier, Adjust Credits
+  - Account status filter: All / Active / Locked / Trial Expiring Soon
+  - Show trial countdown for trial users ("12 days remaining")
+- [ ] New Admin tab: **Subscriptions**
+  - Subscription list with columns: user, tier, status, billing cycle, period end, credits used/total
+  - Tier filter tabs
+  - Bulk actions: extend trial, change tier for selected
+  - Revenue summary cards: MRR, annual revenue, active subscribers, trial users, conversion rate
+- [ ] Add Zod validation schemas: `LockAccountSchema`, `AdjustCreditsSchema`, `ChangeSubscriptionSchema`, `CreateUserWithSubscriptionSchema`
+
+**QA Tasks:**
+- [ ] Test: admin can create user with specific tier and billing cycle
+- [ ] Test: admin can create free (non-paid) account
+- [ ] Test: locking account sets correct fields and locked user cannot log in
+- [ ] Test: unlocking account restores access
+- [ ] Test: changing subscription tier updates `user_subscriptions` and resets credits
+- [ ] Test: credit adjustment creates transaction and updates balance
+- [ ] Test: subscriptions tab shows accurate data
+- [ ] Test: trial countdown displays correctly
+- [ ] Test: non-admin cannot access any of these routes (403)
+
+---
+
+#### S8-4: Superuser impersonation UI
+**Points:** 5 | **Priority:** P0
+
+Build the superuser-only impersonation feature that allows debugging user issues by seeing exactly what a user sees.
+
+**Developer Tasks:**
+- [ ] Create `ImpersonationBanner.tsx` — persistent top banner shown during impersonation:
+  - Yellow/orange warning bar: "You are impersonating [User Name] ([user_id]). All actions will be performed as this user."
+  - "End Impersonation" button
+  - Timer showing session duration
+  - Non-dismissable (cannot be closed, only ended)
+- [ ] Update `UserContext.tsx`:
+  - Add `impersonating: boolean`, `impersonatedUser: UserProfile | null`, `realUser: UserProfile | null` to context
+  - When impersonation is active: `profile` returns the impersonated user's profile, `realUser` stores the superuser's actual profile
+  - `startImpersonation(targetUserId)` — calls `POST /api/superuser/impersonate`, stores impersonation token, re-fetches profile as target user
+  - `endImpersonation()` — calls `DELETE /api/superuser/impersonate`, restores superuser profile
+  - Impersonation state stored in `sessionStorage` (cleared on tab close for safety)
+- [ ] Update `AppShell.tsx`: render `ImpersonationBanner` when `impersonating === true`
+- [ ] Add "Impersonate" button to AdminPanel user list (visible only to superusers)
+- [ ] During impersonation:
+  - All Supabase queries use the impersonated user's `user_id`
+  - Chat drawer sends messages as impersonated user
+  - Eve widget connects as impersonated user
+  - Admin panel remains accessible (superuser retains their role)
+  - All navigation shows impersonated user's data
+- [ ] Create `SuperuserPanel.tsx` — superuser-only page at `/superuser`:
+  - Impersonation history log (from `impersonation_log` table)
+  - Active impersonation sessions
+  - Quick-impersonate search: type user name/phone to start impersonation
+- [ ] Add `/superuser` route guarded by superuser role check
+- [ ] Add Superuser link in sidebar (only visible to superusers)
+
+**QA Tasks:**
+- [ ] Test: impersonation banner appears during active impersonation
+- [ ] Test: impersonated user's data (projects, content, settings) shown correctly
+- [ ] Test: ending impersonation restores superuser view
+- [ ] Test: impersonation survives page navigation but not tab close
+- [ ] Test: non-superuser cannot see Impersonate button
+- [ ] Test: impersonation log records start/end timestamps
+- [ ] Test: admin panel still accessible during impersonation (uses superuser's role, not impersonated user's)
+
+---
+
+#### S8-5: Trial management and auto-expiration
+**Points:** 5 | **Priority:** P0
+
+Handle the 30-day trial lifecycle: countdown, warnings, expiration, and conversion to paid.
+
+**Developer Tasks:**
+- [ ] Create `trial_check` cron endpoint: `POST /api/cron/trial-check` (secured with cron secret)
+  - Query all `user_subscriptions` where tier is trial AND `trial_end < now()` AND status = 'active'
+  - For each expired trial: set `status='expired'`, set `users_v2.account_status='suspended'`
+  - Send email notification: "Your 30-day trial has expired. Upgrade to continue using The Writers Workbench."
+  - Log the transition
+- [ ] Create `credit_reset` cron endpoint: `POST /api/cron/credit-reset`
+  - Query all active subscriptions where `current_period_end < now()`
+  - Reset `credits_remaining` to tier's `monthly_credits`, `credits_used_this_period = 0`
+  - Set new `current_period_start/end`
+  - Insert `credit_transactions` row with type `monthly_reset`
+- [ ] Trial warning emails (7 days, 3 days, 1 day before expiry):
+  - Add `trial_warning_sent` JSONB to `user_subscriptions` tracking which warnings have been sent
+  - Cron checks for trials expiring within 7/3/1 days, sends appropriate warning
+- [ ] Client-side trial banner:
+  - `TrialBanner.tsx` — shown at top of all pages for trial users
+  - "You have X days remaining in your free trial. [Upgrade Now]"
+  - Turns red in last 3 days
+  - Links to upgrade page
+- [ ] Suspended account handling:
+  - When suspended user logs in: show modal "Your trial has expired" with upgrade options and pricing
+  - User can browse but not create content, export, or use chat/Eve
+  - Read-only mode: all mutation buttons disabled, chat drawer shows "Upgrade to continue creating content"
+- [ ] Update `Onboarding.tsx`: after signup, automatically create `trial` subscription (30 days, 200 credits)
+
+**QA Tasks:**
+- [ ] Test: new signup gets trial subscription with correct dates
+- [ ] Test: trial_check cron correctly expires overdue trials
+- [ ] Test: expired trial user sees upgrade modal on login
+- [ ] Test: suspended user can browse but not create/export
+- [ ] Test: credit reset correctly refills credits monthly
+- [ ] Test: trial warning emails sent at 7/3/1 day marks (not duplicated)
+- [ ] Test: upgrade from trial to paid preserves existing content
+
+---
+
+#### S8-6: Credit tracking and usage UI
+**Points:** 5 | **Priority:** P1
+
+Surface credit usage to users so they understand their consumption and can manage their allowance.
+
+**Developer Tasks:**
+- [ ] Add credit display to sidebar footer: "42 / 100 credits" with progress bar (green → yellow → red as depleted)
+- [ ] Create `CreditsPage.tsx` at `/credits`:
+  - Current balance card with circular progress indicator
+  - Monthly allowance display: "42 of 100 monthly credits remaining (resets [date])"
+  - Usage breakdown by category (writing, research, cover art, social) — grouped from `credit_transactions`
+  - Transaction history table: date, description, amount (+/-), balance after
+  - Pagination on transaction history
+  - **"Buy More Credits" section** — available to ALL tiers:
+    - Shows price per credit for user's tier (from `subscription_tiers.credit_purchase_price_cents`)
+    - Quantity selector: preset amounts (10, 25, 50, 100) or custom amount
+    - Total cost display: "25 credits × $1.00 = $25.00"
+    - "Purchase Credits" button → calls `POST /api/credits/purchase` → updates balance immediately
+    - Purchase confirmation modal with total cost
+    - (Actual payment gateway integration deferred — records transaction for admin billing)
+- [ ] Integrate credit deduction into chat proxy:
+  - When `POST /api/chat/proxy` succeeds, deduct credits based on operation type:
+    - Writing operations (write chapter, blog, newsletter, short story): 5 credits
+    - Brainstorm/outline: 3 credits
+    - Research: 2 credits
+    - Cover art generation: 10 credits
+    - Social media repurposing: 3 credits
+    - List/retrieve operations: 0 credits (free)
+  - Return remaining credits in response headers: `X-Credits-Remaining`
+- [ ] Update chat drawer: show credit cost before sending expensive operations ("This will use 5 credits. You have 42 remaining. [Send]")
+- [ ] Credit exhaustion handling:
+  - When credits hit 0: show modal "You've used all your credits for this period"
+  - Show two options: "Purchase More Credits" (immediate) and "Credits reset on [date]" (wait)
+  - Block creation operations, allow read/browse operations
+  - "Purchase Credits" button in exhaustion modal links directly to credits page purchase section
+- [ ] Add credits route to sidebar (below Cost Tracking)
+- [ ] Update CostDashboard to show credits alongside token costs
+
+**QA Tasks:**
+- [ ] Test: sidebar shows correct credit balance
+- [ ] Test: sending a write command deducts correct credits
+- [ ] Test: list operations do not deduct credits
+- [ ] Test: credit exhaustion modal appears at 0 credits with purchase option
+- [ ] Test: purchasing credits updates balance immediately and creates transaction
+- [ ] Test: purchase price reflects tier-specific pricing
+- [ ] Test: transaction history shows all debits, credits, and purchases
+- [ ] Test: credit cost confirmation shown before expensive operations
+- [ ] Test: X-Credits-Remaining header present in chat responses
+- [ ] Test: free_full user can purchase additional credits
+
+---
+
+#### S8-7: Subscription tier management (superuser)
+**Points:** 5 | **Priority:** P1
+
+Allow superusers to configure subscription tiers — pricing, credits, features — without code changes.
+
+**Developer Tasks:**
+- [ ] Create `TierManagement.tsx` in SuperuserPanel:
+  - List all subscription tiers with: name, price (monthly/annual), monthly credits, credit purchase price, features, user count, active/inactive
+  - Edit tier form: display_name, description, **monthly_credits** (the key superuser-controlled value), credit_purchase_price_cents, monthly_price_cents, annual_price_cents, features (checkbox grid), trial_days, sort_order, active toggle
+  - **Monthly credits control** is the primary configuration — prominently displayed with clear labeling: "Monthly Credit Allowance: how many credits users on this tier receive each billing cycle"
+  - Create new tier button
+  - Deactivate tier (soft — existing subscribers keep their tier, new signups cannot select it)
+  - Show user count per tier
+  - "Apply credit change to existing subscribers" checkbox — when superuser changes monthly_credits, option to immediately update all existing subscribers' allowance (does not change their current remaining credits, only the reset amount)
+- [ ] Server routes (all require superuser):
+  - `GET /api/superuser/tiers` — list all tiers with subscriber counts
+  - `POST /api/superuser/tiers` — create new tier
+  - `PUT /api/superuser/tiers/:id` — update tier (price changes only affect new subscribers)
+  - `PUT /api/superuser/tiers/:id/deactivate` — soft deactivate
+- [ ] Create `SystemConfig.tsx` in SuperuserPanel:
+  - Credit costs per operation (currently hardcoded in S8-6) — move to `app_config_v2` with key `credit_costs`
+  - Default tier for new signups
+  - Trial duration override
+  - Global maintenance mode toggle
+- [ ] Server route: `GET/PUT /api/superuser/config` — read/write system-wide configuration
+- [ ] Add Zod schemas: `TierSchema`, `SystemConfigSchema`
+
+**QA Tasks:**
+- [ ] Test: superuser can create a new tier
+- [ ] Test: editing tier price doesn't retroactively change existing subscribers
+- [ ] Test: deactivating tier hides it from signup but keeps existing subscribers
+- [ ] Test: credit cost configuration applies to chat proxy deductions
+- [ ] Test: admin cannot access superuser tier management (403)
+- [ ] Test: system config changes take effect immediately
+
+---
+
+#### S8-8: Role-gated UI and feature flags
+**Points:** 5 | **Priority:** P0
+
+Gate all UI elements based on the user's role and subscription tier. Users should only see what they can access.
+
+**Developer Tasks:**
+- [ ] Create `usePermissions()` hook:
+  - Returns `{ role, tier, features, credits, canExport, canGenerateArt, canRepurposeSocial, isAdmin, isSuperuser, isTrialUser, trialDaysRemaining }`
+  - Reads from `UserContext` profile + subscription data
+  - Memoized for performance
+- [ ] Create `<RequireRole role="admin">` wrapper component:
+  - Renders children only if user has required role (respects hierarchy: superuser > admin > user)
+  - Optional `fallback` prop for "Access Denied" message
+- [ ] Create `<RequireFeature feature="kdp_export">` wrapper component:
+  - Renders children only if user's tier includes the feature
+  - Shows upgrade prompt as fallback: "Upgrade to Pro to unlock this feature"
+- [ ] Gate existing UI elements:
+  - Admin panel link in sidebar: `<RequireRole role="admin">`
+  - Superuser panel link: `<RequireRole role="superuser">`
+  - Export button in ProjectDetail: `<RequireFeature feature="kdp_export">`
+  - "Generate Cover Art" quick command in chat: `<RequireFeature feature="cover_art">`
+  - Social Media tab in ProjectDetail: `<RequireFeature feature="social_media">`
+  - Credit adjustment in admin: `<RequireRole role="admin">`
+  - Tier management: `<RequireRole role="superuser">`
+- [ ] Update sidebar to show/hide sections based on role:
+  - "Superuser" section (only for superusers): Tier Management, System Config, Impersonation Log
+  - "Admin" section (admin + superuser): User Management, Subscriptions, Revenue
+  - "Credits" section (all users): shows credit balance, link to credits page
+- [ ] Upgrade prompts: when a feature is blocked, show inline upgrade card with tier comparison and "Upgrade" CTA
+- [ ] Update all API calls to handle 402 (insufficient credits) and 403 (feature not available) gracefully with user-friendly messages
+
+**QA Tasks:**
+- [ ] Test: standard user cannot see export button
+- [ ] Test: pro user can see and use export button
+- [ ] Test: admin sidebar shows admin items, hides superuser items
+- [ ] Test: superuser sidebar shows all items
+- [ ] Test: upgrade prompt renders for blocked features
+- [ ] Test: 402 response shows "insufficient credits" message (not generic error)
+- [ ] Test: 403 response shows "upgrade required" message for tier-gated features
+- [ ] Test: role hierarchy works correctly (superuser has all admin permissions)
+
+---
+
+#### S8-9: Signup flow with tier selection
+**Points:** 3 | **Priority:** P1
+
+Update the signup and onboarding flow to include tier selection and trial activation.
+
+**Developer Tasks:**
+- [ ] Update `Signup.tsx`:
+  - After email/password step, show tier selection screen
+  - Display pricing cards for each active tier: name, price, credits, feature list, CTA button
+  - "Start Free Trial" card prominent (30 days, no credit card)
+  - "Free Full Access" tier hidden from public signup (admin-provisioned only)
+- [ ] Update `Onboarding.tsx`:
+  - Step 1: Welcome (existing)
+  - Step 2: Choose your plan (tier selection — skipped if admin-created account)
+  - Step 3: Sidebar overview (existing)
+  - Step 4: Eve + Chat (existing)
+  - Step 5: First project (existing)
+- [ ] Create `PricingCards.tsx` — reusable pricing display component:
+  - Card per tier: name, price (monthly/annual toggle), feature checklist, credit count, CTA
+  - Highlight "Most Popular" on pro tier
+  - Annual discount percentage shown
+- [ ] After tier selection:
+  - Create `user_subscriptions` row
+  - For trial: set `trial_start=now()`, `trial_end=now()+30d`, `credits_remaining=200`
+  - For paid: set billing cycle, period start/end, credits per tier
+  - Redirect to dashboard
+- [ ] Add `GET /api/tiers` public endpoint (no auth required) — returns active tiers for pricing page
+
+**QA Tasks:**
+- [ ] Test: signup shows tier selection after account creation
+- [ ] Test: selecting trial creates correct subscription record
+- [ ] Test: selecting paid tier sets correct billing cycle and credits
+- [ ] Test: free_full tier not visible in public signup
+- [ ] Test: admin-created accounts skip tier selection in onboarding
+- [ ] Test: pricing cards render correctly with monthly/annual toggle
+
+---
+
+#### S8-10: E2E tests and migration validation
+**Points:** 3 | **Priority:** P0
+
+Comprehensive testing for the entire RBAC and subscription system.
+
+**Developer Tasks:**
+- [ ] `e2e/sprint8-rbac.spec.ts`:
+  - Login as superuser → verify superuser panel visible → verify impersonation works
+  - Login as admin → verify admin panel visible, superuser panel hidden
+  - Login as standard user → verify limited features, upgrade prompts shown
+  - Login as trial user → verify trial banner, countdown, full features available
+  - Locked account → verify login blocked with appropriate message
+  - Credit exhaustion → verify creation blocked, read operations still work
+  - Impersonation flow: start → verify target user data → end → verify restoration
+- [ ] `client/src/test/sprint8-qa.test.ts`:
+  - `usePermissions` hook: returns correct values for each role/tier combination
+  - `RequireRole`: renders/hides based on role hierarchy
+  - `RequireFeature`: renders/hides based on tier features
+  - Credit display: correct formatting, color thresholds
+  - Trial banner: shows correct days remaining, color changes at 3 days
+  - Pricing cards: renders all tiers, handles monthly/annual toggle
+- [ ] `server/src/test/sprint8-qa.test.ts`:
+  - `requireSuperuser` middleware: blocks non-superusers
+  - `requireTierFeature`: blocks users without feature
+  - `requireCredits`: blocks users with insufficient credits, passes unlimited
+  - `deductCredits`: correct balance math, transaction created
+  - Impersonation routes: only superuser can start, log created
+  - Account lock/unlock: correct status changes
+  - Trial expiration cron: correctly expires and suspends
+  - Credit reset cron: correctly resets and logs
+- [ ] Migration dry-run: verify `008_sprint8_rbac_subscriptions.sql` against V2 Supabase without breaking existing data
+
+**QA Tasks:**
+- [ ] Run full E2E suite on Chromium and Firefox
+- [ ] Verify no regression in Sprints 0-7 functionality
+- [ ] Test migration rollback path (document manual steps)
+- [ ] Verify n8n service role still bypasses all RLS after policy changes
+- [ ] Test with multiple concurrent users at different tiers
+
+---
+
+### Sprint 8 Completion Criteria
+- [ ] Role system expanded: superuser, admin, user (3 roles)
+- [ ] 5 subscription tiers seeded and configurable
+- [ ] Credit system tracking usage per operation
+- [ ] Superuser impersonation working with audit log
+- [ ] Admin can create, lock, unlock, and manage user accounts
+- [ ] Trial lifecycle: 30-day countdown, warnings, expiration, suspension
+- [ ] UI gated by role and tier (upgrade prompts for blocked features)
+- [ ] Signup flow includes tier selection
+- [ ] All new features have unit + E2E tests
+- [ ] Migration tested against V2 Supabase without data loss
+- [ ] All existing tests still pass (no regressions)
+
+---
+
+## Sprint 9: Stripe Integration & Payment Processing (2 weeks)
+
+**Goal:** Integrate Stripe for real payment processing — subscriptions, credit purchases, invoicing, and self-service tier upgrades/downgrades. Replace the manual billing reconciliation from Sprint 8 with automated Stripe-powered payments.
+**Total Points:** 47
+**Prerequisite:** Sprint 8 must be complete (RBAC, subscription tiers, credit system all in place).
+
+### Architecture Overview
+
+Stripe integration follows the **Stripe-as-source-of-truth** pattern for billing, while Supabase remains the source of truth for content and access control:
+
+```
+User Action (upgrade/purchase/cancel)
+    → Client calls server API
+        → Server creates Stripe Checkout Session / PaymentIntent
+            → Stripe processes payment
+                → Stripe fires webhook to server
+                    → Server updates user_subscriptions & credit_transactions in Supabase
+                        → Client reflects updated state via query invalidation
+```
+
+**Key Principle:** Never grant access based on client-side state alone. All entitlement changes flow through Stripe webhooks → server → database. The client only reads the result.
+
+### Stripe Resources Used
+
+| Stripe Concept | Our Use Case |
+|----------------|-------------|
+| **Products** | Each subscription tier = 1 Stripe Product |
+| **Prices** | Monthly and annual price per product (2 per tier) |
+| **Subscriptions** | Recurring billing for paid tiers |
+| **Checkout Sessions** | New subscription signup + tier upgrades |
+| **Customer Portal** | Self-service billing management (update card, cancel) |
+| **Payment Intents** | One-time credit purchases |
+| **Webhooks** | Server-side fulfillment of all payment events |
+| **Customer** | 1:1 mapping to `users_v2` via `stripe_customer_id` |
+
+### Stories
+
+---
+
+#### S9-1: Stripe SDK setup, environment config, and product/price seeding
+**Points:** 5 | **Priority:** P0
+
+Install Stripe, configure API keys, and create the Stripe Products and Prices that mirror our subscription tiers.
+
+**Developer Tasks:**
+- [ ] Install `stripe` npm package in `server/`
+- [ ] Add environment variables to `.env.example`:
+  - `STRIPE_SECRET_KEY` — Stripe secret API key (sk_test_... for dev, sk_live_... for prod)
+  - `STRIPE_PUBLISHABLE_KEY` — Stripe publishable key (pk_test_... / pk_live_...)
+  - `STRIPE_WEBHOOK_SECRET` — webhook endpoint signing secret (whsec_...)
+  - `STRIPE_PRICE_STANDARD_MONTHLY`, `STRIPE_PRICE_STANDARD_ANNUAL` — Stripe Price IDs
+  - `STRIPE_PRICE_PRO_MONTHLY`, `STRIPE_PRICE_PRO_ANNUAL`
+  - `STRIPE_PRICE_PAID_FULL_MONTHLY`, `STRIPE_PRICE_PAID_FULL_ANNUAL`
+  - `STRIPE_CREDIT_PRICE_ID` — price ID for credit pack purchases
+- [ ] Create `server/src/services/stripe.ts`:
+  - Lazy-initialized Stripe client (same pattern as `supabase-admin.ts`)
+  - `getStripeClient()` function — validates `STRIPE_SECRET_KEY` exists, creates singleton
+- [ ] SQL migration `009_sprint9_stripe.sql`:
+  - `ALTER TABLE users_v2 ADD COLUMN stripe_customer_id TEXT UNIQUE`
+  - `ALTER TABLE user_subscriptions ADD COLUMN stripe_subscription_id TEXT UNIQUE`
+  - `ALTER TABLE user_subscriptions ADD COLUMN stripe_current_period_end TIMESTAMPTZ`
+  - `ALTER TABLE credit_transactions ADD COLUMN stripe_payment_intent_id TEXT`
+  - `ALTER TABLE subscription_tiers ADD COLUMN stripe_product_id TEXT`
+  - `ALTER TABLE subscription_tiers ADD COLUMN stripe_price_monthly_id TEXT`
+  - `ALTER TABLE subscription_tiers ADD COLUMN stripe_price_annual_id TEXT`
+  - Add index on `users_v2.stripe_customer_id`
+  - Add index on `user_subscriptions.stripe_subscription_id`
+- [ ] Create `scripts/seed-stripe-products.ts` — CLI script that:
+  - Reads `subscription_tiers` from Supabase
+  - Creates matching Stripe Products and Prices for each tier (monthly + annual)
+  - Creates a Stripe Price for credit pack purchases (per-credit pricing)
+  - Updates `subscription_tiers` rows with `stripe_product_id`, `stripe_price_monthly_id`, `stripe_price_annual_id`
+  - Idempotent (skips tiers that already have Stripe IDs)
+  - Run via: `npx tsx scripts/seed-stripe-products.ts`
+- [ ] Update TypeScript types: add `stripe_customer_id` to `UserProfile`, Stripe IDs to `SubscriptionTier`
+- [ ] Update `server/src/index.ts`: add raw body parsing for Stripe webhook route (Stripe requires raw body for signature verification — must be registered BEFORE `express.json()` or use a separate parser)
+
+**QA Tasks:**
+- [ ] Test: `getStripeClient()` throws clear error when `STRIPE_SECRET_KEY` is missing
+- [ ] Test: seed script creates Products and Prices in Stripe test mode
+- [ ] Test: seed script is idempotent (running twice doesn't create duplicates)
+- [ ] Test: Stripe IDs saved to `subscription_tiers` table
+- [ ] Test: `stripe_customer_id` column is unique (no two users share a Stripe customer)
+- [ ] Test: raw body parsing works for webhook route without breaking JSON parsing for other routes
+
+---
+
+#### S9-2: Stripe Customer creation and sync
+**Points:** 5 | **Priority:** P0
+
+Automatically create Stripe Customers for users and keep them synchronized.
+
+**Developer Tasks:**
+- [ ] Create `server/src/services/stripe-sync.ts`:
+  - `getOrCreateStripeCustomer(userId: string)`: looks up `users_v2.stripe_customer_id`. If null, creates a Stripe Customer with `email`, `name`, `phone`, `metadata: { user_id, supabase_auth_uid }`. Saves `stripe_customer_id` back to `users_v2`. Returns customer ID.
+  - `syncCustomerToStripe(userId: string)`: updates Stripe Customer with latest email/name/phone from `users_v2` (called on profile update)
+  - `findUserByStripeCustomerId(customerId: string)`: reverse lookup for webhook handling
+- [ ] Hook into user creation flow:
+  - When admin creates user (S8-3 `POST /api/admin/users`): call `getOrCreateStripeCustomer` after creating user record
+  - When user signs up (onboarding): call `getOrCreateStripeCustomer` after `users_v2` row is created
+  - Trial users get a Stripe Customer but no Stripe Subscription (trial is free, managed internally)
+- [ ] Hook into profile update:
+  - When `PUT /api/admin/users/:id` changes email/name: call `syncCustomerToStripe`
+  - When user updates own profile in Settings: call `syncCustomerToStripe`
+- [ ] Backfill existing users:
+  - Create `POST /api/superuser/stripe/backfill` — iterates all `users_v2` rows without `stripe_customer_id`, creates Stripe Customers
+  - Eric's account (`+14105914612`) gets a Stripe Customer but no subscription (free_full tier, never charged)
+- [ ] Error handling: if Stripe is unreachable, log error and continue — don't block user creation. Mark `stripe_customer_id` as null and retry on next relevant action.
+
+**QA Tasks:**
+- [ ] Test: new user signup creates Stripe Customer with correct metadata
+- [ ] Test: admin-created user gets Stripe Customer
+- [ ] Test: profile update syncs to Stripe Customer
+- [ ] Test: `getOrCreateStripeCustomer` is idempotent (calling twice returns same customer)
+- [ ] Test: Stripe failure doesn't block user creation (graceful degradation)
+- [ ] Test: backfill endpoint creates Customers for all existing users
+- [ ] Test: Eric's superuser account gets Customer but no Stripe Subscription
+
+---
+
+#### S9-3: Checkout flow — new subscriptions and tier upgrades
+**Points:** 8 | **Priority:** P0
+
+Build the Stripe Checkout integration for subscribing to a paid tier and upgrading/downgrading between tiers.
+
+**Developer Tasks:**
+- [ ] Server routes:
+  - `POST /api/billing/checkout` — creates Stripe Checkout Session for new subscription:
+    - Accepts `{ tier_id, billing_cycle: 'monthly' | 'annual' }`
+    - Looks up `subscription_tiers` to get the correct `stripe_price_monthly_id` or `stripe_price_annual_id`
+    - Creates Checkout Session with `mode: 'subscription'`, `customer`, `success_url`, `cancel_url`
+    - `success_url` includes `session_id` query param for verification
+    - Returns `{ checkout_url }` — client redirects to Stripe
+  - `POST /api/billing/upgrade` — creates Checkout Session for tier change:
+    - If upgrading: prorated, immediate switch via Stripe `subscription.update` with `proration_behavior: 'create_prorations'`
+    - If downgrading: change takes effect at end of current period via `proration_behavior: 'none'` + `cancel_at_period_end` on old + new subscription at period end
+    - Returns `{ checkout_url }` or `{ success: true }` for immediate proration
+  - `POST /api/billing/portal` — creates Stripe Customer Portal session:
+    - Customer Portal handles: update payment method, view invoices, cancel subscription
+    - Returns `{ portal_url }`
+  - `GET /api/billing/status` — returns current billing status:
+    - Current tier, billing cycle, next billing date, payment method (last 4 digits), upcoming invoice amount
+    - Reads from both `user_subscriptions` and Stripe API
+- [ ] Client integration:
+  - Update `PricingCards.tsx` (from S8-9): "Subscribe" button calls `POST /api/billing/checkout` and redirects to `checkout_url`
+  - Add `BillingPage.tsx` at `/billing`:
+    - Current plan card: tier name, price, billing cycle, next payment date
+    - "Change Plan" button → shows tier comparison with upgrade/downgrade pricing
+    - "Manage Billing" button → opens Stripe Customer Portal (payment method, invoices, cancel)
+    - Payment method display: card brand + last 4 digits from Stripe
+    - Invoice history: last 12 invoices from Stripe with PDF download links
+  - Update signup flow: after selecting a paid tier, redirect to Stripe Checkout instead of immediate activation
+  - Add `/billing/success` route — landing page after Stripe Checkout success. Shows "Payment confirmed" and redirects to dashboard.
+  - Add `/billing/cancel` route — landing page after Stripe Checkout cancellation. Shows "No charges made" and redirects to pricing.
+- [ ] Add `Billing` link in sidebar (visible to all users except free_full)
+- [ ] Superuser/admin accounts skip Stripe Checkout entirely (their subscriptions are managed internally)
+
+**QA Tasks:**
+- [ ] Test: clicking "Subscribe" on pro tier redirects to Stripe Checkout with correct price
+- [ ] Test: successful Checkout creates Stripe Subscription and redirects to success page
+- [ ] Test: cancelled Checkout redirects to cancel page with no charges
+- [ ] Test: upgrade from standard to pro creates prorated charge
+- [ ] Test: downgrade from pro to standard takes effect at period end (not immediately)
+- [ ] Test: Customer Portal opens and shows correct customer data
+- [ ] Test: billing page shows correct current plan, price, and next payment date
+- [ ] Test: invoice history displays PDFs from Stripe
+- [ ] Test: free_full and trial users see "Subscribe" not "Change Plan"
+- [ ] Test: superuser/admin accounts do not see billing page or get charged
+
+---
+
+#### S9-4: Stripe webhook handler — subscription lifecycle events
+**Points:** 8 | **Priority:** P0
+
+Handle all Stripe webhook events to keep `user_subscriptions` in sync with Stripe billing state.
+
+**Developer Tasks:**
+- [ ] Create `server/src/routes/stripe-webhook.ts`:
+  - `POST /api/webhooks/stripe` — Stripe webhook endpoint
+  - Verify webhook signature using `stripe.webhooks.constructEvent(rawBody, sig, webhookSecret)`
+  - **Must use raw body** — register route before `express.json()` middleware or use `express.raw({ type: 'application/json' })` on this specific route
+- [ ] Handle these Stripe events:
+  - **`checkout.session.completed`**: 
+    - Extract `customer`, `subscription` from session
+    - Look up user by `stripe_customer_id`
+    - Update `user_subscriptions`: set `stripe_subscription_id`, `status='active'`, `billing_cycle`, `current_period_start/end`
+    - Set `users_v2.account_status = 'active'` (in case they were suspended/trial-expired)
+    - Insert `credit_transactions` row with type `monthly_reset`
+    - Set `credits_remaining` to tier's `monthly_credits`
+  - **`invoice.paid`** (recurring payment success):
+    - Reset credits: `credits_remaining = tier.monthly_credits`, `credits_used_this_period = 0`
+    - Update `current_period_start/end` from Stripe subscription
+    - Insert `credit_transactions` row with type `monthly_reset`
+  - **`invoice.payment_failed`**:
+    - Set `user_subscriptions.status = 'past_due'`
+    - Send email: "Your payment failed. Please update your payment method."
+    - After 3 consecutive failures (check Stripe subscription status): set `account_status = 'suspended'`
+  - **`customer.subscription.updated`**:
+    - Sync tier changes (plan_id → find matching `subscription_tiers`)
+    - Update `billing_cycle` if changed
+    - Update `stripe_current_period_end`
+  - **`customer.subscription.deleted`** (cancellation):
+    - Set `user_subscriptions.status = 'cancelled'`
+    - Keep `account_status = 'active'` until `current_period_end` (access continues through paid period)
+    - After `current_period_end`: set `account_status = 'suspended'` (handled by trial_check cron or a new subscription_check cron)
+  - **`payment_intent.succeeded`** (one-time credit purchase):
+    - Extract `metadata.user_id` and `metadata.credits` from PaymentIntent
+    - Call `purchaseCredits(userId, credits)` — adds credits and creates transaction with `stripe_payment_intent_id`
+- [ ] Idempotency: store processed event IDs in `stripe_events` table (or check `credit_transactions.stripe_payment_intent_id`) to prevent double-processing on webhook retries
+- [ ] Create `stripe_events` table:
+  ```sql
+  CREATE TABLE stripe_events (
+    id TEXT PRIMARY KEY,                    -- Stripe event ID (evt_...)
+    event_type TEXT NOT NULL,
+    processed_at TIMESTAMPTZ DEFAULT now(),
+    payload JSONB
+  );
+  ```
+- [ ] Error handling: if webhook processing fails, return 500 so Stripe retries. Log full event payload for debugging. Never return 200 unless fully processed.
+- [ ] Register webhook route in `server/src/index.ts` — BEFORE `express.json()` middleware
+
+**QA Tasks:**
+- [ ] Test: webhook signature verification rejects tampered payloads
+- [ ] Test: `checkout.session.completed` activates subscription and resets credits
+- [ ] Test: `invoice.paid` resets credits monthly
+- [ ] Test: `invoice.payment_failed` sets status to past_due
+- [ ] Test: 3 consecutive payment failures suspends account
+- [ ] Test: `customer.subscription.deleted` keeps access through paid period then suspends
+- [ ] Test: `payment_intent.succeeded` for credit purchase adds correct credits
+- [ ] Test: duplicate webhook events are idempotent (same event ID processed once)
+- [ ] Test: failed webhook processing returns 500 (not 200) so Stripe retries
+- [ ] Test: webhook route uses raw body parsing (not JSON-parsed)
+- [ ] Test: subscription tier change via Stripe Portal syncs to `user_subscriptions`
+
+---
+
+#### S9-5: Credit purchase checkout flow
+**Points:** 5 | **Priority:** P0
+
+Wire up the credit purchase UI (from S8-6) to actual Stripe payment processing.
+
+**Developer Tasks:**
+- [ ] Update `POST /api/credits/purchase` (from S8-2):
+  - Instead of immediately adding credits, create a Stripe PaymentIntent:
+    - `amount` = `quantity * tier.credit_purchase_price_cents`
+    - `currency` = 'usd'
+    - `customer` = user's `stripe_customer_id`
+    - `metadata` = `{ user_id, credits: quantity, tier_id }`
+  - Return `{ client_secret }` for Stripe Elements or redirect to Stripe Checkout
+  - Credits are NOT added until webhook confirms payment (via `payment_intent.succeeded`)
+- [ ] Alternative flow using Stripe Checkout (simpler):
+  - `POST /api/credits/purchase-checkout` — creates Checkout Session with `mode: 'payment'`
+  - Uses the credit pack Price from `STRIPE_CREDIT_PRICE_ID` with `quantity`
+  - `success_url` = `/credits?purchase=success`
+  - Returns `{ checkout_url }`
+- [ ] Update `CreditsPage.tsx` purchase section:
+  - "Purchase Credits" button creates checkout session and redirects to Stripe
+  - After successful payment + webhook: credits appear in balance (may need polling or SSE notification)
+  - Show "Processing payment..." state between Stripe redirect return and credit appearing
+  - Purchase history section: shows all `credit_transactions` with type `purchase` and their Stripe receipt links
+- [ ] Update credit exhaustion modal:
+  - "Buy More Credits" now redirects to Stripe Checkout (not just internal credit addition)
+  - Show price: "25 credits for $25.00"
+- [ ] Free_full tier credit purchase: free_full users can still purchase credits — their `credit_purchase_price_cents` may differ from paid tiers (superuser-configurable)
+
+**QA Tasks:**
+- [ ] Test: clicking "Purchase 25 Credits" redirects to Stripe Checkout with correct amount ($25.00 at $1.00/credit)
+- [ ] Test: successful payment adds credits via webhook (not client-side)
+- [ ] Test: credits page shows "Processing..." until webhook confirms
+- [ ] Test: cancelled purchase doesn't add credits
+- [ ] Test: purchase history shows Stripe receipt links
+- [ ] Test: free_full users can purchase credits
+- [ ] Test: credit exhaustion modal purchase button works end-to-end
+
+---
+
+#### S9-6: Self-service tier upgrade/downgrade
+**Points:** 5 | **Priority:** P1
+
+Allow users to change their own subscription tier through the billing page.
+
+**Developer Tasks:**
+- [ ] Create `TierComparisonModal.tsx`:
+  - Shows current tier vs available tiers in comparison grid
+  - Feature checklist per tier (from `subscription_tiers.features`)
+  - Credit allowance per tier
+  - Price difference display:
+    - Upgrade: "You'll be charged $30.00 now (prorated for remaining billing period)"
+    - Downgrade: "Your plan will change to Standard at the end of your current billing period on [date]"
+  - "Confirm Change" button
+- [ ] Upgrade flow:
+  - Client calls `POST /api/billing/upgrade` with `{ new_tier_id }`
+  - Server uses Stripe `subscriptions.update()` to switch the price
+  - Stripe prorates and charges immediately for upgrades
+  - Server updates `user_subscriptions.tier_id` upon webhook confirmation
+  - Credits: if upgrading, immediately set `credits_remaining` to max of (current_remaining, new_tier.monthly_credits)
+- [ ] Downgrade flow:
+  - Client calls `POST /api/billing/downgrade` with `{ new_tier_id }`
+  - Server sets `schedule` on Stripe subscription: current plan continues until period end, then switches
+  - Show pending downgrade notice on billing page: "Your plan will change to Standard on [date]"
+  - At period end: Stripe fires `customer.subscription.updated` → webhook updates tier and credits
+- [ ] Cancel flow:
+  - "Cancel Subscription" in Stripe Customer Portal (or via billing page)
+  - Server receives `customer.subscription.deleted` webhook
+  - Access continues through paid period, then account suspends
+  - Show: "Your subscription is cancelled. You have access until [date]."
+  - "Reactivate" button: calls Stripe to un-cancel (if before period end)
+- [ ] Trial → Paid conversion:
+  - Trial users see "Upgrade" prominently on trial banner and billing page
+  - Selecting a paid tier creates new Stripe Subscription
+  - Trial subscription transitions to paid (no gap in access)
+
+**QA Tasks:**
+- [ ] Test: upgrade from standard to pro charges prorated amount
+- [ ] Test: upgrade immediately increases credit allowance
+- [ ] Test: downgrade from pro to standard shows pending notice
+- [ ] Test: downgrade takes effect at period end (not immediately)
+- [ ] Test: cancel shows end date and "Reactivate" button
+- [ ] Test: reactivation before period end works
+- [ ] Test: trial user can upgrade to any paid tier
+- [ ] Test: tier comparison modal shows accurate feature/price differences
+- [ ] Test: admin/superuser accounts cannot trigger Stripe billing operations
+
+---
+
+#### S9-7: Admin billing dashboard and revenue reporting
+**Points:** 5 | **Priority:** P1
+
+Give admins visibility into billing, revenue, and payment health across all users.
+
+**Developer Tasks:**
+- [ ] Update AdminPanel Subscriptions tab (from S8-3):
+  - Add "Payment Status" column: paid, past_due, cancelled, trialing
+  - Add "Last Payment" column: date and amount from Stripe
+  - Add "MRR Contribution" column per user
+  - Failed payments highlighted in red with "Retry Payment" admin action
+- [ ] Create `RevenueDashboard.tsx` — new Admin tab or SuperuserPanel section:
+  - **Summary cards:** MRR, ARR, total customers, active subscribers, trial users, churn rate (30-day)
+  - **Revenue chart:** monthly revenue over last 12 months (from Stripe invoices)
+  - **Tier breakdown:** pie chart showing subscriber count per tier
+  - **Trial conversion funnel:** trial starts → active trials → converted to paid → churned
+  - **Failed payments:** list of past_due accounts with "Send reminder" and "Retry" actions
+  - **Recent transactions:** last 50 Stripe events (from `stripe_events` table)
+- [ ] Server routes:
+  - `GET /api/admin/revenue` — aggregated revenue data:
+    - Pulls from Stripe API: `stripe.invoices.list()` for revenue, `stripe.subscriptions.list()` for counts
+    - Caches results for 5 minutes (Stripe API rate limits)
+  - `POST /api/admin/retry-payment/:userId` — retries failed invoice via `stripe.invoices.pay()`
+  - `GET /api/admin/stripe-events` — paginated list from `stripe_events` table
+- [ ] Superuser: can issue refunds via `POST /api/superuser/refund`:
+  - Accepts `{ stripe_payment_intent_id, amount_cents?, reason }`
+  - Calls `stripe.refunds.create()`
+  - Deducts credits if refunding a credit purchase
+  - Creates `credit_transactions` row with type `refund`
+
+**QA Tasks:**
+- [ ] Test: revenue dashboard shows correct MRR calculation
+- [ ] Test: tier breakdown matches actual subscriber counts
+- [ ] Test: failed payment list shows correct past_due accounts
+- [ ] Test: retry payment triggers Stripe invoice payment
+- [ ] Test: refund deducts credits and creates refund transaction
+- [ ] Test: revenue data caching works (second request within 5 min returns cached)
+- [ ] Test: non-admin cannot access revenue routes
+
+---
+
+#### S9-8: Subscription lifecycle cron and health monitoring
+**Points:** 3 | **Priority:** P1
+
+Ensure subscriptions stay synchronized between Stripe and the database, and handle edge cases.
+
+**Developer Tasks:**
+- [ ] Create `POST /api/cron/subscription-sync` (secured with cron secret):
+  - Queries all `user_subscriptions` with `stripe_subscription_id`
+  - For each, fetches current status from Stripe API
+  - Fixes any drift: if Stripe says `active` but local says `past_due`, update local
+  - If Stripe says `canceled` and `current_period_end < now()`, set `account_status = 'suspended'`
+  - Handles accounts that cancelled but whose access period has now ended
+  - Log all corrections for admin review
+- [ ] Update `POST /api/cron/credit-reset` (from S8-5):
+  - For Stripe-managed subscriptions: verify with Stripe that subscription is still active before resetting credits
+  - Don't reset credits for `past_due` or `cancelled` subscriptions
+- [ ] Create `POST /api/cron/trial-conversion-reminder`:
+  - Trials expiring in 3 days that haven't converted: send email with pricing and direct Checkout link
+  - Include one-click "Start Pro Plan" link (pre-filled Checkout Session)
+- [ ] Health monitoring:
+  - Add Stripe connectivity check to `/api/health`: calls `stripe.balance.retrieve()` — returns `checks.stripe: 'ok' | 'error' | 'skipped'`
+  - Log Stripe API errors with request IDs for debugging
+  - Alert if webhook events stop arriving (check `stripe_events` for gap > 1 hour during business hours)
+
+**QA Tasks:**
+- [ ] Test: subscription-sync corrects drifted status
+- [ ] Test: cancelled subscriptions with expired access get suspended
+- [ ] Test: credit reset skips past_due subscriptions
+- [ ] Test: trial conversion reminder sent at 3-day mark
+- [ ] Test: health check returns stripe status
+- [ ] Test: cron endpoints reject requests without correct secret
+
+---
+
+#### S9-9: E2E tests — full payment lifecycle
+**Points:** 3 | **Priority:** P0
+
+Comprehensive end-to-end testing of the entire billing system using Stripe test mode.
+
+**Developer Tasks:**
+- [ ] `e2e/sprint9-billing.spec.ts` — using Stripe test mode (test API keys + test card numbers):
+  - **New user signup → trial → paid conversion:**
+    1. Sign up new account
+    2. Verify trial subscription created (no Stripe subscription)
+    3. Click "Upgrade to Pro" → verify Stripe Checkout redirect
+    4. Complete Checkout with test card `4242424242424242`
+    5. Verify redirect to success page
+    6. Verify subscription active with correct credits
+  - **Credit purchase flow:**
+    1. Navigate to Credits page
+    2. Select 25 credits
+    3. Click Purchase → verify Stripe Checkout
+    4. Complete payment with test card
+    5. Verify credits added to balance
+    6. Verify transaction appears in history
+  - **Payment failure flow:**
+    1. Create subscription with test card `4000000000000341` (attaches then fails on charge)
+    2. Verify `past_due` status shown in billing page
+    3. Verify warning banner/email notification
+    4. Update payment method via Customer Portal
+    5. Verify account recovers
+  - **Tier upgrade/downgrade:**
+    1. Login as standard user
+    2. Upgrade to pro → verify prorated charge
+    3. Verify credits increase immediately
+    4. Downgrade back to standard → verify pending notice
+    5. Verify access continues through period
+  - **Cancellation:**
+    1. Cancel subscription via billing page
+    2. Verify "access until [date]" message
+    3. Verify "Reactivate" button works before period end
+  - **Admin/superuser billing views:**
+    1. Login as admin → verify revenue dashboard
+    2. Verify subscriber list with payment status
+    3. Login as superuser → verify refund capability
+- [ ] `server/src/test/sprint9-qa.test.ts`:
+  - Stripe client initialization (missing key handling)
+  - Webhook signature verification (valid, invalid, replay)
+  - Checkout session creation (correct price, customer, URLs)
+  - `getOrCreateStripeCustomer` idempotency
+  - Subscription sync cron (drift correction)
+  - Credit purchase → webhook → balance update flow
+  - Refund → credit deduction flow
+  - Rate limiting on billing endpoints
+- [ ] `client/src/test/sprint9-qa.test.ts`:
+  - PricingCards rendering (monthly/annual toggle, feature lists)
+  - BillingPage states (active, past_due, cancelled, trial)
+  - TierComparisonModal (upgrade vs downgrade messaging)
+  - Credit purchase form (quantity, total calculation, validation)
+  - RevenueDashboard (summary cards, chart data formatting)
+  - Billing link visibility (hidden for free_full, visible for paid tiers)
+
+**QA Tasks:**
+- [ ] Run full E2E suite on Chromium and Firefox with Stripe test keys
+- [ ] Verify all Stripe test card scenarios (success, decline, 3D Secure)
+- [ ] Test with Stripe CLI `stripe listen --forward-to localhost:3001/api/webhooks/stripe` for local webhook testing
+- [ ] Verify no regression in Sprints 0-8 functionality
+- [ ] Test webhook idempotency (replay same event twice)
+- [ ] Test race conditions: simultaneous credit purchase + credit usage
+- [ ] Verify PCI compliance: no card numbers stored in our database (all handled by Stripe)
+- [ ] Test Stripe Customer Portal renders correctly
+- [ ] Verify Stripe Dashboard shows correct Products, Prices, Subscriptions, and Customers
+
+---
+
+### Sprint 9 Completion Criteria
+- [ ] Stripe SDK installed and configured with test + production key support
+- [ ] All 5 subscription tiers have corresponding Stripe Products and Prices
+- [ ] Stripe Customers created for all users (with backfill for existing)
+- [ ] Checkout flow works for new subscriptions
+- [ ] Credit purchases processed through Stripe
+- [ ] Webhook handler processes all lifecycle events (paid, failed, cancelled, updated)
+- [ ] Self-service upgrade/downgrade with correct proration
+- [ ] Admin revenue dashboard with MRR, churn, trial conversion metrics
+- [ ] Subscription sync cron catches drift between Stripe and database
+- [ ] Superuser can issue refunds
+- [ ] All Stripe interactions use test mode in dev, live mode in production
+- [ ] No card numbers or sensitive payment data stored in Supabase (PCI compliance)
+- [ ] Full E2E test coverage using Stripe test cards
+- [ ] All existing tests still pass (no regressions)
+
+---
+
 ## Summary
 
 | Sprint | Focus | Stories | Points | Status |
@@ -1209,23 +2265,38 @@ Before any sprint work begins, the following testing infrastructure must be in p
 | 5 | Observability & Advanced Features | 6 | 34 | COMPLETE |
 | 6 | Admin, Settings & Polish | 7 | 34 | COMPLETE |
 | 7 | Testing, Documentation & Deployment | 5 | 28 | COMPLETE |
-| **Total** | | **52 stories** | **256 points** | **100% complete** |
+| 8 | Multi-Tenant RBAC & Subscriptions | 10 | 55 | NOT STARTED |
+| 9 | Stripe Integration & Payments | 9 | 47 | NOT STARTED |
+| **Total** | | **71 stories** | **358 points** | |
 
 ### Velocity Assumption
 - 1 developer agent + 1 QA agent
 - ~35 points per sprint (sustainable pace)
 - 2-week sprints
-- 8 sprints = 16 weeks to completion
+- Sprint 8 is larger than average (~55 points) — may extend to 3 weeks or split into 8a/8b
+- Sprint 9 (~47 points) — may extend to 3 weeks if Stripe edge cases require iteration
 
 ### Risk Factors
 - n8n workflow changes (Sprints 4, 5) require testing against live workflows
 - ElevenLabs widget behavior may vary across browsers
 - Supabase RLS changes require careful migration to avoid breaking n8n service role access
 - KIE.AI image persistence requires workflow deployment coordination
+- **Sprint 8:** Role constraint migration must handle existing users with 'editor'/'viewer' roles — migrate them to 'user' before dropping old values
+- **Sprint 8:** Impersonation via `get_current_user_id()` override must not break n8n service role operations
+- **Sprint 8:** Credit deduction in chat proxy must be atomic to prevent race conditions (use DB transaction)
+- **Sprint 9:** Stripe webhook endpoint must receive raw body (not JSON-parsed) for signature verification — conflicts with global `express.json()` middleware ordering
+- **Sprint 9:** Stripe test mode vs live mode must be environment-driven — no hardcoded test keys in production
+- **Sprint 9:** PCI compliance: never log, store, or transmit card numbers — Stripe Checkout and Elements handle all sensitive data client-side
+- **Sprint 9:** Webhook retries can cause double-processing — idempotency via `stripe_events` table is critical
+- **Sprint 9:** Stripe API rate limits (100 req/s in test, 25 req/s for some endpoints) — admin revenue dashboard must cache responses
 
 ### Deferred to Post-Launch (explicitly out of scope)
 - Collaborative editing / multi-user shared projects (Audit 5.6) — requires significant architecture change
 - Real-time collaborative cursors — not needed for initial SaaS launch
+- Multi-currency support — USD only for initial launch
+- Stripe Connect / marketplace payouts — not needed (single-vendor model)
+- Tax calculation (Stripe Tax) — manual for now, integrate if crossing tax nexus thresholds
+- Dunning management beyond 3-retry — use Stripe's built-in Smart Retries for now
 
 ### Coverage Verification
 All items from the following sources are accounted for in this sprint plan:
@@ -1233,12 +2304,16 @@ All items from the following sources are accounted for in this sprint plan:
 - ARCHITECTURE_REVIEW_V2.md: 75 tasks — **100% covered** (Task 20 marked done, all others assigned)
 - Conversation items: 9 items — **100% covered** (2 architectural decisions documented, 7 in sprints)
 - Collaborative features (Audit 5.6) — **explicitly deferred** to post-launch
+- Payment processing — **covered in Sprint 9** (Stripe integration)
 
 ### Definition of "Done" for Product
-- [ ] All 52 stories completed and QA-verified
+- [ ] All 71 stories completed and QA-verified
 - [ ] All unit tests passing (80%+ coverage on new code)
 - [ ] All E2E tests passing on Chromium and Firefox
 - [ ] All 12 acceptance criteria from design spec marked PASS
 - [ ] Security audit re-run with zero CRITICAL findings
 - [ ] Production deployed on Railway with health checks passing
 - [ ] Customer acceptance review completed
+- [ ] RBAC system tested with all role/tier combinations
+- [ ] Stripe billing tested end-to-end with test cards (signup, payment, upgrade, downgrade, cancel, refund)
+- [ ] PCI compliance verified (no card data in Supabase, all payments via Stripe Checkout/Elements)

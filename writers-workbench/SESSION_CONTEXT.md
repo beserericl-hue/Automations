@@ -641,4 +641,8 @@ All 5 stories delivered (28 points):
 | Production build | — | Succeeds |
 | **Total** | **338** | **All passing** |
 
-**ALL 52 STORIES COMPLETE. PRODUCT READY FOR CUSTOMER ACCEPTANCE REVIEW.**
+**ALL 52 STORIES COMPLETE (Sprints 0-7). PRODUCT READY FOR CUSTOMER ACCEPTANCE REVIEW.**
+
+**Sprint 8 planned** — Multi-Tenant RBAC, Subscription Tiers & Credits (10 stories, 55 points). Adds superuser/admin/user role hierarchy, 5 subscription tiers (standard/pro/trial/paid_full/free_full), credit system, superuser impersonation, trial lifecycle management, and role/tier-gated UI. Eric Beser (`+14105914612`, `eric@agileadtesting.com`) is the superuser — all existing projects/content remain under his account.
+
+**Sprint 9 planned** — Stripe Integration & Payments (9 stories, 47 points). Full Stripe billing: Checkout for subscriptions, PaymentIntent for credit purchases, webhooks for lifecycle events, self-service upgrade/downgrade, admin revenue dashboard, subscription sync cron, refunds.

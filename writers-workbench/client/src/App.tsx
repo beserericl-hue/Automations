@@ -1,25 +1,10 @@
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { UserProvider } from './contexts/UserContext';
 import { ToastProvider } from './contexts/ToastContext';
 import ErrorBoundary from './components/ErrorBoundary';
-
-// Retry dynamic imports once on failure (handles stale chunks after deploy)
-function lazyRetry(importFn: () => Promise<{ default: React.ComponentType }>) {
-  return lazy(() =>
-    importFn().catch(() => {
-      // Chunk failed to load — likely a stale hash after deploy. Reload once.
-      const key = 'chunk-retry';
-      if (!sessionStorage.getItem(key)) {
-        sessionStorage.setItem(key, '1');
-        window.location.reload();
-      }
-      sessionStorage.removeItem(key);
-      return importFn();
-    })
-  );
-}
+import { lazyRetry } from './lib/lazyRetry';
 import LoginPage from './components/auth/LoginPage';
 import SignupPage from './components/auth/SignupPage';
 import ForgotPasswordPage from './components/auth/ForgotPasswordPage';
