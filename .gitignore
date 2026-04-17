@@ -2,11 +2,17 @@
 .mcp.json
 .claude/
 
+# macOS
+.DS_Store
+**/.DS_Store
+
 # Local MCP server source
 elevenlabs-mcp/
 
 # Generated artifacts
 *.pdf
 *.ps
-*.html
 image.png
+
+# HTML reports (but NOT client/index.html)
+/*.html

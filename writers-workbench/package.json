@@ -1,0 +1,32 @@
+{
+  "name": "writers-workbench",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Writers Workbench — SaaS dashboard for The Author Agent",
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently -n client,server -c blue,green \"npm run dev:client\" \"npm run dev:server\"",
+    "dev:client": "npm -w client run dev",
+    "dev:server": "npm -w server run dev",
+    "build": "npm -w client run build && npm -w server run build",
+    "start": "npm -w server run start",
+    "test": "npm -w client run test && npm -w server run test",
+    "test:e2e": "npx playwright test",
+    "lint": "npm -w client run lint && npm -w server run lint",
+    "typecheck": "npm -w client run typecheck && npm -w server run typecheck"
+  },
+  "devDependencies": {
+    "@types/diff": "^7.0.2",
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=9.0.0"
+  },
+  "dependencies": {
+    "diff": "^8.0.4"
+  }
+}

@@ -1971,6 +1971,220 @@ Show outline version history for "The Accord"
 
 ---
 
+## Section P: Delete, Undelete, List Deleted & Email Content (Tests R94–R105)
+
+These tests verify the new manage_library operations: soft-delete, undelete, list deleted items, and email any saved content.
+
+---
+
+### R94: Delete a Draft
+
+**Tests:** manage_library delete operation, soft-delete sets status='deleted', auto-snapshot before delete, email notification
+
+**Prerequisite:** At least one item with status=draft exists (e.g., from earlier tests).
+
+```
+Delete the draft titled "The Forgotten Engineers of Rome"
+```
+
+**Expected:**
+- [ ] Agent calls `manage_library` with operation=delete
+- [ ] Status changes to `deleted`
+- [ ] Version snapshot auto-created with change_note="Auto-snapshot before delete"
+- [ ] Email notification sent confirming deletion
+- [ ] Item no longer appears in "list my drafts"
+
+**If it fails:** Check manage_library has delete operation routing. Verify published_content row status changed to 'deleted'.
+
+---
+
+### R95: Delete Published Item — Error
+
+**Tests:** Guard preventing direct deletion of published content
+
+**Prerequisite:** At least one item with status=published exists.
+
+```
+Delete the published content titled "Why Post-Apocalyptic Fiction Matters More Than Ever in 2026"
+```
+
+**Expected:**
+- [ ] Agent returns error: published items must be unpublished before deletion
+- [ ] Status remains `published` (no change)
+- [ ] No version snapshot created
+
+**If it fails:** Check delete operation guard — published items should be rejected with an error message.
+
+---
+
+### R96: List Deleted Items
+
+**Tests:** manage_library list_deleted operation, returns soft-deleted items
+
+**Prerequisite:** R94 completed (at least one deleted item).
+
+```
+Show my deleted content
+```
+
+**Expected:**
+- [ ] Agent calls `manage_library` with operation=list_deleted
+- [ ] Returns list of items with status=deleted
+- [ ] "The Forgotten Engineers of Rome" appears in the list
+- [ ] Returns up to 20 items, ordered by creation date
+
+---
+
+### R97: List Deleted — Filter by Type
+
+**Tests:** list_deleted with content_type_filter
+
+```
+Show my deleted blog posts
+```
+
+**Expected:**
+- [ ] Agent calls `manage_library` with operation=list_deleted and content_type_filter=blog_post
+- [ ] Returns only deleted blog posts (not stories, chapters, etc.)
+
+---
+
+### R98: Undelete Content
+
+**Tests:** manage_library undelete operation, restores to draft status, email notification
+
+**Prerequisite:** R94 completed ("The Forgotten Engineers of Rome" is deleted).
+
+```
+Undelete "The Forgotten Engineers of Rome"
+```
+
+**Expected:**
+- [ ] Agent calls `manage_library` with operation=undelete
+- [ ] Status changes from `deleted` to `draft`
+- [ ] Email notification sent confirming restoration
+- [ ] Item no longer appears in "list deleted"
+
+---
+
+### R99: Verify Undelete — Item Returns to Drafts
+
+**Tests:** Undeleted item is back in draft listings
+
+**Prerequisite:** R98 completed.
+
+```
+List my drafts
+```
+
+**Expected:**
+- [ ] "The Forgotten Engineers of Rome" appears in the drafts list
+- [ ] Status shows as `draft`
+
+---
+
+### R100: Email Outline
+
+**Tests:** manage_library email_content operation for outlines, JSON-to-HTML conversion
+
+**Prerequisite:** A brainstormed outline exists (e.g., "The Seed Vault" from R30).
+
+```
+Email me the outline for "The Seed Vault"
+```
+
+**Expected:**
+- [ ] Agent calls `manage_library` with operation=email_content, content_type=outline
+- [ ] Outline JSON converted to structured HTML with characters and chapters sections
+- [ ] Email arrives with formatted outline
+- [ ] Source: writing_projects table (outline JSONB column)
+
+---
+
+### R101: Email Short Story
+
+**Tests:** manage_library email_content for short stories, markdown-to-HTML
+
+**Prerequisite:** A short story exists in published_content.
+
+```
+Email me the short story about the Roman soldier and the Colosseum
+```
+
+**Expected:**
+- [ ] Agent calls `manage_library` with operation=email_content, content_type=short_story
+- [ ] Markdown content converted to HTML
+- [ ] Email arrives with formatted story
+- [ ] Source: published_content table
+
+---
+
+### R102: Email Research Report
+
+**Tests:** manage_library email_content for research reports
+
+**Prerequisite:** R02 completed (research report saved).
+
+```
+Email me the research report on "Post-Apocalyptic Fiction Trends 2026"
+```
+
+**Expected:**
+- [ ] Agent calls `manage_library` with operation=email_content, content_type=research
+- [ ] Email arrives with formatted research report
+- [ ] Source: research_reports table
+
+---
+
+### R103: Email Chapter
+
+**Tests:** manage_library email_content for book chapters
+
+**Prerequisite:** A chapter exists (e.g., from R31).
+
+```
+Email me chapter 1 of "The Seed Vault"
+```
+
+**Expected:**
+- [ ] Agent calls `manage_library` with operation=email_content, content_type=chapter
+- [ ] Email arrives with formatted chapter content
+- [ ] Source: published_content table
+
+---
+
+### R104: Email Newsletter
+
+**Tests:** manage_library email_content for newsletters
+
+**Prerequisite:** A newsletter exists in published_content.
+
+```
+Email me the newsletter about revolutions that changed the world
+```
+
+**Expected:**
+- [ ] Agent calls `manage_library` with operation=email_content, content_type=newsletter
+- [ ] Email arrives with formatted newsletter
+- [ ] Source: published_content table
+
+---
+
+### R105: Email Content Not Found
+
+**Tests:** email_content error handling when content doesn't exist
+
+```
+Email me the short story titled "A Story That Definitely Does Not Exist"
+```
+
+**Expected:**
+- [ ] Agent calls `manage_library` with operation=email_content
+- [ ] Returns error or "not found" message
+- [ ] No email sent
+
+---
+
 # PART 2: VOICE REGRESSION TESTS
 
 > **How to run:** Speak these commands to the ElevenLabs voice agent (Eve). The voice agent POSTs to the hub's webhook at `/author_request`. The hub's system prompt is designed to interpret messy voice transcriptions.
@@ -2354,6 +2568,82 @@ Then:
 - [ ] Email arrives at the address stored in `app_config.recipient_email` (not hardcoded)
 - [ ] If `bcc_email` is set, BCC recipient also receives it
 - [ ] Confirms the hub_settings Code node correctly reads from Supabase even for voice-triggered requests
+
+---
+
+## Section V-D: Voice — Delete, Undelete, List Deleted & Email Content (Tests V33–V40)
+
+---
+
+### V33: Voice — Delete Draft
+
+**Speak:**
+> "Delete the draft called The Forgotten Engineers of Rome"
+
+**Expected:** Agent calls `manage_library` operation=delete. Status changes to deleted. Email notification sent.
+
+---
+
+### V34: Voice — Delete Published Error
+
+**Speak:**
+> "Delete the published blog post about post apocalyptic fiction"
+
+**Expected:** Agent returns error — published items must be unpublished first. No status change.
+
+---
+
+### V35: Voice — List Deleted (Trash)
+
+**Speak:**
+> "Show me my trash"
+
+**Expected:** Agent calls `manage_library` operation=list_deleted. Returns deleted items. Alternate trigger phrase "trash" correctly maps to list_deleted.
+
+---
+
+### V36: Voice — Undelete
+
+**Speak:**
+> "Undelete The Forgotten Engineers of Rome put it back in drafts"
+
+**Expected:** Agent calls `manage_library` operation=undelete. Status changes to draft. Email notification sent.
+
+---
+
+### V37: Voice — Email Outline
+
+**Speak:**
+> "Can you email me the outline for The Seed Vault I want to look at it on my phone"
+
+**Expected:** Agent calls `manage_library` operation=email_content, content_type=outline. Formatted outline emailed.
+
+---
+
+### V38: Voice — Email Short Story
+
+**Speak:**
+> "Send me the short story about the Roman soldier by email"
+
+**Expected:** Agent calls `manage_library` operation=email_content, content_type=short_story. Story emailed as HTML.
+
+---
+
+### V39: Voice — Email Research Report
+
+**Speak:**
+> "Email me that research report on post apocalyptic fiction trends"
+
+**Expected:** Agent calls `manage_library` operation=email_content, content_type=research. Report emailed.
+
+---
+
+### V40: Voice — Email Chapter
+
+**Speak:**
+> "Send me chapter one of The Seed Vault in an email"
+
+**Expected:** Agent calls `manage_library` operation=email_content, content_type=chapter. Chapter emailed.
 
 ---
 
@@ -2816,13 +3106,347 @@ Show outline version history for "The Accord"
 
 ---
 
-## Full Regression (All 108 tests)
+### Group 18: Delete, Undelete, List Deleted (R94–R99)
 
-Run all R01–R93 chat tests, then V01–V32 voice tests, in order. Each test in Parts 1 and 2 includes its exact prompt.
+**R94 — Delete a Draft**
+
+```
+Delete the draft titled "The Forgotten Engineers of Rome"
+```
+
+**R96 — List Deleted**
+
+```
+Show my deleted content
+```
+
+**R98 — Undelete**
+
+```
+Undelete "The Forgotten Engineers of Rome"
+```
+
+**R99 — Verify Undelete**
+
+```
+List my drafts
+```
+
+---
+
+### Group 19: Email Content (R100–R105)
+
+**R100 — Email Outline**
+
+```
+Email me the outline for "The Seed Vault"
+```
+
+**R101 — Email Short Story**
+
+```
+Email me the short story about the Roman soldier and the Colosseum
+```
+
+**R102 — Email Research Report**
+
+```
+Email me the research report on "Post-Apocalyptic Fiction Trends 2026"
+```
+
+**R105 — Email Content Not Found**
+
+```
+Email me the short story titled "A Story That Definitely Does Not Exist"
+```
+
+---
+
+## Part 8: Chapter Outline & Story Arc Writing Process (R110–R121)
+
+> **Purpose:** End-to-end test of the new 3-step chapter writing process: brainstorm book outline (with story arc) → brainstorm chapter outline (with sub-chapters) → write chapter. Tests story arc integration, chapter outline generation, sub-chapter structure, dual-arc support, and consistency enforcement.
+>
+> **Prerequisites:** All story arcs must be loaded in `story_arcs_v2`. V2 hub must have `brainstorm_chapter` tool.
+
+---
+
+### R110 — Brainstorm Book Outline with Story Arc
+
+**Tests:** brainstorm_story saves story_arc_name in the outline
+
+```
+Brainstorm a book using the Hero's Journey called "The Signal Beneath."
+Genre: post-apocalyptic. 8 chapters.
+Premise: A radio operator in a collapsed coastal city intercepts a signal from
+a submerged research station. The signal contains coordinates and a child's voice.
+She must decide whether to investigate alone or alert the warlord who controls
+the only working boat.
+Themes: sacrifice, trust, the cost of knowledge.
+```
+
+**Expected:**
+- [ ] brainstorm_story tool called
+- [ ] Outline emailed with 8 chapters + characters
+- [ ] Outline JSON in `writing_projects_v2` contains `story_arc_name: "The Hero's Journey"` (or similar)
+- [ ] Chapter arc_notes reference Hero's Journey stages (Ordinary World, Call to Adventure, etc.)
+- [ ] Characters have names, roles (Protagonist/Antagonist/etc.), arcs, descriptions
+
+---
+
+### R111 — Brainstorm Chapter Outline for Prologue (Same Arc as Book)
+
+**Tests:** brainstorm_chapter generates sub-chapters using book story arc, loads book outline context
+
+```
+Create a chapter outline for the Prologue of "The Signal Beneath"
+```
+
+**Expected:**
+- [ ] brainstorm_chapter tool called (NOT write_chapter)
+- [ ] Chapter outline emailed for review
+- [ ] Chapter outline contains 3-7 sub-chapters
+- [ ] Each sub-chapter has: number, title, brief, arc_beat, characters, setting, emotional_tone, connects_to_book_arc
+- [ ] Characters in sub-chapters use EXACT names from book outline
+- [ ] arc_beat references Hero's Journey stages
+- [ ] Chapter outline saved to `writing_projects_v2.outline.chapters[prologue].chapter_outline`
+- [ ] `chapter_story_arc` field = same as book arc (Hero's Journey)
+- [ ] `book_arc_beat` describes how prologue fits the overall book arc
+
+---
+
+### R112 — Brainstorm Chapter Outline for Chapter 1 (Same Arc)
+
+**Tests:** brainstorm_chapter for a numbered chapter, previous/next chapter context
+
+```
+Create a chapter outline for Chapter 1 of "The Signal Beneath"
+```
+
+**Expected:**
+- [ ] brainstorm_chapter tool called
+- [ ] Chapter outline contains sub-chapters with arc beats
+- [ ] Sub-chapter briefs reference the book outline's brief for Chapter 1
+- [ ] Previous chapter context (Prologue) included in generation
+- [ ] Next chapter context (Chapter 2) included in generation
+- [ ] Characters match book outline exactly
+- [ ] Chapter outline saved to project outline
+
+---
+
+### R113 — Brainstorm Chapter Outline with Different Story Arc
+
+**Tests:** chapter can use a different story arc than the book
+
+```
+Create a chapter outline for Chapter 2 of "The Signal Beneath" using the Fichtean Curve
+```
+
+**Expected:**
+- [ ] brainstorm_chapter called with chapter_story_arc = "Fichtean Curve"
+- [ ] Chapter outline's `chapter_story_arc` = "Fichtean Curve" (different from book's Hero's Journey)
+- [ ] Sub-chapter arc_beats reference Fichtean Curve structure (Opening Crisis, First Crisis, Second Crisis, etc.)
+- [ ] `connects_to_book_arc` still references Hero's Journey for book-level continuity
+- [ ] Both arcs' prompt_text loaded and used in generation
+
+---
+
+### R114 — Write Prologue (After Chapter Outline Exists)
+
+**Tests:** write_chapter loads both book outline AND chapter outline, follows sub-chapters
+
+```
+Write the Prologue for "The Signal Beneath"
+```
+
+**Expected:**
+- [ ] write_chapter tool called (chapter outline already exists from R111)
+- [ ] Written chapter follows the sub-chapter sequence from the chapter outline
+- [ ] Scene breaks (---) appear between sub-chapters
+- [ ] Character names match book outline exactly
+- [ ] Book story arc prompt (Hero's Journey) injected into writing prompt
+- [ ] Chapter emailed with correct formatting
+- [ ] Story bible updated with new entries from the prologue
+- [ ] Word count 1500-3000 (prologue range)
+
+---
+
+### R115 — Write Chapter 1 (After Chapter Outline Exists)
+
+**Tests:** write_chapter with numbered chapter, both outlines enforced
+
+```
+Write Chapter 1 of "The Signal Beneath"
+```
+
+**Expected:**
+- [ ] write_chapter tool called (chapter outline exists from R112)
+- [ ] Written chapter follows sub-chapter sequence exactly
+- [ ] Character names, locations, and events consistent with prologue (story bible)
+- [ ] Book outline's Chapter 1 brief is followed
+- [ ] Chapter outline's sub-chapter briefs are followed
+- [ ] Arc notes from book outline reflected in the writing
+- [ ] Word count 3000-5000 (chapter range)
+- [ ] Ends on a compelling hook for Chapter 2
+
+---
+
+### R116 — Write Chapter Without Chapter Outline (Should Trigger Brainstorm First)
+
+**Tests:** agent enforces the 3-step process — no skipping chapter outline
+
+```
+Write Chapter 3 of "The Signal Beneath"
+```
+
+**Expected:**
+- [ ] Agent detects no chapter outline exists for Chapter 3
+- [ ] Agent calls brainstorm_chapter FIRST (not write_chapter)
+- [ ] Agent tells user: "Chapter outline has been emailed for review"
+- [ ] Agent does NOT proceed to write_chapter without approval
+- [ ] Chapter outline emailed with sub-chapters
+
+---
+
+### R117 — Write Chapter for Book Without Book Outline (Should Fail Gracefully)
+
+**Tests:** error handling when no book outline exists
+
+```
+Write Chapter 1 of "A Book That Does Not Exist Yet"
+```
+
+**Expected:**
+- [ ] Agent tells user that no book outline exists
+- [ ] Agent suggests running brainstorm_story first
+- [ ] No write_chapter or brainstorm_chapter tool called
+
+---
+
+### R118 — Revise Chapter Outline
+
+**Tests:** brainstorm_chapter can revise an existing chapter outline
+
+```
+Revise the chapter outline for Chapter 1 of "The Signal Beneath."
+Make sub-chapter 2 focus more on the protagonist's internal conflict about
+whether to trust the warlord. Add a scene where she finds her dead partner's
+journal in the radio station.
+```
+
+**Expected:**
+- [ ] brainstorm_chapter called with instructions
+- [ ] Revised chapter outline includes the requested changes
+- [ ] Existing sub-chapters preserved unless specifically changed
+- [ ] Characters still match book outline
+- [ ] Updated chapter outline saved to project outline (replaces previous)
+- [ ] Emailed for review
+
+---
+
+### R119 — Consistency Check: Character Names
+
+**Tests:** write_chapter enforces character names from book outline
+
+**Setup:** This is a manual verification test. After R115 completes:
+
+**Expected:**
+- [ ] Every character mentioned in the written chapter matches a name in the book outline
+- [ ] No invented character names that aren't in the outline
+- [ ] Character roles (protagonist, antagonist) consistent with outline
+- [ ] No renamed characters (e.g., outline says "Maya" but chapter says "Maria")
+
+---
+
+### R120 — Kishōtenketsu Chapter Arc (No Conflict Structure)
+
+**Tests:** chapter outline with a non-conflict story arc
+
+```
+Create a chapter outline for Chapter 4 of "The Signal Beneath" using Kishōtenketsu.
+This should be a quieter chapter — the protagonist reaches the coast and
+observes the submerged station from the shore. No combat, no confrontation.
+Focus on contrast and reflection.
+```
+
+**Expected:**
+- [ ] brainstorm_chapter called with chapter_story_arc = "Kishōtenketsu"
+- [ ] Sub-chapter arc_beats reference Ki, Shō, Ten, Ketsu
+- [ ] No forced conflict in the sub-chapters
+- [ ] Ten (twist) is a contrast/revelation, not an attack
+- [ ] Still connects to book's Hero's Journey arc via connects_to_book_arc
+
+---
+
+### R121 — Full Pipeline: Outline → Chapter Outline → Write → Verify
+
+**Tests:** complete end-to-end pipeline with story arc consistency
+
+**Step 1:**
+```
+List the outline for "The Signal Beneath"
+```
+**Expected:** Outline returned with story_arc_name and all chapters
+
+**Step 2:**
+```
+Create a chapter outline for Chapter 5 of "The Signal Beneath" using Dan Harmon's Story Circle
+```
+**Expected:** Chapter outline with Story Circle beats (Comfort Zone, Need, Unfamiliar, Adapt, Get, Pay, Return, Changed)
+
+**Step 3:**
+```
+Write Chapter 5 of "The Signal Beneath"
+```
+**Expected:**
+- [ ] Chapter follows both book outline AND chapter outline
+- [ ] Sub-chapter scenes match the chapter outline
+- [ ] Book arc position correct (Hero's Journey stage for Ch 5)
+- [ ] Chapter arc structure follows Story Circle
+- [ ] Characters consistent with book outline and story bible
+- [ ] No story drift from the book's premise and themes
+
+---
+
+### Regression Test Group: Chapter Outline Process (R110–R121)
+
+| Test | Tool | What It Tests |
+|------|------|---------------|
+| R110 | brainstorm_story | Book outline saves story_arc_name |
+| R111 | brainstorm_chapter | Prologue chapter outline with sub-chapters |
+| R112 | brainstorm_chapter | Chapter 1 outline with prev/next context |
+| R113 | brainstorm_chapter | Different story arc for chapter vs book |
+| R114 | write_chapter | Write prologue from chapter outline |
+| R115 | write_chapter | Write chapter 1 from chapter outline |
+| R116 | agent behavior | Auto-brainstorm chapter when outline missing |
+| R117 | error handling | Graceful failure without book outline |
+| R118 | brainstorm_chapter | Revise existing chapter outline |
+| R119 | consistency | Character name verification |
+| R120 | brainstorm_chapter | Non-conflict arc (Kishōtenketsu) |
+| R121 | full pipeline | End-to-end: outline → chapter outline → write |
+
+**Minimum smoke test:** Run R110, R111, R114, R112, R115 in sequence.
+
+---
+
+## Full Regression (All 140 tests)
+
+Run all R01–R121 chat tests, then V01–V40 voice tests, in order. Each test in Parts 1 and 2 includes its exact prompt.
 
 ---
 
 # PART 4: CHANGE LOG REFERENCE
+
+### Delete, Undelete, List Deleted & Email Content (2026-03-17)
+| Change | Description |
+|--------|-------------|
+| Manage Library (V2) | `delete` operation — soft-delete, sets status='deleted', auto-snapshot before delete, email notification |
+| Manage Library (V2) | `undelete` operation — restores deleted items to draft status, email notification |
+| Manage Library (V2) | `list_deleted` operation — returns up to 20 deleted items, optional content_type_filter |
+| Manage Library (V2) | `email_content` operation — emails any saved content as formatted HTML (outline, research, chapter, short_story, blog_post, newsletter) |
+| Hub preprocess_message | Detects "delete", "undelete", "trash", "email me the" as manage_library operations |
+| Status lifecycle | Extended: Draft/Approved/Rejected/Scheduled → Deleted → (undelete) → Draft. Published must be unpublished first. |
+| Regression tests R94–R105 | 12 new chat tests covering delete, undelete, list_deleted, email_content |
+| Voice tests V33–V40 | 8 new voice tests for delete, undelete, list_deleted, email_content |
 
 ### Outline Management (2026-03-14)
 | Change | Description |

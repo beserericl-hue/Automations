@@ -1,0 +1,570 @@
+{
+  "updatedAt": "2026-03-29T16:35:55.036Z",
+  "createdAt": "2026-03-15T16:42:19.014Z",
+  "id": "z9E2vmG8sZux4aNH",
+  "name": "Data: Content Ingestion V2",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "genre_slug"
+            },
+            {
+              "name": "date"
+            }
+          ]
+        }
+      },
+      "id": "ci-trigger",
+      "name": "workflow_trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "SUPABASE_URL",
+              "value": "https://faklxfakgzkpkbxfihzh.supabase.co",
+              "type": "string"
+            },
+            {
+              "id": "sapi",
+              "name": "SUPABASE_API_KEY",
+              "value": "REDACTED_SUPABASE_KEY",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ci-settings",
+      "name": "settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "p1",
+              "name": "genre_slug",
+              "value": "={{ $('workflow_trigger').item.json.genre_slug }}",
+              "type": "string"
+            },
+            {
+              "id": "p2",
+              "name": "query_date",
+              "value": "={{ $('workflow_trigger').item.json.date || $now.format('yyyy-MM-dd') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ci-params",
+      "name": "set_params",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/content_index?genre_slug=eq.{{ $json.genre_slug }}&scraped_at=gte.{{ $json.query_date }}&order=scraped_at.desc&limit=50",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "ci-query",
+      "name": "query_content_index",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const seen = new Set();\nconst results = [];\nfor (const item of $input.all()) {\n  const title = item.json.title;\n  const path = item.json.content_path;\n  if (!title || (typeof title === 'string' && title.trim() === '')) continue;\n  if (path && !seen.has(path)) {\n    seen.add(path);\n    results.push(item);\n  }\n}\nreturn results;"
+      },
+      "id": "ci-dedupe",
+      "name": "dedupe_paths",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('settings').item.json.SUPABASE_URL }}/storage/v1/object/public/author-content/{{ $json.content_path }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "ci-download",
+      "name": "download_content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.data || $input.first().json;\nlet items;\ntry {\n  items = typeof raw === 'string' ? JSON.parse(raw) : raw;\n} catch (e) {\n  items = [];\n}\nif (!Array.isArray(items)) items = [items];\n\nconst genre = $('dedupe_paths').first().json.genre_slug;\n\nreturn items\n  .filter(d => d && d.title)\n  .map(d => ({\n    json: {\n      title: d.title,\n      source_type: d.source_type || '',\n      source_url: d.source_url || '',\n      genre_slug: genre,\n      summary: d.summary || '',\n      feed_name: d.feed_name || '',\n      content: JSON.stringify(d)\n    }\n  }));"
+      },
+      "id": "ci-prepare",
+      "name": "prepare_content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "id": "ci-aggregate",
+      "name": "aggregate_content",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1568,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "workflow_trigger": {
+      "main": [
+        [
+          {
+            "node": "settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "settings": {
+      "main": [
+        [
+          {
+            "node": "set_params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_params": {
+      "main": [
+        [
+          {
+            "node": "query_content_index",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "query_content_index": {
+      "main": [
+        [
+          {
+            "node": "dedupe_paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dedupe_paths": {
+      "main": [
+        [
+          {
+            "node": "download_content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "download_content": {
+      "main": [
+        [
+          {
+            "node": "prepare_content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prepare_content": {
+      "main": [
+        [
+          {
+            "node": "aggregate_content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "c9a9912b-6ab6-455a-8f32-5c40f427b02d",
+  "activeVersionId": "c9a9912b-6ab6-455a-8f32-5c40f427b02d",
+  "versionCounter": 30,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-03-15T16:42:19.014Z",
+      "createdAt": "2026-03-15T16:42:19.014Z",
+      "role": "workflow:owner",
+      "workflowId": "z9E2vmG8sZux4aNH",
+      "projectId": "so6FfyLmNOjnxEMJ",
+      "project": {
+        "updatedAt": "2026-01-12T16:36:13.622Z",
+        "createdAt": "2026-01-12T15:34:50.204Z",
+        "id": "so6FfyLmNOjnxEMJ",
+        "name": "Eric Beser <eric@agileadtesting.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-29T16:36:02.828Z",
+    "createdAt": "2026-03-29T16:35:55.041Z",
+    "versionId": "c9a9912b-6ab6-455a-8f32-5c40f427b02d",
+    "workflowId": "z9E2vmG8sZux4aNH",
+    "nodes": [
+      {
+        "parameters": {
+          "workflowInputs": {
+            "values": [
+              {
+                "name": "genre_slug"
+              },
+              {
+                "name": "date"
+              }
+            ]
+          }
+        },
+        "id": "ci-trigger",
+        "name": "workflow_trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [
+          0,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "s1",
+                "name": "SUPABASE_URL",
+                "value": "https://faklxfakgzkpkbxfihzh.supabase.co",
+                "type": "string"
+              },
+              {
+                "id": "sapi",
+                "name": "SUPABASE_API_KEY",
+                "value": "REDACTED_SUPABASE_KEY",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "ci-settings",
+        "name": "settings",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          224,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "p1",
+                "name": "genre_slug",
+                "value": "={{ $('workflow_trigger').item.json.genre_slug }}",
+                "type": "string"
+              },
+              {
+                "id": "p2",
+                "name": "query_date",
+                "value": "={{ $('workflow_trigger').item.json.date || $now.format('yyyy-MM-dd') }}",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "ci-params",
+        "name": "set_params",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          448,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "url": "={{ $('settings').item.json.SUPABASE_URL }}/rest/v1/content_index?genre_slug=eq.{{ $json.genre_slug }}&scraped_at=gte.{{ $json.query_date }}&order=scraped_at.desc&limit=50",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "apikey",
+                "value": "={{ $('settings').item.json.SUPABASE_API_KEY }}"
+              },
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $('settings').item.json.SUPABASE_API_KEY }}"
+              }
+            ]
+          },
+          "options": {
+            "response": {
+              "response": {
+                "responseFormat": "json"
+              }
+            }
+          }
+        },
+        "id": "ci-query",
+        "name": "query_content_index",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          672,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const seen = new Set();\nconst results = [];\nfor (const item of $input.all()) {\n  const title = item.json.title;\n  const path = item.json.content_path;\n  if (!title || (typeof title === 'string' && title.trim() === '')) continue;\n  if (path && !seen.has(path)) {\n    seen.add(path);\n    results.push(item);\n  }\n}\nreturn results;"
+        },
+        "id": "ci-dedupe",
+        "name": "dedupe_paths",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          896,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "url": "={{ $('settings').item.json.SUPABASE_URL }}/storage/v1/object/public/author-content/{{ $json.content_path }}",
+          "options": {
+            "response": {
+              "response": {
+                "responseFormat": "text"
+              }
+            }
+          }
+        },
+        "id": "ci-download",
+        "name": "download_content",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1120,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const raw = $input.first().json.data || $input.first().json;\nlet items;\ntry {\n  items = typeof raw === 'string' ? JSON.parse(raw) : raw;\n} catch (e) {\n  items = [];\n}\nif (!Array.isArray(items)) items = [items];\n\nconst genre = $('dedupe_paths').first().json.genre_slug;\n\nreturn items\n  .filter(d => d && d.title)\n  .map(d => ({\n    json: {\n      title: d.title,\n      source_type: d.source_type || '',\n      source_url: d.source_url || '',\n      genre_slug: genre,\n      summary: d.summary || '',\n      feed_name: d.feed_name || '',\n      content: JSON.stringify(d)\n    }\n  }));"
+        },
+        "id": "ci-prepare",
+        "name": "prepare_content",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1344,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "aggregate": "aggregateAllItemData",
+          "options": {}
+        },
+        "id": "ci-aggregate",
+        "name": "aggregate_content",
+        "type": "n8n-nodes-base.aggregate",
+        "typeVersion": 1,
+        "position": [
+          1568,
+          0
+        ]
+      }
+    ],
+    "connections": {
+      "workflow_trigger": {
+        "main": [
+          [
+            {
+              "node": "settings",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "settings": {
+        "main": [
+          [
+            {
+              "node": "set_params",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "set_params": {
+        "main": [
+          [
+            {
+              "node": "query_content_index",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "query_content_index": {
+        "main": [
+          [
+            {
+              "node": "dedupe_paths",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "dedupe_paths": {
+        "main": [
+          [
+            {
+              "node": "download_content",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "download_content": {
+        "main": [
+          [
+            {
+              "node": "prepare_content",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "prepare_content": {
+        "main": [
+          [
+            {
+              "node": "aggregate_content",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Eric Beser",
+    "name": "Version c9a9912b",
+    "description": "changed layout",
+    "autosaved": true,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-29T16:36:02.822Z",
+        "id": 1405,
+        "workflowId": "z9E2vmG8sZux4aNH",
+        "versionId": "c9a9912b-6ab6-455a-8f32-5c40f427b02d",
+        "event": "activated",
+        "userId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      }
+    ]
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "updatedAt": "2026-03-31T12:11:30.214Z",
+  "createdAt": "2026-03-25T22:49:51.086Z",
+  "id": "Ww4PZU1fJcuv9yrW",
+  "name": "Error Notifier - Write Chapter V2",
+  "active": true,
+  "nodes": [
+    {
+      "id": "err-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "err-email",
+      "name": "Send Error Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        200,
+        0
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "CPCSZOInV8Zj1PI1",
+          "name": "Gmail account"
+        }
+      },
+      "parameters": {
+        "sendTo": "eric@agileadtesting.com",
+        "subject": "=\u26a0\ufe0f Chapter Writing Failed",
+        "message": "=<h2>Chapter Writing Error</h2><p><strong>Error:</strong> {{ $json.execution.error.message }}</p><p><strong>Workflow:</strong> {{ $json.workflow.name }}</p><p><strong>Failed Node:</strong> {{ $json.execution.lastNodeExecuted }}</p><p><strong>Time:</strong> {{ $now.format(\"yyyy-MM-dd HH:mm\") }}</p><hr><p>Please retry by telling Eve: <em>\"rewrite chapter [number] of [book title]\"</em></p><p>If it keeps failing, wait 5-10 minutes \u2014 the writing service may be overloaded.</p>",
+        "options": {
+          "appendAttribution": false
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send Error Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "pinData": null,
+  "versionId": "83daef9b-12b9-4093-82e8-fbadeb9517f7"
+}

@@ -1,0 +1,530 @@
+{
+  "updatedAt": "2026-03-27T20:16:11.692Z",
+  "createdAt": "2026-03-26T18:49:31.868Z",
+  "id": "dk75OYTASeu6NkTr",
+  "name": "Sub - Token Usage Tracker V2",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "execution_id"
+            },
+            {
+              "name": "source_workflow_name"
+            }
+          ]
+        }
+      },
+      "id": "tt-trigger",
+      "name": "workflow_trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://n8n.agileadautomation.com/api/v1/executions/{{ $json.execution_id || $('workflow_trigger').first().json.execution_id }}?includeData=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-API-KEY",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmZDdjYzkxZC01MDUxLTQ0NTUtOTVhNi04NDJhNjhjZWFkYjciLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzcxOTQ5NDE0fQ.6kV1Ylcp-J_ygc9_bTT3dWjIfF4MmTbYTRpzuzQsAqE"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "tt-get-exec",
+      "name": "Get execution data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        144
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract token usage from all AI nodes in the execution\nconst execData = $json;\nconst runData = execData?.data?.resultData?.runData || {};\nconst workflowId = execData?.workflowData?.id || '';\nconst workflowName = $('workflow_trigger').first().json.source_workflow_name || execData?.workflowData?.name || '';\nconst executionId = $('workflow_trigger').first().json.execution_id || '';\n\n// Build a model map from workflow node definitions\nconst nodeModelMap = {};\nfor (const node of (execData?.workflowData?.nodes || [])) {\n  const params = node.parameters || {};\n  let model = '';\n  if (params.model) {\n    model = typeof params.model === 'object' ? (params.model.value || params.model.cachedResultName || '') : params.model;\n  }\n  if (params.modelName) {\n    model = typeof params.modelName === 'string' ? params.modelName : (params.modelName.value || '');\n  }\n  if (model) {\n    // Clean model name\n    model = model.replace('models/', '');\n    nodeModelMap[node.name] = model;\n  }\n}\n\nconst records = [];\n\n// Pricing per 1M tokens\nconst pricing = {\n  'claude-sonnet-4-20250514': { input: 3.0, output: 15.0, provider: 'anthropic' },\n  'claude-sonnet-4-6-20250514': { input: 3.0, output: 15.0, provider: 'anthropic' },\n  'claude-3-5-sonnet': { input: 3.0, output: 15.0, provider: 'anthropic' },\n  'gemini-2.5-pro': { input: 1.25, output: 10.0, provider: 'google' },\n  'gemini-2.5-flash': { input: 0.15, output: 0.60, provider: 'google' },\n  'gpt-4o': { input: 2.50, output: 10.0, provider: 'openai' },\n  'gpt-4o-mini': { input: 0.15, output: 0.60, provider: 'openai' },\n  'text-embedding-3-small': { input: 0.02, output: 0, provider: 'openai' },\n  'sonar': { input: 1.0, output: 1.0, provider: 'perplexity' },\n  'sonar-pro': { input: 3.0, output: 15.0, provider: 'perplexity' },\n};\n\nfunction getPrice(model) {\n  if (!model) return { input: 1.0, output: 1.0, provider: 'unknown' };\n  const m = model.toLowerCase();\n  for (const [key, val] of Object.entries(pricing)) {\n    if (m.includes(key) || key.includes(m)) return val;\n  }\n  if (m.includes('claude') || m.includes('anthropic')) return { input: 3.0, output: 15.0, provider: 'anthropic' };\n  if (m.includes('gemini')) return { input: 1.25, output: 10.0, provider: 'google' };\n  if (m.includes('gpt')) return { input: 2.50, output: 10.0, provider: 'openai' };\n  if (m.includes('sonar') || m.includes('perplexity')) return { input: 1.0, output: 1.0, provider: 'perplexity' };\n  return { input: 1.0, output: 1.0, provider: 'unknown' };\n}\n\nfor (const [nodeName, nodeRuns] of Object.entries(runData)) {\n  for (const run of nodeRuns) {\n    const llmData = run?.data?.ai_languageModel;\n    if (llmData) {\n      for (const outputs of llmData) {\n        for (const item of outputs) {\n          const j = item?.json || {};\n          const tokenUsage = j.tokenUsage || j.tokenUsageEstimate || {};\n          \n          // Get model name \u2014 check multiple locations\n          let modelName = '';\n          \n          // 1. inputOverride.ai_languageModel[0][0].json.options.model (most reliable)\n          const io = run?.inputOverride?.ai_languageModel;\n          if (io && io[0] && io[0][0]) {\n            const ioOpts = io[0][0]?.json?.options || {};\n            modelName = ioOpts.model || ioOpts.model_name || ioOpts.modelName || '';\n          }\n          \n          // 2. generationInfo.model_name\n          if (!modelName) {\n            const gi = j?.response?.generations?.[0]?.[0]?.generationInfo || {};\n            modelName = gi.model_name || gi.model || '';\n          }\n          \n          // 3. Workflow node definition\n          if (!modelName) {\n            modelName = nodeModelMap[nodeName] || '';\n          }\n          \n          // 4. Infer from node name\n          if (!modelName) {\n            if (nodeName.toLowerCase().includes('gemini')) modelName = 'gemini-2.5-pro';\n            else if (nodeName.toLowerCase().includes('claude') || nodeName.toLowerCase().includes('sonnet')) modelName = 'claude-sonnet-4-20250514';\n            else if (nodeName.toLowerCase().includes('gpt') || nodeName.toLowerCase().includes('openai')) modelName = 'gpt-4o';\n          }\n          \n          // Clean model name\n          modelName = modelName.replace('models/', '');\n          \n          if (tokenUsage.promptTokens || tokenUsage.completionTokens || tokenUsage.totalTokens) {\n            const prompt_t = tokenUsage.promptTokens || 0;\n            const completion_t = tokenUsage.completionTokens || 0;\n            const total_t = tokenUsage.totalTokens || (prompt_t + completion_t);\n            const priceInfo = getPrice(modelName);\n            const cost = (prompt_t * priceInfo.input / 1000000) + (completion_t * priceInfo.output / 1000000);\n            \n            records.push({\n              execution_id: executionId,\n              workflow_id: workflowId,\n              workflow_name: workflowName,\n              node_name: nodeName,\n              provider: priceInfo.provider,\n              llm_model: modelName || 'unknown',\n              prompt_tokens: prompt_t,\n              completion_tokens: completion_t,\n              total_tokens: total_t,\n              estimated_cost: Math.round(cost * 1000000) / 1000000\n            });\n          }\n        }\n      }\n    }\n    \n    // Perplexity nodes\n    const mainData = run?.data?.main;\n    if (mainData && (nodeName.toLowerCase().includes('perplexity') || nodeName.toLowerCase().includes('research'))) {\n      for (const outputs of (mainData || [])) {\n        for (const item of (outputs || [])) {\n          const usage = item?.json?.usage;\n          if (usage && (usage.prompt_tokens || usage.completion_tokens)) {\n            const prompt_t = usage.prompt_tokens || 0;\n            const completion_t = usage.completion_tokens || 0;\n            const total_t = prompt_t + completion_t;\n            const model = item?.json?.model || 'sonar';\n            const priceInfo = getPrice(model);\n            const cost = (prompt_t * priceInfo.input / 1000000) + (completion_t * priceInfo.output / 1000000);\n            \n            records.push({\n              execution_id: executionId,\n              workflow_id: workflowId,\n              workflow_name: workflowName,\n              node_name: nodeName,\n              provider: 'perplexity',\n              llm_model: model,\n              prompt_tokens: prompt_t,\n              completion_tokens: completion_t,\n              total_tokens: total_t,\n              estimated_cost: Math.round(cost * 1000000) / 1000000\n            });\n          }\n        }\n      }\n    }\n  }\n}\n\nif (records.length === 0) {\n  return [{ json: { result: 'No token usage found in execution ' + executionId, records: 0 } }];\n}\n\nreturn records.map(r => ({ json: r }));\n"
+      },
+      "id": "tt-extract",
+      "name": "extract_usage",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "fieldsToSummarize": {
+          "values": [
+            {
+              "aggregation": "sum",
+              "field": "prompt_tokens"
+            },
+            {
+              "aggregation": "sum",
+              "field": "completion_tokens"
+            },
+            {
+              "aggregation": "sum",
+              "field": "total_tokens"
+            },
+            {
+              "aggregation": "sum",
+              "field": "estimated_cost"
+            }
+          ]
+        },
+        "fieldsToSplitBy": "workflow_id, workflow_name, llm_model, provider, execution_id",
+        "options": {}
+      },
+      "id": "tt-summarize",
+      "name": "aggregate_by_model",
+      "type": "n8n-nodes-base.summarize",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Save aggregated token usage to Supabase\nconst SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_KEY = 'REDACTED_SUPABASE_KEY';\nconst items = $input.all();\n\nconst rows = items.map(item => ({\n  execution_id: item.json.execution_id || '',\n  workflow_id: item.json.workflow_id || '',\n  workflow_name: item.json.workflow_name || '',\n  llm_model: item.json.llm_model || '',\n  provider: item.json.provider || '',\n  prompt_tokens: item.json.sum_prompt_tokens || 0,\n  completion_tokens: item.json.sum_completion_tokens || 0,\n  total_tokens: item.json.sum_total_tokens || 0,\n  estimated_cost: item.json.sum_estimated_cost || 0\n}));\n\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: SUPABASE_URL + '/rest/v1/token_usage_v2',\n    headers: {\n      'apikey': SUPABASE_KEY,\n      'Authorization': 'Bearer ' + SUPABASE_KEY,\n      'Content-Type': 'application/json',\n      'Prefer': 'return=minimal'\n    },\n    body: JSON.stringify(rows)\n  });\n} catch(e) {\n  // Table might not exist yet \u2014 that's ok, log the data anyway\n  return [{ json: { error: true, result: 'Could not save to Supabase: ' + e.message, records: rows.length, data: rows } }];\n}\n\nreturn [{ json: { result: 'Saved ' + rows.length + ' token usage records', records: rows.length } }];\n"
+      },
+      "id": "tt-save",
+      "name": "save_to_supabase",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "track-token-usage-v2",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "tt-webhook",
+      "name": "webhook_trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        240
+      ],
+      "webhookId": "tt-webhook-v2"
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "id": "tt-wait",
+      "name": "wait_for_completion",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        48
+      ],
+      "webhookId": "b9ef1db6-4d18-43a7-8227-2e364d1a6bf5"
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "id": "tt-wait2",
+      "name": "wait_for_completion_webhook",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        240
+      ],
+      "webhookId": "f049a750-2905-43df-abd2-e2c3833596c8"
+    }
+  ],
+  "connections": {
+    "workflow_trigger": {
+      "main": [
+        [
+          {
+            "node": "wait_for_completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "webhook_trigger": {
+      "main": [
+        [
+          {
+            "node": "wait_for_completion_webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get execution data": {
+      "main": [
+        [
+          {
+            "node": "extract_usage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "extract_usage": {
+      "main": [
+        [
+          {
+            "node": "aggregate_by_model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "aggregate_by_model": {
+      "main": [
+        [
+          {
+            "node": "save_to_supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "wait_for_completion": {
+      "main": [
+        [
+          {
+            "node": "Get execution data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "wait_for_completion_webhook": {
+      "main": [
+        [
+          {
+            "node": "Get execution data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "81ffd2ed-26a2-4216-9161-b2922190dc48",
+  "activeVersionId": "81ffd2ed-26a2-4216-9161-b2922190dc48",
+  "versionCounter": 29,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-26T18:49:31.868Z",
+      "createdAt": "2026-03-26T18:49:31.868Z",
+      "role": "workflow:owner",
+      "workflowId": "dk75OYTASeu6NkTr",
+      "projectId": "so6FfyLmNOjnxEMJ",
+      "project": {
+        "updatedAt": "2026-01-12T16:36:13.622Z",
+        "createdAt": "2026-01-12T15:34:50.204Z",
+        "id": "so6FfyLmNOjnxEMJ",
+        "name": "Eric Beser <eric@agileadtesting.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-27T20:17:17.478Z",
+    "createdAt": "2026-03-27T20:16:11.698Z",
+    "versionId": "81ffd2ed-26a2-4216-9161-b2922190dc48",
+    "workflowId": "dk75OYTASeu6NkTr",
+    "nodes": [
+      {
+        "parameters": {
+          "workflowInputs": {
+            "values": [
+              {
+                "name": "execution_id"
+              },
+              {
+                "name": "source_workflow_name"
+              }
+            ]
+          }
+        },
+        "id": "tt-trigger",
+        "name": "workflow_trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [
+          0,
+          48
+        ]
+      },
+      {
+        "parameters": {
+          "url": "=https://n8n.agileadautomation.com/api/v1/executions/{{ $json.execution_id || $('workflow_trigger').first().json.execution_id }}?includeData=true",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "X-N8N-API-KEY",
+                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmZDdjYzkxZC01MDUxLTQ0NTUtOTVhNi04NDJhNjhjZWFkYjciLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzcxOTQ5NDE0fQ.6kV1Ylcp-J_ygc9_bTT3dWjIfF4MmTbYTRpzuzQsAqE"
+              }
+            ]
+          },
+          "options": {
+            "timeout": 30000
+          }
+        },
+        "id": "tt-get-exec",
+        "name": "Get execution data",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          448,
+          144
+        ],
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "jsCode": "// Extract token usage from all AI nodes in the execution\nconst execData = $json;\nconst runData = execData?.data?.resultData?.runData || {};\nconst workflowId = execData?.workflowData?.id || '';\nconst workflowName = $('workflow_trigger').first().json.source_workflow_name || execData?.workflowData?.name || '';\nconst executionId = $('workflow_trigger').first().json.execution_id || '';\n\n// Build a model map from workflow node definitions\nconst nodeModelMap = {};\nfor (const node of (execData?.workflowData?.nodes || [])) {\n  const params = node.parameters || {};\n  let model = '';\n  if (params.model) {\n    model = typeof params.model === 'object' ? (params.model.value || params.model.cachedResultName || '') : params.model;\n  }\n  if (params.modelName) {\n    model = typeof params.modelName === 'string' ? params.modelName : (params.modelName.value || '');\n  }\n  if (model) {\n    // Clean model name\n    model = model.replace('models/', '');\n    nodeModelMap[node.name] = model;\n  }\n}\n\nconst records = [];\n\n// Pricing per 1M tokens\nconst pricing = {\n  'claude-sonnet-4-20250514': { input: 3.0, output: 15.0, provider: 'anthropic' },\n  'claude-sonnet-4-6-20250514': { input: 3.0, output: 15.0, provider: 'anthropic' },\n  'claude-3-5-sonnet': { input: 3.0, output: 15.0, provider: 'anthropic' },\n  'gemini-2.5-pro': { input: 1.25, output: 10.0, provider: 'google' },\n  'gemini-2.5-flash': { input: 0.15, output: 0.60, provider: 'google' },\n  'gpt-4o': { input: 2.50, output: 10.0, provider: 'openai' },\n  'gpt-4o-mini': { input: 0.15, output: 0.60, provider: 'openai' },\n  'text-embedding-3-small': { input: 0.02, output: 0, provider: 'openai' },\n  'sonar': { input: 1.0, output: 1.0, provider: 'perplexity' },\n  'sonar-pro': { input: 3.0, output: 15.0, provider: 'perplexity' },\n};\n\nfunction getPrice(model) {\n  if (!model) return { input: 1.0, output: 1.0, provider: 'unknown' };\n  const m = model.toLowerCase();\n  for (const [key, val] of Object.entries(pricing)) {\n    if (m.includes(key) || key.includes(m)) return val;\n  }\n  if (m.includes('claude') || m.includes('anthropic')) return { input: 3.0, output: 15.0, provider: 'anthropic' };\n  if (m.includes('gemini')) return { input: 1.25, output: 10.0, provider: 'google' };\n  if (m.includes('gpt')) return { input: 2.50, output: 10.0, provider: 'openai' };\n  if (m.includes('sonar') || m.includes('perplexity')) return { input: 1.0, output: 1.0, provider: 'perplexity' };\n  return { input: 1.0, output: 1.0, provider: 'unknown' };\n}\n\nfor (const [nodeName, nodeRuns] of Object.entries(runData)) {\n  for (const run of nodeRuns) {\n    const llmData = run?.data?.ai_languageModel;\n    if (llmData) {\n      for (const outputs of llmData) {\n        for (const item of outputs) {\n          const j = item?.json || {};\n          const tokenUsage = j.tokenUsage || j.tokenUsageEstimate || {};\n          \n          // Get model name \u2014 check multiple locations\n          let modelName = '';\n          \n          // 1. inputOverride.ai_languageModel[0][0].json.options.model (most reliable)\n          const io = run?.inputOverride?.ai_languageModel;\n          if (io && io[0] && io[0][0]) {\n            const ioOpts = io[0][0]?.json?.options || {};\n            modelName = ioOpts.model || ioOpts.model_name || ioOpts.modelName || '';\n          }\n          \n          // 2. generationInfo.model_name\n          if (!modelName) {\n            const gi = j?.response?.generations?.[0]?.[0]?.generationInfo || {};\n            modelName = gi.model_name || gi.model || '';\n          }\n          \n          // 3. Workflow node definition\n          if (!modelName) {\n            modelName = nodeModelMap[nodeName] || '';\n          }\n          \n          // 4. Infer from node name\n          if (!modelName) {\n            if (nodeName.toLowerCase().includes('gemini')) modelName = 'gemini-2.5-pro';\n            else if (nodeName.toLowerCase().includes('claude') || nodeName.toLowerCase().includes('sonnet')) modelName = 'claude-sonnet-4-20250514';\n            else if (nodeName.toLowerCase().includes('gpt') || nodeName.toLowerCase().includes('openai')) modelName = 'gpt-4o';\n          }\n          \n          // Clean model name\n          modelName = modelName.replace('models/', '');\n          \n          if (tokenUsage.promptTokens || tokenUsage.completionTokens || tokenUsage.totalTokens) {\n            const prompt_t = tokenUsage.promptTokens || 0;\n            const completion_t = tokenUsage.completionTokens || 0;\n            const total_t = tokenUsage.totalTokens || (prompt_t + completion_t);\n            const priceInfo = getPrice(modelName);\n            const cost = (prompt_t * priceInfo.input / 1000000) + (completion_t * priceInfo.output / 1000000);\n            \n            records.push({\n              execution_id: executionId,\n              workflow_id: workflowId,\n              workflow_name: workflowName,\n              node_name: nodeName,\n              provider: priceInfo.provider,\n              llm_model: modelName || 'unknown',\n              prompt_tokens: prompt_t,\n              completion_tokens: completion_t,\n              total_tokens: total_t,\n              estimated_cost: Math.round(cost * 1000000) / 1000000\n            });\n          }\n        }\n      }\n    }\n    \n    // Perplexity nodes\n    const mainData = run?.data?.main;\n    if (mainData && (nodeName.toLowerCase().includes('perplexity') || nodeName.toLowerCase().includes('research'))) {\n      for (const outputs of (mainData || [])) {\n        for (const item of (outputs || [])) {\n          const usage = item?.json?.usage;\n          if (usage && (usage.prompt_tokens || usage.completion_tokens)) {\n            const prompt_t = usage.prompt_tokens || 0;\n            const completion_t = usage.completion_tokens || 0;\n            const total_t = prompt_t + completion_t;\n            const model = item?.json?.model || 'sonar';\n            const priceInfo = getPrice(model);\n            const cost = (prompt_t * priceInfo.input / 1000000) + (completion_t * priceInfo.output / 1000000);\n            \n            records.push({\n              execution_id: executionId,\n              workflow_id: workflowId,\n              workflow_name: workflowName,\n              node_name: nodeName,\n              provider: 'perplexity',\n              llm_model: model,\n              prompt_tokens: prompt_t,\n              completion_tokens: completion_t,\n              total_tokens: total_t,\n              estimated_cost: Math.round(cost * 1000000) / 1000000\n            });\n          }\n        }\n      }\n    }\n  }\n}\n\nif (records.length === 0) {\n  return [{ json: { result: 'No token usage found in execution ' + executionId, records: 0 } }];\n}\n\nreturn records.map(r => ({ json: r }));\n"
+        },
+        "id": "tt-extract",
+        "name": "extract_usage",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          672,
+          144
+        ]
+      },
+      {
+        "parameters": {
+          "fieldsToSummarize": {
+            "values": [
+              {
+                "aggregation": "sum",
+                "field": "prompt_tokens"
+              },
+              {
+                "aggregation": "sum",
+                "field": "completion_tokens"
+              },
+              {
+                "aggregation": "sum",
+                "field": "total_tokens"
+              },
+              {
+                "aggregation": "sum",
+                "field": "estimated_cost"
+              }
+            ]
+          },
+          "fieldsToSplitBy": "workflow_id, workflow_name, llm_model, provider, execution_id",
+          "options": {}
+        },
+        "id": "tt-summarize",
+        "name": "aggregate_by_model",
+        "type": "n8n-nodes-base.summarize",
+        "typeVersion": 1.1,
+        "position": [
+          896,
+          144
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// Save aggregated token usage to Supabase\nconst SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_KEY = 'REDACTED_SUPABASE_KEY';\nconst items = $input.all();\n\nconst rows = items.map(item => ({\n  execution_id: item.json.execution_id || '',\n  workflow_id: item.json.workflow_id || '',\n  workflow_name: item.json.workflow_name || '',\n  llm_model: item.json.llm_model || '',\n  provider: item.json.provider || '',\n  prompt_tokens: item.json.sum_prompt_tokens || 0,\n  completion_tokens: item.json.sum_completion_tokens || 0,\n  total_tokens: item.json.sum_total_tokens || 0,\n  estimated_cost: item.json.sum_estimated_cost || 0\n}));\n\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: SUPABASE_URL + '/rest/v1/token_usage_v2',\n    headers: {\n      'apikey': SUPABASE_KEY,\n      'Authorization': 'Bearer ' + SUPABASE_KEY,\n      'Content-Type': 'application/json',\n      'Prefer': 'return=minimal'\n    },\n    body: JSON.stringify(rows)\n  });\n} catch(e) {\n  // Table might not exist yet \u2014 that's ok, log the data anyway\n  return [{ json: { error: true, result: 'Could not save to Supabase: ' + e.message, records: rows.length, data: rows } }];\n}\n\nreturn [{ json: { result: 'Saved ' + rows.length + ' token usage records', records: rows.length } }];\n"
+        },
+        "id": "tt-save",
+        "name": "save_to_supabase",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1120,
+          144
+        ]
+      },
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "track-token-usage-v2",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "id": "tt-webhook",
+        "name": "webhook_trigger",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          0,
+          240
+        ],
+        "webhookId": "tt-webhook-v2"
+      },
+      {
+        "parameters": {
+          "amount": 10
+        },
+        "id": "tt-wait",
+        "name": "wait_for_completion",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [
+          224,
+          48
+        ],
+        "webhookId": "b9ef1db6-4d18-43a7-8227-2e364d1a6bf5"
+      },
+      {
+        "parameters": {
+          "amount": 10
+        },
+        "id": "tt-wait2",
+        "name": "wait_for_completion_webhook",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [
+          224,
+          240
+        ],
+        "webhookId": "f049a750-2905-43df-abd2-e2c3833596c8"
+      }
+    ],
+    "connections": {
+      "workflow_trigger": {
+        "main": [
+          [
+            {
+              "node": "wait_for_completion",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "webhook_trigger": {
+        "main": [
+          [
+            {
+              "node": "wait_for_completion_webhook",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get execution data": {
+        "main": [
+          [
+            {
+              "node": "extract_usage",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "extract_usage": {
+        "main": [
+          [
+            {
+              "node": "aggregate_by_model",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "aggregate_by_model": {
+        "main": [
+          [
+            {
+              "node": "save_to_supabase",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "wait_for_completion": {
+        "main": [
+          [
+            {
+              "node": "Get execution data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "wait_for_completion_webhook": {
+        "main": [
+          [
+            {
+              "node": "Get execution data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Eric Beser",
+    "name": "Version 81ffd2ed",
+    "description": "realigned layout",
+    "autosaved": true,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-27T20:17:17.471Z",
+        "id": 1327,
+        "workflowId": "dk75OYTASeu6NkTr",
+        "versionId": "81ffd2ed-26a2-4216-9161-b2922190dc48",
+        "event": "activated",
+        "userId": "fd7cc91d-5051-4455-95a6-842a68ceadb7"
+      }
+    ]
+  }
+}

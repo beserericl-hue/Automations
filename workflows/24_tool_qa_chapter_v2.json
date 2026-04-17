@@ -1,0 +1,680 @@
+{
+  "updatedAt": "2026-03-31T23:56:06.307Z",
+  "createdAt": "2026-03-29T19:44:15.382Z",
+  "id": "t8xslqa3PWOFMAIM",
+  "name": "Tool - QA Chapter V2",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "project_title"
+            },
+            {
+              "name": "chapter_number"
+            },
+            {
+              "name": "user_prompt"
+            },
+            {
+              "name": "recipient_email"
+            },
+            {
+              "name": "bcc_email"
+            },
+            {
+              "name": "user_id"
+            }
+          ]
+        }
+      },
+      "id": "qa-trigger",
+      "name": "workflow_trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const SUPABASE_URL = 'https://faklxfakgzkpkbxfihzh.supabase.co';\nconst SUPABASE_API_KEY = 'REDACTED_SUPABASE_KEY';\nconst trigger = $('workflow_trigger').first().json;\nconst userId = trigger.user_id || '';\n\nlet recipient_email = trigger.recipient_email;\nlet bcc_email = trigger.bcc_email;\ntry {\n  const rows = await this.helpers.httpRequest({\n    method: 'GET',\n    url: SUPABASE_URL + '/rest/v1/app_config_v2?key=in.(recipient_email,bcc_email)&select=key,value&user_id=eq.' + encodeURIComponent(userId),\n    headers: { 'apikey': SUPABASE_API_KEY, 'Authorization': 'Bearer ' + SUPABASE_API_KEY }\n  });\n  for (const row of (rows || [])) {\n    if (row.key === 'recipient_email' && !recipient_email) recipient_email = row.value;\n    if (row.key === 'bcc_email' && !bcc_email) bcc_email = row.value;\n  }\n} catch (e) {}\nif (!recipient_email) recipient_email = 'eric@agileadtesting.com';\n\nreturn [{ json: { SUPABASE_URL, SUPABASE_API_KEY, recipient_email, bcc_email: bcc_email || '', userId } }];"
+      },
+      "id": "qa-settings",
+      "name": "settings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const s = $('settings').first().json;\nconst trigger = $('workflow_trigger').first().json;\nconst supabaseUrl = s.SUPABASE_URL;\nconst apiKey = s.SUPABASE_API_KEY;\nconst userId = s.userId;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\nconst readHeaders = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey };\nconst userFilter = userId ? '&user_id=eq.' + encodeURIComponent(userId) : '';\n\nconst projectTitle = (trigger.project_title || '').replace(/^(from|of|for|in|the|a|an)\\s+/i, '').replace(/^(from|of|for|in|the|a|an)\\s+/i, '').trim();\nconst rawCh = (trigger.chapter_number || '').toString().trim();\nconst isProl = /^(prologue|prol|0)$/i.test(rawCh);\nconst isEpil = /^(epilogue|epil)$/i.test(rawCh);\n\n// Find project\nconst projResp = await this.helpers.httpRequest({\n  method: 'GET',\n  url: supabaseUrl + '/rest/v1/writing_projects_v2?title=ilike.*' + encodeURIComponent(projectTitle) + '*&select=id,title,outline' + userFilter + '&limit=1',\n  headers: readHeaders\n});\nif (!Array.isArray(projResp) || projResp.length === 0) {\n  return [{ json: { error: true, result: 'Project not found: ' + projectTitle } }];\n}\nconst project = projResp[0];\nconst outline = project.outline || {};\nconst characters = outline.characters || [];\n\n// Determine chapter number\nlet chNum;\nif (isProl) {\n  chNum = 0;\n} else if (isEpil) {\n  chNum = 999;\n} else {\n  chNum = parseInt(rawCh);\n}\n\n// Detect prologue/epilogue by position\nconst allChapters = outline.chapters || [];\nconst chLabel = isProl ? 'Prologue' : (isEpil ? 'Epilogue' : 'Chapter ' + chNum);\n\n// Fetch chapter from published_content_v2\nlet chapResp = await this.helpers.httpRequest({\n  method: 'GET',\n  url: supabaseUrl + '/rest/v1/published_content_v2?project_id=eq.' + project.id + '&chapter_number=eq.' + chNum + '&content_type=eq.chapter' + userFilter + '&limit=1',\n  headers: readHeaders\n});\nif ((!Array.isArray(chapResp) || chapResp.length === 0) && isEpil && chNum !== 999) {\n  chapResp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: supabaseUrl + '/rest/v1/published_content_v2?project_id=eq.' + project.id + '&chapter_number=eq.999&content_type=eq.chapter' + userFilter + '&limit=1',\n    headers: readHeaders\n  });\n  if (Array.isArray(chapResp) && chapResp.length > 0) chNum = 999;\n}\nif ((!Array.isArray(chapResp) || chapResp.length === 0) && isProl && chNum !== 0) {\n  chapResp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: supabaseUrl + '/rest/v1/published_content_v2?project_id=eq.' + project.id + '&chapter_number=eq.0&content_type=eq.chapter' + userFilter + '&limit=1',\n    headers: readHeaders\n  });\n  if (Array.isArray(chapResp) && chapResp.length > 0) chNum = 0;\n}\nif (!Array.isArray(chapResp) || chapResp.length === 0) {\n  return [{ json: { error: true, result: chLabel + ' not found in published content for \"' + project.title + '\". Has it been written yet?' } }];\n}\nconst chapter = chapResp[0];\n\nreturn [{ json: {\n  chapter_text: chapter.content_text || '',\n  chapter_title: chapter.title || '',\n  chapter_id: chapter.id,\n  project_id: project.id,\n  project_title: project.title,\n  outline: outline,\n  characters: characters,\n  chapterLabel: chLabel,\n  chNum: chNum\n} }];"
+      },
+      "id": "qa-load",
+      "name": "load_chapter_and_outline",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nif (data.error) return [{ json: { ...data, has_issues: false, duplicate_count: 0, name_issue_count: 0, duplicates: [], name_issues: [], section_count: 0, chapter_text: '', characters: [], chapter_id: '', project_id: '', project_title: data.result || '', chapterLabel: '', chNum: 0, chapter_title: '' } }];\n\nconst chapterText = data.chapter_text;\nconst characters = data.characters || [];\n\n// Split into sub-chapters by heading markers\nconst sections = chapterText.split(/\\n(?=# )/);\nconst namedSections = sections.map((s, i) => {\n  const titleMatch = s.match(/^#\\s+(.+)/);\n  return { title: titleMatch ? titleMatch[1].trim() : 'Section ' + (i + 1), body: s, index: i };\n}).filter(s => s.body.trim().length > 100);\n\n// N-gram duplicate detection\nfunction getNgrams(text, n) {\n  const words = text.toLowerCase().replace(/[^\\w\\s']/g, ' ').split(/\\s+/).filter(w => w.length > 2);\n  const grams = new Map();\n  for (let i = 0; i <= words.length - n; i++) {\n    const gram = words.slice(i, i + n).join(' ');\n    if (!grams.has(gram)) grams.set(gram, []);\n    grams.get(gram).push(i);\n  }\n  return { grams, words };\n}\n\nconst NGRAM_SIZE = 5;\nconst MIN_RUN = 4; // minimum consecutive matching n-grams = 8-word phrase\nconst duplicates = [];\n\nfor (let i = 0; i < namedSections.length; i++) {\n  const { grams: gramsA } = getNgrams(namedSections[i].body, NGRAM_SIZE);\n  for (let j = i + 1; j < namedSections.length; j++) {\n    const { grams: gramsB, words: wordsB } = getNgrams(namedSections[j].body, NGRAM_SIZE);\n    // Find contiguous runs of shared n-grams in section j\n    let run = [];\n    let runStart = -1;\n    for (let k = 0; k <= wordsB.length - NGRAM_SIZE; k++) {\n      const gram = wordsB.slice(k, k + NGRAM_SIZE).join(' ');\n      if (gramsA.has(gram)) {\n        if (run.length === 0) runStart = k;\n        run.push(gram);\n      } else {\n        if (run.length >= MIN_RUN) {\n          const phraseLen = (run.length - 1) + NGRAM_SIZE;\n          const phrase = wordsB.slice(runStart, runStart + phraseLen).join(' ');\n          duplicates.push({\n            text: phrase,\n            word_count: phraseLen,\n            section_a: namedSections[i].title,\n            section_b: namedSections[j].title,\n            location: 'First in \"' + namedSections[i].title + '\", repeated in \"' + namedSections[j].title + '\"'\n          });\n        }\n        run = [];\n      }\n    }\n    if (run.length >= MIN_RUN) {\n      const phraseLen = (run.length - 1) + NGRAM_SIZE;\n      const phrase = wordsB.slice(runStart, runStart + phraseLen).join(' ');\n      duplicates.push({\n        text: phrase,\n        word_count: phraseLen,\n        section_a: namedSections[i].title,\n        section_b: namedSections[j].title,\n        location: 'First in \"' + namedSections[i].title + '\", repeated in \"' + namedSections[j].title + '\"'\n      });\n    }\n  }\n}\n\n// Character name inconsistency detection\nconst nameIssues = [];\nconst titlePrefixes = ['Professor', 'Prof', 'Dr', 'Mr', 'Mrs', 'Ms', 'Sir', 'Lady', 'Lord', 'Captain', 'General', 'Colonel', 'Inspector'];\n\nfor (const char of characters) {\n  const nameParts = char.name.split(/\\s+/);\n  if (nameParts.length < 2) continue;\n  const lastName = nameParts[nameParts.length - 1];\n\n  // Find all \"[Title/Name] LastName\" patterns in the chapter\n  const regex = new RegExp('\\\\b([A-Z][a-z]+(?:\\\\s+[A-Z][a-z]+)?)\\\\s+' + lastName + '\\\\b', 'g');\n  let match;\n  const foundForms = new Set();\n  while ((match = regex.exec(chapterText)) !== null) {\n    const fullMatch = match[0];\n    if (fullMatch !== char.name && !foundForms.has(fullMatch)) {\n      foundForms.add(fullMatch);\n      // Check if this is a genuinely wrong form (not just first name or last name alone)\n      const prefix = match[1];\n      const isTitle = titlePrefixes.some(t => prefix.startsWith(t));\n      const isPartOfCanonical = char.name.includes(prefix);\n      // Skip if this form belongs to ANOTHER character with the same last name\n      const honorifics = ['Miss', 'Mrs', 'Mr', 'Ms', 'Mister', 'Madam', 'Madame'];\n      const isHonorific = honorifics.some(h => prefix === h);\n      const sameSurnameChars = characters.filter(other => other.name !== char.name && other.name.endsWith(lastName));\n      const belongsToOtherChar = sameSurnameChars.length > 0 && (isHonorific || sameSurnameChars.some(other => other.name === fullMatch || other.name.includes(prefix) || fullMatch.includes(other.name.split(' ')[0])));\n      if (belongsToOtherChar) continue;\n      if (!isPartOfCanonical || isTitle) {\n        const count = (chapterText.match(new RegExp(fullMatch.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'), 'g')) || []).length;\n        nameIssues.push({\n          found: fullMatch,\n          expected: char.name,\n          role: char.role,\n          occurrences: count\n        });\n      }\n    }\n  }\n}\n\nreturn [{ json: {\n  duplicates,\n  name_issues: nameIssues,\n  has_issues: duplicates.length > 0 || nameIssues.length > 0,\n  duplicate_count: duplicates.length,\n  name_issue_count: nameIssues.length,\n  section_count: namedSections.length,\n  chapter_text: data.chapter_text,\n  characters: data.characters,\n  chapter_id: data.chapter_id,\n  project_id: data.project_id,\n  project_title: data.project_title,\n  chapterLabel: data.chapterLabel,\n  chNum: data.chNum,\n  chapter_title: data.chapter_title\n} }];"
+      },
+      "id": "qa-detect",
+      "name": "detect_issues",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond-issues",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.has_issues }}",
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "qa-check",
+      "name": "check_has_issues",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        896,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const issues = $input.first().json;\nconst characters = issues.characters || [];\n\nconst charRef = characters.map(c =>\n  '- ' + c.name + ' (' + c.role + ')' + (c.description ? ': ' + c.description : '')\n).join('\\n');\n\nconst dupList = issues.duplicates.map((d, i) =>\n  (i + 1) + '. [' + d.word_count + ' words] ' + d.location + ':\\n   \"' + d.text.substring(0, 300) + (d.text.length > 300 ? '...' : '') + '\"'\n).join('\\n\\n');\n\nconst nameList = issues.name_issues.map((n, i) =>\n  (i + 1) + '. Found: \"' + n.found + '\" (' + n.occurrences + ' times) -> Should be: \"' + n.expected + '\" (' + n.role + ')'\n).join('\\n');\n\n// Only send ~2000 chars of context around each duplicate for Claude to see\nlet contextSnippets = '';\nfor (const d of issues.duplicates) {\n  const idx = issues.chapter_text.toLowerCase().indexOf(d.text.substring(0, 40).toLowerCase());\n  if (idx > -1) {\n    const start = Math.max(0, idx - 200);\n    const end = Math.min(issues.chapter_text.length, idx + d.text.length + 200);\n    contextSnippets += '\\n---DUPLICATE CONTEXT (in \"' + d.section_b + '\")---\\n' + issues.chapter_text.substring(start, end) + '\\n';\n  }\n}\n\nconst prompt = `You are a professional copy editor. Specific issues have been detected in a chapter. Return ONLY a JSON array of find/replace corrections.\n\n## CANONICAL CHARACTER NAMES\n${charRef}\n\n## DETECTED DUPLICATE CONTENT (${issues.duplicate_count} passages)\n${dupList || 'None detected.'}\n\nFor each duplicate: the passage appears in two sub-chapters. The LATER occurrence should be removed or replaced with a brief 1-2 sentence transition that maintains narrative flow. Do NOT keep the duplicated text.\n\n## DETECTED NAME INCONSISTENCIES (${issues.name_issue_count} issues)\n${nameList || 'None detected.'}\n\n## CONTEXT AROUND DUPLICATES\n${contextSnippets || 'None.'}\n\n## INSTRUCTIONS\nReturn a JSON array of correction objects. Each object has:\n- \"find\": the EXACT text to find in the chapter (copy it precisely, including punctuation)\n- \"replace\": the replacement text (empty string \"\" to delete, or a brief transition sentence)\n- \"reason\": brief explanation (e.g., \"duplicate passage\", \"wrong character name\")\n\nFor name corrections, include one entry per unique wrong form with the exact wrong text and the correct replacement.\nFor duplicate removals, include the exact paragraph(s) to remove from the LATER occurrence, with a brief transition if needed.\n\nIMPORTANT: The \"find\" text must be an EXACT substring of the chapter. Copy it character-for-character. If you are unsure of the exact text, use a shorter unique phrase.\n\nReturn ONLY the JSON array. No commentary, no markdown fences.`;\n\nreturn [{ json: { prompt } }];"
+      },
+      "id": "qa-prompt",
+      "name": "build_correction_prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}"
+      },
+      "id": "qa-llm",
+      "name": "claude_correction",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        1344,
+        208
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 60000
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-20250514",
+        "options": {
+          "maxTokensToSample": 4096,
+          "temperature": 0.2
+        }
+      },
+      "id": "qa-claude",
+      "name": "claude_sonnet_model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.2,
+      "position": [
+        1416,
+        432
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "5LhCYKsaFO3fF7II",
+          "name": "Anthropic account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 60000
+    },
+    {
+      "parameters": {
+        "jsCode": "const original = $('load_chapter_and_outline').first().json.chapter_text;\nconst llmOutput = ($input.first().json.text || $input.first().json.output || '').toString().trim();\nconst issues = $('detect_issues').first().json;\nconst chapterLabel = issues.chapterLabel;\nconst projectTitle = issues.project_title;\n\nlet corrections = [];\ntry {\n  const jsonMatch = llmOutput.match(/\\[[\\s\\S]*\\]/);\n  if (jsonMatch) corrections = JSON.parse(jsonMatch[0]);\n} catch (e) {\n  return [{ json: { error: true, result: 'Could not parse corrections: ' + e.message, corrected_text: original, diff_html: '<p>Error parsing corrections.</p>' } }];\n}\n\nfunction fuzzyFind(haystack, needle) {\n  // 1. Exact match\n  let idx = haystack.indexOf(needle);\n  if (idx !== -1) return { start: idx, end: idx + needle.length, method: 'exact' };\n  \n  // 2. Case-insensitive\n  idx = haystack.toLowerCase().indexOf(needle.toLowerCase());\n  if (idx !== -1) return { start: idx, end: idx + needle.length, method: 'case-insensitive' };\n  \n  // 3. Word-level subsequence: find where most needle words appear in order\n  const needleWords = needle.toLowerCase().replace(/[^a-z0-9\\s']/g, '').split(/\\s+/).filter(w => w.length > 2);\n  if (needleWords.length < 3) return null;\n  \n  const hayLower = haystack.toLowerCase();\n  let searchFrom = 0;\n  \n  while (searchFrom < hayLower.length) {\n    const firstIdx = hayLower.indexOf(needleWords[0], searchFrom);\n    if (firstIdx === -1) break;\n    \n    // Try to match subsequent words within a reasonable window\n    let matched = 1;\n    let lastMatchEnd = firstIdx + needleWords[0].length;\n    const maxWindow = needle.length * 2;\n    \n    for (let w = 1; w < needleWords.length; w++) {\n      const wIdx = hayLower.indexOf(needleWords[w], lastMatchEnd);\n      if (wIdx !== -1 && wIdx - firstIdx < maxWindow) {\n        matched++;\n        lastMatchEnd = wIdx + needleWords[w].length;\n      }\n    }\n    \n    if (matched / needleWords.length >= 0.7) {\n      return { start: firstIdx, end: lastMatchEnd, method: 'fuzzy (' + matched + '/' + needleWords.length + ' words)' };\n    }\n    \n    searchFrom = firstIdx + 1;\n  }\n  return null;\n}\n\nlet corrected = original;\nconst applied = [];\nconst failed = [];\n\nfor (const c of corrections) {\n  if (!c.find || c.find.length < 5) continue;\n  if (c.find === c.replace) continue;\n  \n  const match = fuzzyFind(corrected, c.find);\n  if (match) {\n    const actualFound = corrected.substring(match.start, match.end);\n    const before = corrected.substring(0, match.start);\n    const after = corrected.substring(match.end);\n    corrected = before + (c.replace || '') + after;\n    applied.push({ ...c, method: match.method, actualFound: actualFound.substring(0, 200) });\n  } else {\n    failed.push(c);\n  }\n}\n\ncorrected = corrected.replace(/\\n{4,}/g, '\\n\\n\\n');\n\nconst origWords = original.split(/\\s+/).length;\nconst corrWords = corrected.split(/\\s+/).length;\nconst wordDiff = corrWords - origWords;\n\nlet changesHtml = '';\nfor (const c of applied) {\n  const isRemoval = !c.replace || c.replace.trim().length === 0;\n  const findPreview = (c.actualFound || c.find).substring(0, 150).replace(/</g, '&lt;');\n  const replacePreview = (c.replace || '').substring(0, 150).replace(/</g, '&lt;');\n  changesHtml += '<tr><td style=\"padding:4px 8px;\">' + (c.reason || 'correction') + '</td>' +\n    '<td style=\"padding:4px 8px;background:#fdd;\">' + findPreview + (findPreview.length >= 150 ? '...' : '') + '</td>' +\n    '<td style=\"padding:4px 8px;' + (isRemoval ? '' : 'background:#dfd;') + '\">' + \n    (isRemoval ? '<em>(removed)</em>' : replacePreview) + '</td>' +\n    '<td style=\"padding:4px 8px;font-size:11px;color:#888;\">' + (c.method || '') + '</td></tr>';\n}\nif (failed.length > 0) {\n  for (const c of failed) {\n    changesHtml += '<tr style=\"opacity:0.5;\"><td style=\"padding:4px 8px;\">NOT APPLIED</td>' +\n      '<td style=\"padding:4px 8px;\">' + c.find.substring(0, 100).replace(/</g, '&lt;') + '...</td>' +\n      '<td style=\"padding:4px 8px;\"><em>Text not found</em></td><td></td></tr>';\n  }\n}\n\nconst reportHtml = '<div style=\"border:2px solid #2196F3;border-radius:8px;padding:16px;margin-top:24px;font-family:sans-serif;\">' +\n  '<h2 style=\"color:#2196F3;margin-top:0;\">Chapter Q/A Cleanup Report</h2>' +\n  '<p><strong>Project:</strong> ' + projectTitle + ' | <strong>Chapter:</strong> ' + chapterLabel + '</p>' +\n  '<h3>Summary</h3>' +\n  '<p><strong>Duplicates found:</strong> ' + issues.duplicate_count + ' | <strong>Name issues:</strong> ' + issues.name_issue_count + '</p>' +\n  '<p><strong>Corrections applied:</strong> ' + applied.length + ' | <strong>Failed:</strong> ' + failed.length + '</p>' +\n  '<p><strong>Original:</strong> ' + origWords.toLocaleString() + ' words | <strong>Corrected:</strong> ' + corrWords.toLocaleString() + ' words (' + (wordDiff >= 0 ? '+' : '') + wordDiff + ')</p>' +\n  '<h3>Changes Made</h3>' +\n  '<table style=\"width:100%;border-collapse:collapse;margin:12px 0;\">' +\n  '<tr style=\"background:#f5f5f5;\"><th style=\"text-align:left;padding:4px 8px;\">Reason</th><th style=\"text-align:left;padding:4px 8px;\">Original</th><th style=\"text-align:left;padding:4px 8px;\">Replacement</th><th style=\"text-align:left;padding:4px 8px;\">Match</th></tr>' +\n  changesHtml + '</table></div>';\n\nreturn [{ json: {\n  corrected_text: corrected,\n  diff_html: reportHtml,\n  original_word_count: origWords,\n  corrected_word_count: corrWords,\n  corrections_applied: applied.length,\n  corrections_failed: failed.length\n} }];"
+      },
+      "id": "qa-diff",
+      "name": "generate_diff_report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1696,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const s = $('settings').first().json;\nconst supabaseUrl = s.SUPABASE_URL;\nconst apiKey = s.SUPABASE_API_KEY;\nconst userId = s.userId;\nconst headers = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };\nconst readHeaders = { 'apikey': apiKey, 'Authorization': 'Bearer ' + apiKey };\n\nconst diff = $input.first().json;\nif (diff.error) return [{ json: diff }];\n\nconst chapterId = $('detect_issues').first().json.chapter_id;\nconst originalText = $('load_chapter_and_outline').first().json.chapter_text;\nconst correctedText = diff.corrected_text;\n\n// Snapshot old version\ntry {\n  const verResp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: supabaseUrl + '/rest/v1/content_versions_v2?content_id=eq.' + chapterId + '&order=version_number.desc&limit=1&select=version_number',\n    headers: readHeaders\n  });\n  const maxVer = (Array.isArray(verResp) && verResp.length > 0) ? verResp[0].version_number : 0;\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: supabaseUrl + '/rest/v1/content_versions_v2',\n    headers,\n    body: {\n      content_id: chapterId,\n      version_number: maxVer + 1,\n      content_text: originalText,\n      changed_by: 'qa_chapter',\n      change_note: 'Auto-snapshot before Q/A cleanup',\n      user_id: userId\n    }\n  });\n} catch (e) {\n  // Version snapshot failed, continue anyway\n}\n\n// Save corrected text\nawait this.helpers.httpRequest({\n  method: 'PATCH',\n  url: supabaseUrl + '/rest/v1/published_content_v2?id=eq.' + chapterId + '&user_id=eq.' + encodeURIComponent(userId),\n  headers,\n  body: {\n    content_text: correctedText,\n    updated_at: new Date().toISOString()\n  }\n});\n\nreturn [{ json: {\n  saved: true,\n  diff_html: diff.diff_html,\n  corrected_text: correctedText,\n  original_word_count: diff.original_word_count,\n  corrected_word_count: diff.corrected_word_count\n} }];"
+      },
+      "id": "qa-save",
+      "name": "snapshot_and_save",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('settings').first().json.recipient_email }}",
+        "subject": "=Q/A Cleanup: {{ $('detect_issues').first().json.chapterLabel }}: {{ $('detect_issues').first().json.chapter_title }} \u2014 {{ $('detect_issues').first().json.project_title }}",
+        "message": "={{ ($('workflow_trigger').first().json.user_prompt ? '<div style=\"background:#f0f0f0;padding:12px;margin-bottom:16px;border-radius:4px;font-style:italic;\">' + $('workflow_trigger').first().json.user_prompt + '</div>' : '') + $('snapshot_and_save').first().json.corrected_text.replace(/\\n/g, '<br>') + ($('snapshot_and_save').first().json.diff_html || '') + ($json.audit_html || '') }}",
+        "options": {
+          "appendAttribution": false,
+          "bccList": "={{ $('settings').first().json.bcc_email }}"
+        }
+      },
+      "id": "qa-email",
+      "name": "send_email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2944,
+        208
+      ],
+      "webhookId": "f22b73dd-e4a6-49f4-97b5-4b153262f3db",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "CPCSZOInV8Zj1PI1",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "result",
+              "value": "={{ $('detect_issues').first().json.chapterLabel + ' of \"' + $('detect_issues').first().json.project_title + '\" Q/A cleanup complete. Found ' + $('detect_issues').first().json.duplicate_count + ' duplicate passages and ' + $('detect_issues').first().json.name_issue_count + ' name inconsistencies. Corrected version saved and emailed.' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "qa-result",
+      "name": "set_result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3168,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r2",
+              "name": "result",
+              "value": "={{ $('detect_issues').first().json.chapterLabel + ' of \"' + $('detect_issues').first().json.project_title + '\" passed Q/A review. No duplicate content or name inconsistencies detected.' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "qa-result-clean",
+      "name": "set_result_clean",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1120,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('load_chapter_and_outline').first().json;\nconst correctedText = $('snapshot_and_save').first().json.corrected_text;\nconst outline = data.outline || {};\nconst chNum = data.chNum;\n\nlet bookOutlineText = '';\nif (outline) {\n  const parts = [];\n  if (outline.premise) parts.push('PREMISE: ' + outline.premise);\n  if (outline.themes) parts.push('THEMES: ' + outline.themes.join(', '));\n  if (outline.story_arc_name) parts.push('BOOK STORY ARC: ' + outline.story_arc_name);\n  if (outline.characters) {\n    parts.push('CHARACTERS:\\n' + outline.characters.map(c => '- ' + c.name + ' (' + c.role + '): ' + c.arc).join('\\n'));\n  }\n  if (outline.chapters) {\n    parts.push('CHAPTER OUTLINE:\\n' + outline.chapters.map(ch => 'Ch ' + ch.number + ' \\u2014 ' + ch.title + ': ' + ch.brief + (ch.arc_notes ? ' [Arc: ' + ch.arc_notes + ']' : '')).join('\\n'));\n  }\n  bookOutlineText = parts.join('\\n\\n');\n}\n\nlet chapterOutlineText = 'No chapter outline found.';\nlet thisChapter = null;\nif (outline.chapters) {\n  thisChapter = outline.chapters.find(ch => ch.number === chNum);\n}\nif (thisChapter && thisChapter.chapter_outline && thisChapter.chapter_outline.sub_chapters) {\n  const co = thisChapter.chapter_outline;\n  chapterOutlineText = 'Chapter Story Arc: ' + (co.chapter_story_arc || 'Same as book') + '\\n' +\n    'Book Arc Beat: ' + (co.book_arc_beat || '') + '\\n' +\n    co.sub_chapters.map(sc => 'Sub-chapter ' + sc.number + ': ' + sc.title + '\\n  Brief: ' + sc.brief + '\\n  Characters: ' + (sc.characters || []).join(', ')).join('\\n\\n');\n}\n\nconst bookArcName = outline.story_arc_name || '';\nconst chapterArcName = (thisChapter && thisChapter.chapter_outline) ? (thisChapter.chapter_outline.chapter_story_arc || bookArcName) : bookArcName;\n\nconst auditPrompt = `You are a story consistency auditor. A chapter has just been cleaned up. Verify it against the book outline, chapter outline, and story arc frameworks. Be thorough but fair.\n\n## BOOK OUTLINE\n${bookOutlineText}\n\n## CHAPTER OUTLINE (SUB-CHAPTERS)\n${chapterOutlineText}\n\n## CHAPTER TEXT (CORRECTED)\n${correctedText.substring(0, 150000)}\n\n## VALIDATION CHECKLIST\nFor each item, respond PASS or FAIL with a brief explanation:\n\n1. **Character Consistency**: Do all character names match the book outline exactly?\n2. **Book Arc Advancement**: Does this chapter advance the book's story arc per the arc_notes?\n3. **Chapter Outline Adherence**: Does the chapter follow the sub-chapter sequence? Look for title headings.\n4. **Plot Consistency**: Does the chapter contradict established plot points?\n5. **Theme Alignment**: Does the chapter support the book's stated themes?\n6. **Story Drift Risk**: Any subtle changes that could take the narrative off path?\n7. **Book Story Arc Compliance**: Does this chapter hit its assigned beat in ${bookArcName}?\n8. **Chapter Story Arc Compliance**: Does the internal structure follow ${chapterArcName}?\n9. **Arc Contradiction Check**: Does anything contradict the story arc's rules?\n\n## OUTPUT FORMAT\nReturn JSON with:\n- overall_status: \"PASS\" or \"NEEDS_REVIEW\"\n- checks: array of {name, status (\"PASS\" or \"FAIL\"), detail}\n- summary: one paragraph\n- concerns: array of strings (empty if all PASS)`;\n\nreturn [{ json: { auditPrompt } }];"
+      },
+      "id": "qa-audit-prompt",
+      "name": "build_audit_prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2144,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.auditPrompt }}"
+      },
+      "id": "qa-audit-llm",
+      "name": "audit_llm_chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        2368,
+        208
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 60000
+    },
+    {
+      "parameters": {
+        "jsCode": "const qaText = $input.first().json.text || $input.first().json.output || '';\nconst qaStr = typeof qaText === 'string' ? qaText : JSON.stringify(qaText);\n\nlet qaResult;\ntry {\n  const jsonMatch = qaStr.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    qaResult = JSON.parse(jsonMatch[0]);\n  } else {\n    qaResult = { overall_status: 'UNKNOWN', summary: qaStr.substring(0, 500), checks: [], concerns: ['Could not parse response as JSON'] };\n  }\n} catch (e) {\n  qaResult = { overall_status: 'UNKNOWN', summary: qaStr.substring(0, 500), checks: [], concerns: ['JSON parse error: ' + e.message] };\n}\n\nconst statusColor = qaResult.overall_status === 'PASS' ? '#2d8a4e' : (qaResult.overall_status === 'NEEDS_REVIEW' ? '#c9302c' : '#888');\n\nlet checksHtml = '';\nif (qaResult.checks && qaResult.checks.length > 0) {\n  checksHtml = qaResult.checks.map(c =>\n    '<tr><td style=\"padding:4px 8px;\">' + (c.status === 'PASS' ? '\\u2705' : '\\u274c') + ' ' + c.name + '</td><td style=\"padding:4px 8px;\">' + c.detail + '</td></tr>'\n  ).join('');\n}\n\nconst auditHtml = '<div style=\"border:2px solid ' + statusColor + '; border-radius:8px; padding:16px; margin-top:24px; font-family:sans-serif;\">' +\n  '<h2 style=\"color:' + statusColor + '; margin-top:0;\">Story Consistency Report: ' + qaResult.overall_status + '</h2>' +\n  '<p>' + (qaResult.summary || '') + '</p>' +\n  (checksHtml ? '<table style=\"width:100%; border-collapse:collapse; margin:12px 0;\"><tr style=\"background:#f5f5f5;\"><th style=\"text-align:left; padding:4px 8px;\">Check</th><th style=\"text-align:left; padding:4px 8px;\">Detail</th></tr>' + checksHtml + '</table>' : '') +\n  (qaResult.concerns && qaResult.concerns.length > 0 ? '<h3 style=\"color:#c9302c;\">Concerns:</h3><ul>' + qaResult.concerns.map(c => '<li>' + c + '</li>').join('') + '</ul>' : '') +\n  '</div>';\n\nreturn [{ json: { audit_report: qaResult, audit_html: auditHtml, audit_status: qaResult.overall_status || 'UNKNOWN' } }];"
+      },
+      "id": "qa-audit-parse",
+      "name": "parse_audit_result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2720,
+        208
+      ]
+    },
+    {
+      "id": "qa-token",
+      "name": "track_token_usage",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        3080,
+        200
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "dk75OYTASeu6NkTr",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "execution_id": "={{ $execution.id }}",
+            "source_workflow_name": "QA Chapter V2"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true
+            },
+            {
+              "id": "source_workflow_name",
+              "displayName": "source_workflow_name",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true
+            }
+          ]
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "qa-clean-email",
+      "name": "send_clean_email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1960,
+        450
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "CPCSZOInV8Zj1PI1",
+          "name": "Gmail account"
+        }
+      },
+      "parameters": {
+        "sendTo": "={{ $('settings').first().json.recipient_email }}",
+        "subject": "=Q/A Review: {{ $('detect_issues').first().json.chapterLabel }}: {{ $('detect_issues').first().json.chapter_title }} \u2014 {{ $('detect_issues').first().json.project_title }}",
+        "message": "={{ ($('workflow_trigger').first().json.user_prompt ? '<div style=\"background:#f0f0f0;padding:12px;margin-bottom:16px;border-radius:4px;font-style:italic;\">' + $('workflow_trigger').first().json.user_prompt + '</div>' : '') + '<div style=\"border:2px solid #2d8a4e;border-radius:8px;padding:16px;margin-bottom:16px;font-family:sans-serif;\"><h2 style=\"color:#2d8a4e;margin-top:0;\">\u2705 Q/A Cleanup: No Corrections Needed</h2><p>No duplicate content or character name inconsistencies detected.</p><p><strong>Duplicates checked:</strong> ' + ($('detect_issues').first().json.duplicate_count || 0) + ' | <strong>Name issues:</strong> ' + ($('detect_issues').first().json.name_issue_count || 0) + '</p></div>' + ($('load_chapter_and_outline').first().json.chapter_text || '').replace(/\\n/g, '<br>') + ($json.audit_html || '') }}",
+        "options": {
+          "appendAttribution": false,
+          "bccList": "={{ $('settings').first().json.bcc_email }}"
+        }
+      }
+    },
+    {
+      "id": "qa-clean-audit-prompt",
+      "name": "build_clean_audit_prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        450
+      ],
+      "parameters": {
+        "jsCode": "const data = $('load_chapter_and_outline').first().json;\nif (data.error) return [{ json: { auditPrompt: 'Respond with: ERROR - ' + (data.result || 'Project not found'), skip: true, error: data.result } }];\nconst chapterText = data.chapter_text;\nconst outline = data.outline || {};\nconst chNum = data.chNum;\n\nlet bookOutlineText = '';\nif (outline) {\n  const parts = [];\n  if (outline.premise) parts.push('PREMISE: ' + outline.premise);\n  if (outline.themes) parts.push('THEMES: ' + outline.themes.join(', '));\n  if (outline.story_arc_name) parts.push('BOOK STORY ARC: ' + outline.story_arc_name);\n  if (outline.characters) {\n    parts.push('CHARACTERS:\\n' + outline.characters.map(c => '- ' + c.name + ' (' + c.role + '): ' + c.arc).join('\\n'));\n  }\n  if (outline.chapters) {\n    parts.push('CHAPTER OUTLINE:\\n' + outline.chapters.map(ch => 'Ch ' + ch.number + ' \\u2014 ' + ch.title + ': ' + ch.brief + (ch.arc_notes ? ' [Arc: ' + ch.arc_notes + ']' : '')).join('\\n'));\n  }\n  bookOutlineText = parts.join('\\n\\n');\n}\n\nlet chapterOutlineText = 'No chapter outline found.';\nlet thisChapter = null;\nif (outline.chapters) {\n  thisChapter = outline.chapters.find(ch => ch.number === chNum);\n}\nif (thisChapter && thisChapter.chapter_outline && thisChapter.chapter_outline.sub_chapters) {\n  const co = thisChapter.chapter_outline;\n  chapterOutlineText = 'Chapter Story Arc: ' + (co.chapter_story_arc || 'Same as book') + '\\n' +\n    'Book Arc Beat: ' + (co.book_arc_beat || '') + '\\n' +\n    co.sub_chapters.map(sc => 'Sub-chapter ' + sc.number + ': ' + sc.title + '\\n  Brief: ' + sc.brief + '\\n  Characters: ' + (sc.characters || []).join(', ')).join('\\n\\n');\n}\n\nconst bookArcName = outline.story_arc_name || '';\nconst chapterArcName = (thisChapter && thisChapter.chapter_outline) ? (thisChapter.chapter_outline.chapter_story_arc || bookArcName) : bookArcName;\n\nconst auditPrompt = `You are a story consistency auditor. Verify this chapter against the book outline, chapter outline, and story arc frameworks. Be thorough but fair.\n\n## BOOK OUTLINE\n${bookOutlineText}\n\n## CHAPTER OUTLINE (SUB-CHAPTERS)\n${chapterOutlineText}\n\n## CHAPTER TEXT\n${chapterText.substring(0, 150000)}\n\n## VALIDATION CHECKLIST\nFor each item, respond PASS or FAIL with a brief explanation:\n\n1. **Character Consistency**: Do all character names match the book outline exactly?\n2. **Book Arc Advancement**: Does this chapter advance the book's story arc per the arc_notes?\n3. **Chapter Outline Adherence**: Does the chapter follow the sub-chapter sequence? Look for title headings.\n4. **Plot Consistency**: Does the chapter contradict established plot points?\n5. **Theme Alignment**: Does the chapter support the book's stated themes?\n6. **Story Drift Risk**: Any subtle changes that could take the narrative off path?\n7. **Book Story Arc Compliance**: Does this chapter hit its assigned beat in ${bookArcName}?\n8. **Chapter Story Arc Compliance**: Does the internal structure follow ${chapterArcName}?\n9. **Arc Contradiction Check**: Does anything contradict the story arc's rules?\n\n## OUTPUT FORMAT\nReturn JSON with:\n- overall_status: \"PASS\" or \"NEEDS_REVIEW\"\n- checks: array of {name, status (\"PASS\" or \"FAIL\"), detail}\n- summary: one paragraph\n- concerns: array of strings (empty if all PASS)`;\n\nreturn [{ json: { auditPrompt } }];"
+      }
+    },
+    {
+      "id": "qa-clean-audit-llm",
+      "name": "clean_audit_llm_chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        1520,
+        450
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.auditPrompt }}"
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 60000
+    },
+    {
+      "id": "qa-clean-audit-parse",
+      "name": "parse_clean_audit",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1740,
+        450
+      ],
+      "parameters": {
+        "jsCode": "const qaText = $input.first().json.text || $input.first().json.output || '';\nconst qaStr = typeof qaText === 'string' ? qaText : JSON.stringify(qaText);\n\nlet qaResult;\ntry {\n  const jsonMatch = qaStr.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    qaResult = JSON.parse(jsonMatch[0]);\n  } else {\n    qaResult = { overall_status: 'UNKNOWN', summary: qaStr.substring(0, 500), checks: [], concerns: ['Could not parse response as JSON'] };\n  }\n} catch (e) {\n  qaResult = { overall_status: 'UNKNOWN', summary: qaStr.substring(0, 500), checks: [], concerns: ['JSON parse error: ' + e.message] };\n}\n\nconst statusColor = qaResult.overall_status === 'PASS' ? '#2d8a4e' : (qaResult.overall_status === 'NEEDS_REVIEW' ? '#c9302c' : '#888');\n\nlet checksHtml = '';\nif (qaResult.checks && qaResult.checks.length > 0) {\n  checksHtml = qaResult.checks.map(c =>\n    '<tr><td style=\"padding:4px 8px;\">' + (c.status === 'PASS' ? '\\u2705' : '\\u274c') + ' ' + c.name + '</td><td style=\"padding:4px 8px;\">' + c.detail + '</td></tr>'\n  ).join('');\n}\n\nconst auditHtml = '<div style=\"border:2px solid ' + statusColor + '; border-radius:8px; padding:16px; margin-top:24px; font-family:sans-serif;\">' +\n  '<h2 style=\"color:' + statusColor + '; margin-top:0;\">Story Consistency Report: ' + qaResult.overall_status + '</h2>' +\n  '<p>' + (qaResult.summary || '') + '</p>' +\n  (checksHtml ? '<table style=\"width:100%; border-collapse:collapse; margin:12px 0;\"><tr style=\"background:#f5f5f5;\"><th style=\"text-align:left; padding:4px 8px;\">Check</th><th style=\"text-align:left; padding:4px 8px;\">Detail</th></tr>' + checksHtml + '</table>' : '') +\n  (qaResult.concerns && qaResult.concerns.length > 0 ? '<h3 style=\"color:#c9302c;\">Concerns:</h3><ul>' + qaResult.concerns.map(c => '<li>' + c + '</li>').join('') + '</ul>' : '') +\n  '</div>';\n\nreturn [{ json: { audit_html: auditHtml, audit_status: qaResult.overall_status } }];"
+      }
+    }
+  ],
+  "connections": {
+    "workflow_trigger": {
+      "main": [
+        [
+          {
+            "node": "settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "settings": {
+      "main": [
+        [
+          {
+            "node": "load_chapter_and_outline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "load_chapter_and_outline": {
+      "main": [
+        [
+          {
+            "node": "detect_issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "detect_issues": {
+      "main": [
+        [
+          {
+            "node": "check_has_issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check_has_issues": {
+      "main": [
+        [
+          {
+            "node": "build_correction_prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "set_result_clean",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "build_correction_prompt": {
+      "main": [
+        [
+          {
+            "node": "claude_correction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "claude_correction": {
+      "main": [
+        [
+          {
+            "node": "generate_diff_report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "claude_sonnet_model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "claude_correction",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "audit_llm_chain",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "clean_audit_llm_chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "generate_diff_report": {
+      "main": [
+        [
+          {
+            "node": "snapshot_and_save",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "snapshot_and_save": {
+      "main": [
+        [
+          {
+            "node": "build_audit_prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send_email": {
+      "main": [
+        [
+          {
+            "node": "set_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "build_audit_prompt": {
+      "main": [
+        [
+          {
+            "node": "audit_llm_chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "audit_llm_chain": {
+      "main": [
+        [
+          {
+            "node": "parse_audit_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "parse_audit_result": {
+      "main": [
+        [
+          {
+            "node": "send_email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_result": {
+      "main": [
+        [
+          {
+            "node": "track_token_usage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_result_clean": {
+      "main": [
+        [
+          {
+            "node": "build_clean_audit_prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send_clean_email": {
+      "main": [
+        [
+          {
+            "node": "track_token_usage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "build_clean_audit_prompt": {
+      "main": [
+        [
+          {
+            "node": "clean_audit_llm_chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "clean_audit_llm_chain": {
+      "main": [
+        [
+          {
+            "node": "parse_clean_audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "parse_clean_audit": {
+      "main": [
+        [
+          {
+            "node": "send_clean_email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "binaryMode": "separate",
+    "executionTimeout": 900
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "f634e380-5704-4f3e-adde-ecfea8f9ce52"
+}
