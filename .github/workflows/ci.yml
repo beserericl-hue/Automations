@@ -5,11 +5,13 @@ on:
     branches: [develop]
     paths:
       - 'writers-workbench/**'
+      - 'workflows/**'
       - '.github/workflows/ci.yml'
   pull_request:
     branches: [main]
     paths:
       - 'writers-workbench/**'
+      - 'workflows/**'
       - '.github/workflows/ci.yml'
 
 defaults:
