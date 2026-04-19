@@ -16,12 +16,13 @@
 | 4 | `postal-mariadb` | `mariadb:10.11` | Postal metadata DB | Newsletter / Sprint 11 |
 | 5 | `postal-rabbitmq` | `rabbitmq:3-management` | Postal internal job queue | Newsletter / Sprint 11 |
 | 6 | `postal` | `ghcr.io/postalserver/postal:3` | Email server for `@courseworx.media` | Newsletter / Sprint 11 |
-| 7 | `n8n-postgres` | `postgres:16-alpine` | n8n execution data DB | 13 |
-| 8 | `n8n-main` | `n8nio/n8n:latest` | n8n webhook entry point + UI | 13 |
-| 9 | `n8n-worker-1` | `n8nio/n8n:latest` | n8n worker (queue mode) | 13 |
-| 10 | `n8n-worker-2` | `n8nio/n8n:latest` | n8n worker (scale) | 13 |
+| 7 | `n8n-prod` | `n8nio/n8n:latest` | n8n prod tier (standalone with embedded SQLite OR bound to own Postgres) | 13 |
+| 8 | `n8n-prod-postgres` | `postgres:16-alpine` | n8n-prod's execution data (optional — can use SQLite instead) | 13 |
+| 9 | `n8n-dev` | `n8nio/n8n:latest` | n8n dev tier (separate instance, separate DB, separate webhooks) | 13 |
+| 10 | `n8n-dev-postgres` | `postgres:16-alpine` | n8n-dev's execution data (optional) | 13 |
+| 11+ | `n8n-prod-2`, `n8n-prod-3`, ... | `n8nio/n8n:latest` | Additional prod-tier standalone instances added as user volume grows. Each independent, each routed via partitioning logic in Workbench. | 13+ |
 
-**Total at full buildout: 10 services.**
+**Total at full buildout (2 n8n tiers): 10 services.** Each additional n8n instance for scale adds 1 container (+ optionally 1 Postgres if using PG over SQLite) = ~$25/mo per instance.
 
 **NOT on Railway** (SaaS or external):
 - Supabase (3 projects: V1 baseline / V2 prod / Dev) — SaaS
@@ -154,109 +155,171 @@ REPLY_TO_EMAIL=support@courseworx.media
 
 ---
 
-### Phase 4 — n8n migration to Railway (Sprint 13)
+### Phase 4 — n8n migration to Railway (Sprint 13) — **Independent Instances Model**
 
-Currently n8n runs at `n8n.agileadautomation.com` (external infra). Sprint 13 moves it to Railway in queue mode. Four new services replace the single external instance.
+Currently n8n runs at `n8n.agileadautomation.com` (external infra). Sprint 13 moves it to Railway as **independent standalone instances** rather than n8n's queue mode (main + workers).
 
-#### Service 7: `n8n-postgres`
+**Why independent instances instead of queue mode?** Queue mode requires shared state (Postgres + Redis) across workers, a single encryption key, and careful ops coordination — any change propagates to all workers instantly. We're taking a different model: **each n8n instance is fully self-contained** — its own database, own workflows, own webhooks. When we need more capacity, we launch another full instance. Routing to the right instance is the caller's responsibility (the Workbench Express server, or a router service in front).
 
-1. **New** → **Database** → **Add PostgreSQL** (Railway template), OR deploy from image `postgres:16-alpine`
-2. Environment:
-   ```
-   POSTGRES_USER=n8n
-   POSTGRES_PASSWORD=<openssl rand -base64 24>
-   POSTGRES_DB=n8n
-   ```
-3. Storage → New Volume, 10 GB, mount at `/var/lib/postgresql/data`
-4. Networking → Private only
-5. Capture internal hostname: `n8n-postgres.railway.internal`
+**Trade-off:**
+- ✅ Full isolation — one instance failure can't cascade
+- ✅ Simpler to reason about (no shared state bugs)
+- ✅ Can run different n8n versions per instance (blue-green friendly)
+- ❌ Workflow changes must be applied to each instance separately (sync via n8n API)
+- ❌ Routing logic needed at caller layer
 
-#### Service 8: `n8n-main` (webhook + UI, main process)
+Initial deployment = **2 standalone instances** (prod tier + dev tier). Each handles its own users. Scale adds more prod instances as user count grows.
+
+---
+
+#### Service 7: `n8n-prod` (production-tier standalone)
 
 1. **New** → **Deploy from Docker Image** → `n8nio/n8n:latest`
-2. Environment:
+2. Storage → **New Volume**, 5 GB, mount at `/home/node/.n8n`
+   - This is where n8n stores its SQLite DB, credentials, and workflow data
+   - Using SQLite (default) keeps this instance fully self-contained — no external Postgres needed
+3. Environment:
    ```
-   N8N_HOST=n8n.agileadautomation.com           # keep existing domain
+   N8N_HOST=n8n.agileadautomation.com
    N8N_PORT=5678
    N8N_PROTOCOL=https
    WEBHOOK_URL=https://n8n.agileadautomation.com
    GENERIC_TIMEZONE=America/New_York
+   N8N_ENCRYPTION_KEY=<openssl rand -hex 64>   # UNIQUE per instance
    
-   # Database (shared with workers)
-   DB_TYPE=postgresdb
-   DB_POSTGRESDB_HOST=n8n-postgres.railway.internal
-   DB_POSTGRESDB_PORT=5432
-   DB_POSTGRESDB_DATABASE=n8n
-   DB_POSTGRESDB_USER=n8n
-   DB_POSTGRESDB_PASSWORD=<from service 7>
+   # DB: SQLite (default — on the mounted volume)
+   # Override to Postgres only if you need concurrent reads beyond what SQLite provides
    
-   # Queue mode
-   EXECUTIONS_MODE=queue
-   QUEUE_BULL_REDIS_HOST=redis.railway.internal
-   QUEUE_BULL_REDIS_PORT=6379
-   QUEUE_BULL_REDIS_PASSWORD=<from service 3>
-   
-   # Encryption
-   N8N_ENCRYPTION_KEY=<openssl rand -hex 64>
-   
-   # API
-   N8N_API_KEY_PATH=/public-api
-   
-   # Workflow credentials (externalized per Sprint 13 S13-1 — replaces hardcoded Supabase URLs in Code nodes)
+   # Externalized workflow credentials (Sprint 13 S13-1) — replaces hardcoded values in Code nodes
    N8N_SUPABASE_URL=<V2 Supabase URL>
    N8N_SUPABASE_SERVICE_KEY=<V2 service role key>
-   N8N_ANTHROPIC_API_KEY=<Claude API key>
-   N8N_PERPLEXITY_API_KEY=<Perplexity key>
-   N8N_OPENAI_API_KEY=<OpenAI key>
+   N8N_ANTHROPIC_API_KEY=sk-ant-...
+   N8N_PERPLEXITY_API_KEY=pplx-...
+   N8N_OPENAI_API_KEY=sk-proj-...
    N8N_KIEAI_API_KEY=<KIE.AI key>
-   N8N_FIRECRAWL_API_KEY=<Firecrawl key>
+   N8N_FIRECRAWL_API_KEY=fc-...
    N8N_WORKBENCH_API_URL=https://writers-workbench.up.railway.app
    N8N_POSTAL_API_URL=https://postal-admin.courseworx.media/api/v1
    N8N_POSTAL_API_KEY=<Postal API key>
    ```
-3. Public domain → attach `n8n.agileadautomation.com` (custom domain — update DNS to point at Railway after cutover; during migration, run parallel)
-4. Command: `n8n start` (handles webhooks + UI; not workers)
-5. No volume needed (state is in Postgres + Redis)
+4. Public domain → attach `n8n.agileadautomation.com` (currently this is where the external n8n lives; DNS cutover at migration time)
+5. Command: `n8n start` (default)
+6. After boot: log in via n8n UI, set admin credentials, import V2 workflows from repo JSONs (or migrate from the existing external n8n via workflow export/import)
+7. **Capture N8N API key** (Settings → API → Create API Key) → save as `N8N_PROD_API_KEY` env on the Workbench
 
-#### Services 9 & 10: `n8n-worker-1`, `n8n-worker-2`
+#### Service 8 (optional): `n8n-prod-postgres`
 
-For each worker:
-1. **New** → **Deploy from Docker Image** → `n8nio/n8n:latest`
-2. Environment: SAME as `n8n-main` except:
-   - `EXECUTIONS_MODE=queue` (same)
-   - No public domain (workers don't receive HTTP traffic)
-   - Command: `n8n worker`
-3. No volume needed
-4. Scale horizontally by duplicating (worker-3, worker-4, etc.) — all read from the same Redis queue
+Only deploy if you've outgrown SQLite. Most single-instance deployments don't need this.
 
-**Alternative:** instead of separate `worker-1` and `worker-2` services, use Railway's **replica count** on a single `n8n-worker` service. Set replica count = 2 (or more). Same effect, less service sprawl.
+1. **New** → **Database** → **Add PostgreSQL**, OR image `postgres:16-alpine`
+2. Storage: 10 GB volume at `/var/lib/postgresql/data`
+3. Env: `POSTGRES_USER=n8n`, `POSTGRES_PASSWORD`, `POSTGRES_DB=n8n`
+4. Add to `n8n-prod` service env:
+   ```
+   DB_TYPE=postgresdb
+   DB_POSTGRESDB_HOST=n8n-prod-postgres.railway.internal
+   DB_POSTGRESDB_PORT=5432
+   DB_POSTGRESDB_DATABASE=n8n
+   DB_POSTGRESDB_USER=n8n
+   DB_POSTGRESDB_PASSWORD=<from postgres service>
+   ```
+
+#### Service 9: `n8n-dev` (dev-tier standalone)
+
+Identical pattern to `n8n-prod`, but completely separate:
+1. Same image, same setup, own Volume (5 GB)
+2. Public domain → `n8n-dev.agileadautomation.com` (new subdomain)
+3. Env: **unique `N8N_ENCRYPTION_KEY`** (must not match prod), `WEBHOOK_URL=https://n8n-dev.agileadautomation.com`
+4. Points at Dev Supabase in `N8N_SUPABASE_URL` (not V2)
+5. Add to Workbench dev env: `VITE_N8N_WEBHOOK_URL=https://n8n-dev.agileadautomation.com/webhook/author_request_dev`
+
+#### Service 10 (optional): `n8n-dev-postgres` — same optional pattern as Service 8
 
 ---
 
-## Load balancer question
+#### Scaling beyond 2 instances — when user volume demands it
 
-**Short answer: No, you don't need a separate Railway load balancer service.**
+When the single `n8n-prod` starts saturating (typical sign: executions queuing up past 30s, webhook timeouts), the path forward is more standalone prod instances:
 
-**Why:**
+1. Deploy `n8n-prod-2` (same pattern as `n8n-prod`, own volume, own encryption key, own webhook URL)
+2. Import the same V2 workflows into it (via n8n API — `scripts/sync-workflows-across-instances.sh` would be Sprint 13 scope)
+3. Add its webhook URL to the Workbench's instance routing table (see Load Balancing section below)
+4. Partition users across instances (user_id hash → instance)
 
-1. **For the Workbench Express services (`writers-workbench`, `writers-workbench-dev`):** Railway automatically load-balances across replicas when you scale a service (Service settings → Replicas = N). It fronts replicas with its own edge proxy. You do nothing.
+**Each additional instance adds ~$20-25/mo to Railway cost.** Plan for one instance per ~100-500 concurrent users depending on workflow intensity — chapter writes (long-running) are much more expensive than sync ops.
 
-2. **For n8n in queue mode:**
-   - The **main** process receives HTTP traffic (webhooks + UI). You typically run **one** main. If you scale main to 2+ replicas, Railway load-balances between them — fine, since they're stateless with respect to webhook reception. Both write webhook-received payloads into the Redis queue.
-   - **Workers** don't receive HTTP traffic at all — they pull jobs from Redis. Adding more workers = more throughput, no load balancer needed.
+**Sync discipline:** Any workflow change must be applied to ALL prod instances. Sprint 10.a's promotion scripts (`scripts/promote-dev-to-v2.sh`) need to iterate across every prod instance's n8n API when promoting. Track instance list in `scripts/n8n-instances.json`.
 
-3. **If you ever wanted n8n sharded across truly independent instances** (not queue-mode workers, but fully separate n8n brains) — then yes you'd need a custom router. But that's NOT what this architecture does. Queue mode with 1 main + N workers is the horizontal scaling path.
+---
 
-**When Railway's built-in LB is enough:**
-- One service, multiple replicas (e.g., `n8n-worker` with replica count = 3)
-- Different services on different domains/subdomains (e.g., `writers-workbench` on one domain, `n8n-main` on another)
+## Load balancer question — **YES, eventually needed for n8n fleet**
 
-**When you'd need something more:**
-- Blue-green deployment with custom traffic splits → use Railway environments (not an LB service)
-- Geographic routing → Cloudflare in front of Railway
-- Authentication at the edge → Cloudflare Access or a sidecar Cloudflared tunnel
+Since we're using **independent n8n instances** (not queue mode), routing decisions are now real. Here's the breakdown by layer.
 
-None of those apply today.
+### Layer 1 — Workbench Express: no separate LB needed
+
+Railway auto-balances across replicas of the same service. When the `writers-workbench` service needs more capacity, set replica count = 2 or 3 in Railway; Railway's edge proxy round-robins. Stateless Express requests — works cleanly.
+
+### Layer 2 — Postal, Redis, Postgres: no LB needed
+
+All single-instance services (or, for Postgres, single-primary with eventual read replicas). No load balancing.
+
+### Layer 3 — n8n instances: **this is where routing happens**
+
+At **1 instance**: no LB. `n8n.agileadautomation.com` DNS points at one Railway service. Done.
+
+At **2+ prod instances**, three options:
+
+| Option | Where routing lives | Complexity | When to use |
+|--------|---------------------|-----------|-------------|
+| **A. Workbench routes via user partition** | Express server's chat proxy picks instance based on `user_id` hash | Low — just code in Workbench | Best for us. Deterministic per-user routing; same user always hits same instance. |
+| **B. Cloudflare Load Balancer** in front | External SaaS — round-robins or weighted routing between Railway domains | Medium — requires Cloudflare DNS + LB product ($5/mo) | When we want round-robin or geo-routing without touching code |
+| **C. Nginx/HAProxy sidecar on Railway** | New Railway service runs Nginx, fronts multiple n8n instances | Medium-high — another service to maintain, custom config | Only if we need path-based routing (e.g., `/webhook/chapter/*` → instance A, `/webhook/brainstorm/*` → instance B) |
+
+**Recommendation: Option A (Workbench routes).** Reasoning:
+1. We already have a single entry point in the Workbench chat proxy — just extend it
+2. User-partition routing keeps the "same user always hits same n8n" invariant (useful for n8n's in-flight execution state with chat memory, session keys, etc.)
+3. Zero new services to deploy
+4. Config: a JSON file `writers-workbench/server/src/config/n8n-instances.json` listing instance URLs and their load shares
+
+Skeleton for Option A:
+
+```typescript
+// server/src/lib/n8n-router.ts
+const instances = [
+  { url: 'https://n8n.agileadautomation.com', weight: 1 },
+  { url: 'https://n8n-2.agileadautomation.com', weight: 1 },
+  { url: 'https://n8n-3.agileadautomation.com', weight: 1 },
+];
+
+export function pickN8nInstance(userId: string): string {
+  const hash = simpleHash(userId);
+  const totalWeight = instances.reduce((s, i) => s + i.weight, 0);
+  const pick = hash % totalWeight;
+  let acc = 0;
+  for (const inst of instances) {
+    acc += inst.weight;
+    if (pick < acc) return inst.url;
+  }
+  return instances[0].url;
+}
+```
+
+Chat proxy then POSTs to `${pickN8nInstance(userId)}/webhook/author_request_v2`.
+
+### Layer 4 — Prod vs Dev tiers
+
+Always separate webhooks, never balanced together:
+- Prod Workbench → `pickN8nInstance(userId)` over **prod-tier instances only** → `/webhook/author_request_v2`
+- Dev Workbench → `n8n-dev.agileadautomation.com` (single instance in dev tier) → `/webhook/author_request_dev`
+
+### Summary answer
+
+- **Today** (1 n8n instance): no LB needed.
+- **Tomorrow** (multiple prod n8n instances): add ~20 lines of routing code to the Workbench Express. **No new Railway service, no third-party LB, no Cloudflare LB product needed.**
+- **If you later want round-robin / geo-routing / path-based splits**: then Cloudflare Load Balancer ($5/mo) OR an Nginx service on Railway. Not needed at current or near-future scale.
+
+Sprint 13 adds this story: **S13-X "Multi-instance n8n routing in Workbench"** (~3 pts) — ships when we stand up the 2nd prod n8n.
 
 ---
 
@@ -354,41 +417,32 @@ RABBITMQ_VHOST=postal
 RAILS_ENV=production
 ```
 
-### `n8n-postgres` service (Sprint 13)
+### `n8n-prod` / `n8n-dev` / `n8n-prod-N` services (Sprint 13) — standalone instances
+
+Each n8n instance gets its own copy of this env block. Values that **must differ per instance**: `WEBHOOK_URL`, `N8N_ENCRYPTION_KEY`, `N8N_HOST`. Values that **must stay the same across prod instances** (so the same workflows behave identically): all `N8N_*` workflow credentials below.
 
 ```bash
-POSTGRES_USER=n8n
-POSTGRES_PASSWORD=<openssl rand -base64 24>
-POSTGRES_DB=n8n
-```
-
-### `n8n-main` and `n8n-worker` services (Sprint 13)
-
-```bash
-# Core
-N8N_HOST=n8n.agileadautomation.com
+# Core — UNIQUE PER INSTANCE
+N8N_HOST=n8n.agileadautomation.com              # or n8n-2.agileadautomation.com, n8n-dev.agileadautomation.com
 N8N_PORT=5678
 N8N_PROTOCOL=https
-WEBHOOK_URL=https://n8n.agileadautomation.com
+WEBHOOK_URL=https://n8n.agileadautomation.com   # matches N8N_HOST — must be the publicly reachable URL
 GENERIC_TIMEZONE=America/New_York
-N8N_ENCRYPTION_KEY=<openssl rand -hex 64>
+N8N_ENCRYPTION_KEY=<openssl rand -hex 64>       # DIFFERENT for every instance — do NOT reuse
 
-# DB (shared)
-DB_TYPE=postgresdb
-DB_POSTGRESDB_HOST=n8n-postgres.railway.internal
-DB_POSTGRESDB_PORT=5432
-DB_POSTGRESDB_DATABASE=n8n
-DB_POSTGRESDB_USER=n8n
-DB_POSTGRESDB_PASSWORD=<from n8n-postgres>
+# DB — SQLite (default) uses the mounted volume. No env vars needed.
+# Uncomment below only if you want Postgres instead (optional upgrade)
+# DB_TYPE=postgresdb
+# DB_POSTGRESDB_HOST=n8n-prod-postgres.railway.internal
+# DB_POSTGRESDB_PORT=5432
+# DB_POSTGRESDB_DATABASE=n8n
+# DB_POSTGRESDB_USER=n8n
+# DB_POSTGRESDB_PASSWORD=<from postgres service>
 
-# Queue mode (shared Redis)
-EXECUTIONS_MODE=queue
-QUEUE_BULL_REDIS_HOST=redis.railway.internal
-QUEUE_BULL_REDIS_PORT=6379
-QUEUE_BULL_REDIS_PASSWORD=<from redis>
-
-# Externalized workflow credentials (replaces hardcoded values in Code nodes)
-N8N_SUPABASE_URL=https://<v2-project-ref>.supabase.co
+# Externalized workflow credentials (replaces hardcoded values in Code nodes — Sprint 13 S13-1)
+# Values below are IDENTICAL for every instance in the same tier (prod-1, prod-2, prod-N),
+# different for dev tier.
+N8N_SUPABASE_URL=https://<project-ref>.supabase.co
 N8N_SUPABASE_SERVICE_KEY=sb_secret_...
 N8N_ANTHROPIC_API_KEY=sk-ant-...
 N8N_PERPLEXITY_API_KEY=pplx-...
@@ -400,9 +454,35 @@ N8N_POSTAL_API_URL=https://postal-admin.courseworx.media/api/v1
 N8N_POSTAL_API_KEY=<Postal API key>
 ```
 
+### Optional: `n8n-prod-postgres` / `n8n-dev-postgres` services
+
+Only deploy if you've outgrown SQLite (typically hundreds of executions per minute on one n8n instance). Most single-instance deployments run SQLite indefinitely.
+
+```bash
+POSTGRES_USER=n8n
+POSTGRES_PASSWORD=<openssl rand -base64 24>
+POSTGRES_DB=n8n
+```
+
+### Workbench env addition for multi-instance routing (when > 1 prod n8n instance)
+
+Add to `writers-workbench` service env:
+
+```bash
+# Comma-separated list of prod n8n instance URLs; Workbench router picks by user_id hash
+N8N_PROD_INSTANCES=https://n8n.agileadautomation.com,https://n8n-2.agileadautomation.com
+# Single dev instance
+N8N_DEV_INSTANCE=https://n8n-dev.agileadautomation.com
+# API keys for admin ops (sync workflows, etc.) — one per instance, comma-separated, same order as URLs
+N8N_PROD_API_KEYS=<key-1>,<key-2>
+N8N_DEV_API_KEY=<dev-key>
+```
+
 ---
 
 ## Cost totals
+
+### Baseline (2 n8n tiers — prod + dev, SQLite):
 
 | Service | vCPU | RAM | Volume | Monthly |
 |---------|------|-----|--------|---------|
@@ -412,12 +492,26 @@ N8N_POSTAL_API_KEY=<Postal API key>
 | postal-mariadb | 0.25 | 512 MB | 5 GB | $11 |
 | postal-rabbitmq | 0.25 | 256 MB | 1 GB | $8 |
 | postal | 0.5 | 1 GB | — | $15 |
-| n8n-postgres | 0.5 | 1 GB | 10 GB | $22.50 |
-| n8n-main | 0.5 | 1 GB | — | $15 |
-| n8n-worker-1 | 0.75 | 1.5 GB | — | $27.50 |
-| n8n-worker-2 | 0.75 | 1.5 GB | — | $27.50 |
+| n8n-prod | 0.75 | 1.5 GB | 5 GB | $28.75 |
+| n8n-dev | 0.5 | 1 GB | 5 GB | $16.25 |
 | Railway Pro plan | — | — | — | $20 |
-| **Infra subtotal** | | | | **~$184/mo** |
+| **Infra subtotal (baseline, 2 n8n instances)** | | | | **~$137/mo** |
+
+### Adding a 2nd prod n8n instance for scaling (~$25/mo additional)
+
+| Service | Monthly |
+|---------|---------|
+| n8n-prod-2 (0.75 vCPU, 1.5 GB, 5 GB volume) | $28.75 |
+
+Each additional prod instance: +$25-30/mo. Plan for 1 instance per 100-500 concurrent active users depending on workflow intensity.
+
+### Upgrading an instance from SQLite to Postgres (optional, +$22/mo per instance)
+
+| Service | Monthly |
+|---------|---------|
+| n8n-prod-postgres (0.5 vCPU, 1 GB, 10 GB volume) | $22.50 |
+
+Only needed when an instance saturates SQLite's write throughput — not expected at current scale.
 
 **External services (not Railway):**
 - Supabase Pro × 3 projects (V1 frozen baseline + V2 prod + Dev) = $75/mo
@@ -437,10 +531,13 @@ Sprint 10.b:      Add redis
 Newsletter sprint: Add postal-mariadb, postal-rabbitmq, postal
 Sprint 11:        No new Railway services (Postal workflow migration only)
 Sprint 12:        No new Railway services (chapter parallelization is n8n-only)
-Sprint 13:        Add n8n-postgres, n8n-main, n8n-worker-1, n8n-worker-2
+Sprint 13:        Add n8n-prod + n8n-dev (standalone instances, SQLite)
+                  Implement Workbench multi-instance router
+Scale-as-needed:  Add n8n-prod-2, n8n-prod-3, ... (each is a new standalone)
 ```
 
-At the end: 10 Railway services, ~$184/mo infrastructure.
+Baseline: 8 services, ~$137/mo.
+Each additional prod n8n instance: +1 service, +$25-30/mo.
 
 ---
 
@@ -448,10 +545,10 @@ At the end: 10 Railway services, ~$184/mo infrastructure.
 
 | Concern | Solution |
 |---------|----------|
-| Scale Workbench Express for more concurrent users | Increase replica count on `writers-workbench` service. Railway auto-balances. |
-| Scale n8n throughput | Add more `n8n-worker` replicas. They pull from shared Redis queue — no HTTP routing needed. |
-| High webhook volume to n8n | Scale `n8n-main` to 2–3 replicas. Railway load-balances incoming HTTP. Webhook payloads go into Redis queue; workers process async. |
-| Prod vs dev traffic separation | Already solved — separate Railway services (`writers-workbench` vs `writers-workbench-dev`), separate webhook paths (`/webhook/author_request_v2` vs `/webhook/author_request_dev`). |
-| Geographic distribution | Not applicable at current scale. If needed, put Cloudflare in front of Railway. |
+| Scale Workbench Express for more concurrent users | Increase replica count on `writers-workbench` service. Railway auto-balances. No LB service needed. |
+| Scale n8n throughput | Deploy another standalone `n8n-prod-N` instance. Partition users across instances via Workbench router (user_id hash). No LB service needed. |
+| Prod vs dev traffic separation | Separate Railway services + separate webhook URLs. No LB. |
+| Multi-prod-instance routing | Workbench Express picks instance based on user_id hash before POSTing to n8n webhook. No LB service, just code. |
+| Geographic distribution (future) | Cloudflare in front of Railway. Not Railway-native. |
 
-**You don't need a dedicated load balancer service on Railway for this architecture.**
+**Summary: you don't need a dedicated LB service on Railway.** Routing across n8n instances lives in the Workbench Express server's chat proxy (~20 lines of code, one config file). Railway's built-in edge proxy handles within-service replica balancing for stateless Express. When user count demands it, spin up another `n8n-prod-N`, add its URL to the Workbench router config, and you're done.
