@@ -971,23 +971,317 @@ S10a-5 (schema governance) ─────────────────�
 
 ---
 
-## Sprint 12: Chapter Writer Parallelization
+## Sprint 12: Chapter Writer — Parallelization + Research/Rewrite Tool
 
-**Status:** Planned | **Points:** 34 | **Duration:** 2 weeks | **Priority:** P0
+**Status:** Planned | **Points:** 55 | **Duration:** ~3 weeks | **Priority:** P0
 
-**Goal:** The chapter writer currently takes 10–20 minutes because of a 120-second rate delay between sub-chapters, plus strictly sequential LLM calls. This sprint removes the delay, adds a pre-computed context document, and fans out sub-chapter writes in parallel with a final merge/continuity pass. Target: chapter write time drops to 3–5 minutes.
+**Goal:** Two co-shipped improvements to the chapter pipeline:
+1. **Parallelization (34 pts):** Chapter writer currently takes 10–20 minutes because of a 120-second rate delay and strictly sequential LLM calls. Remove the delay, build a pre-computed context document, fan out sub-chapter writes in parallel, add a merge/continuity pass. **Target: 3–5 minutes per chapter.**
+2. **Research/Rewrite Tool (21 pts):** New composite tool so the user can say one natural-language sentence to Eve and get a revised chapter that:
+   - Researches a topic you specify (saved as its own `research_reports_v2` row AND integrated into the rewrite)
+   - Fixes FAIL/NEEDS_REVIEW items from the chapter's last Q/A consistency report (default on)
+   - Applies freeform style directives per character, scene, or moment ("make Craig and his associates highly exaggerated buffoons; Mason stumbles around trying to follow them")
+   - All of the above stacked in a single invocation
 
-**Why now:** Immediately unlocks 3× throughput for the most painful user-facing operation. Gates scaling — without this, 10 concurrent chapter writes starve all other operations.
+**Why now:** Parallelization gates all concurrent usage (10 chapter writes can't happen simultaneously without it). Rewrite tool addresses the main creative control gap — right now rewrites re-invoke the full writer with the same inputs and produce essentially the same output; the user has no way to inject research, Q/A fixes, or targeted style directives.
 
-### Stories (summary — full detail in first chat-based plan)
+**Governance:** All work on Dev workflows per Sprint 10.a. Promoted to V2 at release.
 
-- **S12-1 (3 pts):** Remove 120s rate_limit_delay from chapter worker, add timing instrumentation
-- **S12-2 (8 pts):** Context document generator — new sub-workflow that synthesizes character state, plot threads, voice samples from previous chapters
-- **S12-3 (13 pts):** Parallel sub-chapter fan-out — rewrite worker to batch-execute all sub-chapters simultaneously using context doc
-- **S12-4 (5 pts):** Continuity merge pass — Claude call smooths transitions between parallel sub-chapters
-- **S12-5 (5 pts):** Timing telemetry + performance dashboard in admin panel
+### Track A — Parallelization (34 pts)
 
-**Depends on:** Sprint 10.a (do all work on Dev worker, then promote)
+#### S12-1: Remove rate delay + timing instrumentation (3 pts) | P0
+
+**Developer Tasks:**
+- [ ] In `Worker - Write Chapter V2 Dev`: delete the `rate_limit_delay` Wait node (120s between sub-chapters)
+- [ ] Reconnect the loop: `Loop Over Sub-Chapters` done → `write_sub_chapter` directly
+- [ ] Add timing Code nodes: capture `Date.now()` at start and end, store breakdown in `metadata.timing` on `published_content_v2`
+- [ ] Run 3 benchmark chapters (3, 5, 7 sub-chapters) and record times
+
+**QA — System Tests:**
+- [ ] 3-sub-chapter chapter < 5 min (was ~8.5 min)
+- [ ] 5-sub-chapter chapter < 8 min (was ~13.5 min)
+- [ ] No Anthropic rate-limit errors
+- [ ] `metadata.timing` populated with breakdown
+- [ ] Chapter content quality unchanged (manual review)
+
+**Definition of Done:** All 3 benchmarks complete without errors + chapter quality confirmed unchanged.
+
+#### S12-2: Context document generator (8 pts) | P0
+
+**Developer Tasks:**
+- [ ] New sub-workflow `Sub - Build Chapter Context V2 Dev`
+- [ ] Input: `project_id`, `chapter_number`, `user_id`
+- [ ] Loads book outline, story bible, genre config, previous chapter summaries (`published_content_v2` WHERE `chapter_number < current`), story arc prompts
+- [ ] LLM call (Claude Sonnet 4, 4096 max tokens, temp 0.2) synthesizes a single context document containing:
+  - Character states as of this chapter (who knows what, where they are)
+  - Active plot threads
+  - Setting details
+  - Voice/tone samples (first 500 chars of 2 previous chapters)
+  - Story arc beat for this chapter
+  - Continuity notes (any QA flags from previous chapters)
+- [ ] Returns context string
+- [ ] Register workflow; capture new ID; add to `workflow-id-map.json`
+
+**QA — System + Unit Tests:**
+- [ ] Context doc includes all character names from story bible
+- [ ] Context doc includes current chapter's arc beat
+- [ ] Context doc includes previous chapter summaries (not full text)
+- [ ] Stays under 4000 tokens (tiktoken count)
+- [ ] Works for Chapter 1 (no previous chapters — graceful empty state)
+- [ ] Works for Prologue (`chapter_number=0`)
+- [ ] Callable via `executeWorkflow` in under 30 seconds
+
+**Definition of Done:** Sub-workflow runs < 30s, output validated across 3 chapter scenarios.
+
+#### S12-3: Parallel sub-chapter fan-out (13 pts) | P0
+
+**Developer Tasks:**
+- [ ] Rewrite `Worker - Write Chapter V2 Dev` core loop:
+  - Before: `Loop → delay → write → memory → loop`
+  - After: `build_chapter_context → generate all sub-chapter prompts → SplitInBatches (batch=N) → write_sub_chapter (parallel) → Merge → sort by sub-chapter number → concat → QA`
+- [ ] Each sub-chapter prompt includes the full context document (identical across all — Anthropic cache hit) + its sub-chapter brief, arc beat, characters, setting
+- [ ] Remove `chapter_memory` (memoryBufferWindow) — replaced by context document
+- [ ] Keep vector store tool available for each sub-chapter (independent retrievals are fine in parallel)
+- [ ] Error handling: if any sub-chapter fails after 3 retries, save partial chapter with `[SECTION FAILED]` marker + notify user
+
+**QA — System Tests:**
+- [ ] 3-sub-chapter chapter < 3 minutes
+- [ ] 5-sub-chapter chapter < 4 minutes
+- [ ] 7-sub-chapter chapter < 5 minutes
+- [ ] All sub-chapters present in correct order
+- [ ] Character names consistent across parallel sub-chapters
+- [ ] No duplicate content between sub-chapters
+- [ ] Partial failure: 1 sub-chapter fails → chapter saved with marker → user notified
+- [ ] 2 users writing chapters simultaneously → both complete without interference
+- [ ] Vector store queries from parallel sub-chapters don't conflict
+- [ ] QA pass still runs on complete chapter
+
+**Definition of Done:** All timing targets hit on Dev; quality regression test passes (manual review of 2 chapters before/after).
+
+#### S12-4: Continuity merge pass (5 pts) | P1
+
+**Developer Tasks:**
+- [ ] New Claude call after concatenation, before QA:
+  - Model: Claude Sonnet 4, 8192 maxTokens, temp 0.3
+  - Prompt: "Review these N sub-chapters written in parallel. Fix: transition sentences between sub-chapters, character state inconsistencies, repeated phrases, tone shifts. Do NOT rewrite — only fix seams."
+  - Input: full concatenated chapter + context document
+  - Output: revised chapter text
+- [ ] Skip merge pass if chapter has ≤ 2 sub-chapters (seamless enough)
+- [ ] Store pre-merge and post-merge in `metadata.versions.pre_merge`
+
+**QA — System Tests:**
+- [ ] Merge pass runs < 60 seconds
+- [ ] 5-sub-chapter chapter shows smoother transitions (manual)
+- [ ] Merge doesn't significantly change word count (< 5% delta)
+- [ ] Merge skipped for 2-sub-chapter chapter
+- [ ] `metadata.versions.pre_merge` contains unmerged text
+
+**Definition of Done:** Merge pass improves one benchmark chapter's readability score (manual) without changing word count > 5%.
+
+#### S12-5: Timing telemetry + performance dashboard (5 pts) | P1
+
+**Developer Tasks:**
+- [ ] Add timing metrics to `token_usage_v2`: `execution_time_ms`, `queue_wait_ms`, `llm_time_ms`
+- [ ] New endpoint `GET /api/admin/performance`:
+  - Avg chapter write time (last 7 days)
+  - P95 chapter write time
+  - Avg sub-chapter write time
+  - Queue wait time distribution
+  - Job success/fail rates by queue
+- [ ] Admin UI Metrics tab → Performance section:
+  - Chapter time chart (before vs after parallelization)
+  - Queue depth over time
+  - Active workers count
+
+**QA — Unit + E2E Tests:**
+- [ ] Performance endpoint returns correct averages from test data
+- [ ] P95 calculation correct
+- [ ] Empty data → zeros (not errors)
+- [ ] Admin-only access enforced
+- [ ] E2E: Admin → Metrics → Performance section shows charts
+
+**Definition of Done:** Dashboard live, showing real data from at least 10 chapter writes.
+
+### Track B — Research / Rewrite Tool (21 pts)
+
+#### S12-6: `Tool - Rewrite Chapter with Research V2 Dev` — main workflow (8 pts) | P0
+
+**Developer Tasks:**
+- [ ] New n8n workflow. Dev-tier naming per Sprint 10.a.
+- [ ] Trigger: `executeWorkflowTrigger` with $fromAI inputs:
+  ```
+  project_title        required
+  chapter_number       required
+  research_focus       optional  freeform text
+  use_qa_report        optional  boolean, default true
+  style_directives     optional  freeform text (per-character, per-scene, or global)
+  user_prompt          always    passthrough of original Eve/chat request
+  recipient_email, bcc_email, user_id    standard V2
+  ```
+- [ ] Flow:
+  1. `settings` — load project from Supabase via `project_title`, read genre_slug, load genre writing_guidelines, load app_config email recipients
+  2. `load_chapter` — fetch current chapter from `published_content_v2` by project_id + chapter_number
+  3. `load_qa_report` — if `use_qa_report` is true, parse `metadata.qa_report`, extract FAIL / NEEDS_REVIEW items
+  4. Branch: if `research_focus` present → call S12-7 research sub-flow → receive findings
+  5. `build_rewrite_prompt` — compose massive prompt combining all inputs (see prompt skeleton below)
+  6. `rewrite_llm` — Claude Sonnet 4, 16000 maxTokens, temp 0.4
+  7. `snapshot_old_chapter` — insert row in `content_versions_v2` with current chapter text
+  8. `update_chapter` — PATCH `published_content_v2` with rewritten text, increment updated_at
+  9. `optional_qa_recheck` — if enabled, call QA chapter V2 workflow on the rewrite (follow-up)
+  10. `send_email` — via Postal (`/api/email/send`) with the rewritten chapter + diff summary + updated Q/A delta
+  11. Async: track_token_usage, re_embed_project (fire-and-forget)
+
+**Prompt skeleton (S12-6 developer reference):**
+```
+SYSTEM: You rewrite existing book chapters. You receive the current chapter, 
+its outline, genre guidelines, and optional directives. Produce a rewritten 
+chapter that: follows the outline structure exactly, maintains character names 
+and plot points, applies the style and research directives provided, and 
+preserves what works.
+
+CHAPTER OUTLINE (must be followed):
+{chapter_outline}
+
+CURRENT CHAPTER:
+{current_chapter_text}
+
+GENRE BASELINE STYLE:
+{genre_config.writing_guidelines}
+
+{{if qa_report has FAILs}}
+Q/A ISSUES TO FIX:
+The previous audit flagged these specific failures — address each:
+- {check_name}: FAIL — {detail}
+- {check_name}: NEEDS_REVIEW — {detail}
+{{/if}}
+
+{{if research_focus provided}}
+RESEARCH ACCURACY:
+User directive: "{research_focus}"
+Research findings (from Perplexity with citations):
+{research_results}
+
+Weave these findings naturally into dialogue or narration. Do not dump research;
+incorporate it as characters would plausibly know or cite it.
+{{/if}}
+
+{{if style_directives provided}}
+STYLE DIRECTIVES (user-specified):
+"{style_directives}"
+
+These instructions apply across the chapter. Figure out which characters, scenes,
+or moments they refer to based on the chapter content. If a directive references
+a specific movie, book, or creative work, use it only as a stylistic anchor —
+NEVER name-drop the reference in the prose itself.
+{{/if}}
+
+PRESERVE:
+- Character names as they appear in the story bible
+- Plot beats from the outline
+- Scene locations from the outline
+- Dialogue that already works
+
+OUTPUT: the rewritten chapter text only. No commentary, no preamble.
+```
+
+**QA — Unit + System Tests:**
+- [ ] Workflow executes end-to-end on a test chapter with all 3 input modes off → produces a baseline rewrite using just Q/A fixes + genre baseline
+- [ ] With `research_focus` only → research pipeline runs, findings appear in prompt
+- [ ] With `style_directives` only → LLM applies directives visibly in output
+- [ ] With `use_qa_report=true` and a chapter that has FAILs → rewrite addresses each specific FAIL
+- [ ] Chapter version snapshotted to `content_versions_v2` before overwrite (verify new row exists)
+- [ ] Email arrives with diff summary
+
+**Definition of Done:** All 4 modes exercised; each mode produces visibly different output from control; chapter versioned correctly.
+
+#### S12-7: Research pipeline sub-workflow (5 pts) | P0
+
+**Developer Tasks:**
+- [ ] New sub-workflow `Sub - Research Chapter Topics V2 Dev`
+- [ ] Input: `chapter_text`, `research_focus` (user directive), `chapter_number`, `project_title`, `user_id`
+- [ ] LLM step 1: Claude 4, temp 0.2, `Extract up to 5 specific research questions from this chapter matching the user's focus`. Returns JSON array of questions.
+- [ ] For each question: call Perplexity (native node, `sonar-pro` model) — accumulate findings + citations
+- [ ] LLM step 2: Claude summarizes findings into a structured research report (markdown with citations)
+- [ ] Persist to `research_reports_v2`:
+  - `title`: "Research for Chapter N of {project_title}: {research_focus[:50]}"
+  - `content`: the markdown report
+  - `genre_slug`: from project
+  - `metadata.source`: `'chapter_rewrite'`, `metadata.chapter_number`, `metadata.project_id`
+- [ ] Return: `{research_markdown, research_id}` to caller (S12-6)
+
+**QA — Unit + System Tests:**
+- [ ] Extracts 3–5 reasonable research questions from a sample chapter + focus
+- [ ] Each question runs through Perplexity successfully
+- [ ] Compiled report has citations
+- [ ] Row written to `research_reports_v2` with correct metadata
+- [ ] Report appears in Writer's Workbench Research Reports list after creation
+
+**Definition of Done:** End-to-end run against Chapter 6 of The Invisible Wall with focus="constitutional arguments Lucia uses" produces a saved report with ≥3 Supreme Court citations.
+
+#### S12-8: Q/A report integration (3 pts) | P0
+
+**Developer Tasks:**
+- [ ] Add logic to S12-6's `load_qa_report` Code node:
+  - Read `published_content_v2.metadata.qa_report` for the chapter
+  - Parse the `checks` array
+  - Filter items where `status IN ('FAIL', 'NEEDS_REVIEW')`
+  - Format as bullet list with `check_name`, `status`, `detail`
+  - Output as prompt fragment for S12-6's rewrite prompt
+- [ ] Default behavior: `use_qa_report=true` unless explicitly passed false
+- [ ] If no Q/A report exists for the chapter → skip gracefully (note in prompt: "no prior Q/A")
+
+**QA — Unit + System Tests:**
+- [ ] Chapter with 3 FAIL checks → prompt fragment lists all 3
+- [ ] Chapter with only PASS → prompt fragment says "no prior issues"
+- [ ] Chapter with no Q/A report → prompt fragment says "no prior Q/A"
+- [ ] Default (no flag passed) → behaves as `use_qa_report=true`
+- [ ] Explicit `use_qa_report=false` → Q/A report skipped entirely
+
+**Definition of Done:** Rewrite prompt correctly reflects Q/A state for 3 test cases (has FAILs / all PASS / no report).
+
+#### S12-9: Hub wiring + tool description + E2E (5 pts) | P0
+
+**Developer Tasks:**
+- [ ] In Dev hub (`The Author Agent V2 Dev`): add new `rewrite_chapter_with_research` tool
+- [ ] Tool description in hub system prompt explains when to use vs write_chapter vs edit_outline:
+  ```
+  rewrite_chapter_with_research — use when user says "rewrite chapter N" with
+  specific directives about research, Q/A fixes, or style. The tool:
+    - accepts research_focus (what to research)
+    - accepts style_directives (freeform, per-character or per-scene)
+    - uses last Q/A report by default (opt-out via "ignore Q/A")
+    - preserves chapter outline structure, character names, plot beats
+  ```
+- [ ] $fromAI tool inputs documented with descriptions (no default values in $fromAI per CLAUDE.md rule about single quotes)
+- [ ] Preprocess_message updates:
+  - Detect rewrite-with-directives patterns ("rewrite chapter N with/that/where", "rewrite chapter N and research", "rewrite chapter N. Make X...")
+  - Add TOOL OVERRIDE for `rewrite_chapter_with_research`
+- [ ] Update `preprocess_message` so sequential-task detection doesn't interfere (Multi-directive rewrite IS one task)
+
+**QA — E2E Tests:**
+- [ ] From chat: "Rewrite chapter 6 of The Invisible Wall. Research the constitutional arguments Lucia uses. Make Craig and his associates highly exaggerated buffoons, and Mason stumbles trying to copy them." → Gemini calls `rewrite_chapter_with_research` with all 3 inputs populated
+- [ ] Shorter variants resolve correctly:
+  - "Rewrite chapter 6 with dark humor" → `style_directives` populated, rest defaults
+  - "Rewrite chapter 6 with research on constitutional law" → `research_focus` populated
+  - "Rewrite chapter 6" → all optional inputs empty, Q/A default on
+- [ ] End-to-end: full chain completes (chapter rewrite + research report saved + email delivered) in < 8 minutes on Dev
+- [ ] Research report visible in Research Reports UI
+- [ ] New chapter version in `content_versions_v2`
+
+**Definition of Done:** 4 E2E scenarios all pass against Dev; research report saved; chapter versioning working.
+
+---
+
+### Sprint 12 totals: 55 pts (9 stories)
+
+### Dependencies
+- Sprint 10.a complete (Dev tier must exist for all workflow changes)
+- Track A and Track B can proceed in parallel (different workflows)
+
+### Recommended execution order
+Track A (solo):  S12-1 → S12-2 → S12-3 → S12-4 → S12-5
+Track B (solo):  S12-7 → S12-8 → S12-6 → S12-9
+Converge at PR to develop; promote both tracks together at end-of-sprint release.
 
 ---
 
@@ -1075,13 +1369,13 @@ Next (ordered):
 | 8 | planned (carried) | 55 |
 | 9 | planned (carried) | 47 |
 | 11 | planned | 21 |
-| 12 | planned | 34 |
+| 12 | planned — expanded 2026-04-20 (added research/rewrite tool) | 55 |
 | 13 | planned | 34 |
 | 14 | planned | 34 |
 | 15 | planned | 34 |
-| **Total remaining** | | **340 pts** |
+| **Total remaining** | | **361 pts** |
 
-At 34 pts/sprint (2-week cadence), that's **~20 weeks (10 sprints) of work**. 10.a is a 3-week sprint at 47 pts. Product-facing sprints (8, 9) can run in parallel with infrastructure sprints since they touch different layers.
+At 34 pts/sprint (2-week cadence), that's **~21 weeks (10-11 sprints) of work**. 10.a is a 3-week sprint at 47 pts. 12 is a 3-week sprint at 55 pts. Product-facing sprints (8, 9) can run in parallel with infrastructure sprints since they touch different layers.
 
 ---
 
