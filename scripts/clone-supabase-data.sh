@@ -63,12 +63,15 @@ echo "mode:   $([ "$REFRESH" = 1 ] && echo refresh || echo initial)$([ "$DRY_RUN
 echo
 
 echo "[1/3] pg_dump --data-only from source"
+# Note: we don't pass --disable-triggers. Supabase's pooler user isn't a
+# superuser and can't DISABLE TRIGGER on system (RI_*) triggers, so the
+# restore would fail. pg_dump emits tables in dependency order, so FK
+# constraints stay satisfied during load even with triggers active.
 pg_dump \
     --data-only \
     --format=custom \
     --no-owner \
     --no-privileges \
-    --disable-triggers \
     "${EXCLUDE_FLAGS[@]}" \
     --file="$DUMP_FILE" \
     "$SOURCE_DB_URL"
@@ -103,7 +106,6 @@ pg_restore \
     --data-only \
     --no-owner \
     --no-privileges \
-    --disable-triggers \
     --single-transaction \
     --dbname="$TARGET_DB_URL" \
     "$DUMP_FILE"
