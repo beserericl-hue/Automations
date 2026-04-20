@@ -51,10 +51,7 @@ healthRouter.get('/', async (_req, res) => {
   res.status(hasErrors ? 503 : 200).json({
     status: hasErrors ? 'degraded' : 'ok',
     service: 'writers-workbench',
-    environment:
-      process.env.APP_ENV ||
-      process.env.RAILWAY_ENVIRONMENT_NAME ||
-      (process.env.NODE_ENV === 'production' ? 'production' : 'development'),
+    environment: process.env.NODE_ENV || 'development',
     version: BUILD_SHA,
     deployed_at: DEPLOYED_AT,
     timestamp: new Date().toISOString(),
