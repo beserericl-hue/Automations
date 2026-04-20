@@ -1,5 +1,15 @@
 import { Router } from 'express';
 
+const nonEmpty = (v: string | undefined) =>
+  v && v !== 'unknown' ? v : undefined;
+
+const BUILD_SHA =
+  nonEmpty(process.env.BUILD_SHA) ||
+  nonEmpty(process.env.RAILWAY_GIT_COMMIT_SHA) ||
+  'unknown';
+const DEPLOYED_AT =
+  nonEmpty(process.env.BUILD_TIME) || new Date().toISOString();
+
 export const healthRouter = Router();
 
 /**
@@ -41,6 +51,12 @@ healthRouter.get('/', async (_req, res) => {
   res.status(hasErrors ? 503 : 200).json({
     status: hasErrors ? 'degraded' : 'ok',
     service: 'writers-workbench',
+    environment:
+      process.env.APP_ENV ||
+      process.env.RAILWAY_ENVIRONMENT_NAME ||
+      (process.env.NODE_ENV === 'production' ? 'production' : 'development'),
+    version: BUILD_SHA,
+    deployed_at: DEPLOYED_AT,
     timestamp: new Date().toISOString(),
     checks,
   });
