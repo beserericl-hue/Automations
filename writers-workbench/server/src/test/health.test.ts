@@ -21,9 +21,19 @@ describe('Health endpoint', () => {
       const res = await fetch(`http://localhost:${port}/api/health`);
       expect(res.status).toBe(200);
 
-      const body = (await res.json()) as { status: string; service: string; timestamp: string };
+      const body = (await res.json()) as {
+        status: string;
+        service: string;
+        environment: string;
+        version: string;
+        deployed_at: string;
+        timestamp: string;
+      };
       expect(body.status).toBe('ok');
       expect(body.service).toBe('writers-workbench');
+      expect(body.environment).toBeDefined();
+      expect(body.version).toBeDefined();
+      expect(body.deployed_at).toBeDefined();
       expect(body.timestamp).toBeDefined();
     } finally {
       server.close();
