@@ -56,8 +56,8 @@ COPY --from=build /app/server/dist ./dist
 # Client build (served as static files by Express)
 COPY --from=build /app/client/dist ./public
 
-ARG BUILD_SHA=unknown
-ARG BUILD_TIME=unknown
+ARG BUILD_SHA
+ARG BUILD_TIME
 ENV BUILD_SHA=${BUILD_SHA}
 ENV BUILD_TIME=${BUILD_TIME}
 ENV NODE_ENV=production

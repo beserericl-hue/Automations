@@ -1,10 +1,14 @@
 import { Router } from 'express';
 
+const nonEmpty = (v: string | undefined) =>
+  v && v !== 'unknown' ? v : undefined;
+
 const BUILD_SHA =
-  process.env.BUILD_SHA ||
-  process.env.RAILWAY_GIT_COMMIT_SHA ||
+  nonEmpty(process.env.BUILD_SHA) ||
+  nonEmpty(process.env.RAILWAY_GIT_COMMIT_SHA) ||
   'unknown';
-const DEPLOYED_AT = process.env.BUILD_TIME || new Date().toISOString();
+const DEPLOYED_AT =
+  nonEmpty(process.env.BUILD_TIME) || new Date().toISOString();
 
 export const healthRouter = Router();
 
