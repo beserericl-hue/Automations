@@ -37,6 +37,7 @@ import re
 import subprocess
 import sys
 import time
+import uuid
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -159,8 +160,22 @@ def rewrite_webhook_path(path):
 
 
 def rewrite_webhook_nodes(node):
+    """Per-node rewrites for the PROD->DEV clone:
+
+    - regenerate webhookId on any node that has one (Gmail, Wait,
+      Webhook, ChatTrigger, etc) so the clone doesn't collide with
+      PROD's webhook registrations at activation time
+    - rewrite webhook-trigger paths from _v2/-v2 to _dev/-dev
+    - rewrite HTTP-Request URLs hitting /webhook/*_v2 to _dev
+    """
     params = node.get("parameters") or {}
     t = node.get("type", "")
+
+    # Regenerate any webhookId unconditionally — webhookId is globally
+    # unique per registered webhook in n8n, so the clone needs its own
+    if node.get("webhookId"):
+        node["webhookId"] = str(uuid.uuid4())
+
     if t == "n8n-nodes-base.webhook":
         p = params.get("path")
         if isinstance(p, str):
