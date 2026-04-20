@@ -1,12 +1,21 @@
 # The Writers Workbench — Sprint Plan v2 (Sprints 10+)
 
-**Version:** 1.0
-**Date:** 2026-04-19
+**Version:** 1.1
+**Date:** 2026-04-20
 **Scope:** Infrastructure scaling, workflow governance, and multi-tenant readiness. Covers Sprints 10–15 plus the pre-existing Sprint 8/9 plans that were drafted but never executed.
 **Methodology:** Scrum — 2-week sprints, story points (Fibonacci), Definition of Done includes tests
 **Predecessor:** [`sprint_document.md`](sprint_document.md) covers Sprints 0–9 (Sprints 0–7 completed; Sprints 8 and 9 still planned).
 
 > **Why a new document:** the first sprint doc captured the Writers Workbench product build (Sprints 0–7 done, 8–9 planned). The work this document covers is a different concern: **infrastructure scaling, workflow governance, and migrating off single-tenant shortcuts.** Keeping it separate preserves clarity. Sprints 8 and 9 are referenced here for sequencing but their detailed stories live in the original doc.
+
+### Testing infrastructure inherited from Sprints 0–7
+
+All sprints in this document assume the testing stack set up in Sprint 0 is operational: **Vitest** (client + server unit tests, ~330 passing), **Playwright** (E2E, chromium-noauth + chromium-authenticated projects), **GitHub Actions CI** (TypeScript, Unit Tests, Production Build required; E2E present but not required on `main` pending Issue #3 fix), **Railway auto-deploy** from `main` (prod) and `develop` (dev). See [`sprint_document.md`](sprint_document.md) Sprint 0 for details. Every story's QA section adds tests on top of this baseline.
+
+### Revision history
+
+- **1.0** (2026-04-19) — Initial v2 doc covering Sprints 10 (done), 10.a (13 pts), 10.b–15 planned.
+- **1.1** (2026-04-20) — Sprint 10.a expanded to 49 pts (added S10a-0 CI/CD verification prerequisite). Sprint 12 expanded to 57 pts (added S12-0 Eve max-iterations hotfix + composite rewrite tool). Sprint 13 refreshed from queue-mode architecture → independent standalone instances with Workbench-side routing. S10-5 and S10-6 marked retroactively complete (validated via PRs #2 and #4, and consolidated into Sprint 10.a promotion tooling respectively).
 
 ---
 
@@ -55,13 +64,13 @@ They remain planned. Recommended sequencing: **10 (done) → 10.a → 10.b → 1
 | **S10-2** Create `release/v1.0` branch + merge to `main` + tag v1.0.0 | 5 | PR #1 merged as `36bb61f`, tag `v1.0.0` pushed |
 | **S10-3** GitHub branch protection rules | 3 | `main` requires PR + `TypeScript & Lint`, `Unit Tests`, `Production Build` checks + `enforce_admins: true`. `develop` blocks force-push and deletion. CONTRIBUTING.md, PR template, CLAUDE.md branching section added |
 | **S10-4** Railway dual-environment setup | 13 | Production deploys from `main`, dev deploys from `develop`. Separate Railway services, separate env vars. |
-| **S10-5** Hotfix and release process validation | 5 | PR #2 (cover art binary fix) and PR #4 (genre-from-DB fix) successfully executed the hotfix process end-to-end |
-| **S10-6** Workflow sync tooling | 5 | Not yet formalized as scripts — workflow fixes in PRs #2, #4 established the manual pattern; scripts to be built in Sprint 10.a |
+| **S10-5** Hotfix and release process validation | 5 | ✅ VALIDATED via PR #2 (cover art binary fix) and PR #4 (genre-from-DB fix) — both hotfix branches cut from `main`, merged through the protected-branch process, cherry-picked/merged to `develop`. Process proven end-to-end with real bugs. |
+| **S10-6** Workflow sync tooling | 5 | ✅ CONSOLIDATED into Sprint 10.a — the `scripts/promote-dev-to-v2.sh` and `scripts/diff-dev-vs-v2.sh` (S10a-10) cover the workflow sync / drift-detection story. Manual sync via MCP tools worked for PRs #2 and #4; automated scripts arrive with 10.a. |
 
 ### Follow-ups filed
 
 - **Issue #3** — E2E test suite fails to render login page in CI. Temporarily removed from required status checks on `main` during PR #2; must be fixed and re-added.
-- **S10-6 workflow sync scripts** — manual pattern worked for hotfixes; deferred to Sprint 10.a for automation.
+- **CI/CD pipeline end-to-end verification** — addressed by new prerequisite story **S10a-0** in Sprint 10.a (confirm dev Railway auto-deploy works, add deploy markers to /api/health).
 
 ### Infrastructure currently in place
 
@@ -76,7 +85,7 @@ They remain planned. Recommended sequencing: **10 (done) → 10.a → 10.b → 1
 
 ## Sprint 10.a: Full Tier Separation — DB, Workflows, Agent
 
-**Status:** In progress (S10a-1 done 2026-04-19) | **Points:** 47 | **Duration:** ~3 weeks | **Priority:** P0
+**Status:** In progress (S10a-1 done 2026-04-19) | **Points:** 49 | **Duration:** ~3 weeks | **Priority:** P0
 
 **Goal:** Establish a three-tier architecture (V1 baseline / V2 production / Dev) across every layer customers touch: Supabase database, n8n workflows, ElevenLabs Eve agent. Cement the coding discipline that makes this sustainable: base tables are immutable; all schema extensions go in meta tables.
 
@@ -155,6 +164,71 @@ Post-cutover (t-3):
 **Why not just additive migrations?** This approach gives us atomic rollback — if the new V2 has any problem, revert the env vars to the old V2 (still intact, just renamed). No ALTER TABLE to unwind. The immutable-base-tables rule + promote-Dev-to-V2 pattern is the tightest possible safety net for a customer-facing DB.
 
 ### Stories
+
+#### S10a-0: CI/CD end-to-end verification + deploy markers (2 pts) | P0 | PREREQUISITE
+
+Verify both the production (`main` → `writers-workbench.up.railway.app`) and development (`develop` → `writers-workbench-dev.up.railway.app`) CI/CD pipelines are working end-to-end before executing the DB cutover and workflow splits. Sprint 10's S10-4 configured both environments, but the dev pipeline was never exercised with a real push-and-observe. Any broken auto-deploy, missing env var, or stale config needs to be caught here — Sprint 10.a's subsequent stories depend on dev being reliably deployable.
+
+**Developer Tasks:**
+
+**Part A — add deploy markers to `/api/health`:**
+- [ ] Update `writers-workbench/server/src/routes/health.ts` to include:
+  ```json
+  {
+    "status": "ok",
+    "service": "writers-workbench",
+    "environment": "production|development",
+    "version": "<git sha at build time>",
+    "deployed_at": "<build timestamp>",
+    "timestamp": "<request time>",
+    "checks": { "supabase": "ok|error|skipped" }
+  }
+  ```
+- [ ] In `writers-workbench/Dockerfile`, capture the git SHA and build timestamp as build args → expose as env vars in the final stage:
+  ```dockerfile
+  ARG GIT_SHA=unknown
+  ARG BUILD_TIMESTAMP=unknown
+  ENV GIT_SHA=${GIT_SHA}
+  ENV DEPLOY_TIMESTAMP=${BUILD_TIMESTAMP}
+  ```
+- [ ] Railway auto-injects `RAILWAY_GIT_COMMIT_SHA` and `RAILWAY_DEPLOYMENT_ID` into deployed services — health endpoint should read those as fallback if `GIT_SHA` isn't set
+
+**Part B — verify develop → dev Railway:**
+- [ ] Merge `feature/sprint-10a-workflow-separation` to `develop` via PR (closes out the 10-commit feature branch sitting there, which needs to land)
+- [ ] Watch PR CI runs on `develop` — TypeScript + Unit Tests + Production Build should all pass
+- [ ] After merge, within 5 minutes visit `https://writers-workbench-dev.up.railway.app/api/health` → confirm `environment: "development"` and `version` matches the latest develop commit SHA
+- [ ] If auto-deploy isn't working: check Railway dashboard → `writers-workbench-dev` service → Settings → Source → verify branch is set to `develop` and auto-deploy is enabled
+
+**Part C — verify main → prod Railway (via release PR):**
+- [ ] Cut release branch: `git checkout -b release/v1.0.1 develop`
+- [ ] Push + open PR to `main`, title "Release v1.0.1 — deploy markers + Sprint 10.a start"
+- [ ] Watch CI pass (TypeScript, Unit Tests, Production Build — all required)
+- [ ] Merge PR with merge commit
+- [ ] Tag `v1.0.1` on main, push tag
+- [ ] Within 5 minutes visit `https://writers-workbench.up.railway.app/api/health` → confirm `environment: "production"` and `version` matches the main SHA at merge time
+- [ ] Verify the release workflow created a GitHub Release for tag `v1.0.1`
+- [ ] Merge main back to develop
+
+**Part D — fix anything that's broken:**
+- [ ] If dev auto-deploy failed: diagnose and fix (env vars, branch config, webhook hooks)
+- [ ] If main pipeline had surprises: document for future sprints
+- [ ] Report final pipeline state
+
+**QA Tasks:**
+- Unit Tests: `/api/health` endpoint returns the new fields (add test)
+- System Tests: both URLs (`writers-workbench.up.railway.app/api/health` and `writers-workbench-dev.up.railway.app/api/health`) return fresh deploy info
+- E2E Tests: not applicable (infra verification)
+
+**Definition of Done:**
+- [ ] Deploy markers visible in both prod and dev health responses
+- [ ] Both auto-deploy pipelines confirmed working with fresh SHAs post-merge
+- [ ] `v1.0.1` tag released on main
+- [ ] Develop and main in sync after release flow
+- [ ] Any pipeline issues documented or fixed
+
+**Depends on:** nothing — runs first in this sprint
+
+---
 
 #### S10a-1: Freeze V2 as production baseline (2 pts) | P0 | ✅ COMPLETE
 
@@ -568,40 +642,43 @@ After this sprint's one-time initial setup (S10a-2 through S10a-6 clone V1 → V
 
 ---
 
-### Sprint 10.a totals: 47 pts across 12 stories
+### Sprint 10.a totals: 49 pts across 13 stories
 
 ### Dependencies
 
 ```
-S10a-1 ✓
-   │
-   ▼
-S10a-2 → S10a-3 → S10a-4 ──────────┐
-                                   │
-                                   ▼
-                              S10a-6 (Dev DB) ──┐
-                                                │
-S10a-5 (schema governance) ──────────────────── │
-                                                ▼
-                      S10a-7 → S10a-8 → S10a-9 → S10a-10
-                                                      │
-                  S10a-11 (Eve clone, parallel) ──────┤
-                                                      ▼
-                                                  S10a-12
+S10a-0 (CI/CD verification) ──────┐
+                                  │
+S10a-1 ✓ ────────────────────────┤
+                                  │
+                                  ▼
+           S10a-2 → S10a-3 → S10a-4 ──────┐
+                                          │
+                                          ▼
+                                     S10a-6 (Dev DB) ──┐
+                                                       │
+S10a-5 (schema governance) ──────────────────────────── │
+                                                       ▼
+                             S10a-7 → S10a-8 → S10a-9 → S10a-10
+                                                             │
+                         S10a-11 (Eve clone, parallel) ──────┤
+                                                             ▼
+                                                         S10a-12
 ```
 
 ### Recommended execution order (solo)
-1. **S10a-5** (governance + CI) — fast, parallelizable, unblocks everything
-2. **S10a-2** (new V2 Supabase + schema + data clone) — biggest single piece
-3. **S10a-3** (storage migration)
-4. **S10a-4** (prod cutover to new V2) — brief downtime
-5. **S10a-6** (Dev Supabase from new V2)
-6. **S10a-11** (Eve agent Dev clone — fully manual in ElevenLabs)
-7. **S10a-7** (clone V2 workflows → Dev, pointing at Dev Supabase)
-8. **S10a-8** (Dev hub + /webhook/author_request_dev)
-9. **S10a-9** (dev Railway env vars → Dev hub + Dev Supabase + Dev Eve)
-10. **S10a-10** (promotion scripts + one practice promotion)
-11. **S10a-12** (release-cycle automation for future use)
+1. **S10a-0** (CI/CD verification + deploy markers) — prerequisite, validates both pipelines
+2. **S10a-5** (schema governance + CI check) — fast, parallelizable, unblocks everything
+3. **S10a-2** (new V2 Supabase + schema + data clone) — biggest single piece
+4. **S10a-3** (storage migration)
+5. **S10a-4** (prod cutover to new V2) — brief downtime
+6. **S10a-6** (Dev Supabase from new V2)
+7. **S10a-11** (Eve agent Dev clone — fully manual in ElevenLabs)
+8. **S10a-7** (clone V2 workflows → Dev, pointing at Dev Supabase)
+9. **S10a-8** (Dev hub + /webhook/author_request_dev)
+10. **S10a-9** (dev Railway env vars → Dev hub + Dev Supabase + Dev Eve)
+11. **S10a-10** (promotion scripts + one practice promotion)
+12. **S10a-12** (release-cycle automation for future use)
 
 ---
 
@@ -973,11 +1050,11 @@ S10a-5 (schema governance) ─────────────────�
 
 ## Sprint 12: Chapter Writer — Parallelization + Research/Rewrite Tool
 
-**Status:** Planned | **Points:** 55 | **Duration:** ~3 weeks | **Priority:** P0
+**Status:** Planned | **Points:** 57 | **Duration:** ~3 weeks | **Priority:** P0
 
 **Goal:** Two co-shipped improvements to the chapter pipeline:
 1. **Parallelization (34 pts):** Chapter writer currently takes 10–20 minutes because of a 120-second rate delay and strictly sequential LLM calls. Remove the delay, build a pre-computed context document, fan out sub-chapter writes in parallel, add a merge/continuity pass. **Target: 3–5 minutes per chapter.**
-2. **Research/Rewrite Tool (21 pts):** New composite tool so the user can say one natural-language sentence to Eve and get a revised chapter that:
+2. **Research/Rewrite Tool (23 pts):** A quick `maxIterations` hotfix to unblock multi-step requests today + new composite tool so the user can say one natural-language sentence to Eve and get a revised chapter that:
    - Researches a topic you specify (saved as its own `research_reports_v2` row AND integrated into the rewrite)
    - Fixes FAIL/NEEDS_REVIEW items from the chapter's last Q/A consistency report (default on)
    - Applies freeform style directives per character, scene, or moment ("make Craig and his associates highly exaggerated buffoons; Mason stumbles around trying to follow them")
@@ -1102,7 +1179,34 @@ S10a-5 (schema governance) ─────────────────�
 
 **Definition of Done:** Dashboard live, showing real data from at least 10 chapter writes.
 
-### Track B — Research / Rewrite Tool (21 pts)
+### Track B — Research / Rewrite Tool (23 pts)
+
+#### S12-0: Eve multi-step task hotfix (2 pts) | P0 | Early-win — ships before rest of Track B
+
+Small, immediate fix to let Gemini complete chains like "retrieve → research → rewrite" RIGHT NOW, without waiting for the full composite tool. When a user issues multi-step requests (sequential tasks, or a single sentence with "and then"/"using"/"based on"), the Author Agent currently hits its `maxIterations` limit of ~3 and returns "Agent stopped due to max iterations." Evidence: execution ID #12539 on 2026-04-20.
+
+**Developer Tasks (Dev hub — per Sprint 10.a governance, applies to Dev hub first, then promotes via S10a-10):**
+- [ ] In `The Author Agent V2 Dev`, bump the Author Agent node's `options.maxIterations` from **3 → 10**. Gemini only consumes what it needs; higher limit has no cost for simple requests.
+- [ ] In `preprocess_message` (Code node): detect multi-step patterns and **skip** the `[TOOL OVERRIDE — retrieve_content]` prefix when found. Heuristics:
+  - Message contains "Task 1:", "Task 2:", or any numbered task list
+  - Message contains ". Then", ". After", "using that", "based on" bridging two verbs
+  - Message contains multiple imperative verbs ("research and rewrite", "get the chapter and rewrite it")
+- [ ] When multi-step is detected, let Gemini plan the chain itself (no forced tool call). The existing TOOL OVERRIDE logic still fires for simple single-intent retrieves.
+- [ ] Promote via S10a-10 to V2 at end of this sprint's release (or hotfix earlier if urgent).
+
+**QA Tasks — System Tests:**
+- [ ] "Get chapter 6 and rewrite it with research on constitutional law" → Gemini calls retrieve → then write_chapter or rewrite_chapter_with_research (when S12-6 lands), without hitting max iterations
+- [ ] "Rewrite chapter 6" (single intent) → TOOL OVERRIDE still applies correctly if matched
+- [ ] Sequential task format ("Task 1:... Task 2:...") → no TOOL OVERRIDE, Gemini plans freely
+- [ ] maxIterations ceiling: 10 calls max before agent stops; logged for visibility
+
+**Definition of Done:**
+- [ ] Dev hub completes execution ID #12539-style prompt end-to-end without max-iterations error
+- [ ] All single-intent patterns (just retrieve, just write, just brainstorm) still work unchanged
+
+**Depends on:** Sprint 10.a S10a-8 (Dev hub must exist)
+
+---
 
 #### S12-6: `Tool - Rewrite Chapter with Research V2 Dev` — main workflow (8 pts) | P0
 
@@ -1272,33 +1376,146 @@ OUTPUT: the rewritten chapter text only. No commentary, no preamble.
 
 ---
 
-### Sprint 12 totals: 55 pts (9 stories)
+### Sprint 12 totals: 57 pts (10 stories)
 
 ### Dependencies
 - Sprint 10.a complete (Dev tier must exist for all workflow changes)
 - Track A and Track B can proceed in parallel (different workflows)
 
 ### Recommended execution order
-Track A (solo):  S12-1 → S12-2 → S12-3 → S12-4 → S12-5
-Track B (solo):  S12-7 → S12-8 → S12-6 → S12-9
+**S12-0 first — it's a 2-pt early win that unblocks multi-step requests TODAY.**
+- Track A (solo):  S12-1 → S12-2 → S12-3 → S12-4 → S12-5
+- Track B (solo):  **S12-0** → S12-7 → S12-8 → S12-6 → S12-9
+
 Converge at PR to develop; promote both tracks together at end-of-sprint release.
 
 ---
 
-## Sprint 13: n8n Queue Mode + DB Migration Preparation
+## Sprint 13: n8n Migration to Railway — Independent Standalone Instances
 
 **Status:** Planned | **Points:** 34 | **Duration:** 2 weeks | **Priority:** P1
 
-**Goal:** Today's single n8n instance is a bottleneck and single point of failure. This sprint externalizes credentials, runs n8n in queue mode with shared Postgres + Redis, deploys multiple worker processes. Also preps the path for eventually migrating off Supabase to Railway-managed Postgres (still optional — Supabase remains fine at current scale).
+**Goal:** Move n8n off the external `n8n.agileadautomation.com` host and onto Railway as **independent standalone instances** (not queue mode). Stand up `n8n-prod` and `n8n-dev` as fully self-contained services (own SQLite, own volumes, own webhooks, own encryption keys). Externalize the hardcoded credentials in V2 workflow Code nodes. Add the Workbench-side router so a future `n8n-prod-2` can be partitioned in.
 
-### Stories (summary)
+**Why standalone, not queue mode?** Queue mode requires shared Postgres + Redis + identical encryption key across all workers. Confirmed out of scope per user direction: every n8n instance is fully isolated — own DB, own workflows, own webhooks. Scaling = launch another full instance; route to it with user_id hash. Trade-off: workflow changes must sync to each instance (automated via scripts); atomic failure isolation is much better.
 
-- **S13-1 (8 pts):** Externalize all n8n workflow credentials to env vars (remove hardcoded Supabase URLs, API keys, Anthropic/Perplexity/OpenAI credentials from Code nodes — use n8n credential system or `$env.*`)
-- **S13-2 (13 pts):** n8n queue mode deployment — shared Postgres for execution data, Redis for queue, 2+ worker processes on Railway
-- **S13-3 (8 pts):** Optional: Railway Postgres for Writers Workbench (separate from Supabase) — start with PgBouncer + pgvector image; keep Supabase for now. Prove the path; full cutover is Sprint 14 or later if needed.
-- **S13-4 (5 pts):** Deploy GoTrue (if Supabase cutover proceeds) — self-hosted auth that matches Supabase JWT format
+See [`docs/railway-deployment.md`](docs/railway-deployment.md) for the full Railway service specs.
 
-**Depends on:** Sprint 10.b (Redis infra), Sprint 10.a (Dev workflow isolation)
+### Stories
+
+#### S13-1: Externalize n8n workflow credentials to env vars (8 pts) | P0
+
+**Developer Tasks (Dev workflows only — per 10.a governance):**
+- [ ] Audit every V2 Dev workflow's Code nodes for hardcoded credentials: Supabase URL, Supabase service role key, Anthropic API key, Perplexity key, OpenAI key, KIE.AI key, Firecrawl key
+- [ ] Replace each with `$env.<VAR_NAME>` references (n8n injects env vars into Code nodes via `$env.*`)
+- [ ] Create n8n instance-level env vars for each: `N8N_SUPABASE_URL`, `N8N_SUPABASE_SERVICE_KEY`, `N8N_ANTHROPIC_API_KEY`, etc. (full list in `docs/railway-deployment.md`)
+- [ ] Update `scripts/promote-dev-to-v2.sh` to handle env-var diffs between tiers (different values for Dev vs V2 vs future instances)
+- [ ] Run each migrated Dev workflow to confirm still working
+
+**QA — System Tests:**
+- [ ] `grep` all 24 Dev V2 workflow JSONs — zero literal API keys or Supabase URLs remain
+- [ ] Every migrated workflow still executes successfully against Dev Supabase
+
+**Definition of Done:**
+- [ ] Zero hardcoded secrets in Dev workflow Code nodes
+- [ ] All workflows still working after env-var refactor
+- [ ] Promotion script updated
+
+#### S13-2: Deploy `n8n-prod` and `n8n-dev` as standalone Railway services (13 pts) | P0
+
+**Developer Tasks:**
+- [ ] Deploy `n8n-prod` on Railway:
+  - Image `n8nio/n8n:latest`
+  - Volume 5 GB at `/home/node/.n8n` (SQLite + credentials + workflows)
+  - Env vars per `docs/railway-deployment.md` including unique `N8N_ENCRYPTION_KEY`
+  - Public domain: `n8n.agileadautomation.com` (DNS cutover from external host at end of sprint)
+- [ ] Import all V2 workflows from repo JSONs via n8n API — or export from current external n8n and import to Railway instance
+- [ ] Deploy `n8n-dev` same pattern — own volume, own unique encryption key, domain `n8n-dev.agileadautomation.com`
+- [ ] Import all Dev workflows from the Dev hub built in Sprint 10.a
+- [ ] Verify each instance executes workflows correctly and reaches its tier's Supabase
+- [ ] Capture n8n API keys on both instances → save in Railway as `N8N_PROD_API_KEY` / `N8N_DEV_API_KEY` on Workbench services
+
+**QA — System Tests:**
+- [ ] n8n-prod health check responds on `n8n.agileadautomation.com`
+- [ ] n8n-dev health check responds on `n8n-dev.agileadautomation.com`
+- [ ] Test webhook POST to each instance returns expected response
+- [ ] No cross-tier data bleed (Dev workflow writes to Dev Supabase only; Prod to V2 Supabase only)
+
+**Definition of Done:**
+- [ ] Two n8n Railway services running
+- [ ] All workflows imported and executing
+- [ ] Domains wired; DNS cutover from external n8n complete
+
+#### S13-3: Workbench multi-instance router (3 pts) | P0
+
+**Developer Tasks:**
+- [ ] Create `writers-workbench/server/src/lib/n8n-router.ts`:
+  - Reads `N8N_PROD_INSTANCES` env var (comma-separated URLs)
+  - `pickN8nInstance(userId)` uses stable hash of `user_id` → instance URL
+  - Same user always hits same instance (preserves in-flight execution state invariants)
+  - Fallback: if env var missing, uses single `N8N_API_URL`
+- [ ] Update `writers-workbench/server/src/routes/chat.ts` to call `pickN8nInstance()` before POSTing the webhook
+- [ ] Add `N8N_PROD_INSTANCES` to `.env.example` with clear comments
+- [ ] Unit tests: stable hash returns same instance for same user across calls; different users distributed across instances
+
+**QA — Unit + E2E Tests:**
+- [ ] User A's chat consistently hits instance 1; user B consistently hits instance 2 (when 2 configured)
+- [ ] Single-instance config still works (backward-compat)
+- [ ] Removing an instance from config doesn't break users (failover logs warning)
+
+**Definition of Done:**
+- [ ] Router works in single-instance and multi-instance modes
+- [ ] Unit tests passing
+
+#### S13-4: Workflow sync across instances (5 pts) | P1
+
+**Developer Tasks:**
+- [ ] `scripts/sync-workflows-across-instances.sh`:
+  - Parameterized: `--tier=prod|dev`, `--source-instance=<URL>`, `--target-instances=<URL,URL,...>`
+  - Exports workflows from source via n8n API
+  - For each target: PATCHes matching workflows (by name) — preserves target workflow IDs
+  - Dry-run flag shows what would change
+  - Logs to `workflows/sync-log.md`
+- [ ] Extend `scripts/promote-dev-to-v2.sh` to invoke sync after promotion (so promoting Dev → V2 updates ALL prod instances)
+- [ ] Update `docs/workflow-governance.md` with multi-instance sync procedure
+
+**QA — Unit + System Tests:**
+- [ ] Dry-run against identical instances → "no changes" report
+- [ ] Actual sync across 2 test instances → both end up identical after run
+- [ ] Sync logs entries correctly
+
+**Definition of Done:**
+- [ ] Multi-instance sync working
+- [ ] Promotion invokes it automatically
+- [ ] Docs updated
+
+#### S13-5: DNS cutover from external n8n to Railway (5 pts) | P0
+
+**Developer Tasks:**
+- [ ] Final verification: Railway `n8n-prod` fully operational, all workflows imported, all credentials working
+- [ ] Update `n8n.agileadautomation.com` DNS to point at Railway (was pointing at external infra)
+- [ ] Brief window where both old and new n8n are reachable (during DNS propagation)
+- [ ] Monitor webhook delivery for 24 hours post-cutover (n8n execution log, Postal delivery log)
+- [ ] After 24h stable: decommission the external n8n host
+- [ ] Update MEMORY.md, CLAUDE.md with new infrastructure notes
+
+**QA — E2E Tests:**
+- [ ] Full chat → chapter write flow against Railway-hosted n8n completes end-to-end
+- [ ] All V2 workflow integration tests from earlier sprints still pass
+- [ ] Newsletter sprint workflows still function (Postal, ingestion, approvals)
+
+**Definition of Done:**
+- [ ] DNS pointing at Railway
+- [ ] External n8n host decommissioned (or in standby)
+- [ ] 24-hour stability window complete
+- [ ] No regressions in any V2 workflow
+
+### Sprint 13 totals: 34 pts (5 stories)
+
+### Dependencies
+- Sprint 10.a complete (Dev tier Supabase + Dev hub)
+- Sprint 10.b complete (Redis) — not strictly required but helpful for observability
+- Note: This sprint does NOT require queue mode. Scaling beyond one prod instance comes from deploying additional standalone instances (S13-3 router handles partitioning).
 
 ---
 
@@ -1363,19 +1580,19 @@ Next (ordered):
 
 | Sprint | Status | Points |
 |--------|--------|--------|
-| 10 | ✅ complete | 34 |
-| 10.a | in progress (S10a-1 done 2026-04-19) | 47 |
+| 10 | ✅ complete (S10-5 validated via PRs #2, #4; S10-6 consolidated into 10.a) | 34 |
+| 10.a | in progress (S10a-1 done 2026-04-19; +S10a-0 CI/CD verification added) | 49 |
 | 10.b | planned | 34 |
 | 8 | planned (carried) | 55 |
 | 9 | planned (carried) | 47 |
 | 11 | planned | 21 |
-| 12 | planned — expanded 2026-04-20 (added research/rewrite tool) | 55 |
-| 13 | planned | 34 |
+| 12 | planned — expanded 2026-04-20 (+S12-0 Eve hotfix + rewrite tool) | 57 |
+| 13 | planned — refreshed 2026-04-20 (independent instances, not queue mode) | 34 |
 | 14 | planned | 34 |
 | 15 | planned | 34 |
-| **Total remaining** | | **361 pts** |
+| **Total remaining** | | **365 pts** |
 
-At 34 pts/sprint (2-week cadence), that's **~21 weeks (10-11 sprints) of work**. 10.a is a 3-week sprint at 47 pts. 12 is a 3-week sprint at 55 pts. Product-facing sprints (8, 9) can run in parallel with infrastructure sprints since they touch different layers.
+At 34 pts/sprint (2-week cadence), that's **~21 weeks (10-11 sprints) of work**. 10.a is a 3-week sprint at 49 pts. 12 is a 3-week sprint at 57 pts. Product-facing sprints (8, 9) can run in parallel with infrastructure sprints since they touch different layers.
 
 ---
 
