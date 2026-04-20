@@ -25,6 +25,7 @@ As of Sprint 10.a (2026-04-19), **V2 workflows are also production baseline** an
 - **Supabase production tables** — DO NOT drop, alter, or delete data without permission
 - Applies to V2 Supabase project `faklxfakgzkpkbxfihzh.supabase.co`
 - Schema changes go through numbered migration files in `writers-workbench/migrations/`, reviewed before applying
+- **Base tables are immutable** — the seven base tables (`users_v2`, `writing_projects_v2`, `published_content_v2`, `story_bible_v2`, `research_reports_v2`, `genre_config_v2`, `story_arcs_v2`) plus `content_versions_v2` / `outline_versions_v2` may not be `ALTER`-ed, `DROP`-ed, or renamed in any migration numbered 008+. Migrations 001–007 are frozen. New per-feature attributes live in meta tables with FKs. Enforced by CI (`scripts/check-base-table-immutability.py`). Full rules: [writers-workbench/docs/schema-governance.md](writers-workbench/docs/schema-governance.md)
 
 ### Where development work happens
 

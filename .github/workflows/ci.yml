@@ -6,12 +6,16 @@ on:
     paths:
       - 'writers-workbench/**'
       - 'workflows/**'
+      - 'scripts/check-base-table-immutability.py'
+      - 'scripts/test-check-base-table-immutability.sh'
       - '.github/workflows/ci.yml'
   pull_request:
     branches: [main, develop]
     paths:
       - 'writers-workbench/**'
       - 'workflows/**'
+      - 'scripts/check-base-table-immutability.py'
+      - 'scripts/test-check-base-table-immutability.sh'
       - '.github/workflows/ci.yml'
 
 defaults:
@@ -19,6 +23,22 @@ defaults:
     working-directory: writers-workbench
 
 jobs:
+  schema-governance:
+    name: Schema Governance Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run base-table immutability check
+        run: python3 scripts/check-base-table-immutability.py
+      - name: Run check-script unit tests
+        run: bash scripts/test-check-base-table-immutability.sh
+
   lint-and-typecheck:
     name: TypeScript & Lint
     runs-on: ubuntu-latest
