@@ -154,21 +154,53 @@ const server = app.listen(PORT, () => {
 });
 
 // Graceful shutdown
-function shutdown(signal: string) {
+async function shutdown(signal: string) {
   logger.info(`${signal} received — shutting down gracefully`);
-  server.close(() => {
-    logger.info('All connections closed. Exiting.');
-    process.exit(0);
+
+  // Stop accepting new HTTP connections first
+  const httpClosed = new Promise<void>((resolve) => {
+    server.close(() => resolve());
   });
 
-  // Force exit after 10 seconds if connections don't drain
+  // Drain BullMQ queues and close Redis — only if the module has been
+  // loaded and REDIS_URL was set (otherwise we never opened a connection)
+  const queuesClosed = (async () => {
+    if (!process.env.REDIS_URL) return;
+    try {
+      const { closeAllQueues } = await import('./lib/queue.js');
+      const { closeRedis } = await import('./lib/redis.js');
+      await closeAllQueues();
+      await closeRedis();
+    } catch (err) {
+      logger.error({ err }, 'shutdown: queue/redis close failed');
+    }
+  })();
+
+  try {
+    await Promise.all([httpClosed, queuesClosed]);
+    logger.info('All connections closed. Exiting.');
+    process.exit(0);
+  } catch (err) {
+    logger.error({ err }, 'shutdown: error during drain');
+    process.exit(1);
+  }
+}
+
+// Force exit after 10 seconds if graceful shutdown stalls
+function armShutdownTimer() {
   setTimeout(() => {
     logger.error('Could not close connections in time. Forcing shutdown.');
     process.exit(1);
-  }, 10_000);
+  }, 10_000).unref();
 }
 
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => {
+  armShutdownTimer();
+  void shutdown('SIGTERM');
+});
+process.on('SIGINT', () => {
+  armShutdownTimer();
+  void shutdown('SIGINT');
+});
 
 export { app };
