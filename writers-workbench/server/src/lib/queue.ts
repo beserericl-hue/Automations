@@ -1,6 +1,7 @@
 import { Queue, type JobsOptions, type QueueOptions } from 'bullmq';
 import { getRedis } from './redis.js';
 import { logger } from './logger.js';
+import { ALL_QUEUE_NAMES, type QueueName } from './jobs/types.js';
 
 // Registry keyed by queue name so we reuse Queue instances across the app
 const registry = new Map<string, Queue>();
@@ -51,4 +52,24 @@ export async function closeAllQueues(): Promise<void> {
 
 export function resetQueueRegistryForTest(): void {
   registry.clear();
+}
+
+/**
+ * Returns the named queue for a priority tier. Creates it on first use
+ * and reuses it on subsequent calls. Callers should prefer this over
+ * createQueue(name) directly so queue names stay consistent with the
+ * priority contract in jobs/types.ts.
+ */
+export function getNamedQueue<TData = unknown, TReturn = unknown>(
+  name: QueueName,
+): Queue<TData, TReturn> {
+  return createQueue<TData, TReturn>(name);
+}
+
+/**
+ * Eagerly create all four named queues. Useful at boot if we want
+ * BullMQ event listeners attached before any jobs land. Idempotent.
+ */
+export function initAllNamedQueues(): Queue[] {
+  return ALL_QUEUE_NAMES.map((name) => createQueue(name));
 }
