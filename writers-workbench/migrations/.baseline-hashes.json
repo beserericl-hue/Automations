@@ -1,0 +1,9 @@
+{
+  "001_add_role_column.sql": "ae2cc16affa4129e1fb4a6498098f4c3a96f4b4b787999543edd276dd4a7fc77",
+  "002_sprint1_data_integrity.sql": "7e2a9a62c28cf4d4dd31441793346ccddb78521cf9588bfefe8a25e94638efdd",
+  "003_sprint3_outline_versioning.sql": "9cbb303291e865895d3c12c41d9aed46ee43291a39413ab3358ebdc376ab638c",
+  "004_cascade_delete_project_content.sql": "16c12c5bf658789e9dc436582833200bdd6de1850d78702b1c979d482c79759d",
+  "005_sprint4_images_social.sql": "cc0970890cf9d11e96c60a86d07ca5bbd288cce3c9403f60eaf77d4a369f4061",
+  "006_sprint5_token_usage.sql": "e22d3b4a2bf1122eafb556d3a9dabbbde68d3ed7f587b39b0cd677191121befe",
+  "007_atomic_chapter_outline.sql": "ceb23d46012cde720de5221e4429191f1c91a41b0e2dfdad531ac60d606398c5"
+}
