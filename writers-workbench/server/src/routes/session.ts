@@ -25,6 +25,27 @@ interface SSEClient {
 
 const sseClients: SSEClient[] = [];
 
+/**
+ * Push an SSE event to every connected client for a given user. Returns
+ * the number of clients the event was delivered to. Safe to call from
+ * anywhere in the server process (BullMQ queue-event listeners, etc.).
+ */
+export function pushSseEvent(userId: string, event: Record<string, unknown>): number {
+  const payload = `data: ${JSON.stringify(event)}\n\n`;
+  let delivered = 0;
+  for (const client of sseClients) {
+    if (client.userId === userId) {
+      try {
+        client.res.write(payload);
+        delivered++;
+      } catch (err) {
+        logger.error({ err, userId }, 'pushSseEvent: write failed');
+      }
+    }
+  }
+  return delivered;
+}
+
 // Cleanup expired sessions every 5 minutes
 setInterval(() => {
   const now = Date.now();

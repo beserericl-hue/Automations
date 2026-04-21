@@ -58,6 +58,13 @@ export default function AppShell({ children }: AppShellProps) {
             queryClient.invalidateQueries({ queryKey: ['dashboard-counts'] });
             queryClient.invalidateQueries({ queryKey: ['dashboard-recent'] });
             queryClient.invalidateQueries({ queryKey: ['content-list'] });
+          } else if (payload.type === 'job-status') {
+            window.dispatchEvent(new CustomEvent('chat-job-status', { detail: payload }));
+            if (payload.status === 'completed' || payload.status === 'failed') {
+              queryClient.invalidateQueries({ queryKey: ['dashboard-counts'] });
+              queryClient.invalidateQueries({ queryKey: ['dashboard-recent'] });
+              queryClient.invalidateQueries({ queryKey: ['content-list'] });
+            }
           }
         } catch {
           // Ignore malformed events
