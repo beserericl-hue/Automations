@@ -70,6 +70,17 @@ healthRouter.get('/', async (_req, res) => {
     checks.postal = 'skipped';
   }
 
+  // S10b-5: active session count (comes from Redis when configured,
+  // in-memory store otherwise). Shown for ops visibility. Failure to
+  // read the count does not make the overall health check degraded.
+  let activeSessions: number | null = null;
+  try {
+    const { getSessionStore } = await import('../lib/session-store.js');
+    activeSessions = await getSessionStore().count();
+  } catch {
+    activeSessions = null;
+  }
+
   const hasErrors = Object.values(checks).some((v) => v === 'error');
 
   res.status(hasErrors ? 503 : 200).json({
@@ -80,5 +91,6 @@ healthRouter.get('/', async (_req, res) => {
     deployed_at: DEPLOYED_AT,
     timestamp: new Date().toISOString(),
     checks,
+    active_sessions: activeSessions,
   });
 });
