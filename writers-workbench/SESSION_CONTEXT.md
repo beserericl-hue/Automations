@@ -1,6 +1,6 @@
 # The Writers Workbench — Session Context Document
 
-**Last Updated:** 2026-04-11
+**Last Updated:** 2026-04-21
 **Purpose:** Read this document at the start of any new Claude Code session working on this project. It contains every key decision, architectural choice, and constraint needed to continue development without re-learning the codebase.
 
 ---
@@ -676,3 +676,177 @@ First production release of The Writers Workbench. Establishes the baseline for 
 - Supabase V2 (unchanged): `https://faklxfakgzkpkbxfihzh.supabase.co`
 - n8n V2 hub (unchanged): `roMDypuMXHv6ugaZ` on `https://n8n.agileadautomation.com`
 - ElevenLabs Beta agent (unchanged): `agent_2801kks580vnf5q80j3bd0n0x45v`
+
+---
+
+## Session 2026-04-21 — Sprint 10.a complete, Sprint 10.b in flight
+
+**Read this section to resume work.** Everything above is historical context; this section reflects the current state of the system as of the end of the 2026-04-21 working session.
+
+### Sprint 10.a (PROD/DEV tier separation) — SHIPPED
+
+**What changed (the big picture):**
+We reframed the original blue-green cutover plan into a simpler two-tier model after realizing mid-sprint that the blue-green pattern conflicted with how the user thought about the system. End state:
+
+- **PROD tier** = what real users hit. Never modified during a sprint except by hotfix or release-time promotion.
+- **DEV tier** = a parallel copy of everything for developer use. All sprint work happens here.
+
+The two tiers are isolated across every layer: database, n8n workflows, Railway services, ElevenLabs agent.
+
+**Databases (Supabase):**
+- **PROD**: `faklxfakgzkpkbxfihzh.supabase.co` — labeled "Writers Assistant PROD" in dashboard. Unchanged. Production users' real data lives here.
+- **DEV**: `gvbvwcnmjkdpclcisqrr.supabase.co` — new project, labeled "Writers Assistant DEV". Populated from PROD via the clone scripts at the start of the sprint (byte-identical row counts + storage).
+- Session-pooler endpoints (needed for psql / pg_dump — direct db.* hosts are IPv6-only):
+  - PROD: `postgresql://postgres.faklxfakgzkpkbxfihzh:<pwd>@aws-0-us-west-2.pooler.supabase.com:5432/postgres`
+  - DEV: `postgresql://postgres.gvbvwcnmjkdpclcisqrr:<pwd>@aws-1-us-east-2.pooler.supabase.com:5432/postgres`
+- DB server is PostgreSQL 17 — use `postgresql@17` brew cask for pg_dump (v15 refuses to dump from v17).
+- Auth users: DEV's `auth.users` was populated by a manual admin API call (Supabase auth schemas aren't cloned by `pg_dump`). The DEV auth user has the same UUID as the PROD one so `users_v2.supabase_auth_uid` still links.
+
+**n8n workflows on `n8n.agileadautomation.com`:**
+- 24 `PROD - <name>` workflows (renamed from the `V2` suffix). Webhook `/webhook/author_request_v2`. IDs unchanged.
+- 24 `DEV - <name>` workflows — clones with:
+  - DEV Supabase URL/key substituted
+  - Webhook paths rewritten `_v2` → `_dev`, `-v2` → `-dev`
+  - `executeWorkflow` / `toolWorkflow` refs rewired so DEV workflows only call sibling DEV workflows
+  - `webhookId`s regenerated to avoid activation collisions with PROD
+- All 48 active. The full PROD→DEV id map lives in `scripts/workflow-id-map.json`.
+- DEV hub webhook: `https://n8n.agileadautomation.com/webhook/author_request_dev`
+- DEV brainstorm webhook: `https://n8n.agileadautomation.com/webhook/brainstorm_story_dev`
+
+**ElevenLabs:**
+- **PROD Eve** `agent_2801kks580vnf5q80j3bd0n0x45v` — renamed to `Writing Assistant PROD`. Tool `tool_2301kksb78ygewvv3q3cm82wcfjs` (`forward_writing_request_v2`) pointing at PROD webhook.
+- **DEV Eve** `agent_0001kpr667v6ffctex0a8dt4fk71` — name `Writing Assistant Dev`. Dedicated tool `tool_0801kprf5a14ee9b5ts7b8d2tetf` (`forward_writing_request_dev`) pointing at DEV webhook.
+- The DEV agent used to share the PROD tool id — now it has its own so webhook edits don't cross tiers.
+
+**Railway:**
+- Two services in the `bubbly-solace` project, one per environment:
+  - `writersworkbench-production.up.railway.app` → PROD Supabase, PROD webhooks, `NODE_ENV=production`
+  - `writersworkbenchdev-production.up.railway.app` → DEV Supabase, DEV webhooks, `NODE_ENV=development`
+- Each env has its own Redis service (added late in session):
+  - Production env: Redis named `Redis`
+  - Development env: Redis named `Redis_Dev`
+- `REDIS_URL` env var on each Workbench service uses reference syntax: `${{Redis.REDIS_PRIVATE_URL}}` (prod) / `${{Redis_Dev.REDIS_PRIVATE_URL}}` (dev) — exact service-name match matters.
+- `/api/health` now returns `version`, `deployed_at`, `environment`, `checks.supabase`, `checks.redis`. Environment derived from `NODE_ENV`.
+- **ALLOWED_ORIGINS gotcha**: must equal the service's own public URL, otherwise crossorigin JS/CSS requests 500 and the page appears blank. Documented in `CLAUDE.md`.
+
+**Governance (enforced by CI on every PR):**
+- `CLAUDE.md` — three-tier baseline protection (V1 frozen, PROD frozen except release/hotfix, DEV active).
+- `writers-workbench/docs/workflow-governance.md` — the DEV→PROD promotion flow, hotfix flow, what-breaks-if-you-ignore-it.
+- `writers-workbench/docs/schema-governance.md` — the 9 base tables (the 7 named ones plus `content_versions_v2`, `outline_versions_v2`) are immutable. Any migration numbered 008+ may not `ALTER` / `DROP` / `RENAME` a base table. Migrations 001-007 are frozen (SHA-256 pinned in `writers-workbench/migrations/.baseline-hashes.json`).
+- `scripts/check-base-table-immutability.py` + `scripts/test-check-base-table-immutability.sh` enforce the above. Wired into GitHub Actions as the `Schema Governance Check` job; added to **main's required status checks** (main now requires 4 checks).
+
+**Key scripts added (all in `scripts/`):**
+- `clone-supabase-schema.sh` — apply `supabase_setup_v2.sql` + numbered migrations to a target DB
+- `clone-supabase-data.sh` — `pg_dump --data-only` → `pg_restore` (no `--disable-triggers` — Supabase pooler role can't disable system triggers)
+- `migrate-storage.py` — clone every Supabase Storage bucket/object via REST API (idempotent, 5-way concurrency)
+- `clone-prod-to-dev.py` — idempotent workflow cloner (runs PROD → DEV transformation: creds, webhook paths, execute refs, webhookIds)
+- `promote-dev-to-prod.py` — release-time promotion script (reverse of above). Default is `--dry-run`. Currently reports 9 workflows with cosmetic `cachedResultName` drift; those will be swept by the first real release.
+- `verify-env-isolation.py` — 3-layer system test (workflow config / data isolation / Railway env). **All 3 layers currently pass.**
+- `check-base-table-immutability.py` + `test-check-base-table-immutability.sh` — schema governance CI
+- `workflow-id-map.json` — authoritative PROD id → DEV id table (24 entries)
+
+**PRs merged this sprint:**
+- #5, #6, #7 — deploy markers hotfixes (version/environment/deployed_at in `/api/health`)
+- #8 — Sprint 10.a bulk (governance docs, scripts, PROD/DEV workflow renames/clones, migration, isolation test)
+- #9 — CLAUDE.md note about tier-specific Railway env vars (learned the hard way via the CORS incident)
+
+### Sprint 10.b (Redis + BullMQ job queue) — IN FLIGHT
+
+**Status:** 13 / 34 points shipped (S10b-1 and S10b-2 merged). S10b-3 is next.
+
+**S10b-1 (shipped, PR #10):**
+- `bullmq@^5` and `ioredis@^5` added to server deps.
+- `server/src/lib/redis.ts` — lazy IORedis client with `maxRetriesPerRequest: null` (required by BullMQ), exponential retry up to 10s, READONLY auto-reconnect, event logging.
+- `server/src/lib/queue.ts` — BullMQ Queue factory with name registry, default job options (attempts=3, exponential backoff, bounded retention).
+- `/api/health` new `checks.redis` field (ok / error / skipped).
+- Shutdown handler now async — drains queues and closes Redis alongside the HTTP server.
+- 12 new unit tests, all passing. `REDIS_URL=${{Redis.REDIS_PRIVATE_URL}}` wired on both PROD and DEV Railway services. Dev `/api/health` confirms `"redis": "ok"`.
+
+**S10b-2 (shipped, PR #11):**
+- `migrations/008_job_queue.sql` — creates `public.job_queue_v2` (BullMQ lifecycle audit). 4 indexes, RLS (users read own, service_role full), FK to `users_v2(user_id)`. Additive only — governance check passes. **Applied live to DEV Supabase; PROD untouched.**
+- `server/src/lib/jobs/types.ts` — `QueueName`, `PriorityTier`, `QUEUE_SETTINGS` with concurrency + timeout per tier (sync 10/30s, medium 4/120s, heavy 2/1200s, background 3/300s), job payload interfaces.
+- `server/src/lib/jobs/classifier.ts` — regex-rule message classifier mirroring the hub's `preprocess_message` logic. First-match-wins; unmatched → `medium-ops/chat_generic`.
+- `server/src/lib/jobs/n8n-worker.ts` — BullMQ Worker factory. 2xx → ok, 4xx → ok:false (non-retryable), 5xx/network → throw (BullMQ retries).
+- `server/src/lib/jobs/job-tracker.ts` — `addTrackedJob()` enqueues + inserts `job_queue_v2` row atomically; `attachTrackerToQueue()` listens to `QueueEvents` and mirrors status transitions, computes `duration_ms` on terminal states.
+- `server/src/lib/queue.ts` — added `getNamedQueue(tier)` typed helper + `initAllNamedQueues()`.
+- 33 new unit tests. Full suite: **169/169 passing.**
+
+**What's NOT yet happening:**
+- Nothing is actually enqueuing on these queues yet. The scaffolding exists but `/api/chat/*` still hits n8n directly.
+
+### S10b-3 — Next up (not yet started)
+
+**Story:** Migrate `/api/chat/*` off direct webhook calls onto queued `N8nWebhookJob` dispatch. Server-Sent Events stream BullMQ progress back to the client. 8 pts, P0.
+
+**What the code does now (for context):**
+- Client calls `POST /api/chat/proxy` with `{ user_message_request, caller_id }`.
+- Server POSTs straight to `VITE_N8N_WEBHOOK_URL` (dev: `/webhook/author_request_dev`, prod: `/webhook/author_request_v2`).
+- Returns the n8n response body.
+- For heavy operations this can tie up a request for 10-20 minutes.
+
+**What S10b-3 will change:**
+- Server classifies the message via `jobs/classifier.ts`.
+- Calls `addTrackedJob()` to enqueue the `N8nWebhookJob` on the correct tier queue.
+- Responds immediately with `{ jobId, trackerRowId }`.
+- Second endpoint `GET /api/chat/stream/:jobId` streams SSE events (waiting → active → progress → completed/failed).
+- `n8n-worker` Workers must be started at server boot — add to `index.ts`.
+- `job-tracker` event listeners must be attached — add to `index.ts`.
+
+### Developer reference — what to know to resume
+
+**Current branch state:**
+- `main` = v1.0.0 (PROD Railway)
+- `develop` = integration branch. All recent merges (Sprint 10.a, S10b-1, S10b-2). DEV Railway auto-deploys from here.
+- `release/v1.0` = tracks main for PROD Railway deploys.
+- No open feature branches at session end. Next work should branch `feature/s10b-3-chat-proxy-migration` off `develop`.
+
+**Branch protection on main:** 4 required status checks (`TypeScript & Lint`, `Unit Tests`, `Production Build`, `Schema Governance Check`). E2E is not required (known broken — Issue #3). Admin push blocked.
+
+**Credentials (for your terminal / Railway dashboard — not in repo):**
+- DB password is the same for PROD and DEV (user's choice — noted).
+- PROD service-role key starts `sb_secret_huxH…`
+- DEV service-role key starts `sb_secret_8GDV…`
+- ElevenLabs API key starts `sk_cb81…`
+- n8n API key lives in `writers-workbench/.env` under `N8N_API_KEY`. Same key works for both PROD and DEV workflows on the shared instance.
+- Test user: `eric@agileadtesting.com` exists on both PROD and DEV auth; same password.
+
+**Active test + isolation baseline:**
+- Run `scripts/verify-env-isolation.py` to confirm the three-layer isolation still holds. All 3 layers passed at session end.
+- Run `python3 scripts/check-base-table-immutability.py` locally or in CI — passes with migrations 001-008 as of end of session.
+
+**Files / folders to know:**
+- `CLAUDE.md` — project-wide rules (baseline protection, git branching, governance cross-references, Railway env-var gotchas).
+- `writers-workbench/docs/workflow-governance.md` — full PROD/DEV workflow rules + promotion flow.
+- `writers-workbench/docs/schema-governance.md` — base-table immutability rule + meta-table pattern.
+- `writers-workbench/docs/railway-deployment.md` — all services, env vars, cost baseline.
+- `writers-workbench/migrations/` — SQL migrations 001-008. `.baseline-hashes.json` pins 001-007.
+- `writers-workbench/server/src/lib/jobs/` — types, classifier, n8n-worker, job-tracker (all from S10b-2).
+- `writers-workbench/server/src/lib/redis.ts` + `queue.ts` — from S10b-1.
+- `scripts/workflow-id-map.json` — PROD→DEV workflow id map.
+
+**Tests:** 169/169 server tests pass (as of S10b-2 merge). Run:
+```
+cd writers-workbench/server && npx vitest run
+```
+
+**Immediate to-do list at start of next session:**
+1. Verify dev Railway picked up the S10b-2 merge (`/api/health` should still show `"redis": "ok"` and migration 008's new table should be reachable — table already applied manually).
+2. Start S10b-3: branch `feature/s10b-3-chat-proxy-migration`. First subtask is updating `routes/chat.ts` to use `addTrackedJob` instead of direct `fetch`.
+3. Decide SSE vs. polling for the new `/api/chat/stream/:jobId` endpoint — SSE preferred but Railway has a 10-minute connection timeout to be aware of for heavy-ops jobs.
+4. After S10b-3: S10b-4 (per-user concurrency + admin dashboard, 5 pts), then S10b-5 (Redis session store, 8 pts).
+
+**Gotchas learned in this session (save yourself the time):**
+- Supabase direct `db.<ref>.supabase.co` hostnames are IPv6-only on new projects. Use the session pooler URI for psql / pg_dump.
+- `pg_dump --disable-triggers` fails on Supabase because the pooler role can't disable RI_* system triggers. Drop the flag.
+- `pg_dump` version must be ≥ server version (pg17 server, pg15 client fails).
+- Supabase Schema Editor changes don't appear in the `migrations/` directory unless you explicitly add them — we found 2 views (`content_metrics_v2`, `token_usage_daily_v2`) that existed on PROD but in no migration. Clone via `pg_dump --schema-only` catches drift.
+- n8n workflow `webhookId` fields are globally unique per instance. Cloned workflows inherit the PROD webhookId and fail to activate with "webhook conflict". Regenerate all `webhookId`s on clone (including on `chatTrigger`, `gmail`, `wait`, etc. nodes — any node that carries one).
+- n8n's PUT API rejects unknown `settings` keys (e.g. `binaryMode`). Strip to the allow-list in `scripts/clone-prod-to-dev.py` before PUT.
+- Railway variable references use the exact service name: `${{Redis.REDIS_PRIVATE_URL}}`. If the service is named `Redis_Dev`, the reference must match.
+- ElevenLabs agent tools are shared server-side — duplicating an agent clones its `tool_ids` but not the tool itself. Create a new tool for DEV, update `tool_ids` on the DEV agent.
+- BullMQ requires `maxRetriesPerRequest: null` on its Redis connection — that's in `server/src/lib/redis.ts`. Do not change.
+
+**Final sanity snapshot at session end:**
+- Dev `/api/health`: `{status: ok, environment: development, version: <recent-sha>, checks: {supabase: ok, redis: ok}}`
+- Prod `/api/health`: `{status: ok, environment: production, version: 2771300…, checks: {supabase: ok}}` (no redis field — prod still on pre-S10b-1 code via `release/v1.0`; that's expected; prod picks up the new check at next release)
+- Isolation test: 3/3 layers green.
