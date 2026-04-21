@@ -292,15 +292,18 @@ describe('S4-6: Chat Drawer Enhancement', () => {
     expect(content).toContain('toLocaleTimeString');
   });
 
-  it('ChatDrawer has async operation confirmation message', async () => {
+  it('ChatDrawer handles server-driven async acknowledgement', async () => {
     const fs = await import('fs');
     const path = await import('path');
     const content = fs.readFileSync(
       path.resolve(process.cwd(), 'src/components/chat/ChatDrawer.tsx'),
       'utf-8'
     );
-    expect(content).toContain('isAsyncCommand');
-    expect(content).toContain('Content Library');
+    // S10b-3: client no longer classifies messages — the /api/chat/proxy
+    // response tells us whether the job was enqueued. ChatDrawer renders a
+    // queued status pill and keeps the isAsync flag for the saved message.
+    expect(content).toContain("mode === 'async'");
+    expect(content).toContain('jobStatus');
     expect(content).toContain('isAsync');
   });
 

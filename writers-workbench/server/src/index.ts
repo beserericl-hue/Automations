@@ -15,8 +15,10 @@ import { exportRouter } from './routes/export.js';
 import { adminRouter } from './routes/admin.js';
 import { brainstormRouter } from './routes/brainstorm.js';
 import { accountRouter } from './routes/account.js';
-import { sessionRouter } from './routes/session.js';
+import { sessionRouter, pushSseEvent } from './routes/session.js';
 import { imagesRouter } from './routes/images.js';
+import { jobsRouter } from './routes/jobs.js';
+import type { JobInfrastructure } from './lib/jobs/boot.js';
 import { swaggerSpec } from './swagger.js';
 import swaggerUi from 'swagger-ui-express';
 
@@ -127,6 +129,8 @@ app.use('/api/images', generalLimiter);
 app.use('/api/images', imagesRouter);
 app.use('/api/callback', generalLimiter);
 app.use('/api/callback', sessionRouter);
+app.use('/api/jobs', generalLimiter);
+app.use('/api/jobs', jobsRouter);
 
 // Centralized error handler (must be after routes)
 app.use(errorHandler);
@@ -153,6 +157,21 @@ const server = app.listen(PORT, () => {
   logger.info(`The Writers Workbench API running on http://localhost:${PORT}`);
 });
 
+// Start BullMQ workers + queue-event listeners (tracker + SSE forwarder)
+// if Redis is configured. The chat proxy enqueues async jobs onto these
+// queues; without workers, jobs would pile up forever.
+let jobInfra: JobInfrastructure | null = null;
+if (process.env.REDIS_URL) {
+  void (async () => {
+    try {
+      const { startJobInfrastructure } = await import('./lib/jobs/boot.js');
+      jobInfra = startJobInfrastructure(pushSseEvent);
+    } catch (err) {
+      logger.error({ err }, 'Failed to start job infrastructure');
+    }
+  })();
+}
+
 // Graceful shutdown
 async function shutdown(signal: string) {
   logger.info(`${signal} received — shutting down gracefully`);
@@ -167,6 +186,10 @@ async function shutdown(signal: string) {
   const queuesClosed = (async () => {
     if (!process.env.REDIS_URL) return;
     try {
+      if (jobInfra) {
+        const { stopJobInfrastructure } = await import('./lib/jobs/boot.js');
+        await stopJobInfrastructure(jobInfra);
+      }
       const { closeAllQueues } = await import('./lib/queue.js');
       const { closeRedis } = await import('./lib/redis.js');
       await closeAllQueues();
