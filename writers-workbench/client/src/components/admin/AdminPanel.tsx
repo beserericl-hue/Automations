@@ -39,7 +39,7 @@ async function adminFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
 export default function AdminPanel() {
   const { profile } = useUser();
-  const [activeTab, setActiveTab] = useState<'users' | 'metrics' | 'workflows'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'metrics' | 'workflows' | 'queues'>('users');
 
   if (!profile?.isAdmin) {
     return (
@@ -54,7 +54,7 @@ export default function AdminPanel() {
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Panel</h1>
 
       <div className="flex gap-2 border-b border-gray-200 dark:border-gray-800">
-        {(['users', 'metrics', 'workflows'] as const).map(tab => (
+        {(['users', 'metrics', 'workflows', 'queues'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -64,7 +64,13 @@ export default function AdminPanel() {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            {tab === 'users' ? 'User Management' : tab === 'metrics' ? 'System Metrics' : 'Workflows'}
+            {tab === 'users'
+              ? 'User Management'
+              : tab === 'metrics'
+                ? 'System Metrics'
+                : tab === 'workflows'
+                  ? 'Workflows'
+                  : 'Queues'}
           </button>
         ))}
       </div>
@@ -72,6 +78,7 @@ export default function AdminPanel() {
       {activeTab === 'users' && <UserManagement />}
       {activeTab === 'metrics' && <SystemMetrics />}
       {activeTab === 'workflows' && <WorkflowStatus />}
+      {activeTab === 'queues' && <QueueStatus />}
     </div>
   );
 }
@@ -371,6 +378,112 @@ function WorkflowStatus() {
           )}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+interface QueueSnapshot {
+  queues: Array<{
+    name: string;
+    counts: Record<string, number>;
+    settings: { concurrency: number; timeoutMs: number };
+  }>;
+  perUserLimits: { totalPerUser: number; heavyPerUser: number; retryDelayMs: number };
+  topUsers: Array<{ user_id: string; active_jobs: number }>;
+  totalActive: number;
+}
+
+function QueueStatus() {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['admin-queues'],
+    queryFn: () => adminFetch<QueueSnapshot>('/queues'),
+    refetchInterval: 10_000,
+  });
+
+  if (isLoading) return <div className="text-sm text-gray-500">Loading queue snapshot...</div>;
+  if (error) return <div className="text-sm text-red-500">Failed to load queues: {(error as Error).message}</div>;
+  if (!data) return <div className="text-sm text-gray-500">No data.</div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
+        <span>
+          Per-user limits: total <strong>{data.perUserLimits.totalPerUser}</strong>, heavy{' '}
+          <strong>{data.perUserLimits.heavyPerUser}</strong>
+        </span>
+        <span>
+          Total jobs in flight: <strong>{data.totalActive}</strong>
+        </span>
+        <span className="text-gray-400">Auto-refresh every 10s</span>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {data.queues.map((q) => (
+          <div
+            key={q.name}
+            className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900"
+          >
+            <div className="mb-3 flex items-baseline justify-between">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{q.name}</h3>
+              <span className="text-xs text-gray-500">
+                concurrency {q.settings.concurrency} · timeout {Math.round(q.settings.timeoutMs / 1000)}s
+              </span>
+            </div>
+            <div className="grid grid-cols-5 gap-2 text-center">
+              <CountCell label="Waiting" value={q.counts.waiting ?? 0} tone="gray" />
+              <CountCell label="Active" value={q.counts.active ?? 0} tone="blue" />
+              <CountCell label="Delayed" value={q.counts.delayed ?? 0} tone="yellow" />
+              <CountCell label="Done" value={q.counts.completed ?? 0} tone="green" />
+              <CountCell label="Failed" value={q.counts.failed ?? 0} tone="red" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 overflow-hidden">
+        <div className="border-b border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+          Top users by active jobs
+        </div>
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
+              <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">User</th>
+              <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">Active Jobs</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+            {data.topUsers.map((u) => (
+              <tr key={u.user_id}>
+                <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{u.user_id}</td>
+                <td className="px-4 py-2 text-sm text-gray-500">{u.active_jobs}</td>
+              </tr>
+            ))}
+            {data.topUsers.length === 0 && (
+              <tr>
+                <td colSpan={2} className="px-4 py-6 text-center text-sm text-gray-400">
+                  No active jobs.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function CountCell({ label, value, tone }: { label: string; value: number; tone: 'gray' | 'blue' | 'yellow' | 'green' | 'red' }) {
+  const toneClass = {
+    gray: 'text-gray-700 dark:text-gray-200',
+    blue: 'text-blue-700 dark:text-blue-300',
+    yellow: 'text-yellow-700 dark:text-yellow-300',
+    green: 'text-green-700 dark:text-green-300',
+    red: 'text-red-700 dark:text-red-300',
+  }[tone];
+  return (
+    <div className="rounded border border-gray-100 px-2 py-2 dark:border-gray-800">
+      <div className={`text-lg font-semibold ${toneClass}`}>{value}</div>
+      <div className="text-[10px] uppercase tracking-wide text-gray-500">{label}</div>
     </div>
   );
 }

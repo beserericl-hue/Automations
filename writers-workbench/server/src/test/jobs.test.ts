@@ -14,6 +14,12 @@ vi.mock('ioredis', () => {
     ping = mocks.pingMock;
     quit = mocks.quitMock;
     on = mocks.onMock;
+    // S10b-4: concurrency gate calls these — counters stay at zero so the
+    // gate always admits in the existing n8n-worker tests.
+    incr = vi.fn(async () => 1);
+    decr = vi.fn(async () => 0);
+    expire = vi.fn(async () => 1);
+    mget = vi.fn(async (...keys: string[]) => keys.map(() => '0'));
   }
   return { default: FakeRedis };
 });
