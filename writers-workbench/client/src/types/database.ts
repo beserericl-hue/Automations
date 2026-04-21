@@ -274,3 +274,81 @@ export interface ContentIndex {
   scraped_at: string;
   metadata: Record<string, unknown>;
 }
+
+export type ContentIngestionType = 'article' | 'reddit_post' | 'tweet' | 'newsletter';
+
+export interface RedditMetadata {
+  score?: number;
+  num_comments?: number;
+  author?: string;
+  subreddit?: string;
+  reddit_id?: string;
+  flair?: string | null;
+}
+
+export interface ContentIngestion {
+  id: string;
+  key: string;
+  user_id: string;
+  type: ContentIngestionType;
+  title: string | null;
+  authors: string | null;
+  source_name: string;
+  source_url: string | null;
+  external_source_urls: string[];
+  image_urls: string[];
+  reddit_metadata: RedditMetadata | null;
+  published_timestamp: string | null;
+  feed_url: string | null;
+  storage_path_md: string;
+  storage_path_html: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export type NewsletterApprovalStage = 'stories' | 'subject_line';
+export type NewsletterApprovalDecision = 'approve' | 'revise';
+
+export interface NewsletterApproval {
+  id: string;
+  token: string;
+  user_id: string;
+  execution_id: string;
+  resume_url: string;
+  stage: NewsletterApprovalStage;
+  payload: Record<string, unknown>;
+  created_at: string;
+  resolved_at: string | null;
+  expires_at: string;
+  decision: NewsletterApprovalDecision | null;
+  feedback: string | null;
+}
+
+export type NewsletterSendStatus =
+  | 'draft'
+  | 'scheduled'
+  | 'sending'
+  | 'sent'
+  | 'failed'
+  | 'cancelled';
+
+export interface NewsletterSend {
+  id: string;
+  user_id: string;
+  send_date: string;
+  subject: string;
+  preheader: string | null;
+  html_body: string;
+  markdown_body: string | null;
+  scheduled_send_at: string | null;
+  status: NewsletterSendStatus;
+  sent_at: string | null;
+  recipient_count: number | null;
+  delivery_provider: string | null;
+  provider_message_id: string | null;
+  error: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
