@@ -72,7 +72,7 @@ Order matters: DB → MQ → App. Open Railway, select **N8N-MCP**, ensure you'r
 
 ### 1.3 `postal`
 
-- [ ] Add service → Docker Image → `ghcr.io/postalserver/postal:3`
+- [ ] Add service → Docker Image → `ghcr.io/postalserver/postal:3.3.5` (the `:3` shorthand does NOT exist on this registry — use the specific version tag or `:latest`)
 - [ ] Rename to `postal`
 - [ ] Variables (paste, filling in the saved values):
   ```
