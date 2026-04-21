@@ -46,6 +46,18 @@ healthRouter.get('/', async (_req, res) => {
     checks.supabase = 'skipped';
   }
 
+  // Redis connectivity
+  if (process.env.REDIS_URL) {
+    try {
+      const { redisHealthy } = await import('../lib/redis.js');
+      checks.redis = (await redisHealthy()) ? 'ok' : 'error';
+    } catch {
+      checks.redis = 'error';
+    }
+  } else {
+    checks.redis = 'skipped';
+  }
+
   const hasErrors = Object.values(checks).some((v) => v === 'error');
 
   res.status(hasErrors ? 503 : 200).json({
