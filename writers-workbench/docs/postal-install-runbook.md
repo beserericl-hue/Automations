@@ -75,7 +75,11 @@ POSTAL_SIGNING_KEY_PATH=/config/signing.key
 RAILS_ENVIRONMENT=production
 WAIT_FOR_TARGETS=postal-mariadb.railway.internal:3306
 WAIT_FOR_TIMEOUT=90
+BIND_ADDRESS=0.0.0.0
+PORT=8080
 ```
+
+`BIND_ADDRESS=0.0.0.0` makes Puma listen on every network interface (not just loopback) so Railway's edge can reach the container. `PORT=8080` pins Postal's listen port so it matches the Networking target port we set in Phase 3.2.
 
 ### 1.4 Set the Custom Start Command (temporary)
 
@@ -250,9 +254,9 @@ to:
 postal web-server
 ```
 
-### 3.2 Generate a public domain
+### 3.2 Generate a public domain and set target port to 8080
 
-Settings → Networking → **Generate Domain**. You'll get something like `postal-web-production-xxxx.up.railway.app`.
+Settings → Networking → **Generate Domain**. You'll get something like `postal-web-production-xxxx.up.railway.app`. On the same domain entry, set **Target Port = `8080`** (must match the `PORT` env var). Save.
 
 ### 3.3 Redeploy
 
