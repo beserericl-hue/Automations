@@ -237,6 +237,34 @@ Answer the prompts:
 exit
 ```
 
+### 2.8 Grant wildcard privileges to the postal user in MariaDB
+
+Postal creates a **separate MySQL database per mail server** named `postal-server-1`, `postal-server-2`, etc. Without a wildcard grant, MariaDB denies the `postal` user when Postal tries to create those databases — you'll see `Access denied for user 'postal'@'%' to database 'postal-server-1'` in the `postal-web` logs and the UI will 500 on Build Server.
+
+SSH into `postal-mariadb`:
+```bash
+railway ssh --project=<your-project-id> --environment=<your-env-id> --service=<postal-mariadb-service-id>
+```
+
+Open MariaDB as root (use the `MARIADB_ROOT_PASSWORD` you set on the `postal-mariadb` service):
+```bash
+mariadb -uroot -p'<MARIADB_ROOT_PASSWORD>'
+```
+
+Run these three SQL statements:
+```sql
+GRANT ALL PRIVILEGES ON `postal-%`.* TO 'postal'@'%';
+FLUSH PRIVILEGES;
+EXIT;
+```
+
+Exit the container:
+```bash
+exit
+```
+
+This grant uses the `postal-%` wildcard, so it covers every per-mail-server database Postal will ever create (`postal-server-1`, `postal-server-2`, etc.) in one command.
+
 ---
 
 ## Phase 3 — Switch postal-web to run the web server
