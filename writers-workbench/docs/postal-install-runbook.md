@@ -350,27 +350,127 @@ Same pattern as postal-web:
 
 ---
 
-## Phase 6 — Configure the sending domain in Postal admin
+## Phase 6 — Configure Postal (complete click-by-click flow)
 
-Now that you're logged into Postal:
+This phase walks you from "logged in as admin for the first time" all the way to "two mail servers with API credentials, dev key pasted into Railway." No skipping, no assumptions.
 
-1. **New Organization** → name `Course Worx Media`
-2. Organization → **Domains** → **Add Domain** → `courseworx.media`
-3. Keep this page open — it lists 4-6 DNS records Postal wants on `courseworx.media`
+### 6.1 Log in
 
-### Publish these DNS records in Cloudflare
+Open `https://postal-admin.courseworx.media`. Log in with the admin user you created via `postal make-user` in Phase 2.6.
 
-Values come from Postal's domain page. Publish each:
+### 6.2 Create the organization
 
-| Type  | Name (Cloudflare)                 | Value                                        | Proxy   |
-|-------|-----------------------------------|----------------------------------------------|---------|
-| TXT   | `postal._domainkey`               | (DKIM key from Postal UI)                    | n/a     |
-| TXT   | `@`                               | `v=spf1 include:spf.postal.courseworx.media ~all` | n/a |
-| TXT   | `spf.postal`                      | (SPF detail from Postal UI)                  | n/a     |
-| CNAME | `rp.postal`                       | (return-path target from Postal UI)          | **DNS only** |
-| TXT   | `_dmarc`                          | `v=DMARC1; p=quarantine; rua=mailto:dmarc@courseworx.media; pct=100` | n/a |
+If this is your first login, you'll see "You are not a member of any organization."
 
-Wait ~15–30 min. Refresh the Postal UI → every record should turn green. Don't proceed past here until all green.
+1. Click **Create a new organization**
+2. **NAME:** `Courseworx Media`
+3. **SHORT NAME:** leave blank (auto-generates `courseworx-media`)
+4. Click **Create organization**
+
+### 6.3 Add the sending domain at the organization level
+
+You land on the org root with a dark tab bar: `Mail Servers | Domains | Settings | Delete Organization`.
+
+1. Click **Domains**
+2. Click **Add Domain**
+3. **NAME:** `courseworx.media`
+4. Click **Create Domain**
+
+Postal shows the 5 DNS records you must publish before the domain will verify.
+
+### 6.4 Publish DNS records in Cloudflare
+
+In another tab: Cloudflare → `courseworx.media` → DNS → Add record. Postal's domain page shows the exact values. The 5 record types are:
+
+| Postal shows | Cloudflare Type | Name | Content | Proxy |
+|--------------|----------------|------|---------|-------|
+| SPF | TXT | `@` (root) | `v=spf1 ... ~all` (copy from Postal) | off (TXT has no proxy) |
+| DKIM | TXT | whatever Postal's name is (e.g. `postal-dkim1._domainkey`) | `v=DKIM1; k=rsa; p=...` (copy from Postal) | off |
+| Return Path | CNAME | whatever Postal shows (e.g. `psrp`) | the target Postal shows | **grey cloud (DNS only)** |
+| MX | MX | `@` | target Postal shows, priority 10 | n/a |
+| Verification | TXT | `@` | random string Postal shows | off |
+
+**Critical:** The CNAME must be grey cloud (DNS only). Orange cloud breaks verification.
+
+Copy values exactly — no extra quotes, no trimmed dots. Cloudflare may auto-add quotes on TXT records; that's fine.
+
+Wait 5–15 min for propagation.
+
+### 6.5 Verify DNS in Postal
+
+Back in Postal's domain page, click **Check my records are correct**. Every row should turn green. **Do not proceed until every row is green.** Postal will not send from an unverified domain.
+
+### 6.6 Create the production mail server
+
+1. Breadcrumb → click **Courseworx Media** to return to org root
+2. Dark tab bar → **Mail Servers**
+3. Click **Build a new mail server**
+4. Form:
+   - **NAME:** `writers-workbench-mail-prod`
+   - **SHORT NAME:** blank
+   - **MODE:** `Live`
+5. Click **Build server**
+
+You land on this mail server's Overview page with banner `writers-workbench-mail-prod` and a green LIVE ribbon.
+
+### 6.7 Authorize courseworx.media on the prod mail server
+
+In the horizontal tab bar at the top of this mail server (Overview / Messages / Domains / Routing / Credentials / Webhooks / Settings):
+
+1. Click **Domains**
+2. Click **Add Domain**
+3. **NAME:** `courseworx.media`
+4. Click **Add Domain**
+
+### 6.8 Create the prod API credential
+
+1. Horizontal tab bar → **Credentials**
+2. Click **Add new Credential**
+3. Form:
+   - **Type:** `API`
+   - **Name:** `prod-api-key`
+   - **Hold?:** unchecked (unchecked = actually send; checked = queue for manual review)
+4. Click **Create**
+5. **Copy the API key value** from the credential detail page
+6. Save in your password manager labeled "Postal prod API key"
+
+### 6.9 Create the dev mail server
+
+1. Breadcrumb → **Courseworx Media**
+2. Dark tab bar → **Mail Servers**
+3. Click **Build a new mail server**
+4. Form:
+   - **NAME:** `writers-workbench-mail-dev`
+   - **SHORT NAME:** blank
+   - **MODE:** `Development` (change the dropdown from Live; this makes the server swallow outbound mail and log it instead of actually sending — safe for testing)
+5. Click **Build server**
+
+### 6.10 Authorize courseworx.media on the dev mail server
+
+(Horizontal tab bar on THIS dev mail server — confirm the banner says `-dev`.)
+
+1. **Domains** tab → **Add Domain**
+2. **NAME:** `courseworx.media`
+3. Click **Add Domain**
+
+### 6.11 Create the dev API credential
+
+1. **Credentials** tab → **Add new Credential**
+2. Form:
+   - **Type:** `API`
+   - **Name:** `dev-api-key`
+   - **Hold?:** unchecked
+3. Click **Create**
+4. **Copy the API key value**
+5. Save in your password manager labeled "Postal dev API key"
+
+### 6.12 Confirm both mail servers exist
+
+Breadcrumb → **Courseworx Media** → **Mail Servers**. The list should show **two** entries:
+- `writers-workbench-mail-prod` (green LIVE)
+- `writers-workbench-mail-dev` (yellow DEV)
+
+Postal configuration is done.
 
 ---
 
