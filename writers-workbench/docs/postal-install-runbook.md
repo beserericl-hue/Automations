@@ -376,29 +376,39 @@ You land on the org root with a dark tab bar: `Mail Servers | Domains | Settings
 3. **NAME:** `courseworx.media`
 4. Click **Create Domain**
 
-Postal shows the 5 DNS records you must publish before the domain will verify.
+Postal shows **4 DNS record sections** on the domain's DNS Setup page: SPF, DKIM, Return Path, and MX. Copy the values Postal displays (especially the DKIM public key — it's generated per install and unique to your domain).
 
 ### 6.4 Publish DNS records in Cloudflare
 
-In another tab: Cloudflare → `courseworx.media` → DNS → Add record. Postal's domain page shows the exact values. The 5 record types are:
+In another tab: Cloudflare → `courseworx.media` → DNS → Records → **Add record**.
 
-| Postal shows | Cloudflare Type | Name | Content | Proxy |
-|--------------|----------------|------|---------|-------|
-| SPF | TXT | `@` (root) | `v=spf1 ... ~all` (copy from Postal) | off (TXT has no proxy) |
-| DKIM | TXT | whatever Postal's name is (e.g. `postal-dkim1._domainkey`) | `v=DKIM1; k=rsa; p=...` (copy from Postal) | off |
-| Return Path | CNAME | whatever Postal shows (e.g. `psrp`) | the target Postal shows | **grey cloud (DNS only)** |
-| MX | MX | `@` | target Postal shows, priority 10 | n/a |
-| Verification | TXT | `@` | random string Postal shows | off |
+| Section on Postal page | Required? | Cloudflare Type | Cloudflare Name | Cloudflare Content | Proxy |
+|------------------------|-----------|-----------------|-----------------|--------------------|-------|
+| **SPF Record** | **REQUIRED** | TXT | `@` (root) | Paste the `v=spf1 ... ~all` string exactly as Postal shows | (TXT has no proxy) |
+| **DKIM Record** | **REQUIRED** | TXT | Copy ONLY the subdomain portion from Postal (e.g. if Postal shows `postal-iGSiwP._domainkey.courseworx.media`, paste `postal-iGSiwP._domainkey` — Cloudflare auto-appends the root) | Paste the full DKIM string as one line — includes `v=DKIM1; t=s; h=sha256; p=<long key>;` | (TXT has no proxy) |
+| **Return Path** | Recommended | CNAME | `psrp` (or whatever subdomain Postal shows) | The target Postal shows, e.g. `rp.postal.courseworx.media` | **grey cloud (DNS only)** |
+| **MX Records** | **OPTIONAL** — skip for outbound-only | MX | `@` | `mx.postal.courseworx.media` (or whatever Postal shows) with priority `10` | n/a |
 
-**Critical:** The CNAME must be grey cloud (DNS only). Orange cloud breaks verification.
+**Critical rules:**
+- The Return Path CNAME **must be grey cloud (DNS only)**. Orange cloud breaks the handshake.
+- Skip the MX record unless you need Postal to **receive** inbound mail. For outbound-only API sending, it's not needed.
+- Copy DKIM exactly — the string is long (several hundred characters). Cloudflare may split it into multiple quoted segments automatically; that's fine.
+- If Cloudflare complains the DKIM value is too long, drop the trailing `;` and try again.
 
-Copy values exactly — no extra quotes, no trimmed dots. Cloudflare may auto-add quotes on TXT records; that's fine.
-
-Wait 5–15 min for propagation.
+Wait 2–10 min for propagation.
 
 ### 6.5 Verify DNS in Postal
 
-Back in Postal's domain page, click **Check my records are correct**. Every row should turn green. **Do not proceed until every row is green.** Postal will not send from an unverified domain.
+Back in Postal's domain page, click **Check my records are correct**. What should turn green:
+
+- SPF row → **must** turn green
+- DKIM row → **must** turn green
+- Return Path row → ideal but not blocking; mail will still send if this stays red
+- MX row → will stay red if you skipped it; that's expected and harmless
+
+**Do not proceed past here until SPF and DKIM are both green.** Postal will not send from a domain where DKIM is unverified.
+
+The domain's overview banner should change to "DKIM & SPF configured correctly on 1 domain" once those two are green.
 
 ### 6.6 Create the production mail server
 
@@ -442,92 +452,81 @@ In the horizontal tab bar at the top of this mail server (Overview / Messages / 
 4. Form:
    - **NAME:** `writers-workbench-mail-dev`
    - **SHORT NAME:** blank
-   - **MODE:** `Development` (change the dropdown from Live; this makes the server swallow outbound mail and log it instead of actually sending — safe for testing)
+   - **MODE:** **Development** — pay attention to this dropdown. If you leave it at `Live`, the dev server will actually deliver mail to real inboxes instead of swallowing it. If you miss this at creation, Step 6.10 shows how to fix it.
 5. Click **Build server**
 
-### 6.10 Authorize courseworx.media on the dev mail server
+### 6.10 Verify (or fix) the dev mail server's Mode
 
-(Horizontal tab bar on THIS dev mail server — confirm the banner says `-dev`.)
+**Why:** The green **LIVE** badge you see on the mail server list means "server is active/online" — NOT "Live mode". Both Live-mode and Development-mode servers show a green LIVE badge. The only way to confirm the actual mode is to open the server's settings form.
 
-1. **Domains** tab → **Add Domain**
-2. **NAME:** `courseworx.media`
-3. Click **Add Domain**
+**To verify / fix:**
 
-### 6.11 Create the dev API credential
+1. In your browser, paste this URL and press Enter (replaces any click path):
+   ```
+   https://postal-admin.courseworx.media/org/courseworx-media/servers/writers-workbench-mail-dev/edit
+   ```
+2. You land on the mail server's edit form, which shows:
+   - **Name:** `writers-workbench-mail-dev`
+   - **Permalink:** disabled (auto-generated)
+   - **Mode:** dropdown — this is what you're checking
+3. Confirm Mode is set to **`Development`**. If it says `Live`, change it:
+   - Click the Mode dropdown
+   - Pick `Development`
+   - Scroll to the bottom of the form
+   - Click **Save server**
 
-1. **Credentials** tab → **Add new Credential**
-2. Form:
+**Alternative click path (if you don't want to use the URL):**
+
+1. Left sidebar → click the `writers-workbench-mail-dev` service
+2. Horizontal tab bar at top of content area → click **Settings**
+3. A SECOND nav bar appears below the first, showing: `Server Settings | Spam | Retention | Send Limit | Advanced Settings | Delete`
+4. Click **Server Settings** in that second bar
+5. Edit form loads — change Mode dropdown to `Development`, click **Save server**
+
+In Postal 3.3.5 the top-level Settings tab is a gateway to a secondary nav. Don't expect Mode to be on the first page you see after clicking Settings — it's one level deeper, under "Server Settings".
+
+### 6.11 Authorize courseworx.media on the dev mail server
+
+Horizontal tab bar on THIS dev mail server (confirm the banner says `writers-workbench-mail-dev`, not `-prod`):
+
+1. Click **Domains**
+2. Click **Add Domain**
+3. **NAME:** `courseworx.media`
+4. Click **Add Domain**
+
+### 6.12 Create the dev API credential
+
+1. Click **Credentials** tab
+2. Click **Add new Credential**
+3. Form:
    - **Type:** `API`
    - **Name:** `dev-api-key`
    - **Hold?:** unchecked
-3. Click **Create**
-4. **Copy the API key value**
-5. Save in your password manager labeled "Postal dev API key"
+4. Click **Create**
+5. **Copy the API key value** from the credential detail page
+6. Save in your password manager labeled "Postal dev API key"
 
-### 6.12 Confirm both mail servers exist
+### 6.13 Confirm both mail servers exist
 
-Breadcrumb → **Courseworx Media** → **Mail Servers**. The list should show **two** entries:
-- `writers-workbench-mail-prod` (green LIVE)
-- `writers-workbench-mail-dev` (yellow DEV)
+Breadcrumb → **Courseworx Media** → **Mail Servers**. The list should show two entries:
+- `writers-workbench-mail-prod`
+- `writers-workbench-mail-dev`
+
+Both will show a green **LIVE** badge — that badge means "online", not "Live mode". The actual mode is what you verified in Step 6.10.
 
 Postal configuration is done.
 
 ---
 
-## Phase 7 — Create the two mail servers + API credentials
+## Phase 7 — Wire env vars into your Workbench service(s)
 
-Postal uses a two-level domain model:
-- Organization domain (done in Phase 6) — holds the DKIM/SPF/return-path DNS records
-- Mail-server-level domain — authorizes a specific mail server to send FROM that domain
+### 7.1 On `WritersWorkbenchDev`
 
-You have to associate the domain at both levels. Phase 6 did the first. Below does the second, plus the API credential.
+Open Railway → `N8N-MCP` project → `WritersWorkbenchDev` service → Variables → Raw Editor. Append these lines (do not delete existing vars):
 
-### 7.1 Production mail server
-
-1. Organization sidebar → **Mail Servers** → **New Mail Server**
-2. Form fields:
-   - **Name:** `writers-workbench-mail-prod`
-   - **Short name:** leave blank (auto-generated)
-   - **Mode:** `Live`
-3. Click **Build server** — you land on the mail server's overview page
-
-4. In the mail server's own sidebar, click **Domains**
-5. Click **Add Domain**
-   - **Domain:** `courseworx.media`
-6. Save — this authorizes this mail server to send from `courseworx.media`
-
-7. Mail server sidebar → **Credentials** → **Add new Credential**
-   - **Name:** `prod-api-key`
-   - **Type:** `API`
-   - **Hold:** leave unchecked (unchecked = actually send; checked = pile into hold queue for debugging)
-8. Save
-9. **Copy the key value shown on the credential page now** — this is your `POSTAL_API_KEY` for production Workbench. Some Postal versions partially hide it after first view.
-
-### 7.2 Dev mail server
-
-Go back to the organization (top breadcrumb `Course Worx Media`) and repeat the full flow:
-
-1. **New Mail Server**
-   - **Name:** `writers-workbench-mail-dev`
-   - **Mode:** `Development` (Postal swallows sends and only logs them — safe for testing)
-   - **Build server**
-2. **Domains** → **Add Domain** → `courseworx.media`
-3. **Credentials** → **Add new Credential**
-   - **Name:** `dev-api-key`
-   - **Type:** `API`
-   - **Hold:** unchecked
-4. Save → **copy the key value** — this is `POSTAL_API_KEY` for the dev Workbench
-
----
-
-## Phase 8 — Wire env vars into your Workbench service(s)
-
-### 8.1 On `WritersWorkbenchDev`
-
-Add these env vars:
 ```
 POSTAL_API_URL=https://postal-admin.courseworx.media/api/v1
-POSTAL_API_KEY=<dev-api-key from Phase 7.2>
+POSTAL_API_KEY=<dev-api-key from Step 6.12>
 EMAIL_SECRET=30c8dc2b3a1339a996c1dff20e5ea28d6e466870cef7635a9a4723819877431d
 SENDER_EMAIL=eve@courseworx.media
 SENDER_NAME=The Writers Workbench (Dev)
@@ -535,16 +534,18 @@ REPLY_TO_EMAIL=support@courseworx.media
 DRY_RUN_EMAIL=true
 ```
 
-### 8.2 On production Workbench (when/if present in `N8N-MCP`)
+Click **Update Variables**. Railway auto-redeploys.
+
+### 7.2 On production Workbench (when/if present in `N8N-MCP`)
 
 Same block, differences:
-- `POSTAL_API_KEY` = `prod-api-key` from Phase 7.1
+- `POSTAL_API_KEY` = `prod-api-key` from Step 6.8
 - `SENDER_NAME` = `The Writers Workbench`
 - **Remove** `DRY_RUN_EMAIL` (or set to `false`)
 
 ---
 
-## Phase 9 — Workbench code work (my follow-up PR)
+## Phase 8 — Workbench code work (follow-up PR)
 
 Nothing in what you've built so far is being called by the Workbench yet — that's code I'll add in a stacked PR on `develop`:
 
@@ -555,11 +556,11 @@ Nothing in what you've built so far is being called by the Workbench yet — tha
 - `DRY_RUN_EMAIL=true` short-circuits the Postal call
 - Unit tests
 
-Ping me when Phase 8 is done and I'll open that PR.
+Ping me when Phase 7 is done and I'll open that PR.
 
 ---
 
-## Phase 10 — Smoke test (after Phase 9 deploys)
+## Phase 9 — Smoke test (after Phase 8 deploys)
 
 ```bash
 # Dev dry-run
@@ -587,10 +588,16 @@ Then flip `DRY_RUN_EMAIL=false` on `WritersWorkbenchDev`, wait for redeploy, rep
 | `postal initialize` says "can't connect to DB" | `MAIN_DB_PASSWORD` / `MESSAGE_DB_PASSWORD` don't match what MariaDB has | Match them. Passwords are in `postal-mariadb` env |
 | `postal initialize` says "signing key not readable" | Wrong permissions | `chmod 600 /config/signing.key` |
 | Postal login page won't load | `postal web-server` crashed — check Deploy Logs | Usually either postal.yml syntax error or DB not reachable |
+| Railway shows "Application failed to respond" | Postal bound to `127.0.0.1` instead of `0.0.0.0` | Ensure `BIND_ADDRESS=0.0.0.0` and `PORT=8080` are set on `postal-web`; Networking Target Port = 8080 |
+| Logs show `Listening on http://127.0.0.1:8080` | Missing `BIND_ADDRESS=0.0.0.0` env var | Add it, redeploy; logs should show `0.0.0.0:8080` |
+| Postal UI 403 or "host not allowed" | The hostname you're hitting is not in `postal.yml` `web_hostname` | SSH in, edit `/config/postal.yml`, update `web_hostname` to match the URL you're using; restart service |
 | Custom domain stuck "Awaiting DNS" | Cloudflare CNAME is orange-clouded | Switch to grey (DNS only) |
+| Building a mail server in Postal UI returns 500 | MariaDB `postal` user lacks privileges on per-server databases | See Phase 2.8 — run `GRANT ALL PRIVILEGES ON \`postal-%\`.* TO 'postal'@'%'; FLUSH PRIVILEGES;` |
 | DKIM row stays red 30 min after publishing | CF truncated TXT value, or you need to click Verify again in Postal | Quote the TXT value in CF; re-click Verify |
-| Mail queues but never sends | `postal-worker` not running | Check worker service Active + logs |
-| `postal make-user` already ran, created wrong user | Run `postal make-user` again and create a second admin, then delete the first from the admin UI | — |
+| Dev mail server shows green LIVE badge — am I in Live mode? | The LIVE badge means "online", not "Live mode". Modes look identical externally. | Verify via Settings → Server Settings (the two-level nav) — see Step 6.10 |
+| Can't find the Mode field after creating a mail server | Postal's top-level Settings tab is a gateway to a sub-nav with `Server Settings`, `Spam`, `Retention`, etc. | URL shortcut: `/org/<slug>/servers/<server>/edit` — Mode is on that form |
+| `postal make-user` password doesn't work at login | Typo during interactive entry | Run `postal make-user` again and create a second admin. Multiple admins are harmless. |
+| Mail queues but never sends | `postal-worker` not running, or its `/config` files are missing | Worker must be Active AND its `/config/postal.yml` + `/config/signing.key` must exist (same content as `postal-web`) |
 
 ---
 
