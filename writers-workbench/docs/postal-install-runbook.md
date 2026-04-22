@@ -348,21 +348,47 @@ Wait ~15–30 min. Refresh the Postal UI → every record should turn green. Don
 
 ## Phase 7 — Create the two mail servers + API credentials
 
+Postal uses a two-level domain model:
+- Organization domain (done in Phase 6) — holds the DKIM/SPF/return-path DNS records
+- Mail-server-level domain — authorizes a specific mail server to send FROM that domain
+
+You have to associate the domain at both levels. Phase 6 did the first. Below does the second, plus the API credential.
+
 ### 7.1 Production mail server
 
-- Organization → **Mail Servers** → New Mail Server
-- Name: `writers-workbench-mail-prod`
-- Mode: **Live**
-- Open it → **Credentials** → New → type **API** → label `prod-api-key`
-- **Copy the key value** — this is `POSTAL_API_KEY` for production Workbench
+1. Organization sidebar → **Mail Servers** → **New Mail Server**
+2. Form fields:
+   - **Name:** `writers-workbench-mail-prod`
+   - **Short name:** leave blank (auto-generated)
+   - **Mode:** `Live`
+3. Click **Build server** — you land on the mail server's overview page
+
+4. In the mail server's own sidebar, click **Domains**
+5. Click **Add Domain**
+   - **Domain:** `courseworx.media`
+6. Save — this authorizes this mail server to send from `courseworx.media`
+
+7. Mail server sidebar → **Credentials** → **Add new Credential**
+   - **Name:** `prod-api-key`
+   - **Type:** `API`
+   - **Hold:** leave unchecked (unchecked = actually send; checked = pile into hold queue for debugging)
+8. Save
+9. **Copy the key value shown on the credential page now** — this is your `POSTAL_API_KEY` for production Workbench. Some Postal versions partially hide it after first view.
 
 ### 7.2 Dev mail server
 
-- Mail Servers → New
-- Name: `writers-workbench-mail-dev`
-- Mode: **Development** (Postal will swallow sends and just log them — flip to Live later when ready)
-- Credentials → New → type **API** → label `dev-api-key`
-- **Copy the key value** — this is `POSTAL_API_KEY` for the dev Workbench
+Go back to the organization (top breadcrumb `Course Worx Media`) and repeat the full flow:
+
+1. **New Mail Server**
+   - **Name:** `writers-workbench-mail-dev`
+   - **Mode:** `Development` (Postal swallows sends and only logs them — safe for testing)
+   - **Build server**
+2. **Domains** → **Add Domain** → `courseworx.media`
+3. **Credentials** → **Add new Credential**
+   - **Name:** `dev-api-key`
+   - **Type:** `API`
+   - **Hold:** unchecked
+4. Save → **copy the key value** — this is `POSTAL_API_KEY` for the dev Workbench
 
 ---
 
