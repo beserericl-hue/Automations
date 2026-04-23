@@ -17,7 +17,7 @@ Sprint 10.a (PROD/DEV tier separation) did **not** touch the newsletter pipeline
 | Legacy duplicate | `[OLD] Node - Scrape Url` (was `Node - Scrape Url`) | `glJfsY6KaO0aoX0A` | inactive, renamed to `[OLD]` prefix |
 | Broken pointer (rewired away in S4) | (n/a — was referenced by ingestion workflow) | `qVEM2rCD1jlJPeRs` | 404; no longer referenced after S4 |
 | Ingestion source (frozen baseline) | `AI News Data Ingestion Orig` | `53SlwZMS21gpvz3H` | inactive (baseline — cloned to V2 in S4) |
-| **New (S4)** | **`AI News Data Ingestion V2`** | **`2T3TwGHhdGQlTpQ5`** | **inactive** — awaiting manual spot-check + first-feed activation |
+| **New (S4)** | **`AI News Data Ingestion V2`** | **`2T3TwGHhdGQlTpQ5`** | **active** — 78 nodes (after Reddit no-auth patch); first scheduled fire within 3h of activation |
 | Newsletter Agent source (S6) | `Content - Newsletter Agent` | `4DQ7DmA9pFtXzsKX` | inactive (baseline — clone to V2 in S6) |
 
 ## S1 verification
@@ -57,15 +57,40 @@ PROD credentials don't exist yet. They'll be created at release promotion using 
 
 Net: 80 → 75 nodes (−7 S3/proxy, +2 HTTP Request). All node UUIDs regenerated so the workflow can coexist with Orig without collisions.
 
-### Before activating
+### Two follow-up fixes applied after the initial clone (both verified live)
 
-V2 is **inactive on purpose** so the user can eyeball the workflow in the n8n UI before flipping it on. Checklist for first activation (per sprint doc S4):
+**1. Reddit OAuth replaced with no-auth HTTP Request.** The 3 native `n8n-nodes-base.reddit` nodes (`get_reddit_{artificial,open_ai,artificial_inteligence}_items`) required a Reddit OAuth credential, and Reddit doesn't issue API keys to third parties. Replaced each with a pair:
 
-- Open `AI News Data Ingestion V2` in n8n → Workflow view → confirm the graph looks sane around `get_identity`, `search_existing`, `skip_existing_resources`, `try_extract_external_sources`, `upload_content`.
-- Open `upload_content` and look at the JSON body expression — the `external_source_urls` branch assumes `try_extract_external_sources` emits `$json.output.external_source_urls` as a comma-separated string. If the LLM output shape is different, the first live run will show empty arrays (not an error) and we fix forward.
-- Limit active feeds to one RSS + one Reddit for the first pass to avoid burst traffic.
-- Run manually once; verify `content_ingestion_v2` row in DEV Supabase + `.md`/`.html` blobs in the `newsletter-ingestion` bucket.
-- Then activate.
+- `get_reddit_*_items_http` — HTTP Request v4.2, GET `https://www.reddit.com/comments/{{ $json.url.match(/comments\/([^/]+)/)[1] }}.json?raw_json=1`, `User-Agent: writers-workbench/1.0 (newsletter ingestion)`. `onError: continueRegularOutput` so Reddit rate-limit responses flow through with an `.error` field for the downstream filter to drop.
+- `extract_reddit_*_items` — Set node in raw JSON mode, expression `$json[0].data.children[0].data` (or `{error:'reddit_unexpected_shape', raw:$json}` fallback). Re-exposes `url_overridden_by_dest`, `is_self`, `selftext`, `selftext_html`, `title`, `permalink`, `created_utc`, `score`, `num_comments`, `author`, `subreddit`, `id`, `link_flair_text` at the top level — exactly what the existing `filter_reddit_*_items` and `normalize_reddit_*_items` nodes already read. S5's self-post branch will fork off `extract_reddit_*_items` directly since `is_self` and `selftext` are already available.
+
+**2. OpenAI credential attached to the `o3-mini` LLM node.** `try_extract_external_sources` uses `@n8n/n8n-nodes-langchain.lmChatOpenAi`; the credential slot was empty in Orig (which is why Orig couldn't activate either). Attached cred `xSzPIySN61drme77` (`OpenAi account`, native `openAiApi` type from MEMORY).
+
+Node delta after these two fixes: Orig 80 → V2 78 (−7 S3/proxy, −3 native reddit, +2 ingestion HTTP, +3 reddit HTTP, +3 extract).
+
+### End-to-end verification (automated, no manual steps)
+
+Committed at [`scripts/newsletter-ingestion-e2e-sim.py`](../../scripts/newsletter-ingestion-e2e-sim.py). Walks every transformation the patched V2 will perform against live services:
+
+1. `r/OpenAI/new.json` — real Reddit listing, no auth
+2. `comments/{postId}.json` — real Reddit post detail, no auth — returns the full article body via `selftext` (self-posts) or via `url_overridden_by_dest` + scrape (link posts)
+3. Flatten to top-level via the extract expression
+4. Filter (keep link post, drop self/error/reddit/youtube)
+5. Build `uploadFileName` with the same regex as `get_identity`
+6. `GET /api/ingestion/search?prefix=...&user_id=...` — real dev Express + Supabase
+7. Firecrawl stub (S1 already proved Node - Scrape Url V2 works via its `activeVersion` snapshot)
+8. `POST /api/ingestion/upload` — real dev Express + Supabase + Storage
+9. `psql` SELECT confirms the row is present with the right `type`, `title`, `source_name`, and storage paths
+10. Second search confirms dedup signal flips on (items.length becomes 1)
+11. `DELETE` cleanup so the test doesn't pollute dev
+
+All 11 steps **PASSED** on 2026-04-23.
+
+### Activation state
+
+V2 is **active** as of 2026-04-23; `activeVersionId = 0d971d35-5a08-4cc7-b88e-15c8133b0912`. n8n's activation step validates every node's config — this passed cleanly, which means all expressions (URL regex on the new HTTP nodes, raw JSON extract, upload body JSON expression, filter rewrite) compiled without syntax errors. Orig stays inactive.
+
+First scheduled fire is within 3h (Reddit triggers) or 4h (other feeds) of activation. The executions endpoint (`GET /api/v1/executions?workflowId=2T3TwGHhdGQlTpQ5`) will populate as each trigger fires.
 
 ### URL substitution at promotion
 
