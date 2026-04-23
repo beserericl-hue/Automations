@@ -988,3 +988,124 @@ A customer-facing architecture document for Dewayne Ballard lives on `docs/finte
 - Prod `/api/health`: unchanged since last release; will pick up email endpoint + `checks.postal` at next release/v1.1 cut
 - Postal stack: 3/3 services Active, DKIM + SPF green, 2 mail servers provisioned, both API keys in hand
 - Sprint 10.a: closed. Sprint 10.b: 34/34 pts of code + tests committed across 3 open PRs pending review.
+
+---
+
+## Session 2026-04-23 — Newsletter Migration sprint S1–S3 shipped
+
+**Read this section to resume work on the Newsletter Migration sprint.** Everything above is historical context for other sprints. This session pushed the Newsletter Migration sprint (`writers-workbench/sprint-newsletter-migration.md`, v1.1, 11 stories / 39 points) through its first three stories on branch `feature/newsletter-sprint-s1`, which was cut from `develop` in a sibling worktree (`../Automations-newsletter-s1`) so the in-flight S10b-3 work in the main worktree wouldn't be disturbed.
+
+The Newsletter workflows were **not** touched by Sprint 10.a's PROD/DEV rename — they stayed on their original IDs on `n8n.agileadautomation.com`. This sprint migrates them directly to `V2` suffixes (not `DEV -`/`PROD -`) per the sprint doc, which predates 10.a. At release time this naming will reconcile, but for now `V2` is the sprint's working suffix.
+
+### S1 (Scrape URL wire-up) — SHIPPED
+
+- Cloned `Node - Scrape Url` (`bXBsnU4d6OseXWho`) → **`Node - Scrape Url V2` (`BJaUNEt6PPIqbWLa`)**, active, Firecrawl credential `oWli4irymtVqSDyC` preserved. Node IDs regenerated on clone.
+- Legacy duplicate `glJfsY6KaO0aoX0A` renamed to `[OLD] Node - Scrape Url` (was wired to the broken `BZku8v1a2K12iFGQ` "OpenAI" httpHeaderAuth cred — kept inactive as dead weight).
+- Live scrape verification deferred to S4's ingestion dry-run per the sprint doc.
+- ID registry lives at [`writers-workbench/docs/newsletter-migration-workflow-ids.md`](writers-workbench/docs/newsletter-migration-workflow-ids.md) so S4 can look the V2 id up.
+
+### S2 (Supabase schema + storage bucket) — SHIPPED
+
+- Migration [`writers-workbench/migrations/009_newsletter_ingestion.sql`](writers-workbench/migrations/009_newsletter_ingestion.sql) — 100% additive, schema governance check green.
+- Three new tables, all FK-partitioned on `users_v2(user_id)` with `ON DELETE CASCADE`:
+  - `content_ingestion_v2` — one row per scraped item. Metadata only; body blobs live in Supabase Storage. Soft delete via `deleted_at`.
+  - `newsletter_approvals_v2` — open approval gates keyed by public token. 48h default expiry.
+  - `newsletter_sends_v2` — finished newsletters parked `status='scheduled'` with `scheduled_send_at = now() + 24h` for the future calendar cron.
+- RLS via `get_current_user_id()` on all three (own-row SELECT + ALL); service role bypasses.
+- Shared `updated_at` trigger function `newsletter_touch_updated_at()` on `content_ingestion_v2` + `newsletter_sends_v2`.
+- Private `newsletter-ingestion` storage bucket (10 MB, md/html/plain mime allowlist). Service-role-only for this sprint; Phase 2 UI opens it up.
+- **Applied live to DEV Supabase** (`gvbvwcnmjkdpclcisqrr`, PG 17.6). PROD (`faklxfakgzkpkbxfihzh`) untouched. FK violation probe, RLS enable probe, index count probe, bucket probe all verified.
+- TypeScript types `ContentIngestion`, `NewsletterApproval`, `NewsletterSend` + union helpers added to `client/src/types/database.ts` for Phase 2 UI.
+- `.env.example` stubbed with the 11 newsletter-sprint env vars (most are server-side; the n8n side uses credentials + hardcoded workflow JSON, not env vars — see decision below).
+
+### S3 (Supabase-backed ingestion endpoints) — SHIPPED
+
+Three Express routes under `/api/ingestion`, all gated on an `X-Ingestion-Secret` shared-header middleware:
+- `POST /api/ingestion/upload` — uploads `{markdown, html}` pair to the `newsletter-ingestion` bucket and upserts one row. On partial failure (blob up, DB insert down) the blobs are cleaned up. FK violation returns 400 `FK_VIOLATION` so callers can tell client error from server breakage.
+- `GET /api/ingestion/search?prefix=&user_id=&type_not=` — metadata-only listing by key prefix (`2026-04-23/`). Capped at 500 rows.
+- `GET /api/ingestion/get/:key` — URL-decodes key, returns metadata + both blobs. 404 when row is missing, 500 `BLOB_MISSING` when row exists but storage has been wiped.
+
+Files:
+- [`server/src/middleware/shared-secret.ts`](writers-workbench/server/src/middleware/shared-secret.ts) — reusable factory. S7/S9/S11 will reuse for `X-Email-Secret` / `X-Approval-Secret`.
+- [`server/src/routes/ingestion.ts`](writers-workbench/server/src/routes/ingestion.ts) — three endpoints + OpenAPI annotations.
+- [`server/src/schemas.ts`](writers-workbench/server/src/schemas.ts) — `IngestionKeySchema`, `IngestionUploadSchema`, `IngestionSearchQuerySchema`. Key regex rejects `..`, leading `/`, null bytes, and `.md` / `.html` suffixes (server appends).
+- [`server/src/test/ingestion.test.ts`](writers-workbench/server/src/test/ingestion.test.ts) — **17/17 passing**, in-memory Supabase fake mocks storage + table builder chain.
+- [`server/src/index.ts`](writers-workbench/server/src/index.ts) — router registered behind `generalLimiter`.
+
+Path traversal guard is belt-and-braces: Zod in the schema + a runtime check in the route after URL decoding the `:key` param. Either alone would catch the sprint-doc test cases; having both means a future schema relaxation can't silently open a hole.
+
+Full server suite: **124/124 passing** (includes 17 new).
+
+### Key operational decision — n8n configuration path (no env vars)
+
+**Finding:** n8n Community edition does not allow `$env.*` references in expressions, which the original sprint doc assumed. `WORKBENCH_URL`, `INGESTION_SECRET`, `NEWSLETTER_USER_ID` etc. cannot ship as n8n env vars.
+
+**Decision:** per-tier n8n **`httpHeaderAuth` credentials** for each shared secret; URLs and identity values **hardcoded in the workflow JSON** and substituted by `scripts/clone-prod-to-dev.py` during release promotion (same mechanism already used for the Supabase URL substitution). Same pattern as the existing Firecrawl credential (`oWli4irymtVqSDyC`). This avoids a per-iteration Supabase lookup on the high-frequency ingestion path (50–100 calls per run), keeps secrets out of workflow JSON, and fits the existing DEV/PROD credential-pair convention.
+
+The Express side keeps using Railway env vars — that's unaffected.
+
+### Secrets generated this session
+
+Three 256-bit hex secrets per tier were generated this session (`INGESTION_SECRET`, `APPROVAL_SECRET`, `EMAIL_SECRET` × DEV + PROD = 6 total). They live only in the user's vault and this session's terminal scrollback. **They are not in the repo.** `.env.example` holds placeholders.
+
+Deployment targets for each secret:
+- Railway env var on the matching Workbench service (one per tier)
+- n8n `httpHeaderAuth` credential on `n8n.agileadautomation.com` (one per tier-secret pair = 6 creds when fully wired)
+
+As of session end **none have been pushed anywhere** — wiring is the first task of the next session (needed before S4 can exercise the DEV ingestion endpoint).
+
+### S4 — Next up (not yet started)
+
+**Story:** Clone `AI News Data Ingestion Orig` (`53SlwZMS21gpvz3H`) to `AI News Data Ingestion V2`, rewire its six S3/proxy nodes to hit the new `/api/ingestion/*` endpoints, and repoint its `scrape_url` `executeWorkflow` node at `BJaUNEt6PPIqbWLa` (replacing the broken `qVEM2rCD1jlJPeRs`). 3 pts, P0.
+
+**Unblocks needed before S4 can run end-to-end:**
+1. Wire the DEV `INGESTION_SECRET` into Railway dev service env + an n8n `httpHeaderAuth` credential.
+2. Confirm DEV Express exposes `/api/ingestion/*` once the branch deploys (right now the feature branch is unmerged; dev Railway tracks `develop`).
+
+### Developer reference — what to know to resume
+
+**Branch state:**
+- `feature/newsletter-sprint-s1` — carries S1 + MCP fix + S2 + S3 (4 commits ahead of `develop`).
+- `develop` — unchanged since S10b-2.
+- `feature/s10b-3-chat-proxy-migration` — active in a different session, different worktree. Do not touch.
+
+**Worktree layout (this session):**
+- Main worktree: `/Users/ericbeser/Documents/GitHub/Automations` — S10b-3 session's working copy, do not modify.
+- Newsletter worktree: `/Users/ericbeser/Documents/GitHub/Automations-newsletter-s1` — where all Newsletter sprint work happens. Has its own `node_modules` (installed this session).
+
+**Commits on the feature branch this session:**
+- `2921dd8` — S1 (Node - Scrape Url V2 + legacy dup retired)
+- `eb8bc55` — Point n8n MCP at the correct self-hosted instance (see next paragraph)
+- `3014c98` — S2 (migration 009, types, env.example)
+- `718c905` — S3 (ingestion endpoints, shared-secret middleware, 17 tests)
+
+**`.mcp.json` drift fix:** was pointing at `https://agiletesting.app.n8n.cloud` with an unrelated API key. Every n8n-mcp call was 404-ing because all project workflows (Newsletter, PROD/DEV tiers, Author Agent tools) live on `https://n8n.agileadautomation.com`. Fixed via `eb8bc55`; the correct key was already in `writers-workbench/.env` as `N8N_API_KEY`. The fix doesn't take effect until Claude Code reloads MCP config. Until then: use direct curl against the REST API.
+
+**DEV Supabase pooler (confirmed working this session):**
+- `PGHOST=aws-1-us-east-2.pooler.supabase.com PGPORT=5432 PGUSER=postgres.gvbvwcnmjkdpclcisqrr PGDATABASE=postgres PGPASSWORD=<user vault> /usr/local/opt/postgresql@17/bin/psql`
+
+**Files / folders to know for Newsletter sprint:**
+- [`writers-workbench/sprint-newsletter-migration.md`](writers-workbench/sprint-newsletter-migration.md) — the sprint plan (v1.1).
+- [`writers-workbench/docs/newsletter-migration-workflow-ids.md`](writers-workbench/docs/newsletter-migration-workflow-ids.md) — running registry of n8n workflow IDs (authoritative for S4 wiring).
+- [`writers-workbench/migrations/009_newsletter_ingestion.sql`](writers-workbench/migrations/009_newsletter_ingestion.sql) — applied to DEV.
+- [`writers-workbench/server/src/routes/ingestion.ts`](writers-workbench/server/src/routes/ingestion.ts) + [`middleware/shared-secret.ts`](writers-workbench/server/src/middleware/shared-secret.ts).
+
+**Tests:** 124/124 server, 214/214 client pass on the feature branch.
+
+**Immediate to-do at start of next session:**
+1. Paste DEV `INGESTION_SECRET` into Railway dev service env; create DEV `httpHeaderAuth` credential `DEV Workbench Ingestion Secret` on n8n.
+2. Push `feature/newsletter-sprint-s1` and open a draft PR so dev Railway picks up the new endpoints (or merge to `develop` directly if comfortable).
+3. Smoke-test: `curl -H 'X-Ingestion-Secret: <dev>' 'https://writersworkbenchdev-production.up.railway.app/api/ingestion/search?prefix=NEVER/&user_id=%2B14105914612'` → expect `{success:true,items:[]}`.
+4. Begin S4.
+
+**Gotchas learned this session:**
+- n8n Community edition disallows `$env.*` in expressions. Shared secrets must live in `httpHeaderAuth` credentials; non-secret config must be hardcoded (and substituted at promotion) or read from `app_config_v2`.
+- Cloudflare fronts `n8n.agileadautomation.com` and blocks Python `urllib`'s default user-agent with error 1010. `curl` works fine; Python needs a browser UA or prefer `subprocess.run(['curl', ...])`.
+- n8n `POST /workflows` and `PUT /workflows/:id` allow only `name`, `nodes`, `connections`, `settings` (and `settings` itself only allows a small allowlist — `binaryMode`, `callerPolicy`, `availableInMCP` etc. get rejected). Strip incoming source workflows before re-posting.
+- The v1.1 sprint doc was written before Sprint 10.a's PROD/DEV rename completed. Newsletter workflows weren't in scope for the rename and keep their original IDs — do not search for `PROD - AI News Data Ingestion` or `DEV - Node - Scrape Url`, they don't exist. The sprint's own `V2` suffix is the working naming.
+
+**Final sanity snapshot at session end:**
+- Migration 009 applied live to DEV; PROD untouched.
+- `Node - Scrape Url V2` (`BJaUNEt6PPIqbWLa`) active on n8n with preserved Firecrawl cred.
+- Feature branch `feature/newsletter-sprint-s1` = 4 commits ahead of `develop`, unpushed.
+- Server suite: 124/124. Client suite: 214/214. Schema governance: 9/9 migrations / base tables clean.
