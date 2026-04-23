@@ -46,6 +46,10 @@ export const DeleteAccountSchema = z.object({
   confirmation: z.literal('DELETE', { message: 'Must type DELETE to confirm' }),
 });
 
+// ============================================
+// Email send endpoint (Postal — from PR #17)
+// ============================================
+
 const AttachmentSchema = z.object({
   name: z.string().min(1).max(255),
   contentType: z.string().min(1).max(200),
@@ -63,4 +67,49 @@ export const EmailSendSchema = z.object({
   from: z.string().max(200).optional(),
   attachments: z.array(AttachmentSchema).max(10).optional(),
   user_id: z.string().optional(),
+});
+
+// ============================================
+// Newsletter Migration sprint (S3 ingestion endpoints)
+// ============================================
+
+// Storage-key validation: rejects path traversal, absolute paths,
+// null bytes, trailing file extensions, and anything Postgres
+// text_pattern_ops won't play nicely with. Max 512 chars.
+const ingestionKeyRegex = /^(?!.*\.\.)(?!\/)[A-Za-z0-9._\-/]+$/;
+const IngestionKeySchema = z
+  .string()
+  .min(1, 'key is required')
+  .max(512, 'key too long (max 512 chars)')
+  .refine((v) => !v.includes('\0'), { message: 'key must not contain null bytes' })
+  .refine((v) => ingestionKeyRegex.test(v), {
+    message: 'key must be date/slug-style path (no .., no leading /, no special chars)',
+  })
+  .refine((v) => !/\.(md|html)$/i.test(v), {
+    message: 'key must not include .md or .html extension (server appends)',
+  });
+
+export const IngestionTypeSchema = z.enum(['article', 'reddit_post', 'tweet', 'newsletter']);
+
+export const IngestionUploadSchema = z.object({
+  key: IngestionKeySchema,
+  user_id: z.string().min(1, 'user_id is required'),
+  type: IngestionTypeSchema,
+  title: z.string().max(500).optional().nullable(),
+  authors: z.string().max(500).optional().nullable(),
+  source_name: z.string().min(1, 'source_name is required').max(200),
+  source_url: z.string().url().max(2000).optional().nullable(),
+  external_source_urls: z.array(z.string().url().max(2000)).max(100).optional().default([]),
+  image_urls: z.array(z.string().url().max(2000)).max(100).optional().default([]),
+  reddit_metadata: z.record(z.string(), z.unknown()).optional().nullable(),
+  published_timestamp: z.string().datetime({ offset: true }).optional().nullable(),
+  feed_url: z.string().url().max(2000).optional().nullable(),
+  markdown: z.string().max(5 * 1024 * 1024, 'markdown too large (max 5 MB)'),
+  html: z.string().max(5 * 1024 * 1024, 'html too large (max 5 MB)'),
+});
+
+export const IngestionSearchQuerySchema = z.object({
+  prefix: IngestionKeySchema,
+  user_id: z.string().min(1, 'user_id is required'),
+  type_not: IngestionTypeSchema.optional(),
 });
