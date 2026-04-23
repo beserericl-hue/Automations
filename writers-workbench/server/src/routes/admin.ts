@@ -475,3 +475,67 @@ adminRouter.get('/storage', async (_req: Request, res: Response) => {
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to fetch storage stats' } });
   }
 });
+
+/**
+ * @openapi
+ * /admin/bounces:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Recent Postal bounce / complaint events
+ *     description: |
+ *       Returns up to 100 most recent events from email_bounces_v2,
+ *       optionally filtered by event_type or recipient address.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: event_type
+ *         schema: { type: string }
+ *       - in: query
+ *         name: to
+ *         schema: { type: string }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Bounce list
+ *       403:
+ *         description: Not an admin
+ */
+adminRouter.get('/bounces', async (req: Request, res: Response) => {
+  const eventType = typeof req.query.event_type === 'string' ? req.query.event_type : null;
+  const to = typeof req.query.to === 'string' ? req.query.to : null;
+  const limitRaw = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : 100;
+  const limit = Number.isFinite(limitRaw) ? Math.min(500, Math.max(1, limitRaw)) : 100;
+
+  try {
+    const supabase = getSupabaseAdmin();
+    let q = supabase
+      .from('email_bounces_v2')
+      .select('*')
+      .order('received_at', { ascending: false })
+      .limit(limit);
+    if (eventType) q = q.eq('event_type', eventType);
+    if (to) q = q.eq('to_address', to);
+
+    const { data, error } = await q;
+    if (error) {
+      logger.error({ err: error }, 'admin/bounces query failed');
+      res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: error.message } });
+      return;
+    }
+
+    // Summary counts by event_type for the same (optionally-filtered) window
+    const bounces = data ?? [];
+    const summary: Record<string, number> = {};
+    for (const row of bounces as Array<{ event_type: string }>) {
+      summary[row.event_type] = (summary[row.event_type] ?? 0) + 1;
+    }
+
+    res.json({ success: true, data: { bounces, summary, total: bounces.length } });
+  } catch (err) {
+    logger.error({ err }, 'admin/bounces threw');
+    res.status(500).json({ success: false, error: { code: 'INTERNAL' } });
+  }
+});

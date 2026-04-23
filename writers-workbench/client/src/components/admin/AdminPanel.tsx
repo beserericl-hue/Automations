@@ -39,7 +39,7 @@ async function adminFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
 export default function AdminPanel() {
   const { profile } = useUser();
-  const [activeTab, setActiveTab] = useState<'users' | 'metrics' | 'workflows' | 'queues'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'metrics' | 'workflows' | 'queues' | 'bounces'>('users');
 
   if (!profile?.isAdmin) {
     return (
@@ -54,7 +54,7 @@ export default function AdminPanel() {
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Panel</h1>
 
       <div className="flex gap-2 border-b border-gray-200 dark:border-gray-800">
-        {(['users', 'metrics', 'workflows', 'queues'] as const).map(tab => (
+        {(['users', 'metrics', 'workflows', 'queues', 'bounces'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -70,7 +70,9 @@ export default function AdminPanel() {
                 ? 'System Metrics'
                 : tab === 'workflows'
                   ? 'Workflows'
-                  : 'Queues'}
+                  : tab === 'queues'
+                    ? 'Queues'
+                    : 'Email Bounces'}
           </button>
         ))}
       </div>
@@ -79,6 +81,7 @@ export default function AdminPanel() {
       {activeTab === 'metrics' && <SystemMetrics />}
       {activeTab === 'workflows' && <WorkflowStatus />}
       {activeTab === 'queues' && <QueueStatus />}
+      {activeTab === 'bounces' && <BounceStatus />}
     </div>
   );
 }
@@ -537,3 +540,132 @@ const roleBadge: Record<string, string> = {
 };
 
 const inputClass = 'block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white';
+
+// --------------------------------------------------------------------
+// S11-5 — Email bounces & complaints
+
+interface BounceRow {
+  id: string;
+  postal_message_id: string | null;
+  postal_event_id: string | null;
+  event_type: string;
+  to_address: string;
+  from_address: string | null;
+  subject: string | null;
+  bounce_type: string | null;
+  bounce_reason: string | null;
+  occurred_at: string;
+  received_at: string;
+}
+
+interface BouncePayload {
+  bounces: BounceRow[];
+  summary: Record<string, number>;
+  total: number;
+}
+
+function BounceStatus() {
+  const [filterType, setFilterType] = useState<string>('');
+  const [filterTo, setFilterTo] = useState<string>('');
+
+  const qs: string[] = [];
+  if (filterType) qs.push(`event_type=${encodeURIComponent(filterType)}`);
+  if (filterTo) qs.push(`to=${encodeURIComponent(filterTo)}`);
+  qs.push('limit=100');
+  const path = `/bounces?${qs.join('&')}`;
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['admin-bounces', filterType, filterTo],
+    queryFn: () => adminFetch<BouncePayload>(path),
+    refetchInterval: 30_000,
+  });
+
+  if (isLoading) return <div className="text-sm text-gray-500">Loading bounces...</div>;
+  if (error) return <div className="text-sm text-red-500">Failed to load bounces: {(error as Error).message}</div>;
+  if (!data) return <div className="text-sm text-gray-500">No data.</div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3 text-xs">
+        <div className="flex items-center gap-2">
+          <label className="text-gray-500">Event type:</label>
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            className="rounded border border-gray-300 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+          >
+            <option value="">all</option>
+            <option value="MessageBounced">MessageBounced</option>
+            <option value="MessageHeld">MessageHeld</option>
+            <option value="SpamComplaint">SpamComplaint</option>
+            <option value="MessageDeliveryFailed">MessageDeliveryFailed</option>
+            <option value="MessageDSNReceived">MessageDSNReceived</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-gray-500">Recipient:</label>
+          <input
+            value={filterTo}
+            onChange={(e) => setFilterTo(e.target.value)}
+            placeholder="to@example.com"
+            className="rounded border border-gray-300 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+          />
+        </div>
+        <span className="text-gray-400">{data.total} event{data.total === 1 ? '' : 's'} — auto-refresh 30s</span>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {Object.entries(data.summary).map(([type, count]) => (
+          <span
+            key={type}
+            className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+          >
+            {type}: <strong>{count}</strong>
+          </span>
+        ))}
+      </div>
+
+      <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 overflow-hidden">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
+              <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">Received</th>
+              <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">Type</th>
+              <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">To</th>
+              <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">Subject</th>
+              <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">Reason</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+            {data.bounces.map((b) => (
+              <tr key={b.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                <td className="px-4 py-2 text-xs text-gray-500">{new Date(b.received_at).toLocaleString()}</td>
+                <td className="px-4 py-2 text-xs">
+                  <span className={`rounded-full px-2 py-0.5 font-medium ${
+                    b.event_type === 'MessageBounced' || b.event_type === 'MessageDeliveryFailed'
+                      ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+                      : b.event_type === 'SpamComplaint'
+                        ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300'
+                        : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                  }`}>
+                    {b.event_type}
+                  </span>
+                </td>
+                <td className="px-4 py-2 text-xs text-gray-900 dark:text-white">{b.to_address}</td>
+                <td className="px-4 py-2 text-xs text-gray-600 dark:text-gray-400 max-w-xs truncate">{b.subject || '—'}</td>
+                <td className="px-4 py-2 text-xs text-gray-600 dark:text-gray-400 max-w-xs truncate">{b.bounce_reason || '—'}</td>
+              </tr>
+            ))}
+            {data.bounces.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-4 py-6 text-center text-sm text-gray-400">
+                  No bounce events recorded.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
