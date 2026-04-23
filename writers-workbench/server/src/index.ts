@@ -19,6 +19,8 @@ import { sessionRouter, pushSseEvent } from './routes/session.js';
 import { imagesRouter } from './routes/images.js';
 import { emailRouter } from './routes/email.js';
 import { ingestionRouter } from './routes/ingestion.js';
+import { approvalsApiRouter, approvalsPublicRouter } from './routes/approvals.js';
+import { newsletterSendsRouter } from './routes/newsletter-sends.js';
 import { jobsRouter } from './routes/jobs.js';
 import type { JobInfrastructure } from './lib/jobs/boot.js';
 import { swaggerSpec } from './swagger.js';
@@ -133,6 +135,16 @@ app.use('/api/email', generalLimiter);
 app.use('/api/email', emailRouter);
 app.use('/api/ingestion', generalLimiter);
 app.use('/api/ingestion', ingestionRouter);
+app.use('/api/approvals', generalLimiter);
+app.use('/api/approvals', approvalsApiRouter);
+// Public-facing approval form (no /api prefix — users click this from an email).
+// Mount express.urlencoded() first so POST /approvals/:token/resolve can parse
+// the standard HTML form submission.
+app.use('/approvals', express.urlencoded({ extended: true }));
+app.use('/approvals', generalLimiter);
+app.use('/approvals', approvalsPublicRouter);
+app.use('/api/newsletter-sends', generalLimiter);
+app.use('/api/newsletter-sends', newsletterSendsRouter);
 app.use('/api/callback', generalLimiter);
 app.use('/api/callback', sessionRouter);
 app.use('/api/jobs', generalLimiter);
