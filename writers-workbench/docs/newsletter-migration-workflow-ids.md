@@ -17,7 +17,7 @@ Sprint 10.a (PROD/DEV tier separation) did **not** touch the newsletter pipeline
 | Legacy duplicate | `[OLD] Node - Scrape Url` (was `Node - Scrape Url`) | `glJfsY6KaO0aoX0A` | inactive, renamed to `[OLD]` prefix |
 | Broken pointer (rewired away in S4) | (n/a — was referenced by ingestion workflow) | `qVEM2rCD1jlJPeRs` | 404; no longer referenced after S4 |
 | Ingestion source (frozen baseline) | `AI News Data Ingestion Orig` | `53SlwZMS21gpvz3H` | inactive (baseline — cloned to V2 in S4) |
-| **New (S4)** | **`AI News Data Ingestion V2`** | **`2T3TwGHhdGQlTpQ5`** | **active** — 78 nodes (after Reddit no-auth patch); first scheduled fire within 3h of activation |
+| **New (S4+S5)** | **`AI News Data Ingestion V2`** | **`2T3TwGHhdGQlTpQ5`** | **active** — 86 nodes (S4 reduced Orig to 78, S5 added the 8-node self-post branch); `activeVersionId=d21c13b4-3614-4d12-9733-0d8f968ca627` |
 | Newsletter Agent source (S6) | `Content - Newsletter Agent` | `4DQ7DmA9pFtXzsKX` | inactive (baseline — clone to V2 in S6) |
 
 ## S1 verification
@@ -88,9 +88,56 @@ All 11 steps **PASSED** on 2026-04-23.
 
 ### Activation state
 
-V2 is **active** as of 2026-04-23; `activeVersionId = 0d971d35-5a08-4cc7-b88e-15c8133b0912`. n8n's activation step validates every node's config — this passed cleanly, which means all expressions (URL regex on the new HTTP nodes, raw JSON extract, upload body JSON expression, filter rewrite) compiled without syntax errors. Orig stays inactive.
+V2 is **active** as of 2026-04-23; current `activeVersionId = d21c13b4-3614-4d12-9733-0d8f968ca627` (post-S5). n8n's activation step validates every node's config — both the S4 and the S5 re-activations passed cleanly, which means all expressions (URL regex on the new HTTP nodes, raw JSON extract, upload body JSON expressions, filter rewrites, route IF, self-post normalize Code) compiled without syntax errors. Orig stays inactive.
 
 First scheduled fire is within 3h (Reddit triggers) or 4h (other feeds) of activation. The executions endpoint (`GET /api/v1/executions?workflowId=2T3TwGHhdGQlTpQ5`) will populate as each trigger fires.
+
+---
+
+## S5 — Reddit self-post branch (added 2026-04-23)
+
+Forks off each `extract_reddit_{sub}_items` node (introduced in S4) with a parallel self-post pipeline that bypasses Firecrawl since the body is already in hand on the Reddit response.
+
+**8 new nodes:**
+
+| Name | Type | Role |
+|---|---|---|
+| `filter_reddit_{sub}_self_posts` (×3) | `filter` v2.2, typeValidation=`loose` | keeps items with `is_self=true`, non-empty `selftext` ≠ `[removed]`/`[deleted]`, no `crosspost_parent` |
+| `normalize_reddit_{sub}_self_posts` (×3) | `code` v2 `runOnceForEachItem` | emits `{sourceName:'reddit-{sub}', feedType:'reddit_post', title, link, url, creator, pubDate, isoDate, feedUrl, body_markdown, body_html, reddit_metadata}` — matches `get_identity`'s expected input so the existing Set node keeps working unchanged |
+| `route_scrape_or_self` | `if` v2.2 | `$('get_identity').item.json.feedType === 'reddit_post'`: TRUE → `upload_content_self_post` (skip scrape), FALSE → `delay` (existing link-post path) |
+| `upload_content_self_post` | `httpRequest` v4.2, cred `jQBRJbmiUeTk8c11` | POST `/api/ingestion/upload` with `type:'reddit_post'`, `markdown:body_markdown`, `html:body_html`, `reddit_metadata` populated |
+
+**Edge changes (8 edges total):**
+- `extract_reddit_{sub}_items` → `filter_reddit_{sub}_self_posts` (×3 new, alongside existing to `filter_reddit_{sub}_items`)
+- `filter_reddit_{sub}_self_posts` → `normalize_reddit_{sub}_self_posts` (×3 new)
+- `normalize_reddit_{sub}_self_posts` → `get_identity` (×3 new, merges into the 17 existing normalize→get_identity edges)
+- `skip_existing_resources` → `route_scrape_or_self` (rewired; replaces the old `skip→delay` edge)
+- `route_scrape_or_self.true` → `upload_content_self_post` (new)
+- `route_scrape_or_self.false` → `delay` (preserves link-post path)
+
+**HTML-entity decode** lives inside the normalize Code node — a 6-replacement helper for `&amp;`, `&lt;`, `&gt;`, `&quot;`, `&#039;`, `&#x200B;` (the entities Reddit embeds in `selftext_html`).
+
+### S5 end-to-end verification (automated, no manual steps)
+
+Committed at [`scripts/newsletter-selfpost-e2e-sim.py`](../../scripts/newsletter-selfpost-e2e-sim.py). Walks the full self-post path against **live** services:
+
+```
+ 1. r/OpenAI/new.json                -> pick a real is_self=true post (id 1stua1s)
+ 2. comments/{postId}.json           -> full post incl. selftext/selftext_html
+ 3. filter_reddit_*_self_posts       -> PASS
+ 4. normalize_reddit_*_self_posts    -> sourceName=reddit-OpenAI, body_markdown populated, reddit_metadata keys all present
+ 5. get_identity                     -> uploadFileName computed
+ 6. /api/ingestion/search (dev)      -> items:[]
+ 7. route_scrape_or_self              -> TRUE (bypass scrape)
+ 8. /api/ingestion/upload (dev)      -> 200 OK
+ 9. psql SELECT                      -> type=reddit_post, reddit_metadata JSONB populated with score/author/reddit_id/subreddit/num_comments/flair
+10. /api/ingestion/get/:key          -> full roundtrip OK, markdown body matches, reddit_metadata.reddit_id matches post id
+11. DELETE cleanup
+
+S5 SELF-POST END-TO-END SIM PASSED
+```
+
+Reusable for every future change to the Reddit self-post pipeline.
 
 ### URL substitution at promotion
 
