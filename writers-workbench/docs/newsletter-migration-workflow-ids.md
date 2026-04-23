@@ -217,6 +217,52 @@ POST /api/email/send with attachment body       -> 200, message_id=aad0a152-...@
 
 Only `share_stories_approval_feedback` and `share_subject_line_approval_feedback` remain as Slack nodes in V2, scheduled for removal in S10.
 
+---
+
+## S9 — Approval backend (added 2026-04-23)
+
+Express routes on the Workbench server that replace the Slack `sendAndWait` gate for newsletter approvals. Tokens are minted here and stored in `newsletter_approvals_v2`; the n8n Wait-node resume URL never leaves the server.
+
+**New files:**
+- [`server/src/routes/approvals.ts`](../server/src/routes/approvals.ts) — three endpoints + two exported routers:
+  - `approvalsApiRouter` mounted under `/api/approvals` — the n8n-facing side, gated by `X-Approval-Secret` (cred `ytjKAO1BESVf6Cnz` on n8n, env `APPROVAL_SECRET` on Railway).
+  - `approvalsPublicRouter` mounted under `/approvals` — the reviewer-facing side. The 24-byte token IS the credential.
+- [`server/src/schemas.ts`](../server/src/schemas.ts) — new `ApprovalStageSchema`, `ApprovalCreateSchema`, `ApprovalResolveSchema`.
+
+**Endpoints:**
+| Endpoint | Auth | Purpose |
+|---|---|---|
+| `POST /api/approvals/create` | `X-Approval-Secret` | Mint a token, insert a `newsletter_approvals_v2` row, return `{ token, approval_url: "${APPROVAL_BASE_URL}/approvals/${token}" }`. |
+| `GET /approvals/:token` | Token is credential | SSR HTML form with radio Approve/Revise + feedback textarea. Renders gone/expired page for resolved or expired rows. |
+| `POST /approvals/:token/resolve` | Token is credential | Validates the submission, transactionally UPDATEs the row (only when `resolved_at IS NULL`), POSTs `{decision, feedback}` to the stored `resume_url` (n8n Wait node webhook). Returns a thank-you page on success, 409 on double-submit, 410 on expired, 502 if n8n resume fails (decision already persisted — not lost). |
+
+Dev Railway env: `APPROVAL_SECRET` and `APPROVAL_BASE_URL=https://writersworkbenchdev-production.up.railway.app` set via `railway variable set`.
+
+**Tests:** [`server/src/test/approvals.test.ts`](../server/src/test/approvals.test.ts) — 18/18 passing. In-memory Supabase fake + scoped fetch mock (only intercepts calls to the simulated n8n resume URL, passes everything else through). Covers: auth 401, missing `APPROVAL_BASE_URL` 500, invalid stage 400, FK violation 400, form rendering, expired/resolved pages, approve + revise happy paths, double-submit 409, expired row 410, resume fail 502, network exception 502, malformed-token rejection.
+
+Full server suite after S9: **187/187 passing**.
+
+---
+
+## S10 — Slack sendAndWait → Postal approval flow (added 2026-04-23)
+
+Replaces the remaining 2 Slack `sendAndWait` nodes in `Content - Newsletter Agent V2` with 3-node groups using the S9 approval backend.
+
+| Removed | Replacement group |
+|---|---|
+| `share_stories_approval_feedback` (Slack sendAndWait) | `create_approval_stories` (POST `/api/approvals/create`) → `send_approval_email_stories` (POST `/api/email/send` with approval_url button) → `wait_for_stories_approval` (Wait node, resume=webhook, 48h timeout) |
+| `share_subject_line_approval_feedback` (Slack sendAndWait) | same shape for the subject-line gate |
+
+`create_approval_{stage}` bodies pass `resume_url: $execution.resumeUrl` and `execution_id: $execution.id` so the server-stored resume URL matches the Wait node's webhook. `send_approval_email_{stage}` reads `$('create_approval_{stage}').item.json.approval_url` from the previous step and renders an HTML email with a prominent "Open approval form" button.
+
+Downstream `extract_{stage}_approval_feedback` LLM extractors have their `text` input updated from `$json.data.text` (Slack reply) to `JSON.stringify($json.body || $json)` (the `{decision, feedback}` JSON posted by `/approvals/:token/resolve`). The LLM's existing `{approved, feedback}` output shape and the downstream `check_{stage}_feedback` IF node are unchanged.
+
+**Net V2 change this patch:** 83 → 87 nodes (−2 Slack sendAndWait, +6 approval nodes = 3 per gate × 2 gates).
+
+**After S10:** V2 has **zero Slack nodes**. No more references to channel `C08PGU0CLKS`. Slack credential is no longer attached to any node.
+
+V2 is still not activatable because of pre-existing LLM / s3-segment cred gaps unrelated to this work (documented in S6 activation status). S11 will close those out along with the final segment-storage migration.
+
 ### URL substitution at promotion
 
 `WORKBENCH_URL` (dev: `writersworkbenchdev-production.up.railway.app`, prod: `writersworkbench-production.up.railway.app`) is hardcoded in the two new HTTP Request nodes. `scripts/clone-prod-to-dev.py` and its reverse `promote-dev-to-prod.py` already do URL substitution for the Supabase URL; extending to `WORKBENCH_URL` is a one-line tweak (add it to the substitution table) at DEV → PROD promotion time.
