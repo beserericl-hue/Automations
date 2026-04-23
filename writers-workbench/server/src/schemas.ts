@@ -45,3 +45,22 @@ export const AdminUserUpdateSchema = z.object({
 export const DeleteAccountSchema = z.object({
   confirmation: z.literal('DELETE', { message: 'Must type DELETE to confirm' }),
 });
+
+const AttachmentSchema = z.object({
+  name: z.string().min(1).max(255),
+  contentType: z.string().min(1).max(200),
+  data: z.string().min(1), // base64
+});
+
+export const EmailSendSchema = z.object({
+  to: z.union([z.string().email(), z.array(z.string().email()).min(1).max(50)]),
+  subject: z.string().min(1, 'subject is required').max(998, 'subject too long'),
+  html: z.string().min(1, 'html is required').max(500_000, 'html too large'),
+  text: z.string().max(500_000).optional(),
+  cc: z.union([z.string().email(), z.array(z.string().email()).max(20)]).optional(),
+  bcc: z.union([z.string().email(), z.array(z.string().email()).max(20)]).optional(),
+  replyTo: z.string().email().optional(),
+  from: z.string().max(200).optional(),
+  attachments: z.array(AttachmentSchema).max(10).optional(),
+  user_id: z.string().optional(),
+});
