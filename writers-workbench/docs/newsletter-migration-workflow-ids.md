@@ -18,7 +18,8 @@ Sprint 10.a (PROD/DEV tier separation) did **not** touch the newsletter pipeline
 | Broken pointer (rewired away in S4) | (n/a — was referenced by ingestion workflow) | `qVEM2rCD1jlJPeRs` | 404; no longer referenced after S4 |
 | Ingestion source (frozen baseline) | `AI News Data Ingestion Orig` | `53SlwZMS21gpvz3H` | inactive (baseline — cloned to V2 in S4) |
 | **New (S4+S5)** | **`AI News Data Ingestion V2`** | **`2T3TwGHhdGQlTpQ5`** | **active** — 86 nodes (S4 reduced Orig to 78, S5 added the 8-node self-post branch); `activeVersionId=d21c13b4-3614-4d12-9733-0d8f968ca627` |
-| Newsletter Agent source (S6) | `Content - Newsletter Agent` | `4DQ7DmA9pFtXzsKX` | inactive (baseline — clone to V2 in S6) |
+| Newsletter Agent source (frozen baseline) | `Content - Newsletter Agent` | `4DQ7DmA9pFtXzsKX` | inactive (baseline — cloned to V2 in S6) |
+| **New (S6)** | **`Content - Newsletter Agent V2`** | **`bMvMKyK8obwYZmNb`** | inactive — activation blocked by pre-existing LLM/Slack/s3-segment cred gaps that S8/S10/S11 resolve (same as Orig; not a regression) |
 
 ## S1 verification
 
@@ -138,6 +139,55 @@ S5 SELF-POST END-TO-END SIM PASSED
 ```
 
 Reusable for every future change to the Reddit self-post pipeline.
+
+---
+
+## S6 — Newsletter Agent read path (added 2026-04-23)
+
+Clones `Content - Newsletter Agent` (`4DQ7DmA9pFtXzsKX`, 87 nodes, inactive baseline) to `Content - Newsletter Agent V2` (`bMvMKyK8obwYZmNb`, 83 nodes) and swaps the S3 + `api.aitools.inc` reads for Workbench `/api/ingestion/*` reads.
+
+**6 nodes dropped** — the server-side now covers what each of these did:
+- `filter_only_markdown` (server filters to rows with both blobs)
+- `get_markdown_object_info` (metadata is on the search response)
+- `exclude_newsletters` (new `type_not` query param)
+- `get_markdown_file_content` (no binary extraction — the get endpoint returns markdown as JSON)
+- `extract_tweets` + `get_tweet_object_info` (same reasoning for the tweet path)
+
+**4 nodes reshaped to HTTP Request** (keeping their original names so existing `$('search_markdown_objects')` and `$('download_markdown_object')` references still resolve):
+- `search_markdown_objects` → GET `/api/ingestion/search?prefix={{ $json.Date }}/&type_not=newsletter&user_id=+14105914612`
+- `download_markdown_object` → GET `/api/ingestion/get/{{ encodeURIComponent($json.key) }}`
+- `search_tweets` → GET `/api/ingestion/search?prefix={{ $('form_trigger').item.json.Date }}/tweet.&user_id=+14105914612`
+- `download_tweet_objects` → GET `/api/ingestion/get/{{ encodeURIComponent($json.key) }}`
+
+All 4 use cred `jQBRJbmiUeTk8c11` (DEV Workbench Ingestion Secret).
+
+**2 splitOut nodes added** so each item in the search response becomes its own `$json` for downstream processing: `split_search_markdown`, `split_search_tweets`.
+
+**3 nodes rewritten in place:**
+- `check_any_results` — filter expression now checks `{{ ($json.items || []).length > 0 }}` against the new envelope shape; `typeValidation: loose` (strict is a known n8n gotcha).
+- `prepare_markdown_content` — template now references `$('search_markdown_objects').item.json.{key,type,source_name,authors,external_source_urls}` plus `$('download_markdown_object').item.json.markdown`.
+- `prepare_tweet_content` — simplified template reading the same shape via `$('search_tweets')` / `$('download_tweet_objects')`. Tweet-specific metadata fields (user handle, follower count, view count) that lived only in the old `api.aitools.inc` `Metadata` object are dropped — they'd need a `metadata` JSONB column or a dedicated `tweet_metadata` column on `content_ingestion_v2` before they can be restored.
+
+Net: 87 → 83 nodes (−6 drops, +4 reshape-in-place is net zero, +2 splits, nothing new beyond that — one of the drops was the extract node whose function is absorbed by the JSON response).
+
+### S6 end-to-end verification (automated, no manual steps)
+
+Committed at [`scripts/newsletter-agent-read-e2e-sim.py`](../../scripts/newsletter-agent-read-e2e-sim.py). Seeds three rows (two `article`, one `newsletter`) on today's date via `/api/ingestion/upload`, calls the new search path with `type_not=newsletter`, confirms only the two articles come back, gets each one back via `/api/ingestion/get/:key`, renders the `prepare_markdown_content` template, and cleans up.
+
+```
+ 1. seed 3 rows (2 article + 1 newsletter)
+ 2. /api/ingestion/search?type_not=newsletter -> 2 items (newsletter excluded) PASS
+ 3. split_search_markdown                       -> each item iterated
+ 4. /api/ingestion/get/:key                     -> markdown body round-trips
+ 5. prepare_markdown_content render             -> well-formed YAML-fronted markdown block
+ 6. DELETE cleanup                              -> 3 rows removed
+
+S6 READ-PATH END-TO-END SIM PASSED
+```
+
+### Activation status
+
+V2 activation is currently **blocked** by 12 pre-existing configuration issues on nodes untouched by S6: `download_segment_content` (s3 cred), `claude-3-5-sonnet` (anthropicApi), `gemini-2.5-pro` (googlePalmApi), and 9 Slack nodes (slackOAuth2Api). Every one of those also blocks Orig activation — not a regression. S8 replaces the 9 Slack nodes with HTTP calls to `/api/email/send`; S11's final segment-storage migration and the LLM cred attachments resolve the other three.
 
 ### URL substitution at promotion
 
