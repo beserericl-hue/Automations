@@ -11,7 +11,7 @@
  * index.ts once the chat proxy migrates onto the queue.
  */
 
-import { Worker, type Job, type WorkerOptions } from 'bullmq';
+import { DelayedError, Worker, type Job, type WorkerOptions } from 'bullmq';
 import { getRedis } from '../redis.js';
 import { logger } from '../logger.js';
 import {
@@ -20,6 +20,12 @@ import {
   type N8nWebhookJob,
   type QueueName,
 } from './types.js';
+import {
+  DEFAULT_LIMITS,
+  releaseUserSlot,
+  tryAcquireUserSlot,
+  type ConcurrencyLimits,
+} from './concurrency.js';
 
 /** Thin wrapper so tests can stub the HTTP call. */
 export type HttpPost = (
@@ -51,15 +57,36 @@ export function createN8nWorker(
   opts: {
     http?: HttpPost;
     workerOptions?: Partial<WorkerOptions>;
+    limits?: ConcurrencyLimits;
   } = {},
 ): Worker<N8nWebhookJob, JobResult> {
   const http = opts.http ?? defaultHttpPost;
   const settings = QUEUE_SETTINGS[queueName];
+  const limits = opts.limits ?? DEFAULT_LIMITS;
 
   const processor = async (
     job: Job<N8nWebhookJob, JobResult>,
+    token?: string,
   ): Promise<JobResult> => {
-    const { webhookUrl, body } = job.data;
+    const { webhookUrl, body, userId } = job.data;
+
+    // S10b-4: per-user concurrency gate. If the user already has N jobs
+    // running, push this one to the delayed set and throw DelayedError
+    // so BullMQ doesn't count it as a failed attempt.
+    // tryAcquireUserSlot already rolls back its own counters on refusal,
+    // so we only pair a release when the acquire returned 'ok'.
+    const acquired = await tryAcquireUserSlot(userId, queueName, limits);
+    if (acquired !== 'ok') {
+      logger.info(
+        { jobId: job.id, queue: queueName, userId, reason: acquired },
+        'n8n-worker: deferring — per-user concurrency limit hit',
+      );
+      if (token) {
+        await job.moveToDelayed(Date.now() + limits.retryDelayMs, token);
+      }
+      throw new DelayedError();
+    }
+
     const start = Date.now();
     try {
       const { status, body: resp } = await http(webhookUrl, body);
@@ -86,6 +113,10 @@ export function createN8nWorker(
         'n8n-worker: fail',
       );
       throw err; // let BullMQ mark the attempt failed and retry per policy
+    } finally {
+      // Paired with the 'ok' acquire above — safe because `acquired !== 'ok'`
+      // returns via throw before reaching this block.
+      await releaseUserSlot(userId, queueName);
     }
   };
 

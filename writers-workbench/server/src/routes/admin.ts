@@ -356,6 +356,96 @@ adminRouter.get('/workflows', async (_req: Request, res: Response) => {
   }
 });
 
+/**
+ * @openapi
+ * /admin/queues:
+ *   get:
+ *     tags: [Admin]
+ *     summary: BullMQ queue depths, worker concurrency, and per-user hot list
+ *     description: |
+ *       Live queue snapshot for the admin dashboard. For each of the four named queues
+ *       returns waiting/active/delayed/completed/failed counts plus configured concurrency.
+ *       Also returns the top 20 users by currently-running jobs (from job_queue_v2).
+ *       Returns 503 when Redis is not configured on this instance.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Snapshot payload.
+ *       403:
+ *         description: Not an admin.
+ *       503:
+ *         description: Redis not configured.
+ */
+adminRouter.get('/queues', async (_req: Request, res: Response) => {
+  if (!process.env.REDIS_URL) {
+    res.status(503).json({
+      success: false,
+      error: { code: 'REDIS_UNAVAILABLE', message: 'REDIS_URL not configured on this instance' },
+    });
+    return;
+  }
+
+  try {
+    const { getNamedQueue } = await import('../lib/queue.js');
+    const { ALL_QUEUE_NAMES, QUEUE_SETTINGS } = await import('../lib/jobs/types.js');
+    const { DEFAULT_LIMITS } = await import('../lib/jobs/concurrency.js');
+
+    const queues = await Promise.all(
+      ALL_QUEUE_NAMES.map(async (name) => {
+        const q = getNamedQueue(name);
+        const counts = await q.getJobCounts(
+          'waiting',
+          'active',
+          'delayed',
+          'completed',
+          'failed',
+        );
+        return {
+          name,
+          counts,
+          settings: QUEUE_SETTINGS[name],
+        };
+      }),
+    );
+
+    const supabase = getSupabaseAdmin();
+    const { data: activeJobs, error: activeErr } = await supabase
+      .from('job_queue_v2')
+      .select('user_id, queue_name, job_type, created_at')
+      .in('status', ['waiting', 'active', 'delayed']);
+
+    if (activeErr) {
+      logger.error({ err: activeErr }, 'admin/queues: active jobs query failed');
+    }
+
+    const perUser = new Map<string, number>();
+    for (const row of (activeJobs ?? []) as { user_id: string }[]) {
+      perUser.set(row.user_id, (perUser.get(row.user_id) ?? 0) + 1);
+    }
+    const topUsers = [...perUser.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20)
+      .map(([user_id, count]) => ({ user_id, active_jobs: count }));
+
+    res.json({
+      success: true,
+      data: {
+        queues,
+        perUserLimits: DEFAULT_LIMITS,
+        topUsers,
+        totalActive: (activeJobs ?? []).length,
+      },
+    });
+  } catch (err) {
+    logger.error({ err }, 'admin/queues: snapshot failed');
+    res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to fetch queue snapshot' },
+    });
+  }
+});
+
 // GET /api/admin/storage — Supabase Storage usage stats
 adminRouter.get('/storage', async (_req: Request, res: Response) => {
   try {
