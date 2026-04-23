@@ -4,13 +4,20 @@ import { useQuery } from '@tanstack/react-query';
 import ReactMarkdown from 'react-markdown';
 import { useUser } from '../../contexts/UserContext';
 import { supabase } from '../../config/supabase';
-import { N8N_WEBHOOK_URL } from '../../config/constants';
+
+type JobStatus = 'queued' | 'active' | 'completed' | 'failed';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
-  timestamp: string; // ISO string for localStorage serialization
+  timestamp: string;
   isAsync?: boolean;
+  /** BullMQ job id when this assistant message represents a queued job. */
+  jobId?: string;
+  /** Live status of the attached job (updates via SSE). */
+  jobStatus?: JobStatus;
+  /** Short tag describing what the job does (e.g. "write_chapter"). */
+  jobType?: string;
 }
 
 interface ChatDrawerProps {
@@ -19,6 +26,7 @@ interface ChatDrawerProps {
 }
 
 const CHAT_STORAGE_KEY = 'writers-workbench-chat-history';
+const ACTIVE_JOBS_KEY = 'writers-workbench-active-jobs';
 const MAX_MESSAGES = 100;
 
 const QUICK_COMMANDS = [
@@ -31,15 +39,6 @@ const QUICK_COMMANDS = [
   { label: 'List my outlines', command: 'List all outlines' },
   { label: 'Approve content...', command: 'Approve ' },
 ];
-
-// Async operations don't return immediate data
-const ASYNC_PATTERNS = [
-  /^(write|brainstorm|generate|repurpose|create)/i,
-];
-
-function isAsyncCommand(text: string): boolean {
-  return ASYNC_PATTERNS.some(p => p.test(text.trim()));
-}
 
 function loadMessages(): Message[] {
   try {
@@ -56,8 +55,48 @@ function saveMessages(messages: Message[]) {
   try {
     localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages.slice(-MAX_MESSAGES)));
   } catch {
-    // localStorage full — clear old messages
     localStorage.removeItem(CHAT_STORAGE_KEY);
+  }
+}
+
+function saveActiveJobs(messages: Message[]) {
+  try {
+    const activeIds = messages
+      .filter((m) => m.jobId && (m.jobStatus === 'queued' || m.jobStatus === 'active'))
+      .map((m) => m.jobId!);
+    localStorage.setItem(ACTIVE_JOBS_KEY, JSON.stringify(activeIds));
+  } catch {
+    // ignore
+  }
+}
+
+function statusLabel(status?: JobStatus): string {
+  switch (status) {
+    case 'queued':
+      return 'Queued';
+    case 'active':
+      return 'Processing';
+    case 'completed':
+      return 'Complete';
+    case 'failed':
+      return 'Failed';
+    default:
+      return '';
+  }
+}
+
+function statusClasses(status?: JobStatus): string {
+  switch (status) {
+    case 'queued':
+      return 'bg-yellow-50 text-yellow-800 border border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800';
+    case 'active':
+      return 'bg-blue-50 text-blue-800 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800';
+    case 'completed':
+      return 'bg-green-50 text-green-800 border border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800';
+    case 'failed':
+      return 'bg-red-50 text-red-800 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800';
+    default:
+      return 'bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100';
   }
 }
 
@@ -74,7 +113,6 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Detect current project context for context-aware suggestions
   const isOnProject = location.pathname.startsWith('/projects/') && params.id;
   const { data: currentProject } = useQuery({
     queryKey: ['project-context', params.id],
@@ -89,9 +127,9 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
     enabled: !!isOnProject,
   });
 
-  // Persist messages to localStorage
   useEffect(() => {
     saveMessages(messages);
+    saveActiveJobs(messages);
   }, [messages]);
 
   useEffect(() => {
@@ -105,28 +143,60 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Resize drag handler
-  const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-    const startX = e.clientX;
-    const startWidth = drawerWidth;
+  // Listen for SSE job-status events dispatched by AppShell and update the
+  // attached assistant message's badge without a refresh.
+  useEffect(() => {
+    function handleJobStatus(event: Event) {
+      const detail = (event as CustomEvent).detail as {
+        jobId: string;
+        status: JobStatus;
+        error?: string;
+      } | undefined;
+      if (!detail?.jobId) return;
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.jobId !== detail.jobId) return m;
+          return {
+            ...m,
+            jobStatus: detail.status,
+            content:
+              detail.status === 'completed'
+                ? 'Done — results are in your Content Library.'
+                : detail.status === 'failed'
+                  ? `Job failed: ${detail.error || 'unknown error'}`
+                  : m.content,
+          };
+        }),
+      );
+    }
+    window.addEventListener('chat-job-status', handleJobStatus);
+    return () => window.removeEventListener('chat-job-status', handleJobStatus);
+  }, []);
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const newWidth = Math.max(360, Math.min(800, startWidth + (startX - e.clientX)));
-      setDrawerWidth(newWidth);
-    };
-    const handleMouseUp = () => {
-      setIsResizing(false);
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  }, [drawerWidth]);
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      setIsResizing(true);
+      const startX = e.clientX;
+      const startWidth = drawerWidth;
+
+      const handleMouseMove = (e: MouseEvent) => {
+        const newWidth = Math.max(360, Math.min(800, startWidth + (startX - e.clientX)));
+        setDrawerWidth(newWidth);
+      };
+      const handleMouseUp = () => {
+        setIsResizing(false);
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    },
+    [drawerWidth],
+  );
 
   const addMessage = (msg: Message) => {
-    setMessages(prev => [...prev.slice(-(MAX_MESSAGES - 1)), msg]);
+    setMessages((prev) => [...prev.slice(-(MAX_MESSAGES - 1)), msg]);
   };
 
   const sendMessage = async () => {
@@ -138,49 +208,43 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
     setInput('');
     setSending(true);
 
-    const async_ = isAsyncCommand(text);
-
     try {
-      let url = N8N_WEBHOOK_URL;
-      let response: Response;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
 
-      try {
-        response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_message_request: text,
-            user_id: profile?.user_id || '',
-          }),
-        });
-      } catch {
-        // CORS likely blocked — use proxy
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData?.session?.access_token;
-        response = await fetch('/api/chat/proxy', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({
-            user_message_request: text,
-            user_id: profile?.user_id || '',
-          }),
-        });
+      const response = await fetch('/api/chat/proxy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          user_message_request: text,
+          user_id: profile?.user_id || '',
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => response.statusText);
+        throw new Error(`HTTP ${response.status}: ${errText}`);
       }
 
       const data = await response.json();
-      const assistantContent = data.output || data.text || data.message || JSON.stringify(data);
 
-      if (async_) {
+      if (data?.mode === 'async' && data.jobId) {
         addMessage({
           role: 'assistant',
-          content: 'Command sent. Results will appear in your Content Library when ready.',
+          content: 'Queued — you can keep working while this runs.',
           timestamp: new Date().toISOString(),
           isAsync: true,
+          jobId: data.jobId,
+          jobStatus: 'queued',
+          jobType: data?.classification?.jobType,
         });
       } else {
+        const payload = data?.data ?? data;
+        const assistantContent =
+          payload?.output || payload?.text || payload?.message || JSON.stringify(payload);
         addMessage({
           role: 'assistant',
           content: assistantContent,
@@ -214,32 +278,39 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
   const clearHistory = () => {
     setMessages([]);
     localStorage.removeItem(CHAT_STORAGE_KEY);
+    localStorage.removeItem(ACTIVE_JOBS_KEY);
   };
 
-  // Context-aware commands based on current page
-  const contextCommands = currentProject ? [
-    { label: `Write next chapter of "${currentProject.title}"`, command: `Write chapter ${(currentProject.chapter_count || 0) + 1} of ${currentProject.title}` },
-    { label: `Generate cover art for "${currentProject.title}"`, command: `Generate cover art for ${currentProject.title}` },
-    { label: `Repurpose "${currentProject.title}" for social`, command: `Repurpose ${currentProject.title} to social media` },
-  ] : [];
+  const contextCommands = currentProject
+    ? [
+        {
+          label: `Write next chapter of "${currentProject.title}"`,
+          command: `Write chapter ${(currentProject.chapter_count || 0) + 1} of ${currentProject.title}`,
+        },
+        {
+          label: `Generate cover art for "${currentProject.title}"`,
+          command: `Generate cover art for ${currentProject.title}`,
+        },
+        {
+          label: `Repurpose "${currentProject.title}" for social`,
+          command: `Repurpose ${currentProject.title} to social media`,
+        },
+      ]
+    : [];
 
   return (
     <>
-      {/* Backdrop */}
       {open && <div className="fixed inset-0 z-40 bg-black/20" onClick={onClose} />}
 
-      {/* Drawer */}
       <div
         className={`fixed right-0 top-0 z-50 flex h-full transform flex-col border-l border-gray-200 bg-white shadow-xl transition-transform dark:border-gray-800 dark:bg-gray-950 ${open ? 'translate-x-0' : 'translate-x-full'}`}
         style={{ width: `${drawerWidth}px`, maxWidth: '100vw' }}
       >
-        {/* Resize handle */}
         <div
           className={`absolute left-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-brand-500/30 ${isResizing ? 'bg-brand-500/30' : ''}`}
           onMouseDown={handleResizeStart}
         />
 
-        {/* Header */}
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 px-4 dark:border-gray-800">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Chat with Author Agent</h2>
           <div className="flex items-center gap-1">
@@ -262,7 +333,6 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
           </div>
         </div>
 
-        {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 && (
             <div className="text-center mt-8">
@@ -275,13 +345,25 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
           )}
           {messages.map((msg, i) => (
             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
-                msg.role === 'user'
-                  ? 'bg-brand-600 text-white'
-                  : msg.isAsync
-                    ? 'bg-yellow-50 text-yellow-800 border border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800'
-                    : 'bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100'
-              }`}>
+              <div
+                className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
+                  msg.role === 'user'
+                    ? 'bg-brand-600 text-white'
+                    : msg.jobId
+                      ? statusClasses(msg.jobStatus)
+                      : msg.isAsync
+                        ? statusClasses('queued')
+                        : 'bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100'
+                }`}
+              >
+                {msg.role === 'assistant' && msg.jobId && (
+                  <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide">
+                    <span className="inline-flex items-center rounded-full bg-white/60 px-1.5 py-0.5 dark:bg-black/20">
+                      {statusLabel(msg.jobStatus)}
+                    </span>
+                    {msg.jobType && <span className="opacity-70">{msg.jobType}</span>}
+                  </div>
+                )}
                 {msg.role === 'assistant' ? (
                   <div className="prose prose-sm dark:prose-invert max-w-none">
                     <ReactMarkdown>{msg.content}</ReactMarkdown>
@@ -289,9 +371,7 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
                 ) : (
                   msg.content
                 )}
-                <div className={`mt-1 text-[10px] ${
-                  msg.role === 'user' ? 'text-white/60' : 'text-gray-400'
-                }`}>
+                <div className={`mt-1 text-[10px] ${msg.role === 'user' ? 'text-white/60' : 'text-gray-500'}`}>
                   {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
               </div>
@@ -311,12 +391,10 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Quick Commands panel */}
         {showCommands && (
           <div className="border-t border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-900">
             <div className="mb-2 text-xs font-medium text-gray-500">Quick Commands</div>
 
-            {/* Context-aware commands */}
             {contextCommands.length > 0 && (
               <div className="mb-2">
                 <div className="mb-1 text-[10px] uppercase tracking-wide text-brand-600 dark:text-brand-400">Current Project</div>
@@ -333,7 +411,6 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
               </div>
             )}
 
-            {/* Standard quick commands */}
             <div className="grid grid-cols-2 gap-1">
               {QUICK_COMMANDS.map((cmd, i) => (
                 <button
@@ -348,7 +425,6 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
           </div>
         )}
 
-        {/* Input */}
         <div className="shrink-0 border-t border-gray-200 p-3 dark:border-gray-800">
           <div className="flex items-end gap-2">
             <button
@@ -363,14 +439,14 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
             <textarea
               ref={inputRef}
               value={input}
-              onChange={e => setInput(e.target.value)}
+              onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
               disabled={sending}
               rows={1}
               className="max-h-24 min-h-[36px] flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
               style={{ height: 'auto' }}
-              onInput={e => {
+              onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement;
                 target.style.height = 'auto';
                 target.style.height = `${Math.min(target.scrollHeight, 96)}px`;
