@@ -1044,15 +1044,37 @@ Full server suite: **124/124 passing** (includes 17 new).
 
 The Express side keeps using Railway env vars — that's unaffected.
 
-### Secrets generated this session
+### Secrets wired this session (DEV tier only)
 
-Three 256-bit hex secrets per tier were generated this session (`INGESTION_SECRET`, `APPROVAL_SECRET`, `EMAIL_SECRET` × DEV + PROD = 6 total). They live only in the user's vault and this session's terminal scrollback. **They are not in the repo.** `.env.example` holds placeholders.
+Three 256-bit hex secrets per tier were generated; only the DEV ones were deployed. PROD secrets remain in the user's vault for release-time promotion.
 
-Deployment targets for each secret:
-- Railway env var on the matching Workbench service (one per tier)
-- n8n `httpHeaderAuth` credential on `n8n.agileadautomation.com` (one per tier-secret pair = 6 creds when fully wired)
+**Pre-existing state discovered mid-session (did not overwrite):**
+- Postal is **already installed** as three Railway services in the `N8N-MCP` project: `postal-web`, `postal-mariadb`, `postal-worker`. The sprint doc's S7 is therefore partly done — infrastructure exists, DNS and domain config are presumably in place (reachable at `postal-admin.courseworx.media` per env config). What S7 still needs is the Express `/api/email/send` endpoint and the reachability health check.
+- `WritersWorkbenchDev` service already had `EMAIL_SECRET`, `POSTAL_API_KEY`, `POSTAL_API_URL`, `SENDER_EMAIL=eve@courseworx.media`, `SENDER_NAME=The Writers Workbench (Dev)`, `REPLY_TO_EMAIL=support@courseworx.media`. Existing `EMAIL_SECRET` value was reused instead of overwritten with the one generated this session.
 
-As of session end **none have been pushed anywhere** — wiring is the first task of the next session (needed before S4 can exercise the DEV ingestion endpoint).
+**Dev Railway env vars added this session (`N8N-MCP` project, `WritersWorkbenchDev` service):**
+- `INGESTION_SECRET` — new (generated this session)
+- `APPROVAL_SECRET` — new (generated this session)
+- (`EMAIL_SECRET` left at existing value)
+
+**n8n `httpHeaderAuth` credentials created this session on `n8n.agileadautomation.com`:**
+
+| Credential name | ID | Header |
+|---|---|---|
+| `DEV Workbench Ingestion Secret` | `jQBRJbmiUeTk8c11` | `X-Ingestion-Secret` |
+| `DEV Workbench Approval Secret`  | `ytjKAO1BESVf6Cnz` | `X-Approval-Secret` |
+| `DEV Workbench Email Secret`     | `kxrSg24PIR2Npfvw` | `X-Email-Secret` (value = existing Railway `EMAIL_SECRET`) |
+
+PROD secrets and PROD credentials are not yet created — they land at release-time promotion.
+
+### PR #19 — draft against `develop`
+
+`feature/newsletter-sprint-s1` pushed to origin and a draft PR (#19) is open against `develop`. Once the operational tasks above are done and the PR flips to ready + merges, dev Railway auto-deploys and `/api/ingestion/*` becomes reachable. Smoke test after that:
+```
+curl -H 'X-Ingestion-Secret: <dev secret>' \
+  'https://writersworkbenchdev-production.up.railway.app/api/ingestion/search?prefix=NEVER/&user_id=%2B14105914612'
+```
+Expected: `{"success":true,"items":[]}`.
 
 ### S4 — Next up (not yet started)
 
@@ -1093,10 +1115,9 @@ As of session end **none have been pushed anywhere** — wiring is the first tas
 **Tests:** 124/124 server, 214/214 client pass on the feature branch.
 
 **Immediate to-do at start of next session:**
-1. Paste DEV `INGESTION_SECRET` into Railway dev service env; create DEV `httpHeaderAuth` credential `DEV Workbench Ingestion Secret` on n8n.
-2. Push `feature/newsletter-sprint-s1` and open a draft PR so dev Railway picks up the new endpoints (or merge to `develop` directly if comfortable).
-3. Smoke-test: `curl -H 'X-Ingestion-Secret: <dev>' 'https://writersworkbenchdev-production.up.railway.app/api/ingestion/search?prefix=NEVER/&user_id=%2B14105914612'` → expect `{success:true,items:[]}`.
-4. Begin S4.
+1. Flip PR #19 from draft to ready, merge to `develop` once reviewed (auto-deploys dev Railway).
+2. Once deployed, smoke-test: `curl -H 'X-Ingestion-Secret: <dev>' 'https://writersworkbenchdev-production.up.railway.app/api/ingestion/search?prefix=NEVER/&user_id=%2B14105914612'` → expect `{success:true,items:[]}`.
+3. Begin S4 — clone `AI News Data Ingestion Orig`, rewire 6 S3/proxy nodes to `/api/ingestion/*`, point `scrape_url` at `BJaUNEt6PPIqbWLa`. Use n8n credential `jQBRJbmiUeTk8c11` on the new HTTP Request nodes.
 
 **Gotchas learned this session:**
 - n8n Community edition disallows `$env.*` in expressions. Shared secrets must live in `httpHeaderAuth` credentials; non-secret config must be hardcoded (and substituted at promotion) or read from `app_config_v2`.

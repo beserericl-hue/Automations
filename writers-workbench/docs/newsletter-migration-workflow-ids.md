@@ -29,9 +29,25 @@ Sprint 10.a (PROD/DEV tier separation) did **not** touch the newsletter pipeline
 
 Live end-to-end scrape verification (real URL in → markdown + rawHtml out) is **deferred to S4's system test**, per the sprint doc — S4 wires the ingestion workflow at this V2 scraper and the first ingestion dry-run exercises it.
 
+## n8n `httpHeaderAuth` credential IDs (DEV tier, created 2026-04-23)
+
+| Credential name | ID | Header |
+|---|---|---|
+| `DEV Workbench Ingestion Secret` | `jQBRJbmiUeTk8c11` | `X-Ingestion-Secret` |
+| `DEV Workbench Approval Secret`  | `ytjKAO1BESVf6Cnz` | `X-Approval-Secret` |
+| `DEV Workbench Email Secret`     | `kxrSg24PIR2Npfvw` | `X-Email-Secret` |
+
+Each DEV workflow's HTTP Request nodes that call `/api/{ingestion,approvals,email}/*` must reference these via `"authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "credentials": {"httpHeaderAuth": {"id": "<cred id>"}}` — same pattern already used by the Firecrawl credential (`oWli4irymtVqSDyC`).
+
+PROD credentials don't exist yet. They'll be created at release promotion using the PROD secret values (currently only in the user's vault). `scripts/clone-prod-to-dev.py` handles credential ID substitution during promotion.
+
 ## For S4
 
 The ingestion V2 clone's `scrape_url` executeWorkflow node must point its `workflowId` at `BJaUNEt6PPIqbWLa` (replacing the broken `qVEM2rCD1jlJPeRs`).
+
+The two new HTTP Request nodes this story adds (`search_existing` and `upload_content`) must both reference cred `jQBRJbmiUeTk8c11` (DEV Workbench Ingestion Secret).
+
+URL for DEV Express: `https://writersworkbenchdev-production.up.railway.app` (will be the `WORKBENCH_URL` hardcoded in the workflow JSON; `scripts/clone-prod-to-dev.py` will substitute to `writersworkbench-production.up.railway.app` at promotion).
 
 ## MCP config drift
 
