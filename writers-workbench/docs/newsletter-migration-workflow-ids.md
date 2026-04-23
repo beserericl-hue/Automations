@@ -187,7 +187,35 @@ S6 READ-PATH END-TO-END SIM PASSED
 
 ### Activation status
 
-V2 activation is currently **blocked** by 12 pre-existing configuration issues on nodes untouched by S6: `download_segment_content` (s3 cred), `claude-3-5-sonnet` (anthropicApi), `gemini-2.5-pro` (googlePalmApi), and 9 Slack nodes (slackOAuth2Api). Every one of those also blocks Orig activation — not a regression. S8 replaces the 9 Slack nodes with HTTP calls to `/api/email/send`; S11's final segment-storage migration and the LLM cred attachments resolve the other three.
+V2 activation is currently **blocked** by 12 pre-existing configuration issues on nodes untouched by S6: `download_segment_content` (s3 cred), `claude-3-5-sonnet` (anthropicApi), `gemini-2.5-pro` (googlePalmApi), and 9 Slack nodes (slackOAuth2Api). Every one of those also blocks Orig activation — not a regression. S8 replaces the 7 informational Slack nodes with HTTP calls to `/api/email/send`; S10 replaces the remaining 2 approval Slack nodes; S11's final segment-storage migration and the LLM cred attachments resolve the other three.
+
+---
+
+## S8 — Slack → Postal email migration (added 2026-04-23)
+
+Replaces the 7 informational Slack nodes in `Content - Newsletter Agent V2` with HTTP Request nodes calling the Workbench `/api/email/send` endpoint (PR #17, already live on dev). Keeps the 2 `sendAndWait` approval Slack nodes untouched — those are S10's scope.
+
+| Old Slack node | New email node | Subject |
+|---|---|---|
+| `share_selected_stories` | `share_selected_stories_email` | `Newsletter {Date} — Selected Stories` |
+| `share_stories_reasoning` | `share_stories_reasoning_email` | `Re: Newsletter {Date} — Selected Stories Reasoning` (threaded equiv) |
+| `share_segment_msg` | `share_segment_msg_email` | `Newsletter {Date} \| Segment: {title}` |
+| `share_subject_line` | `share_subject_line_email` | `Newsletter {Date} — Subject Line` |
+| `share_subject_line_reasoning` | `share_subject_line_reasoning_email` | `Re: Newsletter {Date} — Subject Line Reasoning` |
+| `share_newsletter_msg` | `share_newsletter_msg_email` | `Newsletter {Date} — Preview (internal)` |
+| `upload_newsletter_file` | `upload_newsletter_file_email` | `Newsletter {Date} — final .md` (+ base64 attachment) |
+
+All 7 use cred `kxrSg24PIR2Npfvw` (DEV Workbench Email Secret). HTML bodies wrap the original Slack text expressions verbatim in `<pre>…</pre>` — preserves formatting without adding a markdown-to-HTML node per email. Recipient is currently hardcoded to `eric@agileadtesting.com` (the DEV user's `recipient_email` per `app_config_v2`); a follow-up refactor can centralize via Supabase lookup.
+
+`upload_newsletter_file_email` sends the newsletter `.md` as a base64 attachment to Postal by referencing `$binary.data.data` from the existing `create_newsletter_file` convertToFile node — no extra conversion.
+
+**Validated live against dev Postal in this session:**
+```
+POST /api/email/send with S8 body shape         -> 200, message_id=8e0f2417-...@rp.postal.courseworx.media
+POST /api/email/send with attachment body       -> 200, message_id=aad0a152-...@rp.postal.courseworx.media
+```
+
+Only `share_stories_approval_feedback` and `share_subject_line_approval_feedback` remain as Slack nodes in V2, scheduled for removal in S10.
 
 ### URL substitution at promotion
 
