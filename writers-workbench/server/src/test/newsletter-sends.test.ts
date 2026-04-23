@@ -32,28 +32,69 @@ function reset() {
   delete state.forceError;
 }
 
+function buildChain(initialRows: () => FakeSend[], onResult: (rows: FakeSend[]) => { data: unknown; error: unknown }) {
+  const filters: Record<string, unknown> = {};
+  const notFilters: Record<string, unknown> = {};
+  const lte: Record<string, unknown> = {};
+  const builder: Record<string, unknown> = {
+    eq(col: string, val: unknown) { filters[col] = val; return builder; },
+    neq(col: string, val: unknown) { notFilters[col] = val; return builder; },
+    lte(col: string, val: unknown) { lte[col] = val; return builder; },
+    order() { return builder; },
+    select() { return builder; },
+    maybeSingle() {
+      const rows = initialRows().filter((r) => {
+        for (const k of Object.keys(filters)) {
+          if ((r as unknown as Record<string, unknown>)[k] !== filters[k]) return false;
+        }
+        for (const k of Object.keys(notFilters)) {
+          if ((r as unknown as Record<string, unknown>)[k] === notFilters[k]) return false;
+        }
+        return true;
+      });
+      const result = onResult(rows);
+      if (result.error) return Promise.resolve({ data: null, error: result.error });
+      const arr = (result.data as FakeSend[] | null) ?? [];
+      return Promise.resolve({ data: Array.isArray(arr) && arr.length ? arr[0] : null, error: null });
+    },
+    then(onFulfilled: (x: { data: unknown; error: unknown }) => unknown) {
+      const rows = initialRows().filter((r) => {
+        for (const k of Object.keys(filters)) {
+          if ((r as unknown as Record<string, unknown>)[k] !== filters[k]) return false;
+        }
+        for (const k of Object.keys(notFilters)) {
+          if ((r as unknown as Record<string, unknown>)[k] === notFilters[k]) return false;
+        }
+        for (const k of Object.keys(lte)) {
+          if (String((r as unknown as Record<string, unknown>)[k]) > String(lte[k])) return false;
+        }
+        return true;
+      });
+      return Promise.resolve(onResult(rows)).then(onFulfilled);
+    },
+  };
+  return builder;
+}
+
 const fakeSupabase = {
   from(table: string) {
     if (table !== 'newsletter_sends_v2') throw new Error(`Unexpected table: ${table}`);
     return {
-      upsert(row: Partial<FakeSend>, opts?: { onConflict?: string }) {
-        // Mirror the conflict-by-(user_id, send_date) behavior
-        const builder: Record<string, unknown> = {
-          select(_cols: string) { return builder; },
-          maybeSingle() {
-            if (state.forceError) {
-              return Promise.resolve({ data: null, error: { message: state.forceError, code: '99' } });
-            }
-            if (row.user_id && !state.validUserIds.has(row.user_id)) {
-              return Promise.resolve({ data: null, error: { message: 'FK violation', code: '23503' } });
-            }
-            const existing = state.rows.findIndex((r) =>
-              opts?.onConflict === 'user_id,send_date' &&
-              r.user_id === row.user_id && r.send_date === row.send_date
-            );
-            const id = existing >= 0 ? state.rows[existing].id : 'row-' + Math.random().toString(36).slice(2);
+      select(_cols: string) {
+        return buildChain(
+          () => state.rows,
+          (rows) => state.forceError
+            ? { data: null, error: { message: state.forceError, code: '99' } }
+            : { data: rows, error: null },
+        );
+      },
+      insert(row: Partial<FakeSend>) {
+        return buildChain(
+          () => {
+            if (state.forceError) return [];
+            if (row.user_id && !state.validUserIds.has(row.user_id)) return [];
             const next: FakeSend = {
-              id,
+              id: 'row-' + Math.random().toString(36).slice(2),
               user_id: row.user_id!,
               send_date: row.send_date!,
               subject: row.subject!,
@@ -64,34 +105,29 @@ const fakeSupabase = {
               status: (row.status as string) ?? 'scheduled',
               metadata: (row.metadata as Record<string, unknown>) ?? {},
             };
-            if (existing >= 0) state.rows[existing] = next;
-            else state.rows.push(next);
-            return Promise.resolve({ data: { id: next.id, scheduled_send_at: next.scheduled_send_at, status: next.status }, error: null });
+            state.rows.push(next);
+            return [next];
           },
-        };
-        return builder;
+          (rows) => {
+            if (state.forceError) return { data: null, error: { message: state.forceError, code: '99' } };
+            if (row.user_id && !state.validUserIds.has(row.user_id)) {
+              return { data: null, error: { message: 'FK violation', code: '23503' } };
+            }
+            return { data: rows, error: null };
+          },
+        );
       },
-      select(_cols: string) {
-        const filters: Record<string, unknown> = {};
-        const lte: Record<string, unknown> = {};
-        const builder: Record<string, unknown> = {
-          eq(col: string, val: unknown) { filters[col] = val; return builder; },
-          lte(col: string, val: unknown) { lte[col] = val; return builder; },
-          order() { return builder; },
-          then(onFulfilled: (x: { data: FakeSend[]; error: null }) => unknown) {
-            const rows = state.rows.filter((r) => {
-              for (const k of Object.keys(filters)) {
-                if ((r as unknown as Record<string, unknown>)[k] !== filters[k]) return false;
-              }
-              for (const k of Object.keys(lte)) {
-                if (String((r as unknown as Record<string, unknown>)[k]) > String(lte[k])) return false;
-              }
-              return true;
-            });
-            return Promise.resolve({ data: rows, error: null }).then(onFulfilled);
+      update(updates: Partial<FakeSend>) {
+        return buildChain(
+          () => state.rows,
+          (rows) => {
+            if (state.forceError) return { data: null, error: { message: state.forceError, code: '99' } };
+            for (const row of rows) {
+              Object.assign(row, updates);
+            }
+            return { data: rows, error: null };
           },
-        };
-        return builder;
+        );
       },
     };
   },
