@@ -850,3 +850,141 @@ cd writers-workbench/server && npx vitest run
 - Dev `/api/health`: `{status: ok, environment: development, version: <recent-sha>, checks: {supabase: ok, redis: ok}}`
 - Prod `/api/health`: `{status: ok, environment: production, version: 2771300…, checks: {supabase: ok}}` (no redis field — prod still on pre-S10b-1 code via `release/v1.0`; that's expected; prod picks up the new check at next release)
 - Isolation test: 3/3 layers green.
+
+---
+
+## Session 2026-04-22 to 2026-04-23 — Sprint 10.a/10.b wrap + Newsletter S7 (Postal) install
+
+**Read this section to resume. Everything above is earlier context.**
+
+### Sprint 10.a — CLOSED (on main at v1.0, all release work done in prior session)
+
+No new 10.a work in this session. State unchanged:
+- PROD/DEV tier separation enforced via CLAUDE.md and `scripts/check-base-table-immutability.py`.
+- 24 `PROD - <name>` + 24 `DEV - <name>` workflows on `n8n.agileadautomation.com`.
+- Two Railway Workbench services + two Redis services, one per environment.
+- Schema governance CI check required on main.
+
+### Sprint 10.b — IN FLIGHT (3 PRs open, stacked against develop)
+
+All three remaining stories coded, tested, pushed. Each PR has its own CI-green feature branch. Stacked so the chain needs to merge in order: #13 → #14 → #15. Merge cleanly by retargeting #14 to `develop` after #13 merges, then #15 after #14.
+
+| Story | Points | PR | Base | Status |
+|-------|--------|----|----|--------|
+| S10b-1 Redis + BullMQ library | 5 | #10 | develop | Merged (prior session) |
+| S10b-2 Job queue schema + priority | 8 | #11 | develop | Merged (prior session) |
+| S10b-3 Chat proxy → queue dispatch | 8 | [#13](https://github.com/beserericl-hue/Automations/pull/13) | develop | Open, all 4 required checks green |
+| S10b-4 Per-user concurrency + admin queue dashboard | 5 | [#14](https://github.com/beserericl-hue/Automations/pull/14) | feature/s10b-3-... | Open, stacked |
+| S10b-5 Session store + SSE pub/sub → Redis | 8 | [#15](https://github.com/beserericl-hue/Automations/pull/15) | feature/s10b-4-... | Open, stacked |
+
+**S10b-3 — Migrate chat proxy onto BullMQ + SSE progress**
+- `server/src/routes/chat.ts` classifies every inbound message via `jobs/classifier.ts`. Sync tier (list/retrieve/approve) keeps the direct n8n fetch; async tier (write/brainstorm/generate) enqueues to the priority-matched BullMQ queue and returns `{jobId, trackerRowId, status:'queued'}`.
+- New `N8N_HUB_WEBHOOK_URL` env var (full URL). Falls back to the legacy `${N8N_API_URL}/webhook/author_request_v2` so prod keeps working without env changes. Dev needs `N8N_HUB_WEBHOOK_URL=https://n8n.agileadautomation.com/webhook/author_request_dev` set before/on deploy.
+- `server/src/routes/jobs.ts` — user-scoped jobs API (list, stats, detail, status, cancel). Cancel only allowed for `waiting`/`delayed`.
+- `server/src/lib/jobs/sse-forwarder.ts` + `boot.ts` — at server boot, start one BullMQ Worker per queue, attach the tracker (S10b-2) and a new SSE forwarder that pushes `job-status` events to the user's SSE channel as queue events fire.
+- `server/src/routes/session.ts` — `pushSseEvent(userId, event)` exported so the forwarder can push without a round-trip.
+- `client/src/components/chat/ChatDrawer.tsx` — async responses render Queued → Processing → Complete/Failed pills. Active job IDs persist in localStorage so a refresh restores state.
+- `client/src/components/layout/AppShell.tsx` — fans `job-status` SSE events to the window so ChatDrawer can subscribe.
+- 11 new server tests, 3 new client component tests, 1 updated S4-6 test. Full suite 335/335 green at merge.
+
+**S10b-4 — Per-user concurrency gate + admin queue dashboard**
+- `server/src/lib/jobs/concurrency.ts` — `tryAcquireUserSlot` / `releaseUserSlot` / `getUserCounts` using Redis `INCR`/`DECR` with 30-min TTL safety valve. `DEFAULT_LIMITS`: 3 total / 1 heavy per user.
+- `server/src/lib/jobs/n8n-worker.ts` — processor acquires before HTTP, releases in `finally` on ok path. On refusal, calls `job.moveToDelayed(Date.now()+5s, token)` and throws BullMQ's `DelayedError` (not a retry).
+- `server/src/routes/admin.ts` — `GET /api/admin/queues`: queue depths per tier (`waiting`, `active`, `delayed`, `completed`, `failed`), configured concurrency, DEFAULT_LIMITS, top 20 users by active job count, total in-flight. Returns 503 when `REDIS_URL` is unset.
+- `client/src/components/admin/AdminPanel.tsx` — new **Queues** tab with 10s auto-refresh.
+- 10 new server tests.
+
+**S10b-5 — Session store + SSE fan-out to Redis**
+- `server/src/lib/session-store.ts` — `SessionStore` interface. Redis impl uses hash-per-user key `session:{userId}` with key-level 30-min TTL, `SCAN` for count. Critical detail: `isActive` uses `HEXISTS` before the `MULTI` so an expired key doesn't get resurrected by `HSET lastActivity`. In-memory fallback for local dev without Redis.
+- `server/src/lib/sse-pubsub.ts` — `publishSseEvent` uses main Redis for PUBLISH; dedicated second IORedis connection for subscriber mode (IORedis won't let you SUBSCRIBE on the same client as PUBLISH). Ref-counted per-channel local handler map — only SUBSCRIBE on first local listener per user channel; UNSUBSCRIBE on last.
+- `server/src/routes/session.ts` — refactored. `pushSseEvent` is now async and publishes. Every endpoint (register, unregister, active, content-ready, events) goes through the two abstractions.
+- `server/src/routes/health.ts` — new `active_sessions` field in payload. Failure to read does not fail the health check.
+- `server/src/lib/jobs/sse-forwarder.ts` — `SsePushFn` widened to sync-or-async return.
+- `server/src/index.ts` — `closeSsePubsub` in graceful shutdown alongside `closeAllQueues` + `closeRedis`.
+- 12 new server tests.
+
+**Test counts at end of 10.b work:**
+- Server: 119 (base) + 11 (S10b-3) + 10 (S10b-4) + 12 (S10b-5) = 152 passing across the stack
+- Client: 217 passing
+- Typecheck + production build: clean on all three branches
+
+### Newsletter Sprint S7 — Postal install complete (supports Sprint 11)
+
+Postal 3.3.5 stack is live in Railway `N8N-MCP` project, production environment:
+
+| Service | Role | State |
+|---------|------|-------|
+| `postal-mariadb` | metadata + per-server DBs | Active, 5 GB volume at `/var/lib/mysql` |
+| `postal-web` | admin UI + HTTP API | Active, volume at `/config`, public at `postal-admin.courseworx.media` |
+| `postal-worker` | outbound mail processor | Active, own `/config` volume with same postal.yml + signing.key |
+
+Not installed: `postal-rabbitmq` (Postal 3.x dropped it) and `postal-smtp` (only needed for inbound mail; out of scope for API-only sending).
+
+**Inside Postal:**
+- Organization `Courseworx Media`, slug `courseworx-media`
+- Sending domain `courseworx.media` verified (SPF + DKIM green in Postal; published on Cloudflare with grey-cloud on the Return Path CNAME)
+- Two mail servers:
+  - `writers-workbench-mail-prod` — mode Live — API key saved offline
+  - `writers-workbench-mail-dev` — mode Development (Postal swallows sends and logs only) — API key saved offline
+- Admin user `eric@agileadtesting.com` on the Postal admin UI
+
+**Gotchas captured in the runbook** (`writers-workbench/docs/postal-install-runbook.md`, committed on branch `docs/postal-install-runbook`, PR [#16](https://github.com/beserericl-hue/Automations/pull/16)):
+- Postal 3.x image tag `:3` does NOT exist on GHCR — only `:latest` and specific versions like `:3.3.5`
+- `postal start` is NOT a real command. The three processes are `postal web-server`, `postal worker`, `postal smtp-server`, each as its own Railway service with its own `/config` volume
+- Postal `config/puma.rb` reads `BIND_ADDRESS` + `PORT` env vars. Default is loopback. On Railway set `BIND_ADDRESS=0.0.0.0` and `PORT=8080`, then set Networking target port to 8080
+- Postal creates a separate MySQL database per mail server (`postal-server-1`, `postal-server-2`, ...). MariaDB user needs `GRANT ALL PRIVILEGES ON \`postal-%\`.* TO 'postal'@'%'` or Build Server returns 500
+- Postal's `ActionDispatch::HostAuthorization` only lets the `web_hostname` from `postal.yml` access the UI. Any other URL returns 403
+- The "LIVE" badge on mail server tiles means "server active/online," NOT "Live mode". To verify mode: `/org/<slug>/servers/<server>/edit` (or Settings → Server Settings in the two-level nav)
+
+### `/api/email/send` endpoint — SHIPPED (PR #17 merged to develop)
+
+Workbench-side HTTP API that dispatches mail through Postal. `server/src/lib/email.ts` is the Postal client (handles DRY_RUN_EMAIL, signature headers, attachments). `server/src/routes/email.ts` is the route, gated by `X-Email-Secret` header and an in-memory 30/min-per-user_id rate limit. 12 new server tests. Full server suite 119/119 after merge.
+
+**Env vars on `WritersWorkbenchDev` (set in this session):**
+- `POSTAL_API_URL=https://postal-admin.courseworx.media/api/v1`
+- `POSTAL_API_KEY=<dev-api-key>` (from `writers-workbench-mail-dev` credentials)
+- `EMAIL_SECRET=30c8dc2b3a1339a996c1dff20e5ea28d6e466870cef7635a9a4723819877431d`
+- `SENDER_EMAIL=eve@courseworx.media`
+- `SENDER_NAME=The Writers Workbench (Dev)`
+- `REPLY_TO_EMAIL=support@courseworx.media`
+- `DRY_RUN_EMAIL=false` (flipped off after dry-run smoke test passed)
+
+**Smoke tests executed live:**
+- Dry-run: `POST /api/email/send` → `{success:true, message_id:"dry-run-...", mode:"dry-run"}` — 200
+- Live (Postal actually called): `POST /api/email/send` → `{success:true, message_id:"f8c95e3c-...@rp.postal.courseworx.media", mode:"sent"}` — 200
+- `/api/health` shows `checks.postal: ok`
+
+Dev mail server is in Development mode so no mail reaches real inboxes — Postal UI's Messages tab logs every send for inspection.
+
+### Fintech architecture proposal — separate branch
+
+A customer-facing architecture document for Dewayne Ballard lives on `docs/fintech-architecture-ballard` (committed `fintech-architecture-ballard.md` + `fintech-architecture-ballard.pdf` at repo root). Describes multi-tenant Supabase design, RLS, Stripe entitlements, loan amortization at scale, audit logging, regulatory reporting, multi-currency, ACH vs card reconciliation, RLS CI test harness, and Supabase security posture for fintech workloads. No code — architectural prose. Not merged; reference branch only.
+
+### Branch state at session end
+
+- `main` = v1.0.0 (PROD Railway). Unchanged.
+- `develop` = all prior merges + PR #17 (email endpoint). Dev Railway picks up on merge.
+- Open PRs: **#13** (S10b-3, targeting develop), **#14** (S10b-4, targeting S10b-3 branch), **#15** (S10b-5, targeting S10b-4 branch), **#16** (Postal runbook, targeting develop, docs-only).
+
+### Immediate to-do list for next session
+
+1. Review + merge PR #13 (S10b-3). **Before merge:** set `N8N_HUB_WEBHOOK_URL=https://n8n.agileadautomation.com/webhook/author_request_dev` on the dev Workbench service so async jobs hit DEV n8n — otherwise the fallback sends dev queue jobs to PROD webhook.
+2. Retarget PR #14 to `develop`, review, merge.
+3. Retarget PR #15 to `develop`, review, merge. Sprint 10.b closes at 34/34 pts once all three are in.
+4. Merge PR #16 (docs-only, no risk).
+5. Kick off **Sprint 11** — migrate 15 V2 `DEV - ...` n8n workflows from Gmail node to HTTP Request → `/api/email/send`. Workflow-editing work; promotion DEV → PROD via `scripts/promote-dev-to-prod.py` at end of sprint.
+
+### Gotchas captured in this session
+
+- `gh pr merge` on a stacked PR with E2E-only failures succeeds because E2E is not a required check; proceed with squash merge. Chain merges by retargeting the next PR's base from the predecessor feature branch to `develop` after each merge.
+- `railway ssh` fails with "Your application is not running or in a unexpected state" if the service is crash-looping or scaled to zero. Workaround pattern: set Custom Start Command to `sleep infinity`, redeploy, SSH in, fix the `/config` or env issue, set start command to the real entrypoint, redeploy.
+- Postal's `docker-entrypoint.sh` just waits for `WAIT_FOR_TARGETS` and execs `$@`. The `ENTRYPOINT` is the wait script; the `CMD` is whatever you pass. Railway's "Custom Start Command" overrides `CMD`, so you write the full subcommand (`postal web-server` / `postal worker`).
+- Cloudflare: the Return Path CNAME under Postal's sending domain MUST be grey cloud (DNS only). Orange-clouding breaks the return-path handshake and causes bounces to fail in non-obvious ways.
+- For cross-environment visibility, `checks.postal` in `/api/health` skips the reachability probe when `DRY_RUN_EMAIL=true` (by design — no point pinging Postal if we're not going to call it).
+
+### Final sanity snapshot at session end
+
+- Dev `/api/health`: `{status:ok, environment:development, version:68da1456, checks:{supabase:ok, redis:ok, postal:ok}}`
+- Prod `/api/health`: unchanged since last release; will pick up email endpoint + `checks.postal` at next release/v1.1 cut
+- Postal stack: 3/3 services Active, DKIM + SPF green, 2 mail servers provisioned, both API keys in hand
+- Sprint 10.a: closed. Sprint 10.b: 34/34 pts of code + tests committed across 3 open PRs pending review.
