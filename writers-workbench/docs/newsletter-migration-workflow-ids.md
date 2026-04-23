@@ -10,13 +10,14 @@ Sprint 10.a (PROD/DEV tier separation) did **not** touch the newsletter pipeline
 
 ## Workflow IDs
 
-| Role | Name | ID | Status (post-S1) |
+| Role | Name | ID | Status |
 |---|---|---|---|
 | Source (frozen baseline) | `Node - Scrape Url` | `bXBsnU4d6OseXWho` | inactive — **do not modify** per project baseline rule |
 | **New (S1)** | **`Node - Scrape Url V2`** | **`BJaUNEt6PPIqbWLa`** | **active** |
 | Legacy duplicate | `[OLD] Node - Scrape Url` (was `Node - Scrape Url`) | `glJfsY6KaO0aoX0A` | inactive, renamed to `[OLD]` prefix |
-| Broken pointer (to be rewired in S4) | (n/a — referenced by ingestion workflow) | `qVEM2rCD1jlJPeRs` | 404 — ingestion's `scrape_url` executeWorkflow node currently points here |
-| Ingestion source (S4) | `AI News Data Ingestion Orig` | `53SlwZMS21gpvz3H` | inactive (baseline — clone to V2 in S4) |
+| Broken pointer (rewired away in S4) | (n/a — was referenced by ingestion workflow) | `qVEM2rCD1jlJPeRs` | 404; no longer referenced after S4 |
+| Ingestion source (frozen baseline) | `AI News Data Ingestion Orig` | `53SlwZMS21gpvz3H` | inactive (baseline — cloned to V2 in S4) |
+| **New (S4)** | **`AI News Data Ingestion V2`** | **`2T3TwGHhdGQlTpQ5`** | **inactive** — awaiting manual spot-check + first-feed activation |
 | Newsletter Agent source (S6) | `Content - Newsletter Agent` | `4DQ7DmA9pFtXzsKX` | inactive (baseline — clone to V2 in S6) |
 
 ## S1 verification
@@ -41,13 +42,34 @@ Each DEV workflow's HTTP Request nodes that call `/api/{ingestion,approvals,emai
 
 PROD credentials don't exist yet. They'll be created at release promotion using the PROD secret values (currently only in the user's vault). `scripts/clone-prod-to-dev.py` handles credential ID substitution during promotion.
 
-## For S4
+## S4 verification
 
-The ingestion V2 clone's `scrape_url` executeWorkflow node must point its `workflowId` at `BJaUNEt6PPIqbWLa` (replacing the broken `qVEM2rCD1jlJPeRs`).
+`AI News Data Ingestion V2` (`2T3TwGHhdGQlTpQ5`) was built by cloning Orig (80 nodes) with six structural transformations:
 
-The two new HTTP Request nodes this story adds (`search_existing` and `upload_content`) must both reference cred `jQBRJbmiUeTk8c11` (DEV Workbench Ingestion Secret).
+1. **7 S3/proxy nodes dropped** — `upload_temp_markdown`, `copy_markdown`, `delete_temp_markdown`, `upload_temp_html`, `copy_html`, `delete_temp_html`, `search_existing_resource`. None of the `s3` resource operations against the `data-ingestion` bucket or `api.aitools.inc` proxy calls remain.
+2. **`search_existing` added** — HTTP Request v4.2, GET `https://writersworkbenchdev-production.up.railway.app/api/ingestion/search?prefix={{$json.uploadFileName}}&user_id=+14105914612`, cred `jQBRJbmiUeTk8c11`. Same position as the old `search_existing_resource`.
+3. **`upload_content` added** — HTTP Request v4.2, POST `https://writersworkbenchdev-production.up.railway.app/api/ingestion/upload`, cred `jQBRJbmiUeTk8c11`. Body is a single JSON expression that assembles `{key, user_id, type, title, authors, source_name, source_url, external_source_urls, image_urls, reddit_metadata?, published_timestamp, feed_url, markdown, html}` from the earlier nodes. `type` maps `feedType` to one of the four allowed ingestion types; anything unrecognized falls back to `article`.
+4. **Edges rewired**:
+   - `get_identity → search_existing → skip_existing_resources`
+   - `try_extract_external_sources → upload_content`
+5. **`skip_existing_resources` filter rewritten** — now checks `{{ ($json.items || []).length === 0 }}` against the new search response shape. Type validation flipped from `strict` to `loose` (MEMORY.md: Filter node with `strict typeValidation` discards everything).
+6. **`scrape_url` executeWorkflow retargeted** — `workflowId.value` = `BJaUNEt6PPIqbWLa`, `workflowId.cachedResultName` = `Node - Scrape Url V2`. The broken `qVEM2rCD1jlJPeRs` pointer is gone.
 
-URL for DEV Express: `https://writersworkbenchdev-production.up.railway.app` (will be the `WORKBENCH_URL` hardcoded in the workflow JSON; `scripts/clone-prod-to-dev.py` will substitute to `writersworkbench-production.up.railway.app` at promotion).
+Net: 80 → 75 nodes (−7 S3/proxy, +2 HTTP Request). All node UUIDs regenerated so the workflow can coexist with Orig without collisions.
+
+### Before activating
+
+V2 is **inactive on purpose** so the user can eyeball the workflow in the n8n UI before flipping it on. Checklist for first activation (per sprint doc S4):
+
+- Open `AI News Data Ingestion V2` in n8n → Workflow view → confirm the graph looks sane around `get_identity`, `search_existing`, `skip_existing_resources`, `try_extract_external_sources`, `upload_content`.
+- Open `upload_content` and look at the JSON body expression — the `external_source_urls` branch assumes `try_extract_external_sources` emits `$json.output.external_source_urls` as a comma-separated string. If the LLM output shape is different, the first live run will show empty arrays (not an error) and we fix forward.
+- Limit active feeds to one RSS + one Reddit for the first pass to avoid burst traffic.
+- Run manually once; verify `content_ingestion_v2` row in DEV Supabase + `.md`/`.html` blobs in the `newsletter-ingestion` bucket.
+- Then activate.
+
+### URL substitution at promotion
+
+`WORKBENCH_URL` (dev: `writersworkbenchdev-production.up.railway.app`, prod: `writersworkbench-production.up.railway.app`) is hardcoded in the two new HTTP Request nodes. `scripts/clone-prod-to-dev.py` and its reverse `promote-dev-to-prod.py` already do URL substitution for the Supabase URL; extending to `WORKBENCH_URL` is a one-line tweak (add it to the substitution table) at DEV → PROD promotion time.
 
 ## MCP config drift
 
