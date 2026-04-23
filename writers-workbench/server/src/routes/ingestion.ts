@@ -94,13 +94,16 @@ ingestionRouter.post(
     const storagePathHtml = `${key}.html`;
 
     // Upload both blobs. Run in parallel; we need both anyway.
+    // Supabase bucket allowed_mime_types is a strict string match — the bucket
+    // allowlist is ['text/markdown','text/html','text/plain'], so the Content-Type
+    // here must match exactly. Appending '; charset=utf-8' rejects the upload.
     const [mdResult, htmlResult] = await Promise.all([
       supabase.storage.from(BUCKET).upload(storagePathMd, Buffer.from(markdown, 'utf-8'), {
-        contentType: 'text/markdown; charset=utf-8',
+        contentType: 'text/markdown',
         upsert: true,
       }),
       supabase.storage.from(BUCKET).upload(storagePathHtml, Buffer.from(html, 'utf-8'), {
-        contentType: 'text/html; charset=utf-8',
+        contentType: 'text/html',
         upsert: true,
       }),
     ]);
