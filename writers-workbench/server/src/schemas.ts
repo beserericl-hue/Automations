@@ -135,3 +135,21 @@ export const ApprovalResolveSchema = z.object({
   decision: z.enum(['approve', 'revise']),
   feedback: z.string().max(5000).optional().default(''),
 });
+
+// ============================================
+// Newsletter Migration sprint (S11 newsletter-sends save)
+// ============================================
+
+export const NewsletterSendSaveSchema = z.object({
+  user_id: z.string().min(1, 'user_id is required'),
+  send_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'send_date must be YYYY-MM-DD'),
+  subject: z.string().min(1, 'subject is required').max(998),
+  preheader: z.string().max(500).optional().nullable(),
+  html_body: z.string().min(1, 'html_body is required').max(5 * 1024 * 1024),
+  markdown_body: z.string().max(5 * 1024 * 1024).optional().nullable(),
+  // Optional explicit schedule time. If missing, server defaults to now()+24h.
+  scheduled_send_at: z.string().datetime({ offset: true }).optional().nullable(),
+  metadata: z.record(z.string(), z.unknown()).optional().nullable(),
+});

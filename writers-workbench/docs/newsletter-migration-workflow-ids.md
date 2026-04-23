@@ -261,7 +261,65 @@ Downstream `extract_{stage}_approval_feedback` LLM extractors have their `text` 
 
 **After S10:** V2 has **zero Slack nodes**. No more references to channel `C08PGU0CLKS`. Slack credential is no longer attached to any node.
 
-V2 is still not activatable because of pre-existing LLM / s3-segment cred gaps unrelated to this work (documented in S6 activation status). S11 will close those out along with the final segment-storage migration.
+V2 is still not activatable because of pre-existing LLM / s3-segment cred gaps unrelated to this work (documented in S6 activation status). S11 closes those out along with the final segment-storage migration.
+
+---
+
+## S11 — Final save, activation, cutover (added 2026-04-23)
+
+### Express: `/api/newsletter-sends/save`
+
+New route [`server/src/routes/newsletter-sends.ts`](../server/src/routes/newsletter-sends.ts):
+
+| Endpoint | Auth | Purpose |
+|---|---|---|
+| `POST /api/newsletter-sends/save` | `X-Ingestion-Secret` | Upserts a `newsletter_sends_v2` row with `status='scheduled'` and `scheduled_send_at = body.scheduled_send_at ?? now()+24h`. `onConflict:(user_id,send_date)` means a re-run for the same date replaces the previous draft. Returns `{success, id, scheduled_send_at, status}`. |
+| `GET /api/newsletter-sends/scheduled` | `requireAuth + requireAdmin` | Lists rows with `status='scheduled'` and `scheduled_send_at <= now()+7d`. Read-only view for the future calendar cron. |
+
+`NewsletterSendSaveSchema` added to `server/src/schemas.ts`. **6 new unit tests** ([`server/src/test/newsletter-sends.test.ts`](../server/src/test/newsletter-sends.test.ts), all passing): auth 401, default +24h, explicit value, upsert-by-(user_id,send_date), FK violation 400, bad date format 400. Full server suite: **193/193 passing.**
+
+### n8n (Content - Newsletter Agent V2)
+
+**Segment-download swap** (finishes the "no more S3" goal):
+- Drop: `get_segment_content_info` (HTTP to api.aitools.inc), `download_segment_content` (s3), `get_segment_content_text` (extractFromFile).
+- Add: `download_segment` — HTTP GET `/api/ingestion/get/{{ encodeURIComponent($json['current_story.identifiers']) }}`, cred `jQBRJbmiUeTk8c11`.
+- Rewrite `prepare_segment_content_item` to read from `$('download_segment').item.json.{type,source_name,authors,external_source_urls,image_urls,markdown}` instead of `get_segment_content_info.json.Metadata.*` + `get_segment_content_text.json.data`.
+
+**Final terminal step** — inserted after `share_newsletter_msg_email`:
+- `save_scheduled_newsletter` — POST `/api/newsletter-sends/save`. Body pulls `subject` and `preheader` from `set_selected_stories` and `markdown_body` from `set_full_newsletter.full_newsletter_content`. `html_body` wraps the markdown in `<pre>` (good enough for internal preview; future polish can do real markdown→HTML). `metadata` carries `generated_by` + `execution_id`.
+- `final_notification` — POST `/api/email/send`. Subject: `Newsletter {date} — saved as scheduled`. HTML body shows the row id + `scheduled_send_at`. Attachment: the `.md` base64-encoded from `set_full_newsletter.full_newsletter_content`.
+
+**LLM credentials attached** (pre-existing Orig gap):
+- `claude-3-5-sonnet` ← `5LhCYKsaFO3fF7II` (`Anthropic account`).
+- `gemini-2.5-pro` ← `QCbiHRahj2Q15wqr` (`Google Gemini(PaLM) Api account`).
+
+**Second executeWorkflow retarget**:
+- `scrape_segment_external_source_url` also pointed at the broken `qVEM2rCD1jlJPeRs`. Retargeted to `BJaUNEt6PPIqbWLa` (the S1 V2 scraper).
+
+### Activation & cutover
+
+**V2 newsletter agent activated** — `activeVersionId = f5a201ca-6334-4c2a-a593-5f6274c097b0`. n8n validated all 87 node configs cleanly. Ingestion V2 was already active from S5.
+
+**Forbidden-string sweep on `Content - Newsletter Agent V2`** (sprint-doc DoD):
+
+| Check | Result |
+|---|---|
+| Slack node count | 0 |
+| S3 node count | 0 |
+| `api.aitools.inc` references | 0 |
+| `data-ingestion` bucket references | 0 |
+| broken `qVEM2rCD1jlJPeRs` references | 0 |
+| Slack channel `C08PGU0CLKS` | 0 |
+
+Orig (`4DQ7DmA9pFtXzsKX`) and `AI News Data Ingestion Orig` (`53SlwZMS21gpvz3H`) remain inactive — untouched baselines.
+
+### Node delta summary across the sprint
+
+| Workflow | Orig | V2 (final) | Net change |
+|---|---|---|---|
+| `AI News Data Ingestion` | 80 | 86 | −7 S3/proxy, −3 native reddit, +2 ingestion HTTP, +6 reddit HTTP/extract, +8 self-post (S5) |
+| `Content - Newsletter Agent` | 87 | 87 | −6 S3/proxy for markdown/tweet reads, +2 HTTP+split (S6); −7 informational Slack, +7 email HTTP (S8); −2 sendAndWait Slack, +6 approval nodes (S10); −3 segment S3, +3 save/notify/scrape-retarget (S11) |
+| `Node - Scrape Url` | 2 | 2 | unchanged, activated (S1) |
 
 ### URL substitution at promotion
 
