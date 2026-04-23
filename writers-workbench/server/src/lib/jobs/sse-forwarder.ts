@@ -17,7 +17,7 @@ import { getRedis } from '../redis.js';
 import { logger } from '../logger.js';
 import { getSupabaseAdmin } from '../../services/supabase-admin.js';
 
-export type SsePushFn = (userId: string, event: Record<string, unknown>) => number;
+export type SsePushFn = (userId: string, event: Record<string, unknown>) => number | Promise<number>;
 
 interface TrackerMeta {
   user_id: string;
@@ -53,15 +53,19 @@ export function attachSseForwarderToQueue(
   const emit = async (bullJobId: string, status: string, extra: Record<string, unknown> = {}) => {
     const meta = await lookupJob(bullJobId);
     if (!meta) return;
-    push(meta.user_id, {
-      type: 'job-status',
-      jobId: bullJobId,
-      status,
-      job_type: meta.job_type,
-      queue: meta.queue_name,
-      timestamp: new Date().toISOString(),
-      ...extra,
-    });
+    try {
+      await push(meta.user_id, {
+        type: 'job-status',
+        jobId: bullJobId,
+        status,
+        job_type: meta.job_type,
+        queue: meta.queue_name,
+        timestamp: new Date().toISOString(),
+        ...extra,
+      });
+    } catch (err) {
+      logger.error({ err, bullJobId, status }, 'sse-forwarder: push failed');
+    }
   };
 
   events.on('active', ({ jobId }) => {

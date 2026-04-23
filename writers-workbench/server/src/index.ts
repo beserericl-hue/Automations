@@ -198,7 +198,9 @@ async function shutdown(signal: string) {
       }
       const { closeAllQueues } = await import('./lib/queue.js');
       const { closeRedis } = await import('./lib/redis.js');
+      const { closeSsePubsub } = await import('./lib/sse-pubsub.js');
       await closeAllQueues();
+      await closeSsePubsub();
       await closeRedis();
     } catch (err) {
       logger.error({ err }, 'shutdown: queue/redis close failed');
