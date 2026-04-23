@@ -17,6 +17,7 @@ import { brainstormRouter } from './routes/brainstorm.js';
 import { accountRouter } from './routes/account.js';
 import { sessionRouter } from './routes/session.js';
 import { imagesRouter } from './routes/images.js';
+import { emailRouter } from './routes/email.js';
 import { swaggerSpec } from './swagger.js';
 import swaggerUi from 'swagger-ui-express';
 
@@ -125,6 +126,8 @@ app.use('/api/session', generalLimiter);
 app.use('/api/session', sessionRouter);
 app.use('/api/images', generalLimiter);
 app.use('/api/images', imagesRouter);
+app.use('/api/email', generalLimiter);
+app.use('/api/email', emailRouter);
 app.use('/api/callback', generalLimiter);
 app.use('/api/callback', sessionRouter);
 

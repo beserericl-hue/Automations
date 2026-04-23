@@ -22,6 +22,12 @@ const options: swaggerJsdoc.Options = {
           bearerFormat: 'JWT',
           description: 'Supabase Auth access token',
         },
+        emailSecret: {
+          type: 'apiKey',
+          in: 'header',
+          name: 'X-Email-Secret',
+          description: 'Shared secret for internal callers of /api/email/send',
+        },
       },
       schemas: {
         Error: {
@@ -171,6 +177,38 @@ const options: swaggerJsdoc.Options = {
             research: { type: 'integer' },
             storyBible: { type: 'integer' },
             images: { type: 'integer' },
+          },
+        },
+        EmailSendRequest: {
+          type: 'object',
+          required: ['to', 'subject', 'html'],
+          properties: {
+            to: {
+              oneOf: [
+                { type: 'string', format: 'email' },
+                { type: 'array', items: { type: 'string', format: 'email' } },
+              ],
+            },
+            subject: { type: 'string', maxLength: 998 },
+            html: { type: 'string' },
+            text: { type: 'string' },
+            cc: { oneOf: [{ type: 'string', format: 'email' }, { type: 'array', items: { type: 'string', format: 'email' } }] },
+            bcc: { oneOf: [{ type: 'string', format: 'email' }, { type: 'array', items: { type: 'string', format: 'email' } }] },
+            replyTo: { type: 'string', format: 'email' },
+            from: { type: 'string' },
+            attachments: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['name', 'contentType', 'data'],
+                properties: {
+                  name: { type: 'string' },
+                  contentType: { type: 'string' },
+                  data: { type: 'string', description: 'base64-encoded content' },
+                },
+              },
+            },
+            user_id: { type: 'string', description: 'Used for per-user rate limiting' },
           },
         },
       },

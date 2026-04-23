@@ -58,6 +58,18 @@ healthRouter.get('/', async (_req, res) => {
     checks.redis = 'skipped';
   }
 
+  // Postal reachability (only when DRY_RUN_EMAIL is not set)
+  if (process.env.POSTAL_API_URL && process.env.DRY_RUN_EMAIL !== 'true') {
+    try {
+      const { postalReachable } = await import('../lib/email.js');
+      checks.postal = (await postalReachable()) ? 'ok' : 'error';
+    } catch {
+      checks.postal = 'error';
+    }
+  } else {
+    checks.postal = 'skipped';
+  }
+
   const hasErrors = Object.values(checks).some((v) => v === 'error');
 
   res.status(hasErrors ? 503 : 200).json({
