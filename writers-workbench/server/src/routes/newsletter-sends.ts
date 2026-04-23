@@ -75,22 +75,54 @@ newsletterSendsRouter.post(
       ?? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
     const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase
+
+    // Table has a PARTIAL unique index on (user_id, send_date) WHERE status !=
+    // 'cancelled' (migration 009 — allows multiple cancelled rows per date).
+    // Partial indexes don't work with Supabase's ON CONFLICT upsert. Do an
+    // explicit find-then-update-or-insert instead.
+    const rowShape = {
+      user_id: body.user_id,
+      send_date: body.send_date,
+      subject: body.subject,
+      preheader: body.preheader ?? null,
+      html_body: body.html_body,
+      markdown_body: body.markdown_body ?? null,
+      scheduled_send_at: scheduledAt,
+      status: 'scheduled',
+      metadata: body.metadata ?? {},
+    };
+
+    const { data: existing, error: lookupErr } = await supabase
       .from('newsletter_sends_v2')
-      .upsert({
-        user_id: body.user_id,
-        send_date: body.send_date,
-        subject: body.subject,
-        preheader: body.preheader ?? null,
-        html_body: body.html_body,
-        markdown_body: body.markdown_body ?? null,
-        scheduled_send_at: scheduledAt,
-        status: 'scheduled',
-        metadata: body.metadata ?? {},
-      }, { onConflict: 'user_id,send_date' })
-      .select('id, scheduled_send_at, status')
+      .select('id')
+      .eq('user_id', body.user_id)
+      .eq('send_date', body.send_date)
+      .neq('status', 'cancelled')
       .maybeSingle();
 
+    if (lookupErr) {
+      logger.error({ lookupErr }, 'newsletter-sends save: lookup failed');
+      res.status(500).json({
+        success: false,
+        error: { code: 'DB_QUERY_FAILED', message: lookupErr.message },
+      });
+      return;
+    }
+
+    const writeResult = existing
+      ? await supabase
+          .from('newsletter_sends_v2')
+          .update(rowShape)
+          .eq('id', (existing as { id: string }).id)
+          .select('id, scheduled_send_at, status')
+          .maybeSingle()
+      : await supabase
+          .from('newsletter_sends_v2')
+          .insert(rowShape)
+          .select('id, scheduled_send_at, status')
+          .maybeSingle();
+
+    const { data, error } = writeResult;
     if (error) {
       const code = (error as { code?: string }).code;
       if (code === '23503') {
@@ -100,7 +132,7 @@ newsletterSendsRouter.post(
         });
         return;
       }
-      logger.error({ error }, 'newsletter-sends save failed');
+      logger.error({ error }, 'newsletter-sends save: write failed');
       res.status(500).json({
         success: false,
         error: { code: 'DB_UPSERT_FAILED', message: error.message },
