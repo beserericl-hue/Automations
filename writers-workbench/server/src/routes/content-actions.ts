@@ -150,19 +150,33 @@ contentActionsRouter.post(
       // Build the hub prompt. Explicit tool + parameters so Gemini has a
       // deterministic routing decision — no prose creativity required on
       // the LLM's part.
+      //
+      // CRITICAL: avoid the words "QA" / "Q/A" / "consistency report" —
+      // the hub's preprocess_message has a QA-override regex that
+      // prepends "[TOOL OVERRIDE — qa_chapter]" whenever it sees those,
+      // which short-circuits to the direct QA path and skips the rewrite
+      // tool entirely. We still pass use_qa_report as a parameter name
+      // (the rewrite tool reads it), we just phrase it in a way that
+      // doesn't match the override regex.
       const forceCitationsFragment =
         body.citation_mode === 'inline'
-          ? ' Force inline citations in prose (force_citations_in_prose=true).'
+          ? ' force_citations_in_prose=true.'
           : body.citation_mode === 'invisible'
-            ? ' Force invisible citations (force_citations_in_prose=false).'
+            ? ' force_citations_in_prose=false.'
             : '';
-      const styleFragment = body.style_directives ? ` Style directives: ${body.style_directives}.` : '';
-      const qaFragment = body.use_qa_report ? ' Use the chapter\'s last QA report (use_qa_report=true).' : '';
+      const styleFragment = body.style_directives ? ` style_directives="${body.style_directives}".` : '';
+      const qaFragment = body.use_qa_report ? ' use_qa_report=true.' : '';
+
+      // Title stripped of surrounding quotes / punctuation so Gemini's
+      // extraction of the quoted title doesn't bleed into adjacent
+      // params (the same class of bug fixed in PR #32).
+      const safeTitle = project.title.replace(/"/g, '').trim();
 
       const preFormedPrompt =
-        `Call the rewrite_chapter_with_research tool to rewrite chapter ${chapter.chapter_number} ` +
-        `of "${project.title}". research_focus: ${body.research_focus}.${qaFragment}${styleFragment}${forceCitationsFragment} ` +
-        `Do not call any other tool; this is a direct rewrite request from the UI.`;
+        `Invoke rewrite_chapter_with_research. project_title=${safeTitle}. ` +
+        `chapter_number=${chapter.chapter_number}. ` +
+        `research_focus=${body.research_focus}.${qaFragment}${styleFragment}${forceCitationsFragment} ` +
+        `This is a direct rewrite request from the UI. Do not call any other tool.`;
 
       const queue = getNamedQueue<N8nWebhookJob>('heavy-ops');
       const { bullJobId, trackerRowId } = await addTrackedJob<N8nWebhookJob>({

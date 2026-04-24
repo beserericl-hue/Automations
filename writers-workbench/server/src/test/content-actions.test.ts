@@ -212,7 +212,12 @@ describe('POST /api/content/:id/rewrite-with-research', () => {
       const jobData = job.data as { body: { user_message_request: string } };
       expect(jobData.body.user_message_request).toContain('rewrite_chapter_with_research');
       expect(jobData.body.user_message_request).toContain('The Invisible Wall');
-      expect(jobData.body.user_message_request).toContain('chapter 7');
+      expect(jobData.body.user_message_request).toContain('chapter_number=7');
+      // Regression guard: the prompt must NOT contain the words that trigger
+      // the hub's preprocess_message QA-shortcut. Otherwise the UI-dispatched
+      // rewrite is silently routed to direct_qa_chapter and never runs.
+      expect(jobData.body.user_message_request).not.toMatch(/\bQA report\b/i);
+      expect(jobData.body.user_message_request).not.toMatch(/\bQ\/A\b/);
     } finally {
       await s.close();
     }
