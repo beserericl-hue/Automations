@@ -229,24 +229,34 @@ return [
 ];
 """
 
-BUILD_REWRITE_PROMPT_CODE = r"""// S12-6 — assemble the credibility-first rewrite prompt from the
-// loaded chapter + the research report the S12-7 pipeline just
-// produced.
+BUILD_REWRITE_PROMPT_CODE = r"""// S12-6 — assemble the credibility-first rewrite prompt.
+//
+// HARD PRECEDENCE (top wins when they conflict):
+//   1. Book outline + story arc + genre writing directive  (OUTLINE TRUTH)
+//   2. Story bible entries for named characters/places      (OUTLINE TRUTH)
+//   3. Previous chapter summaries                           (CONTINUITY TRUTH)
+//   4. Original chapter prose + user focus statement        (WHAT TO REWRITE)
+//   5. Research report                                      (REFERENCE ONLY)
+//
+// Research NEVER overrides outline facts. If the research suggests a
+// detail (a name, a timeline, a procedure) that contradicts the
+// outline or story bible, the outline wins. Research is reference
+// material for plausibility — never the source of character identity,
+// plot events, or structural decisions.
 
 const loaded = $('load_chapter').first().json;
 const research = $('call_research_pipeline').first().json;
+const ctx = ($('build_chapter_context').first() || { json: {} }).json;
 
 const researchContent = research.content || '';
 const researchReportId = research.research_report_id || null;
+const contextDoc = ctx.context_document || '';
 
 const style = loaded.style_directives;
 const qa = loaded.qa_report;
 const chapter = loaded.chapter || {};
 const chapterText = chapter.content || '';
 
-// Credibility-first directive. The prose itself stays fiction; the
-// facts that back character arguments, historical references, legal
-// procedures, and technical vocabulary come from the research report.
 const modeBlock = loaded.citations_in_prose
   ? (
       'CITATION MODE: INLINE.\n' +
@@ -260,45 +270,89 @@ const modeBlock = loaded.citations_in_prose
       'CITATION MODE: INVISIBLE (FICTION DEFAULT).\n' +
       'Do NOT print footnote markers, parenthetical citations, source\n' +
       'labels, or "according to ..." constructions in the prose. The\n' +
-      'research report below is your research notes, not a bibliography\n' +
-      'to quote. Use the facts in it to make character arguments,\n' +
-      'historical references, vocabulary, and procedural descriptions\n' +
-      'credible. When a character cites a case, makes a constitutional\n' +
-      'argument, describes a historical event, or invokes technical\n' +
-      'jargon, the underlying fact must match the research — but the\n' +
-      'prose reads like fiction, not like a footnoted essay.\n' +
-      'If you cannot ground a claim in the research without sounding\n' +
-      'like you are citing it, rewrite the sentence so the claim is\n' +
-      'conveyed through action, dialogue, or observation instead.'
+      'research report is research notes, not a bibliography to quote.\n' +
+      'Use the facts in it to make character arguments, historical\n' +
+      'references, vocabulary, and procedural descriptions credible —\n' +
+      'but the prose reads like fiction, not like a footnoted essay.'
     );
 
 const qaBlock = (qa && typeof qa === 'string' && qa.trim())
-  ? '\n\nQ/A REPORT TO ADDRESS:\n' + qa.trim() + '\n'
+  ? '\n\nKNOWN ISSUES TO ADDRESS (from the last consistency review):\n' + qa.trim() + '\n'
   : '';
 
-const styleBlock = style
-  ? '\n\nSTYLE DIRECTIVES:\n' + style + '\n'
-  : '';
+const styleBlock = style ? '\n\nSTYLE DIRECTIVES:\n' + style + '\n' : '';
 
 const systemPrompt =
-  'You are rewriting one chapter of a novel with the goal of grounding\n' +
-  'it in real, verifiable facts without sacrificing its fiction voice.\n' +
-  'You are the author, not a critic. Preserve the chapter structure,\n' +
-  'pacing, point of view, and character voice unless the style\n' +
-  'directives say otherwise.\n\n' +
+  'You are rewriting one chapter of a novel. Your job is to reconcile\n' +
+  'the chapter with the BOOK OUTLINE + STORY BIBLE + STORY ARC + GENRE\n' +
+  'WRITING DIRECTIVE and ground its factual content in the supplied\n' +
+  'research. You are the author, not a critic.\n\n' +
+
+  '# HARD PRECEDENCE — READ THIS FIRST\n' +
+  'When sources conflict, this is the order of authority:\n' +
+  '  1. BOOK OUTLINE (character roster, premise, chapter map)  — ABSOLUTE\n' +
+  '  2. STORY BIBLE (named characters, places, rules)            — ABSOLUTE\n' +
+  '  3. STORY ARC BEATS / GENRE WRITING DIRECTIVE                — ABSOLUTE\n' +
+  '  4. PREVIOUS CHAPTERS (established continuity)               — ABSOLUTE\n' +
+  '  5. Original chapter prose + focus statement                 — subject to correction\n' +
+  '  6. Research report                                          — REFERENCE ONLY\n' +
+  '\n' +
+  'If the research suggests a name, age, relationship, location, or\n' +
+  'event that contradicts layers 1–4, the research is WRONG for this\n' +
+  'book. The outline wins. Every time.\n\n' +
+
+  '# LOCKED CHARACTER IDENTITY\n' +
+  'Every named character in the BOOK OUTLINE has a locked name_format\n' +
+  'and biography. You MUST use those names exactly. NEVER introduce an\n' +
+  'alternate surname, nickname, or ethnic variant (e.g. do not rename\n' +
+  '"Lucia Morales" to "Lucia Moretti", "Santos-Martinez", or any other\n' +
+  'form). Their age, family, relationships, and role in the plot come\n' +
+  'from the outline — not from research, not from the original prose.\n' +
+  '\n' +
+  'FINAL CHECK before returning: every proper noun referring to a\n' +
+  'character must match the outline EXACTLY. If the original prose uses\n' +
+  'a name variant the outline doesn\'t have, CORRECT it. If the\n' +
+  'original treats a character as a stranger when a previous chapter\n' +
+  'established them as a friend, CORRECT the framing.\n\n' +
+
+  '# STORY ARC AND GENRE WRITING DIRECTIVE\n' +
+  'If the outline names a story arc (Fichtean Curve, Three-Act, etc),\n' +
+  'the chapter MUST execute its assigned arc beat for its position in\n' +
+  'the book. The genre writing directive loaded from the PROJECT\n' +
+  'CONTEXT governs tone, mood, pacing, vocabulary, and intimacy rules\n' +
+  '(if applicable). Strictly follow it. Research must not push the\n' +
+  'chapter outside the genre.\n\n' +
+
+  '# WHAT "CREDIBILITY" MEANS HERE\n' +
+  'Credibility is grounding: when a character in the chapter makes a\n' +
+  'constitutional argument, references a historical event, describes a\n' +
+  'legal procedure, or uses technical jargon, the underlying fact must\n' +
+  'be real (per research). It does NOT mean rewriting the scene around\n' +
+  'research topics. It does NOT mean expanding deportation procedure\n' +
+  'content if the scene is about a character\'s internal conflict. Keep\n' +
+  'the original scene; sharpen the factual details inside it.\n\n' +
+
   modeBlock + qaBlock + styleBlock + '\n\n' +
+
   'OUTPUT: return ONLY the rewritten chapter as markdown. No preamble,\n' +
-  'no closing note, no meta commentary. The first line should be the\n' +
-  'chapter heading (# ' + loaded.chapter_label + (chapter.title ? ' — ' + chapter.title : '') + ').';
+  'no change log, no meta commentary. First line is the chapter heading\n' +
+  '(# ' + loaded.chapter_label + (chapter.title ? ' — ' + chapter.title : '') + ').';
 
 const userPrompt =
-  'RESEARCH REPORT (reference material — not a bibliography to quote):\n\n' +
-  researchContent +
+  '# PROJECT CONTEXT — AUTHORITATIVE TRUTH FOR THIS REWRITE\n' +
+  '# (outline, story bible, genre directive, story arc, previous chapters)\n\n' +
+  (contextDoc || '_(no project context loaded — proceed with caution)_') +
   '\n\n---\n\n' +
-  'ORIGINAL CHAPTER (rewrite this):\n\n' +
+  '# RESEARCH REPORT — reference material only, never overrides the outline\n\n' +
+  (researchContent || '_(no research report)_') +
+  '\n\n---\n\n' +
+  '# ORIGINAL CHAPTER (rewrite this — the prose below may contain the\n' +
+  '# exact identity/timeline/arc errors the outline above forbids;\n' +
+  '# the outline wins)\n\n' +
   chapterText +
   '\n\n---\n\n' +
-  'FOCUS FOR THIS REWRITE: ' + loaded.focus;
+  '# FOCUS FOR THIS REWRITE\n' +
+  loaded.focus;
 
 return [
   {
@@ -416,6 +470,7 @@ def build_workflow_body() -> dict:
     anthropic_cred_id = os.environ["ANTHROPIC_CRED_ID"]
     research_pipeline_id = os.environ["RESEARCH_PIPELINE_WF_ID"]
     qa_chapter_wf_id = os.environ.get("QA_CHAPTER_WF_ID", "Z3M57QWR8FCU3Omb")
+    context_builder_wf_id = os.environ.get("CONTEXT_BUILDER_WF_ID", "jJe84zB3U1HA9xVv")
 
     nodes = [
         {
@@ -461,6 +516,41 @@ def build_workflow_body() -> dict:
             "type": "n8n-nodes-base.code",
             "typeVersion": 2,
             "position": [440, 0],
+        },
+        # S12-2 Build Chapter Context sub-workflow. Must run BEFORE
+        # the research pipeline so the outline/bible/genre/previous
+        # chapters are authoritative over anything the research says.
+        # Without this node, Claude rewrites the scene using research
+        # topics as the source of truth and drifts character names +
+        # plot state badly.
+        {
+            "parameters": {
+                "workflowId": {"__rl": True, "mode": "id", "value": context_builder_wf_id},
+                "workflowInputs": {
+                    "mappingMode": "defineBelow",
+                    "value": {
+                        "user_id": "={{ $json.user_id }}",
+                        "project_title": "={{ $json.project_title }}",
+                        "chapter_number": "={{ $json.chapter_raw }}",
+                        "focus": "={{ $json.focus }}",
+                        "max_prev_chapters": "={{ 3 }}",
+                    },
+                    "matchingColumns": [],
+                    "schema": [
+                        {"id": "bcc1", "displayName": "user_id", "type": "string", "required": False, "defaultMatch": False, "display": True, "canBeUsedToMatch": True},
+                        {"id": "bcc2", "displayName": "project_title", "type": "string", "required": False, "defaultMatch": False, "display": True, "canBeUsedToMatch": True},
+                        {"id": "bcc3", "displayName": "chapter_number", "type": "string", "required": False, "defaultMatch": False, "display": True, "canBeUsedToMatch": True},
+                        {"id": "bcc4", "displayName": "focus", "type": "string", "required": False, "defaultMatch": False, "display": True, "canBeUsedToMatch": True},
+                        {"id": "bcc5", "displayName": "max_prev_chapters", "type": "number", "required": False, "defaultMatch": False, "display": True, "canBeUsedToMatch": True},
+                    ],
+                },
+                "options": {},
+            },
+            "id": "bcc",
+            "name": "build_chapter_context",
+            "type": "n8n-nodes-base.executeWorkflow",
+            "typeVersion": 1.2,
+            "position": [560, 0],
         },
         # Call S12-7 research pipeline via executeWorkflow.
         {
@@ -606,6 +696,9 @@ def build_workflow_body() -> dict:
         "workflow_trigger": {"main": [[{"node": "settings", "type": "main", "index": 0}]]},
         "settings": {"main": [[{"node": "load_chapter", "type": "main", "index": 0}]]},
         "load_chapter": {
+            "main": [[{"node": "build_chapter_context", "type": "main", "index": 0}]]
+        },
+        "build_chapter_context": {
             "main": [[{"node": "call_research_pipeline", "type": "main", "index": 0}]]
         },
         "call_research_pipeline": {
