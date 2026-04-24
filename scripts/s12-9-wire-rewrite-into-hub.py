@@ -44,15 +44,17 @@ UA = (
 
 TOOL_DESCRIPTION = (
     "Rewrite an EXISTING chapter so its facts, arguments, and references are grounded in "
-    "real-world research. Use this when the user asks to 'add research', 'ground the "
-    "chapter', 'make it credible', 'rewrite with real facts', 'check the history', or "
-    "'polish the legal argument'. You MUST call retrieve_content first if you don't yet "
-    "know the exact chapter_number to rewrite. For FICTION (the default), the research "
-    "grounds prose invisibly — the rewritten chapter will NOT print footnote markers or "
-    "source labels; research is used to make character arguments, historical references, "
-    "and technical vocabulary credible. For NON-FICTION (project_type='non_fiction'), "
-    "citations go inline. The research report is saved separately so the author can "
-    "audit every sourced fact. Input chapter_number may be 'Prologue', 'Epilogue', or 1,2,3..."
+    "real-world research, then automatically re-run the chapter Q/A pass on the fresh prose. "
+    "Use this when the user asks to 'add research', 'ground the chapter', 'make it credible', "
+    "'rewrite with real facts', 'check the history', or 'polish the legal argument'. You "
+    "MUST call retrieve_content first if you don't yet know the exact chapter_number to rewrite. "
+    "For FICTION (the default), research grounds prose invisibly — the rewritten chapter will "
+    "NOT print footnote markers or source labels; research is used to make character arguments, "
+    "historical references, and technical vocabulary credible. For NON-FICTION "
+    "(project_type='non_fiction'), citations go inline. The research report is saved separately "
+    "so the author can audit every sourced fact. After the rewrite the tool runs a fresh Q/A "
+    "consistency report so the user immediately sees whether the named issues were resolved. "
+    "Input chapter_number may be 'Prologue', 'Epilogue', or 1,2,3..."
 )
 
 SYSTEM_PROMPT_BLOCK = """

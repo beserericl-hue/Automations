@@ -397,6 +397,7 @@ def build_workflow_body() -> dict:
     supabase_key = os.environ["DEV_SUPABASE_SERVICE_ROLE_KEY"]
     anthropic_cred_id = os.environ["ANTHROPIC_CRED_ID"]
     research_pipeline_id = os.environ["RESEARCH_PIPELINE_WF_ID"]
+    qa_chapter_wf_id = os.environ.get("QA_CHAPTER_WF_ID", "Z3M57QWR8FCU3Omb")
 
     nodes = [
         {
@@ -517,6 +518,70 @@ def build_workflow_body() -> dict:
             "typeVersion": 2,
             "position": [1320, 0],
         },
+        # Auto-rerun QA on the fresh prose. This is what closes the
+        # loop: the rewrite exists to fix QA-flagged drift, so the
+        # feedback must happen immediately. DEV - Tool - QA Chapter
+        # (Z3M57QWR8FCU3Omb) reads the chapter from the DB, runs the
+        # consistency / name / duplicate checks, persists a new QA
+        # report in metadata.last_qa_report, and emails the author.
+        {
+            "parameters": {
+                "workflowId": {"__rl": True, "mode": "id", "value": qa_chapter_wf_id},
+                "workflowInputs": {
+                    "mappingMode": "defineBelow",
+                    "value": {
+                        "project_title": "={{ $json.project_title }}",
+                        "chapter_number": "={{ $('load_chapter').first().json.chapter_raw }}",
+                        "user_id": "={{ $('load_chapter').first().json.user_id }}",
+                        "user_prompt": "=[S12-6 auto-rerun after rewrite] focus: {{ $('load_chapter').first().json.focus }}",
+                        "recipient_email": "",
+                        "bcc_email": "",
+                    },
+                    "matchingColumns": [],
+                    "schema": [
+                        {"id": "q1", "displayName": "project_title", "required": False, "defaultMatch": False, "display": True, "type": "string", "canBeUsedToMatch": True},
+                        {"id": "q2", "displayName": "chapter_number", "required": False, "defaultMatch": False, "display": True, "type": "string", "canBeUsedToMatch": True},
+                        {"id": "q3", "displayName": "user_id", "required": False, "defaultMatch": False, "display": True, "type": "string", "canBeUsedToMatch": True},
+                        {"id": "q4", "displayName": "user_prompt", "required": False, "defaultMatch": False, "display": True, "type": "string", "canBeUsedToMatch": True},
+                        {"id": "q5", "displayName": "recipient_email", "required": False, "defaultMatch": False, "display": True, "type": "string", "canBeUsedToMatch": True},
+                        {"id": "q6", "displayName": "bcc_email", "required": False, "defaultMatch": False, "display": True, "type": "string", "canBeUsedToMatch": True},
+                    ],
+                },
+                "options": {},
+            },
+            "id": "qa_rerun",
+            "name": "qa_rerun",
+            "type": "n8n-nodes-base.executeWorkflow",
+            "typeVersion": 1.2,
+            "position": [1540, 0],
+        },
+        # Final merger: combine the rewrite payload (pre-QA) with the
+        # QA rerun result so the hub gets one clean response.
+        {
+            "parameters": {
+                "jsCode": (
+                    "// S12-8 — merge package_and_save output with qa_rerun output.\n"
+                    "// Fails open on QA errors: the rewrite is already delivered, a\n"
+                    "// QA failure must not roll back or hide that.\n"
+                    "const pkg = $('package_and_save').first().json;\n"
+                    "const qa = $input.first().json || {};\n"
+                    "const qaResult = qa.result || qa.qa_result || qa.output || '';\n"
+                    "return [{ json: {\n"
+                    "  ...pkg,\n"
+                    "  qa_rerun: {\n"
+                    "    status: (typeof qaResult === 'string' && qaResult.toLowerCase().includes('passed q/a')) ? 'PASS' : 'NEEDS_REVIEW',\n"
+                    "    summary: typeof qaResult === 'string' ? qaResult.slice(0, 1000) : '(non-string result)',\n"
+                    "    tool_workflow_id: 'Z3M57QWR8FCU3Omb',\n"
+                    "  },\n"
+                    "} }];\n"
+                ),
+            },
+            "id": "final_merge",
+            "name": "final_output",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [1760, 0],
+        },
     ]
 
     connections = {
@@ -533,6 +598,12 @@ def build_workflow_body() -> dict:
         },
         "rewrite_llm": {
             "main": [[{"node": "package_and_save", "type": "main", "index": 0}]]
+        },
+        "package_and_save": {
+            "main": [[{"node": "qa_rerun", "type": "main", "index": 0}]]
+        },
+        "qa_rerun": {
+            "main": [[{"node": "final_output", "type": "main", "index": 0}]]
         },
         "rewrite_claude": {
             "ai_languageModel": [
