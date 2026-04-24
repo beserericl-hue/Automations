@@ -11,6 +11,7 @@ import SocialMediaPanel from '../social/SocialMediaPanel';
 import CostDashboard from '../cost/CostDashboard';
 import { sendWebhookCommand } from '../../lib/webhook';
 import CommandDialog from '../shared/CommandDialog';
+import RewriteWithResearchModal from '../content/RewriteWithResearchModal';
 import type { WritingProject, PublishedContent, StoryBibleEntry, ResearchReport, GenreConfig, StoryArc, OutlineCharacter, OutlineChapter, ChapterOutline, SubChapter } from '../../types/database';
 
 const TABS = ['overview', 'outline', 'chapters', 'bible', 'art', 'social', 'research', 'cost', 'export'] as const;
@@ -337,7 +338,7 @@ export default function ProjectDetail() {
           />
         )}
         {activeTab === 'outline' && <OutlineTab outline={outline} storyArc={storyArc ?? null} projectTitle={project.title} userId={userId!} writtenChapterNumbers={new Set((chapters || []).map(c => c.chapter_number).filter((n): n is number => n != null))} projectUpdatedAt={project.updated_at} outlineVersionInfo={outlineVersionInfo ?? null} />}
-        {activeTab === 'chapters' && <ChaptersTab chapters={chapters} projectTitle={project.title} userId={userId!} />}
+        {activeTab === 'chapters' && <ChaptersTab chapters={chapters} projectTitle={project.title} projectType={project.project_type} userId={userId!} />}
         {activeTab === 'bible' && <BibleTab entries={bibleEntries} projectId={id!} />}
         {activeTab === 'art' && <ArtTab projectId={id!} />}
         {activeTab === 'social' && <SocialTab projectId={id!} />}
@@ -841,15 +842,21 @@ function OutlineTab({ outline, storyArc, projectTitle, userId, writtenChapterNum
 function ChaptersTab({
   chapters,
   projectTitle,
+  projectType,
   userId,
 }: {
   chapters: (Pick<PublishedContent, 'id' | 'title' | 'chapter_number' | 'status' | 'updated_at'> & { content_text: string | null })[] | undefined;
   projectTitle: string;
+  projectType: string | null | undefined;
   userId: string;
 }) {
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogConfig, setDialogConfig] = useState<{ title: string; description: string; sendLabel: string; buildCommand: (notes: string) => string } | null>(null);
+  const [rewriteResearchTarget, setRewriteResearchTarget] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
 
   if (!chapters?.length) {
     return <EmptyState message="No chapters written yet. Use the chat or Eve to write your first chapter." />;
@@ -901,23 +908,45 @@ function ChaptersTab({
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-400">{new Date(ch.updated_at).toLocaleDateString()}</td>
                 <td className="px-4 py-3">
-                  <button
-                    disabled={isPending}
-                    onClick={() => {
-                      setDialogConfig({
-                        title: `Rewrite ${chapterLabel}`,
-                        description: `Rewrite "${ch.title}" based on the chapter outline and book outline.`,
-                        sendLabel: 'Rewrite Chapter',
-                        buildCommand: (notes) => `rewrite ${chapterLabel} of ${projectTitle}. IMPORTANT: Follow the chapter outline and book outline exactly — use the outlined sub-chapters, characters, arc beats, and scene briefs. Do not deviate from the outline structure.` + (notes ? ` ADDITIONAL INSTRUCTIONS: ${notes}` : ''),
-                      });
-                      setPendingAction(actionKey);
-                      setDialogOpen(true);
-                    }}
-                    className="rounded border border-green-300 px-2 py-1 text-[10px] font-medium text-green-600 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-950 disabled:opacity-50"
-                    title="Rewrite this chapter"
-                  >
-                    Rewrite
-                  </button>
+                  <div className="flex gap-1.5">
+                    <button
+                      disabled={isPending}
+                      onClick={() => {
+                        setDialogConfig({
+                          title: `Rewrite ${chapterLabel}`,
+                          description: `Rewrite "${ch.title}" based on the chapter outline and book outline.`,
+                          sendLabel: 'Rewrite Chapter',
+                          buildCommand: (notes) => `rewrite ${chapterLabel} of ${projectTitle}. IMPORTANT: Follow the chapter outline and book outline exactly — use the outlined sub-chapters, characters, arc beats, and scene briefs. Do not deviate from the outline structure.` + (notes ? ` ADDITIONAL INSTRUCTIONS: ${notes}` : ''),
+                        });
+                        setPendingAction(actionKey);
+                        setDialogOpen(true);
+                      }}
+                      className="rounded border border-green-300 px-2 py-1 text-[10px] font-medium text-green-600 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-950 disabled:opacity-50"
+                      title="Rewrite this chapter from the outline"
+                    >
+                      Rewrite
+                    </button>
+                    <button
+                      disabled={isPending}
+                      onClick={() =>
+                        setRewriteResearchTarget({
+                          id: ch.id,
+                          label:
+                            ch.chapter_number === 0
+                              ? 'Prologue'
+                              : ch.chapter_number === 999
+                                ? 'Epilogue'
+                                : ch.chapter_number != null
+                                  ? `Chapter ${ch.chapter_number}`
+                                  : ch.title || 'Chapter',
+                        })
+                      }
+                      className="rounded border border-purple-300 px-2 py-1 text-[10px] font-medium text-purple-600 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-950 disabled:opacity-50"
+                      title="Rewrite this chapter grounded in real research"
+                    >
+                      + research
+                    </button>
+                  </div>
                 </td>
               </tr>
             );
@@ -939,6 +968,23 @@ function ChaptersTab({
           title={dialogConfig.title}
           description={dialogConfig.description}
           sendLabel={dialogConfig.sendLabel}
+        />
+      )}
+
+      {/* Rewrite-with-research modal (S12-10). The project-level chapters
+          list doesn't eagerly load per-chapter metadata, so we pass
+          hasQaReport=false — the user can still tick "Use last Q/A
+          report" in the modal and the tool will look for one on the
+          chapter row server-side. projectType comes from the project
+          the Chapters tab belongs to; the modal uses it for the
+          auto-derived citation mode display. */}
+      {rewriteResearchTarget && (
+        <RewriteWithResearchModal
+          contentId={rewriteResearchTarget.id}
+          chapterLabel={rewriteResearchTarget.label}
+          hasQaReport={false}
+          projectType={projectType}
+          onClose={() => setRewriteResearchTarget(null)}
         />
       )}
     </div>
