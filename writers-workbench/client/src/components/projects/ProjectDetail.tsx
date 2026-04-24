@@ -872,7 +872,7 @@ function ChaptersTab({
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Words</th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Status</th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Updated</th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 w-20">Actions</th>
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 w-56">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -921,7 +921,7 @@ function ChaptersTab({
                         setPendingAction(actionKey);
                         setDialogOpen(true);
                       }}
-                      className="rounded border border-green-300 px-2 py-1 text-[10px] font-medium text-green-600 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-950 disabled:opacity-50"
+                      className="rounded-lg px-3 py-1.5 text-xs font-medium border border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-950 disabled:opacity-50 whitespace-nowrap"
                       title="Rewrite this chapter from the outline"
                     >
                       Rewrite
@@ -941,10 +941,10 @@ function ChaptersTab({
                                   : ch.title || 'Chapter',
                         })
                       }
-                      className="rounded border border-purple-300 px-2 py-1 text-[10px] font-medium text-purple-600 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-950 disabled:opacity-50"
+                      className="rounded-lg px-3 py-1.5 text-xs font-medium border border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-950 disabled:opacity-50 whitespace-nowrap"
                       title="Rewrite this chapter grounded in real research"
                     >
-                      + research
+                      Rewrite with research
                     </button>
                   </div>
                 </td>
