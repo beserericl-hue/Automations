@@ -16,6 +16,7 @@ import { validateBody } from '../middleware/validate.js';
 import { EmailSendSchema } from '../schemas.js';
 import { logger } from '../lib/logger.js';
 import { sendEmail } from '../lib/email.js';
+import { getEmailRateLimiter, resetEmailRateLimiterForTest } from '../lib/rate-limit.js';
 
 export const emailRouter = Router();
 
@@ -37,44 +38,9 @@ function requireEmailSecret(req: Request, res: Response, next: () => void): void
   next();
 }
 
-// --------------------------------------------------------------------
-// Per-user in-memory rate limiter
-//
-// Sliding 60-second window, max RATE_LIMIT_PER_MIN sends per user_id.
-// In-memory is fine for a single Express instance; when we go multi-
-// instance this moves to Redis (future S10b follow-up).
-
-const RATE_LIMIT_PER_MIN = 30;
-const WINDOW_MS = 60_000;
-
-interface UserWindow {
-  count: number;
-  windowStart: number;
-}
-const userWindows = new Map<string, UserWindow>();
-
-// Periodic cleanup so the map doesn't grow unbounded
-setInterval(() => {
-  const now = Date.now();
-  for (const [k, w] of userWindows) {
-    if (now - w.windowStart > WINDOW_MS * 2) userWindows.delete(k);
-  }
-}, 5 * 60_000).unref();
-
-function checkRateLimit(userId: string): { ok: true } | { ok: false; retryAfter: number } {
-  const now = Date.now();
-  const existing = userWindows.get(userId);
-  if (!existing || now - existing.windowStart > WINDOW_MS) {
-    userWindows.set(userId, { count: 1, windowStart: now });
-    return { ok: true };
-  }
-  if (existing.count < RATE_LIMIT_PER_MIN) {
-    existing.count++;
-    return { ok: true };
-  }
-  const retryAfter = Math.ceil((existing.windowStart + WINDOW_MS - now) / 1000);
-  return { ok: false, retryAfter };
-}
+// Per-user rate limiter comes from lib/rate-limit.ts. When REDIS_URL is
+// set, it's Redis-backed (shared across Express instances); otherwise
+// in-memory for local dev. Config is 30 sends/min/user_id.
 
 // --------------------------------------------------------------------
 
@@ -128,7 +94,7 @@ emailRouter.post(
     };
 
     const rateKey = body.user_id ?? 'anonymous';
-    const gate = checkRateLimit(rateKey);
+    const gate = await getEmailRateLimiter().checkAndIncr(rateKey);
     if (!gate.ok) {
       res.setHeader('Retry-After', String(gate.retryAfter));
       res
@@ -174,5 +140,5 @@ emailRouter.post(
 );
 
 export function __resetRateLimiterForTest(): void {
-  userWindows.clear();
+  resetEmailRateLimiterForTest();
 }
