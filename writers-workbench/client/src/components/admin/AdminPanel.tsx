@@ -39,7 +39,7 @@ async function adminFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
 export default function AdminPanel() {
   const { profile } = useUser();
-  const [activeTab, setActiveTab] = useState<'users' | 'metrics' | 'workflows' | 'queues' | 'bounces'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'metrics' | 'workflows' | 'queues' | 'bounces' | 'performance'>('users');
 
   if (!profile?.isAdmin) {
     return (
@@ -54,7 +54,7 @@ export default function AdminPanel() {
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Panel</h1>
 
       <div className="flex gap-2 border-b border-gray-200 dark:border-gray-800">
-        {(['users', 'metrics', 'workflows', 'queues', 'bounces'] as const).map(tab => (
+        {(['users', 'metrics', 'workflows', 'queues', 'performance', 'bounces'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -72,7 +72,9 @@ export default function AdminPanel() {
                   ? 'Workflows'
                   : tab === 'queues'
                     ? 'Queues'
-                    : 'Email Bounces'}
+                    : tab === 'performance'
+                      ? 'Performance'
+                      : 'Email Bounces'}
           </button>
         ))}
       </div>
@@ -81,6 +83,7 @@ export default function AdminPanel() {
       {activeTab === 'metrics' && <SystemMetrics />}
       {activeTab === 'workflows' && <WorkflowStatus />}
       {activeTab === 'queues' && <QueueStatus />}
+      {activeTab === 'performance' && <PerformanceStatus />}
       {activeTab === 'bounces' && <BounceStatus />}
     </div>
   );
@@ -660,6 +663,175 @@ function BounceStatus() {
               <tr>
                 <td colSpan={5} className="px-4 py-6 text-center text-sm text-gray-400">
                   No bounce events recorded.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------
+// S12-5 — Performance telemetry dashboard
+
+interface PercentileBucket {
+  avg: number;
+  p50: number;
+  p95: number;
+}
+
+interface WorkflowPerf {
+  workflow_name: string;
+  count: number;
+  execution_ms: PercentileBucket;
+  queue_wait_ms: PercentileBucket;
+  llm_time_ms: PercentileBucket;
+  total_tokens: number;
+  cost_usd: number;
+}
+
+interface RecentSample {
+  workflow_name: string;
+  execution_ms: number | null;
+  queue_wait_ms: number | null;
+  llm_time_ms: number | null;
+  created_at: string;
+}
+
+interface PerformancePayload {
+  window_days: number;
+  total_runs: number;
+  workflows: WorkflowPerf[];
+  recent: RecentSample[];
+}
+
+function formatMs(ms: number | null | undefined): string {
+  if (ms == null) return '—';
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  const min = Math.floor(ms / 60_000);
+  const sec = Math.round((ms % 60_000) / 1000);
+  return `${min}m ${sec}s`;
+}
+
+function PerformanceStatus() {
+  const [days, setDays] = useState<number>(7);
+  const [workflowFilter, setWorkflowFilter] = useState<string>('');
+
+  const qs: string[] = [`days=${days}`];
+  if (workflowFilter) qs.push(`workflow=${encodeURIComponent(workflowFilter)}`);
+  const path = `/performance?${qs.join('&')}`;
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['admin-performance', days, workflowFilter],
+    queryFn: () => adminFetch<PerformancePayload>(path),
+    refetchInterval: 30_000,
+  });
+
+  if (isLoading) return <div className="text-sm text-gray-500">Loading performance data...</div>;
+  if (error) return <div className="text-sm text-red-500">Failed to load performance: {(error as Error).message}</div>;
+  if (!data) return <div className="text-sm text-gray-500">No data.</div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3 text-xs">
+        <div className="flex items-center gap-2">
+          <label className="text-gray-500">Window:</label>
+          <select
+            value={days}
+            onChange={(e) => setDays(parseInt(e.target.value, 10))}
+            className="rounded border border-gray-300 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+          >
+            <option value={1}>last 24h</option>
+            <option value={7}>last 7 days</option>
+            <option value={30}>last 30 days</option>
+            <option value={90}>last 90 days</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-gray-500">Workflow:</label>
+          <input
+            value={workflowFilter}
+            onChange={(e) => setWorkflowFilter(e.target.value)}
+            placeholder="Worker - Write Chapter..."
+            className="rounded border border-gray-300 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+          />
+        </div>
+        <span className="text-gray-400">
+          {data.total_runs} run{data.total_runs === 1 ? '' : 's'} with timing — auto-refresh 30s
+        </span>
+      </div>
+
+      <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 overflow-hidden">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
+              <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">Workflow</th>
+              <th className="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500">Runs</th>
+              <th className="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500">Exec avg</th>
+              <th className="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500">Exec p50</th>
+              <th className="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500">Exec p95</th>
+              <th className="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500">Queue p95</th>
+              <th className="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500">LLM p95</th>
+              <th className="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500">Tokens</th>
+              <th className="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500">Cost</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+            {data.workflows.map((w) => (
+              <tr key={w.workflow_name} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                <td className="px-4 py-2 text-xs font-medium text-gray-900 dark:text-white">{w.workflow_name}</td>
+                <td className="px-4 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{w.count}</td>
+                <td className="px-4 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{formatMs(w.execution_ms.avg)}</td>
+                <td className="px-4 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{formatMs(w.execution_ms.p50)}</td>
+                <td className="px-4 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{formatMs(w.execution_ms.p95)}</td>
+                <td className="px-4 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{formatMs(w.queue_wait_ms.p95)}</td>
+                <td className="px-4 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{formatMs(w.llm_time_ms.p95)}</td>
+                <td className="px-4 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{w.total_tokens.toLocaleString()}</td>
+                <td className="px-4 py-2 text-right text-xs text-gray-700 dark:text-gray-300">${w.cost_usd.toFixed(4)}</td>
+              </tr>
+            ))}
+            {data.workflows.length === 0 && (
+              <tr>
+                <td colSpan={9} className="px-4 py-6 text-center text-sm text-gray-400">
+                  No timing data in this window. Workflows must record execution_time_ms to appear here.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 overflow-hidden">
+        <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-2 text-xs font-medium uppercase text-gray-500">
+          Recent 50 runs
+        </div>
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
+              <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">When</th>
+              <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">Workflow</th>
+              <th className="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500">Execution</th>
+              <th className="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500">Queue wait</th>
+              <th className="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500">LLM</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+            {data.recent.map((r, i) => (
+              <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                <td className="px-4 py-2 text-xs text-gray-500">{new Date(r.created_at).toLocaleString()}</td>
+                <td className="px-4 py-2 text-xs text-gray-700 dark:text-gray-300 truncate max-w-xs">{r.workflow_name}</td>
+                <td className="px-4 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{formatMs(r.execution_ms)}</td>
+                <td className="px-4 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{formatMs(r.queue_wait_ms)}</td>
+                <td className="px-4 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{formatMs(r.llm_time_ms)}</td>
+              </tr>
+            ))}
+            {data.recent.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-4 py-6 text-center text-sm text-gray-400">
+                  No recent runs.
                 </td>
               </tr>
             )}

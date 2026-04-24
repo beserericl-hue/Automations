@@ -539,3 +539,142 @@ adminRouter.get('/bounces', async (req: Request, res: Response) => {
     res.status(500).json({ success: false, error: { code: 'INTERNAL' } });
   }
 });
+
+// --------------------------------------------------------------------
+// GET /api/admin/performance — S12-5 timing telemetry for the
+// Performance dashboard.
+//
+// Aggregates token_usage_v2 rows with non-null execution_time_ms over a
+// window (default 7d) and returns:
+//   - per-workflow p50/p95/avg/count for execution_time_ms, queue_wait_ms, llm_time_ms
+//   - recent samples (last 50) for the sparkline
+//   - overall totals
+//
+// Queue-wait is derived from job_queue_v2 when available (started_at - created_at).
+
+function percentile(sorted: number[], p: number): number {
+  if (sorted.length === 0) return 0;
+  const idx = Math.min(sorted.length - 1, Math.max(0, Math.floor((p / 100) * sorted.length)));
+  return sorted[idx];
+}
+
+/**
+ * @openapi
+ * /admin/performance:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Chapter generation latency, queue wait, and LLM time telemetry
+ *     description: |
+ *       Aggregates timing rows from token_usage_v2 over the last N days
+ *       (default 7) so the admin Performance dashboard can plot p50/p95/avg
+ *       per workflow, a recent-samples sparkline, and the queue/LLM share.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: days
+ *         schema: { type: integer, minimum: 1, maximum: 90, default: 7 }
+ *       - in: query
+ *         name: workflow
+ *         schema: { type: string }
+ *         description: Optional filter, e.g. "Worker - Write Chapter V2 Dev".
+ *     responses:
+ *       200:
+ *         description: Performance snapshot
+ *       403:
+ *         description: Not an admin
+ */
+adminRouter.get('/performance', async (req: Request, res: Response) => {
+  const daysRaw = typeof req.query.days === 'string' ? parseInt(req.query.days, 10) : 7;
+  const days = Number.isFinite(daysRaw) ? Math.min(90, Math.max(1, daysRaw)) : 7;
+  const workflow = typeof req.query.workflow === 'string' ? req.query.workflow : null;
+  const sinceIso = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  try {
+    const supabase = getSupabaseAdmin();
+
+    let q = supabase
+      .from('token_usage_v2')
+      .select('workflow_name, execution_time_ms, queue_wait_ms, llm_time_ms, total_tokens, cost_usd, created_at')
+      .not('execution_time_ms', 'is', null)
+      .gte('created_at', sinceIso)
+      .order('created_at', { ascending: false })
+      .limit(5000);
+    if (workflow) q = q.eq('workflow_name', workflow);
+
+    const { data, error } = await q;
+    if (error) {
+      logger.error({ err: error }, 'admin/performance query failed');
+      res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: error.message } });
+      return;
+    }
+
+    const rows = (data ?? []) as Array<{
+      workflow_name: string;
+      execution_time_ms: number | null;
+      queue_wait_ms: number | null;
+      llm_time_ms: number | null;
+      total_tokens: number | null;
+      cost_usd: number | string | null;
+      created_at: string;
+    }>;
+
+    // Group by workflow
+    const byWorkflow = new Map<string, typeof rows>();
+    for (const r of rows) {
+      const arr = byWorkflow.get(r.workflow_name) ?? [];
+      arr.push(r);
+      byWorkflow.set(r.workflow_name, arr);
+    }
+
+    const workflows = [...byWorkflow.entries()].map(([name, list]) => {
+      const execs = list.map((r) => r.execution_time_ms ?? 0).sort((a, b) => a - b);
+      const waits = list.map((r) => r.queue_wait_ms ?? 0).sort((a, b) => a - b);
+      const llms = list.map((r) => r.llm_time_ms ?? 0).sort((a, b) => a - b);
+      const totalTokens = list.reduce((s, r) => s + (r.total_tokens ?? 0), 0);
+      const totalCost = list.reduce((s, r) => s + Number(r.cost_usd ?? 0), 0);
+      return {
+        workflow_name: name,
+        count: list.length,
+        execution_ms: {
+          avg: Math.round(execs.reduce((s, v) => s + v, 0) / execs.length),
+          p50: percentile(execs, 50),
+          p95: percentile(execs, 95),
+        },
+        queue_wait_ms: {
+          avg: Math.round(waits.reduce((s, v) => s + v, 0) / Math.max(1, waits.length)),
+          p50: percentile(waits, 50),
+          p95: percentile(waits, 95),
+        },
+        llm_time_ms: {
+          avg: Math.round(llms.reduce((s, v) => s + v, 0) / Math.max(1, llms.length)),
+          p50: percentile(llms, 50),
+          p95: percentile(llms, 95),
+        },
+        total_tokens: totalTokens,
+        cost_usd: Number(totalCost.toFixed(4)),
+      };
+    });
+
+    const recent = rows.slice(0, 50).map((r) => ({
+      workflow_name: r.workflow_name,
+      execution_ms: r.execution_time_ms,
+      queue_wait_ms: r.queue_wait_ms,
+      llm_time_ms: r.llm_time_ms,
+      created_at: r.created_at,
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        window_days: days,
+        total_runs: rows.length,
+        workflows: workflows.sort((a, b) => b.count - a.count),
+        recent,
+      },
+    });
+  } catch (err) {
+    logger.error({ err }, 'admin/performance threw');
+    res.status(500).json({ success: false, error: { code: 'INTERNAL' } });
+  }
+});
