@@ -206,7 +206,9 @@ async function loadRouter() {
 async function withServer<T>(fn: (baseUrl: string) => Promise<T>): Promise<T> {
   const router = await loadRouter();
   const app = express();
-  app.use(express.json({ limit: '10mb' }));
+  // Match production index.ts limit (30mb) so large-html tests don't 413 at
+  // the parser layer before reaching our schema validation.
+  app.use(express.json({ limit: '30mb' }));
   app.use('/api/ingestion', router);
   const server = app.listen(0);
   const port = (server.address() as AddressInfo).port;
@@ -516,6 +518,35 @@ describe('Ingestion endpoints (S3)', () => {
       expect(r.status).toBe(400);
       const j = await r.json() as { error: { code: string } };
       expect(j.error.code).toBe('INVALID_KEY');
+    });
+  });
+
+  // Regression: prior 5 MB cap rejected Firecrawl rawHtml on big CNN articles
+  // (exec 13631). New cap matches the Storage bucket's 10 MB file_size_limit.
+  it('accepts html up to 10 MB', async () => {
+    await withServer(async (base) => {
+      const bigHtml = '<p>x</p>'.repeat(1_200_000);  // ~9.6 MB
+      const r = await fetch(`${base}/upload`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Ingestion-Secret': TEST_SECRET },
+        body: JSON.stringify(validBody({ key: '2026-04-24/big.src', html: bigHtml })),
+      });
+      expect(r.status).toBe(200);
+    });
+  });
+
+  it('rejects html over 10 MB with the updated error message', async () => {
+    await withServer(async (base) => {
+      const tooBigHtml = 'x'.repeat(11 * 1024 * 1024);
+      const r = await fetch(`${base}/upload`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Ingestion-Secret': TEST_SECRET },
+        body: JSON.stringify(validBody({ key: '2026-04-24/huge.src', html: tooBigHtml })),
+      });
+      expect(r.status).toBe(400);
+      const j = await r.json() as { error: { fields: Array<{ field: string; message: string }> } };
+      expect(j.error.fields[0].field).toBe('html');
+      expect(j.error.fields[0].message).toMatch(/10 MB/);
     });
   });
 });

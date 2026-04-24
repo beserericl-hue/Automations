@@ -104,8 +104,11 @@ export const IngestionUploadSchema = z.object({
   reddit_metadata: z.record(z.string(), z.unknown()).optional().nullable(),
   published_timestamp: z.string().datetime({ offset: true }).optional().nullable(),
   feed_url: z.string().url().max(2000).optional().nullable(),
-  markdown: z.string().max(5 * 1024 * 1024, 'markdown too large (max 5 MB)'),
-  html: z.string().max(5 * 1024 * 1024, 'html too large (max 5 MB)'),
+  // 10 MB caps match the newsletter-ingestion Storage bucket's file_size_limit
+  // (migration 009). Raised from 5 MB after exec 13631 hit the cap on a CNN
+  // article whose raw HTML (inline scripts + styles) exceeded 5 MB.
+  markdown: z.string().max(10 * 1024 * 1024, 'markdown too large (max 10 MB)'),
+  html: z.string().max(10 * 1024 * 1024, 'html too large (max 10 MB)'),
 });
 
 export const IngestionSearchQuerySchema = z.object({

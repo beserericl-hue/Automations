@@ -110,7 +110,9 @@ app.use('/api/export', exportLimiter);
 app.use('/api/brainstorm', brainstormLimiter);
 app.use('/api/admin', generalLimiter);
 
-app.use(express.json({ limit: '10mb' }));
+// 30 MB: newsletter ingestion uploads can carry markdown up to 10 MB + html up
+// to 10 MB (see IngestionUploadSchema) plus metadata, plus any future headroom.
+app.use(express.json({ limit: '30mb' }));
 
 // API documentation
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
