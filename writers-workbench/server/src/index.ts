@@ -22,6 +22,7 @@ import { ingestionRouter } from './routes/ingestion.js';
 import { approvalsApiRouter, approvalsPublicRouter } from './routes/approvals.js';
 import { newsletterSendsRouter } from './routes/newsletter-sends.js';
 import { jobsRouter } from './routes/jobs.js';
+import { contentActionsRouter } from './routes/content-actions.js';
 import type { JobInfrastructure } from './lib/jobs/boot.js';
 import { swaggerSpec } from './swagger.js';
 import swaggerUi from 'swagger-ui-express';
@@ -151,6 +152,8 @@ app.use('/api/callback', generalLimiter);
 app.use('/api/callback', sessionRouter);
 app.use('/api/jobs', generalLimiter);
 app.use('/api/jobs', jobsRouter);
+app.use('/api/content', generalLimiter);
+app.use('/api/content', contentActionsRouter);
 
 // Centralized error handler (must be after routes)
 app.use(errorHandler);
