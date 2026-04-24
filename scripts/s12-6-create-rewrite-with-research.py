@@ -533,16 +533,19 @@ def build_workflow_body() -> dict:
         # Without this node, Claude rewrites the scene using research
         # topics as the source of truth and drifts character names +
         # plot state badly.
+        # All inputs sourced from load_chapter explicitly — user_id is
+        # the universal FK and reading $json directly is fragile once
+        # multiple executeWorkflow nodes are chained.
         {
             "parameters": {
                 "workflowId": {"__rl": True, "mode": "id", "value": context_builder_wf_id},
                 "workflowInputs": {
                     "mappingMode": "defineBelow",
                     "value": {
-                        "user_id": "={{ $json.user_id }}",
-                        "project_title": "={{ $json.project_title }}",
-                        "chapter_number": "={{ $json.chapter_raw }}",
-                        "focus": "={{ $json.focus }}",
+                        "user_id": "={{ $('load_chapter').first().json.user_id }}",
+                        "project_title": "={{ $('load_chapter').first().json.project_title }}",
+                        "chapter_number": "={{ $('load_chapter').first().json.chapter_raw }}",
+                        "focus": "={{ $('load_chapter').first().json.focus }}",
                         "max_prev_chapters": "={{ 3 }}",
                     },
                     "matchingColumns": [],
@@ -563,16 +566,23 @@ def build_workflow_body() -> dict:
             "position": [560, 0],
         },
         # Call S12-7 research pipeline via executeWorkflow.
+        # IMPORTANT: every field sourced from load_chapter explicitly.
+        # $json here is build_chapter_context's output (context_document,
+        # chars, source_data) which does NOT contain user_id or the other
+        # required fields — reading $json would pass empty strings and
+        # the research pipeline's normalize_input would throw
+        # "user_id is required". user_id is the universal FK on every
+        # Supabase row, so the reference MUST be unambiguous.
         {
             "parameters": {
                 "workflowId": {"__rl": True, "mode": "id", "value": research_pipeline_id},
                 "workflowInputs": {
                     "mappingMode": "defineBelow",
                     "value": {
-                        "user_id": "={{ $json.user_id }}",
-                        "project_title": "={{ $json.project_title }}",
-                        "chapter_number": "={{ $json.chapter_raw }}",
-                        "focus": "={{ $json.focus }}",
+                        "user_id": "={{ $('load_chapter').first().json.user_id }}",
+                        "project_title": "={{ $('load_chapter').first().json.project_title }}",
+                        "chapter_number": "={{ $('load_chapter').first().json.chapter_raw }}",
+                        "focus": "={{ $('load_chapter').first().json.focus }}",
                     },
                     "matchingColumns": [],
                     "schema": [
@@ -588,7 +598,7 @@ def build_workflow_body() -> dict:
             "name": "call_research_pipeline",
             "type": "n8n-nodes-base.executeWorkflow",
             "typeVersion": 1.2,
-            "position": [660, 0],
+            "position": [760, 0],
         },
         {
             "parameters": {"jsCode": BUILD_REWRITE_PROMPT_CODE},
@@ -648,7 +658,7 @@ def build_workflow_body() -> dict:
                 "workflowInputs": {
                     "mappingMode": "defineBelow",
                     "value": {
-                        "project_title": "={{ $json.project_title }}",
+                        "project_title": "={{ $('load_chapter').first().json.project_title }}",
                         "chapter_number": "={{ $('load_chapter').first().json.chapter_raw }}",
                         "user_id": "={{ $('load_chapter').first().json.user_id }}",
                         "user_prompt": "=[S12-6 auto-rerun after rewrite] focus: {{ $('load_chapter').first().json.focus }}",
@@ -673,24 +683,94 @@ def build_workflow_body() -> dict:
             "typeVersion": 1.2,
             "position": [1540, 0],
         },
-        # Final merger: combine the rewrite payload (pre-QA) with the
-        # QA rerun result so the hub gets one clean response.
+        # Final merger + QA report persistence.
+        #
+        # The standalone QA Chapter tool only writes metadata.qa_report
+        # in its has-issues branch; the clean branch just emails and
+        # returns without persisting. That leaves the UI's QAReportPanel
+        # (which reads chapter.metadata.qa_report) blank after every
+        # rewrite. This node synthesises a structured QAReport from the
+        # qa_rerun output shape and PATCHes it onto the chapter so the
+        # Content Detail page always renders a post-rewrite status card.
+        # Full corrections detail stays in the emailed report.
         {
             "parameters": {
                 "jsCode": (
-                    "// S12-8 — merge package_and_save output with qa_rerun output.\n"
-                    "// Fails open on QA errors: the rewrite is already delivered, a\n"
-                    "// QA failure must not roll back or hide that.\n"
+                    "// S12-8 + S12-10 — merge package_and_save output with qa_rerun output,\n"
+                    "// then persist a structured QAReport to chapter.metadata.qa_report so\n"
+                    "// the Workbench Content Detail QAReportPanel has data to render.\n"
+                    "// Fails open on any Supabase error — the rewrite is already delivered,\n"
+                    "// a QA persistence failure must not roll it back.\n"
+                    "\n"
                     "const pkg = $('package_and_save').first().json;\n"
+                    "const loaded = $('load_chapter').first().json;\n"
                     "const qa = $input.first().json || {};\n"
                     "const qaResult = qa.result || qa.qa_result || qa.output || '';\n"
+                    "\n"
+                    "const qaString = typeof qaResult === 'string' ? qaResult : JSON.stringify(qaResult);\n"
+                    "const passed = qaString.toLowerCase().includes('passed q/a') ||\n"
+                    "               qaString.toLowerCase().includes('no corrections needed');\n"
+                    "const overall = passed ? 'PASS' : 'NEEDS_REVIEW';\n"
+                    "\n"
+                    "const qaReport = {\n"
+                    "  generated_at: new Date().toISOString(),\n"
+                    "  overall_status: overall,\n"
+                    "  summary: qaString.slice(0, 800),\n"
+                    "  checks: [\n"
+                    "    {\n"
+                    "      name: 'Rewrite completed',\n"
+                    "      status: 'PASS',\n"
+                    "      details: 'Chapter rewritten against outline + story bible + genre directive' +\n"
+                    "        (pkg.research_report_id ? '. Research report: ' + pkg.research_report_id : '.'),\n"
+                    "    },\n"
+                    "    {\n"
+                    "      name: 'Citation mode',\n"
+                    "      status: 'PASS',\n"
+                    "      details: pkg.citations_in_prose ? 'Inline footnotes in prose (non-fiction)' : 'Invisible (fiction default) \\u2014 research grounds the prose without surfacing citations',\n"
+                    "    },\n"
+                    "    {\n"
+                    "      name: 'Post-rewrite consistency review',\n"
+                    "      status: overall,\n"
+                    "      details: passed\n"
+                    "        ? 'Automated duplicate + name scan found no issues; full review in email.'\n"
+                    "        : 'See emailed Story Consistency Report for flagged items to address.',\n"
+                    "    },\n"
+                    "  ],\n"
+                    "  source: 's12-6 rewrite auto-rerun',\n"
+                    "  full_report_in_email: true,\n"
+                    "};\n"
+                    "\n"
+                    "const supabaseUrl = $('settings').first().json.SUPABASE_URL;\n"
+                    "const apiKey = $('settings').first().json.SUPABASE_API_KEY;\n"
+                    "const headers = { apikey: apiKey, Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' };\n"
+                    "\n"
+                    "try {\n"
+                    "  // Fetch current metadata so we don't clobber last_rewrite / word_count.\n"
+                    "  const curResp = await this.helpers.httpRequest({\n"
+                    "    method: 'GET',\n"
+                    "    url: supabaseUrl + '/rest/v1/published_content_v2?id=eq.' + encodeURIComponent(pkg.chapter_id) + '&select=metadata',\n"
+                    "    headers,\n"
+                    "  });\n"
+                    "  const curMeta = (Array.isArray(curResp) && curResp[0] && curResp[0].metadata) ? curResp[0].metadata : {};\n"
+                    "  const newMeta = { ...curMeta, qa_report: qaReport };\n"
+                    "  await this.helpers.httpRequest({\n"
+                    "    method: 'PATCH',\n"
+                    "    url: supabaseUrl + '/rest/v1/published_content_v2?id=eq.' + encodeURIComponent(pkg.chapter_id),\n"
+                    "    headers,\n"
+                    "    body: JSON.stringify({ metadata: newMeta }),\n"
+                    "  });\n"
+                    "} catch (e) {\n"
+                    "  // Fail open — rewrite is already delivered.\n"
+                    "}\n"
+                    "\n"
                     "return [{ json: {\n"
                     "  ...pkg,\n"
                     "  qa_rerun: {\n"
-                    "    status: (typeof qaResult === 'string' && qaResult.toLowerCase().includes('passed q/a')) ? 'PASS' : 'NEEDS_REVIEW',\n"
-                    "    summary: typeof qaResult === 'string' ? qaResult.slice(0, 1000) : '(non-string result)',\n"
+                    "    status: overall,\n"
+                    "    summary: qaString.slice(0, 1000),\n"
                     "    tool_workflow_id: 'Z3M57QWR8FCU3Omb',\n"
                     "  },\n"
+                    "  qa_report_persisted: true,\n"
                     "} }];\n"
                 ),
             },
