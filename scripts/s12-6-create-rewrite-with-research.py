@@ -127,7 +127,20 @@ LOAD_CHAPTER_CODE = r"""// S12-6 — load the chapter prose and resolve project_
 
 const trig = $('workflow_trigger').first().json;
 const userId = (trig.user_id || '').toString();
-const projectTitle = (trig.project_title || '').toString();
+
+// Gemini tool-calling quirk: when the user's prompt quotes the
+// project title (e.g. rewrite chapter 7 of "The Invisible Wall" ...),
+// Gemini sometimes dumps everything after the opening quote into
+// project_title. Sanitize aggressively: take the first line, trim
+// trailing quotes/punctuation, strip anything following a bare
+// double quote.
+const rawTitle = (trig.project_title || '').toString();
+const projectTitle = rawTitle
+  .split(/\r?\n/)[0]
+  .split('"')[0]
+  .replace(/[.,;:\s"']+$/, '')
+  .trim();
+
 const chapterRaw = trig.chapter_number;
 const focus = (trig.research_focus || '').toString().trim();
 const useQa = !!trig.use_qa_report;

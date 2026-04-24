@@ -63,8 +63,13 @@ When the user wants an existing chapter rewritten with research grounding — ph
 """
 
 TOOL_INPUTS = [
-    ("project_title", "The book project title", "string", None),
-    ("chapter_number", "Chapter number (1, 2, etc.), or 'Prologue' or 'Epilogue'", "string", None),
+    (
+        "project_title",
+        "The book project title ONLY, exactly as stored in the library. Do NOT include surrounding quotes, the word 'rewrite', 'chapter N', the research focus, or any other instructions. Example: 'The Invisible Wall', not 'The Invisible Wall\". research_focus: ...'. Just the title.",
+        "string",
+        None,
+    ),
+    ("chapter_number", "Chapter number ONLY (1, 2, etc.), or the literal word 'Prologue' or 'Epilogue'. Do not include other text.", "string", None),
     (
         "research_focus",
         "1-3 sentence description of what to research to ground this chapter — e.g. 'First Amendment case law on compelled speech, 1970-2005'",
