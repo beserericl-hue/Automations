@@ -323,6 +323,24 @@ const systemPrompt =
   '(if applicable). Strictly follow it. Research must not push the\n' +
   'chapter outside the genre.\n\n' +
 
+  '# SUB-CHAPTER STRUCTURE COMPLIANCE — MANDATORY\n' +
+  'If the PROJECT CONTEXT section titled "THIS CHAPTER — REQUIRED\n' +
+  'STRUCTURE" lists numbered sub-chapters (e.g. "1. Evening Routine",\n' +
+  '"2. The Forms", ...), the rewritten chapter MUST:\n' +
+  '  - Use each sub-chapter title as an H2 markdown heading (## Title)\n' +
+  '  - Preserve the EXACT number of sub-chapters in the listed order\n' +
+  '  - Execute each sub-chapter\'s arc_beat, setting, and brief\n' +
+  '  - NOT merge sub-chapters into a single continuous narrative\n' +
+  '  - NOT invent new sub-chapter titles or reorder them\n' +
+  '\n' +
+  'The chapter heading (# ' + loaded.chapter_label + ') is H1. Each\n' +
+  'sub-chapter title is H2. Sub-chapters act as scene breaks within\n' +
+  'the chapter — each with a clear beginning, middle, and end, feeling\n' +
+  'like a discrete scene rather than a paragraph transition.\n' +
+  '\n' +
+  'If the outline does NOT list sub-chapters for this chapter, write\n' +
+  'it as a single scene with no H2 headings.\n\n' +
+
   '# WHAT "CREDIBILITY" MEANS HERE\n' +
   'Credibility is grounding: when a character in the chapter makes a\n' +
   'constitutional argument, references a historical event, describes a\n' +
