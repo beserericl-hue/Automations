@@ -437,15 +437,25 @@ const newMetadata = {
 // ON UPDATE trigger on this table — so we set it explicitly. Without
 // this the Workbench UI's "Updated" stamp stays frozen at the last
 // write-chapter timestamp and the user can't tell a rewrite ran.
+//
+// genre_slug: chapters can drift out of sync with their project when
+// the project's genre is reclassified after chapters are written. The
+// rewrite runs under the project's CURRENT genre (via Build Chapter
+// Context), so we sync the chapter's genre_slug column to the project
+// here. This makes the Content Library display stay honest about what
+// genre rules the prose is actually being held to.
+const projectGenre = (loaded.project || {}).genre_slug || null;
+const patchBody = {
+  content_text: rewritten,
+  metadata: newMetadata,
+  updated_at: new Date().toISOString(),
+};
+if (projectGenre) patchBody.genre_slug = projectGenre;
 await this.helpers.httpRequest({
   method: 'PATCH',
   url: pcUrl,
   headers,
-  body: JSON.stringify({
-    content_text: rewritten,
-    metadata: newMetadata,
-    updated_at: new Date().toISOString(),
-  }),
+  body: JSON.stringify(patchBody),
 });
 
 return [
