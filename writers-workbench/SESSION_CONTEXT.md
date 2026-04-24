@@ -1130,3 +1130,49 @@ Expected: `{"success":true,"items":[]}`.
 - `Node - Scrape Url V2` (`BJaUNEt6PPIqbWLa`) active on n8n with preserved Firecrawl cred.
 - Feature branch `feature/newsletter-sprint-s1` = 4 commits ahead of `develop`, unpushed.
 - Server suite: 124/124. Client suite: 214/214. Schema governance: 9/9 migrations / base tables clean.
+
+---
+
+## 2026-04-24 — Sprint 12 consistency fixes + UI MVP (honest status)
+
+### What actually shipped this session
+
+**1. Workflow changes (live on DEV n8n):**
+- `DEV - Worker - Write Chapter` (fsKRGkzphWT62rja) — 26 → 32 nodes:
+  - `build_chapter_context` executeWorkflow node inserted between `get_project_data` and `research_topic`; calls S12-2 context builder `jJe84zB3U1HA9xVv`.
+  - `build_sub_chapter_prompts` patched: prepends the S12-2 context document to every sub-chapter system prompt and adds a **LOCKED CHARACTER ROSTER / FINAL CHECK** block above the existing CHARACTER NAME RULES.
+  - Continuity merge chain (`continuity_prepare` → `continuity_merge_llm` → `continuity_finalize`, with `continuity_merge_claude` as ai_languageModel) inserted between `concatenate_chapter` and `update_story_bible`. Skips the LLM pass for chapters with ≤2 sub-chapters.
+  - `write_timing` node added after `set_result` — writes `execution_time_ms` / `queue_wait_ms` / `llm_time_ms` to `token_usage_v2` (fails open). Requires migration 011 (applied).
+- `DEV - Tool - Rewrite Chapter with Research` (O8EWqLrqxcTJiWGN) — fixed two bugs discovered in smoke testing:
+  - `load_chapter` now selects `content_text` (the real column), not `content`; `package_and_save` PATCHes `content_text` too.
+  - `rewrite_llm` chainLlm node uses `promptType=define` + concatenated `text`, not the broken `messages.messageValues` shape.
+- `DEV - Sub - Research Pipeline` (ACgIg1WPkIipiy5o) — same chainLlm fix on `derive_questions_llm`.
+
+**2. Workbench code (PR pending):**
+- New `POST /api/content/:id/rewrite-with-research` endpoint (`server/src/routes/content-actions.ts`) — validates input, resolves chapter + project, enqueues a heavy-ops BullMQ job with a pre-formed prompt that forces the hub to call `rewrite_chapter_with_research`. 5 vitest tests covering auth / validation / enqueue.
+- `RewriteWithResearchModal.tsx` + button wired into `ContentDetail.tsx` — appears only for `content_type='chapter'`. Collects `research_focus`, `use_qa_report`, `style_directives`, and citation mode (auto/invisible/inline). Submission posts to the new endpoint; progress surfaces through the existing SSE `chat-job-status` event.
+- Migration 011 (`token_usage_v2` timing columns) applied to DEV Supabase.
+
+**3. E2E verified (exec 13819 on 2026-04-24):**
+- User prompt → DEV hub → Gemini → `rewrite_chapter_with_research` → Research Pipeline (ACgIg1WPkIipiy5o exec 13820, success, 10s) → Claude Sonnet rewrite → DB writes.
+- Research report `94089947-77f8-415c-9227-16a273814d07` persisted with topic prefix `[Chapter 7 Rewrite] ...`.
+- `published_content_v2.content_text` updated for chapter `d91a5aad-...` (46,532 chars); `metadata.last_rewrite` records the research_report_id + timestamp + `citations_in_prose: false`.
+- Fiction mode correctly derived (project_type=`story` → `citations_in_prose: false`); **zero** footnote markers in the rewritten prose.
+
+### Deferred to next sprint (design doc needed)
+- **S12-3 true parallel sub-chapter fan-out.** n8n's loop model serializes iterations by design; real parallelism requires moving sub-chapter writing to BullMQ jobs on the Workbench. Explicit separate sprint.
+
+### Known gotchas / context for the next session
+- n8n's `POST /workflows/{id}/deactivate` returns 403 on DEV hub + DEV worker; PUT-in-place works anyway. Scripts now tolerate the 403 and continue.
+- n8n chainLlm nodes **require** `promptType: 'define'` + `text` field. The `messages.messageValues` form errors with "No prompt specified. Expected to find the prompt in an input field called 'chatInput'". Watch for this in any future chainLlm creation.
+- `published_content_v2.content_text` (not `content`), no top-level `summary` or `word_count` columns — those live in `metadata` JSONB.
+- `content_versions_v2.content_text` (not `content`), `change_note` (not `change_summary`), `changed_by` (not `version_type`).
+- Hub `preprocess_message` has aggressive pre-routing: mentioning "Q/A report" in the user_message_request shortcuts to `direct_qa_chapter` and skips the Agent entirely. When smoke-testing tools through the hub, avoid QA-trigger keywords in the test prompt.
+- Hub webhook `/webhook/author_request_dev` expects payload to be flat JSON (n8n wraps it under `body` automatically). Double-wrapping with `{"body": {...}}` ends up as `body.body.*` and silently fails.
+- Cloudflare times out long hub responses at ~100s with 524. Async (queued) operations are unaffected; sync call-to-tool through the hub that takes more than 90s will get a 524 on the client side while the tool keeps running server-side.
+
+### Status of earlier Sprint 12 PRs
+- **PR #28 (S12-5 timing + performance dashboard)** — open.
+- **PR #29 (S12-2 context builder)** — open.
+- **PR #30 (S12-6/7/9 rewrite-with-research)** — open, but the scripts in that PR have the schema + chainLlm bugs. This session's updated scripts supersede them. When #30 merges, rebase this session's branch; if #30 is closed in favor of this one, note it in the merge message.
+

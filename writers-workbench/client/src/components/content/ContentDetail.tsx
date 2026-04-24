@@ -10,6 +10,7 @@ import ImageGallery from '../images/ImageGallery';
 import { contentToHtml } from '../../lib/content-utils';
 import QAReportPanel from './QAReportPanel';
 import ProvenancePanel from './ProvenancePanel';
+import RewriteWithResearchModal from './RewriteWithResearchModal';
 import type { PublishedContent, GeneratedImage } from '../../types/database';
 
 export default function ContentDetail() {
@@ -25,6 +26,7 @@ export default function ContentDetail() {
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const [scheduleDate, setScheduleDate] = useState('');
   const [showImagePicker, setShowImagePicker] = useState(false);
+  const [showRewriteModal, setShowRewriteModal] = useState(false);
 
   const { data: item, isLoading, isError, error } = useQuery({
     queryKey: ['content-detail', id],
@@ -291,6 +293,16 @@ export default function ContentDetail() {
             </button>
           )}
 
+          {item.content_type === 'chapter' && (
+            <button
+              onClick={() => setShowRewriteModal(true)}
+              title="Rewrite this chapter grounded in real research (S12-6)"
+              className="rounded-lg px-3 py-1.5 text-xs font-medium border border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-950"
+            >
+              Rewrite with research
+            </button>
+          )}
+
           <button
             onClick={handleDeleteClick}
             className="rounded-lg px-3 py-1.5 text-xs font-medium border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950"
@@ -299,6 +311,20 @@ export default function ContentDetail() {
           </button>
         </div>
       </div>
+
+      {showRewriteModal && item.content_type === 'chapter' && (
+        <RewriteWithResearchModal
+          contentId={item.id}
+          chapterLabel={
+            item.chapter_number != null ? `Chapter ${item.chapter_number}` : item.title || 'Chapter'
+          }
+          hasQaReport={!!(item.metadata as Record<string, unknown> | null | undefined)?.['last_qa_report']}
+          projectType={
+            (item.metadata as Record<string, unknown> | null | undefined)?.['project_type'] as string | undefined
+          }
+          onClose={() => setShowRewriteModal(false)}
+        />
+      )}
 
       {/* Cover image banner */}
       {item.cover_image_path ? (
