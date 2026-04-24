@@ -379,6 +379,10 @@ const newMetadata = {
     citations_in_prose: loaded.citations_in_prose,
   },
 };
+// updated_at is not auto-updated by Supabase on PATCH — there is no
+// ON UPDATE trigger on this table — so we set it explicitly. Without
+// this the Workbench UI's "Updated" stamp stays frozen at the last
+// write-chapter timestamp and the user can't tell a rewrite ran.
 await this.helpers.httpRequest({
   method: 'PATCH',
   url: pcUrl,
@@ -386,6 +390,7 @@ await this.helpers.httpRequest({
   body: JSON.stringify({
     content_text: rewritten,
     metadata: newMetadata,
+    updated_at: new Date().toISOString(),
   }),
 });
 
