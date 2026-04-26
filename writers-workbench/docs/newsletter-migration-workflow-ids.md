@@ -350,3 +350,49 @@ PROD secret + cred deferred to release-time promotion. Add `NEWSLETTER_CALLBACK_
 | `DEV Workbench Newsletter Callback Secret` | `1aF4oDhcjhe8R5sk` | `X-Callback-Secret` |
 
 Header value matches the `NEWSLETTER_CALLBACK_SECRET` Railway env var. Will be attached to the 9 `emit_stage_*` HTTP Request nodes added in the 2a sprint's S3.
+
+### S3 — n8n workflow rewrite (applied 2026-04-26)
+
+`Content - Newsletter Agent V2` (id `bMvMKyK8obwYZmNb`) PUT'd from 87 → 99 nodes via [`scripts/s3-newsletter-workflow-rewrite.py`](../../scripts/s3-newsletter-workflow-rewrite.py). The script is **idempotent** — re-runs skip nodes that already exist by name, so partial-failure recovery is safe.
+
+Nodes added (12):
+
+| Node | Type | Purpose |
+|---|---|---|
+| `webhook_trigger` | `n8n-nodes-base.webhook` v2.1 | New entry point: `POST /webhook/compose-newsletter-dev`, headerAuth via `DEV Workbench Ingestion Secret` (`jQBRJbmiUeTk8c11`) |
+| `respond_to_webhook` | `n8n-nodes-base.respondToWebhook` v1.5 | Returns `{executionId, editionId}` synchronously to `POST /api/newsletter/generate` |
+| `set_trigger_inputs` | `n8n-nodes-base.set` v3.4 | Normalizes form vs webhook payload shapes into one downstream-friendly `{Date, Previous Newsletter Content, Edition Id}` |
+| `emit_stage_gathering` | `httpRequest` v4.2 | After `set_trigger_inputs` (parallel to `search_markdown_objects`) |
+| `emit_stage_picking` | `httpRequest` v4.2 | Parallel sibling of `set_current_stories` after `pick_top_stories` |
+| `emit_stage_awaiting_stories` | `httpRequest` v4.2 | Parallel sibling of `send_approval_email_stories` after `create_approval_stories` |
+| `emit_stage_stories_approved` | `httpRequest` v4.2 | Parallel sibling on TRUE branch of `check_stories_feedback` |
+| `emit_stage_awaiting_subject` | `httpRequest` v4.2 | Parallel sibling of `send_approval_email_subject_line` after `create_approval_subject_line` |
+| `emit_stage_subject_approved` | `httpRequest` v4.2 | Parallel sibling on TRUE branch of `check_subject_line_feedback` |
+| `emit_stage_writing_segment` | `httpRequest` v4.2 | Parallel sibling of `iterate_stories` after `set_story_segment` (per-iteration emit) |
+| `emit_stage_segments_done` | `httpRequest` v4.2 | Parallel sibling of `write_intro` after `set_combined_sections_content` |
+| `emit_stage_saved` | `httpRequest` v4.2 | Parallel sibling of `final_notification` after `save_scheduled_newsletter` |
+
+All 9 emit nodes are spliced as **siblings** of the original downstream — never blocking the product path. Each uses `onError: continueRegularOutput` so a callback failure can never stop a run, and is authenticated via `DEV Workbench Newsletter Callback Secret` (`1aF4oDhcjhe8R5sk`).
+
+Edited node: `form_trigger` — added `Edition Id` (text, placeholder `ai-news`, not required). Form URL unchanged: still `https://n8n.agileadautomation.com/form/45ae3f3f-3564-4b28-b50c-75c4bb55e817`.
+
+### S3 — pending manual step
+
+The n8n public API on this instance forbids `POST /api/v1/workflows/:id/{activate,deactivate}` (returns 403 — license/scope-restricted). The structural PUT was accepted, but **n8n's `activeVersion` snapshot only refreshes for new triggers on a deactivate→activate cycle**. The form-trigger field update propagated immediately (verified live by GETting the form URL — Edition Id placeholder shows), but the new `webhook_trigger` won't fire until the workflow is toggled in the n8n UI.
+
+**Operator step (one-time):** open `Content - Newsletter Agent V2` in https://n8n.agileadautomation.com, click **Deactivate** (top-right), then **Activate**. After that:
+
+```
+N8N_NEWSLETTER_WEBHOOK_URL=https://n8n.agileadautomation.com/webhook/compose-newsletter-dev
+```
+
+set on the Railway DEV `WritersWorkbenchDev` service, then probe:
+
+```
+curl -i -X POST https://n8n.agileadautomation.com/webhook/compose-newsletter-dev \
+  -H 'Content-Type: application/json' \
+  -H "X-Ingestion-Secret: $INGESTION_SECRET" \
+  -d '{"Date":"2026-04-27","Previous Newsletter Content":"","Edition Id":"ai-news"}'
+```
+
+Expected: `200 {"executionId":"<id>","editionId":"ai-news"}`. If you see `403 WWW-Authenticate: Basic realm="Webhook"`, the runtime didn't pick up the new trigger — toggle the activation state again in the UI.
