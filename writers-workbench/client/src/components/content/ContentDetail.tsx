@@ -9,6 +9,7 @@ import VersionHistory from './VersionHistory';
 import ImageGallery from '../images/ImageGallery';
 import { contentToHtml } from '../../lib/content-utils';
 import QAReportPanel from './QAReportPanel';
+import AnnotationsPanel from './AnnotationsPanel';
 import ProvenancePanel from './ProvenancePanel';
 import RewriteWithResearchModal from './RewriteWithResearchModal';
 import type { PublishedContent, GeneratedImage } from '../../types/database';
@@ -428,6 +429,9 @@ export default function ContentDetail() {
           userId={userId!}
         />
       )}
+
+      {/* S12-13 — shared review-annotations panel (drift_scan + genre_eval) */}
+      {item.content_type === 'chapter' && <AnnotationsPanel contentId={id!} />}
 
       {/* Sources / Provenance */}
       <ProvenancePanel contentId={id!} />

@@ -1376,18 +1376,89 @@ OUTPUT: the rewritten chapter text only. No commentary, no preamble.
 
 ---
 
-### Sprint 12 totals: 57 pts (10 stories)
+### Track C — Reviewer/Editor Tools (added mid-sprint)
+
+Two diagnostic-and-fix tools and a shared review surface, added once Track B exposed how often the user wants targeted, evidence-backed feedback on what's already written rather than another full rewrite.
+
+#### S12-11: `Tool - Evaluate Genre Compliance V2 Dev` (8 pts) | P0 | ✅ COMPLETE
+
+**Goal:** Score one chapter against the project's genre writing directive and return a structured per-rule report (scores, evidence quotes, three streams of suggestions: prose adaptations, outline adaptations, observations). Read-only — produces a report, never mutates the chapter or outline.
+
+**Developer Tasks (done):**
+- [x] New workflow `DEV - Tool - Evaluate Genre Compliance` (id `e9LEpCM5L7zVpQxl`)
+- [x] Computed-before architecture: validator computes context from verified `evidence.quote` position rather than trusting LLM context fields
+- [x] Schema enum on `adaptation_target` + fuzzy text match on `evidence.quote` to defend against fabrication
+- [x] Required suggestion shape: rule_dimension, score, status, adaptation_target, scope.sub_chapter, evidence (quote + context), exemplar (title + technique), after (rewritten prose), editor_note (60–280 char human voice), proposed_change, preserves
+- [x] Three-stream output: `prose_adaptations`, `outline_adaptations`, `observations`
+- [x] Persists to `published_content_v2.metadata.genre_eval`
+- [x] Wired into DEV hub via `evaluate_genre_compliance` tool node + `ui:evaluate-genre` source bypass for server-dispatched eval jobs
+- [x] First successful scan: 7 kept / 1 rejected on Ch7 of *The Invisible Wall*
+
+**QA / DoD:** Smoke run on Ch7 of *The Invisible Wall* shipped a structured report with rejected-suggestion count > 0 (validator did its job). ✅
+
+#### S12-12: `Tool - Scan Character Drift V2 Dev` (8 pts) | P0 | 🟡 IN PROGRESS
+
+**Goal:** Detect character-name drift across every chapter of a project. Aggregates per-character variant tallies, flags forbidden variants and cross-chapter inconsistencies, and surfaces unknown people not in the outline roster. Read-only — produces a report, never mutates content.
+
+**Developer Tasks (done):**
+- [x] New workflow `DEV - Tool - Scan Character Drift` (id `fJWDHXhle345f6jY`)
+- [x] **Pivot from LLM-based extraction to deterministic regex algorithm** (`scanner_algorithm: 'deterministic-regex-v4'`). Cuts time from 5+ min to <1 sec, eliminates token-limit failures, eliminates parse failures, eliminates fabrication risk. Driven by user feedback ("create an algorithm that will work for all chapter sizes — deal with the performance issues").
+- [x] Three-phase matcher: (1) canonical full-name + first-name regex with longest-first ordering, (2) drift candidates `<canonical first> <Surname>` not in allowed set, (3) unknown people via honorific + bare-name pattern with consumed-range masking
+- [x] Possessive stripping (`Lucia's` → `Lucia`)
+- [x] Wired into DEV hub via `scan_character_drift` tool node + `ui:scan-character-drift` source bypass
+- [x] Persists to `writing_projects_v2.outline._character_drift_scan`
+
+**Developer Tasks (open — finish this sprint):**
+- [ ] **Reverse-order detection**: add regex pass for `<Surname>,\s*<canonical first_name>` (case-file form, e.g. "Rodriguez, Elena") and `<Surname>\s+<canonical first_name>`. Surfaces drift the v4 forward-only matcher missed in Ch5 of *The Invisible Wall*.
+- [ ] **Noise filter expansion**: extend `NON_PERSON_PATTERNS` to filter the unknown-character bucket. Current scan returns 144 unknowns of which ~134 are noise (legal terms: Constitution, Supreme Court, Fourteenth Amendment; ICE jargon: Priority One/Two/Three, Target Profile Alpha/Beta, Real Americans; place names: Maple Avenue, Roosevelt Elementary; broken paragraph compounds like "The October", "The Tract"). Goal: real character signals visible without scrolling.
+- [ ] Re-scan *The Invisible Wall* and confirm: ≥2 reverse-order drift flags surface (Ch5 Elena/Rodriguez, Ch7 Maria Elena Rodriguez), ≤20 unknown_characters with most being real (Pastor Williams, Mrs. Chen, Maria Santos, Agent Martinez/Rodriguez/Thompson, Director Harrison, Mr. Peterson, Mrs. Rodriguez, Justice Brennan, Carmen).
+
+**QA / DoD:** Re-scan must surface the Ch5 case-file drift (`Rodriguez, Elena`) as a `variant_inconsistency` flag and reduce unknown-character noise by at least 80%.
+
+#### S12-13: Shared Report-Comment UI surface (8 pts) | P1 | NEW
+
+**Goal:** Stop forcing the user to mentally cross-reference a JSON report against the chapter prose. Every drift flag and every genre-eval suggestion gets pinned to the exact span in the chapter editor — like Google Docs comments — with one-click "apply suggested fix" or "open in editor at this position." One UI shared by S12-11 and S12-12 (and any future evidence-backed report tool).
+
+**Why now:** Both S12-11 and S12-12 already store enough anchoring metadata (`evidence.quote`, `chapter_number`, `sample_contexts`) to drive a comment surface. Without this, "hand-fix" today means typing instructions to Eve in the chat panel — workable but blind to the report. With it, the user reviews flags and accepts/rejects fixes inline.
+
+**Developer Tasks:**
+- [ ] **API**: `GET /api/projects/:id/chapters/:n/annotations` — returns merged annotations from `metadata.genre_eval` (S12-11) and `outline._character_drift_scan` (S12-12) for that chapter, normalized to a single shape: `{source: 'genre_eval'|'drift_scan', anchor: {quote, char_offset?}, severity, message, suggestion?: {action, replacement_text?}}`
+- [ ] **API**: `POST /api/projects/:id/chapters/:n/annotations/:annotationId/apply` — performs the precise span replacement (no full LLM rewrite), snapshots prior text into `content_versions_v2`, returns updated chapter
+- [ ] **API**: `POST /api/projects/:id/chapters/:n/annotations/:annotationId/dismiss` — marks the annotation `dismissed_at` so it doesn't reappear
+- [ ] **Anchoring algorithm**: locate `evidence.quote` in current chapter text (exact match first, then 90% fuzzy match within ±200 chars of `sample_contexts.context`); compute character offset; if not found, mark annotation as `stale`
+- [ ] **Client**: side panel in chapter editor listing annotations grouped by source, each with severity icon, message, evidence excerpt, and Apply/Dismiss/Open buttons. Clicking Open scrolls editor to anchor and highlights the span.
+- [ ] **Client**: inline gutter marker on highlighted span (like a comment pin) so the user can spot them while reading
+- [ ] **Client**: stale annotations get a "rescan" CTA that triggers the source tool again
+- [ ] **n8n side**: ensure `genre_eval` and `_character_drift_scan` writers store anchoring fields needed by the API (`evidence.quote` already present; add `evidence.context` for drift_scan flags so fuzzy match works)
+
+**QA — System + E2E Tests:**
+- [ ] Drift scan with reverse-order flag (Ch5 case file) → annotation appears in side panel with correct anchor
+- [ ] Click Apply on drift annotation → text replaced, version snapshot created, annotation removed from list
+- [ ] Click Dismiss → annotation gone but no text change, no version snapshot
+- [ ] Genre eval suggestion with `proposed_change` → Apply replaces correct span
+- [ ] Editing the chapter so `evidence.quote` no longer matches → annotation marked stale → rescan CTA visible
+- [ ] Two annotations on overlapping spans → both visible, applying one updates the other's anchor
+
+**Definition of Done:** End-user can review a drift scan / genre eval, click Apply on at least one annotation per source, and see the chapter text update + version snapshot in `content_versions_v2`. No JSON-blob hunting required.
+
+---
+
+### Sprint 12 totals (revised): 81 pts (13 stories)
+
+Original Tracks A + B: 57 pts. Track C add-ons (S12-11, S12-12, S12-13): 24 pts.
 
 ### Dependencies
 - Sprint 10.a complete (Dev tier must exist for all workflow changes)
 - Track A and Track B can proceed in parallel (different workflows)
+- Track C depends on Track B's Q/A report shape (S12-8) for genre-eval suggestions to dovetail
 
 ### Recommended execution order
 **S12-0 first — it's a 2-pt early win that unblocks multi-step requests TODAY.**
 - Track A (solo):  S12-1 → S12-2 → S12-3 → S12-4 → S12-5
 - Track B (solo):  **S12-0** → S12-7 → S12-8 → S12-6 → S12-9
+- Track C (solo, added mid-sprint):  **S12-11** ✅ → **S12-12** 🟡 → S12-13
 
-Converge at PR to develop; promote both tracks together at end-of-sprint release.
+Converge at PR to develop; promote all three tracks together at end-of-sprint release.
 
 ---
 
