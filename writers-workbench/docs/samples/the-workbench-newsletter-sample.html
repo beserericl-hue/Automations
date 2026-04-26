@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>👀 OpenAI drops a privacy-focused model</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Dancing+Script:wght@600&display=swap" rel="stylesheet">
+<style>
+  body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
+  table,td{mso-table-lspace:0;mso-table-rspace:0}
+  img{-ms-interpolation-mode:bicubic;border:0;outline:none;text-decoration:none;display:block;max-width:100%;height:auto}
+  body{margin:0!important;padding:0!important;background:#efeadf;font-family:Georgia,'Times New Roman',serif}
+  a{color:#14288c;text-decoration:underline}
+  a:hover{color:#0b1a5f}
+  .preheader{display:none!important;visibility:hidden;mso-hide:all;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden}
+  @media only screen and (max-width:620px){
+    .container{width:100%!important}
+    .px-pad{padding-left:24px!important;padding-right:24px!important}
+    .h-title{font-size:26px!important;line-height:1.2!important}
+  }
+</style>
+</head>
+<body style="margin:0;padding:0;background:#efeadf;" data-screen-label="The Workbench — Rendered Newsletter">
+
+<div class="preheader">Plus: Karpathy says 1,800× smaller can match a 1.8T giant, and Nvidia hosts 80 frontier models free.</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#efeadf;">
+  <tr><td align="center" style="padding:24px 12px;">
+
+    <!-- View-on-web bar -->
+    <table role="presentation" class="container" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;">
+      <tr><td align="center" style="padding:0 0 10px 0;font-family:Inter,Arial,sans-serif;font-size:11px;color:#6b6256;letter-spacing:.08em;text-transform:uppercase;">
+        Issue #43 &nbsp;·&nbsp; Friday, April 24, 2026 &nbsp;·&nbsp; <a href="#" style="color:#6b6256;text-decoration:underline;">View in browser</a>
+      </td></tr>
+    </table>
+
+    <!-- MAIN CARD -->
+    <table role="presentation" class="container" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background:#fbf8f2;border:1px solid #e8dfc9;">
+
+      <!-- Masthead -->
+      <tr><td align="center" class="px-pad" style="padding:40px 48px 8px 48px;border-bottom:1px solid #e8dfc9;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+          <td align="center" style="font-family:'Playfair Display',Georgia,'Times New Roman',serif;font-size:48px;line-height:1;letter-spacing:-0.02em;color:#14288c;font-weight:700;padding-bottom:6px;">
+            The <em style="font-style:italic;font-weight:400;">Workbench</em>
+          </td>
+        </tr><tr>
+          <td align="center" style="font-family:'Playfair Display',Georgia,serif;font-size:15px;font-style:italic;color:#6b6256;padding-bottom:16px;">
+            Dispatches from the Machine Room
+          </td>
+        </tr><tr>
+          <td align="center" style="font-family:Inter,Arial,sans-serif;font-size:10px;letter-spacing:.32em;text-transform:uppercase;color:#6b6256;padding-bottom:28px;">
+            A&nbsp;&nbsp;CourseworxAI&nbsp;&nbsp;Weekly
+          </td>
+        </tr></table>
+      </td></tr>
+
+      <!-- Intro -->
+      <tr><td class="px-pad" style="padding:32px 48px 0 48px;font-family:'Playfair Display',Georgia,serif;font-size:17px;line-height:1.7;color:#2a2620;">
+        Good morning. Seven things worth your time this week — a privacy model that's actually shipping, a Karpathy thread that reframes how small models can get, and a solo-dev revenue breakdown that's less smug than usual.
+      </td></tr>
+
+      <!-- Lead story -->
+      <tr><td class="px-pad" style="padding:28px 48px 0 48px;">
+        <div style="font-family:Inter,Arial,sans-serif;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#14288c;font-weight:600;margin-bottom:10px;">Lead story</div>
+        <h1 class="h-title" style="margin:0 0 14px 0;font-family:'Playfair Display',Georgia,serif;font-size:34px;line-height:1.15;letter-spacing:-0.015em;color:#14288c;font-weight:700;">
+          OpenAI drops a privacy-focused model — and the trade-off is real
+        </h1>
+        <p style="margin:0 0 14px 0;font-family:'Playfair Display',Georgia,serif;font-size:17px;line-height:1.75;color:#2a2620;">
+          OpenAI quietly shipped a new model this week tuned for local inference and strict data boundaries. If you've been waiting to pilot AI inside a regulated workflow — healthcare notes, legal drafts, HR — <a href="#">this is the first serious option</a> from a major lab.
+        </p>
+        <p style="margin:0 0 8px 0;font-family:'Playfair Display',Georgia,serif;font-size:17px;line-height:1.75;color:#2a2620;">
+          The catch: about 12% on reasoning benchmarks traded for the privacy guarantees. Fine for compliance teams. Harder for consumer apps.
+        </p>
+        <div style="font-family:Inter,Arial,sans-serif;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-top:14px;">
+          <a href="#" style="color:#14288c;text-decoration:none;">Read the full breakdown &rarr;</a>
+        </div>
+      </td></tr>
+
+      <tr><td class="px-pad" style="padding:28px 48px 0 48px;"><hr style="border:0;border-top:1px solid #e8dfc9;margin:0;"></td></tr>
+
+      <!-- Sponsor -->
+      <tr><td style="padding:28px 48px 0 48px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4ede0;border:1px solid #e8dfc9;">
+          <tr><td style="padding:22px 24px;">
+            <div style="font-family:Inter,Arial,sans-serif;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#6b6256;font-weight:600;margin-bottom:8px;">Presented by &nbsp;·&nbsp; Nvidia Inception</div>
+            <div style="font-family:'Playfair Display',Georgia,serif;font-size:22px;line-height:1.25;color:#14288c;font-weight:700;margin-bottom:8px;">Eighty frontier models. Zero setup. Free for builders.</div>
+            <div style="font-family:'Playfair Display',Georgia,serif;font-size:15px;line-height:1.6;color:#2a2620;margin-bottom:14px;">Inception members get managed access to Llama, Mistral, DeepSeek, and 77 more — plus credits, office hours, and GTM support. Apply in ten minutes.</div>
+            <a href="#" style="display:inline-block;font-family:Inter,Arial,sans-serif;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#fbf8f2;background:#14288c;padding:10px 16px;text-decoration:none;">Apply now</a>
+          </td></tr>
+        </table>
+      </td></tr>
+
+      <!-- Pull quote -->
+      <tr><td class="px-pad" style="padding:28px 48px 0 48px;">
+        <div style="border-left:3px solid #14288c;padding-left:20px;font-family:'Playfair Display',Georgia,serif;font-style:italic;font-size:22px;line-height:1.4;color:#14288c;">
+          "A 1.8-billion-parameter model can match a 1.8-trillion-parameter model on most practical tasks — if you're willing to do the data work."
+        </div>
+        <div style="font-family:Inter,Arial,sans-serif;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#6b6256;padding-left:23px;margin-top:10px;font-weight:500;">
+          — Andrej Karpathy, on small models
+        </div>
+      </td></tr>
+
+      <tr><td class="px-pad" style="padding:28px 48px 0 48px;"><hr style="border:0;border-top:1px solid #e8dfc9;margin:0;"></td></tr>
+
+      <!-- Trending -->
+      <tr><td class="px-pad" style="padding:28px 48px 0 48px;">
+        <div style="font-family:Inter,Arial,sans-serif;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#6b6256;font-weight:600;margin-bottom:8px;">Trending this week</div>
+        <h2 style="margin:0 0 18px 0;font-family:'Playfair Display',Georgia,serif;font-size:26px;line-height:1.2;color:#14288c;font-weight:700;">What builders are reading</h2>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr><td style="padding:14px 0;border-bottom:1px solid #e8dfc9;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+              <td width="44" valign="top" style="font-family:'Playfair Display',Georgia,serif;font-size:26px;color:#14288c;font-weight:700;line-height:1;">02</td>
+              <td valign="top">
+                <a href="#" style="display:block;font-family:'Playfair Display',Georgia,serif;font-size:17px;line-height:1.35;color:#14288c;font-weight:700;text-decoration:none;margin-bottom:4px;">Karpathy: a 1.8B model can match a 1.8T giant on practical tasks</a>
+                <div style="font-family:Inter,Arial,sans-serif;font-size:12px;color:#6b6256;">X thread · 4 min</div>
+              </td>
+            </tr></table>
+          </td></tr>
+
+          <tr><td style="padding:14px 0;border-bottom:1px solid #e8dfc9;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+              <td width="44" valign="top" style="font-family:'Playfair Display',Georgia,serif;font-size:26px;color:#14288c;font-weight:700;line-height:1;">04</td>
+              <td valign="top">
+                <a href="#" style="display:block;font-family:'Playfair Display',Georgia,serif;font-size:17px;line-height:1.35;color:#14288c;font-weight:700;text-decoration:none;margin-bottom:4px;">Anthropic publishes a new post-training recipe</a>
+                <div style="font-family:Inter,Arial,sans-serif;font-size:12px;color:#6b6256;">Anthropic blog · 12 min</div>
+              </td>
+            </tr></table>
+          </td></tr>
+
+          <tr><td style="padding:14px 0;border-bottom:1px solid #e8dfc9;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+              <td width="44" valign="top" style="font-family:'Playfair Display',Georgia,serif;font-size:26px;color:#14288c;font-weight:700;line-height:1;">05</td>
+              <td valign="top">
+                <a href="#" style="display:block;font-family:'Playfair Display',Georgia,serif;font-size:17px;line-height:1.35;color:#14288c;font-weight:700;text-decoration:none;margin-bottom:4px;">How one solo dev shipped a $30k/mo writing tool</a>
+                <div style="font-family:Inter,Arial,sans-serif;font-size:12px;color:#6b6256;">IndieHackers · 9 min</div>
+              </td>
+            </tr></table>
+          </td></tr>
+
+          <tr><td style="padding:14px 0;border-bottom:1px solid #e8dfc9;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+              <td width="44" valign="top" style="font-family:'Playfair Display',Georgia,serif;font-size:26px;color:#14288c;font-weight:700;line-height:1;">06</td>
+              <td valign="top">
+                <a href="#" style="display:block;font-family:'Playfair Display',Georgia,serif;font-size:17px;line-height:1.35;color:#14288c;font-weight:700;text-decoration:none;margin-bottom:4px;">The case against RAG for most internal search</a>
+                <div style="font-family:Inter,Arial,sans-serif;font-size:12px;color:#6b6256;">Substack · 7 min</div>
+              </td>
+            </tr></table>
+          </td></tr>
+
+          <tr><td style="padding:14px 0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+              <td width="44" valign="top" style="font-family:'Playfair Display',Georgia,serif;font-size:26px;color:#14288c;font-weight:700;line-height:1;">07</td>
+              <td valign="top">
+                <a href="#" style="display:block;font-family:'Playfair Display',Georgia,serif;font-size:17px;line-height:1.35;color:#14288c;font-weight:700;text-decoration:none;margin-bottom:4px;">Postal v3.3 ships native DKIM rotation</a>
+                <div style="font-family:Inter,Arial,sans-serif;font-size:12px;color:#6b6256;">postalserver.io · 3 min</div>
+              </td>
+            </tr></table>
+          </td></tr>
+        </table>
+      </td></tr>
+
+      <tr><td class="px-pad" style="padding:28px 48px 0 48px;"><hr style="border:0;border-top:1px solid #e8dfc9;margin:0;"></td></tr>
+
+      <!-- From the Workbench -->
+      <tr><td class="px-pad" style="padding:28px 48px 0 48px;">
+        <div style="font-family:Inter,Arial,sans-serif;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#6b6256;font-weight:600;margin-bottom:8px;">From the Workbench</div>
+        <h2 style="margin:0 0 14px 0;font-family:'Playfair Display',Georgia,serif;font-size:24px;line-height:1.2;color:#14288c;font-weight:700;">New in The Writers Workbench</h2>
+        <p style="margin:0 0 14px 0;font-family:'Playfair Display',Georgia,serif;font-size:17px;line-height:1.75;color:#2a2620;">
+          Eve now supports voice capture during chapter drafts. Hold space, speak, and she'll transcribe straight into your manuscript — no context-switch to another app. It's rough, it's fast, and <a href="#">it's exactly how I drafted this issue</a>.
+        </p>
+        <p style="margin:0;font-family:'Playfair Display',Georgia,serif;font-size:17px;line-height:1.75;color:#2a2620;">
+          Cost dashboards also got a real date range picker. If you're burning budget on Sonnet, you'll see it now.
+        </p>
+      </td></tr>
+
+      <tr><td class="px-pad" style="padding:28px 48px 0 48px;"><hr style="border:0;border-top:1px solid #e8dfc9;margin:0;"></td></tr>
+
+      <!-- Signoff -->
+      <tr><td class="px-pad" style="padding:32px 48px 8px 48px;">
+        <p style="margin:0 0 14px 0;font-family:'Playfair Display',Georgia,serif;font-size:16px;line-height:1.7;color:#2a2620;">
+          That's it for this week. Reply and tell me what landed. I read every one.
+        </p>
+        <div style="font-family:'Dancing Script','Brush Script MT',cursive;font-size:36px;color:#14288c;line-height:1;margin-bottom:4px;">— Ericl</div>
+        <div style="font-family:Inter,Arial,sans-serif;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#6b6256;font-weight:600;">
+          Editor, The Workbench
+        </div>
+      </td></tr>
+
+      <!-- Stamp -->
+      <tr><td align="center" style="padding:8px 48px 36px 48px;">
+        <img src="../../../../assets/logos/courseworx-stamp-black.png" width="84" alt="CourseworxAI stamp" style="display:inline-block;width:84px;height:auto;opacity:.7;">
+      </td></tr>
+
+    </table>
+
+    <!-- Footer -->
+    <table role="presentation" class="container" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;">
+      <tr><td align="center" style="padding:24px 12px 40px 12px;font-family:Inter,Arial,sans-serif;font-size:11px;color:#6b6256;line-height:1.6;">
+        <div style="margin-bottom:8px;">You're getting this because you subscribed to The Workbench at courseworx.media.</div>
+        <div>
+          <a href="#" style="color:#6b6256;text-decoration:underline;">Update preferences</a> ·
+          <a href="#" style="color:#6b6256;text-decoration:underline;">Unsubscribe</a> ·
+          <a href="#" style="color:#6b6256;text-decoration:underline;">View in browser</a>
+        </div>
+        <div style="margin-top:12px;">CourseworxAI · 1140 Broadway, New York, NY 10001</div>
+      </td></tr>
+    </table>
+
+  </td></tr>
+</table>
+
+</body>
+</html>
