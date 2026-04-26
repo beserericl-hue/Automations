@@ -1176,3 +1176,78 @@ Expected: `{"success":true,"items":[]}`.
 - **PR #29 (S12-2 context builder)** — open.
 - **PR #30 (S12-6/7/9 rewrite-with-research)** — open, but the scripts in that PR have the schema + chainLlm bugs. This session's updated scripts supersede them. When #30 merges, rebase this session's branch; if #30 is closed in favor of this one, note it in the merge message.
 
+---
+
+## 2026-04-26 — Sprint 12 Track C complete; Track A deferred to dedicated sprints
+
+### What this session shipped (PR #40 → develop)
+
+**Track C — Reviewer/Editor Tools (24 pts, all green):**
+
+1. **S12-11 — Genre Compliance Evaluator** (`evaluate_genre_compliance`, wf `e9LEpCM5L7zVpQxl`). Computed-before validator (server computes `evidence.context` from the verified `evidence.quote` position rather than trusting Claude's context field — defends against fabrication). Three-stream output: `prose_adaptations`, `outline_adaptations`, `observations`. Persists to `published_content_v2.metadata.genre_eval`. Wired to DEV hub via `evaluate_genre_compliance` tool node + `ui:evaluate-genre` source bypass. **Already shipped in earlier session — no changes here.**
+
+2. **S12-12 — Character Drift Scanner** (`scan_character_drift`, wf `fJWDHXhle345f6jY`). **Major pivot from LLM-based to deterministic regex algorithm** (`scanner_algorithm: 'deterministic-regex-v4'`) driven by user feedback ("create an algorithm that will work for all chapter sizes"). Cuts wall time from 5+ min to <1 sec, eliminates parse failures, eliminates token-limit issues, eliminates fabrication risk. Detects three drift classes:
+   - **Phase 0 (NEW)** — reverse-order drift (`<Surname>, <canonical first>` case-file form). Required structural anchor before the surname token (e.g. "Case #2851:", "Subject Name:", "Detainee:") so it doesn't false-fire on sentence-boundary commas like "...her careful English, Mason found..." or paragraph breaks like "\n\nDownstairs, Craig...".
+   - **Phase 1** — canonical matches with longest-first pattern ordering and consumed-range masking; bare surname now in `allowed_set` so "Reyes" alone for "Captain Vael Reyes" doesn't false-flag.
+   - **Phase 2** — forward drift candidates (`<canonical first> <unknown surname>`).
+   - **Phase 3** — unknown-person mentions with **shape-based** noise filter (no story-name hardcoding). HONORIFICS expanded to be genre-agnostic (added political/royalty/religious/sci-fi titles — "senator", "lord", "pastor", "captain", "elder", etc.). HEADER_TOKENS catch bureaucratic/place/institution shapes (clause, statute, county, conclave, guild, etc.). Per-project `outline._scanner_exclusions: string[]` hook for the long tail.
+   - Persists to `writing_projects_v2.outline._character_drift_scan` (NOT `metadata` — base-table immutability).
+   - **Result on *The Invisible Wall*:** 1 real drift surfaced (Ch5 "Rodriguez, Elena"), 144→32 unknowns (78% noise drop), 0 false positives. Multi-genre smoke (sci-fi/romance/fantasy/political) all clean.
+
+3. **S12-13 — Shared Annotations UI** (NEW story added mid-sprint; was option 4 in the prior Q&A). Three new endpoints in `server/src/routes/content-actions.ts`:
+   - `GET /api/content/:id/annotations` — merges `metadata.genre_eval` + `outline._character_drift_scan` for the chapter, normalised to `UnifiedAnnotation[]`. Honours `metadata.dismissed_annotations`. Auto-derives `replacement_text` for reverse-order drift (`Rodriguez, Elena` → `Morales, Elena`).
+   - `POST /api/content/:id/annotations/apply` — precise span replacement (no LLM rewrite). Snapshots prior text into `content_versions_v2` with `change_note: annotation_apply:<source>:<id>` BEFORE mutating. Returns 422 on stale anchor (target text no longer present). Marks annotation dismissed.
+   - `POST /api/content/:id/annotations/dismiss` — adds annotation id to `metadata.dismissed_annotations` array.
+   - Annotation ID is deterministic: `<source>:<chapter_number>:<kind>:<evidence_normalised>` so the same flag on a re-scan collapses onto the same row.
+   - New `client/src/components/content/AnnotationsPanel.tsx` (305 lines) wired into `ContentDetail.tsx` for chapters. Two source sections (drift first, genre second). Each row: severity badge, evidence quote in blockquote, suggested replacement in green box, Apply / Dismiss buttons.
+   - 4 new vitest tests (GET merge + Apply happy path + 422 stale + Dismiss). 9/9 total content-actions tests pass.
+
+4. **S12-2 patch** — `Build Chapter Context` (wf `jJe84zB3U1HA9xVv`) `build_context` Code node updated. Replaced `### Characters` block with `### LOCKED CHARACTER ROSTER` directive ("Use ONLY the canonical name forms... `name_variants` is the COMPLETE allowed set... anything outside it is drift") plus a `name_variants:` line per character that combines declared `c.name_variants[]`, the canonical full name, and the bare first-name. Downstream rewrite/worker tools now see the canonical roster.
+
+**Hand-fix verification (real Ch5 fix):**
+- Ran the apply-endpoint code path directly against DEV Supabase: replaced the 1 occurrence of "Rodriguez, Elena" with "Morales, Elena" in chapter `d2063a9f-c8ea-47c8-ba43-067bbcd5e858` (The Efficiency Report).
+- Snapshotted prior text into `content_versions_v2` (version_number=2, changed_by=`annotation_apply`).
+- Marked annotation `drift_scan:5:reverse_order_drift:Rodriguez, Elena` as dismissed.
+- Re-scan confirmed 0 drift flags. Same code path the deployed apply endpoint will use — proves the surface end-to-end before merge.
+
+### Track A — DEFERRED to dedicated sprints (Sprints 16–18)
+
+S12-1 (remove rate_limit_delay), S12-3 (parallel fan-out), S12-4 (continuity merge), S12-5 (timing + dashboard) **removed from Sprint 12** and re-planned at the END of the sprint sequence (after Sprint 15 load test). The user's reasoning, captured verbatim:
+
+> "The purpose of the wait node between sub chapters was the max limit that claude put on token processing and the exhorbitant number of tokens required to write the sub chapter. We had to make a tradeoff between quality of output and time. The write chapter process needs the architecture looked at to reduce the processing load, and to queue up processes that are not token hogs. We need to analyse the output to determine how the quality chapter writing can be accomplished by different LLM's or a combination of LLMs. Break down the sprints so that we can make this architectual change without the risks you have shown in this sprint."
+
+This is now Sprints 16 (analysis/profiling), 17 (LLM bake-off + quality benchmarks), 18 (architecture refactor + safe rollout). Full breakdown lives in `sprint_document_v2.md` Sprints 16–18 sections (added this session).
+
+### Workflow IDs touched this session
+- `fJWDHXhle345f6jY` — DEV - Tool - Scan Character Drift (deterministic algorithm v4 deployed)
+- `jJe84zB3U1HA9xVv` — DEV - Sub - Build Chapter Context (LOCKED CHARACTER ROSTER patch)
+- `FLA6xIDEvejihQLP` — DEV - The Author Agent (already wired; verified no changes needed this session)
+- `e9LEpCM5L7zVpQxl` — DEV - Tool - Evaluate Genre Compliance (verified; no changes)
+- `O8EWqLrqxcTJiWGN` — DEV - Tool - Rewrite Chapter with Research (verified; no changes)
+
+### Critical context for the next session
+
+**Drift scanner — algorithm choices that are easy to misunderstand:**
+- `NON_PERSON_PATTERNS` is intentionally **short and universal** (calendar, US states, generic constitutional terms, agency acronyms via `^[A-Z]{2,5}\d{0,3}$`). Story-specific names DO NOT belong here — that broke for The Invisible Wall mid-session and was reverted.
+- `HEADER_TOKENS` is the workhorse: any token in a short phrase (≤5 tokens) that matches a bureaucratic/place/institution suffix → filter. Genre-agnostic.
+- `outline._scanner_exclusions: string[]` is the per-project escape hatch — the user can mark "Yick Wo", "Justice Brennan", etc. as known-non-person without code changes. **No UI to edit this list yet.**
+- `HONORIFICS` is consulted in two places: `stripHonorifics()` for matching and `honorificRe` in Phase 3. Both **derive from the same Set** so additions stay in sync.
+- The reverse-order Phase 0 anchor list is intentionally narrow — only fires after structural form-field markers (Case #, Name:, Subject:, etc.). No `^\s*$/` start-of-line anchor — that false-fires on every paragraph break.
+
+**S12-13 hand-fix — what happens server-side:**
+1. GET `/api/content/:id/annotations` rebuilds annotations on every fetch (no annotation table; flags live in source JSON).
+2. Apply does `text.split(target).join(replacement)` — **all** occurrences of the exact target are replaced. For a case-file table that drifts twice in the same chapter, both get fixed in one click.
+3. Version snapshot uses the real schema: `(content_id, user_id, version_number, content_text, changed_by, change_note)`. version_number is computed via `select … order desc limit 1`. NOT `snapshot_reason` — that field doesn't exist.
+4. Stale anchor → 422 (not 500) so the client can show a "rescan needed" CTA.
+
+**Sprint 11 (Postal email migration) — status unchanged this session.** The Newsletter Agent migration sprint installed Postal and migrated 1 newsletter workflow. The other 15 V2 workflows still send via Gmail OAuth (cred `CPCSZOInV8Zj1PI1`). Sprint 11 stories (S11-1 through S11-5) remain open — no work this session. Independent of Sprint 12.
+
+**Open follow-ups (small):**
+- The deterministic scanner still surfaces ~20 long-tail noise items per typical chapter (Yick Wo, Wong Wing, Justice Brennan, Crown Victoria, etc.). These are the per-project `_scanner_exclusions` candidates — UI for editing this list is NOT built yet.
+- AnnotationsPanel doesn't yet show inline gutter markers in the RichTextEditor — only the side panel. Spec called for both; spec was descoped to ship the panel first.
+- S12-13 has no e2e Playwright test yet — only vitest unit tests on the server endpoints.
+- After PR #40 merges and dev Railway redeploys, the AnnotationsPanel needs a manual UI smoke (open the project's Ch5 — drift annotation should be empty since we hand-fixed it; open Ch7 if it has flags; click Apply; verify text update + version row).
+
+**PR open at end of session:** [#40 — S12-11/12/13: genre eval, deterministic drift scanner, shared annotations UI](https://github.com/beserericl-hue/Automations/pull/40)
+
+---
