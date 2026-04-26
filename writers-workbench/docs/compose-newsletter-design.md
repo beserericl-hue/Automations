@@ -132,14 +132,16 @@ Primary action in `PageHeader`: `Generate newsletter →`.
 
 ### 3.2 Generate (`/newsletter/generate`)
 
-Mirrors the n8n `form_trigger`:
+UI fields:
 
 - **Edition** — dropdown populated from `GET /api/newsletter/editions`. Default `ai-news`.
 - **Date** — required date input, defaults to today. Used as the `prefix` for `/api/ingestion/search` inside the workflow.
 - **Previous newsletter content** — optional textarea, prefilled from the most recent `newsletter_sends_v2.markdown_body` for the selected edition via `GET /api/newsletter/editions/:id/last-sent-markdown`.
-- **Submit** — `POST /api/newsletter/generate` → server proxies to the n8n form webhook with `multipart/form-data` fields `Date`, `Previous Newsletter Content`, `Edition Id` → returns `{executionId, started: true}` → client navigates to `/newsletter/execution/:executionId`.
+- **Submit** — `POST /api/newsletter/generate` → server POSTs JSON to the n8n **webhook trigger** (not the form trigger) at `N8N_NEWSLETTER_WEBHOOK_URL` with `X-Ingestion-Secret` header. The webhook's first node is `Respond to Webhook` returning `{executionId: $execution.id, editionId}` synchronously → server returns `{executionId, started: true}` → client navigates directly to `/newsletter/execution/:executionId`. **No `correlationId` round-trip** — the executionId is known before the client redirects.
 
-The n8n form URL stays live (for debugging and for external editor access if we ever need it) but is no longer the primary entry point.
+**Webhook over form trigger.** The original sprint draft used the n8n `formTrigger` because the workflow predates the in-app UI; with the UI owning input collection there's no reason to render an n8n-hosted HTML form, encode `multipart/form-data`, or invent a `correlationId` to stitch the optimistic redirect. A plain `webhook` trigger with a synchronous `respondToWebhook` node returns `executionId` directly. The trigger is auth-gated by `X-Ingestion-Secret` (reused from the existing ingestion cred), closing the "anyone with the URL can trigger a run" gap that the form trigger left open.
+
+The n8n `formTrigger` node stays in the workflow as a **secondary entry point** for ops/debug use (curators can still hit the form URL in a browser if the Workbench is down). Both triggers funnel through a single `set_trigger_inputs` Set node so every downstream reference is `$('set_trigger_inputs')` regardless of which entry was used.
 
 ### 3.3 Execution tracker (`/newsletter/execution/:id`)
 
@@ -204,7 +206,7 @@ Seven canonical stages. Labels, pill colors, and SSE event stages align one-to-o
 
 | # | Label | `stage` (SSE) | Emitting n8n node | Pill when active |
 |---|---|---|---|---|
-| 1 | Gathering | `gathering` | `emit_stage_gathering` (after `form_trigger`) | `bg-blue-100 text-blue-700` pulsing |
+| 1 | Gathering | `gathering` | `emit_stage_gathering` (after `set_trigger_inputs`) | `bg-blue-100 text-blue-700` pulsing |
 | 2 | Selecting stories | `selecting_stories` | `emit_stage_picking` (after `pick_top_stories`) | same |
 | 3 | Stories approval | `awaiting_stories_approval` | `emit_stage_awaiting_stories` (after `create_approval_stories`) | `bg-amber-100 text-amber-700` pulsing |
 | 4 | Subject line | `subject_approved` ← upstream `writing` | `emit_stage_stories_approved` (after `check_stories_feedback` true) | blue pulsing |
@@ -321,7 +323,7 @@ inside the same transaction as the upsert, with `FOR UPDATE` on a tiny `newslett
 |---|---|---|---|
 | `GET`  | `/api/newsletter/editions` | session | List enabled editions for the current user. |
 | `GET`  | `/api/newsletter/editions/:id/last-sent-markdown` | session | Returns `{markdown: string \| null}` from the most recent `newsletter_sends_v2` row for the edition. |
-| `POST` | `/api/newsletter/generate` | session | Validates `{edition_id, send_date, previous_newsletter_content?}`, POSTs `multipart/form-data` to `N8N_NEWSLETTER_FORM_URL`, returns `{executionId?, started: true}`. |
+| `POST` | `/api/newsletter/generate` | session | Validates `{edition_id, send_date, previous_newsletter_content?}`, POSTs JSON to `N8N_NEWSLETTER_WEBHOOK_URL` with `X-Ingestion-Secret`, returns the synchronous `{executionId, started: true}` from the workflow's `Respond to Webhook` node. |
 | `GET`  | `/api/newsletter/execution/:id/status` | session | Thin proxy over n8n `GET /api/v1/executions/:id` with `X-N8N-API-KEY`. Strips to `{executionId, status, mode, startedAt, stoppedAt, lastNodeExecuted}`. |
 | `GET`  | `/api/newsletter/approvals/open` | session | Open approvals for the session user: `SELECT * FROM newsletter_approvals_v2 WHERE user_id = $session AND resolved_at IS NULL AND expires_at > now() [AND execution_id = $1] [AND stage = $2]`. Includes `payload` + `approval_url`. |
 | `POST` | `/api/newsletter/approvals/:token/resolve` | session | Authenticated counterpart to the existing public endpoint. Verifies `user_id` matches session; reuses the extracted `server/src/lib/approvals.ts` core; emits `newsletter.approval.resolved`. |
@@ -343,13 +345,17 @@ inside the same transaction as the upsert, with `FOR UPDATE` on a tiny `newslett
 
 ### 6.4 n8n workflow additions
 
-Nine HTTP Request nodes added to `Content - Newsletter Agent V2` (`bMvMKyK8obwYZmNb`). All authenticated via a new DEV httpHeaderAuth credential `DEV Workbench Newsletter Callback Secret` (header `X-Callback-Secret`, matching env `NEWSLETTER_CALLBACK_SECRET` on Railway). All post to `POST {WORKBENCH_URL}/api/callback/newsletter-stage` with body:
+Twelve nodes added to `Content - Newsletter Agent V2` (`bMvMKyK8obwYZmNb`): one new `webhook` trigger, one `respondToWebhook` node, one `set_trigger_inputs` Set node that normalizes both trigger paths, and the nine `emit_stage_*` HTTP Request nodes. Net 87 → 99 nodes.
+
+**Trigger fan-in.** The existing `form_trigger` node is preserved as a secondary ops/debug entry point. A new `webhook_trigger` (n8n-nodes-base.webhook v2, `responseMode: 'responseNode'`, auth = `httpHeaderAuth` cred `DEV Workbench Ingestion Secret` checking `X-Ingestion-Secret`) is the primary path. The webhook's first downstream node is `respond_to_webhook` (n8n-nodes-base.respondToWebhook) returning `{ "executionId": "={{ $execution.id }}", "editionId": "={{ $json.body['Edition Id'] || 'ai-news' }}" }` synchronously to the caller, then execution continues. Both triggers funnel into a single `set_trigger_inputs` Set node that exposes a normalized `{Date, "Previous Newsletter Content", "Edition Id"}` shape on `$json` regardless of which trigger fired. Every downstream reference uses `$('set_trigger_inputs').item.json[...]` — no node references either trigger directly.
+
+**Stage-emit nodes.** Nine HTTP Request nodes, all authenticated via a new DEV httpHeaderAuth credential `DEV Workbench Newsletter Callback Secret` (header `X-Callback-Secret`, matching env `NEWSLETTER_CALLBACK_SECRET` on Railway). All POST to `{WORKBENCH_URL}/api/callback/newsletter-stage` with body:
 
 ```json
 {
   "userId":       "+14105914612",
   "executionId":  "={{ $execution.id }}",
-  "editionId":    "={{ $('form_trigger').item.json['Edition Id'] || 'ai-news' }}",
+  "editionId":    "={{ $('set_trigger_inputs').item.json['Edition Id'] || 'ai-news' }}",
   "stage":        "<stage>",
   "detail":       "<optional human-readable string>",
   "ts":           "={{ $now.toISO() }}"
@@ -358,7 +364,7 @@ Nine HTTP Request nodes added to `Content - Newsletter Agent V2` (`bMvMKyK8obwYZ
 
 | Node | Placed after | `stage` |
 |---|---|---|
-| `emit_stage_gathering` | `form_trigger` | `gathering` |
+| `emit_stage_gathering` | `set_trigger_inputs` | `gathering` |
 | `emit_stage_picking` | `pick_top_stories` | `selecting_stories` |
 | `emit_stage_awaiting_stories` | `create_approval_stories` | `awaiting_stories_approval` |
 | `emit_stage_stories_approved` | `check_stories_feedback` → true | `stories_approved` (→ UI advances to pill #4) |
@@ -370,9 +376,14 @@ Nine HTTP Request nodes added to `Content - Newsletter Agent V2` (`bMvMKyK8obwYZ
 
 `emit_stage_writing_segment` is the one that emits repeatedly — it fires once per iteration of `iterate_stories` (see workflow doc §1.6). The UI treats the most recent `writing_segment` event as the ticker inside pill #6 ("Writing segments · 3/7").
 
-### 6.5 Form-trigger update
+### 6.5 Trigger updates
 
-The n8n form gains a new optional hidden field `Edition Id` (type `text`, default `ai-news`). `POST /api/newsletter/generate` submits it. `$('form_trigger').item.json['Edition Id']` is referenced by the `emit_stage_*` nodes above, by `create_approval_stories` (for the `editionId` field stored in `newsletter_approvals_v2.edition_id` — new column below), and by `save_scheduled_newsletter` (for `edition_id` on `newsletter_sends_v2`).
+Both trigger nodes carry the new `Edition Id` field:
+
+- **`webhook_trigger`** — accepts a JSON body with `Date`, `Previous Newsletter Content`, `Edition Id`. Header `X-Ingestion-Secret` required (re-uses existing `DEV Workbench Ingestion Secret` cred).
+- **`form_trigger`** (preserved) — gains an optional `Edition Id` field (type `text`, default `ai-news`).
+
+`set_trigger_inputs` (Set node, `runOnceForEachItem`, `includeOtherFields: false`) normalizes both into a uniform `{Date, "Previous Newsletter Content", "Edition Id"}` so `create_approval_stories` (for `newsletter_approvals_v2.edition_id`) and `save_scheduled_newsletter` (for `newsletter_sends_v2.edition_id`) can both read `$('set_trigger_inputs').item.json['Edition Id']` without caring which trigger fired.
 
 ### 6.6 New column on `newsletter_approvals_v2`
 
