@@ -30,15 +30,23 @@
  */
 import { Router, Request, Response } from 'express';
 import { requireAuth } from '../middleware/auth.js';
+import { requireSharedSecret } from '../middleware/shared-secret.js';
 import { validateBody } from '../middleware/validate.js';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import {
   GenerateSchema,
   NewsletterEditionIdParamSchema,
+  StageCallbackSchema,
 } from '../schemas.js';
 import { logger } from '../lib/logger.js';
+import { pushSseEvent } from './session.js';
 
 export const newsletterRouter = Router();
+
+// Mounted at /api/callback. Holds n8n-facing endpoints that authenticate
+// via shared-secret header rather than a session JWT — this matches the
+// requireApprovalSecret pattern used by /api/approvals/create.
+export const newsletterCallbackRouter = Router();
 
 /**
  * @openapi
@@ -422,5 +430,83 @@ newsletterRouter.get(
       stoppedAt: body.stoppedAt,
       lastNodeExecuted: (body.data as { resultData?: { lastNodeExecuted?: string } } | undefined)?.resultData?.lastNodeExecuted ?? null,
     });
+  },
+);
+
+// --------------------------------------------------------------------
+// Stage-emit callback — POST /api/callback/newsletter-stage
+//
+// Called by the 9 emit_stage_* nodes inside `Content - Newsletter Agent V2`
+// each time the workflow crosses a checkpoint. Auth is `X-Callback-Secret`
+// (shared with n8n via the `DEV Workbench Newsletter Callback Secret`
+// httpHeaderAuth credential). Side effect: publish a `newsletter.stage`
+// event to the SSE channel for the workflow's user, so the in-app
+// Execution Status page (S7) can update its progress strip in real time.
+//
+// The handler intentionally validates strictly and returns 400/401 cleanly,
+// because n8n emit nodes use `onError: continueRegularOutput` — a 4xx
+// from here only logs in the n8n UI; it never poisons the run.
+// --------------------------------------------------------------------
+
+const requireCallbackSecret = requireSharedSecret(
+  'X-Callback-Secret',
+  'NEWSLETTER_CALLBACK_SECRET',
+);
+
+/**
+ * @openapi
+ * /callback/newsletter-stage:
+ *   post:
+ *     tags: [Newsletter]
+ *     summary: Receive a stage-update callback from the n8n compose-newsletter workflow
+ *     description: |
+ *       Authenticated via `X-Callback-Secret` (shared with n8n). Validated
+ *       payload is rebroadcast as a `newsletter.stage` SSE event on
+ *       `sse:{userId}` so the React Execution Status page can update.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [userId, executionId, editionId, stage, ts]
+ *             properties:
+ *               userId:      { type: string }
+ *               executionId: { type: string }
+ *               editionId:   { type: string }
+ *               stage:       { type: string, enum: [gathering, selecting_stories, awaiting_stories_approval, stories_approved, awaiting_subject_approval, subject_approved, writing_segment, segments_done, saved, error] }
+ *               detail:      { type: string }
+ *               ts:          { type: string, format: date-time }
+ *     responses:
+ *       200: { description: "{success: true, broadcast: number} — count of SSE consumers reached" }
+ *       400: { description: Validation error }
+ *       401: { description: Missing or invalid X-Callback-Secret }
+ *       500: { description: NEWSLETTER_CALLBACK_SECRET not configured }
+ */
+newsletterCallbackRouter.post(
+  '/newsletter-stage',
+  requireCallbackSecret,
+  validateBody(StageCallbackSchema),
+  async (req: Request, res: Response) => {
+    const body = req.body as import('zod').infer<typeof StageCallbackSchema>;
+
+    const broadcast = await pushSseEvent(body.userId, {
+      event: 'newsletter.stage',
+      data: {
+        userId: body.userId,
+        executionId: body.executionId,
+        editionId: body.editionId,
+        stage: body.stage,
+        detail: body.detail ?? '',
+        ts: body.ts,
+      },
+    });
+
+    logger.info(
+      { userId: body.userId, executionId: body.executionId, stage: body.stage, broadcast },
+      'newsletter stage callback',
+    );
+
+    res.json({ success: true, broadcast });
   },
 );

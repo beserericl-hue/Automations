@@ -21,7 +21,7 @@ import { emailRouter } from './routes/email.js';
 import { ingestionRouter } from './routes/ingestion.js';
 import { approvalsApiRouter, approvalsPublicRouter } from './routes/approvals.js';
 import { newsletterSendsRouter } from './routes/newsletter-sends.js';
-import { newsletterRouter } from './routes/newsletter.js';
+import { newsletterRouter, newsletterCallbackRouter } from './routes/newsletter.js';
 import { jobsRouter } from './routes/jobs.js';
 import { contentActionsRouter } from './routes/content-actions.js';
 import type { JobInfrastructure } from './lib/jobs/boot.js';
@@ -153,6 +153,11 @@ app.use('/api/newsletter', generalLimiter);
 app.use('/api/newsletter', newsletterRouter);
 app.use('/api/callback', generalLimiter);
 app.use('/api/callback', sessionRouter);
+// Newsletter stage-emit callback (S3) — POST /api/callback/newsletter-stage.
+// Auth via X-Callback-Secret header (NEWSLETTER_CALLBACK_SECRET env). The
+// router is mounted on the same /api/callback prefix as sessionRouter; no
+// path conflicts because session.ts has /content-ready / /eve-knowledge etc.
+app.use('/api/callback', newsletterCallbackRouter);
 app.use('/api/jobs', generalLimiter);
 app.use('/api/jobs', jobsRouter);
 app.use('/api/content', generalLimiter);
