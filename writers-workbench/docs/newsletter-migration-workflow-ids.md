@@ -328,3 +328,25 @@ Orig (`4DQ7DmA9pFtXzsKX`) and `AI News Data Ingestion Orig` (`53SlwZMS21gpvz3H`)
 ## MCP config drift
 
 `.mcp.json` at repo root points at `https://agiletesting.app.n8n.cloud`, but this project's n8n lives at `https://n8n.agileadautomation.com`. Until `.mcp.json` is updated, `mcp__n8n-mcp__n8n_get_workflow` and friends return 404 for every newsletter-sprint workflow. Workaround used during S1: direct `curl` against the correct host with the key from `writers-workbench/.env`.
+
+---
+
+## Compose Newsletter 2a — additions (2026-04-26)
+
+### Railway env vars (DEV — `WritersWorkbenchDev` service in the `N8N-MCP` project)
+
+| Name | Value | Notes |
+|---|---|---|
+| `NEWSLETTER_CALLBACK_SECRET` | 32-byte hex (in user vault) | Consumed by `POST /api/callback/newsletter-stage`. Set 2026-04-26. |
+| `N8N_UI_URL` | `https://n8n.agileadautomation.com` | Used to build "Open in n8n →" deep links on the ExecutionStatus page. |
+| `N8N_NEWSLETTER_FORM_URL` | `https://n8n.agileadautomation.com/form/45ae3f3f-3564-4b28-b50c-75c4bb55e817` | Target of `POST /api/newsletter/generate`. Captured from `Content - Newsletter Agent V2`'s form-trigger webhookId before the S3 `Edition Id` field is added — adding the field does not change the URL. |
+
+PROD secret + cred deferred to release-time promotion. Add `NEWSLETTER_CALLBACK_SECRET` to the `scripts/clone-prod-to-dev.py` substitution table at first 2a promotion.
+
+### n8n credential (DEV tier, created 2026-04-26)
+
+| Credential name | ID | Header |
+|---|---|---|
+| `DEV Workbench Newsletter Callback Secret` | `1aF4oDhcjhe8R5sk` | `X-Callback-Secret` |
+
+Header value matches the `NEWSLETTER_CALLBACK_SECRET` Railway env var. Will be attached to the 9 `emit_stage_*` HTTP Request nodes added in the 2a sprint's S3.
