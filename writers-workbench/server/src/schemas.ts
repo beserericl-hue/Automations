@@ -156,3 +156,36 @@ export const NewsletterSendSaveSchema = z.object({
   scheduled_send_at: z.string().datetime({ offset: true }).optional().nullable(),
   metadata: z.record(z.string(), z.unknown()).optional().nullable(),
 });
+
+// ============================================
+// Compose Newsletter 2a (S2 — generate + status)
+// ============================================
+
+// `edition_id` follows the same shape as the seeded `ai-news` row in
+// migration 012 — short, slug-style, lowercase letters/digits/hyphens.
+const EditionIdSchema = z
+  .string()
+  .min(1, 'edition_id is required')
+  .max(64, 'edition_id too long')
+  .regex(/^[a-z0-9][a-z0-9-]*$/, 'edition_id must be slug-style (lowercase, digits, hyphens)');
+
+export const GenerateSchema = z.object({
+  edition_id: EditionIdSchema,
+  send_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'send_date must be YYYY-MM-DD'),
+  // Optional. Forwarded to the n8n workflow as the "Previous Newsletter Content"
+  // field, which the LLM uses to avoid duplicate coverage. Capped at 1MB to
+  // prevent accidental megabyte-sized pastes from blowing past the express
+  // body limit.
+  previous_newsletter_content: z
+    .string()
+    .max(1024 * 1024, 'previous_newsletter_content too large (max 1 MB)')
+    .optional()
+    .default(''),
+});
+
+// Used as a path-param validator for endpoints that take an edition id.
+export const NewsletterEditionIdParamSchema = z.object({
+  id: EditionIdSchema,
+});
