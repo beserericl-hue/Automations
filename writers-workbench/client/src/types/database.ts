@@ -323,6 +323,25 @@ export interface NewsletterApproval {
   expires_at: string;
   decision: NewsletterApprovalDecision | null;
   feedback: string | null;
+  // Compose Newsletter 2a (migration 012). Backfilled to 'ai-news' on
+  // existing rows; required for new rows once S2/S3 wire up the route.
+  edition_id: string | null;
+}
+
+// Compose Newsletter 2a — newsletter editions (migration 012)
+export interface NewsletterEdition {
+  id: string;
+  display_name: string;
+  subheader: string;
+  genre: string;
+  description: string | null;
+  newsletter_name: string;
+  primary_color: string;
+  paper_color: string;
+  enabled: boolean;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export type NewsletterSendStatus =
@@ -351,4 +370,11 @@ export interface NewsletterSend {
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+  // Compose Newsletter 2a (migration 012). Backfilled to 'ai-news' on
+  // existing rows. execution_id is the n8n execution id captured by the
+  // webhook trigger's Respond to Webhook node (S3). issue_number is
+  // assigned at save time in Phase 2b.
+  edition_id: string | null;
+  execution_id: string | null;
+  issue_number: number | null;
 }
