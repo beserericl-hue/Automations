@@ -146,16 +146,16 @@ Three endpoints in a new router at `writers-workbench/server/src/routes/newslett
 |---|---|---|---|
 | `GET`  | `/api/newsletter/editions` | — | `{editions: NewsletterEdition[]}` |
 | `GET`  | `/api/newsletter/editions/:id/last-sent-markdown` | — | `{markdown: string \| null}` |
-| `POST` | `/api/newsletter/generate` | `{edition_id, send_date, previous_newsletter_content?}` (Zod `GenerateSchema`) | `{executionId?: string, started: true}` |
+| `POST` | `/api/newsletter/generate` | `{edition_id, send_date, previous_newsletter_content?}` (Zod `GenerateSchema`) | `{executionId: string, started: true}` (executionId is synchronous from the workflow's `Respond to Webhook` node) |
 | `GET`  | `/api/newsletter/execution/:id/status` | — | `{executionId, status, mode, startedAt, stoppedAt, lastNodeExecuted}` |
 
 **`/generate` implementation notes:**
 
 - Validates body.
 - Looks up `newsletter_editions_v2` row for the id; 404 if disabled or missing.
-- POSTs `multipart/form-data` to `N8N_NEWSLETTER_FORM_URL` with fields `Date`, `Previous Newsletter Content`, `Edition Id`.
-- n8n form webhooks don't return the `executionId` synchronously — the handler returns `{started: true}` immediately; the first `newsletter.stage` SSE event (from `emit_stage_gathering`) is what lets the client navigate to the tracker with a real id.
-- Return shape therefore also includes a short-lived `correlationId` (server-generated UUID) that the server attaches to the form POST as a hidden field `Correlation Id`. `emit_stage_gathering` echoes it in the first SSE event so the client can stitch its optimistic redirect (`/newsletter/execution/<correlationId>`) onto the real executionId.
+- POSTs JSON to `N8N_NEWSLETTER_WEBHOOK_URL` with `X-Ingestion-Secret: $INGESTION_SECRET` header. Body: `{"Date": send_date, "Previous Newsletter Content": previous_content || "", "Edition Id": edition_id}`. n8n surfaces this at `$json.body.*` on the `webhook_trigger` node; the new `set_trigger_inputs` node (S3) normalizes it to a uniform `{Date, "Previous Newsletter Content", "Edition Id"}` shape on `$json` so downstream nodes don't have to care which trigger fired.
+- The workflow's first downstream node is `Respond to Webhook` returning `{executionId: $execution.id, editionId}` **synchronously** to the caller. The handler awaits that response and returns `{executionId, started: true}` to the client.
+- **No `correlationId`.** The executionId is known at request time; the client redirects directly to `/newsletter/execution/<executionId>`. This was the original sprint plan — eliminated by switching from `formTrigger` (which doesn't return `executionId`) to `webhook` + `respondToWebhook`.
 
 **Schemas:** add `GenerateSchema` and `NewsletterEditionSchema` to `server/src/schemas.ts`.
 
@@ -176,40 +176,70 @@ Three endpoints in a new router at `writers-workbench/server/src/routes/newslett
 
 ---
 
-### S3 — n8n: form-trigger `Edition Id` field + 9 stage-emit nodes + callback endpoint
+### S3 — n8n: webhook trigger + `Edition Id` field + 9 stage-emit nodes + callback endpoint
 
-Wires the workflow to emit stage events into the Workbench's SSE channel. **Zero edits to existing nodes' expressions**, except the 3 nodes that read `editionId` from the form trigger.
+Adds a webhook trigger as the primary entry point (preserving the existing form trigger as an ops fallback), funnels both into a single normalize node, then wires the 9 stage-emit nodes against that normalize node — so downstream expressions don't care which trigger fired.
 
 **Workbench side:**
 
 - New route `POST /api/callback/newsletter-stage` in `server/src/routes/newsletter.ts` (continues the S2 router).
   - Auth: `X-Callback-Secret` header equals `NEWSLETTER_CALLBACK_SECRET` env.
-  - Body (Zod `StageCallbackSchema`): `{userId, executionId, editionId, stage, detail?, ts, correlationId?}`.
+  - Body (Zod `StageCallbackSchema`): `{userId, executionId, editionId, stage, detail?, ts}`.
   - Side effect: push `{event: 'newsletter.stage', data: {...body}}` to the SSE channel for `userId`.
 - Extend existing `POST /api/approvals/create` — after the DB insert (already live from S9 of the prior sprint), also broadcast `newsletter.approval.created` to the session's SSE channel.
 - Extend existing `POST /api/approvals/:token/resolve` — after the DB update + n8n resume POST, also broadcast `newsletter.approval.resolved`.
 
 **n8n side (all changes to `Content - Newsletter Agent V2`, workflow id `bMvMKyK8obwYZmNb`):**
 
-1. **Credential:** create `DEV Workbench Newsletter Callback Secret` (httpHeaderAuth, header `X-Callback-Secret`, value = the Railway env). Capture the cred id in the registry table above.
-2. **Form trigger:** add field `Edition Id` (type `text`, default `ai-news`, not required).
-3. **Add 9 HTTP Request v4.2 nodes.** All identical except for placement and the `stage` literal. Template body JSON:
+1. **Credentials:**
+   - Re-use existing `DEV Workbench Ingestion Secret` (`jQBRJbmiUeTk8c11`, header `X-Ingestion-Secret`) on the new webhook trigger.
+   - Create `DEV Workbench Newsletter Callback Secret` (httpHeaderAuth, header `X-Callback-Secret`, value = the Railway env). Capture the cred id in the registry table above.
+
+2. **Add `webhook_trigger` (n8n-nodes-base.webhook v2):**
+   - HTTP Method: `POST`.
+   - Path: `compose-newsletter-dev` (full URL becomes `https://n8n.agileadautomation.com/webhook/compose-newsletter-dev` — capture and set as `N8N_NEWSLETTER_WEBHOOK_URL` on Railway DEV).
+   - `responseMode: 'responseNode'` (response comes from the dedicated node below, not the trigger itself).
+   - Authentication: `headerAuth` referencing `DEV Workbench Ingestion Secret`. Calls without `X-Ingestion-Secret` get 401.
+
+3. **Add `respond_to_webhook` (n8n-nodes-base.respondToWebhook):**
+   - Wired immediately after `webhook_trigger`.
+   - Response code `200`. Response body (JSON expression):
+     ```json
+     {
+       "executionId": "={{ $execution.id }}",
+       "editionId":   "={{ $json.body['Edition Id'] || 'ai-news' }}"
+     }
+     ```
+   - Returns to the caller synchronously. After this node, execution continues async into the rest of the pipeline.
+
+4. **Add `set_trigger_inputs` (n8n-nodes-base.set v3.4, `mode: 'manual'`, `includeOtherFields: false`):**
+   - Receives input from BOTH `respond_to_webhook` (webhook path) AND `form_trigger` (form path). n8n's Set node accepts multiple inputs and emits one normalized item per input.
+   - Assignments produce a uniform shape regardless of trigger:
+     ```
+     Date                       = $json.body?.Date ?? $json.Date
+     Previous Newsletter Content = $json.body?.['Previous Newsletter Content'] ?? $json['Previous Newsletter Content'] ?? ''
+     Edition Id                 = $json.body?.['Edition Id'] ?? $json['Edition Id'] ?? 'ai-news'
+     ```
+   - Downstream of this node is the original first-real-step node of the workflow (`search_markdown_objects`). Wire `set_trigger_inputs.main[0] → search_markdown_objects`.
+
+5. **Form trigger update:** add field `Edition Id` (type `text`, default `ai-news`, not required) on the existing `form_trigger`. Wire `form_trigger.main[0] → set_trigger_inputs` (joining the webhook-side feed at the same input).
+
+6. **Add 9 HTTP Request v4.2 stage-emit nodes.** All identical except for placement and the `stage` literal. Template body JSON:
 
    ```json
    {
      "userId":      "={{ $execution.runData.ExecutionMetadata?.userId || '+14105914612' }}",
      "executionId": "={{ $execution.id }}",
-     "editionId":   "={{ $('form_trigger').item.json['Edition Id'] || 'ai-news' }}",
+     "editionId":   "={{ $('set_trigger_inputs').item.json['Edition Id'] || 'ai-news' }}",
      "stage":       "<STAGE>",
      "detail":      "<OPTIONAL EXPRESSION>",
-     "ts":          "={{ $now.toISO() }}",
-     "correlationId": "={{ $('form_trigger').item.json['Correlation Id'] || null }}"
+     "ts":          "={{ $now.toISO() }}"
    }
    ```
 
    | Node name | Placed after | `stage` | `detail` expression |
    |---|---|---|---|
-   | `emit_stage_gathering` | `form_trigger` | `gathering` | `'started ingestion search'` |
+   | `emit_stage_gathering` | `set_trigger_inputs` | `gathering` | `'started ingestion search'` |
    | `emit_stage_picking` | `pick_top_stories` | `selecting_stories` | `'picked ' + $json.output.top_selected_stories.length + ' stories'` |
    | `emit_stage_awaiting_stories` | `create_approval_stories` | `awaiting_stories_approval` | `'approval token ' + $json.token` |
    | `emit_stage_stories_approved` | `check_stories_feedback` → true | `stories_approved` | `'writing subject line'` |
@@ -221,7 +251,9 @@ Wires the workflow to emit stage events into the Workbench's SSE channel. **Zero
 
    Every emit node uses `onError: continueRegularOutput` — a failed callback must never stop the workflow (the main path is the product of record; SSE is a nice-to-have).
 
-4. **Edges:** each emit node is inserted in-line — upstream's existing `main[0]` is rewired to the emit node, and the emit node's `main[0]` goes to what used to be downstream. Net: 9 new nodes, 9 new edges, 9 removed edges. Node count 87 → 96.
+7. **Edges summary:** Net 12 new nodes (1 webhook trigger, 1 respond, 1 set_trigger_inputs, 9 emit), with edges fanning both triggers into the single `set_trigger_inputs` node. Node count 87 → 99. Re-activate the workflow after PUT — `activeVersionId` should change with `active: true`.
+
+8. **Capture `N8N_NEWSLETTER_WEBHOOK_URL`** from the activated webhook URL and `railway variable set` it on `WritersWorkbenchDev`. Capture the new credential id in `newsletter-migration-workflow-ids.md` under `Compose Newsletter 2a — additions`.
 
 **Verification:**
 
@@ -267,7 +299,7 @@ client/src/lib/newsletter/formatStage.ts                   (stage enum → label
 
 - Subscribes to the existing `/api/session/events` SSE channel (already wired in Sprint 5).
 - Filters events to the `newsletter.*` prefix.
-- If `executionId` is passed, filters further to events where `data.executionId === executionId || data.correlationId === executionId`.
+- If `executionId` is passed, filters further to events where `data.executionId === executionId`. (No `correlationId` fallback — the webhook trigger returns the real `executionId` synchronously, so the client always knows it before subscribing.)
 - Returns `{events: StageEvent[], latestStage: Stage | null, pendingApprovals: ApprovalRow[], pendingApprovalCount: number}`.
 - Badge in sidebar binds to `pendingApprovalCount`.
 
@@ -331,7 +363,7 @@ Two entry-point pages.
 **`NewsletterGenerate.tsx`:**
 
 - Three fields: **Edition** (select, from `GET /api/newsletter/editions`, default `ai-news`), **Date** (defaults today), **Previous newsletter content** (textarea, prefilled from `GET /api/newsletter/editions/:id/last-sent-markdown`).
-- Submit → `POST /api/newsletter/generate` → receives `{started: true, correlationId}` → navigates to `/newsletter/execution/<correlationId>`.
+- Submit → `POST /api/newsletter/generate` → receives `{started: true, executionId}` → navigates to `/newsletter/execution/<executionId>`.
 - Loading, inline field-error, disabled-while-in-flight states.
 
 **Components added:**
@@ -535,8 +567,8 @@ S1 + S2 + S3 + S4 + S5 can ship in the first week (plumbing). S6 + S7 + S8 ship 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
 | SSE delivery gap during a long run | Medium | High — user sees stale state | On tracker mount, `GET /api/newsletter/execution/:id/status` reconstructs strip from `lastNodeExecuted`. Full fix in Phase 2c (stage-event persistence table). |
-| `executionId` not returned synchronously by n8n form webhook | High | Medium | `correlationId` scheme in S2 + S3. `emit_stage_gathering` echoes it in its callback body; client replaces the placeholder URL with the real executionId once the first event arrives. |
-| n8n form webhook URL rotates on workflow reactivation | Low | Medium | `N8N_NEWSLETTER_FORM_URL` env var is a one-line change. Document the refresh procedure in `compose-newsletter-feature.md` troubleshooting. |
+| Webhook URL rotates on workflow reactivation | Low | Medium | `N8N_NEWSLETTER_WEBHOOK_URL` env var is a one-line change. Document the refresh procedure in `compose-newsletter-feature.md` troubleshooting. (Note: n8n preserves the webhook path on PUT-in-place; the URL only rotates if you change the trigger node's Path field.) |
+| Form-trigger fallback drift (someone uses the form path while UI is broken, then we discover divergent behavior) | Low | Low | `set_trigger_inputs` normalizes both inputs into the same shape — every downstream node references `$('set_trigger_inputs')`. Both paths produce identical newsletter output. |
 | Double-resolve race (email click + in-app click) | Low | Low | `WHERE resolved_at IS NULL` guard already handles this; second resolver gets 409. |
 | n8n resume-POST failure after in-app resolve | Low | Medium | Decision already persisted in `newsletter_approvals_v2`. 502 response tells the user to retry; retry is idempotent (same token, same resolved-state check). |
 | LLM picked a story with no `identifiers` | Low | Medium | `ApprovalPayloadStories` shows empty-state card with suggested Revise feedback (`"story 3 has no sources"`). |
@@ -573,10 +605,11 @@ Explicitly _not_ in this sprint:
 Scope notes for Claude Code:
 
 - **Do all DB + server work against DEV** (`writersworkbenchdev-production.up.railway.app`, DEV Supabase). Mirror cred patterns from S9 + S11. Do **not** touch PROD credentials; they'll be minted at promotion time.
-- **Do not alter** `Content - Newsletter Agent V2`'s existing 87 nodes. Every S3 node is additive.
+- **Do not alter** `Content - Newsletter Agent V2`'s existing 87 nodes' parameters or expressions. Every S3 node is additive — the only edits to existing nodes are: (a) the `form_trigger` gets an `Edition Id` field, (b) edges that previously fed `search_markdown_objects` now route through the new `set_trigger_inputs` node first.
 - **Emit-node credentials** must use the `genericCredentialType: httpHeaderAuth` pattern, same as every other outbound call to the Workbench (`oWli4irymtVqSDyC`, `jQBRJbmiUeTk8c11`, `ytjKAO1BESVf6Cnz`, `kxrSg24PIR2Npfvw`).
+- **Webhook trigger** uses the existing `DEV Workbench Ingestion Secret` (`jQBRJbmiUeTk8c11`) as `headerAuth` — no new cred required for it. The new `DEV Workbench Newsletter Callback Secret` is only for the 9 emit nodes calling back into the Workbench.
 - **When in doubt on UI tokens**, read the design system root `README.md` → Visual Foundations. The StatusPill color map is already canonical and must be reused.
-- **Treat `correlationId`** as load-bearing: without it the client can't stitch its optimistic redirect onto the real executionId. Add test coverage for it in S3 + S9.
+- **No `correlationId` plumbing.** The webhook trigger returns the synchronous `executionId` via the `Respond to Webhook` node — the client always knows it before subscribing to SSE. Do not reintroduce a correlation-stitching scheme.
 
 If any of this runs into an environmental blocker (e.g., `.mcp.json` still pointing at the wrong n8n host, per the workflow-ids doc's "MCP config drift" note) — stop and ask; don't guess.
 
