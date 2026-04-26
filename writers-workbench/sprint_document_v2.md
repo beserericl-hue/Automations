@@ -1048,40 +1048,34 @@ S10a-5 (schema governance) ─────────────────�
 
 ---
 
-## Sprint 12: Chapter Writer — Parallelization + Research/Rewrite Tool
+## Sprint 12: Chapter Writer — Research/Rewrite Tool + Reviewer/Editor Tools
 
-**Status:** Planned | **Points:** 57 | **Duration:** ~3 weeks | **Priority:** P0
+**Status:** In progress (Track B + Track C shipped on PR #40, Track A deferred) | **Points:** 47 | **Duration:** ~3 weeks | **Priority:** P0
 
-**Goal:** Two co-shipped improvements to the chapter pipeline:
-1. **Parallelization (34 pts):** Chapter writer currently takes 10–20 minutes because of a 120-second rate delay and strictly sequential LLM calls. Remove the delay, build a pre-computed context document, fan out sub-chapter writes in parallel, add a merge/continuity pass. **Target: 3–5 minutes per chapter.**
-2. **Research/Rewrite Tool (23 pts):** A quick `maxIterations` hotfix to unblock multi-step requests today + new composite tool so the user can say one natural-language sentence to Eve and get a revised chapter that:
+**Goal:** Two co-shipped capabilities for the chapter pipeline:
+1. **Research/Rewrite Tool (23 pts):** A quick `maxIterations` hotfix to unblock multi-step requests today + new composite tool so the user can say one natural-language sentence to Eve and get a revised chapter that:
    - Researches a topic you specify (saved as its own `research_reports_v2` row AND integrated into the rewrite)
    - Fixes FAIL/NEEDS_REVIEW items from the chapter's last Q/A consistency report (default on)
    - Applies freeform style directives per character, scene, or moment ("make Craig and his associates highly exaggerated buffoons; Mason stumbles around trying to follow them")
    - All of the above stacked in a single invocation
+2. **Reviewer/Editor tools (24 pts, added mid-sprint):** Per-chapter genre eval + per-project character drift scan + a shared annotations UI that pins each flag to the spans it cites, with one-click apply.
 
-**Why now:** Parallelization gates all concurrent usage (10 chapter writes can't happen simultaneously without it). Rewrite tool addresses the main creative control gap — right now rewrites re-invoke the full writer with the same inputs and produce essentially the same output; the user has no way to inject research, Q/A fixes, or targeted style directives.
+**Why now:** Rewrite tool addresses the main creative control gap — right now rewrites re-invoke the full writer with the same inputs and produce essentially the same output; the user has no way to inject research, Q/A fixes, or targeted style directives. The reviewer tools surfaced from mid-sprint UX work — the user wanted "comments on a chapter you can fix in place" rather than "blind rewrites".
+
+**Track A removed from Sprint 12 — deferred to dedicated sprints (Sprints 16–18).** The original plan to remove the 120s rate delay and parallelize sub-chapter writes was scoped naively. The wait was load-bearing: it was a deliberate quality-vs-time tradeoff against Anthropic token-rate limits and the high token cost of each sub-chapter. Doing this safely requires (a) an LLM bake-off to find lower-token-rate options without losing quality, (b) a quality-comparison harness so we can prove the new architecture doesn't regress prose, and (c) a side-by-side rollout. See Sprints 16–18.
 
 **Governance:** All work on Dev workflows per Sprint 10.a. Promoted to V2 at release.
 
-### Track A — Parallelization (34 pts)
+### Track A — DEFERRED to Sprints 16–18 (see end of doc)
 
-#### S12-1: Remove rate delay + timing instrumentation (3 pts) | P0
+The original Track A (S12-1 remove rate delay, S12-3 parallel fan-out, S12-4 continuity merge, S12-5 timing dashboard — 26 pts) has been **removed from Sprint 12** and re-planned as Sprints 16, 17, and 18. See those sprints for the full breakdown. The reasoning:
 
-**Developer Tasks:**
-- [ ] In `Worker - Write Chapter V2 Dev`: delete the `rate_limit_delay` Wait node (120s between sub-chapters)
-- [ ] Reconnect the loop: `Loop Over Sub-Chapters` done → `write_sub_chapter` directly
-- [ ] Add timing Code nodes: capture `Date.now()` at start and end, store breakdown in `metadata.timing` on `published_content_v2`
-- [ ] Run 3 benchmark chapters (3, 5, 7 sub-chapters) and record times
+- The 120s `rate_limit_delay` Wait node was load-bearing — a deliberate trade against Anthropic's per-minute token limit and the high token cost of each sub-chapter. Removing it without a replacement strategy risks 429s.
+- Parallel fan-out is a **major architecture change**, not a hotfix. Doing it inside n8n via `SplitInBatches` may not even buy true parallelism (n8n's loop model serializes by design — see the 2026-04-24 session notes).
+- We have **no quality-regression harness** to detect prose quality drops from a faster-but-different writer. Without one, "quality unchanged (manual review)" is not a real DoD.
+- Per the user's framing: *"We need to analyse the output to determine how the quality chapter writing can be accomplished by different LLM's or a combination of LLMs. Break down the sprints so that we can make this architectural change without the risks you have shown."*
 
-**QA — System Tests:**
-- [ ] 3-sub-chapter chapter < 5 min (was ~8.5 min)
-- [ ] 5-sub-chapter chapter < 8 min (was ~13.5 min)
-- [ ] No Anthropic rate-limit errors
-- [ ] `metadata.timing` populated with breakdown
-- [ ] Chapter content quality unchanged (manual review)
-
-**Definition of Done:** All 3 benchmarks complete without errors + chapter quality confirmed unchanged.
+S12-2 (context builder) DID ship in this sprint and remains below — it's an enabler that was needed for the Track B rewrite tool too.
 
 #### S12-2: Context document generator (8 pts) | P0
 
@@ -1110,74 +1104,7 @@ S10a-5 (schema governance) ─────────────────�
 
 **Definition of Done:** Sub-workflow runs < 30s, output validated across 3 chapter scenarios.
 
-#### S12-3: Parallel sub-chapter fan-out (13 pts) | P0
-
-**Developer Tasks:**
-- [ ] Rewrite `Worker - Write Chapter V2 Dev` core loop:
-  - Before: `Loop → delay → write → memory → loop`
-  - After: `build_chapter_context → generate all sub-chapter prompts → SplitInBatches (batch=N) → write_sub_chapter (parallel) → Merge → sort by sub-chapter number → concat → QA`
-- [ ] Each sub-chapter prompt includes the full context document (identical across all — Anthropic cache hit) + its sub-chapter brief, arc beat, characters, setting
-- [ ] Remove `chapter_memory` (memoryBufferWindow) — replaced by context document
-- [ ] Keep vector store tool available for each sub-chapter (independent retrievals are fine in parallel)
-- [ ] Error handling: if any sub-chapter fails after 3 retries, save partial chapter with `[SECTION FAILED]` marker + notify user
-
-**QA — System Tests:**
-- [ ] 3-sub-chapter chapter < 3 minutes
-- [ ] 5-sub-chapter chapter < 4 minutes
-- [ ] 7-sub-chapter chapter < 5 minutes
-- [ ] All sub-chapters present in correct order
-- [ ] Character names consistent across parallel sub-chapters
-- [ ] No duplicate content between sub-chapters
-- [ ] Partial failure: 1 sub-chapter fails → chapter saved with marker → user notified
-- [ ] 2 users writing chapters simultaneously → both complete without interference
-- [ ] Vector store queries from parallel sub-chapters don't conflict
-- [ ] QA pass still runs on complete chapter
-
-**Definition of Done:** All timing targets hit on Dev; quality regression test passes (manual review of 2 chapters before/after).
-
-#### S12-4: Continuity merge pass (5 pts) | P1
-
-**Developer Tasks:**
-- [ ] New Claude call after concatenation, before QA:
-  - Model: Claude Sonnet 4, 8192 maxTokens, temp 0.3
-  - Prompt: "Review these N sub-chapters written in parallel. Fix: transition sentences between sub-chapters, character state inconsistencies, repeated phrases, tone shifts. Do NOT rewrite — only fix seams."
-  - Input: full concatenated chapter + context document
-  - Output: revised chapter text
-- [ ] Skip merge pass if chapter has ≤ 2 sub-chapters (seamless enough)
-- [ ] Store pre-merge and post-merge in `metadata.versions.pre_merge`
-
-**QA — System Tests:**
-- [ ] Merge pass runs < 60 seconds
-- [ ] 5-sub-chapter chapter shows smoother transitions (manual)
-- [ ] Merge doesn't significantly change word count (< 5% delta)
-- [ ] Merge skipped for 2-sub-chapter chapter
-- [ ] `metadata.versions.pre_merge` contains unmerged text
-
-**Definition of Done:** Merge pass improves one benchmark chapter's readability score (manual) without changing word count > 5%.
-
-#### S12-5: Timing telemetry + performance dashboard (5 pts) | P1
-
-**Developer Tasks:**
-- [ ] Add timing metrics to `token_usage_v2`: `execution_time_ms`, `queue_wait_ms`, `llm_time_ms`
-- [ ] New endpoint `GET /api/admin/performance`:
-  - Avg chapter write time (last 7 days)
-  - P95 chapter write time
-  - Avg sub-chapter write time
-  - Queue wait time distribution
-  - Job success/fail rates by queue
-- [ ] Admin UI Metrics tab → Performance section:
-  - Chapter time chart (before vs after parallelization)
-  - Queue depth over time
-  - Active workers count
-
-**QA — Unit + E2E Tests:**
-- [ ] Performance endpoint returns correct averages from test data
-- [ ] P95 calculation correct
-- [ ] Empty data → zeros (not errors)
-- [ ] Admin-only access enforced
-- [ ] E2E: Admin → Metrics → Performance section shows charts
-
-**Definition of Done:** Dashboard live, showing real data from at least 10 chapter writes.
+> Stories **S12-1, S12-3, S12-4, S12-5 deferred** to Sprints 16, 17, 18. See end of doc.
 
 ### Track B — Research / Rewrite Tool (23 pts)
 
@@ -1376,18 +1303,86 @@ OUTPUT: the rewritten chapter text only. No commentary, no preamble.
 
 ---
 
-### Sprint 12 totals: 57 pts (10 stories)
+### Track C — Reviewer/Editor Tools (added mid-sprint)
+
+Two diagnostic-and-fix tools and a shared review surface, added once Track B exposed how often the user wants targeted, evidence-backed feedback on what's already written rather than another full rewrite.
+
+#### S12-11: `Tool - Evaluate Genre Compliance V2 Dev` (8 pts) | P0 | ✅ COMPLETE
+
+**Goal:** Score one chapter against the project's genre writing directive and return a structured per-rule report (scores, evidence quotes, three streams of suggestions: prose adaptations, outline adaptations, observations). Read-only — produces a report, never mutates the chapter or outline.
+
+**Developer Tasks (done):**
+- [x] New workflow `DEV - Tool - Evaluate Genre Compliance` (id `e9LEpCM5L7zVpQxl`)
+- [x] Computed-before architecture: validator computes context from verified `evidence.quote` position rather than trusting LLM context fields
+- [x] Schema enum on `adaptation_target` + fuzzy text match on `evidence.quote` to defend against fabrication
+- [x] Required suggestion shape: rule_dimension, score, status, adaptation_target, scope.sub_chapter, evidence (quote + context), exemplar (title + technique), after (rewritten prose), editor_note (60–280 char human voice), proposed_change, preserves
+- [x] Three-stream output: `prose_adaptations`, `outline_adaptations`, `observations`
+- [x] Persists to `published_content_v2.metadata.genre_eval`
+- [x] Wired into DEV hub via `evaluate_genre_compliance` tool node + `ui:evaluate-genre` source bypass for server-dispatched eval jobs
+- [x] First successful scan: 7 kept / 1 rejected on Ch7 of *The Invisible Wall*
+
+**QA / DoD:** Smoke run on Ch7 of *The Invisible Wall* shipped a structured report with rejected-suggestion count > 0 (validator did its job). ✅
+
+#### S12-12: `Tool - Scan Character Drift V2 Dev` (8 pts) | P0 | 🟡 IN PROGRESS
+
+**Goal:** Detect character-name drift across every chapter of a project. Aggregates per-character variant tallies, flags forbidden variants and cross-chapter inconsistencies, and surfaces unknown people not in the outline roster. Read-only — produces a report, never mutates content.
+
+**Developer Tasks (done):**
+- [x] New workflow `DEV - Tool - Scan Character Drift` (id `fJWDHXhle345f6jY`)
+- [x] **Pivot from LLM-based extraction to deterministic regex algorithm** (`scanner_algorithm: 'deterministic-regex-v4'`). Cuts time from 5+ min to <1 sec, eliminates token-limit failures, eliminates parse failures, eliminates fabrication risk. Driven by user feedback ("create an algorithm that will work for all chapter sizes — deal with the performance issues").
+- [x] Three-phase matcher: (1) canonical full-name + first-name regex with longest-first ordering, (2) drift candidates `<canonical first> <Surname>` not in allowed set, (3) unknown people via honorific + bare-name pattern with consumed-range masking
+- [x] Possessive stripping (`Lucia's` → `Lucia`)
+- [x] Wired into DEV hub via `scan_character_drift` tool node + `ui:scan-character-drift` source bypass
+- [x] Persists to `writing_projects_v2.outline._character_drift_scan`
+
+**Developer Tasks (done in PR #40):**
+- [x] **Reverse-order detection** — added Phase 0 with case-file structural anchors (Case #, Subject Name:, Detainee:, etc.). Catches the Ch5 "Rodriguez, Elena" miss without false-firing on sentence-boundary commas like "...her careful English, Mason..." or paragraph breaks like "\n\nDownstairs, Craig...".
+- [x] **Noise filter rewrite (shape-based, not enumerated)** — `NON_PERSON_PATTERNS` reduced to true universals (calendar, US states, generic constitutional terms, agency-acronym shape `^[A-Z]{2,5}\d{0,3}$`). `HEADER_TOKENS` set catches bureaucratic/place/institution shapes (clause, statute, county, conclave, guild, etc.) — works for any genre. `HONORIFICS` expanded to be genre-agnostic (added political/royalty/religious/sci-fi titles).
+- [x] **Per-project escape hatch** — `outline._scanner_exclusions: string[]` lets the user mark "Yick Wo", "Justice Brennan", etc. as known-non-person without code changes (UI for editing this list is a follow-up).
+- [x] Re-scan *The Invisible Wall* confirmed: 1 real Ch5 drift surfaced, 144→32 unknowns (78% noise drop), 0 false positives. Multi-genre smoke (sci-fi/romance/fantasy/political) all clean.
+
+**QA / DoD:** ✅ Met — Ch5 case-file drift surfaces as `reverse_order_drift` flag; noise reduced 78%.
+
+#### S12-13: Shared Report-Comment UI surface (8 pts) | P1 | ✅ COMPLETE (PR #40)
+
+**Goal:** Stop forcing the user to mentally cross-reference a JSON report against the chapter prose. Every drift flag and every genre-eval suggestion gets pinned to the exact span in the chapter editor — like Google Docs comments — with one-click apply.
+
+**Developer Tasks (done):**
+- [x] **API**: `GET /api/content/:id/annotations` — merges `metadata.genre_eval` (S12-11) + project `outline._character_drift_scan` (S12-12) into `UnifiedAnnotation[]`. Honours `metadata.dismissed_annotations`. Auto-derives `replacement_text` for reverse-order drift.
+- [x] **API**: `POST /api/content/:id/annotations/apply` — precise span replacement, snapshots prior text into `content_versions_v2` BEFORE mutating, marks annotation dismissed, returns 422 on stale anchor.
+- [x] **API**: `POST /api/content/:id/annotations/dismiss` — adds annotation id to `metadata.dismissed_annotations`.
+- [x] **Deterministic annotation IDs**: `<source>:<chapter_number>:<kind>:<evidence_normalised>` so re-scans collapse onto the same row.
+- [x] **Client**: `AnnotationsPanel.tsx` (305 lines) wired into `ContentDetail.tsx` for chapters. Two source sections (drift first, genre second). Severity badge, evidence quote in blockquote, suggested replacement in green box, Apply / Dismiss buttons.
+- [x] **Tests**: 4 new vitest tests (GET merge, Apply happy path, 422 stale, Dismiss). 9/9 content-actions tests pass.
+
+**Deferred follow-ups (not blocking ship):**
+- [ ] **Client**: inline gutter marker on the editor span (the current panel is side-panel-only; gutter pins are a separate enhancement).
+- [ ] **Client**: stale annotation "rescan" CTA that triggers the source tool again.
+- [ ] **e2e Playwright test** for the full Apply round-trip.
+- [ ] **UI for editing `outline._scanner_exclusions`** so users can mark long-tail noise (Yick Wo, Justice Brennan, etc.) without engineering involvement.
+
+**Definition of Done:** ✅ End-user can review a drift scan / genre eval, click Apply, see the chapter text update + version snapshot in `content_versions_v2`. Hand-fix of Ch5 *The Invisible Wall* "Rodriguez, Elena" → "Morales, Elena" was performed via this code path (run server-side directly against DEV Supabase prior to deploy) and confirmed by re-scan returning 0 drift flags.
+
+---
+
+### Sprint 12 totals (revised): 47 pts shipped (Tracks B + C, 9 stories) + 26 pts deferred to Sprints 16–18
+
+- **Track B (Research/Rewrite Tool):** 23 pts — S12-0, S12-2, S12-6, S12-7, S12-8, S12-9. Shipped earlier in sprint.
+- **Track C (Reviewer/Editor Tools, added mid-sprint):** 24 pts — S12-11, S12-12, S12-13. Shipped on PR #40.
+- **Track A (Parallelization):** 26 pts — S12-1, S12-3, S12-4, S12-5. **Deferred** to Sprints 16–18 with quality-regression harness as prerequisite.
 
 ### Dependencies
 - Sprint 10.a complete (Dev tier must exist for all workflow changes)
-- Track A and Track B can proceed in parallel (different workflows)
+- Track B and Track C can proceed in parallel (different workflows)
+- Track C depends on Track B's Q/A report shape (S12-8) for genre-eval suggestions to dovetail
 
 ### Recommended execution order
 **S12-0 first — it's a 2-pt early win that unblocks multi-step requests TODAY.**
 - Track A (solo):  S12-1 → S12-2 → S12-3 → S12-4 → S12-5
 - Track B (solo):  **S12-0** → S12-7 → S12-8 → S12-6 → S12-9
+- Track C (solo, added mid-sprint):  **S12-11** ✅ → **S12-12** 🟡 → S12-13
 
-Converge at PR to develop; promote both tracks together at end-of-sprint release.
+Converge at PR to develop; promote all three tracks together at end-of-sprint release.
 
 ---
 
@@ -1555,6 +1550,231 @@ See [`docs/railway-deployment.md`](docs/railway-deployment.md) for the full Rail
 
 ---
 
+## Sprint 16: Chapter Writer — Profiling & Quality-Comparison Harness (no architecture change)
+
+**Status:** Planned | **Points:** 21 | **Duration:** 2 weeks | **Priority:** P1 | **Pre-requisite for 17 & 18**
+
+**Goal:** Before we touch the chapter writer's architecture, build the **measurement infrastructure** that lets us prove an alternative writer doesn't regress on quality. Today there is no harness, no baseline, and no agreed-on quality metric. The original Sprint 12 Track A plan ("Chapter content quality unchanged (manual review)") is not a real DoD — humans don't notice prose regressions across 50,000 words. This sprint produces the rulers.
+
+**Why now:** The 120s `rate_limit_delay` Wait node in `Worker - Write Chapter V2 Dev` is a deliberate trade-off against (a) Anthropic's per-minute output-token rate limit and (b) the high token cost per sub-chapter (~5000 words × ~1.3 tokens/word × N sub-chapters). Removing it is a 5-minute change but the quality risks are real. We need to know what we're trading for what before we choose a new architecture in Sprint 17.
+
+**Governance:** All work read-only against `Worker - Write Chapter V2 Dev`. NO mutations to live workflows. New tooling lives in `scripts/` and `writers-workbench/server/src/quality/`.
+
+### Stories
+
+#### S16-1: Profile current chapter writer (5 pts) | P0
+
+**Developer Tasks:**
+- [ ] Instrument `Worker - Write Chapter V2 Dev` with **read-only timing telemetry** — wrap each LLM call site to emit start/end + token counts to a new `chapter_write_profile_v2` table. Keep the live workflow's behaviour byte-identical.
+- [ ] Run 9 profiling chapters (3 chapters × 3 projects spanning 3 genres) and capture per-call breakdown: per-sub-chapter output tokens, time, queue wait, retry count, the actual rate-limit headers Anthropic returns.
+- [ ] Compute per-chapter "where does the time go": `% in delay node`, `% in LLM calls`, `% in vector store`, `% in QA`, `% in n8n loop overhead`.
+
+**QA / DoD:**
+- [ ] Profile report markdown checked into `writers-workbench/docs/chapter-writer-profile-2026.md` with charts per genre.
+- [ ] Identifies the actual bottleneck (which may NOT be the wait node; could be Anthropic queueing the requests internally regardless).
+
+#### S16-2: Quality scoring framework (8 pts) | P0
+
+**Developer Tasks:**
+- [ ] Define explicit quality dimensions (cribbed from S12-11 evaluator rules + new):
+  1. **Character voice consistency** — Mason in sub-chapter 5 sounds like Mason in sub-chapter 1
+  2. **Plot beat coverage** — every required beat from `chapter_outline.sub_chapters[].arc_beat` lands
+  3. **Scene-to-scene continuity** — character state, setting, time-of-day match across sub-chapter boundaries
+  4. **Prose density** — info per sentence isn't wildly different from the genre baseline
+  5. **Dialogue authenticity** — character-specific patterns preserved
+  6. **Show-don't-tell ratio** — sensory detail beats summary
+  7. **Pacing variance** — short paragraphs around action, longer in reflection
+- [ ] Implement `writers-workbench/server/src/quality/scoreChapter.ts`: takes `(chapterText, outline, contextDoc, referenceChapter?)`, calls a Claude Sonnet judge with a structured prompt, returns `{dimension, score 1-10, evidence_quote, rationale}` per dimension. Idempotent on the same input.
+- [ ] Adversarial regression tests: hand-craft "definitely-bad" chapters (jarring tone shift, dropped character, contradictory setting) and prove the scorer catches them with score ≤ 3 on the relevant dimension.
+
+**QA / DoD:**
+- [ ] Scoring framework returns a deterministic-up-to-judge score for the same input.
+- [ ] 5 hand-crafted bad chapters score ≤ 3 on the dimension they're designed to fail.
+- [ ] Documentation in `writers-workbench/docs/chapter-quality-scoring.md`.
+
+#### S16-3: Reference baseline — 15 chapters across 3 genres (5 pts) | P0
+
+**Developer Tasks:**
+- [ ] Run the current `Worker - Write Chapter V2 Dev` (unchanged) against 15 chapter outlines:
+  - 5 from a sci-fi project (post-apocalyptic or political-scifi)
+  - 5 from a romance project (metaphysical-romance or scifi-romance)
+  - 5 from a political/literary project (political-dark-comedy)
+- [ ] Save each chapter's full text + final QA report + scoring framework output.
+- [ ] Persist as a **golden corpus** at `writers-workbench/quality-baseline/2026-04-baseline/` (gitignored if too large; otherwise checked in).
+
+**QA / DoD:**
+- [ ] 15 chapters generated successfully on the unchanged writer.
+- [ ] Quality scores per chapter recorded as the baseline that all future architecture experiments must match.
+- [ ] No chapter has any dimension score < 5 on the baseline (sanity check that the current writer actually produces shippable prose; if it doesn't, S17 is moot until S12-2 / S12-8 fixes that).
+
+#### S16-4: Side-by-side comparison harness (3 pts) | P1
+
+**Developer Tasks:**
+- [ ] CLI `scripts/compare-chapter-writers.py <writer_id_a> <writer_id_b> --outlines outlines.json` that:
+  - Triggers writer A and writer B against the same outline
+  - Captures both outputs
+  - Runs each through the scoring framework
+  - Prints a markdown comparison: per-dimension delta, time delta, token delta, cost delta
+- [ ] Used in S17 to compare LLM/architecture options against the baseline writer.
+
+**QA / DoD:**
+- [ ] Running the harness with `writer_a == writer_b` against a baseline chapter shows ~0 score delta and ≤10% time variance — proves the harness itself is stable.
+
+### Sprint 16 totals: 21 pts
+
+**Depends on:** Sprint 12 complete. Sprint 10.b ideally complete (queue infra makes parallel-writer experiments easier).
+
+**Does NOT change any production behaviour.** Pure measurement.
+
+---
+
+## Sprint 17: LLM Bake-off + Architecture Spike (no production rollout)
+
+**Status:** Planned | **Points:** 26 | **Duration:** 2 weeks | **Priority:** P1
+
+**Goal:** Use the Sprint 16 harness to answer two architectural questions before we change anything:
+1. **Is the right answer different LLMs?** Specifically: can a smaller/cheaper/faster LLM write parts of a sub-chapter (scaffolding, dialogue beats, sensory description) without quality loss, while only the "hard" parts use Claude Sonnet/Opus?
+2. **Is the right answer architectural change?** Specifically: where should sub-chapter parallelism live (n8n SplitInBatches vs Workbench BullMQ vs hybrid), and how do we manage the Anthropic per-minute token rate without a hand-rolled Wait node?
+
+This is a SPIKE — produces decisions and prototypes, not production code.
+
+### Stories
+
+#### S17-1: Single-LLM bake-off — Sonnet vs alternatives (8 pts) | P0
+
+**Developer Tasks:**
+- [ ] Run the S16-3 baseline corpus through 6 alternative single-LLM writers, identical prompt + context:
+  - Claude Sonnet 4.6 (current default)
+  - Claude Sonnet 4.7
+  - Claude Haiku 4.5 (cheap/fast)
+  - Claude Opus 4.7 (premium)
+  - Gemini 2.5 Pro
+  - Gemini 2.5 Flash
+  - GPT-4o
+  - GPT-4o-mini
+- [ ] Score each output against the baseline via the S16-2 framework. Capture cost (input + output tokens × model pricing) and wall time.
+- [ ] Build a scorecard: per-genre quality vs cost vs time per LLM. Identify any model that matches Sonnet quality at <50% cost or <50% time.
+
+**QA / DoD:**
+- [ ] Scorecard markdown in `writers-workbench/docs/llm-bakeoff-2026.md` with one row per (genre × model).
+- [ ] Recommended single-LLM default for each of the 3 genres (may all be Sonnet — that's a valid answer).
+
+#### S17-2: Multi-LLM composition experiments (8 pts) | P1
+
+**Developer Tasks:**
+- [ ] Try 4 multi-LLM compositions on the baseline corpus:
+  - **(a) Scaffolder + Prose** — Haiku expands the sub-chapter outline into a beat-by-beat plan; Sonnet writes the prose against the plan
+  - **(b) Draft + Polish** — Haiku writes a fast draft; Sonnet does a polish pass
+  - **(c) Per-element specialisation** — Haiku for setting/sensory, Sonnet for dialogue, Opus for the climax sub-chapter only
+  - **(d) Cache-leveraged Sonnet-only** — single LLM but with explicit cache reuse: emit a long stable system prompt + chapter context once, hit the cache for every sub-chapter (validates the Sonnet cache savings claim)
+- [ ] Score, compare to single-LLM baseline. Cost / quality / time trade-off table.
+
+**QA / DoD:**
+- [ ] Decision: which composition (if any) ships in Sprint 18 vs single-LLM Sonnet default.
+- [ ] Documented trade-offs of the rejected compositions (so we don't re-litigate later).
+
+#### S17-3: Architecture spike — three options, pick one (8 pts) | P0
+
+**Developer Tasks:** Build a tiny prototype of each option, run a 5-sub-chapter chapter through each, measure rate-limit behaviour:
+- **Option A — n8n native parallel.** SplitInBatches with batch size = N sub-chapters. Verify whether n8n actually parallelises the Anthropic calls or serializes them internally. (Strong suspicion from prior session notes that it serializes.)
+- **Option B — Workbench BullMQ fan-out.** New `/api/chapter/write` endpoint enqueues N sub-chapter jobs to a `chapter-sub` BullMQ queue with `concurrency` controlled by Workbench config. n8n only orchestrates the trigger + concat + QA. Anthropic rate-limit honored via the existing BullMQ rate-limiter.
+- **Option C — Hybrid.** n8n keeps the per-sub-chapter LLM calls but the wait between them is replaced by a Workbench-side rate-limiter check (the worker calls `/api/rate/anthropic/wait?tokens=5000` which blocks until tokens are available, then returns).
+
+**QA / DoD:**
+- [ ] One of the three is recommended in writing with measured rate-limit handling, true wall-time, and architectural risk per option.
+- [ ] Recommended option becomes the foundation for Sprint 18.
+
+#### S17-4: Continuity-merge experiment (2 pts) | P1
+
+**Developer Tasks:**
+- [ ] Take 3 baseline chapters that were generated as N sub-chapters today and rewrite their concatenation through a "merge pass" Claude call (the original S12-4 spirit but on already-good prose).
+- [ ] Score before/after via S16-2.
+
+**QA / DoD:**
+- [ ] Determines whether continuity merge actually moves the score or is a no-op (which would let us drop the story from Sprint 18).
+
+### Sprint 17 totals: 26 pts
+
+**Depends on:** Sprint 16 (harness + baseline must exist).
+
+**Does NOT change any production behaviour.** Spike outputs are prototypes + decisions.
+
+---
+
+## Sprint 18: Chapter Writer — Safe Architecture Rollout
+
+**Status:** Planned | **Points:** 34 | **Duration:** 3 weeks | **Priority:** P1
+
+**Goal:** Implement the Sprint 17 winning architecture + LLM choice on a NEW workflow (`Worker - Write Chapter V2 Dev v2`), run it side-by-side against the legacy writer, and shift traffic via feature flag only when the side-by-side data proves no regression.
+
+**Why this shape:** This is the high-risk sprint. The risk model from the original Sprint 12 Track A — "promote a rewritten worker on Friday and pray nothing breaks" — is replaced by:
+- A second workflow exists alongside the legacy one
+- Every chapter-write request runs through BOTH workflows for the first week
+- Quality scores from each are recorded
+- Traffic shifts only when delta is provably ≤ threshold
+
+### Stories
+
+#### S18-1: Implement winning architecture as `Worker - Write Chapter V2 Dev v2` (13 pts) | P0
+
+**Developer Tasks:**
+- [ ] Whatever Sprint 17 picked: build it. Live next to the legacy worker, NOT replacing it. Different workflow ID.
+- [ ] Wire the same triggers, same I/O contract — interchangeable from the hub's point of view.
+- [ ] Use the LLM choice from S17 (default Sonnet, possibly multi-LLM composition).
+- [ ] Anthropic rate-limit handled via the chosen mechanism (BullMQ rate-limiter / wait endpoint / SplitInBatches — whichever S17 picked).
+
+**QA / DoD:**
+- [ ] New workflow runs end-to-end against 5 baseline chapters successfully.
+- [ ] Wall time ≤ 50% of legacy on the same chapters.
+- [ ] Quality scores within 5% of baseline on every dimension.
+
+#### S18-2: Side-by-side runner + delta dashboard (8 pts) | P0
+
+**Developer Tasks:**
+- [ ] Add a feature flag `CHAPTER_WRITER_SHADOW_MODE=true|false` (Workbench env var). When true, every chapter-write request runs BOTH workflows in parallel, returns the legacy result to the user, and records both outputs + their quality scores to `chapter_writer_shadow_v2`.
+- [ ] Admin dashboard at `/admin/chapter-writer-shadow` shows last 30 days of deltas: per-dimension score delta, time delta, token delta, cost delta, side-by-side prose snippets for any chapter where delta > threshold.
+
+**QA / DoD:**
+- [ ] Shadow mode runs cleanly for 1 week against real user traffic without affecting user-facing behaviour.
+- [ ] Dashboard shows actionable per-chapter delta data.
+
+#### S18-3: Continuity merge pass (5 pts) | P1 — if S17-4 found it valuable
+
+**Developer Tasks:**
+- [ ] Add the merge pass to the new workflow per Sprint 17's findings.
+- [ ] Skip if Sprint 17 concluded merge is a no-op for the chosen architecture.
+
+#### S18-4: Traffic-shift rollout (5 pts) | P0
+
+**Developer Tasks:**
+- [ ] Replace `CHAPTER_WRITER_SHADOW_MODE` with `CHAPTER_WRITER_PRIMARY=legacy|new` and a per-user split percentage `CHAPTER_WRITER_NEW_PCT=0..100`.
+- [ ] Day 1: 10% of new chapter requests use the new writer, rest fall through to legacy. Both outputs still scored.
+- [ ] Day 4: if no regression, 50%.
+- [ ] Day 7: if no regression, 100%.
+- [ ] Day 14: legacy workflow archived (renamed `… LEGACY`, deactivated). Workbench code path that called legacy removed.
+
+**QA / DoD:**
+- [ ] 100% traffic on new writer for ≥7 days with quality scores matching baseline.
+- [ ] Legacy workflow safely archived.
+- [ ] No user-reported quality regression.
+
+#### S18-5: Performance dashboard + telemetry (3 pts) | P1
+
+**Developer Tasks:**
+- [ ] What S12-5 originally promised: per-chapter wall time, per-sub-chapter time, queue wait, P95 — but on the new workflow's metrics only (legacy metrics archived).
+- [ ] Cost per chapter chart so we can detect cost regressions from LLM-mix changes.
+
+**QA / DoD:**
+- [ ] Dashboard live with real production data after S18-4 reaches 100%.
+
+### Sprint 18 totals: 34 pts
+
+**Depends on:** Sprints 16 + 17. Cannot start until S17 picks the architecture.
+
+**This is the only sprint that changes the live chapter writer.** All risk concentrates here, but it's gated behind shadow-mode + percentage rollout + provable quality scores.
+
+---
+
 ## Sprint sequencing at a glance
 
 ```
@@ -1565,14 +1785,16 @@ Next (ordered):
                      │         │
                      └─▶ 12 ───┤
                                │
-                               ├──▶ 8 ──▶ 9 ──▶ 13 ──▶ 14 ──▶ 15
+                               ├──▶ 8 ──▶ 9 ──▶ 13 ──▶ 14 ──▶ 15 ──▶ 16 ──▶ 17 ──▶ 18
                                │
                                └─(option to skip 13/14 until pain justifies)
 ```
 
-**Recommended order:** 10.a → 10.b → 11 → 12 → 8 → 9 → 13 → 14 → 15
+**Recommended order:** 10.a → 10.b → 11 → 12 → 8 → 9 → 13 → 14 → 15 → 16 → 17 → 18
 
-**Alternative (product-features-first):** 10.a → 8 → 9 → 10.b → 11 → 12 → 13 → 14 → 15 — if customer demand for multi-tenancy + billing outweighs the need for scaling infrastructure
+**Why 16/17/18 at the end:** 16–18 is the chapter-writer architecture programme (deferred Track A from Sprint 12). It needs the queue infrastructure from 10.b, runs against the load-tested production environment from 15, and changes the most-touched workflow in the system — so it goes last. The 3-sprint shape (Profile → Spike → Safe Rollout) is the user-mandated alternative to the original "rip-and-replace" Track A. See the user's framing captured at the top of Sprint 16.
+
+**Alternative (product-features-first):** 10.a → 8 → 9 → 10.b → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18 — if customer demand for multi-tenancy + billing outweighs the need for scaling infrastructure. 16/17/18 stay last in either ordering.
 
 ---
 
@@ -1586,13 +1808,16 @@ Next (ordered):
 | 8 | planned (carried) | 55 |
 | 9 | planned (carried) | 47 |
 | 11 | planned | 21 |
-| 12 | planned — expanded 2026-04-20 (+S12-0 Eve hotfix + rewrite tool) | 57 |
+| 12 | in progress — Tracks B + C shipped (PR #40); Track A moved to Sprints 16–18 | 47 |
 | 13 | planned — refreshed 2026-04-20 (independent instances, not queue mode) | 34 |
 | 14 | planned | 34 |
 | 15 | planned | 34 |
-| **Total remaining** | | **365 pts** |
+| 16 | planned 2026-04-26 — chapter writer profiling + quality harness (no architecture change) | 21 |
+| 17 | planned 2026-04-26 — LLM bake-off + architecture spike (no production rollout) | 26 |
+| 18 | planned 2026-04-26 — safe architecture rollout (shadow mode + traffic shift) | 34 |
+| **Total remaining** | | **436 pts** |
 
-At 34 pts/sprint (2-week cadence), that's **~21 weeks (10-11 sprints) of work**. 10.a is a 3-week sprint at 49 pts. 12 is a 3-week sprint at 57 pts. Product-facing sprints (8, 9) can run in parallel with infrastructure sprints since they touch different layers.
+At 34 pts/sprint (2-week cadence), that's **~26 weeks (13 sprints) of work**. 10.a is a 3-week sprint at 49 pts; 12 is a 3-week sprint at 47 pts; 18 is a 3-week sprint at 34 pts. Product-facing sprints (8, 9) can run in parallel with infrastructure sprints since they touch different layers. Sprints 16/17/18 must run sequentially — each depends on the prior one's output.
 
 ---
 

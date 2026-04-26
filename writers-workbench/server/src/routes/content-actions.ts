@@ -85,6 +85,432 @@ function resolveHubWebhookUrl(): string {
  *       503:
  *         description: Hub webhook not configured
  */
+// =====================================================================
+// S12-13 — Shared Report-Comment Surface
+// =====================================================================
+// Surfaces annotations from S12-11 (genre_eval) + S12-12 (drift_scan)
+// pinned to spans in the chapter, with apply/dismiss/open actions. Single
+// API shared by both report sources so future evidence-backed tools
+// (rewrite_diff, citation_audit, etc.) can plug in without UI changes.
+
+interface UnifiedAnnotation {
+  id: string;
+  source: 'genre_eval' | 'drift_scan';
+  severity: 'high' | 'medium' | 'low' | 'info';
+  message: string;
+  evidence_quote: string | null;
+  evidence_context: string | null;
+  chapter_number: number | null;
+  suggestion?: {
+    action: 'replace' | 'note';
+    target_text?: string; // exact text to replace
+    replacement_text?: string;
+  };
+  dismissed: boolean;
+  raw: unknown; // original report fragment for debugging
+}
+
+const ApplyAnnotationSchema = z.object({
+  annotationId: z.string().min(1),
+  source: z.enum(['genre_eval', 'drift_scan']),
+  // Optional override of the replacement text — lets the user tweak the
+  // suggestion before applying.
+  replacementText: z.string().min(1).max(20000).optional(),
+});
+
+const DismissAnnotationSchema = z.object({
+  annotationId: z.string().min(1),
+  source: z.enum(['genre_eval', 'drift_scan']),
+});
+
+/**
+ * Build the deterministic ID for an annotation so the same flag re-fetched
+ * later collapses onto the same row in `metadata.dismissed_annotations`.
+ */
+function buildAnnotationId(source: string, chapterNumber: number | null, evidence: string, kind: string): string {
+  const norm = (evidence || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  return `${source}:${chapterNumber ?? 'x'}:${kind}:${norm}`;
+}
+
+/**
+ * @openapi
+ * /content/{id}/annotations:
+ *   get:
+ *     tags: [Content]
+ *     summary: Unified annotations panel for a chapter (drift + genre eval)
+ *     description: |
+ *       Merges annotations from `metadata.genre_eval` (S12-11) and the
+ *       project's `outline._character_drift_scan` (S12-12), filtered to the
+ *       chapter's number. Anchors each annotation to its evidence quote so
+ *       the client can pin it inline. Honours `metadata.dismissed_annotations`.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200: { description: Annotations list }
+ *       404: { description: Chapter not found }
+ */
+contentActionsRouter.get('/:id/annotations', async (req: Request, res: Response) => {
+  const userId = req.userId;
+  if (!userId) {
+    res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED' } });
+    return;
+  }
+  const { id } = req.params;
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data: chapter, error: chapterErr } = await supabase
+      .from('published_content_v2')
+      .select('id, project_id, chapter_number, content_text, metadata')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .is('deleted_at', null)
+      .single();
+    if (chapterErr || !chapter) {
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND' } });
+      return;
+    }
+
+    const meta = (chapter.metadata as Record<string, unknown> | null) || {};
+    const dismissed = new Set<string>(
+      Array.isArray(meta.dismissed_annotations) ? (meta.dismissed_annotations as string[]) : [],
+    );
+    const annotations: UnifiedAnnotation[] = [];
+
+    // ---- Source 1: genre_eval (lives on the chapter's own metadata) ----
+    const genre = (meta.genre_eval as Record<string, unknown> | undefined) || undefined;
+    if (genre) {
+      for (const stream of ['prose_adaptations', 'outline_adaptations', 'observations'] as const) {
+        const items = Array.isArray(genre[stream]) ? (genre[stream] as Record<string, unknown>[]) : [];
+        for (const it of items) {
+          const evidence = (it.evidence as Record<string, unknown> | undefined) || {};
+          const quote = (evidence.quote as string | undefined) || null;
+          const context = (evidence.context as string | undefined) || null;
+          const after = (it.after as string | undefined) || null;
+          const editorNote = (it.editor_note as string | undefined) || null;
+          const ruleDim = (it.rule_dimension as string | undefined) || stream;
+          const score = (it.score as number | undefined) ?? null;
+          const aid = buildAnnotationId('genre_eval', chapter.chapter_number, quote || ruleDim, stream);
+          annotations.push({
+            id: aid,
+            source: 'genre_eval',
+            severity: score != null && score < 3 ? 'high' : score != null && score < 5 ? 'medium' : 'low',
+            message: editorNote || ruleDim,
+            evidence_quote: quote,
+            evidence_context: context,
+            chapter_number: chapter.chapter_number,
+            suggestion:
+              quote && after
+                ? { action: 'replace', target_text: quote, replacement_text: after }
+                : { action: 'note' },
+            dismissed: dismissed.has(aid),
+            raw: it,
+          });
+        }
+      }
+    }
+
+    // ---- Source 2: drift_scan (lives on project outline) ----
+    if (chapter.project_id) {
+      const { data: project } = await supabase
+        .from('writing_projects_v2')
+        .select('outline')
+        .eq('id', chapter.project_id)
+        .single();
+      const outline = (project?.outline as Record<string, unknown> | null) || {};
+      const scan = outline._character_drift_scan as Record<string, unknown> | undefined;
+      if (scan) {
+        const characters = Array.isArray(scan.characters) ? (scan.characters as Record<string, unknown>[]) : [];
+        for (const c of characters) {
+          const flags = Array.isArray(c.drift_flags) ? (c.drift_flags as Record<string, unknown>[]) : [];
+          for (const f of flags) {
+            if (f.chapter_number !== chapter.chapter_number) continue;
+            const variant = (f.variant as string | undefined) || '';
+            const ctx = (f.context as string | undefined) || '';
+            const flagType = (f.type as string | undefined) || 'drift';
+            const sev = (f.severity as string | undefined) || 'medium';
+            const aid = buildAnnotationId('drift_scan', chapter.chapter_number, variant, flagType);
+            const canonical = (c.name_format as string | undefined) || (c.name as string | undefined) || '';
+            // For reverse_order_drift: replacement preserves first name, swaps surname.
+            // "Rodriguez, Elena" → "Morales, Elena" using canonical surname.
+            let replacementText: string | undefined;
+            if (flagType === 'reverse_order_drift' && canonical) {
+              const canonToks = canonical.split(/\s+/);
+              const firstName = canonToks[0] || '';
+              const surname = canonToks.length > 1 ? canonToks[canonToks.length - 1] : '';
+              if (firstName && surname && variant.includes(',')) {
+                replacementText = `${surname}, ${firstName}`;
+              }
+            }
+            annotations.push({
+              id: aid,
+              source: 'drift_scan',
+              severity: sev === 'high' ? 'high' : sev === 'medium' ? 'medium' : 'low',
+              message: `Character drift: "${variant}" — ${canonical} canonical`,
+              evidence_quote: variant,
+              evidence_context: ctx,
+              chapter_number: chapter.chapter_number,
+              suggestion: replacementText
+                ? { action: 'replace', target_text: variant, replacement_text: replacementText }
+                : { action: 'note' },
+              dismissed: dismissed.has(aid),
+              raw: f,
+            });
+          }
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      annotations,
+      counts: {
+        total: annotations.length,
+        active: annotations.filter((a) => !a.dismissed).length,
+        by_source: {
+          genre_eval: annotations.filter((a) => a.source === 'genre_eval').length,
+          drift_scan: annotations.filter((a) => a.source === 'drift_scan').length,
+        },
+      },
+    });
+  } catch (err) {
+    logger.error({ err, userId, contentId: id }, 'content-actions: annotations GET failed');
+    res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL', message: err instanceof Error ? err.message : 'Internal error' },
+    });
+  }
+});
+
+/**
+ * @openapi
+ * /content/{id}/annotations/apply:
+ *   post:
+ *     tags: [Content]
+ *     summary: Apply an annotation's suggested fix to the chapter text
+ *     description: |
+ *       Performs a precise span replacement (no LLM rewrite). Snapshots the
+ *       prior chapter text into `content_versions_v2` before mutating, so
+ *       Apply is reversible via the existing version-history UI.
+ *       Returns 422 if the target text can't be found in the current chapter
+ *       (the chapter has been edited since the annotation was anchored).
+ */
+contentActionsRouter.post(
+  '/:id/annotations/apply',
+  validateBody(ApplyAnnotationSchema),
+  async (req: Request, res: Response) => {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED' } });
+      return;
+    }
+    const { id } = req.params;
+    const { annotationId, source, replacementText } = req.body as z.infer<typeof ApplyAnnotationSchema>;
+
+    try {
+      const supabase = getSupabaseAdmin();
+      const { data: chapter, error } = await supabase
+        .from('published_content_v2')
+        .select('id, project_id, chapter_number, title, content_text, metadata')
+        .eq('id', id)
+        .eq('user_id', userId)
+        .is('deleted_at', null)
+        .single();
+      if (error || !chapter) {
+        res.status(404).json({ success: false, error: { code: 'NOT_FOUND' } });
+        return;
+      }
+
+      // Re-fetch annotations for this chapter via the same builder so we
+      // know the exact target_text/replacement_text. Calling the GET handler
+      // logic inline avoids HTTP round-trip.
+      const meta = (chapter.metadata as Record<string, unknown>) || {};
+      const dismissed = new Set<string>(Array.isArray(meta.dismissed_annotations) ? (meta.dismissed_annotations as string[]) : []);
+      let target: { target_text: string; replacement_text: string } | null = null;
+
+      if (source === 'genre_eval') {
+        const genre = (meta.genre_eval as Record<string, unknown> | undefined) || {};
+        for (const stream of ['prose_adaptations', 'outline_adaptations', 'observations'] as const) {
+          const items = Array.isArray(genre[stream]) ? (genre[stream] as Record<string, unknown>[]) : [];
+          for (const it of items) {
+            const evidence = (it.evidence as Record<string, unknown> | undefined) || {};
+            const quote = (evidence.quote as string | undefined) || '';
+            const ruleDim = (it.rule_dimension as string | undefined) || stream;
+            const aid = buildAnnotationId('genre_eval', chapter.chapter_number, quote || ruleDim, stream);
+            if (aid === annotationId) {
+              const after = (it.after as string | undefined) || '';
+              if (quote && (replacementText || after)) {
+                target = { target_text: quote, replacement_text: replacementText || after };
+              }
+              break;
+            }
+          }
+          if (target) break;
+        }
+      } else if (source === 'drift_scan' && chapter.project_id) {
+        const { data: project } = await supabase
+          .from('writing_projects_v2')
+          .select('outline')
+          .eq('id', chapter.project_id)
+          .single();
+        const outline = (project?.outline as Record<string, unknown> | null) || {};
+        const scan = outline._character_drift_scan as Record<string, unknown> | undefined;
+        const characters = Array.isArray(scan?.characters) ? (scan.characters as Record<string, unknown>[]) : [];
+        outer: for (const c of characters) {
+          const flags = Array.isArray(c.drift_flags) ? (c.drift_flags as Record<string, unknown>[]) : [];
+          for (const f of flags) {
+            if (f.chapter_number !== chapter.chapter_number) continue;
+            const variant = (f.variant as string | undefined) || '';
+            const flagType = (f.type as string | undefined) || 'drift';
+            const aid = buildAnnotationId('drift_scan', chapter.chapter_number, variant, flagType);
+            if (aid === annotationId) {
+              const canonical = (c.name_format as string | undefined) || (c.name as string | undefined) || '';
+              const canonToks = canonical.split(/\s+/);
+              const firstName = canonToks[0] || '';
+              const surname = canonToks.length > 1 ? canonToks[canonToks.length - 1] : '';
+              if (replacementText) {
+                target = { target_text: variant, replacement_text: replacementText };
+              } else if (flagType === 'reverse_order_drift' && surname && variant.includes(',')) {
+                target = { target_text: variant, replacement_text: `${surname}, ${firstName}` };
+              } else if (canonical) {
+                target = { target_text: variant, replacement_text: canonical };
+              }
+              break outer;
+            }
+          }
+        }
+      }
+
+      if (!target) {
+        res.status(404).json({ success: false, error: { code: 'ANNOTATION_NOT_FOUND' } });
+        return;
+      }
+
+      const text = chapter.content_text || '';
+      if (!text.includes(target.target_text)) {
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'STALE_ANNOTATION',
+            message: 'Target text no longer present — chapter was edited since the report was generated.',
+          },
+        });
+        return;
+      }
+      // Snapshot prior text into content_versions_v2 before mutating.
+      // version_number is computed as the next integer for this chapter.
+      const { data: lastVersion } = await supabase
+        .from('content_versions_v2')
+        .select('version_number')
+        .eq('content_id', chapter.id)
+        .order('version_number', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nextVersion = ((lastVersion?.version_number as number | undefined) ?? 0) + 1;
+      await supabase.from('content_versions_v2').insert({
+        content_id: chapter.id,
+        user_id: userId,
+        version_number: nextVersion,
+        content_text: text,
+        changed_by: 'annotation_apply',
+        change_note: `annotation_apply:${source}:${annotationId.slice(0, 60)}`,
+      });
+
+      // Replace ALL exact-match occurrences of the target so an "Elena Rodriguez"
+      // case-file table that drifts twice in the same chapter is fully fixed.
+      const newText = text.split(target.target_text).join(target.replacement_text);
+
+      // Mark the annotation dismissed so the UI doesn't re-surface it after apply.
+      dismissed.add(annotationId);
+      const newMetadata = { ...meta, dismissed_annotations: [...dismissed] };
+
+      await supabase
+        .from('published_content_v2')
+        .update({ content_text: newText, metadata: newMetadata })
+        .eq('id', chapter.id)
+        .eq('user_id', userId);
+
+      logger.info(
+        { userId, contentId: id, annotationId, source, replacements: text.split(target.target_text).length - 1 },
+        'content-actions: annotation applied',
+      );
+
+      res.json({
+        success: true,
+        applied: {
+          annotationId,
+          source,
+          replacements: text.split(target.target_text).length - 1,
+          target_text: target.target_text,
+          replacement_text: target.replacement_text,
+        },
+      });
+    } catch (err) {
+      logger.error({ err, userId, contentId: id }, 'content-actions: annotation apply failed');
+      res.status(500).json({
+        success: false,
+        error: { code: 'INTERNAL', message: err instanceof Error ? err.message : 'Internal error' },
+      });
+    }
+  },
+);
+
+/**
+ * @openapi
+ * /content/{id}/annotations/dismiss:
+ *   post:
+ *     tags: [Content]
+ *     summary: Dismiss an annotation without applying its fix
+ */
+contentActionsRouter.post(
+  '/:id/annotations/dismiss',
+  validateBody(DismissAnnotationSchema),
+  async (req: Request, res: Response) => {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED' } });
+      return;
+    }
+    const { id } = req.params;
+    const { annotationId } = req.body as z.infer<typeof DismissAnnotationSchema>;
+    try {
+      const supabase = getSupabaseAdmin();
+      const { data: chapter, error } = await supabase
+        .from('published_content_v2')
+        .select('id, metadata')
+        .eq('id', id)
+        .eq('user_id', userId)
+        .is('deleted_at', null)
+        .single();
+      if (error || !chapter) {
+        res.status(404).json({ success: false, error: { code: 'NOT_FOUND' } });
+        return;
+      }
+      const meta = (chapter.metadata as Record<string, unknown>) || {};
+      const dismissed = new Set<string>(
+        Array.isArray(meta.dismissed_annotations) ? (meta.dismissed_annotations as string[]) : [],
+      );
+      dismissed.add(annotationId);
+      const newMetadata = { ...meta, dismissed_annotations: [...dismissed] };
+      await supabase
+        .from('published_content_v2')
+        .update({ metadata: newMetadata })
+        .eq('id', chapter.id)
+        .eq('user_id', userId);
+      res.json({ success: true, dismissed: annotationId });
+    } catch (err) {
+      logger.error({ err, userId, contentId: id }, 'content-actions: annotation dismiss failed');
+      res.status(500).json({
+        success: false,
+        error: { code: 'INTERNAL', message: err instanceof Error ? err.message : 'Internal error' },
+      });
+    }
+  },
+);
+
 contentActionsRouter.post(
   '/:id/rewrite-with-research',
   validateBody(RewriteWithResearchSchema),

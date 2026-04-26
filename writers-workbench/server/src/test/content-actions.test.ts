@@ -223,3 +223,252 @@ describe('POST /api/content/:id/rewrite-with-research', () => {
     }
   });
 });
+
+// =====================================================================
+// S12-13 — Annotations endpoints
+// =====================================================================
+describe('S12-13 annotations endpoints', () => {
+  // Override the per-test stub with one that supports the apply path
+  // (insert version + update content). We rebuild the from() chain so it
+  // recognises both reads and writes against the same tables.
+  function installAnnotationsStub() {
+    let updatedRow: Record<string, unknown> | null = null;
+    let insertedVersion: Record<string, unknown> | null = null;
+    let lastVersionRow: Record<string, unknown> | null = null;
+    mocks.supabaseStub.from = vi.fn((table: string) => {
+      const chain: Record<string, unknown> = {};
+      chain.select = vi.fn(() => chain);
+      chain.eq = vi.fn(() => chain);
+      chain.is = vi.fn(() => chain);
+      chain.order = vi.fn(() => chain);
+      chain.limit = vi.fn(() => chain);
+      chain.maybeSingle = vi.fn(async () => ({ data: lastVersionRow, error: null }));
+      chain.single = vi.fn(async () => {
+        if (table === 'published_content_v2') {
+          return mocks.chapterRow ? { data: mocks.chapterRow, error: null } : { data: null, error: { code: 'PGRST116' } };
+        }
+        if (table === 'writing_projects_v2') {
+          return mocks.projectRow ? { data: mocks.projectRow, error: null } : { data: null, error: { code: 'PGRST116' } };
+        }
+        return { data: null, error: { code: 'UNKNOWN' } };
+      });
+      chain.insert = vi.fn(async (row: Record<string, unknown>) => {
+        if (table === 'content_versions_v2') insertedVersion = row;
+        return { data: null, error: null };
+      });
+      chain.update = vi.fn((row: Record<string, unknown>) => {
+        if (table === 'published_content_v2') updatedRow = row;
+        // Make .update().eq().eq()… terminate as a thenable so awaiting
+        // resolves with `{data, error}` (matches Supabase client surface).
+        const updateChain: PromiseLike<{ data: null; error: null }> & { eq: (...args: unknown[]) => unknown } = {
+          eq: () => updateChain,
+          then: (onfulfilled, _onrejected) => Promise.resolve({ data: null, error: null }).then(onfulfilled, _onrejected),
+        };
+        return updateChain;
+      });
+      return chain;
+    }) as unknown as typeof mocks.supabaseStub.from;
+    return {
+      getInsertedVersion: () => insertedVersion,
+      getUpdatedRow: () => updatedRow,
+      setLastVersion: (row: Record<string, unknown> | null) => { lastVersionRow = row; },
+    };
+  }
+
+  it('GET /content/:id/annotations merges drift_scan + genre_eval for the chapter', async () => {
+    installAnnotationsStub();
+    mocks.chapterRow = {
+      id: 'ch-1',
+      project_id: 'proj-1',
+      chapter_number: 5,
+      content_text: 'Case #2851: Rodriguez, Elena. Single adult subject.',
+      metadata: {
+        genre_eval: {
+          prose_adaptations: [
+            {
+              rule_dimension: 'voice_consistency',
+              score: 2,
+              evidence: { quote: 'Single adult subject', context: '... Single adult subject ...' },
+              after: 'A solitary adult, processed through the cogs of the system',
+              editor_note: 'Lift the case-file flatness — Mason is feeling something here.',
+            },
+          ],
+        },
+      },
+    };
+    mocks.projectRow = {
+      outline: {
+        characters: [
+          { name: 'Elena Morales', name_format: 'Elena Morales', role: 'Static' },
+        ],
+        _character_drift_scan: {
+          characters: [
+            {
+              name: 'Elena Morales',
+              name_format: 'Elena Morales',
+              drift_flags: [
+                {
+                  type: 'reverse_order_drift',
+                  variant: 'Rodriguez, Elena',
+                  chapter_number: 5,
+                  context: 'Case #2851: Rodriguez, Elena. Single adult subject.',
+                  severity: 'high',
+                },
+              ],
+            },
+          ],
+        },
+      },
+    };
+
+    const { contentActionsRouter } = await import('../routes/content-actions.js');
+    const app = makeApp((a) => a.use('/api/content', contentActionsRouter));
+    const s = startServer(app);
+    try {
+      const res = await fetch(`http://localhost:${s.port}/api/content/ch-1/annotations`, {
+        headers: { Authorization: 'Bearer +user' },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        success: boolean;
+        annotations: Array<{ source: string; severity: string; suggestion?: { replacement_text?: string } }>;
+        counts: { by_source: Record<string, number> };
+      };
+      expect(body.success).toBe(true);
+      expect(body.counts.by_source.drift_scan).toBe(1);
+      expect(body.counts.by_source.genre_eval).toBe(1);
+      const driftAnn = body.annotations.find((a) => a.source === 'drift_scan');
+      expect(driftAnn?.suggestion?.replacement_text).toBe('Morales, Elena');
+    } finally {
+      await s.close();
+    }
+  });
+
+  it('POST /content/:id/annotations/apply replaces target text and snapshots prior version', async () => {
+    const stub = installAnnotationsStub();
+    mocks.chapterRow = {
+      id: 'ch-1',
+      project_id: 'proj-1',
+      chapter_number: 5,
+      title: 'Ch 5',
+      content_text: 'Case #2851: Rodriguez, Elena. Single adult subject.',
+      metadata: {},
+    };
+    mocks.projectRow = {
+      outline: {
+        characters: [{ name: 'Elena Morales', name_format: 'Elena Morales' }],
+        _character_drift_scan: {
+          characters: [
+            {
+              name: 'Elena Morales',
+              name_format: 'Elena Morales',
+              drift_flags: [
+                {
+                  type: 'reverse_order_drift',
+                  variant: 'Rodriguez, Elena',
+                  chapter_number: 5,
+                  context: 'Case #2851: Rodriguez, Elena.',
+                  severity: 'high',
+                },
+              ],
+            },
+          ],
+        },
+      },
+    };
+
+    // The annotation id is the same algo the GET handler uses; reproduce it
+    // here so we can call apply directly.
+    const norm = 'Rodriguez, Elena';
+    const annotationId = `drift_scan:5:reverse_order_drift:${norm}`;
+
+    const { contentActionsRouter } = await import('../routes/content-actions.js');
+    const app = makeApp((a) => a.use('/api/content', contentActionsRouter));
+    const s = startServer(app);
+    try {
+      const res = await fetch(`http://localhost:${s.port}/api/content/ch-1/annotations/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer +user' },
+        body: JSON.stringify({ annotationId, source: 'drift_scan' }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { success: boolean; applied: { replacements: number; replacement_text: string } };
+      expect(body.success).toBe(true);
+      expect(body.applied.replacements).toBe(1);
+      expect(body.applied.replacement_text).toBe('Morales, Elena');
+      // Side effects
+      expect(stub.getInsertedVersion()?.change_note).toMatch(/drift_scan/);
+      expect((stub.getUpdatedRow()?.content_text as string)).toContain('Morales, Elena');
+      expect((stub.getUpdatedRow()?.content_text as string)).not.toContain('Rodriguez, Elena');
+    } finally {
+      await s.close();
+    }
+  });
+
+  it('POST /content/:id/annotations/apply returns 422 when target text no longer present', async () => {
+    installAnnotationsStub();
+    mocks.chapterRow = {
+      id: 'ch-1',
+      project_id: 'proj-1',
+      chapter_number: 5,
+      title: 'Ch 5',
+      content_text: 'Case #2851: Morales, Elena. Single adult subject.', // already fixed
+      metadata: {},
+    };
+    mocks.projectRow = {
+      outline: {
+        _character_drift_scan: {
+          characters: [
+            {
+              name: 'Elena Morales',
+              name_format: 'Elena Morales',
+              drift_flags: [{
+                type: 'reverse_order_drift',
+                variant: 'Rodriguez, Elena',
+                chapter_number: 5,
+                severity: 'high',
+              }],
+            },
+          ],
+        },
+      },
+    };
+    const annotationId = `drift_scan:5:reverse_order_drift:Rodriguez, Elena`;
+    const { contentActionsRouter } = await import('../routes/content-actions.js');
+    const app = makeApp((a) => a.use('/api/content', contentActionsRouter));
+    const s = startServer(app);
+    try {
+      const res = await fetch(`http://localhost:${s.port}/api/content/ch-1/annotations/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer +user' },
+        body: JSON.stringify({ annotationId, source: 'drift_scan' }),
+      });
+      expect(res.status).toBe(422);
+      const body = (await res.json()) as { error: { code: string } };
+      expect(body.error.code).toBe('STALE_ANNOTATION');
+    } finally {
+      await s.close();
+    }
+  });
+
+  it('POST /content/:id/annotations/dismiss adds annotationId to metadata.dismissed_annotations', async () => {
+    const stub = installAnnotationsStub();
+    mocks.chapterRow = { id: 'ch-1', metadata: {} };
+
+    const { contentActionsRouter } = await import('../routes/content-actions.js');
+    const app = makeApp((a) => a.use('/api/content', contentActionsRouter));
+    const s = startServer(app);
+    try {
+      const res = await fetch(`http://localhost:${s.port}/api/content/ch-1/annotations/dismiss`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer +user' },
+        body: JSON.stringify({ annotationId: 'drift_scan:5:reverse_order_drift:foo', source: 'drift_scan' }),
+      });
+      expect(res.status).toBe(200);
+      const updatedMeta = stub.getUpdatedRow()?.metadata as { dismissed_annotations?: string[] };
+      expect(updatedMeta?.dismissed_annotations).toContain('drift_scan:5:reverse_order_drift:foo');
+    } finally {
+      await s.close();
+    }
+  });
+});
