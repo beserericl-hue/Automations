@@ -1,6 +1,6 @@
 # The Writers Workbench — Session Context Document
 
-**Last Updated:** 2026-04-21
+**Last Updated:** 2026-04-26
 **Purpose:** Read this document at the start of any new Claude Code session working on this project. It contains every key decision, architectural choice, and constraint needed to continue development without re-learning the codebase.
 
 ---
@@ -1249,5 +1249,81 @@ This is now Sprints 16 (analysis/profiling), 17 (LLM bake-off + quality benchmar
 - After PR #40 merges and dev Railway redeploys, the AnnotationsPanel needs a manual UI smoke (open the project's Ch5 — drift annotation should be empty since we hand-fixed it; open Ch7 if it has flags; click Apply; verify text update + version row).
 
 **PR open at end of session:** [#40 — S12-11/12/13: genre eval, deterministic drift scanner, shared annotations UI](https://github.com/beserericl-hue/Automations/pull/40)
+
+---
+
+## 2026-04-26 (continued) — PR #40 merged, sprint-state audit, stale PRs closed
+
+Continuation of the same working session, after the initial Track C ship + Sprint replan above.
+
+### PR #40 merged via admin override (commit `1ff111a` at 19:46 UTC)
+
+GitHub branch protection on `develop` requires 1 approving review and the PR author cannot self-approve. With both the commits and the PR authored under the user's git identity (`beser.ericl@gmail.com`), `gh pr review --approve` returned `Review Can not approve your own pull request`. User authorised admin merge; closed via `gh pr merge 40 --merge --admin --delete-branch`.
+
+**Two CI fix commits landed before the merge:**
+
+1. **`dab3b58`** — `fix(s12-13 tests): make update-chain thenable typing match strict tsconfig`. The CI's `tsc -p server/tsconfig.json` is stricter than the local config; the original `then` shim signature `(resolve: (v: unknown) => unknown) => unknown` rejected `undefined` for `onfulfilled`. Replaced with a proper `PromiseLike` whose `then` accepts the standard `onfulfilled/onrejected` pair. 9/9 tests still pass.
+
+2. **`e0425b6`** — `ci(e2e): pass VITE_SUPABASE_* secrets to chromium-noauth Playwright run`. The `.github/workflows/ci.yml` `e2e-tests` job runs `npx playwright test --project=chromium-noauth` which spawns `npm run dev:client` (Vite dev server). The dev server initialises the Supabase client. **Without `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` in the env**, auth misbehaves and route guards inconsistently leave unauthenticated users on `/`, `/chapters`, etc. instead of redirecting to `/login`. All 18 noauth tests then fail (5 in `login.spec.ts`, 13 in `sprint2-navigation.spec.ts`) with the same `15s timeout waiting for "The Writers Workbench" heading`. Fix: propagate the same env-var block already used by the `npm run build` step on line 102 into the noauth playwright step. **Important context:** this was a long-standing latent bug — the `e2e-tests` job has `if: github.event_name == 'pull_request'`, so pushes to `develop` SKIP it, and develop's history shows `E2E Tests (Chromium): skipped` on every recent run. PR #40 was the first PR in a while to actually exercise it.
+
+### Three stale Sprint 12 PRs closed (no merge)
+
+After the merge, the following Sprint 12 PRs were still open with no path to merge:
+
+| PR | Why closed |
+|---|---|
+| **#28** S12-5: timing telemetry + performance dashboard | S12-5 was deferred to Sprint 18-5 in this session's replan. Sprint 18 instruments the new chapter-writer architecture, not the legacy worker — merging #28 would add code that gets ripped out. |
+| **#29** S12-2: Build Chapter Context sub-workflow | Superseded by PR #31. The actual context builder shipped from #31. |
+| **#30** S12-6/7/9: credibility-first chapter rewrite with research | Superseded by PR #31. The 2026-04-24 SESSION_CONTEXT note flagged this branch's scripts as having schema + chainLlm bugs that #31 fixed; merging would re-introduce broken code. |
+
+`gh pr list --state open` returned zero remaining PRs after the close-out.
+
+### Sprint state audit — corrections to earlier-in-session statements
+
+Mid-session I told the user **"Sprint 10.b is in flight"** when asked what's next. That was wrong — I anchored on the 2026-04-21 SESSION_CONTEXT entry which truthfully said 10.b was in flight at that date, but later sessions completed the remaining stories. Verified state as of 2026-04-26:
+
+**Sprint 10.a — SHIPPED** (per 2026-04-21 session entry; verified by PR list — #5/6/7 deploy markers, #8 bulk, #9 CLAUDE.md note all merged; PROD/DEV tier separation visible across Supabase, n8n, ElevenLabs, Railway).
+
+**Sprint 10.b — SHIPPED** (verified by `gh pr list`):
+- S10b-1 → PR #10 ✅
+- S10b-2 → PR #11 ✅
+- S10b-3 → PR #13 ✅
+- S10b-4 → PR #20 ✅ (#14 was the original PR for this story; closed and superseded by #20)
+- S10b-5 → PR #15 ✅
+
+**Sprint 11 — DEV-complete, awaiting release** (corrects another wrong claim in the earlier 2026-04-26 entry above which said "the other 15 V2 workflows still send via Gmail OAuth"). Verified via direct n8n inventory (`/api/v1/workflows?limit=250`):
+- **DEV tier**: 14 of 14 email-sending workflows are on Postal (`/api/email/send`); zero on Gmail.
+- **PROD tier**: 14 of 14 still on Gmail; zero on Postal — by design, awaits release-day promotion via `scripts/promote-dev-to-prod.py`.
+- S11-1/S11-2/S11-3 don't have per-story commits because the migration was a single sweep via `scripts/s11-migrate-gmail-to-postal.py` (`b9303aa`).
+- S11-4 → PR #23 ✅ (Redis-backed email rate limiter)
+- S11-5 → PR #24 ✅ (bounce + complaint webhook + admin UI)
+
+**Sprint 12 — DEV-complete after PR #40 merge.**
+- Track A (S12-1/3/4/5, 26 pts) moved to Sprints 16/17/18 (3-sprint architecture programme with quality harness + LLM bake-off + safe rollout).
+- Track B (S12-0/2/6/7/8/9) shipped via PR #31 et al earlier in sprint.
+- Track C (S12-11/12/13) shipped via PR #40 this session.
+
+### User feedback captured this session
+
+> "we won't update Prod until release day."
+
+Codifying as: any sprint whose DEV-side work is complete is **effectively done from a development perspective**, even if the workflow tier separation governance still labels it "open" until the release-day promotion runs. Don't loop back to such sprints when asked "what's next to work on" — they're done; only release runs them.
+
+> "Sprints are not left undone without explicit permission first."
+
+Reaffirmed governance rule. The Track A removal from Sprint 12 in this session WAS explicit (user wrote: *"Can Track A become a separate sprints. Move it to the end of the other sprints..."*). Future deferrals must follow the same pattern: explicit user direction, captured in the sprint doc with a back-link.
+
+### Where things actually stand at end of session
+
+- `develop` HEAD is `1ff111a` (PR #40 merge). Local `develop` synced.
+- Open PRs: **0**.
+- DEV Railway will auto-deploy PR #40 within ~3 min of the merge — `AnnotationsPanel` UI + `/api/content/:id/annotations` endpoints become live then.
+- DEV Supabase has the Ch5 hand-fix applied (commit-equivalent persisted state, see "Hand-fix verification" above).
+- DEV n8n has the deterministic drift scanner v4 + LOCKED CHARACTER ROSTER context patch live.
+- PROD untouched — no production resources modified this session.
+
+**Recommended next sprint:** Sprint 8 (Multi-tenant RBAC, 55 pts) per the v2 doc's recommended order. Sprint 8 details aren't in `sprint_document_v2.md` — they live in the original `sprint_document.md`. If picking up Sprint 8 in a future session, start by extracting the actual Sprint 8 stories from there.
+
+**Process lesson noted:** When asked "what is the next sprint?" or "what's open in sprint X", do NOT anchor on a single SESSION_CONTEXT entry. Cross-reference with `gh pr list --state all` and `git log --all --oneline | grep <sprint id>` before answering. Twice this session that anchor-on-one-entry pattern produced a wrong answer that the user had to push back on.
 
 ---
