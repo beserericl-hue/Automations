@@ -454,3 +454,243 @@ describe('Execution status proxy (S2)', () => {
     });
   });
 });
+
+// -----------------------------------------------------------------------------
+// S3 — Stage-emit callback (POST /api/callback/newsletter-stage)
+//
+// Auth: shared-secret header X-Callback-Secret matching NEWSLETTER_CALLBACK_SECRET.
+// Side effect: publishes a `newsletter.stage` SSE event to the user's channel.
+//
+// We build a separate mini-app that mounts ONLY the callback router so we
+// don't exercise requireAuth on this path (the callback never sees a JWT).
+// publishSseEvent is mocked to capture broadcasts in-memory rather than
+// requiring Redis or a real EventEmitter subscriber.
+// -----------------------------------------------------------------------------
+
+const TEST_CALLBACK_SECRET = 'test-callback-secret-456';
+
+const sseBroadcasts: Array<{ userId: string; event: Record<string, unknown> }> = [];
+vi.mock('../lib/sse-pubsub.js', () => ({
+  publishSseEvent: async (userId: string, event: Record<string, unknown>) => {
+    sseBroadcasts.push({ userId, event });
+    return 1;
+  },
+  subscribeSseEvents: async () => async () => undefined,
+  closeSsePubsub: async () => undefined,
+  resetSsePubsubForTest: () => undefined,
+}));
+
+async function withCallbackServer<T>(fn: (baseUrl: string) => Promise<T>): Promise<T> {
+  const mod = await import('../routes/newsletter.js');
+  const app = express();
+  app.use(express.json({ limit: '1mb' }));
+  app.use('/api/callback', mod.newsletterCallbackRouter);
+  const server = app.listen(0);
+  const port = (server.address() as AddressInfo).port;
+  try { return await fn(`http://localhost:${port}`); }
+  finally { server.close(); }
+}
+
+describe('Stage callback endpoint (S3)', () => {
+  beforeEach(() => {
+    sseBroadcasts.length = 0;
+    process.env.NEWSLETTER_CALLBACK_SECRET = TEST_CALLBACK_SECRET;
+  });
+
+  it('accepts a valid POST and broadcasts a newsletter.stage event', async () => {
+    await withCallbackServer(async (base) => {
+      const r = await fetch(`${base}/api/callback/newsletter-stage`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Callback-Secret': TEST_CALLBACK_SECRET,
+        },
+        body: JSON.stringify({
+          userId: TEST_USER,
+          executionId: 'exec-99',
+          editionId: 'ai-news',
+          stage: 'gathering',
+          detail: 'started ingestion search',
+          ts: '2026-04-26T20:00:00.000Z',
+        }),
+      });
+      expect(r.status).toBe(200);
+      const j = await r.json() as { success: boolean; broadcast: number };
+      expect(j.success).toBe(true);
+      expect(j.broadcast).toBe(1);
+
+      expect(sseBroadcasts).toHaveLength(1);
+      expect(sseBroadcasts[0].userId).toBe(TEST_USER);
+      expect(sseBroadcasts[0].event.event).toBe('newsletter.stage');
+      const data = sseBroadcasts[0].event.data as Record<string, unknown>;
+      expect(data.stage).toBe('gathering');
+      expect(data.executionId).toBe('exec-99');
+      expect(data.editionId).toBe('ai-news');
+      expect(data.detail).toBe('started ingestion search');
+    });
+  });
+
+  it('returns 401 when X-Callback-Secret is missing', async () => {
+    await withCallbackServer(async (base) => {
+      const r = await fetch(`${base}/api/callback/newsletter-stage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: TEST_USER,
+          executionId: 'exec-99',
+          editionId: 'ai-news',
+          stage: 'gathering',
+          ts: '2026-04-26T20:00:00.000Z',
+        }),
+      });
+      expect(r.status).toBe(401);
+      expect(sseBroadcasts).toHaveLength(0);
+    });
+  });
+
+  it('returns 401 when X-Callback-Secret is wrong', async () => {
+    await withCallbackServer(async (base) => {
+      const r = await fetch(`${base}/api/callback/newsletter-stage`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Callback-Secret': 'wrong',
+        },
+        body: JSON.stringify({
+          userId: TEST_USER,
+          executionId: 'exec-99',
+          editionId: 'ai-news',
+          stage: 'gathering',
+          ts: '2026-04-26T20:00:00.000Z',
+        }),
+      });
+      expect(r.status).toBe(401);
+      expect(sseBroadcasts).toHaveLength(0);
+    });
+  });
+
+  it('returns 500 MISCONFIGURED when NEWSLETTER_CALLBACK_SECRET is unset', async () => {
+    delete process.env.NEWSLETTER_CALLBACK_SECRET;
+    await withCallbackServer(async (base) => {
+      const r = await fetch(`${base}/api/callback/newsletter-stage`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Callback-Secret': TEST_CALLBACK_SECRET,
+        },
+        body: JSON.stringify({
+          userId: TEST_USER,
+          executionId: 'exec-99',
+          editionId: 'ai-news',
+          stage: 'gathering',
+          ts: '2026-04-26T20:00:00.000Z',
+        }),
+      });
+      expect(r.status).toBe(500);
+      expect(sseBroadcasts).toHaveLength(0);
+    });
+  });
+
+  it('returns 400 when stage is not one of the whitelist values', async () => {
+    await withCallbackServer(async (base) => {
+      const r = await fetch(`${base}/api/callback/newsletter-stage`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Callback-Secret': TEST_CALLBACK_SECRET,
+        },
+        body: JSON.stringify({
+          userId: TEST_USER,
+          executionId: 'exec-99',
+          editionId: 'ai-news',
+          stage: 'NOT_A_STAGE',
+          ts: '2026-04-26T20:00:00.000Z',
+        }),
+      });
+      expect(r.status).toBe(400);
+      expect(sseBroadcasts).toHaveLength(0);
+    });
+  });
+
+  it('returns 400 when required fields are missing', async () => {
+    await withCallbackServer(async (base) => {
+      const r = await fetch(`${base}/api/callback/newsletter-stage`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Callback-Secret': TEST_CALLBACK_SECRET,
+        },
+        body: JSON.stringify({ stage: 'gathering' }),
+      });
+      expect(r.status).toBe(400);
+      expect(sseBroadcasts).toHaveLength(0);
+    });
+  });
+
+  it('returns 400 when ts is not a valid ISO datetime', async () => {
+    await withCallbackServer(async (base) => {
+      const r = await fetch(`${base}/api/callback/newsletter-stage`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Callback-Secret': TEST_CALLBACK_SECRET,
+        },
+        body: JSON.stringify({
+          userId: TEST_USER,
+          executionId: 'exec-99',
+          editionId: 'ai-news',
+          stage: 'gathering',
+          ts: 'yesterday',
+        }),
+      });
+      expect(r.status).toBe(400);
+      expect(sseBroadcasts).toHaveLength(0);
+    });
+  });
+
+  it('accepts an empty detail (defaults to "")', async () => {
+    await withCallbackServer(async (base) => {
+      const r = await fetch(`${base}/api/callback/newsletter-stage`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Callback-Secret': TEST_CALLBACK_SECRET,
+        },
+        body: JSON.stringify({
+          userId: TEST_USER,
+          executionId: 'exec-99',
+          editionId: 'ai-news',
+          stage: 'segments_done',
+          ts: '2026-04-26T20:00:00.000Z',
+        }),
+      });
+      expect(r.status).toBe(200);
+      const data = sseBroadcasts[0].event.data as Record<string, unknown>;
+      expect(data.detail).toBe('');
+    });
+  });
+
+  it('accepts the "error" overlay stage', async () => {
+    await withCallbackServer(async (base) => {
+      const r = await fetch(`${base}/api/callback/newsletter-stage`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Callback-Secret': TEST_CALLBACK_SECRET,
+        },
+        body: JSON.stringify({
+          userId: TEST_USER,
+          executionId: 'exec-99',
+          editionId: 'ai-news',
+          stage: 'error',
+          detail: 'pick_top_stories failed: Claude API 503',
+          ts: '2026-04-26T20:00:00.000Z',
+        }),
+      });
+      expect(r.status).toBe(200);
+      const data = sseBroadcasts[0].event.data as Record<string, unknown>;
+      expect(data.stage).toBe('error');
+      expect(String(data.detail)).toContain('Claude API 503');
+    });
+  });
+});

@@ -135,6 +135,22 @@ vi.mock('../services/supabase-admin.js', () => ({
 }));
 
 // -----------------------------------------------------------------------------
+// SSE pubsub mock (S3) — captures broadcasts so we can assert that
+// /api/approvals/create and /approvals/:token/resolve emit the
+// `newsletter.approval.created` and `newsletter.approval.resolved` events.
+// -----------------------------------------------------------------------------
+const sseBroadcasts: Array<{ userId: string; event: Record<string, unknown> }> = [];
+vi.mock('../lib/sse-pubsub.js', () => ({
+  publishSseEvent: async (userId: string, event: Record<string, unknown>) => {
+    sseBroadcasts.push({ userId, event });
+    return 1;
+  },
+  subscribeSseEvents: async () => async () => undefined,
+  closeSsePubsub: async () => undefined,
+  resetSsePubsubForTest: () => undefined,
+}));
+
+// -----------------------------------------------------------------------------
 // fetch() mocking — we need to verify the resume POST is issued.
 // -----------------------------------------------------------------------------
 const fetchCalls: Array<{ url: string; method: string; body: string }> = [];
@@ -145,6 +161,7 @@ const originalFetch = globalThis.fetch;
 beforeEach(() => {
   reset();
   fetchCalls.length = 0;
+  sseBroadcasts.length = 0;
   fetchResponseStatus = 200;
   fetchShouldThrow = false;
   process.env.APPROVAL_SECRET = TEST_SECRET;
@@ -465,6 +482,89 @@ describe('Approvals backend (S9)', () => {
       });
       // Either Express' route-matcher rejects the path or our guard does; both are OK
       expect([400, 404]).toContain(r.status);
+    });
+  });
+});
+
+// -----------------------------------------------------------------------------
+// S3 (Compose Newsletter 2a) — SSE broadcasts on create + resolve
+// -----------------------------------------------------------------------------
+describe('Approvals SSE broadcasts (S3)', () => {
+  it('POST /api/approvals/create broadcasts newsletter.approval.created', async () => {
+    await withServer(async (base) => {
+      const r = await fetch(`${base}/api/approvals/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Approval-Secret': TEST_SECRET },
+        body: JSON.stringify({
+          user_id: '+14105914612',
+          execution_id: 'exec-501',
+          resume_url: 'http://localhost:9999/__n8n_resume__/501',
+          stage: 'stories',
+          payload: { headline: 'h1' },
+        }),
+      });
+      expect(r.status).toBe(200);
+      const j = await r.json() as { success: boolean; token: string };
+
+      const created = sseBroadcasts.find((b) => (b.event as { event?: string }).event === 'newsletter.approval.created');
+      expect(created).toBeDefined();
+      expect(created!.userId).toBe('+14105914612');
+      const data = created!.event.data as Record<string, unknown>;
+      expect(data.stage).toBe('stories');
+      expect(data.execution_id).toBe('exec-501');
+      expect(data.token).toBe(j.token);
+    });
+  });
+
+  it('POST /approvals/:token/resolve broadcasts newsletter.approval.resolved', async () => {
+    const { token } = seedRow({ user_id: '+14105914612', stage: 'subject_line' });
+    await withServer(async (base) => {
+      const r = await fetch(`${base}/approvals/${token}/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'decision=approve&feedback=ship+it',
+      });
+      expect(r.status).toBe(200);
+
+      const resolved = sseBroadcasts.find((b) => (b.event as { event?: string }).event === 'newsletter.approval.resolved');
+      expect(resolved).toBeDefined();
+      expect(resolved!.userId).toBe('+14105914612');
+      const data = resolved!.event.data as Record<string, unknown>;
+      expect(data.stage).toBe('subject_line');
+      expect(data.decision).toBe('approve');
+      expect(data.feedback).toBe('ship it');
+      expect(data.resumed).toBe(true);
+    });
+  });
+
+  it('POST resolve with decision=revise still broadcasts resolved', async () => {
+    const { token } = seedRow({ user_id: '+14105914612', stage: 'stories' });
+    await withServer(async (base) => {
+      const r = await fetch(`${base}/approvals/${token}/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'decision=revise&feedback=tighten+lead',
+      });
+      expect(r.status).toBe(200);
+      const resolved = sseBroadcasts.find((b) => (b.event as { event?: string }).event === 'newsletter.approval.resolved');
+      expect(resolved).toBeDefined();
+      expect((resolved!.event.data as Record<string, unknown>).decision).toBe('revise');
+    });
+  });
+
+  it('POST resolve still broadcasts resolved even when n8n resume fails (502)', async () => {
+    const { token } = seedRow({ user_id: '+14105914612', stage: 'stories' });
+    fetchResponseStatus = 500; // simulate n8n resume returning 5xx
+    await withServer(async (base) => {
+      const r = await fetch(`${base}/approvals/${token}/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'decision=approve&feedback=',
+      });
+      expect(r.status).toBe(502); // user-facing surface still reports the resume failure
+      const resolved = sseBroadcasts.find((b) => (b.event as { event?: string }).event === 'newsletter.approval.resolved');
+      expect(resolved).toBeDefined();
+      expect((resolved!.event.data as Record<string, unknown>).resumed).toBe(false);
     });
   });
 });

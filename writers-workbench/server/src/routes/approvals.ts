@@ -27,6 +27,7 @@ import { validateBody } from '../middleware/validate.js';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import { ApprovalCreateSchema, ApprovalResolveSchema } from '../schemas.js';
 import { logger } from '../lib/logger.js';
+import { pushSseEvent } from './session.js';
 
 // Mount by caller:
 //   app.use('/api/approvals', approvalsApiRouter)
@@ -238,6 +239,24 @@ approvalsApiRouter.post(
       return;
     }
 
+    // Compose Newsletter 2a (S3): broadcast a `newsletter.approval.created`
+    // event to the workflow user's SSE channel so the in-app approvals
+    // queue lights up in real time. Best-effort — never block the response
+    // on it (n8n is waiting synchronously for {token, approval_url}).
+    try {
+      await pushSseEvent(body.user_id, {
+        event: 'newsletter.approval.created',
+        data: {
+          token,
+          stage: body.stage,
+          execution_id: body.execution_id,
+          approval_url: `${baseUrl}/approvals/${token}`,
+        },
+      });
+    } catch (err) {
+      logger.warn({ err, userId: body.user_id }, 'approvals create: SSE broadcast failed');
+    }
+
     res.json({
       success: true,
       token,
@@ -427,6 +446,28 @@ approvalsPublicRouter.post(
     } catch (err) {
       resumed = false;
       logger.error({ err, token }, 'approvals resolve: n8n resume POST failed');
+    }
+
+    // Compose Newsletter 2a (S3): broadcast `newsletter.approval.resolved`
+    // to the workflow user's SSE channel so their pending-approvals list
+    // can drop this row and the running execution's progress strip can
+    // advance to the next stage. Best-effort — the user-facing response
+    // is the thank-you page either way. Done unconditionally (even on a
+    // 502 resume failure) because the DB row IS resolved.
+    try {
+      await pushSseEvent(row.user_id, {
+        event: 'newsletter.approval.resolved',
+        data: {
+          token,
+          stage: row.stage,
+          execution_id: row.execution_id,
+          decision,
+          feedback,
+          resumed,
+        },
+      });
+    } catch (err) {
+      logger.warn({ err, userId: row.user_id, token }, 'approvals resolve: SSE broadcast failed');
     }
 
     if (!resumed) {

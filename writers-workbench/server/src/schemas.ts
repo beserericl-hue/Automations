@@ -189,3 +189,34 @@ export const GenerateSchema = z.object({
 export const NewsletterEditionIdParamSchema = z.object({
   id: EditionIdSchema,
 });
+
+// ============================================
+// Compose Newsletter 2a (S3 — n8n stage-emit callback)
+// ============================================
+
+// Stage values mirror the 9 emit_stage_* nodes in `Content - Newsletter Agent V2`.
+// New stages can be added without a server change as long as the n8n side
+// passes a slug-style string — but listing them here gives the server an
+// authoritative whitelist so a typo on the n8n side surfaces as a 400
+// rather than silently fanning out to the SSE channel.
+export const NewsletterStageSchema = z.enum([
+  'gathering',
+  'selecting_stories',
+  'awaiting_stories_approval',
+  'stories_approved',
+  'awaiting_subject_approval',
+  'subject_approved',
+  'writing_segment',
+  'segments_done',
+  'saved',
+  'error',
+]);
+
+export const StageCallbackSchema = z.object({
+  userId: z.string().min(1, 'userId is required'),
+  executionId: z.string().min(1, 'executionId is required').max(200),
+  editionId: EditionIdSchema,
+  stage: NewsletterStageSchema,
+  detail: z.string().max(1000).optional().default(''),
+  ts: z.string().datetime({ offset: true }),
+});
