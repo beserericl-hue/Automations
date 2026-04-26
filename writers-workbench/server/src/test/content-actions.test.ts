@@ -257,12 +257,13 @@ describe('S12-13 annotations endpoints', () => {
         return { data: null, error: null };
       });
       chain.update = vi.fn((row: Record<string, unknown>) => {
-        const updateChain: Record<string, unknown> = {};
         if (table === 'published_content_v2') updatedRow = row;
-        updateChain.eq = vi.fn(() => updateChain);
-        // updates resolve when awaited
-        (updateChain as unknown as PromiseLike<unknown>).then = (resolve: (v: unknown) => unknown) =>
-          resolve({ data: null, error: null });
+        // Make .update().eq().eq()… terminate as a thenable so awaiting
+        // resolves with `{data, error}` (matches Supabase client surface).
+        const updateChain: PromiseLike<{ data: null; error: null }> & { eq: (...args: unknown[]) => unknown } = {
+          eq: () => updateChain,
+          then: (onfulfilled, _onrejected) => Promise.resolve({ data: null, error: null }).then(onfulfilled, _onrejected),
+        };
         return updateChain;
       });
       return chain;
