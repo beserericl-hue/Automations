@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
+import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import Pagination from '../shared/Pagination';
 import type { PublishedContent } from '../../types/database';
@@ -28,7 +29,7 @@ const statusColors: Record<string, string> = {
 export default function ContentLibrary() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { profile } = useUser();
+  const { profile, isImpersonating } = useUser();
   const userId = profile?.user_id;
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -46,10 +47,14 @@ export default function ContentLibrary() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
-  // Fetch all content
+  // Fetch all content (Sprint 8: routes through impersonation proxy when active)
   const { data: items, isLoading, isError, error } = useQuery({
-    queryKey: ['content-library', userId],
+    queryKey: ['content-library', userId, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<PublishedContent[]>>('/api/impersonate/data/content?limit=500');
+        return res.data ?? [];
+      }
       const { data, error } = await supabase
         .from('published_content_v2')
         .select('*')
@@ -64,8 +69,13 @@ export default function ContentLibrary() {
 
   // Fetch projects for filter dropdown
   const { data: projects } = useQuery({
-    queryKey: ['projects-filter', userId],
+    queryKey: ['projects-filter', userId, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        interface PartialProject { id: string; title: string }
+        const res = await apiFetch<ApiEnvelope<PartialProject[]>>('/api/impersonate/data/projects?limit=500');
+        return (res.data ?? []).map((p) => ({ id: p.id, title: p.title }));
+      }
       const { data, error } = await supabase
         .from('writing_projects_v2')
         .select('id, title')
@@ -121,8 +131,19 @@ export default function ContentLibrary() {
 
 
   // Bulk actions
+  // During impersonation, fan out one PATCH/DELETE per id. The proxy doesn't
+  // expose a bulk endpoint — keeps the audit log per-resource.
   const bulkApproveMutation = useMutation({
     mutationFn: async (ids: string[]) => {
+      if (isImpersonating) {
+        await Promise.all(
+          ids.map((cid) => apiFetch(`/api/impersonate/write/content/${cid}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'approved' }),
+          })),
+        );
+        return;
+      }
       const { error } = await supabase
         .from('published_content_v2')
         .update({ status: 'approved' })
@@ -138,6 +159,16 @@ export default function ContentLibrary() {
 
   const bulkPublishMutation = useMutation({
     mutationFn: async (ids: string[]) => {
+      if (isImpersonating) {
+        const publishedAt = new Date().toISOString();
+        await Promise.all(
+          ids.map((cid) => apiFetch(`/api/impersonate/write/content/${cid}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'published', published_at: publishedAt }),
+          })),
+        );
+        return;
+      }
       const { error } = await supabase
         .from('published_content_v2')
         .update({ status: 'published', published_at: new Date().toISOString() })
@@ -153,6 +184,12 @@ export default function ContentLibrary() {
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
+      if (isImpersonating) {
+        await Promise.all(
+          ids.map((cid) => apiFetch(`/api/impersonate/write/content/${cid}`, { method: 'DELETE' })),
+        );
+        return;
+      }
       const { error } = await supabase
         .from('published_content_v2')
         .update({ deleted_at: new Date().toISOString() })

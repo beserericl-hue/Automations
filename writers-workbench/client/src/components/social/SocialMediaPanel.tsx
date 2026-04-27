@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
+import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import type { SocialPost, GeneratedImage } from '../../types/database';
 
 interface SocialMediaPanelProps {
@@ -29,14 +30,22 @@ function getImageUrl(storagePath: string): string {
 }
 
 export default function SocialMediaPanel({ projectId }: SocialMediaPanelProps) {
-  const { profile } = useUser();
+  const { profile, isImpersonating } = useUser();
   const userId = profile?.user_id;
   const [platformFilter, setPlatformFilter] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const { data: posts, isLoading } = useQuery({
-    queryKey: ['social-posts', userId, projectId, platformFilter],
+    queryKey: ['social-posts', userId, projectId, platformFilter, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const params = new URLSearchParams();
+        if (projectId) params.set('project_id', projectId);
+        if (platformFilter) params.set('platform', platformFilter);
+        const qs = params.toString() ? `?${params}` : '';
+        const res = await apiFetch<ApiEnvelope<SocialPost[]>>(`/api/impersonate/data/social-posts${qs}`);
+        return res.data ?? [];
+      }
       let query = supabase
         .from('social_posts_v2')
         .select('*')
@@ -53,12 +62,17 @@ export default function SocialMediaPanel({ projectId }: SocialMediaPanelProps) {
     enabled: !!userId,
   });
 
-  // Fetch images linked to posts
-  const imageIds = [...new Set((posts || []).filter(p => p.image_id).map(p => p.image_id!))];
+  // Fetch images linked to posts (impersonation-aware: pulls from generated_images_v2 list endpoint
+  // and filters client-side to keep server surface area small)
+  const imageIds = [...new Set((posts || []).filter((p) => p.image_id).map((p) => p.image_id!))];
   const { data: images } = useQuery({
-    queryKey: ['social-post-images', imageIds],
+    queryKey: ['social-post-images', imageIds, isImpersonating],
     queryFn: async () => {
       if (imageIds.length === 0) return [];
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<GeneratedImage[]>>('/api/impersonate/data/images?limit=500');
+        return (res.data ?? []).filter((img) => imageIds.includes(img.id));
+      }
       const { data, error } = await supabase
         .from('generated_images_v2')
         .select('*')

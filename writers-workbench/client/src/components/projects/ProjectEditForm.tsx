@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
+import { apiFetch } from '../../lib/api';
 import type { WritingProject, GenreConfig } from '../../types/database';
 
 interface ProjectEditFormProps {
@@ -15,7 +16,7 @@ const PROJECT_STATUSES = ['planning', 'in_progress', 'complete', 'on_hold', 'aba
 const PROJECT_TYPES = ['book', 'novella', 'short_story_collection', 'serial'] as const;
 
 export default function ProjectEditForm({ project, onClose }: ProjectEditFormProps) {
-  const { profile } = useUser();
+  const { profile, isImpersonating } = useUser();
   const userId = profile?.user_id;
   const queryClient = useQueryClient();
 
@@ -51,17 +52,24 @@ export default function ProjectEditForm({ project, onClose }: ProjectEditFormPro
         premise: premise.trim(),
         themes: themes.split(',').map(t => t.trim()).filter(Boolean),
       };
+      const payload = {
+        title: title.trim(),
+        genre_slug: genreSlug || null,
+        status,
+        project_type: projectType,
+        outline: updatedOutline,
+      };
 
+      if (isImpersonating) {
+        await apiFetch(`/api/impersonate/write/projects/${project.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        });
+        return;
+      }
       const { error } = await supabase
         .from('writing_projects_v2')
-        .update({
-          title: title.trim(),
-          genre_slug: genreSlug || null,
-          status,
-          project_type: projectType,
-          outline: updatedOutline,
-          updated_at: new Date().toISOString(),
-        })
+        .update({ ...payload, updated_at: new Date().toISOString() })
         .eq('id', project.id)
         .eq('user_id', userId!);
       if (error) throw error;

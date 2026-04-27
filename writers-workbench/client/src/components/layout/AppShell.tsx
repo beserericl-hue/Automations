@@ -4,6 +4,8 @@ import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import ChatDrawer from '../chat/ChatDrawer';
 import OnboardingTutorial from '../onboarding/OnboardingTutorial';
+import ImpersonationBanner from '../superuser/ImpersonationBanner';
+import TrialBanner from '../credits/TrialBanner';
 import { useUser } from '../../contexts/UserContext';
 import { useToast } from '../../contexts/ToastContext';
 import { supabase } from '../../config/supabase';
@@ -97,6 +99,8 @@ export default function AppShell({ children }: AppShellProps) {
 
       {/* Main area */}
       <div className="flex flex-1 flex-col overflow-hidden">
+        <ImpersonationBanner />
+        <TrialBanner />
         <TopBar onMenuClick={() => setMobileOpen(!mobileOpen)} onChatToggle={() => setChatOpen(!chatOpen)} />
         <main className="flex-1 overflow-auto p-6">
           {children}

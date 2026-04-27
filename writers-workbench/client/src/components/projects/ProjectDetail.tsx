@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
+import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import ExportDialog from '../export/ExportDialog';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import ProjectEditForm from './ProjectEditForm';
@@ -33,7 +34,7 @@ export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { profile } = useUser();
+  const { profile, isImpersonating } = useUser();
   const [searchParams, setSearchParams] = useSearchParams();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [cascadeInfo, setCascadeInfo] = useState<string[]>([]);
@@ -46,10 +47,15 @@ export default function ProjectDetail() {
     setSearchParams({ tab }, { replace: true });
   };
 
-  // Project data
+  // Project data (Sprint 8: routes through impersonation proxy when active)
   const { data: project, isLoading, isError, error } = useQuery({
-    queryKey: ['project-detail', id],
+    queryKey: ['project-detail', id, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<WritingProject>>(`/api/impersonate/data/projects/${id}`);
+        if (!res.data) throw new Error('Project not found');
+        return res.data;
+      }
       const { data, error } = await supabase
         .from('writing_projects_v2')
         .select('*')
@@ -64,9 +70,25 @@ export default function ProjectDetail() {
   });
 
   // Chapters
+  type ChapterRow = Pick<PublishedContent, 'id' | 'title' | 'chapter_number' | 'status' | 'updated_at'> & { content_text: string | null };
   const { data: chapters } = useQuery({
-    queryKey: ['project-chapters', id],
+    queryKey: ['project-chapters', id, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<PublishedContent[]>>(
+          `/api/impersonate/data/content?project_id=${encodeURIComponent(id!)}&type=chapter&limit=500`,
+        );
+        return ((res.data ?? []) as PublishedContent[])
+          .map((c) => ({
+            id: c.id,
+            title: c.title,
+            chapter_number: c.chapter_number,
+            status: c.status,
+            updated_at: c.updated_at,
+            content_text: c.content_text ?? null,
+          }) as ChapterRow)
+          .sort((a, b) => (a.chapter_number ?? 0) - (b.chapter_number ?? 0));
+      }
       const { data, error } = await supabase
         .from('published_content_v2')
         .select('id, title, chapter_number, status, content_text, updated_at')
@@ -76,15 +98,19 @@ export default function ProjectDetail() {
         .is('deleted_at', null)
         .order('chapter_number', { ascending: true });
       if (error) throw error;
-      return data as (Pick<PublishedContent, 'id' | 'title' | 'chapter_number' | 'status' | 'updated_at'> & { content_text: string | null })[];
+      return data as ChapterRow[];
     },
     enabled: !!id && !!userId,
   });
 
   // Story Bible entries
   const { data: bibleEntries } = useQuery({
-    queryKey: ['project-bible', id],
+    queryKey: ['project-bible', id, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<StoryBibleEntry[]>>(`/api/impersonate/data/story-bible/${id}`);
+        return res.data ?? [];
+      }
       const { data, error } = await supabase
         .from('story_bible_v2')
         .select('*')
@@ -102,8 +128,12 @@ export default function ProjectDetail() {
   // Research reports — show all user research, not filtered by genre
   // Genre filter was too strict (research for a project may be tagged with a different genre)
   const { data: researchReports } = useQuery({
-    queryKey: ['project-research', id],
+    queryKey: ['project-research', id, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<ResearchReport[]>>('/api/impersonate/data/research?limit=30');
+        return res.data ?? [];
+      }
       const { data, error } = await supabase
         .from('research_reports_v2')
         .select('*')
@@ -150,9 +180,17 @@ export default function ProjectDetail() {
   });
 
   // Outline version info
+  interface OutlineVersionInfo {
+    totalVersions: number;
+    latestVersion: { version_number: number; created_at: string; revision_note: string | null } | null;
+  }
   const { data: outlineVersionInfo } = useQuery({
-    queryKey: ['outline-versions-info', id],
-    queryFn: async () => {
+    queryKey: ['outline-versions-info', id, isImpersonating],
+    queryFn: async (): Promise<OutlineVersionInfo> => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<OutlineVersionInfo>>(`/api/impersonate/data/outline-versions-info/${id}`);
+        return res.data ?? { totalVersions: 0, latestVersion: null };
+      }
       const { data, error, count } = await supabase
         .from('outline_versions_v2')
         .select('version_number, created_at, revision_note', { count: 'exact' })
@@ -169,9 +207,14 @@ export default function ProjectDetail() {
     enabled: !!id && !!userId,
   });
 
-  // Soft delete — also soft-deletes all child content (no orphans)
+  // Soft delete — also soft-deletes all child content (no orphans).
+  // During impersonation, the server proxy performs the same cascade atomically.
   const deleteMutation = useMutation({
     mutationFn: async () => {
+      if (isImpersonating) {
+        await apiFetch(`/api/impersonate/write/projects/${id}`, { method: 'DELETE' });
+        return;
+      }
       const now = new Date().toISOString();
 
       // Soft-delete all child content first (chapters, short stories, etc.)

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import ReactMarkdown from 'react-markdown';
 import { useUser } from '../../contexts/UserContext';
 import { supabase } from '../../config/supabase';
+import CreditExhaustionModal from '../credits/CreditExhaustionModal';
 
 type JobStatus = 'queued' | 'active' | 'completed' | 'failed';
 
@@ -100,8 +101,15 @@ function statusClasses(status?: JobStatus): string {
   }
 }
 
+interface CreditExhaustionState {
+  open: boolean;
+  creditsRequired?: number;
+  creditsRemaining?: number;
+  attemptedOperation?: string;
+}
+
 export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
-  const { profile } = useUser();
+  const { profile, refreshSubscription } = useUser();
   const location = useLocation();
   const params = useParams<{ id: string }>();
   const [messages, setMessages] = useState<Message[]>(loadMessages);
@@ -109,6 +117,7 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
   const [sending, setSending] = useState(false);
   const [showCommands, setShowCommands] = useState(false);
   const [drawerWidth, setDrawerWidth] = useState(480);
+  const [exhaustion, setExhaustion] = useState<CreditExhaustionState>({ open: false });
   const [isResizing, setIsResizing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -224,12 +233,34 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
         }),
       });
 
+      // Sprint 8 (S8-6): out-of-credits — show buy-more modal instead of an error bubble.
+      if (response.status === 402) {
+        const errBody = await response
+          .json()
+          .catch(() => ({} as { error?: { creditsRequired?: number; creditsRemaining?: number } }));
+        const errInfo = (errBody as { error?: { creditsRequired?: number; creditsRemaining?: number } }).error ?? {};
+        setExhaustion({
+          open: true,
+          creditsRequired: errInfo.creditsRequired,
+          creditsRemaining: errInfo.creditsRemaining,
+          attemptedOperation: text.length > 60 ? `${text.slice(0, 60)}…` : text,
+        });
+        // Pull the user message back into the input so it isn't lost.
+        setInput(text);
+        setMessages((prev) => prev.slice(0, -1));
+        return;
+      }
+
       if (!response.ok) {
         const errText = await response.text().catch(() => response.statusText);
         throw new Error(`HTTP ${response.status}: ${errText}`);
       }
 
       const data = await response.json();
+
+      // Refresh subscription so the sidebar credit pill updates.
+      const charged = (data as { creditsCharged?: number }).creditsCharged;
+      if (charged && charged > 0) void refreshSubscription();
 
       if (data?.mode === 'async' && data.jobId) {
         addMessage({
@@ -464,6 +495,14 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
           </div>
         </div>
       </div>
+
+      <CreditExhaustionModal
+        open={exhaustion.open}
+        onClose={() => setExhaustion({ open: false })}
+        creditsRequired={exhaustion.creditsRequired}
+        creditsRemaining={exhaustion.creditsRemaining}
+        attemptedOperation={exhaustion.attemptedOperation}
+      />
     </>
   );
 }

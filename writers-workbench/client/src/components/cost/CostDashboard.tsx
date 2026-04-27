@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
+import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import type { TokenUsage } from '../../types/database';
 
 type DateRange = '7d' | '30d' | '90d' | 'all';
@@ -64,13 +65,22 @@ interface CostDashboardProps {
 }
 
 export default function CostDashboard({ projectId }: CostDashboardProps) {
-  const { profile } = useUser();
+  const { profile, isImpersonating } = useUser();
   const userId = profile?.user_id;
   const [range, setRange] = useState<DateRange>('30d');
 
   const { data: records, isLoading } = useQuery({
-    queryKey: ['token-usage', userId, range, projectId],
+    queryKey: ['token-usage', userId, range, projectId, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const days = range === '7d' ? 7 : range === '30d' ? 30 : range === '90d' ? 90 : 365;
+        const res = await apiFetch<ApiEnvelope<TokenUsage[]>>(`/api/impersonate/data/token-usage?days=${days}`);
+        let rows = res.data ?? [];
+        if (projectId) {
+          rows = rows.filter((r) => (r.metadata as { project_id?: string } | null)?.project_id === projectId);
+        }
+        return rows;
+      }
       let query = supabase
         .from('token_usage_v2')
         .select('*')

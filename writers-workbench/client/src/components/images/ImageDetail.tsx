@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
+import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import { getImageUrl } from './ImageGallery';
 import type { GeneratedImage } from '../../types/database';
 
@@ -21,7 +22,7 @@ export default function ImageDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { profile } = useUser();
+  const { profile, isImpersonating } = useUser();
   const userId = profile?.user_id;
 
   const [prompt, setPrompt] = useState('');
@@ -34,8 +35,13 @@ export default function ImageDetail() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: image, isLoading } = useQuery({
-    queryKey: ['image-detail', id],
+    queryKey: ['image-detail', id, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<GeneratedImage>>(`/api/impersonate/data/images/${id}`);
+        if (!res.data) throw new Error('Image not found');
+        return res.data;
+      }
       const { data, error } = await supabase
         .from('generated_images_v2')
         .select('*')

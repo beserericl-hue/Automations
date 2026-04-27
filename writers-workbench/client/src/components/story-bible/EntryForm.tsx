@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
+import { apiFetch } from '../../lib/api';
 import type { StoryBibleEntry } from '../../types/database';
 
 const ENTRY_TYPES = ['character', 'location', 'event', 'timeline', 'plot_thread', 'world_rule'] as const;
@@ -24,7 +25,7 @@ interface EntryFormProps {
 const inputClass = 'block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white';
 
 export default function EntryForm({ projectId, entry, onClose }: EntryFormProps) {
-  const { profile } = useUser();
+  const { profile, isImpersonating } = useUser();
   const userId = profile?.user_id;
   const queryClient = useQueryClient();
 
@@ -54,17 +55,35 @@ export default function EntryForm({ projectId, entry, onClose }: EntryFormProps)
         if (key.trim()) metadata[key.trim()] = value.trim();
       });
 
-      const data = {
-        user_id: userId!,
+      const writePayload = {
         project_id: projectId,
         entry_type: entryType,
         name: name.trim(),
         description: description.trim(),
         chapter_introduced: chapterIntroduced ? parseInt(chapterIntroduced, 10) : null,
         metadata,
-        updated_at: new Date().toISOString(),
       };
 
+      if (isImpersonating) {
+        if (entry) {
+          await apiFetch(`/api/impersonate/write/story-bible/${entry.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(writePayload),
+          });
+        } else {
+          await apiFetch('/api/impersonate/write/story-bible', {
+            method: 'POST',
+            body: JSON.stringify(writePayload),
+          });
+        }
+        return;
+      }
+
+      const data = {
+        ...writePayload,
+        user_id: userId!,
+        updated_at: new Date().toISOString(),
+      };
       if (entry) {
         const { error } = await supabase
           .from('story_bible_v2')

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../config/supabase';
+import { apiFetch } from '../../lib/api';
 
 // S12-13 — shared report-comment surface for chapter editors. Renders
 // merged annotations from genre_eval (S12-11) and drift_scan (S12-12)
@@ -38,18 +38,12 @@ interface AnnotationsPanelProps {
   contentId: string;
 }
 
-async function authHeaders(): Promise<HeadersInit> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token ?? '';
-  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
-}
-
+// Sprint 8: routes through apiFetch so the X-Impersonate-User header is
+// auto-attached during impersonation. The server-side annotation routes
+// already use req.userId (which is swapped by requireAuth), so honoring
+// the header is the only missing piece on the client.
 async function fetchAnnotations(contentId: string): Promise<AnnotationsResponse> {
-  const res = await fetch(`/api/content/${contentId}/annotations`, {
-    headers: await authHeaders(),
-  });
-  if (!res.ok) throw new Error(`Failed to load annotations (${res.status})`);
-  return (await res.json()) as AnnotationsResponse;
+  return apiFetch<AnnotationsResponse>(`/api/content/${contentId}/annotations`);
 }
 
 async function applyAnnotation(args: {
@@ -58,19 +52,14 @@ async function applyAnnotation(args: {
   source: AnnotationSource;
   replacementText?: string;
 }): Promise<void> {
-  const res = await fetch(`/api/content/${args.contentId}/annotations/apply`, {
+  await apiFetch(`/api/content/${args.contentId}/annotations/apply`, {
     method: 'POST',
-    headers: await authHeaders(),
     body: JSON.stringify({
       annotationId: args.annotationId,
       source: args.source,
       ...(args.replacementText ? { replacementText: args.replacementText } : {}),
     }),
   });
-  const body = (await res.json()) as { success?: boolean; error?: { code?: string; message?: string } };
-  if (!res.ok || !body.success) {
-    throw new Error(body.error?.message || `Apply failed (${res.status})`);
-  }
 }
 
 async function dismissAnnotation(args: {
@@ -78,15 +67,10 @@ async function dismissAnnotation(args: {
   annotationId: string;
   source: AnnotationSource;
 }): Promise<void> {
-  const res = await fetch(`/api/content/${args.contentId}/annotations/dismiss`, {
+  await apiFetch(`/api/content/${args.contentId}/annotations/dismiss`, {
     method: 'POST',
-    headers: await authHeaders(),
     body: JSON.stringify({ annotationId: args.annotationId, source: args.source }),
   });
-  const body = (await res.json()) as { success?: boolean; error?: { message?: string } };
-  if (!res.ok || !body.success) {
-    throw new Error(body.error?.message || `Dismiss failed (${res.status})`);
-  }
 }
 
 export default function AnnotationsPanel({ contentId }: AnnotationsPanelProps) {

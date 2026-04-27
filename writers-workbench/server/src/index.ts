@@ -23,6 +23,12 @@ import { approvalsApiRouter, approvalsPublicRouter } from './routes/approvals.js
 import { newsletterSendsRouter } from './routes/newsletter-sends.js';
 import { jobsRouter } from './routes/jobs.js';
 import { contentActionsRouter } from './routes/content-actions.js';
+import { creditsRouter } from './routes/credits.js';
+import { superuserRouter } from './routes/superuser.js';
+import { tiersRouter } from './routes/tiers.js';
+import { cronRouter } from './routes/cron.js';
+import { impersonateDataRouter } from './routes/impersonate-data.js';
+import { impersonateWriteRouter } from './routes/impersonate-write.js';
 import type { JobInfrastructure } from './lib/jobs/boot.js';
 import { swaggerSpec } from './swagger.js';
 import swaggerUi from 'swagger-ui-express';
@@ -154,6 +160,18 @@ app.use('/api/jobs', generalLimiter);
 app.use('/api/jobs', jobsRouter);
 app.use('/api/content', generalLimiter);
 app.use('/api/content', contentActionsRouter);
+app.use('/api/credits', generalLimiter);
+app.use('/api/credits', creditsRouter);
+app.use('/api/superuser', generalLimiter);
+app.use('/api/superuser', superuserRouter);
+app.use('/api/tiers', generalLimiter);
+app.use('/api/tiers', tiersRouter);
+app.use('/api/cron', generalLimiter);
+app.use('/api/cron', cronRouter);
+app.use('/api/impersonate/data', generalLimiter);
+app.use('/api/impersonate/data', impersonateDataRouter);
+app.use('/api/impersonate/write', generalLimiter);
+app.use('/api/impersonate/write', impersonateWriteRouter);
 
 // Centralized error handler (must be after routes)
 app.use(errorHandler);
