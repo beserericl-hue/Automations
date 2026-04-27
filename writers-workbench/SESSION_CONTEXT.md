@@ -1327,3 +1327,138 @@ Reaffirmed governance rule. The Track A removal from Sprint 12 in this session W
 **Process lesson noted:** When asked "what is the next sprint?" or "what's open in sprint X", do NOT anchor on a single SESSION_CONTEXT entry. Cross-reference with `gh pr list --state all` and `git log --all --oneline | grep <sprint id>` before answering. Twice this session that anchor-on-one-entry pattern produced a wrong answer that the user had to push back on.
 
 ---
+
+## 2026-04-27 — Sprint 8 shipped to DEV (RBAC + tiers + credits + impersonation read/write); onboarding tour rewrite
+
+### What shipped this session
+
+Two PRs merged to `develop` (squash, admin override per the develop branch-protection rule that blocks self-approval):
+
+- **PR #50** — `feat(sprint-8)` at `2f4f1c3`. Sprint 8 in full plus the gap fixes from the 2026-04-26 sessions plus write impersonation plus the role-change endpoint plus inline Edit-user.
+- **PR #51** — `feat(onboarding)` at `780cc22`. Anchored, spotlight-cutout product tour. Each step now positions next to the actual UI element it talks about.
+
+DEV `/api/health` confirmed live at `780cc22` (deployed 2026-04-27T13:49:38Z). `checks.supabase`/`redis`/`postal` all `ok`.
+
+### Sprint 8 — DEV-complete (PROD untouched)
+
+10 stories / 55 pts shipped. Spec is in `sprint_document.md` (original Sprint 8 section). Adapted away from the spec's literal SQL because the spec called for `ALTER users_v2` which the schema-governance check on migrations ≥008 forbids; used the meta-table pattern the doc itself prescribes for that case.
+
+#### Migration 011 — what's actually in DEV Supabase (`gvbvwcnmjkdpclcisqrr`)
+
+Applied 2026-04-26. PROD Supabase (`faklxfakgzkpkbxfihzh`) does NOT have it yet — apply at release-day.
+
+Six new tables (all additive — `scripts/check-base-table-immutability.py` passes):
+
+| Table | Purpose |
+|---|---|
+| `user_account_meta_v2` | Account lifecycle: `account_status` (active/locked/suspended/pending), `locked_at`, `locked_by`, `locked_reason`. PK = `user_id`, FK CASCADE to `users_v2`. Absence of a row = active. |
+| `user_role_meta_v2` | Elevated role (`'superuser'` or `'admin'`). Absence of a row = ordinary user. The legacy `users_v2.role` column from migration 001 is left untouched (its frozen CHECK doesn't accept `'superuser'`); effective role = `COALESCE(user_role_meta_v2.role, users_v2.role, 'user')`. |
+| `subscription_tiers` | 5 seeded tiers: `trial` (200/mo, 30d, 0¢), `standard` (100/mo, $19.99, $199/yr; default for self-signup), `pro` (500/mo, $49.99, $499/yr, all features), `paid_full` (1000/mo, $49.99, $499/yr), `free_full` (1000/mo, 0¢, admin-provisioned only — `publicly_selectable=false`). Each row has `features` JSONB (`kdp_export`, `cover_art`, `social_media`, `max_projects`) and `credit_purchase_price_cents` (default 100¢ = $1.00/credit). |
+| `user_subscriptions` | One per user. Tracks tier_id, status, billing_cycle, period_start/end, trial_start/end, credits_remaining, credits_used_this_period, auto_renew, trial_warnings_sent JSONB array. UNIQUE on user_id. |
+| `credit_transactions` | Audit ledger. Five `transaction_type` values: `monthly_reset`, `usage`, `admin_adjustment`, `purchase`, `refund`. Includes `balance_after` so a single row tells you the running balance at that moment. |
+| `impersonation_log` | Superuser audit trail. `actions_taken` JSONB array — each successful write through the impersonation-write proxy appends an entry capped at 500 per session. UNIQUE active session per superuser via partial index. |
+
+Helper functions (parallel — no `CREATE OR REPLACE` on existing functions the base tables depend on):
+
+- `is_admin_v2()` — `true` if the JWT's `auth.uid()` user has `user_role_meta_v2.role IN ('admin','superuser')`
+- `is_superuser_v2()` — strictly superuser
+- `is_account_active_v2()` — `false` if `user_account_meta_v2.account_status` is anything but `active`
+- `get_user_effective_role_v2(p_user_id)` — `COALESCE` of meta + legacy
+
+Role-escalation trigger `prevent_role_meta_escalation` on `user_role_meta_v2` (INSERT/UPDATE/DELETE): blocks non-superuser callers. Service role bypasses (auth.uid() IS NULL).
+
+#### User seed — what's in DEV right now
+
+Verified live via psql against DEV pooler:
+
+```
+   user_id    | legacy_role | effective_role
+--------------+-------------+----------------
+ +14105914612 | admin       | superuser     -- Eric (granted by migration seed; legacy column is admin because the v1 CHECK can't store 'superuser')
+ +17063338699 | user        | (none)        -- Horace (test user; no meta row, no subscription)
+```
+
+Eric's user_subscriptions row: tier `free_full`, status `active`, billing_cycle `none`, credits_remaining `1000`. Eric also has `user_account_meta_v2.account_status = 'active'`.
+
+Horace has NO subscription row — credits show as 0 in the UI and chat will 402 once it's wired to the credit gate. Open follow-up below.
+
+#### Server endpoints added
+
+All under `/api/*`. Full list in `server/src/routes/`:
+
+- `creditsRouter` — `/credits/{balance,pricing,transactions,purchase}`
+- `superuserRouter` — `/superuser/{impersonate,impersonate/active,impersonate/log,tiers,tiers/:id,tiers/:id/deactivate,config}`
+- `tiersRouter` — `/tiers` (public, no auth — for signup pricing page)
+- `cronRouter` — `/cron/{trial-check,credit-reset,trial-warnings}` gated by `X-Cron-Secret`. `trial-warnings` resolves the recipient email then calls Postal `sendEmail()` with 7d/3d/1d HTML templates. Marks `trial_warnings_sent` regardless of email outcome to avoid spamming on hard-bounce.
+- `impersonateDataRouter` — `/impersonate/data/{dashboard, projects[/:id], projects-summary, content[/:id], research[/:id], story-bible/:projectId, outline-versions[-info]/:projectId, content-versions/:contentId, images[/:id], social-posts, trash, search, token-usage, provenance/:contentId, outlines}`. Superuser-only. Service role + filter by `req.userId` (which is the impersonated id when `X-Impersonate-User` is set + the superuser has an active impersonation_log row).
+- `impersonateWriteRouter` — `/impersonate/write/{projects/:id[+/restore], content/:id[+/restore], content-versions, story-bible[/:id], research/:id[+/restore], images[/:id], social-posts/:id}`. Same gate, plus requires `req.isImpersonating === true`. Field whitelists per resource. Every successful write appends an audit entry to `impersonation_log.actions_taken`.
+- `cronRouter`'s trial-warning Postal integration uses the existing `EMAIL_SECRET` + Postal mail server credentials already wired on the dev Workbench Railway service.
+
+Auth middleware (`server/src/middleware/auth.ts`) extended:
+
+- `requireAuth` loads role meta + account meta + subscription in parallel, blocks `account_status !== 'active'` (except superusers, who bypass account-status), honors `X-Impersonate-User` header.
+- New: `requireSuperuser`, `requireTierFeature(name)`, `requireCredits(amount)`. `requireAdmin` now treats superuser as admin (hierarchy: superuser > admin > user).
+
+`/api/chat/proxy` now does pre-flight credit check (returns 402 INSUFFICIENT_CREDITS with `creditsRequired` + `creditsRemaining`); deducts on success; sets `X-Credits-Remaining` header. Cost lookup is configurable via `app_config_v2.sprint8_superuser_config.credit_costs` with hard-coded defaults (write 5, brainstorm 3, research 2, cover_art 10, social 3, list/retrieve 0).
+
+`/api/admin/users/:id/role` is the canonical role-change endpoint. Writes to `user_role_meta_v2` (insert for `admin`/`superuser`, delete for `user`); only superusers can grant elevated roles; cannot demote yourself. The legacy `PUT /api/admin/users/:id` still updates name/email but cannot set role to `'superuser'` (the legacy CHECK rejects it).
+
+#### Client UI added
+
+- New routes: `/credits` (CreditsPage with Buy More Credits + transaction history), `/superuser` (SuperuserPanel with Impersonation, Tier Management, System Config tabs).
+- Banners mounted in AppShell: `ImpersonationBanner` (live timer, End button) and `TrialBanner` (turns red ≤3d).
+- Sidebar: credit pill (color-coded green/amber/red), Credits link, Superuser link (visible only to superusers).
+- AdminPanel rebuilt:
+  - 7 tabs: User Management, Subscriptions, Revenue, System Metrics, Workflows, Queues, Email Bounces.
+  - User row shows tier badge, account status, credits, trial countdown when applicable.
+  - Inline role dropdown: `user` / `admin` / `superuser` (admin/superuser disabled with `(superuser only)` label for non-superuser callers). Default value reads from `effective_role` not legacy column.
+  - Action buttons per row: **Edit** (display_name + email modal), **Lock** (with reason), **Unlock**, **Credits** (delta + reason), **Impersonate** (superuser only; disabled while another impersonation session is active).
+  - Subscriptions tab: filter by tier/status, sortable.
+  - Revenue tab: MRR, ARR, active paid/free/trial counts, breakdown by tier.
+- Onboarding flow: 2-step (profile → tier-selection via PricingCards). Calls `POST /api/account/subscribe`. Annual/monthly toggle. "Most Popular" ribbon on Pro.
+
+#### Impersonation data plane — every read view in the app honors it
+
+When `useUser().isImpersonating === true`:
+Dashboard, ProjectList, ProjectDetail (all six tabs' data: project + chapters + story bible + research + outline versions), ContentLibrary, ContentDetail, ResearchList, ResearchDetail, ImageGallery, ImageDetail, SocialMediaPanel, StoryBiblePanel, TrashView, OutlineList, VersionHistory drawer, ProvenancePanel, CostDashboard, Sidebar's My Projects expandable, TopBar breadcrumb title resolution, TopBar global search.
+
+Every write the impersonator triggers persists as the target user with an audit entry:
+ProjectEditForm save, ProjectDetail delete (cascade), ContentDetail save / status / schedule / cover-image / delete + content_versions snapshot, StoryBiblePanel + EntryForm CRUD, ResearchDetail save/delete, ResearchList delete, TrashView restore, ContentLibrary bulk approve/publish/delete (one PATCH per id for per-resource audit), AnnotationsPanel apply/dismiss (now via `apiFetch`).
+
+Server-mediated routes that already used `req.userId` (image generation, chat/brainstorm, rewrite-with-research, Q/A) work transparently during impersonation — they just see the swapped userId.
+
+#### Onboarding tour (PR #51)
+
+Replaces the old centered-modal tutorial with anchored popovers + spotlight cutouts. `data-tour` attributes added to `aside` (sidebar), the EveOrb wrapper, the credits pill, and the topbar chat button. Each step has a `target` selector + preferred `placement` (top/bottom/left/right/center). Smart placement falls back to the side with the most viewport room. Spotlight uses the `box-shadow: 0 0 0 9999px rgba(0,0,0,0.7)` inset trick for the dimmed cutout. Re-measures on resize, scroll, and DOM reflow via ResizeObserver. Smooth-scrolls offscreen targets into view.
+
+### Tests + build state
+
+- **508/508 tests passing** at end of session (PR #51 squash).
+- Sprint 8 added: server `sprint8-qa.test.ts` (14), `sprint8-gaps.test.ts` (3), `sprint8-impersonate-write.test.ts` (3); client `sprint8-qa.test.tsx` (18), `sprint8-gaps.test.tsx` (5).
+- TypeScript: clean both workspaces.
+- Production build: clean.
+- Schema governance: clean (migration 011 is additive only).
+
+### Known follow-ups (deliberately deferred)
+
+- **Self-signups should auto-create a trial subscription.** Current state: if a user finishes signup but skips tier-selection, they have no `user_subscriptions` row and credits show 0. Chat 402s once they try anything. Pragmatic fix: have the onboarding "Skip" path call `/api/account/subscribe { tier_name: 'trial' }` automatically. Test user Horace (+17063338699) is in this state right now — useful for testing the credit-exhaustion flow.
+- **`UserSettings` profile edits via impersonation:** not wired to the write proxy. Admin Panel "Edit user" modal covers this need.
+- **`GenreList` private genre management via impersonation:** not wired (low-priority surface).
+- **Stripe (Sprint 9) replaces the placeholder credit-purchase flow.** Right now `POST /api/credits/purchase` records the intent + bumps the balance immediately, no money moves. Sprint 9 plugs this through Checkout Sessions + PaymentIntent + webhook fulfilment.
+
+### Side sprint flagged by the user — incoming integration
+
+User noted at session end that **another side sprint is in flight on a different workflow** that will integrate into Writers Workbench. Details TBD when that work surfaces. Anyone picking up the next session: when integrating, route any new auth-protected endpoints through `requireAuth` (so the impersonation header is honored automatically) and append the user's writes to `impersonation_log.actions_taken` if the new flow can be triggered during impersonation. Use `data-tour` attributes on any prominent new UI elements so they can be added to the onboarding tour later.
+
+### Open PRs at end of session: 0
+
+`develop` HEAD is `780cc22` (PR #51 merge). Sprint 8 + tour live on dev. PROD on v1.0 still — no Sprint 8 anywhere on prod.
+
+### What the next session should pick up (in this order, your call)
+
+1. **Release Sprint 8 to PROD.** Apply migration 011 to PROD Supabase (`faklxfakgzkpkbxfihzh`); cut a `release/v1.1` branch from `develop`; PR to `main`; deploy. Eric is already seeded as superuser in DEV — the same `INSERT … WHERE EXISTS` guard in the migration will seed him in PROD too.
+2. **Sprint 9 — Stripe Integration (47 pts).** Prereq Sprint 8 (done). Replaces the placeholder purchase flow with real money movement.
+3. **Auto-trial on skip.** Tiny follow-up to fix the "0 credits after signup" gap.
+4. **Side-sprint integration** (whatever the user has in flight elsewhere).
+
+---
