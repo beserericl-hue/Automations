@@ -8,11 +8,13 @@ Usage:
     python3 scripts/s3-newsletter-workflow-rewrite.py             # apply
     python3 scripts/s3-newsletter-workflow-rewrite.py --dry-run   # write /tmp/wf-rewritten.json only
 
-After this script PUTs the structure, the runtime needs a Deactivate→Activate
-in the n8n UI to register the NEW webhook trigger. The existing form_trigger
-edit propagates immediately. The /api/v1/workflows/:id/activate and
-/deactivate endpoints return 403 on this n8n instance (license-restricted),
-so toggling must happen in the browser.
+After this script PUTs the structure, the runtime needs a Publish action in
+the n8n UI to push the draft live for any NEW trigger to register. The
+existing form_trigger edit propagates immediately. This n8n is self-hosted
+v2.x — the v1.x active/inactive toggle was replaced with publish/unpublish,
+and the public REST API exposes neither (`/activate` and `/deactivate` return
+403; `/publish` returns 405), so the toggle must happen in the browser:
+open the workflow, click the Published dropdown (top-right), pick Publish (⌘P).
 
 Nodes added (12):
   1) webhook_trigger              — POST /webhook/compose-newsletter-dev

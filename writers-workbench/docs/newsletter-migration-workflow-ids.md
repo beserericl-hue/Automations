@@ -376,17 +376,29 @@ All 9 emit nodes are spliced as **siblings** of the original downstream — neve
 
 Edited node: `form_trigger` — added `Edition Id` (text, placeholder `ai-news`, not required). Form URL unchanged: still `https://n8n.agileadautomation.com/form/45ae3f3f-3564-4b28-b50c-75c4bb55e817`.
 
-### S3 — pending manual step
+### S3 — pending manual step (n8n 2.x publish)
 
-The n8n public API on this instance forbids `POST /api/v1/workflows/:id/{activate,deactivate}` (returns 403 — license/scope-restricted). The structural PUT was accepted, but **n8n's `activeVersion` snapshot only refreshes for new triggers on a deactivate→activate cycle**. The form-trigger field update propagated immediately (verified live by GETting the form URL — Edition Id placeholder shows), but the new `webhook_trigger` won't fire until the workflow is toggled in the n8n UI.
+This n8n instance is **self-hosted v2.x**, where the v1.x active/inactive toggle was replaced with a Publish/Unpublish model. Only the **published** version is what the runtime serves; PUT via the public API lands as an unpublished draft. Until you Publish, the runtime keeps serving the previous version's triggers.
 
-**Operator step (one-time):** open `Content - Newsletter Agent V2` in https://n8n.agileadautomation.com, click **Deactivate** (top-right), then **Activate**. After that:
+The form-trigger field update propagated immediately (verified live by GETting the form URL — Edition Id placeholder shows), but the **new** `webhook_trigger` won't fire until the workflow's draft is published.
+
+**Operator step (one-time):**
+
+1. Open `Content - Newsletter Agent V2` at https://n8n.agileadautomation.com/workflow/bMvMKyK8obwYZmNb
+2. Click the **Published / version dropdown** (top-right of the editor, shows `n / m` version counter)
+3. Click **Publish** (or press ⌘P / Ctrl+P)
+
+The status badge stays "Published" but the version pointer advances to include the draft.
+
+API note: `/api/v1/workflows/:id/publish` returns **405** on this n8n version, and `/activate` / `/deactivate` (v1.x endpoints) return **403** — neither path is automatable on the public REST API. If a future n8n release exposes a publish endpoint, update [`scripts/s3-newsletter-workflow-rewrite.py`](../../scripts/s3-newsletter-workflow-rewrite.py) to call it after the PUT.
+
+After publishing, set on Railway DEV `WritersWorkbenchDev`:
 
 ```
 N8N_NEWSLETTER_WEBHOOK_URL=https://n8n.agileadautomation.com/webhook/compose-newsletter-dev
 ```
 
-set on the Railway DEV `WritersWorkbenchDev` service, then probe:
+then probe:
 
 ```
 curl -i -X POST https://n8n.agileadautomation.com/webhook/compose-newsletter-dev \
@@ -395,4 +407,4 @@ curl -i -X POST https://n8n.agileadautomation.com/webhook/compose-newsletter-dev
   -d '{"Date":"2026-04-27","Previous Newsletter Content":"","Edition Id":"ai-news"}'
 ```
 
-Expected: `200 {"executionId":"<id>","editionId":"ai-news"}`. If you see `403 WWW-Authenticate: Basic realm="Webhook"`, the runtime didn't pick up the new trigger — toggle the activation state again in the UI.
+Expected: `200 {"executionId":"<id>","editionId":"ai-news"}`. If you see `403 WWW-Authenticate: Basic realm="Webhook"`, the draft is still unpublished — re-Publish from the dropdown.
