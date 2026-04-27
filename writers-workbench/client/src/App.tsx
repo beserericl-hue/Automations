@@ -31,6 +31,8 @@ import ImageDetail from './components/images/ImageDetail';
 const ContentLibrary = lazyRetry(() => import('./components/content/ContentLibrary'));
 const CostDashboard = lazyRetry(() => import('./components/cost/CostDashboard'));
 const SourceBrowser = lazyRetry(() => import('./components/content/SourceBrowser'));
+const SuperuserPanel = lazyRetry(() => import('./components/superuser/SuperuserPanel'));
+const CreditsPage = lazyRetry(() => import('./components/credits/CreditsPage'));
 
 export default function App() {
   return (
@@ -74,6 +76,8 @@ export default function App() {
                     <Route path="sources" element={<SourceBrowser />} />
                     <Route path="settings" element={<UserSettings />} />
                     <Route path="admin/*" element={<AdminPanel />} />
+                    <Route path="superuser/*" element={<SuperuserPanel />} />
+                    <Route path="credits" element={<CreditsPage />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
                   </Suspense>

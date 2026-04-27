@@ -3,6 +3,8 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
+import { usePermissions } from '../../hooks/usePermissions';
+import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import EveOrb from '../eve/EveOrb';
 import type { WritingProject } from '../../types/database';
 
@@ -12,7 +14,8 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ open, onToggle }: SidebarProps) {
-  const { profile } = useUser();
+  const { profile, isImpersonating } = useUser();
+  const { isAdmin, isSuperuser, creditsRemaining, creditsMonthly } = usePermissions();
   const userId = profile?.user_id;
   const location = useLocation();
   const [projectsExpanded, setProjectsExpanded] = useState(true);
@@ -20,8 +23,14 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
 
   // Fetch projects for expandable sidebar section
   const { data: projects } = useQuery({
-    queryKey: ['sidebar-projects', userId],
+    queryKey: ['sidebar-projects', userId, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<Pick<WritingProject, 'id' | 'title' | 'status' | 'updated_at'>[]>>(
+          '/api/impersonate/data/projects-summary?limit=20',
+        );
+        return res.data ?? [];
+      }
       const { data, error } = await supabase
         .from('writing_projects_v2')
         .select('id, title, status, updated_at')
@@ -252,13 +261,59 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
             </svg>
           </div>
         )}
+        {open && (
+          <CreditPill remaining={creditsRemaining} monthly={creditsMonthly} />
+        )}
+        <SidebarLink to="/credits" icon={CreditIcon} label="Credits" open={open} />
         <SidebarLink to="/trash" icon={TrashIcon} label="Trash" open={open} />
         <SidebarLink to="/settings" icon={SettingsIcon} label="Settings" open={open} />
-        {profile?.isAdmin && (
+        {isAdmin && (
           <SidebarLink to="/admin" icon={AdminIcon} label="Admin" open={open} />
+        )}
+        {isSuperuser && (
+          <SidebarLink to="/superuser" icon={SuperuserIcon} label="Superuser" open={open} />
         )}
       </div>
     </aside>
+  );
+}
+
+function CreditPill({ remaining, monthly }: { remaining: number; monthly: number }) {
+  const pct = monthly > 0 ? Math.max(0, Math.min(100, (remaining / monthly) * 100)) : 0;
+  const color = pct < 15 ? 'bg-red-500' : pct < 40 ? 'bg-amber-500' : 'bg-green-500';
+  return (
+    <div className="px-3 pb-2">
+      <div className="text-[10px] uppercase tracking-wide text-gray-500">Credits</div>
+      <div className="flex items-center gap-2">
+        <span className="font-mono text-xs">
+          {remaining}
+          {monthly > 0 && <span className="text-gray-400"> / {monthly}</span>}
+        </span>
+      </div>
+      {monthly > 0 && (
+        <div className="mt-1 h-1.5 w-full overflow-hidden rounded bg-gray-200 dark:bg-gray-800">
+          <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CreditIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <circle cx="12" cy="12" r="9" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6M12 9v6" />
+    </svg>
+  );
+}
+
+function SuperuserIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l9 4v6c0 5-4 8-9 8s-9-3-9-8V7l9-4z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4" />
+    </svg>
   );
 }
 

@@ -1,19 +1,31 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
+import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import { useState } from 'react';
 import type { WritingProject } from '../../types/database';
 
+interface TrashPayload {
+  projects: WritingProject[];
+  content: unknown[];
+  research: unknown[];
+  bible: unknown[];
+}
+
 export default function TrashView() {
-  const { profile } = useUser();
+  const { profile, isImpersonating } = useUser();
   const userId = profile?.user_id;
   const queryClient = useQueryClient();
   const [restoringId, setRestoringId] = useState<string | null>(null);
 
   const { data: deletedProjects, isLoading } = useQuery({
-    queryKey: ['trash-projects', userId],
+    queryKey: ['trash-projects', userId, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<TrashPayload>>('/api/impersonate/data/trash');
+        return res.data?.projects ?? [];
+      }
       const { data, error } = await supabase
         .from('writing_projects_v2')
         .select('*')
@@ -28,6 +40,10 @@ export default function TrashView() {
 
   const restoreMutation = useMutation({
     mutationFn: async (projectId: string) => {
+      if (isImpersonating) {
+        await apiFetch(`/api/impersonate/write/projects/${projectId}/restore`, { method: 'POST' });
+        return;
+      }
       const { error } = await supabase
         .from('writing_projects_v2')
         .update({ deleted_at: null })

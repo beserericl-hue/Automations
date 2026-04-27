@@ -143,6 +143,106 @@ export const ApprovalResolveSchema = z.object({
 // Newsletter Migration sprint (S11 newsletter-sends save)
 // ============================================
 
+// ============================================
+// Sprint 8: RBAC, subscription tiers, credits
+// ============================================
+
+const PhoneE164 = z.string().regex(/^\+[1-9]\d{1,14}$/, 'Phone must be E.164 format (e.g. +14105551234)');
+
+export const CreditPurchaseSchema = z.object({
+  amount: z.coerce.number().int().min(1, 'amount must be at least 1').max(10000, 'max 10000 per purchase'),
+});
+
+export const ImpersonateStartSchema = z.object({
+  target_user_id: PhoneE164,
+  reason: z.string().max(500).optional(),
+});
+
+const TierFeaturesSchema = z.object({
+  kdp_export: z.boolean().optional(),
+  cover_art: z.boolean().optional(),
+  social_media: z.boolean().optional(),
+  max_projects: z.number().int().min(0).optional(),
+}).catchall(z.union([z.boolean(), z.number(), z.string()]));
+
+export const TierCreateSchema = z.object({
+  name: z.string().min(1).max(50).regex(/^[a-z0-9_]+$/, 'name must be lowercase a-z, 0-9, _'),
+  display_name: z.string().min(1).max(100),
+  description: z.string().max(1000).optional().nullable(),
+  monthly_credits: z.number().int().min(0).max(100000),
+  monthly_price_cents: z.number().int().min(0).max(100000000),
+  annual_price_cents: z.number().int().min(0).max(100000000),
+  credit_purchase_price_cents: z.number().int().min(1).max(100000).optional().default(100),
+  features: TierFeaturesSchema.optional().default({}),
+  is_default: z.boolean().optional().default(false),
+  publicly_selectable: z.boolean().optional().default(true),
+  trial_days: z.number().int().min(0).max(365).optional().default(0),
+  sort_order: z.number().int().optional().default(0),
+  active: z.boolean().optional().default(true),
+});
+
+export const TierUpdateSchema = z.object({
+  display_name: z.string().min(1).max(100).optional(),
+  description: z.string().max(1000).nullable().optional(),
+  monthly_credits: z.number().int().min(0).max(100000).optional(),
+  monthly_price_cents: z.number().int().min(0).max(100000000).optional(),
+  annual_price_cents: z.number().int().min(0).max(100000000).optional(),
+  credit_purchase_price_cents: z.number().int().min(1).max(100000).optional(),
+  features: TierFeaturesSchema.optional(),
+  publicly_selectable: z.boolean().optional(),
+  trial_days: z.number().int().min(0).max(365).optional(),
+  sort_order: z.number().int().optional(),
+  active: z.boolean().optional(),
+  // Server-side flag (UI sends it) — does not persist on subscription_tiers.
+  _apply_credit_change_to_existing: z.boolean().optional(),
+});
+
+export const SuperuserConfigSchema = z.object({
+  credit_costs: z.record(z.string(), z.number().int().min(0).max(1000)).optional(),
+  maintenance_mode: z.boolean().optional(),
+  default_tier_name: z.string().min(1).max(50).optional(),
+  trial_duration_days_override: z.number().int().min(0).max(365).optional(),
+}).catchall(z.unknown());
+
+export const LockAccountSchema = z.object({
+  reason: z.string().min(1, 'lock reason required').max(500),
+});
+
+export const AdjustCreditsSchema = z.object({
+  delta: z.coerce.number().int().refine((n) => n !== 0, 'delta must be non-zero'),
+  reason: z.string().min(1).max(500),
+});
+
+export const ChangeSubscriptionSchema = z.object({
+  tier_name: z.string().min(1).max(50),
+  billing_cycle: z.enum(['monthly', 'annual', 'none']).optional(),
+  reset_credits: z.boolean().optional().default(true),
+});
+
+export const CreateUserWithSubscriptionSchema = z.object({
+  phone: PhoneE164,
+  display_name: z.string().min(1).max(100),
+  email: z.string().email(),
+  role: z.enum(['user', 'admin', 'editor', 'viewer']).optional().default('user'),
+  // Subscription
+  tier_name: z.string().min(1).max(50),
+  billing_cycle: z.enum(['monthly', 'annual', 'none']).optional().default('none'),
+  is_free: z.boolean().optional().default(false),
+});
+
+export const SignupSubscribeSchema = z.object({
+  tier_name: z.string().min(1).max(50),
+  billing_cycle: z.enum(['monthly', 'annual', 'none']).optional().default('none'),
+});
+
+export const RoleChangeSchema = z.object({
+  // Sprint 8: 'superuser' and 'admin' write to user_role_meta_v2; 'user' deletes
+  // any existing meta row. Only a superuser caller may grant 'admin' or
+  // 'superuser' (enforced in the route handler).
+  role: z.enum(['user', 'admin', 'superuser']),
+  notes: z.string().max(500).optional(),
+});
+
 export const NewsletterSendSaveSchema = z.object({
   user_id: z.string().min(1, 'user_id is required'),
   send_date: z

@@ -1,8 +1,17 @@
 import { Router, Request, Response } from 'express';
 import { validateBody } from '../middleware/validate.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
-import { AdminUserSchema, AdminUserUpdateSchema } from '../schemas.js';
+import {
+  AdminUserSchema,
+  AdminUserUpdateSchema,
+  CreateUserWithSubscriptionSchema,
+  LockAccountSchema,
+  AdjustCreditsSchema,
+  ChangeSubscriptionSchema,
+  RoleChangeSchema,
+} from '../schemas.js';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
+import { adjustCreditsAdmin } from '../services/credits.js';
 import { logger } from '../lib/logger.js';
 
 export const adminRouter = Router();
@@ -142,10 +151,10 @@ adminRouter.get('/users', async (_req: Request, res: Response) => {
 
     if (error) throw error;
 
-    // Enrich with content and project counts
+    // Enrich with Sprint 8 meta + content/project counts
     const enriched = await Promise.all(
       (users || []).map(async (user) => {
-        const [contentRes, projectRes] = await Promise.all([
+        const [contentRes, projectRes, accountRes, roleRes, subRes] = await Promise.all([
           supabase
             .from('published_content_v2')
             .select('id', { count: 'exact', head: true })
@@ -156,11 +165,23 @@ adminRouter.get('/users', async (_req: Request, res: Response) => {
             .select('id', { count: 'exact', head: true })
             .eq('user_id', user.user_id)
             .is('deleted_at', null),
+          supabase.from('user_account_meta_v2').select('account_status, locked_at, locked_reason').eq('user_id', user.user_id).maybeSingle(),
+          supabase.from('user_role_meta_v2').select('role').eq('user_id', user.user_id).maybeSingle(),
+          supabase
+            .from('user_subscriptions')
+            .select('credits_remaining, credits_used_this_period, status, billing_cycle, current_period_end, trial_end, tier:subscription_tiers!inner(name, display_name, monthly_credits)')
+            .eq('user_id', user.user_id)
+            .maybeSingle(),
         ]);
         return {
           ...user,
           content_count: contentRes.count ?? 0,
           project_count: projectRes.count ?? 0,
+          account_status: accountRes.data?.account_status ?? 'active',
+          locked_at: accountRes.data?.locked_at ?? null,
+          locked_reason: accountRes.data?.locked_reason ?? null,
+          effective_role: roleRes.data?.role ?? (user.role === 'admin' ? 'admin' : 'user'),
+          subscription: subRes.data ?? null,
         };
       })
     );
@@ -537,5 +558,477 @@ adminRouter.get('/bounces', async (req: Request, res: Response) => {
   } catch (err) {
     logger.error({ err }, 'admin/bounces threw');
     res.status(500).json({ success: false, error: { code: 'INTERNAL' } });
+  }
+});
+
+// ============================================================
+// Sprint 8 (S8-3): account lifecycle + subscription management
+// ============================================================
+
+/**
+ * @openapi
+ * /admin/users-with-subscription:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Create a user and provision their subscription in one call
+ *     security:
+ *       - bearerAuth: []
+ */
+adminRouter.post(
+  '/users-with-subscription',
+  validateBody(CreateUserWithSubscriptionSchema),
+  async (req: Request, res: Response) => {
+    const { phone, display_name, email, role, tier_name, billing_cycle, is_free } = req.body;
+    const supabase = getSupabaseAdmin();
+
+    try {
+      const { data: existing } = await supabase.from('users_v2').select('user_id').eq('user_id', phone).maybeSingle();
+      if (existing) {
+        res.status(409).json({ success: false, error: { code: 'DUPLICATE', message: 'A user with this phone number already exists' } });
+        return;
+      }
+
+      // Resolve tier (free flag forces free_full when set).
+      const lookupName = is_free ? 'free_full' : tier_name;
+      const { data: tier, error: tierErr } = await supabase
+        .from('subscription_tiers')
+        .select('id, monthly_credits, trial_days')
+        .eq('name', lookupName)
+        .maybeSingle();
+      if (tierErr || !tier) {
+        res.status(400).json({ success: false, error: { code: 'INVALID_TIER', message: `Tier '${lookupName}' not found` } });
+        return;
+      }
+
+      const { data: user, error: userErr } = await supabase
+        .from('users_v2')
+        .insert({
+          user_id: phone,
+          phone_number: phone,
+          display_name: display_name.trim(),
+          email: email.trim(),
+          role: role || 'user',
+        })
+        .select()
+        .single();
+      if (userErr) throw userErr;
+
+      const periodStart = new Date();
+      const periodEnd = is_free ? null : new Date(periodStart.getTime() + 30 * 24 * 3600 * 1000);
+      const trialEnd = tier.trial_days > 0 ? new Date(periodStart.getTime() + tier.trial_days * 24 * 3600 * 1000) : null;
+
+      const { error: subErr } = await supabase.from('user_subscriptions').insert({
+        user_id: phone,
+        tier_id: tier.id,
+        status: 'active',
+        billing_cycle: is_free ? 'none' : billing_cycle ?? 'monthly',
+        current_period_start: periodStart.toISOString(),
+        current_period_end: periodEnd ? periodEnd.toISOString() : null,
+        trial_start: trialEnd ? periodStart.toISOString() : null,
+        trial_end: trialEnd ? trialEnd.toISOString() : null,
+        credits_remaining: tier.monthly_credits,
+        auto_renew: !is_free,
+        created_by: req.realUserId ?? req.userId ?? null,
+      });
+      if (subErr) {
+        // Best-effort cleanup of the half-created user
+        await supabase.from('users_v2').delete().eq('user_id', phone);
+        throw subErr;
+      }
+
+      // Seed an initial monthly_reset transaction so the UI ledger has a starting row.
+      await supabase.from('credit_transactions').insert({
+        user_id: phone,
+        amount: tier.monthly_credits,
+        balance_after: tier.monthly_credits,
+        transaction_type: 'monthly_reset',
+        description: `Initial allowance from tier '${lookupName}'`,
+      });
+
+      res.status(201).json({ success: true, data: user });
+    } catch (err) {
+      logger.error({ err }, 'admin: create-user-with-subscription failed');
+      res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to create user' } });
+    }
+  },
+);
+
+/**
+ * @openapi
+ * /admin/users/{id}/lock:
+ *   put:
+ *     tags: [Admin]
+ *     summary: Lock a user account
+ *     security:
+ *       - bearerAuth: []
+ */
+adminRouter.put('/users/:id/lock', validateBody(LockAccountSchema), async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { reason } = req.body as { reason: string };
+  if (id === req.realUserId) {
+    res.status(400).json({ success: false, error: { code: 'BAD_REQUEST', message: 'Cannot lock your own account' } });
+    return;
+  }
+
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from('user_account_meta_v2')
+    .upsert({
+      user_id: id,
+      account_status: 'locked',
+      locked_at: new Date().toISOString(),
+      locked_by: req.realUserId ?? req.userId ?? null,
+      locked_reason: reason,
+    }, { onConflict: 'user_id' })
+    .select()
+    .single();
+
+  if (error) {
+    res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: error.message } });
+    return;
+  }
+  res.json({ success: true, data });
+});
+
+/**
+ * @openapi
+ * /admin/users/{id}/unlock:
+ *   put:
+ *     tags: [Admin]
+ *     summary: Unlock a user account
+ *     security:
+ *       - bearerAuth: []
+ */
+adminRouter.put('/users/:id/unlock', async (req: Request, res: Response) => {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from('user_account_meta_v2')
+    .upsert({
+      user_id: req.params.id,
+      account_status: 'active',
+      locked_at: null,
+      locked_by: null,
+      locked_reason: null,
+    }, { onConflict: 'user_id' })
+    .select()
+    .single();
+
+  if (error) {
+    res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: error.message } });
+    return;
+  }
+  res.json({ success: true, data });
+});
+
+/**
+ * @openapi
+ * /admin/users/{id}/subscription:
+ *   put:
+ *     tags: [Admin]
+ *     summary: Change a user's subscription tier
+ *     security:
+ *       - bearerAuth: []
+ */
+adminRouter.put(
+  '/users/:id/subscription',
+  validateBody(ChangeSubscriptionSchema),
+  async (req: Request, res: Response) => {
+    const { tier_name, billing_cycle, reset_credits } = req.body;
+    const supabase = getSupabaseAdmin();
+
+    const { data: tier, error: tierErr } = await supabase
+      .from('subscription_tiers')
+      .select('id, monthly_credits, trial_days')
+      .eq('name', tier_name)
+      .maybeSingle();
+    if (tierErr || !tier) {
+      res.status(400).json({ success: false, error: { code: 'INVALID_TIER', message: `Tier '${tier_name}' not found` } });
+      return;
+    }
+
+    const updates: Record<string, unknown> = {
+      tier_id: tier.id,
+    };
+    if (billing_cycle) updates.billing_cycle = billing_cycle;
+    if (reset_credits !== false) {
+      updates.credits_remaining = tier.monthly_credits;
+      updates.credits_used_this_period = 0;
+      updates.current_period_start = new Date().toISOString();
+    }
+
+    const { data, error } = await supabase
+      .from('user_subscriptions')
+      .update(updates)
+      .eq('user_id', req.params.id)
+      .select()
+      .single();
+
+    if (error) {
+      res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: error.message } });
+      return;
+    }
+
+    if (reset_credits !== false) {
+      await supabase.from('credit_transactions').insert({
+        user_id: req.params.id,
+        amount: tier.monthly_credits,
+        balance_after: tier.monthly_credits,
+        transaction_type: 'admin_adjustment',
+        description: `Tier change to '${tier_name}' — credits reset`,
+        reference_id: req.realUserId ?? req.userId ?? null,
+      });
+    }
+
+    res.json({ success: true, data });
+  },
+);
+
+/**
+ * @openapi
+ * /admin/users/{id}/credits:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Adjust a user's credit balance (positive or negative)
+ *     security:
+ *       - bearerAuth: []
+ */
+adminRouter.post('/users/:id/credits', validateBody(AdjustCreditsSchema), async (req: Request, res: Response) => {
+  const { delta, reason } = req.body as { delta: number; reason: string };
+  const targetId = String(req.params.id);
+  const result = await adjustCreditsAdmin(targetId, delta, reason, req.realUserId ?? req.userId ?? 'unknown');
+  if (!result.ok) {
+    const status = result.reason === 'NO_SUBSCRIPTION' ? 404 : 500;
+    res.status(status).json({ success: false, error: { code: result.reason, message: result.message } });
+    return;
+  }
+  res.json({ success: true, data: result });
+});
+
+/**
+ * @openapi
+ * /admin/subscriptions:
+ *   get:
+ *     tags: [Admin]
+ *     summary: List subscriptions with user info, optional filters
+ *     security:
+ *       - bearerAuth: []
+ */
+adminRouter.get('/subscriptions', async (req: Request, res: Response) => {
+  const tierFilter = typeof req.query.tier === 'string' ? req.query.tier : null;
+  const statusFilter = typeof req.query.status === 'string' ? req.query.status : null;
+
+  const supabase = getSupabaseAdmin();
+  let q = supabase
+    .from('user_subscriptions')
+    .select(`
+      id, user_id, status, billing_cycle, current_period_start, current_period_end,
+      trial_start, trial_end, credits_remaining, credits_used_this_period, auto_renew,
+      tier:subscription_tiers!inner(id, name, display_name, monthly_credits, monthly_price_cents, annual_price_cents)
+    `)
+    .order('created_at', { ascending: false })
+    .limit(500);
+  if (statusFilter) q = q.eq('status', statusFilter);
+
+  const { data, error } = await q;
+  if (error) {
+    res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: error.message } });
+    return;
+  }
+
+  let rows = (data ?? []) as Array<Record<string, unknown> & { tier?: { name?: string } | null }>;
+  if (tierFilter) {
+    rows = rows.filter((r) => r.tier?.name === tierFilter);
+  }
+
+  res.json({ success: true, data: rows });
+});
+
+/**
+ * @openapi
+ * /admin/revenue:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Aggregate billing stats (MRR, active subscribers, conversions)
+ *     security:
+ *       - bearerAuth: []
+ */
+adminRouter.get('/revenue', async (_req: Request, res: Response) => {
+  const supabase = getSupabaseAdmin();
+  const { data: subs, error } = await supabase
+    .from('user_subscriptions')
+    .select(`
+      status, billing_cycle, trial_end,
+      tier:subscription_tiers!inner(name, monthly_price_cents, annual_price_cents)
+    `);
+
+  if (error) {
+    res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: error.message } });
+    return;
+  }
+
+  let mrrCents = 0;
+  let arrCents = 0;
+  let activePaid = 0;
+  let activeFree = 0;
+  let trialActive = 0;
+  let trialExpired = 0;
+  const byTier: Record<string, number> = {};
+
+  type Row = {
+    status: string;
+    billing_cycle: string;
+    trial_end: string | null;
+    tier?: { name?: string; monthly_price_cents?: number; annual_price_cents?: number } | null;
+  };
+
+  for (const row of (subs ?? []) as Row[]) {
+    const tier = row.tier;
+    if (!tier) continue;
+    byTier[tier.name ?? 'unknown'] = (byTier[tier.name ?? 'unknown'] ?? 0) + 1;
+
+    if (row.status !== 'active') {
+      if (row.status === 'expired' && tier.name === 'trial') trialExpired++;
+      continue;
+    }
+    if (tier.name === 'trial') {
+      trialActive++;
+      continue;
+    }
+    if ((tier.monthly_price_cents ?? 0) === 0 && (tier.annual_price_cents ?? 0) === 0) {
+      activeFree++;
+      continue;
+    }
+    activePaid++;
+    if (row.billing_cycle === 'monthly') {
+      mrrCents += tier.monthly_price_cents ?? 0;
+    } else if (row.billing_cycle === 'annual') {
+      mrrCents += Math.round((tier.annual_price_cents ?? 0) / 12);
+    }
+    arrCents += (row.billing_cycle === 'annual' ? (tier.annual_price_cents ?? 0) : (tier.monthly_price_cents ?? 0) * 12);
+  }
+
+  res.json({
+    success: true,
+    data: {
+      mrr_cents: mrrCents,
+      arr_cents: arrCents,
+      active_paid_subscribers: activePaid,
+      active_free_subscribers: activeFree,
+      active_trial_subscribers: trialActive,
+      expired_trials: trialExpired,
+      subscribers_by_tier: byTier,
+    },
+  });
+});
+
+/**
+ * @openapi
+ * /admin/users/{id}/role:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Promote / demote a user. Writes to user_role_meta_v2 (Sprint 8).
+ *     description: |
+ *       Source-of-truth for elevated roles is `user_role_meta_v2`. The legacy
+ *       `users_v2.role` column has a frozen CHECK constraint that does NOT
+ *       accept 'superuser' — so role changes flow through this endpoint, NOT
+ *       through PUT /admin/users/:id with a role field.
+ *
+ *       Authorization rules:
+ *         - Setting role to 'admin' or 'superuser' requires the caller to be a superuser.
+ *         - Admins can demote (set role to 'user') but not promote.
+ *         - A user cannot demote themselves to keep at least one superuser/admin in the system.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [role]
+ *             properties:
+ *               role:
+ *                 type: string
+ *                 enum: [user, admin, superuser]
+ *               notes: { type: string }
+ *     responses:
+ *       200: { description: Role updated; returns the user with the new effective_role }
+ *       403: { description: Caller lacks permission to grant the requested role }
+ *       404: { description: User not found }
+ */
+adminRouter.post('/users/:id/role', validateBody(RoleChangeSchema), async (req: Request, res: Response) => {
+  const { role, notes } = req.body as { role: 'user' | 'admin' | 'superuser'; notes?: string };
+  const targetId = String(req.params.id);
+  const callerEffectiveRole = req.effectiveRole;
+  const callerId = req.realUserId ?? req.userId ?? 'unknown';
+
+  // Sprint 8 spec: only superuser may grant elevated roles.
+  if ((role === 'superuser' || role === 'admin') && callerEffectiveRole !== 'superuser') {
+    res.status(403).json({
+      success: false,
+      error: { code: 'FORBIDDEN', message: 'Only superusers can promote others to admin or superuser' },
+    });
+    return;
+  }
+
+  // Don't let callers strip themselves of access in one click.
+  if (targetId === callerId && role === 'user' && (callerEffectiveRole === 'admin' || callerEffectiveRole === 'superuser')) {
+    res.status(400).json({
+      success: false,
+      error: { code: 'BAD_REQUEST', message: 'Cannot demote yourself. Ask another superuser to do it.' },
+    });
+    return;
+  }
+
+  const supabase = getSupabaseAdmin();
+
+  try {
+    // Confirm target exists.
+    const { data: target } = await supabase.from('users_v2').select('user_id, role').eq('user_id', targetId).maybeSingle();
+    if (!target) {
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'User not found' } });
+      return;
+    }
+
+    if (role === 'user') {
+      // Demote: clear the meta row + set legacy column to 'user'
+      await supabase.from('user_role_meta_v2').delete().eq('user_id', targetId);
+      await supabase.from('users_v2').update({ role: 'user' }).eq('user_id', targetId);
+    } else {
+      // Promote / change elevation
+      await supabase
+        .from('user_role_meta_v2')
+        .upsert(
+          {
+            user_id: targetId,
+            role,
+            granted_by: callerId,
+            granted_at: new Date().toISOString(),
+            notes: notes ?? null,
+          },
+          { onConflict: 'user_id' },
+        );
+      // Keep legacy column in sync — its CHECK constraint accepts 'admin' but
+      // not 'superuser'. For superuser elevation we leave the legacy column at
+      // 'admin' (defensible: every superuser is also an admin) so any older
+      // code path that still reads users_v2.role gets a sensible answer.
+      await supabase.from('users_v2').update({ role: 'admin' }).eq('user_id', targetId);
+    }
+
+    // Return the enriched row matching the user-list shape.
+    const { data: updated } = await supabase.from('users_v2').select('*').eq('user_id', targetId).maybeSingle();
+    const { data: roleMeta } = await supabase.from('user_role_meta_v2').select('role').eq('user_id', targetId).maybeSingle();
+    const effective_role = (roleMeta as { role?: string } | null)?.role ?? (updated?.role === 'admin' ? 'admin' : 'user');
+
+    logger.info({ caller: callerId, target: targetId, role }, 'admin: role changed');
+    res.json({ success: true, data: { ...updated, effective_role } });
+  } catch (err) {
+    logger.error({ err, target: targetId }, 'admin: role change failed');
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to change role' } });
   }
 });

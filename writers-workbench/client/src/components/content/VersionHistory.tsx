@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
+import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import { diffWords } from 'diff';
 import type { ContentVersion } from '../../types/database';
 
@@ -13,7 +14,7 @@ interface VersionHistoryProps {
 type ViewMode = 'list' | 'view' | 'compare';
 
 export default function VersionHistory({ contentId, onRestore }: VersionHistoryProps) {
-  const { profile } = useUser();
+  const { profile, isImpersonating } = useUser();
   const userId = profile?.user_id;
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -22,8 +23,12 @@ export default function VersionHistory({ contentId, onRestore }: VersionHistoryP
   const [compareVersions, setCompareVersions] = useState<[string, string]>(['', '']);
 
   const { data: versions, isLoading } = useQuery({
-    queryKey: ['content-versions', contentId],
+    queryKey: ['content-versions', contentId, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<ContentVersion[]>>(`/api/impersonate/data/content-versions/${contentId}`);
+        return res.data ?? [];
+      }
       const { data, error } = await supabase
         .from('content_versions_v2')
         .select('*')

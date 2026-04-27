@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useUser } from '../../contexts/UserContext';
 import { useTheme } from '../../hooks/useTheme';
 import { supabase } from '../../config/supabase';
+import { apiFetch, type ApiEnvelope } from '../../lib/api';
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -28,7 +29,7 @@ const breadcrumbLabels: Record<string, string> = {
 
 export default function TopBar({ onMenuClick, onChatToggle }: TopBarProps) {
   const { signOut } = useAuth();
-  const { profile } = useUser();
+  const { profile, isImpersonating } = useUser();
   const { effectiveTheme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
@@ -88,9 +89,21 @@ export default function TopBar({ onMenuClick, onChatToggle }: TopBarProps) {
   }, [segments[0], segments[1]]);
 
   const { data: entityTitle } = useQuery({
-    queryKey: ['breadcrumb-title', entityId?.type, entityId?.id],
+    queryKey: ['breadcrumb-title', entityId?.type, entityId?.id, isImpersonating],
     queryFn: async () => {
       if (!entityId || !userId) return null;
+      if (isImpersonating) {
+        const path =
+          entityId.type === 'content'
+            ? `/api/impersonate/data/content/${entityId.id}`
+            : `/api/impersonate/data/projects/${entityId.id}`;
+        try {
+          const res = await apiFetch<ApiEnvelope<{ title: string }>>(path);
+          return res.data?.title || null;
+        } catch {
+          return null;
+        }
+      }
       if (entityId.type === 'content') {
         const { data } = await supabase
           .from('published_content_v2')
@@ -130,9 +143,33 @@ export default function TopBar({ onMenuClick, onChatToggle }: TopBarProps) {
 
   // Global search
   const { data: searchResults } = useQuery({
-    queryKey: ['global-search', searchQuery, userId],
+    queryKey: ['global-search', searchQuery, userId, isImpersonating],
     queryFn: async () => {
       if (!searchQuery.trim() || !userId) return [];
+
+      if (isImpersonating) {
+        interface SearchPayload {
+          projects: Array<{ id: string; title: string }>;
+          content: Array<{ id: string; title: string; content_type: string }>;
+          research: Array<{ id: string; topic: string }>;
+        }
+        const res = await apiFetch<ApiEnvelope<SearchPayload>>(
+          `/api/impersonate/data/search?q=${encodeURIComponent(searchQuery.trim())}`,
+        );
+        const p = res.data ?? { projects: [], content: [], research: [] };
+        const results: SearchResult[] = [];
+        for (const proj of p.projects) {
+          results.push({ id: proj.id, title: proj.title, type: 'project', path: `/projects/${proj.id}` });
+        }
+        for (const c of p.content) {
+          results.push({ id: c.id, title: c.title, type: c.content_type, path: `/content/${c.id}` });
+        }
+        for (const r of p.research) {
+          results.push({ id: r.id, title: r.topic, type: 'research', path: `/research` });
+        }
+        return results;
+      }
+
       const q = `%${searchQuery.trim()}%`;
       const [projects, content, research] = await Promise.all([
         supabase

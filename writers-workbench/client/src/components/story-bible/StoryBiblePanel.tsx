@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
+import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import EntryForm from './EntryForm';
 import type { StoryBibleEntry, WritingProject } from '../../types/database';
@@ -31,15 +32,20 @@ export default function StoryBiblePanel() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { profile } = useUser();
+  const { profile, isImpersonating } = useUser();
   const userId = profile?.user_id;
   const [deletingEntry, setDeletingEntry] = useState<StoryBibleEntry | null>(null);
   const [editingEntry, setEditingEntry] = useState<StoryBibleEntry | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
 
   const { data: project } = useQuery({
-    queryKey: ['project-detail', id],
+    queryKey: ['project-detail', id, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<WritingProject>>(`/api/impersonate/data/projects/${id}`);
+        if (!res.data) throw new Error('Project not found');
+        return { id: res.data.id, title: res.data.title } as Pick<WritingProject, 'id' | 'title'>;
+      }
       const { data, error } = await supabase
         .from('writing_projects_v2')
         .select('id, title')
@@ -53,8 +59,12 @@ export default function StoryBiblePanel() {
   });
 
   const { data: entries, isLoading, isError, error } = useQuery({
-    queryKey: ['story-bible', id],
+    queryKey: ['story-bible', id, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<StoryBibleEntry[]>>(`/api/impersonate/data/story-bible/${id}`);
+        return res.data ?? [];
+      }
       const { data, error } = await supabase
         .from('story_bible_v2')
         .select('*')
@@ -77,6 +87,10 @@ export default function StoryBiblePanel() {
 
   const deleteMutation = useMutation({
     mutationFn: async (entryId: string) => {
+      if (isImpersonating) {
+        await apiFetch(`/api/impersonate/write/story-bible/${entryId}`, { method: 'DELETE' });
+        return;
+      }
       const { error } = await supabase
         .from('story_bible_v2')
         .update({ deleted_at: new Date().toISOString() })

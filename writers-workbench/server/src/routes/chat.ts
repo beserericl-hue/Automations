@@ -1,3 +1,4 @@
+import type { Response } from 'express';
 import { Router } from 'express';
 import { validateBody } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -7,6 +8,8 @@ import { classifyJob } from '../lib/jobs/classifier.js';
 import { getNamedQueue } from '../lib/queue.js';
 import { addTrackedJob } from '../lib/jobs/job-tracker.js';
 import type { N8nWebhookJob } from '../lib/jobs/types.js';
+import { getCreditCost } from '../services/credit-costs.js';
+import { deductCredits } from '../services/credits.js';
 
 export const chatRouter = Router();
 
@@ -49,6 +52,16 @@ function resolveWebhookUrl(): string {
  *       502:
  *         description: Failed to reach n8n webhook (sync path only)
  */
+/** Privileged roles bypass credit checks (Sprint 8). */
+function bypassCredits(req: { effectiveRole?: string }): boolean {
+  return req.effectiveRole === 'superuser' || req.effectiveRole === 'admin';
+}
+
+/** Set X-Credits-Remaining response header (Sprint 8 / S8-6). */
+function setCreditsHeader(res: Response, remaining: number): void {
+  res.setHeader('X-Credits-Remaining', String(remaining));
+}
+
 chatRouter.post('/proxy', requireAuth, validateBody(ChatProxySchema), async (req, res) => {
   const webhookUrl = resolveWebhookUrl();
 
@@ -61,6 +74,27 @@ chatRouter.post('/proxy', requireAuth, validateBody(ChatProxySchema), async (req
   const classification = classifyJob(message);
   const userId = req.userId!;
 
+  // Sprint 8: pre-flight credit check. Cost is dynamic per jobType, sourced
+  // from app_config_v2 with hard-coded defaults. Superusers/admins bypass.
+  // Users with NO subscription record (e.g. mid-onboarding, test fixtures) are
+  // also let through — the credit gate only fires once a subscription exists.
+  const cost = await getCreditCost(classification.jobType);
+  const hasSubscription = req.subscriptionTier !== null && req.subscriptionTier !== undefined;
+  if (!bypassCredits(req) && cost > 0 && hasSubscription && (req.creditsRemaining ?? 0) < cost) {
+    setCreditsHeader(res, req.creditsRemaining ?? 0);
+    res.status(402).json({
+      success: false,
+      error: {
+        code: 'INSUFFICIENT_CREDITS',
+        message: `This operation requires ${cost} credits; you have ${req.creditsRemaining ?? 0}.`,
+        creditsRequired: cost,
+        creditsRemaining: req.creditsRemaining ?? 0,
+      },
+    });
+    return;
+  }
+  const shouldDeduct = !bypassCredits(req) && cost > 0 && hasSubscription;
+
   // Sync tier: keep the low-latency direct call so the client gets an
   // immediate response (list/retrieve/approve and friends).
   if (classification.tier === 'sync') {
@@ -71,6 +105,15 @@ chatRouter.post('/proxy', requireAuth, validateBody(ChatProxySchema), async (req
         body: JSON.stringify(req.body),
       });
       const data = await response.json();
+
+      // Deduct credits after a successful sync call.
+      let balance = req.creditsRemaining ?? 0;
+      if (shouldDeduct) {
+        const result = await deductCredits(userId, cost, `chat.sync:${classification.jobType}`);
+        if (result.ok) balance = result.balance_after;
+      }
+      setCreditsHeader(res, balance);
+
       res.json({
         mode: 'sync',
         classification: {
@@ -78,6 +121,8 @@ chatRouter.post('/proxy', requireAuth, validateBody(ChatProxySchema), async (req
           queue: classification.queue,
           jobType: classification.jobType,
         },
+        creditsCharged: bypassCredits(req) ? 0 : cost,
+        creditsRemaining: balance,
         data,
       });
     } catch (error) {
@@ -102,6 +147,14 @@ chatRouter.post('/proxy', requireAuth, validateBody(ChatProxySchema), async (req
         body: JSON.stringify(req.body),
       });
       const data = await response.json();
+
+      let balance = req.creditsRemaining ?? 0;
+      if (shouldDeduct) {
+        const result = await deductCredits(userId, cost, `chat.sync-fallback:${classification.jobType}`);
+        if (result.ok) balance = result.balance_after;
+      }
+      setCreditsHeader(res, balance);
+
       res.json({
         mode: 'sync-fallback',
         classification: {
@@ -109,6 +162,8 @@ chatRouter.post('/proxy', requireAuth, validateBody(ChatProxySchema), async (req
           queue: classification.queue,
           jobType: classification.jobType,
         },
+        creditsCharged: bypassCredits(req) ? 0 : cost,
+        creditsRemaining: balance,
         data,
       });
     } catch (error) {
@@ -136,6 +191,18 @@ chatRouter.post('/proxy', requireAuth, validateBody(ChatProxySchema), async (req
       jobTypeTag: classification.jobType,
     });
 
+    // Deduct credits at enqueue time. The spec says "deduct on success" — we
+    // interpret successful enqueue as the success boundary for async ops, since
+    // the alternative (deduct after worker completes) would let users queue
+    // unlimited free jobs while one is running. Refund happens on permanent
+    // failure (handled by the worker's failure path — TODO S8-10 hardening).
+    let balance = req.creditsRemaining ?? 0;
+    if (!bypassCredits(req) && cost > 0) {
+      const result = await deductCredits(userId, cost, `chat.async:${classification.jobType}`, bullJobId);
+      if (result.ok) balance = result.balance_after;
+    }
+    setCreditsHeader(res, balance);
+
     res.json({
       mode: 'async',
       jobId: bullJobId,
@@ -146,6 +213,8 @@ chatRouter.post('/proxy', requireAuth, validateBody(ChatProxySchema), async (req
         queue: classification.queue,
         jobType: classification.jobType,
       },
+      creditsCharged: bypassCredits(req) ? 0 : cost,
+      creditsRemaining: balance,
     });
   } catch (error) {
     logger.error({ err: error, userId, queue: classification.queue }, 'chat: enqueue failed');

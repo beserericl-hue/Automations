@@ -3,10 +3,16 @@ import { Navigate } from 'react-router-dom';
 import { supabase } from '../../config/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUser } from '../../contexts/UserContext';
+import { apiFetch } from '../../lib/api';
+import PricingCards from '../credits/PricingCards';
+import type { SubscriptionTier } from '../../types/database';
+
+type Step = 'profile' | 'tier' | 'done';
 
 export default function OnboardingPage() {
   const { user } = useAuth();
-  const { needsOnboarding, refreshProfile } = useUser();
+  const { needsOnboarding, refreshProfile, refreshSubscription } = useUser();
+  const [step, setStep] = useState<Step>('profile');
   const [displayName, setDisplayName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [email, setEmail] = useState(user?.email || '');
@@ -14,7 +20,8 @@ export default function OnboardingPage() {
   const [submitting, setSubmitting] = useState(false);
 
   if (!user) return <Navigate to="/login" replace />;
-  if (!needsOnboarding) return <Navigate to="/" replace />;
+  // Allow tier-step rendering even after profile creation (when needsOnboarding flips to false).
+  if (!needsOnboarding && step !== 'tier') return <Navigate to="/" replace />;
 
   const formatPhone = (value: string): string => {
     // Strip non-digits except leading +
@@ -91,6 +98,9 @@ export default function OnboardingPage() {
       }
 
       await refreshProfile();
+      // Move on to tier selection (S8-9). If for any reason refresh has not yet
+      // surfaced a subscription, the tier step still renders against /api/tiers.
+      setStep('tier');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Setup failed';
       if (message.includes('duplicate key') && message.includes('phone_number')) {
@@ -102,6 +112,43 @@ export default function OnboardingPage() {
       setSubmitting(false);
     }
   };
+
+  const handleTierSelect = async (tier: SubscriptionTier, billing: 'monthly' | 'annual' | 'none') => {
+    setError('');
+    setSubmitting(true);
+    try {
+      await apiFetch('/api/account/subscribe', {
+        method: 'POST',
+        body: JSON.stringify({ tier_name: tier.name, billing_cycle: billing }),
+      });
+      await refreshSubscription();
+      setStep('done');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to set up subscription');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (step === 'done') return <Navigate to="/" replace />;
+
+  if (step === 'tier') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6 dark:bg-gray-950">
+        <div className="w-full max-w-5xl space-y-6 rounded-xl border border-gray-200 bg-white p-8 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Choose your plan</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Pick a plan to get started. You can change or cancel anytime.
+            </p>
+          </div>
+          <PricingCards onSelect={handleTierSelect} />
+          {error && <p className="text-center text-sm text-red-600">{error}</p>}
+          {submitting && <p className="text-center text-sm text-gray-500">Activating subscription…</p>}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">

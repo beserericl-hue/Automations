@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
+import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import Pagination from '../shared/Pagination';
 import { TableSkeleton, EmptyState } from '../shared/Skeleton';
 import type { ResearchReport } from '../../types/database';
 
 export default function ResearchList() {
-  const { profile } = useUser();
+  const { profile, isImpersonating } = useUser();
   const userId = profile?.user_id;
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -18,8 +19,12 @@ export default function ResearchList() {
   const [pageSize, setPageSize] = useState(25);
 
   const { data: reports, isLoading, isError, error } = useQuery({
-    queryKey: ['research', userId],
+    queryKey: ['research', userId, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<ResearchReport[]>>('/api/impersonate/data/research?limit=500');
+        return res.data ?? [];
+      }
       const { data, error } = await supabase
         .from('research_reports_v2')
         .select('*')
@@ -34,6 +39,10 @@ export default function ResearchList() {
 
   const deleteMutation = useMutation({
     mutationFn: async (reportId: string) => {
+      if (isImpersonating) {
+        await apiFetch(`/api/impersonate/write/research/${reportId}`, { method: 'DELETE' });
+        return;
+      }
       const { error } = await supabase
         .from('research_reports_v2')
         .update({ deleted_at: new Date().toISOString() })

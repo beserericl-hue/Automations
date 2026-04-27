@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState, useMemo } from 'react';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
+import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import RichTextEditor from '../editor/RichTextEditor';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import { contentToHtml } from '../../lib/content-utils';
@@ -12,14 +13,19 @@ export default function ResearchDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { profile } = useUser();
+  const { profile, isImpersonating } = useUser();
   const userId = profile?.user_id;
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const { data: report, isLoading, isError, error } = useQuery({
-    queryKey: ['research-detail', id],
+    queryKey: ['research-detail', id, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<ResearchReport>>(`/api/impersonate/data/research/${id}`);
+        if (!res.data) throw new Error('Research report not found');
+        return res.data;
+      }
       const { data, error } = await supabase
         .from('research_reports_v2')
         .select('*')
@@ -36,6 +42,13 @@ export default function ResearchDetail() {
   const saveMutation = useMutation({
     mutationFn: async (html: string) => {
       setSaveStatus('saving');
+      if (isImpersonating) {
+        await apiFetch(`/api/impersonate/write/research/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ content: html }),
+        });
+        return;
+      }
       const { error } = await supabase
         .from('research_reports_v2')
         .update({
@@ -58,6 +71,10 @@ export default function ResearchDetail() {
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
+      if (isImpersonating) {
+        await apiFetch(`/api/impersonate/write/research/${id}`, { method: 'DELETE' });
+        return;
+      }
       const { error } = await supabase
         .from('research_reports_v2')
         .update({ deleted_at: new Date().toISOString() })

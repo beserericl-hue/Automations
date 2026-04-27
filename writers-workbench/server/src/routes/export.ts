@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, SectionType } from 'docx';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import { validateBody } from '../middleware/validate.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireTierFeature } from '../middleware/auth.js';
 import { ExportRequestSchema } from '../schemas.js';
 import { logger } from '../lib/logger.js';
 
@@ -58,7 +58,7 @@ const PAGE_SIZES: Record<string, { width: number; height: number }> = {
  *       404:
  *         description: Project not found or no exportable chapters
  */
-exportRouter.post('/docx', requireAuth, validateBody(ExportRequestSchema), async (req, res) => {
+exportRouter.post('/docx', requireAuth, requireTierFeature('kdp_export'), validateBody(ExportRequestSchema), async (req, res) => {
   try {
     const { project_id, page_size } = req.body;
     const user_id = req.userId!; // From JWT, not request body

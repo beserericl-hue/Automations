@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
+import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import type { GeneratedImage } from '../../types/database';
 
 interface ImageGalleryProps {
@@ -26,15 +27,25 @@ export function getImageUrl(storagePath: string): string {
 }
 
 export default function ImageGallery({ projectId, onSelectImage }: ImageGalleryProps) {
-  const { profile } = useUser();
+  const { profile, isImpersonating } = useUser();
   const userId = profile?.user_id;
   const navigate = useNavigate();
   const [typeFilter, setTypeFilter] = useState('');
   const [genreFilter, setGenreFilter] = useState('');
 
   const { data: images, isLoading } = useQuery({
-    queryKey: ['generated-images', userId, projectId, typeFilter, genreFilter],
+    queryKey: ['generated-images', userId, projectId, typeFilter, genreFilter, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const params = new URLSearchParams();
+        if (projectId) params.set('project_id', projectId);
+        if (typeFilter) params.set('image_type', typeFilter);
+        params.set('limit', '500');
+        const res = await apiFetch<ApiEnvelope<GeneratedImage[]>>(`/api/impersonate/data/images?${params.toString()}`);
+        let rows = res.data ?? [];
+        if (genreFilter) rows = rows.filter((r) => r.genre_slug === genreFilter);
+        return rows;
+      }
       let query = supabase
         .from('generated_images_v2')
         .select('*')
@@ -53,8 +64,13 @@ export default function ImageGallery({ projectId, onSelectImage }: ImageGalleryP
   });
 
   const { data: genres } = useQuery({
-    queryKey: ['image-genres', userId],
+    queryKey: ['image-genres', userId, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<GeneratedImage[]>>('/api/impersonate/data/images?limit=500');
+        const slugs = [...new Set((res.data ?? []).map((d) => d.genre_slug).filter(Boolean) as string[])];
+        return slugs.sort();
+      }
       const { data, error } = await supabase
         .from('generated_images_v2')
         .select('genre_slug')
