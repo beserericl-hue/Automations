@@ -1493,6 +1493,28 @@ The blanket DEV → PROD copy left two tier-sensitive values pointing at DEV res
 
 **Lesson for the next release:** when copying secrets DEV → PROD by name, NEVER blanket-copy non-secret config (URLs, display names, mode flags, branch refs). Audit every value field one by one. Better: maintain a per-tier `prod-overrides.env` checked into the repo (with secrets read from a separate vault) so the two sets are reviewable.
 
+#### Post-release auth issue surfaced + diagnosed (also fixed mid-session)
+
+User reported "can't log in" on PROD; reset email link redirected to `localhost:3000`. Diagnosis:
+
+- **Root cause:** both Supabase projects (DEV `gvbvwcnmjkdpclcisqrr` and PROD `faklxfakgzkpkbxfihzh`) have **Auth → URL Configuration → Site URL** set to the factory default `http://localhost:3000`. Password-reset / magic-link emails embed Site URL as the redirect target → email link drops the user on a dead local address.
+- **Aggravating side-effect:** the partial-recovery flow can land you in a state where the password gets silently changed but you don't know to what. User couldn't remember the new password on either tier.
+- **Fix applied:** admin-reset password on both via the service-role key (`PUT /auth/v1/admin/users/{id}` with `{password: 'Fr332bafami!y'}`). Verified token issuance afterward. Both DEV and PROD accept `Fr332bafami!y` again — the same value that's in `E2E_TEST_PASSWORD`.
+- **Still TODO:** update Site URL + Redirect URLs allowlist on both Supabase projects so the email flow actually works for real users. Two paths: (a) Supabase dashboard → Auth → URL Configuration on each project, or (b) Supabase Management API with a PAT (https://supabase.com/dashboard/account/tokens).
+
+PROD URL config to set (from Supabase dashboard or Management API):
+```
+https://supabase.com/dashboard/project/faklxfakgzkpkbxfihzh/auth/url-configuration
+  Site URL    → https://writersworkbench-production.up.railway.app
+  Redirect+   → https://writersworkbench-production.up.railway.app/**
+```
+DEV equivalent:
+```
+https://supabase.com/dashboard/project/gvbvwcnmjkdpclcisqrr/auth/url-configuration
+  Site URL    → https://writersworkbenchdev-production.up.railway.app
+  Redirect+   → https://writersworkbenchdev-production.up.railway.app/**
+```
+
 ### Git topology after the release
 
 - `main` HEAD: `f392403` (merge PR #56, tagged `v1.1.0`)
