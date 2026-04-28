@@ -1553,3 +1553,29 @@ Deploy of `f392403` confirmed via `/api/health` showing the new SHA + `checks.{s
 The current `scripts/promote-dev-to-prod.py` swaps Supabase URL/keys + webhook paths + executeWorkflow refs. It does NOT swap n8n credential IDs (e.g., the `httpHeaderAuth` credentials backing `X-Email-Secret` / `X-Ingestion-Secret`). That means PROD workflows still reference DEV-side credential IDs — and because we copied DEV's secret values onto PROD Railway, the auth handshake works end-to-end. If you ever want true credential separation per tier, the script needs a credential-id mapping pass and PROD-side credentials need to exist in n8n.
 
 ---
+
+## 2026-04-28 (continued) — v1.1.1 hotfix shipped to both tiers
+
+Merge commit `462a0a9` (PR #57) on `main`, deployed to PROD via `release/v1.0` ratchet at 19:13:38 UTC and to DEV at 19:13:09 UTC (develop fast-forwarded with merge commit `6aff40f`).
+
+### What the hotfix did
+
+- **`<PasswordInput>` reusable component** ([client/src/components/shared/PasswordInput.tsx](writers-workbench/client/src/components/shared/PasswordInput.tsx)) — eye-icon show/hide toggle with `aria-pressed` + autoComplete pass-through. forwardRef + useId so callers keep id/required/className semantics.
+- **All 6 password inputs replaced** — LoginPage, SignupPage (×2 — password + confirm), ResetPasswordPage (×2), Settings → Change Password. Each got an explicit `autoComplete` (`current-password` for login, `new-password` everywhere else).
+- **`POST /api/admin/users/:id/full`** — new admin endpoint covering display_name + email + recipient_email + bcc_email + password in one call. Per-field whitelisted updates (users_v2 / app_config_v2 / Supabase Auth admin updateUserById). Returns per-field `{ ok, error? }` so the client can surface partial-success toasts. Schema: `AdminUserFullUpdateSchema`.
+- **`GET /api/admin/users/:id/email-prefs`** — populates the new fields from `app_config_v2` when the dialog opens.
+- **AdminPanel `EditUserDialog` rewritten** — three fieldsets (Profile / Email delivery / Password). Password section collapsed behind a "Reset this user's password" button. Uses `<PasswordInput>` for the reset field.
+
+### Lesson for the next session — Playwright `getByLabel` substring matching
+
+The first hotfix attempt CI-failed with strict-mode violation on 4 noauth tests because the toggle button's `aria-label="Show password"` contains "Password", and Playwright's `getByLabel('Password')` does substring matching by default → matched both the input AND the toggle. Fix: `getByLabel('Password', { exact: true })` in `e2e/auth.setup.ts` and `e2e/pages/login.page.ts`. Don't change the toggle's aria-label — "Show password" / "Hide password" is the right SR experience; tighten the test selector instead.
+
+### Tests / CI
+
+556/556 unit tests, all 4 required CI checks green (Schema Governance, TypeScript & Lint, Unit Tests, Production Build), E2E pass (1m12s) on the second push after the test selector fix. Squash-merged via admin override (develop-protection precedent from PR #40).
+
+### Open follow-ups still standing
+
+Same list as above (CRON_SECRET, Sprint 9 Stripe, auto-trial on signup skip, Supabase Site URL + Redirect URLs allowlist on both Supabase projects).
+
+---
