@@ -190,6 +190,18 @@ app.use('/api/impersonate/data', impersonateDataRouter);
 app.use('/api/impersonate/write', generalLimiter);
 app.use('/api/impersonate/write', impersonateWriteRouter);
 
+// Test-only fixture endpoint (Compose Newsletter 2a — S9). Mounts only when
+// NODE_ENV === 'test' so production never exposes the canonical-run replay.
+if (process.env.NODE_ENV === 'test') {
+  // Dynamic import keeps the route file out of the production bundle's
+  // import graph when this branch is dead.
+  void import('./routes/test-newsletter.js').then((m) => {
+    app.use('/api/test/newsletter', generalLimiter);
+    app.use('/api/test/newsletter', m.testNewsletterRouter);
+    logger.info('Test-only fixture endpoint mounted at /api/test/newsletter');
+  });
+}
+
 // Centralized error handler (must be after routes)
 app.use(errorHandler);
 
