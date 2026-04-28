@@ -14,3 +14,9 @@ playwright/.cache/
 
 # Playwright auth state
 e2e/.auth/
+
+# Built user-manual artifacts — derived from MD + screenshots via
+# `node scripts/build-user-manual.mjs`. The MD source and screenshot PNGs
+# ARE checked in; the heavy HTML/PDF builds (~15 MB combined) are not.
+docs/PRODUCTION_WEB_UI_USER_MANUAL.html
+docs/PRODUCTION_WEB_UI_USER_MANUAL.pdf

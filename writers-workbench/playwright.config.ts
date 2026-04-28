@@ -6,6 +6,12 @@ config(); // Load .env into process.env
 
 const AUTH_FILE = path.join(__dirname, 'e2e', '.auth', 'user.json');
 
+// E2E_BASE_URL overrides the local dev server target. Used to capture user-
+// manual screenshots against PROD/DEV without spinning up a local Vite server.
+// When set, the local webServer block is skipped so Playwright doesn't try
+// to npm run dev:client.
+const REMOTE_BASE_URL = process.env.E2E_BASE_URL;
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -14,9 +20,18 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: REMOTE_BASE_URL || 'http://localhost:5173',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    // Headless Chromium's default UA contains "HeadlessChrome" which some
+    // edge layers (Cloudflare etc.) treat as a bot and block. When capturing
+    // against deployed URLs, present as a regular Chrome desktop.
+    ...(REMOTE_BASE_URL
+      ? {
+          userAgent:
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        }
+      : {}),
   },
   projects: [
     // Auth setup — runs first, saves session state
@@ -47,10 +62,14 @@ export default defineConfig({
       use: { ...devices['Desktop Firefox'] },
     },
   ],
-  webServer: {
-    command: 'npm run dev:client',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
-  },
+  ...(REMOTE_BASE_URL
+    ? {}
+    : {
+        webServer: {
+          command: 'npm run dev:client',
+          url: 'http://localhost:5173',
+          reuseExistingServer: !process.env.CI,
+          timeout: 30_000,
+        },
+      }),
 });
