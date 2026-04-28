@@ -37,9 +37,13 @@ import {
   GenerateSchema,
   NewsletterEditionIdParamSchema,
   StageCallbackSchema,
+  ApprovalResolveSchema,
+  ApprovalsOpenQuerySchema,
+  ApprovalTokenParamSchema,
 } from '../schemas.js';
 import { logger } from '../lib/logger.js';
 import { pushSseEvent } from './session.js';
+import { resolveApproval } from '../lib/approvals.js';
 
 export const newsletterRouter = Router();
 
@@ -430,6 +434,196 @@ newsletterRouter.get(
       stoppedAt: body.stoppedAt,
       lastNodeExecuted: (body.data as { resultData?: { lastNodeExecuted?: string } } | undefined)?.resultData?.lastNodeExecuted ?? null,
     });
+  },
+);
+
+// --------------------------------------------------------------------
+// Compose Newsletter 2a (S5) — in-app approvals API
+//
+// Session-authenticated counterparts to the public email-link approval
+// surface. Both endpoints pin every action to the caller's session id —
+// no token-as-credential here, the JWT is the credential and the token
+// is just a row identifier.
+//
+//   GET  /api/newsletter/approvals/open
+//        List the caller's open approvals (resolved_at IS NULL AND
+//        expires_at > now()), with optional execution_id and stage
+//        filters. Returns each row's payload plus a constructed
+//        approval_url so the UI can deep-link to the public form too.
+//
+//   POST /api/newsletter/approvals/:token/resolve
+//        JSON variant of the public form. Returns 403 when the token
+//        belongs to another user, 409 when already resolved, 410 when
+//        expired, 502 when the n8n resume POST fails (decision is still
+//        persisted and the SSE event still fires). The resolve core
+//        lives in lib/approvals.ts and is shared with the public route
+//        so behaviour cannot drift.
+// --------------------------------------------------------------------
+
+/**
+ * @openapi
+ * /newsletter/approvals/open:
+ *   get:
+ *     tags: [Newsletter]
+ *     summary: List the caller's open (unresolved, unexpired) newsletter approvals
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: execution_id
+ *         required: false
+ *         schema: { type: string }
+ *       - in: query
+ *         name: stage
+ *         required: false
+ *         schema: { type: string, enum: [stories, subject_line] }
+ *     responses:
+ *       200: { description: "{success, approvals: ApprovalRow[]}" }
+ *       400: { description: Validation error }
+ *       401: { description: Missing or invalid auth }
+ */
+newsletterRouter.get('/approvals/open', requireAuth, async (req: Request, res: Response) => {
+  const parsed = ApprovalsOpenQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({
+      success: false,
+      error: { code: 'VALIDATION_ERROR', fields: parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message })) },
+    });
+    return;
+  }
+  const userId = req.userId!;
+  const { execution_id, stage } = parsed.data;
+
+  const supabase = getSupabaseAdmin();
+  const nowIso = new Date().toISOString();
+
+  let query = supabase
+    .from('newsletter_approvals_v2')
+    .select('id, token, user_id, execution_id, stage, payload, created_at, expires_at, resolved_at, decision, feedback')
+    .eq('user_id', userId)
+    .is('resolved_at', null)
+    .gt('expires_at', nowIso)
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (execution_id) query = query.eq('execution_id', execution_id);
+  if (stage) query = query.eq('stage', stage);
+
+  const { data, error } = await query;
+  if (error) {
+    logger.error({ error, userId }, 'newsletter approvals open: query failed');
+    res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: error.message } });
+    return;
+  }
+
+  // Tag each row with its public approval URL when APPROVAL_BASE_URL is
+  // configured — handy for "open in browser" actions in the in-app UI even
+  // though the in-app POST does the actual resolve.
+  const baseUrl = process.env.APPROVAL_BASE_URL;
+  const approvals = (data ?? []).map((row) => ({
+    ...row,
+    approval_url: baseUrl ? `${baseUrl}/approvals/${row.token}` : null,
+  }));
+
+  res.json({ success: true, approvals });
+});
+
+/**
+ * @openapi
+ * /newsletter/approvals/{token}/resolve:
+ *   post:
+ *     tags: [Newsletter]
+ *     summary: In-app resolve of a newsletter approval (session-authenticated)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [decision]
+ *             properties:
+ *               decision: { type: string, enum: [approve, revise] }
+ *               feedback: { type: string }
+ *     responses:
+ *       200: { description: "{success: true, resumed: true}" }
+ *       400: { description: Validation }
+ *       401: { description: Missing or invalid auth }
+ *       403: { description: Token belongs to another user }
+ *       404: { description: Token unknown }
+ *       409: { description: Already resolved }
+ *       410: { description: Expired }
+ *       502: { description: n8n resume POST failed (decision still persisted) }
+ */
+newsletterRouter.post(
+  '/approvals/:token/resolve',
+  requireAuth,
+  validateBody(ApprovalResolveSchema),
+  async (req: Request, res: Response) => {
+    const params = ApprovalTokenParamSchema.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', fields: params.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message })) },
+      });
+      return;
+    }
+    const { token } = params.data;
+    const body = req.body as import('zod').infer<typeof ApprovalResolveSchema>;
+    const userId = req.userId!;
+
+    const result = await resolveApproval({
+      token,
+      decision: body.decision,
+      feedback: body.feedback,
+      sessionUserId: userId,
+    });
+
+    switch (result.status) {
+      case 'ok':
+        res.json({ success: true, resumed: true });
+        return;
+      case 'resume_failed':
+        // Decision persisted, SSE broadcast fired, but n8n didn't ack the
+        // resume. UI should surface this as "saved, retry workflow".
+        res.status(502).json({
+          success: true,
+          resumed: false,
+          error: { code: 'UPSTREAM_RESUME_FAILED', message: 'Decision saved, but the n8n resume POST failed' },
+        });
+        return;
+      case 'not_found':
+        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Approval not found' } });
+        return;
+      case 'forbidden':
+        res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'This approval belongs to another user' } });
+        return;
+      case 'already_resolved':
+        res.status(409).json({
+          success: false,
+          error: { code: 'ALREADY_RESOLVED', message: 'Approval was already resolved' },
+          resolved_at: result.row?.resolved_at ?? null,
+          decision: result.row?.decision ?? null,
+        });
+        return;
+      case 'expired':
+        res.status(410).json({
+          success: false,
+          error: { code: 'EXPIRED', message: 'Approval window has closed' },
+          expires_at: result.row?.expires_at ?? null,
+        });
+        return;
+      case 'lookup_error':
+      case 'update_error':
+        res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: 'Database operation failed' } });
+        return;
+    }
   },
 );
 
