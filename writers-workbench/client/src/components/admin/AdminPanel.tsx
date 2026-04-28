@@ -77,23 +77,6 @@ async function adminFetch<T>(path: string, options?: RequestInit): Promise<T> {
   return json.data;
 }
 
-/** Fetch from any /api/* path with the current Supabase JWT (no /admin prefix). */
-async function adminFetchAny<T>(path: string, options?: RequestInit): Promise<T> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  const res = await fetch(`/api${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...options?.headers,
-    },
-  });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error?.message || 'Request failed');
-  return json.data;
-}
-
 type AdminTab = 'users' | 'subscriptions' | 'revenue' | 'metrics' | 'workflows' | 'queues' | 'bounces';
 
 const TAB_LABELS: Record<AdminTab, string> = {
@@ -170,9 +153,13 @@ function UserManagement() {
   const [editTarget, setEditTarget] = useState<AdminUser | null>(null);
   const [tierTarget, setTierTarget] = useState<AdminUser | null>(null);
 
+  // Sprint 8: admin tier list returns ALL active tiers (including
+  // free_full / "Full Access (Comp)" which is admin-provisioned only and
+  // therefore filtered out of the public /api/tiers endpoint that powers
+  // the signup page).
   const { data: tiers } = useQuery({
     queryKey: ['admin-tiers'],
-    queryFn: () => adminFetchAny<SubscriptionTier[]>('/tiers'),
+    queryFn: () => adminFetch<SubscriptionTier[]>('/tiers'),
     staleTime: 60_000,
   });
 
@@ -1249,7 +1236,7 @@ function SubscriptionsTab() {
 
   const { data: tiers } = useQuery({
     queryKey: ['admin-tiers'],
-    queryFn: () => adminFetchAny<SubscriptionTier[]>('/tiers'),
+    queryFn: () => adminFetch<SubscriptionTier[]>('/tiers'),
     staleTime: 60_000,
   });
 
