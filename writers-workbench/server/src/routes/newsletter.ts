@@ -567,7 +567,7 @@ newsletterRouter.get('/approvals/open', requireAuth, async (req: Request, res: R
     return;
   }
   const userId = req.userId!;
-  const { execution_id, stage } = parsed.data;
+  const { execution_id, stage, token } = parsed.data;
 
   const supabase = getSupabaseAdmin();
   const nowIso = new Date().toISOString();
@@ -583,6 +583,7 @@ newsletterRouter.get('/approvals/open', requireAuth, async (req: Request, res: R
 
   if (execution_id) query = query.eq('execution_id', execution_id);
   if (stage) query = query.eq('stage', stage);
+  if (token) query = query.eq('token', token);
 
   const { data, error } = await query;
   if (error) {

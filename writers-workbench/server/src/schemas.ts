@@ -139,12 +139,16 @@ export const ApprovalResolveSchema = z.object({
   feedback: z.string().max(5000).optional().default(''),
 });
 
-// Compose Newsletter 2a (S5) — query schema for the in-app
-// `GET /api/newsletter/approvals/open` endpoint. Both filters are optional;
-// the user-id filter is pinned server-side to the session.
+// Compose Newsletter 2a (S5/S8) — query schema for the in-app
+// `GET /api/newsletter/approvals/open` endpoint. All filters are
+// optional; the user-id filter is pinned server-side to the session.
+// `token` (S8) lets ApprovalDetail fetch a single row through the same
+// endpoint without standing up a /:token GET that would duplicate auth +
+// visibility wiring.
 export const ApprovalsOpenQuerySchema = z.object({
   execution_id: z.string().min(1).max(200).optional(),
   stage: ApprovalStageSchema.optional(),
+  token: z.string().regex(/^[A-Za-z0-9_-]{20,128}$/, 'token format invalid').optional(),
 });
 
 // Token shape lives in approvals.ts as `isValidToken` (24+ char base64url).
