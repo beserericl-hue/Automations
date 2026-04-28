@@ -287,6 +287,25 @@ export interface ContentIndex {
   metadata: Record<string, unknown>;
 }
 
+// Migration 013 — per-user ingestion URLs scoped to a genre. The seeded
+// public URLs still live in the text[] columns on genre_config_v2; this
+// table holds user-added URLs and admin-curated public additions.
+export type GenreIngestionUrlType = 'rss' | 'source' | 'subreddit' | 'goodreads';
+export type GenreIngestionUrlVisibility = 'public' | 'private';
+
+export interface GenreIngestionUrl {
+  id: string;
+  genre_slug: string;
+  url: string;
+  url_type: GenreIngestionUrlType;
+  visibility: GenreIngestionUrlVisibility;
+  created_by_user_id: string;
+  label: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export type ContentIngestionType = 'article' | 'reddit_post' | 'tweet' | 'newsletter';
 
 export interface RedditMetadata {

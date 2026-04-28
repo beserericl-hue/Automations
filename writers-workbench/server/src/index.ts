@@ -22,6 +22,7 @@ import { ingestionRouter } from './routes/ingestion.js';
 import { approvalsApiRouter, approvalsPublicRouter } from './routes/approvals.js';
 import { newsletterSendsRouter } from './routes/newsletter-sends.js';
 import { newsletterRouter, newsletterCallbackRouter } from './routes/newsletter.js';
+import { genresRouter, adminGenreUrlsRouter } from './routes/genres.js';
 import { jobsRouter } from './routes/jobs.js';
 import { contentActionsRouter } from './routes/content-actions.js';
 import { creditsRouter } from './routes/credits.js';
@@ -164,6 +165,14 @@ app.use('/api/callback', sessionRouter);
 // router is mounted on the same /api/callback prefix as sessionRouter; no
 // path conflicts because session.ts has /content-ready / /eve-knowledge etc.
 app.use('/api/callback', newsletterCallbackRouter);
+// Migration 013 — per-genre user ingestion URLs. The base /api/genres
+// route is user-callable (requireAuth inside); admin-only cross-user view
+// nests under /api/admin/genre-urls (requireAuth + requireAdmin inside).
+app.use('/api/genres', generalLimiter);
+app.use('/api/genres', genresRouter);
+app.use('/api/admin/genre-urls', generalLimiter);
+app.use('/api/admin/genre-urls', adminGenreUrlsRouter);
+
 app.use('/api/jobs', generalLimiter);
 app.use('/api/jobs', jobsRouter);
 app.use('/api/content', generalLimiter);
