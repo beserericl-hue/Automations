@@ -429,7 +429,7 @@ URL: **`/brainstorm`**
 
 This is **how new projects are born.** Brainstorm takes a rough premise (or even just a tone + topic) and turns it into a full chapter-by-chapter outline saved as a new project. After you submit, the system:
 
-1. Sends the request to the n8n hub workflow.
+1. Sends the request to the writing engine.
 2. Returns an **acknowledgement** within a couple of seconds: *"Working on it — you'll get an email when it's ready."*
 3. Runs the brainstorm in the background (typically 60–120 seconds).
 4. Drops the finished outline into **My Projects → [your title]** and emails you a copy.
@@ -520,13 +520,13 @@ Click the **Brainstorm** button at the bottom. You'll get a green toast: *"Comma
 
 Behind the scenes:
 
-1. The hub workflow validates the inputs and resolves the genre + story arc from the database.
-2. It runs Perplexity research on the genre/topic to gather discovery material.
-3. It calls Claude with the prime directive, genre guidelines, story arc structure, and your concept text to produce a chapter outline.
-4. It writes a new row to **`writing_projects_v2`**, inserts the outline JSON, and emails you the rendered HTML.
+1. The writing engine validates the inputs and resolves the genre + story arc.
+2. It runs research on the genre/topic to gather discovery material.
+3. It generates a chapter outline using the writing prime directive, the genre's writing guidelines, the chosen story arc structure, and your concept text.
+4. It saves the new project, attaches the outline, and emails you the rendered HTML.
 5. The Content Library and **My Projects** sidebar refresh automatically.
 
-If you don't see the email within 3 minutes, check **Reference → Cost Tracking** (§16) — failed brainstorms still log a cost row with an error in the description column. Common causes: invalid genre slug, story arc not found, transient OpenAI / Perplexity rate limit.
+If you don't see the email within 3 minutes, check **Reference → Cost Tracking** (§16) — failed brainstorms still log a cost row with an error in the description column. Common causes: invalid genre, story arc not found, or a transient model rate limit.
 
 > **Want to revise an existing outline instead of starting fresh?** Don't use Brainstorm for that — use **Chat with Eve** (§20) or **Talk to Eve** (§21) and say *"revise the outline for `[title]` to add a prologue"* / *"change JoJo's age to 38"*. Re-brainstorming creates a new project; revision edits the one you have and version-snapshots the previous outline.
 
@@ -723,7 +723,7 @@ URL: **`/settings`**
 ### Account
 
 - **Display name** — editable.
-- **Email** — read-only (managed by Supabase Auth).
+- **Email** — read-only (managed by your sign-in account).
 - **Phone (user_id)** — read-only.
 
 ### Password
@@ -754,6 +754,8 @@ URL: **`/admin`**
 
 ![Admin panel](./screenshots/19-admin.png)
 
+> **Heads up — this section applies only if you are a workspace administrator.** The **Admin** entry in the sidebar is hidden for regular writer accounts. If you don't see it, you can skip this section.
+
 Visible only to admin users.
 
 ### Tab — User Management
@@ -772,7 +774,7 @@ Visible only to admin users.
 
 ### Tab — Workflows
 
-- Live n8n execution table with status badges, duration, started-at.
+- Live workflow execution table with status badges, duration, and start time.
 - Auto-refreshes every 30 seconds.
 
 ---
@@ -783,7 +785,7 @@ Visible only to admin users.
 
 Opens from the **chat icon** in the top bar (right side, between the search and theme toggle).
 
-This is the **text version of Eve.** She shares the same brain, tools, and memory as the voice agent in §21 — both surfaces talk to the same n8n hub workflow (`/webhook/author_request_v2`) and read/write the same projects, outlines, library, and story bibles. **Anything you can say to voice Eve, you can type to chat Eve.** The full command reference is in §22.
+This is the **text version of Eve.** She shares the same brain, tools, and memory as the voice agent in §21 — both surfaces talk to the same writing engine and read/write the same projects, outlines, library, and story bibles. **Anything you can say to voice Eve, you can type to chat Eve.** The full command reference is in §22.
 
 ### When to use chat vs voice
 
@@ -858,7 +860,7 @@ The Content Library refreshes automatically; the new outline is also emailed to 
 
 ### How async operations work under the hood
 
-When you ask Eve to **write**, **brainstorm**, **repurpose**, or **generate art**, the hub workflow accepts the request, validates it, and immediately returns an acknowledgement. The actual heavy work runs on a background queue — Claude calls, Perplexity research, image generation, file writes — and emits a **toast notification** in the bottom-right when complete.
+When you ask Eve to **write**, **brainstorm**, **repurpose**, or **generate art**, the writing engine accepts the request, validates it, and immediately returns an acknowledgement. The actual heavy work runs on a background queue — research, drafting, image generation, file delivery — and emits a **toast notification** in the bottom-right when complete.
 
 **Sync operations** (list, retrieve, approve, list outlines, list versions, etc.) skip the queue and return inline because their data is already in the database.
 
@@ -870,7 +872,7 @@ If a long-running task fails (rate limit, validation error), you'll see a red to
 
 ![Eve voice widget popover](./screenshots/21-eve-widget-open.png)
 
-Eve is the voice surface. She lives at the **bottom of the sidebar** as the **Talk to Eve** button, and she's the same agent as Chat with Eve (§20) — same tools, same memory, same hub workflow. The only difference is the modality.
+Eve is the voice surface. She lives at the **bottom of the sidebar** as the **Talk to Eve** button, and she's the same agent as Chat with Eve (§20) — same tools, same memory, same writing engine. The only difference is the modality.
 
 ### What Eve is good at (and what she isn't)
 
@@ -944,7 +946,7 @@ The ElevenLabs widget keeps a per-session conversation; if you close and re-open
 > 1. **Spoken aloud** to Eve via the voice widget (sidebar → **Talk to Eve**), or
 > 2. **Typed** into the **Chat with Eve** drawer (top-bar chat icon).
 >
-> Anything in the tables below can be typed exactly as written — the system uses the **same n8n hub workflow** (`/webhook/author_request_v2`) for both interfaces. Use voice when you're hands-free; use Chat with Eve when you want a written transcript, copy-pasteable titles, or quiet/discreet work.
+> Anything in the tables below can be typed exactly as written — both interfaces drive the **same writing engine**. Use voice when you're hands-free; use Chat with Eve when you want a written transcript, copy-pasteable titles, or quiet/discreet work.
 
 ### Project & Outline
 
@@ -1007,7 +1009,7 @@ The ElevenLabs widget keeps a per-session conversation; if you close and re-open
 
 | Say... | What happens |
 |---|---|
-| "Generate cover art for *[project]*" | DALL-E generates cover, saves to Art tab, emails. |
+| "Generate cover art for *[project]*" | Nano Banana generates the cover image, saves to the Art tab, and emails it. |
 | "Repurpose *[title]* to social media" | Generates Twitter/LinkedIn/Instagram posts. |
 
 ### Story Bible
@@ -1117,35 +1119,4 @@ Contact your administrator. Production support is provided by Course Worx Media.
 
 ---
 
-*Last updated: 2026-04-17*  
-*Production version: v1.0.x (Course Worx baseline)*  
-*This manual covers only features deployed to production. For Eve's voice command syntax in detail, see also [`useguide.md`](../useguide.md).*
-
----
-
-## Maintainer notes — Regenerating screenshots
-
-All screenshots in this manual live in `writers-workbench/docs/screenshots/`. They are auto-captured by [`e2e/capture-manual-screenshots.spec.ts`](../e2e/capture-manual-screenshots.spec.ts).
-
-To re-capture after a UI change:
-
-```bash
-cd writers-workbench
-# Capture against local dev (default — fastest, requires .env with E2E_TEST_EMAIL/PASSWORD)
-npx playwright test e2e/capture-manual-screenshots.spec.ts --project=chromium
-
-# Capture against production (slower, captures the live UI)
-PLAYWRIGHT_BASE_URL=https://writersworkbench-production.up.railway.app \
-  npx playwright test e2e/capture-manual-screenshots.spec.ts --project=chromium
-
-# Capture in dark mode (filenames are prefixed with "dark-")
-CAPTURE_THEME=dark npx playwright test e2e/capture-manual-screenshots.spec.ts --project=chromium
-```
-
-The script:
-- Logs in once via `auth.setup.ts` and reuses the session.
-- Captures every screen / tab / dialog at **1440 × 900** viewport, full-page.
-- Writes a fresh `INDEX.md` listing all captured files.
-- Takes ~90 seconds end-to-end (~30 screenshots).
-
-If a screen is added or removed, edit the `test(...)` blocks in the spec — each test maps cleanly to a manual section by number.
+*This manual covers only features available in the current production release. New capabilities — including the upcoming Newsletter Agent — will be documented in subsequent updates.*
