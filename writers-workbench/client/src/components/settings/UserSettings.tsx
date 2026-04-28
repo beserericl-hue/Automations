@@ -7,6 +7,7 @@ import { useUser } from '../../contexts/UserContext';
 import { useTheme } from '../../hooks/useTheme';
 import { useToast } from '../../contexts/ToastContext';
 import { resetTutorial } from '../onboarding/OnboardingTutorial';
+import PasswordInput from '../shared/PasswordInput';
 
 export default function UserSettings() {
   const { user } = useAuth();
@@ -201,7 +202,13 @@ export default function UserSettings() {
       {/* Password */}
       <Section title="Change Password">
         <Field label="New Password">
-          <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className={inputClass} placeholder="Min 8 characters" />
+          <PasswordInput
+            autoComplete="new-password"
+            value={newPassword}
+            onChange={e => setNewPassword(e.target.value)}
+            className={inputClass}
+            placeholder="Min 8 characters"
+          />
         </Field>
         {passwordError && <p className="text-sm text-red-600">{passwordError}</p>}
         <button onClick={changePassword} className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400">

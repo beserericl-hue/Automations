@@ -243,6 +243,24 @@ export const RoleChangeSchema = z.object({
   notes: z.string().max(500).optional(),
 });
 
+/**
+ * Hotfix (2026-04-28): one-shot admin update covering profile fields,
+ * app_config_v2 email overrides, and password reset. All fields optional —
+ * the route only updates what's present. Password reset goes through the
+ * Supabase Auth admin API; the rest are direct table updates.
+ */
+export const AdminUserFullUpdateSchema = z
+  .object({
+    display_name: z.string().min(1).max(100).optional(),
+    email: z.string().email('Invalid email address').optional().nullable(),
+    recipient_email: z.string().email('Invalid recipient email').optional().nullable().or(z.literal('')),
+    bcc_email: z.string().email('Invalid bcc email').optional().nullable().or(z.literal('')),
+    password: z.string().min(8, 'Password must be at least 8 characters').optional(),
+  })
+  .refine((v) => Object.values(v).some((x) => x !== undefined), {
+    message: 'At least one field must be provided',
+  });
+
 export const NewsletterSendSaveSchema = z.object({
   user_id: z.string().min(1, 'user_id is required'),
   send_date: z

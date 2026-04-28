@@ -4,6 +4,7 @@ import { useUser } from '../../contexts/UserContext';
 import { useToast } from '../../contexts/ToastContext';
 import { supabase } from '../../config/supabase';
 import { usePermissions } from '../../hooks/usePermissions';
+import PasswordInput from '../shared/PasswordInput';
 import type { UserProfile, SubscriptionTier } from '../../types/database';
 
 interface AdminUser extends UserProfile {
@@ -235,16 +236,43 @@ function UserManagement() {
     onError: (err: Error) => addToast(err.message, 'error'),
   });
 
+  // Hotfix (2026-04-28): full-edit endpoint covers display_name, email,
+  // recipient_email, bcc_email, AND password reset. The legacy PUT
+  // /admin/users/:id endpoint handled only the first two; the new POST
+  // .../:id/full also writes app_config_v2 + invokes the Supabase Auth admin
+  // API for the password.
   const editProfileMutation = useMutation({
-    mutationFn: ({ userId, updates }: { userId: string; updates: { display_name?: string; email?: string } }) =>
-      adminFetch(`/users/${encodeURIComponent(userId)}`, {
-        method: 'PUT',
-        body: JSON.stringify(updates),
-      }),
-    onSuccess: () => {
+    mutationFn: ({
+      userId,
+      updates,
+    }: {
+      userId: string;
+      updates: {
+        display_name?: string;
+        email?: string;
+        recipient_email?: string;
+        bcc_email?: string;
+        password?: string;
+      };
+    }) =>
+      adminFetch<{ user_id: string; results: Record<string, { ok: boolean; error?: string }> }>(
+        `/users/${encodeURIComponent(userId)}/full`,
+        { method: 'POST', body: JSON.stringify(updates) },
+      ),
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       setEditTarget(null);
-      addToast('User profile updated', 'success');
+      // Surface partial failures (e.g. Supabase admin password reset failed)
+      const fields = (data as { results?: Record<string, { ok: boolean; error?: string }> })?.results ?? {};
+      const failed = Object.entries(fields).filter(([, r]) => !r.ok);
+      if (failed.length === 0) {
+        addToast('User updated', 'success');
+      } else {
+        addToast(
+          `Saved with ${failed.length} issue(s): ${failed.map(([k, r]) => `${k}: ${r.error ?? 'failed'}`).join(', ')}`,
+          'error',
+        );
+      }
     },
     onError: (err: Error) => addToast(err.message, 'error'),
   });
@@ -714,6 +742,14 @@ function AdjustCreditsDialog({
   );
 }
 
+interface EditUserUpdates {
+  display_name?: string;
+  email?: string;
+  recipient_email?: string;
+  bcc_email?: string;
+  password?: string;
+}
+
 function EditUserDialog({
   target,
   onCancel,
@@ -722,58 +758,186 @@ function EditUserDialog({
 }: {
   target: AdminUser;
   onCancel: () => void;
-  onConfirm: (updates: { display_name?: string; email?: string }) => void;
+  onConfirm: (updates: EditUserUpdates) => void;
   submitting: boolean;
 }) {
   const [displayName, setDisplayName] = useState(target.display_name ?? '');
   const [email, setEmail] = useState(target.email ?? '');
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [bccEmail, setBccEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPasswordSection, setShowPasswordSection] = useState(false);
 
-  const isDirty = displayName.trim() !== (target.display_name ?? '') || email.trim() !== (target.email ?? '');
+  // Load app_config email prefs for this user (parallel to what UserSettings shows)
+  const { data: prefs, isLoading: prefsLoading } = useQuery({
+    queryKey: ['admin-user-email-prefs', target.user_id],
+    queryFn: () =>
+      adminFetch<{ recipient_email: string | null; bcc_email: string | null }>(
+        `/users/${encodeURIComponent(target.user_id)}/email-prefs`,
+      ),
+    staleTime: 0,
+  });
+
+  // Seed the email-pref fields once they arrive.
+  const [seeded, setSeeded] = useState(false);
+  if (prefs && !seeded) {
+    setRecipientEmail(prefs.recipient_email ?? '');
+    setBccEmail(prefs.bcc_email ?? '');
+    setSeeded(true);
+  }
+
+  const initialDisplayName = target.display_name ?? '';
+  const initialEmail = target.email ?? '';
+  const initialRecipient = prefs?.recipient_email ?? '';
+  const initialBcc = prefs?.bcc_email ?? '';
+
+  const profileChanged =
+    displayName.trim() !== initialDisplayName || email.trim() !== initialEmail;
+  const prefsChanged =
+    seeded &&
+    (recipientEmail.trim() !== initialRecipient || bccEmail.trim() !== initialBcc);
+  const passwordChanged = showPasswordSection && password.length >= 8;
+  const isDirty = profileChanged || prefsChanged || passwordChanged;
+
+  const passwordTooShort = showPasswordSection && password.length > 0 && password.length < 8;
+
   const handleSubmit = () => {
-    const updates: { display_name?: string; email?: string } = {};
-    if (displayName.trim() !== (target.display_name ?? '')) updates.display_name = displayName.trim();
-    if (email.trim() !== (target.email ?? '')) updates.email = email.trim();
+    const updates: EditUserUpdates = {};
+    if (displayName.trim() !== initialDisplayName) updates.display_name = displayName.trim();
+    if (email.trim() !== initialEmail) updates.email = email.trim();
+    if (seeded && recipientEmail.trim() !== initialRecipient) {
+      updates.recipient_email = recipientEmail.trim();
+    }
+    if (seeded && bccEmail.trim() !== initialBcc) {
+      updates.bcc_email = bccEmail.trim();
+    }
+    if (showPasswordSection && password.length >= 8) {
+      updates.password = password;
+    }
     if (Object.keys(updates).length > 0) onConfirm(updates);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onCancel}>
-      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         <h3 className="text-lg font-bold">Edit user</h3>
         <p className="mt-1 text-xs text-gray-500">
-          Phone (<span className="font-mono">{target.phone_number}</span>) is the primary key and cannot be changed. Use the role
-          dropdown in the table to change role; use Lock / Adjust Credits for those actions.
+          Phone (<span className="font-mono">{target.phone_number}</span>) is the primary key and cannot be changed.
+          Role / lock / credits / tier each have their own dedicated buttons.
         </p>
 
-        <div className="mt-4 space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Display name</label>
-            <input
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              className={inputClass}
-              placeholder="Display name"
-            />
+        {/* Profile */}
+        <fieldset className="mt-4 rounded border border-gray-200 p-3 dark:border-gray-700">
+          <legend className="px-2 text-xs font-semibold uppercase text-gray-500">Profile</legend>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Display name</label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                className={inputClass}
+                placeholder="Display name"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Email (contact)</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={inputClass}
+                placeholder="user@example.com"
+              />
+            </div>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className={inputClass}
-              placeholder="user@example.com"
-            />
-          </div>
-        </div>
+        </fieldset>
+
+        {/* Email delivery prefs (mirror of Settings page) */}
+        <fieldset className="mt-3 rounded border border-gray-200 p-3 dark:border-gray-700">
+          <legend className="px-2 text-xs font-semibold uppercase text-gray-500">Email delivery</legend>
+          {prefsLoading ? (
+            <p className="text-xs text-gray-500">Loading current preferences…</p>
+          ) : (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  Recipient email <span className="text-gray-400">(where writing results are sent)</span>
+                </label>
+                <input
+                  type="email"
+                  value={recipientEmail}
+                  onChange={(e) => setRecipientEmail(e.target.value)}
+                  className={inputClass}
+                  placeholder="user@example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  BCC email <span className="text-gray-400">(optional)</span>
+                </label>
+                <input
+                  type="email"
+                  value={bccEmail}
+                  onChange={(e) => setBccEmail(e.target.value)}
+                  className={inputClass}
+                  placeholder="bcc@example.com"
+                />
+              </div>
+            </div>
+          )}
+        </fieldset>
+
+        {/* Password reset */}
+        <fieldset className="mt-3 rounded border border-gray-200 p-3 dark:border-gray-700">
+          <legend className="px-2 text-xs font-semibold uppercase text-gray-500">Password</legend>
+          {!showPasswordSection ? (
+            <button
+              type="button"
+              onClick={() => setShowPasswordSection(true)}
+              className="text-sm text-blue-600 hover:text-blue-800"
+            >
+              Reset this user's password
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <PasswordInput
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={inputClass}
+                placeholder="Min 8 characters"
+              />
+              {passwordTooShort && (
+                <p className="text-xs text-red-600">Password must be at least 8 characters</p>
+              )}
+              <p className="text-xs text-gray-500">
+                Goes through Supabase Auth admin API. The user is not notified — share the new password out-of-band
+                or have them use Forgot Password to set their own.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPasswordSection(false);
+                  setPassword('');
+                }}
+                className="text-xs text-gray-500 hover:text-gray-700"
+              >
+                Cancel password reset
+              </button>
+            </div>
+          )}
+        </fieldset>
 
         <div className="mt-5 flex justify-end gap-2">
           <button onClick={onCancel} className="rounded border border-gray-300 px-3 py-1 text-sm">
             Cancel
           </button>
           <button
-            disabled={!isDirty || submitting}
+            disabled={!isDirty || submitting || passwordTooShort}
             onClick={handleSubmit}
             className="rounded bg-blue-600 px-3 py-1 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
           >

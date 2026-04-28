@@ -9,6 +9,7 @@ import {
   AdjustCreditsSchema,
   ChangeSubscriptionSchema,
   RoleChangeSchema,
+  AdminUserFullUpdateSchema,
 } from '../schemas.js';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import { adjustCreditsAdmin } from '../services/credits.js';
@@ -1152,3 +1153,140 @@ adminRouter.post('/users/:id/role', validateBody(RoleChangeSchema), async (req: 
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to change role' } });
   }
 });
+
+/**
+ * @openapi
+ * /admin/users/{id}/email-prefs:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Read a user's app_config_v2 email overrides (recipient + bcc)
+ *     description: |
+ *       Used by the admin Edit User dialog to populate the same fields that
+ *       appear in the user's own Settings page. The values live in
+ *       app_config_v2 (key='recipient_email' and key='bcc_email').
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: "{ recipient_email: string|null, bcc_email: string|null }" }
+ */
+adminRouter.get('/users/:id/email-prefs', async (req: Request, res: Response) => {
+  const targetId = String(req.params.id);
+  const { data, error } = await getSupabaseAdmin()
+    .from('app_config_v2')
+    .select('key, value')
+    .eq('user_id', targetId)
+    .in('key', ['recipient_email', 'bcc_email']);
+  if (error) {
+    res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: error.message } });
+    return;
+  }
+  const map: Record<string, string | null> = { recipient_email: null, bcc_email: null };
+  for (const row of (data ?? []) as Array<{ key: string; value: string }>) {
+    if (row.key in map) map[row.key] = row.value ?? null;
+  }
+  res.json({ success: true, data: map });
+});
+
+/**
+ * @openapi
+ * /admin/users/{id}/full:
+ *   post:
+ *     tags: [Admin]
+ *     summary: One-shot admin update for profile + email overrides + password (hotfix 2026-04-28)
+ *     description: |
+ *       Single endpoint that touches every field a user can change in their own
+ *       Settings page. All fields are optional — only the present ones are
+ *       written.
+ *
+ *       - `display_name`, `email` → users_v2 update
+ *       - `recipient_email`, `bcc_email` → app_config_v2 upsert
+ *       - `password` → Supabase Auth admin updateUserById
+ *
+ *       The legacy `PUT /api/admin/users/:id` is kept for backward compat with
+ *       older callers (it only handles display_name + email + role on the
+ *       legacy column). New admin UI uses this `/full` endpoint.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: "Per-field results: { display_name?, email?, recipient_email?, bcc_email?, password? } each with ok/error" }
+ *       400: { description: Validation error }
+ *       404: { description: User not found }
+ */
+adminRouter.post('/users/:id/full', validateBody(AdminUserFullUpdateSchema), async (req: Request, res: Response) => {
+  const targetId = String(req.params.id);
+  const { display_name, email, recipient_email, bcc_email, password } = req.body as {
+    display_name?: string;
+    email?: string | null;
+    recipient_email?: string | null;
+    bcc_email?: string | null;
+    password?: string;
+  };
+  const supabase = getSupabaseAdmin();
+
+  // Confirm target exists.
+  const { data: existing } = await supabase
+    .from('users_v2')
+    .select('user_id, supabase_auth_uid')
+    .eq('user_id', targetId)
+    .maybeSingle();
+  if (!existing) {
+    res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'User not found' } });
+    return;
+  }
+
+  const results: Record<string, { ok: boolean; error?: string }> = {};
+
+  // 1. Profile (users_v2)
+  if (display_name !== undefined || email !== undefined) {
+    const updates: Record<string, unknown> = {};
+    if (display_name !== undefined) updates.display_name = display_name.trim();
+    if (email !== undefined) updates.email = email && email.trim() !== '' ? email.trim() : null;
+    const { error } = await supabase.from('users_v2').update(updates).eq('user_id', targetId);
+    results.profile = error ? { ok: false, error: error.message } : { ok: true };
+  }
+
+  // 2. App config — recipient_email + bcc_email
+  for (const [key, raw] of [
+    ['recipient_email', recipient_email],
+    ['bcc_email', bcc_email],
+  ] as const) {
+    if (raw === undefined) continue;
+    const value = raw === null ? '' : raw.trim();
+    const { error } = await supabase
+      .from('app_config_v2')
+      .upsert({ user_id: targetId, key, value }, { onConflict: 'user_id,key' });
+    results[key] = error ? { ok: false, error: error.message } : { ok: true };
+  }
+
+  // 3. Password — Supabase Auth admin updateUserById
+  if (password !== undefined) {
+    const authUid = (existing as { supabase_auth_uid: string | null }).supabase_auth_uid;
+    if (!authUid) {
+      results.password = { ok: false, error: 'User has no linked Supabase Auth UUID (account never finished signup)' };
+    } else {
+      const { error } = await supabase.auth.admin.updateUserById(authUid, { password });
+      if (error) {
+        results.password = { ok: false, error: error.message };
+        logger.warn({ targetId, err: error }, 'admin: password reset failed');
+      } else {
+        results.password = { ok: true };
+        logger.info({ targetId, by: req.realUserId ?? req.userId }, 'admin: password reset by admin');
+      }
+    }
+  }
+
+  // Return the per-field outcomes so the client can show partial-success feedback.
+  res.json({ success: true, data: { user_id: targetId, results } });
+});
+
+
