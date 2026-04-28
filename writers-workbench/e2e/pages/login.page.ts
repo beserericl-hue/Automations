@@ -17,7 +17,9 @@ export class LoginPage {
     this.heading = page.getByRole('heading', { name: 'The Writers Workbench' });
     this.subtitle = page.getByText('Sign in to your account');
     this.emailInput = page.getByLabel('Email');
-    this.passwordInput = page.getByLabel('Password');
+    // exact: true — the show/hide toggle button has aria-label "Show password" /
+    // "Hide password" which would otherwise also match getByLabel('Password').
+    this.passwordInput = page.getByLabel('Password', { exact: true });
     this.signInButton = page.getByRole('button', { name: /sign in/i });
     this.googleButton = page.getByRole('button', { name: /continue with google/i });
     this.forgotPasswordLink = page.getByRole('link', { name: /forgot password/i });

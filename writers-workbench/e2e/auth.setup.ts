@@ -22,7 +22,9 @@ setup('authenticate', async ({ page }) => {
 
   await page.goto('/login');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  // exact: true — the password show/hide toggle button's aria-label is
+  // "Show password" / "Hide password", which would otherwise match too.
+  await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: /sign in/i }).click();
 
   // Wait for redirect to dashboard after successful login
