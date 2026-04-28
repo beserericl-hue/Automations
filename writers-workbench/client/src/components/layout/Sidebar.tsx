@@ -20,6 +20,7 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
   const location = useLocation();
   const [projectsExpanded, setProjectsExpanded] = useState(true);
   const [referenceExpanded, setReferenceExpanded] = useState(false);
+  const [newsletterExpanded, setNewsletterExpanded] = useState(false);
 
   // Fetch projects for expandable sidebar section
   const { data: projects } = useQuery({
@@ -48,10 +49,15 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
   const projectCount = projects?.length ?? 0;
   const isProjectRoute = location.pathname.startsWith('/projects');
   const isReferenceRoute = ['/genres', '/story-arcs', '/research', '/sources', '/cost'].some(p => location.pathname.startsWith(p));
+  // Newsletter section: distinct prefix from the legacy /newsletters redirect
+  // (which goes to /library?type=newsletter) — startsWith('/newsletter')
+  // matches both /newsletter/* and /newsletters, so be specific.
+  const isNewsletterRoute = location.pathname === '/newsletter' || location.pathname.startsWith('/newsletter/');
 
   // Auto-expand sections when navigating into them
   if (isProjectRoute && !projectsExpanded) setProjectsExpanded(true);
   if (isReferenceRoute && !referenceExpanded) setReferenceExpanded(true);
+  if (isNewsletterRoute && !newsletterExpanded) setNewsletterExpanded(true);
 
   return (
     <aside
@@ -159,6 +165,96 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
 
         {/* Outlines */}
         <SidebarLink to="/outlines" icon={OutlineIcon} label="Outlines" open={open} />
+
+        {/* Newsletter — collapsible section (Compose Newsletter 2a) */}
+        <div>
+          <button
+            onClick={() => open ? setNewsletterExpanded(!newsletterExpanded) : undefined}
+            className={`flex w-full items-center gap-3 px-3 py-2 text-sm whitespace-nowrap ${
+              open ? '' : 'justify-center'
+            } ${
+              isNewsletterRoute
+                ? 'bg-brand-50 text-brand-700 font-medium dark:bg-brand-950 dark:text-brand-300'
+                : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+            }`}
+            title={!open ? 'Newsletter' : undefined}
+          >
+            <NewsletterIcon className="h-5 w-5 shrink-0" />
+            {open && (
+              <>
+                <span className="flex-1 text-left truncate">Newsletter</span>
+                <ChevronIcon expanded={newsletterExpanded} />
+              </>
+            )}
+          </button>
+
+          {open && newsletterExpanded && (
+            <div className="ml-4 border-l border-gray-200 dark:border-gray-700">
+              <NavLink
+                to="/newsletter"
+                end
+                className={({ isActive }) =>
+                  `flex items-center gap-2 px-3 py-1.5 text-xs whitespace-nowrap ${
+                    isActive
+                      ? 'text-brand-700 font-medium dark:text-brand-300'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  }`
+                }
+              >
+                Home
+              </NavLink>
+              <NavLink
+                to="/newsletter/generate"
+                className={({ isActive }) =>
+                  `flex items-center gap-2 px-3 py-1.5 text-xs whitespace-nowrap ${
+                    isActive
+                      ? 'text-brand-700 font-medium dark:text-brand-300'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  }`
+                }
+              >
+                Generate
+              </NavLink>
+              <NavLink
+                to="/newsletter/approvals"
+                className={({ isActive }) =>
+                  `flex items-center justify-between gap-2 px-3 py-1.5 text-xs whitespace-nowrap ${
+                    isActive
+                      ? 'text-brand-700 font-medium dark:text-brand-300'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  }`
+                }
+              >
+                <span>Pending approvals</span>
+                {/* Badge slot — count populated by S5/S8 once the in-app approvals API ships. */}
+              </NavLink>
+              <NavLink
+                to="/newsletter/sends"
+                className={({ isActive }) =>
+                  `flex items-center gap-2 px-3 py-1.5 text-xs whitespace-nowrap ${
+                    isActive
+                      ? 'text-brand-700 font-medium dark:text-brand-300'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  }`
+                }
+              >
+                Sends
+              </NavLink>
+              <NavLink
+                to="/newsletter/ingestion"
+                className={({ isActive }) =>
+                  `flex items-center gap-2 px-3 py-1.5 text-xs whitespace-nowrap ${
+                    isActive
+                      ? 'text-brand-700 font-medium dark:text-brand-300'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  }`
+                }
+              >
+                Ingestion
+              </NavLink>
+            </div>
+          )}
+        </div>
 
         {/* Divider */}
         <div className="my-2 mx-3 border-t border-gray-200 dark:border-gray-700" />
@@ -424,6 +520,14 @@ function OutlineIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+    </svg>
+  );
+}
+
+function NewsletterIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75v6a2.25 2.25 0 002.25 2.25h15a2.25 2.25 0 002.25-2.25v-6m-19.5 0v-6A2.25 2.25 0 014.5 4.5h15a2.25 2.25 0 012.25 2.25v6m-19.5 0h19.5M7.5 9h3M7.5 12h3M7.5 15h3" />
     </svg>
   );
 }
