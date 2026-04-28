@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../contexts/UserContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -168,6 +168,7 @@ function UserManagement() {
   const [lockTarget, setLockTarget] = useState<AdminUser | null>(null);
   const [creditTarget, setCreditTarget] = useState<AdminUser | null>(null);
   const [editTarget, setEditTarget] = useState<AdminUser | null>(null);
+  const [tierTarget, setTierTarget] = useState<AdminUser | null>(null);
 
   const { data: tiers } = useQuery({
     queryKey: ['admin-tiers'],
@@ -257,6 +258,26 @@ function UserManagement() {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       setEditTarget(null);
       addToast('User profile updated', 'success');
+    },
+    onError: (err: Error) => addToast(err.message, 'error'),
+  });
+
+  const assignTierMutation = useMutation({
+    mutationFn: ({
+      userId,
+      tier_name,
+      billing_cycle,
+      reset_credits,
+    }: { userId: string; tier_name: string; billing_cycle: 'monthly' | 'annual' | 'none'; reset_credits: boolean }) =>
+      adminFetch(`/users/${encodeURIComponent(userId)}/subscription`, {
+        method: 'PUT',
+        body: JSON.stringify({ tier_name, billing_cycle, reset_credits }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-subscriptions'] });
+      setTierTarget(null);
+      addToast('Subscription updated', 'success');
     },
     onError: (err: Error) => addToast(err.message, 'error'),
   });
@@ -467,6 +488,13 @@ function UserManagement() {
                         >
                           Edit
                         </button>
+                        <button
+                          onClick={() => setTierTarget(u)}
+                          className="text-xs text-purple-700 hover:text-purple-900 dark:text-purple-400"
+                          title={u.subscription ? 'Change subscription tier' : 'Assign a subscription tier'}
+                        >
+                          {u.subscription ? 'Tier' : 'Set Tier'}
+                        </button>
                         {isLocked ? (
                           <button
                             onClick={() => unlockMutation.mutate(u.user_id)}
@@ -485,6 +513,7 @@ function UserManagement() {
                         <button
                           onClick={() => setCreditTarget(u)}
                           className="text-xs text-blue-700 hover:text-blue-900 dark:text-blue-400"
+                          title={u.subscription ? 'Adjust credits (no charge)' : 'User has no subscription — set a tier first'}
                         >
                           Credits
                         </button>
@@ -530,6 +559,11 @@ function UserManagement() {
           onConfirm={(delta, reason) =>
             adjustCreditsMutation.mutate({ userId: creditTarget.user_id, delta, reason })
           }
+          onAssignTierInstead={() => {
+            const t = creditTarget;
+            setCreditTarget(null);
+            setTierTarget(t);
+          }}
           submitting={adjustCreditsMutation.isPending}
         />
       )}
@@ -542,6 +576,18 @@ function UserManagement() {
             editProfileMutation.mutate({ userId: editTarget.user_id, updates })
           }
           submitting={editProfileMutation.isPending}
+        />
+      )}
+
+      {tierTarget && tiers && (
+        <AssignSubscriptionDialog
+          target={tierTarget}
+          tiers={tiers}
+          onCancel={() => setTierTarget(null)}
+          onConfirm={(payload) =>
+            assignTierMutation.mutate({ userId: tierTarget.user_id, ...payload })
+          }
+          submitting={assignTierMutation.isPending}
         />
       )}
     </div>
@@ -594,22 +640,62 @@ function AdjustCreditsDialog({
   target,
   onCancel,
   onConfirm,
+  onAssignTierInstead,
   submitting,
 }: {
   target: AdminUser;
   onCancel: () => void;
   onConfirm: (delta: number, reason: string) => void;
+  onAssignTierInstead: () => void;
   submitting: boolean;
 }) {
   const [delta, setDelta] = useState(0);
   const [reason, setReason] = useState('');
   const balance = target.subscription?.credits_remaining ?? 0;
+  const hasSubscription = target.subscription !== null && target.subscription !== undefined;
+
+  if (!hasSubscription) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onCancel}>
+        <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900" onClick={(e) => e.stopPropagation()}>
+          <h3 className="text-lg font-bold">No subscription</h3>
+          <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+            <strong>{target.display_name || target.phone_number}</strong> has no active subscription, so there's no
+            credit balance to adjust. Assign a tier first — that creates the subscription and seeds the initial
+            credit allotment from the tier's monthly cap.
+          </p>
+          <p className="mt-2 text-xs text-gray-500">
+            For comp/full-access (universal) accounts, use the <span className="font-mono">Full Access (Comp)</span>
+            {' '}tier — $0 / month, 1000 credits / month, all features unlocked.
+          </p>
+          <div className="mt-5 flex justify-end gap-2">
+            <button onClick={onCancel} className="rounded border border-gray-300 px-3 py-1 text-sm">
+              Cancel
+            </button>
+            <button
+              onClick={onAssignTierInstead}
+              className="rounded bg-purple-600 px-3 py-1 text-sm font-semibold text-white hover:bg-purple-700"
+            >
+              Assign tier
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onCancel}>
       <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-lg font-bold">Adjust credits</h3>
         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
           Current balance: <span className="font-mono">{balance}</span>
+          {target.subscription?.tier && (
+            <span> on tier <span className="font-mono">{target.subscription.tier.display_name}</span></span>
+          )}
+        </p>
+        <p className="mt-1 text-xs text-green-700 dark:text-green-400">
+          No money is charged — this is an admin balance adjustment, not a purchase.
         </p>
         <input
           type="number"
@@ -705,6 +791,174 @@ function EditUserDialog({
             className="rounded bg-blue-600 px-3 py-1 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
           >
             {submitting ? 'Saving…' : 'Save changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AssignSubscriptionDialog({
+  target,
+  tiers,
+  onCancel,
+  onConfirm,
+  submitting,
+}: {
+  target: AdminUser;
+  tiers: SubscriptionTier[];
+  onCancel: () => void;
+  onConfirm: (payload: {
+    tier_name: string;
+    billing_cycle: 'monthly' | 'annual' | 'none';
+    reset_credits: boolean;
+  }) => void;
+  submitting: boolean;
+}) {
+  const currentTierName = target.subscription?.tier?.name ?? '';
+  const sortedTiers = useMemo(
+    () => [...tiers].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
+    [tiers],
+  );
+  // Default the tier dropdown: keep current tier when changing; default to
+  // free_full for users with no subscription (the "comp / universal" path the
+  // admin most often wants here).
+  const [tierName, setTierName] = useState(
+    currentTierName || sortedTiers.find((t) => t.name === 'free_full')?.name || sortedTiers[0]?.name || '',
+  );
+  const [billing, setBilling] = useState<'monthly' | 'annual' | 'none'>(
+    (target.subscription?.billing_cycle as 'monthly' | 'annual' | 'none' | undefined) ?? 'none',
+  );
+  const [resetCredits, setResetCredits] = useState(true);
+
+  const selectedTier = sortedTiers.find((t) => t.name === tierName);
+  const isFreeTier =
+    selectedTier !== undefined && selectedTier.monthly_price_cents === 0 && selectedTier.annual_price_cents === 0;
+
+  const handleSubmit = () => {
+    if (!tierName) return;
+    onConfirm({ tier_name: tierName, billing_cycle: isFreeTier ? 'none' : billing, reset_credits: resetCredits });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onCancel}>
+      <div
+        className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-lg font-bold">
+          {target.subscription ? 'Change subscription tier' : 'Assign subscription tier'}
+        </h3>
+        <p className="mt-1 text-xs text-gray-500">
+          User: <span className="font-mono">{target.phone_number}</span>
+          {target.subscription?.tier && (
+            <>
+              {' · current: '}
+              <span className="font-mono">{target.subscription.tier.display_name}</span>
+              {' · '}
+              <span className="font-mono">
+                {target.subscription.credits_remaining} / {target.subscription.tier.monthly_credits} credits
+              </span>
+            </>
+          )}
+        </p>
+
+        <div className="mt-4 space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Tier</label>
+            <select
+              value={tierName}
+              onChange={(e) => setTierName(e.target.value)}
+              className={inputClass}
+            >
+              {sortedTiers.map((t) => (
+                <option key={t.id} value={t.name}>
+                  {t.display_name} — {t.monthly_credits} credits / mo
+                  {t.monthly_price_cents > 0
+                    ? ` · $${(t.monthly_price_cents / 100).toFixed(2)}/mo`
+                    : ' · $0 (comp)'}
+                </option>
+              ))}
+            </select>
+            {selectedTier?.description && (
+              <p className="mt-1 text-xs text-gray-500">{selectedTier.description}</p>
+            )}
+          </div>
+
+          {!isFreeTier && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Billing cycle</label>
+              <div className="flex items-center gap-4 text-sm">
+                <label className="flex items-center gap-1">
+                  <input
+                    type="radio"
+                    checked={billing === 'monthly'}
+                    onChange={() => setBilling('monthly')}
+                  />
+                  Monthly{' '}
+                  {selectedTier && (
+                    <span className="text-xs text-gray-500">
+                      (${(selectedTier.monthly_price_cents / 100).toFixed(2)})
+                    </span>
+                  )}
+                </label>
+                <label className="flex items-center gap-1">
+                  <input
+                    type="radio"
+                    checked={billing === 'annual'}
+                    onChange={() => setBilling('annual')}
+                  />
+                  Annual{' '}
+                  {selectedTier && (
+                    <span className="text-xs text-gray-500">
+                      (${(selectedTier.annual_price_cents / 100).toFixed(2)})
+                    </span>
+                  )}
+                </label>
+              </div>
+            </div>
+          )}
+
+          {isFreeTier && (
+            <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-200">
+              This is a $0 tier. The user will not be billed for credits at this tier — credits replenish to the
+              monthly cap each cycle without any charge.
+            </div>
+          )}
+
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={resetCredits}
+              onChange={(e) => setResetCredits(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              Reset credit balance to the new tier's monthly cap
+              {selectedTier && (
+                <span className="text-xs text-gray-500"> ({selectedTier.monthly_credits} credits)</span>
+              )}
+              <span className="block text-xs text-gray-500">
+                On a brand-new subscription this is forced on.
+              </span>
+            </span>
+          </label>
+        </div>
+
+        <div className="mt-6 flex justify-end gap-2">
+          <button onClick={onCancel} className="rounded border border-gray-300 px-3 py-1 text-sm">
+            Cancel
+          </button>
+          <button
+            disabled={!tierName || submitting}
+            onClick={handleSubmit}
+            className="rounded bg-purple-600 px-3 py-1 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-50"
+          >
+            {submitting
+              ? 'Saving…'
+              : target.subscription
+                ? 'Update subscription'
+                : 'Create subscription'}
           </button>
         </div>
       </div>
