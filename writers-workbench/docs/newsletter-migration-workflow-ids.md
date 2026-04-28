@@ -408,3 +408,73 @@ curl -i -X POST https://n8n.agileadautomation.com/webhook/compose-newsletter-dev
 ```
 
 Expected: `200 {"executionId":"<id>","editionId":"ai-news"}`. If you see `403 WWW-Authenticate: Basic realm="Webhook"`, the draft is still unpublished — re-Publish from the dropdown.
+
+---
+
+## Compose Newsletter 2a — sprint complete (2026-04-28)
+
+All 10 stories shipped to DEV. PROD waits for release-day promotion.
+
+### Server endpoints added (live on DEV `writersworkbenchdev-production.up.railway.app`)
+
+| Endpoint | Story |
+|---|---|
+| `GET  /api/newsletter/editions` | S2 |
+| `GET  /api/newsletter/editions/:id/last-sent-markdown` | S2 |
+| `POST /api/newsletter/generate` | S2 |
+| `GET  /api/newsletter/execution/:id/status` | S2 |
+| `GET  /api/newsletter/sends` | S6 |
+| `GET  /api/newsletter/approvals/open` (filters: `execution_id`, `stage`, `token`) | S5 / S8 |
+| `POST /api/newsletter/approvals/:token/resolve` | S5 |
+| `GET  /api/newsletter/templates` (+ `:id` GET / POST / PUT / DELETE) | Templates T2 |
+| `POST /api/newsletter/templates/:id/preview` | Templates T2 |
+| `POST /api/newsletter/render-html` | Templates T4 |
+| `POST /api/callback/newsletter-stage` | S3 |
+
+### n8n workflow `Content - Newsletter Agent V2` (id `bMvMKyK8obwYZmNb`)
+
+87 nodes → **99 nodes** after S3. Additions:
+
+| Node | Type | Purpose |
+|---|---|---|
+| `webhook_trigger` | webhook v2.1, headerAuth via `jQBRJbmiUeTk8c11` | New entry point at `/webhook/compose-newsletter-dev` |
+| `respond_to_webhook` | respondToWebhook v1.5 | Returns `{executionId, editionId}` synchronously |
+| `set_trigger_inputs` | set v3.4 | Normalizes form vs webhook payload shapes |
+| `emit_stage_gathering` | httpRequest v4.2 | Calls `/api/callback/newsletter-stage` (cred `1aF4oDhcjhe8R5sk`) |
+| `emit_stage_picking` | httpRequest v4.2 | After `pick_top_stories` |
+| `emit_stage_awaiting_stories` | httpRequest v4.2 | After `create_approval_stories` |
+| `emit_stage_stories_approved` | httpRequest v4.2 | TRUE branch of `check_stories_feedback` |
+| `emit_stage_awaiting_subject` | httpRequest v4.2 | After `create_approval_subject_line` |
+| `emit_stage_subject_approved` | httpRequest v4.2 | TRUE branch of `check_subject_line_feedback` |
+| `emit_stage_writing_segment` | httpRequest v4.2 | Per-iteration after `set_story_segment` |
+| `emit_stage_segments_done` | httpRequest v4.2 | After `set_combined_sections_content` |
+| `emit_stage_saved` | httpRequest v4.2 | After `save_scheduled_newsletter` |
+
+All emit nodes spliced as **siblings** of the original downstream — never blocking the product path. Each uses `onError: continueRegularOutput`.
+
+Form trigger updated with `Edition Id` field; URL unchanged: `https://n8n.agileadautomation.com/form/45ae3f3f-3564-4b28-b50c-75c4bb55e817`.
+
+### Database (DEV Supabase `gvbvwcnmjkdpclcisqrr`)
+
+| Migration | Adds |
+|---|---|
+| **012** (S1) | `newsletter_editions_v2` + edition_id columns on sends/approvals + `ai-news` seed |
+| **013** (side sprint) | `genre_ingestion_urls_v2` + admin/superuser ingestion read RLS |
+| **014** (Templates T1) | `newsletter_templates_v2` + Workbench template seed |
+
+### Railway DEV env vars (`WritersWorkbenchDev` service)
+
+| Var | Value | Set 2026-04 |
+|---|---|---|
+| `INGESTION_SECRET` | rotated via `PATCH /api/v1/credentials/jQBRJbmiUeTk8c11` | ✓ |
+| `NEWSLETTER_CALLBACK_SECRET` | 32-byte hex (in user vault) | ✓ |
+| `N8N_NEWSLETTER_WEBHOOK_URL` | `https://n8n.agileadautomation.com/webhook/compose-newsletter-dev` | ✓ |
+| `N8N_API_URL` | `https://n8n.agileadautomation.com` | ✓ |
+| `N8N_API_KEY` | (existing) | ✓ |
+| `APPROVAL_BASE_URL` | (existing) | ✓ |
+
+### Pending release-day work (deferred — PR not in 2a)
+
+- **n8n send-time render swap** — replace `combine_markdown_content` with HTTP Request to `/api/newsletter/render-html` so `newsletter_sends_v2.html_body` is rendered through the Workbench template. Tracked: [#63](https://github.com/beserericl-hue/Automations/issues/63).
+- **PROD migration application** — apply 013 + 014 to `faklxfakgzkpkbxfihzh.supabase.co` as part of release v1.2.
+- **PROD workflow promotion** — `scripts/promote-dev-to-prod.py` for the new emit nodes + webhook trigger, plus the new credential clones.
