@@ -966,6 +966,37 @@ adminRouter.get('/revenue', async (_req: Request, res: Response) => {
 
 /**
  * @openapi
+ * /admin/tiers:
+ *   get:
+ *     tags: [Admin]
+ *     summary: List all active subscription tiers (admin-only — includes non-publicly-selectable tiers)
+ *     description: |
+ *       Unlike `GET /api/tiers` (which serves the public signup page and
+ *       filters by `publicly_selectable=true`), this endpoint returns every
+ *       active tier — including admin-provisioned ones like `free_full` /
+ *       Full Access (Comp). Used by the AdminPanel's tier-assignment UI so
+ *       admins can put a user on a comp tier the public signup never offers.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Tier list }
+ */
+adminRouter.get('/tiers', async (_req: Request, res: Response) => {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from('subscription_tiers')
+    .select('*')
+    .eq('active', true)
+    .order('sort_order');
+  if (error) {
+    res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: error.message } });
+    return;
+  }
+  res.json({ success: true, data: data ?? [] });
+});
+
+/**
+ * @openapi
  * /admin/users/{id}/role:
  *   post:
  *     tags: [Admin]
