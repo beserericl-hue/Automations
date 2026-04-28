@@ -291,6 +291,53 @@ export const NewsletterEditionIdParamSchema = z.object({
 });
 
 // ============================================
+// Migration 013 — per-genre user ingestion URLs
+// ============================================
+
+export const GenreIngestionUrlTypeSchema = z.enum(['rss', 'source', 'subreddit', 'goodreads']);
+export const GenreIngestionUrlVisibilitySchema = z.enum(['public', 'private']);
+
+// Slug shape mirrors the existing genre_slug values seeded in genre_config_v2.
+const GenreSlugSchema = z
+  .string()
+  .min(1, 'genre_slug is required')
+  .max(64, 'genre_slug too long')
+  .regex(/^[a-z0-9][a-z0-9-]*$/, 'genre_slug must be slug-style (lowercase, digits, hyphens)');
+
+export const GenreSlugParamSchema = z.object({
+  slug: GenreSlugSchema,
+});
+
+export const GenreUrlIdParamSchema = z.object({
+  slug: GenreSlugSchema,
+  id: z.string().uuid('id must be a UUID'),
+});
+
+export const AddGenreUrlSchema = z.object({
+  url: z
+    .string()
+    .url('url must be a valid URL')
+    .max(2000, 'url too long')
+    .refine(
+      (v) => {
+        try {
+          const u = new URL(v);
+          return u.protocol === 'http:' || u.protocol === 'https:';
+        } catch {
+          return false;
+        }
+      },
+      { message: 'url must use http or https' },
+    ),
+  url_type: GenreIngestionUrlTypeSchema,
+  label: z.string().max(200).optional().nullable(),
+  // Defaults to private. Setting 'public' is enforced by the route — only
+  // admin/superuser callers may pass 'public'; anyone else is rejected
+  // before the insert reaches Postgres.
+  visibility: GenreIngestionUrlVisibilitySchema.optional().default('private'),
+});
+
+// ============================================
 // Compose Newsletter 2a (S3 — n8n stage-emit callback)
 // ============================================
 

@@ -562,6 +562,52 @@ adminRouter.get('/bounces', async (req: Request, res: Response) => {
 });
 
 // ============================================================
+// Side sprint (migration 013): cross-user ingestion view for admin/superuser.
+// Migration 013 widened the SELECT RLS on content_ingestion_v2 to include
+// is_admin_v2(); this route lets the admin UI surface that visibility with
+// optional filters (user, key prefix, type) and a hard pagination cap.
+// ============================================================
+adminRouter.get('/ingestion', async (req: Request, res: Response) => {
+  const userIdFilter = typeof req.query.user_id === 'string' ? req.query.user_id : null;
+  const prefix = typeof req.query.prefix === 'string' ? req.query.prefix : null;
+  const type = typeof req.query.type === 'string' ? req.query.type : null;
+  const limitRaw = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : 100;
+  const limit = Number.isFinite(limitRaw) ? Math.min(500, Math.max(1, limitRaw)) : 100;
+
+  try {
+    const supabase = getSupabaseAdmin();
+    let q = supabase
+      .from('content_ingestion_v2')
+      .select('id, key, user_id, type, title, source_name, source_url, created_at')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (userIdFilter) q = q.eq('user_id', userIdFilter);
+    if (prefix) q = q.like('key', `${prefix}%`);
+    if (type) q = q.eq('type', type);
+
+    const { data, error } = await q;
+    if (error) {
+      logger.error({ err: error }, 'admin/ingestion query failed');
+      res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: error.message } });
+      return;
+    }
+
+    const rows = data ?? [];
+    // Summary by user_id so the admin can see who's ingesting what at a glance.
+    const byUser: Record<string, number> = {};
+    for (const row of rows as Array<{ user_id: string }>) {
+      byUser[row.user_id] = (byUser[row.user_id] ?? 0) + 1;
+    }
+
+    res.json({ success: true, data: { rows, total: rows.length, by_user: byUser } });
+  } catch (err) {
+    logger.error({ err }, 'admin/ingestion threw');
+    res.status(500).json({ success: false, error: { code: 'INTERNAL' } });
+  }
+});
+
+// ============================================================
 // Sprint 8 (S8-3): account lifecycle + subscription management
 // ============================================================
 
