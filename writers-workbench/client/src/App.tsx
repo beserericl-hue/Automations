@@ -46,6 +46,10 @@ const ScheduledSends = lazyRetry(() => import('./components/newsletter/Scheduled
 const NewsletterDetail = lazyRetry(() => import('./components/newsletter/NewsletterDetail'));
 const IngestionBrowser = lazyRetry(() => import('./components/newsletter/IngestionBrowser'));
 
+// Newsletter Templates Sprint (T3)
+const TemplatesList = lazyRetry(() => import('./components/newsletter/TemplatesList'));
+const TemplateEditor = lazyRetry(() => import('./components/newsletter/TemplateEditor'));
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -101,6 +105,13 @@ export default function App() {
                     <Route path="newsletter/sends" element={<ScheduledSends />} />
                     <Route path="newsletter/sends/:id" element={<NewsletterDetail />} />
                     <Route path="newsletter/ingestion" element={<IngestionBrowser />} />
+                    {/* Newsletter Templates Sprint (T3) — list + editor.
+                        Branding lives inside each template's HTML, AI content
+                        is what's variable per send. /preview is what n8n
+                        calls at send time (T4 wiring follow-up). */}
+                    <Route path="newsletter/templates" element={<TemplatesList />} />
+                    <Route path="newsletter/templates/new" element={<TemplateEditor />} />
+                    <Route path="newsletter/templates/:id" element={<TemplateEditor />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
                   </Suspense>
