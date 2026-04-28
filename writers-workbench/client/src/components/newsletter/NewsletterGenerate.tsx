@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch, ApiError } from '../../lib/api';
 import EditionBadge from './EditionBadge';
-import type { NewsletterEdition } from '../../types/database';
+import type { NewsletterEdition, NewsletterTemplateListItem } from '../../types/database';
 
 interface EditionsResponse {
   success: boolean;
@@ -29,6 +29,17 @@ interface GenerateResponse {
   started: boolean;
 }
 
+interface TemplatesListResponse {
+  success: boolean;
+  templates: NewsletterTemplateListItem[];
+}
+
+interface PreviewResponse {
+  success: boolean;
+  html: string;
+  warnings: string[];
+}
+
 function todayIso(): string {
   // YYYY-MM-DD in the caller's local TZ. Server schema demands the
   // YYYY-MM-DD shape only, so DST changes are fine.
@@ -39,6 +50,16 @@ function todayIso(): string {
   return `${y}-${m}-${day}`;
 }
 
+function formatLongDate(yyyyMmDd: string): string {
+  // "2026-04-24" → "Friday, April 24, 2026" — what the masthead shows.
+  // Tolerate parse failures by passing the raw string through.
+  const [y, m, d] = yyyyMmDd.split('-').map((p) => parseInt(p, 10));
+  if (!y || !m || !d) return yyyyMmDd;
+  const dt = new Date(y, m - 1, d);
+  if (Number.isNaN(dt.getTime())) return yyyyMmDd;
+  return dt.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+}
+
 export default function NewsletterGenerate() {
   const navigate = useNavigate();
   const [editionId, setEditionId] = useState<string>('');
@@ -46,6 +67,12 @@ export default function NewsletterGenerate() {
   const [previousContent, setPreviousContent] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Template preview (T4)
+  const [previewHtml, setPreviewHtml] = useState<string>('');
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   // Editions
   const editionsQuery = useQuery({
@@ -84,6 +111,42 @@ export default function NewsletterGenerate() {
     // edit it — switching editions while typing won't clobber their input.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastSentQuery.data?.markdown]);
+
+  async function handlePreview() {
+    if (!editionId) return;
+    setPreviewError(null);
+    setPreviewHtml('');
+    setPreviewLoading(true);
+    setPreviewOpen(true);
+    try {
+      // Find the active default template for this edition. The list endpoint
+      // already orders is_default desc, so the first row is the right one.
+      const list = await apiFetch<TemplatesListResponse>(
+        `/api/newsletter/templates?edition_id=${encodeURIComponent(editionId)}`,
+      );
+      const def = list.templates.find((t) => t.is_default && t.active) ?? list.templates[0];
+      if (!def) {
+        setPreviewError(`No template found for edition "${editionId}". Create one in Newsletter → Templates.`);
+        return;
+      }
+      // Render with sample-data fallback only — the AI hasn't run yet, so the
+      // preview at compose time is the template + sample data, not real content.
+      // Including the chosen send_date so the issue date in the preview matches.
+      const res = await apiFetch<PreviewResponse>(
+        `/api/newsletter/templates/${encodeURIComponent(def.id)}/preview`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ data: { issue: { date: formatLongDate(sendDate) } } }),
+        },
+      );
+      setPreviewHtml(res.html);
+    } catch (err) {
+      if (err instanceof ApiError) setPreviewError(`${err.code}: ${err.message}`);
+      else setPreviewError('Unexpected preview error');
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -193,15 +256,69 @@ export default function NewsletterGenerate() {
               </p>
             )}
           </div>
-          <button
-            type="submit"
-            disabled={submitting || !editionId}
-            className="inline-flex items-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:disabled:bg-gray-700"
-          >
-            {submitting ? 'Starting…' : 'Generate newsletter →'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handlePreview()}
+              disabled={submitting || previewLoading || !editionId}
+              className="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+              title="Render the active default template against its sample data"
+            >
+              {previewLoading ? 'Rendering…' : 'Preview template'}
+            </button>
+            <button
+              type="submit"
+              disabled={submitting || !editionId}
+              className="inline-flex items-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:disabled:bg-gray-700"
+            >
+              {submitting ? 'Starting…' : 'Generate newsletter →'}
+            </button>
+          </div>
         </div>
       </form>
+
+      {/* Preview modal */}
+      {previewOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Template preview"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setPreviewOpen(false); }}
+        >
+          <div className="flex h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-white shadow-xl dark:bg-gray-900">
+            <header className="flex items-center justify-between border-b border-gray-200 px-4 py-2 dark:border-gray-700">
+              <div>
+                <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100">Template preview</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Default template for {selectedEdition?.display_name ?? editionId} rendered with sample data. Real AI content shows up at send time.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(false)}
+                className="rounded-md px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+              >
+                Close
+              </button>
+            </header>
+            {previewError ? (
+              <div role="alert" className="m-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+                {previewError}
+              </div>
+            ) : previewLoading ? (
+              <div className="flex flex-1 items-center justify-center text-sm text-gray-400">Rendering…</div>
+            ) : (
+              <iframe
+                title="Template preview iframe"
+                sandbox=""
+                srcDoc={previewHtml}
+                className="block flex-1 w-full border-0"
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

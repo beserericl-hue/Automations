@@ -408,6 +408,15 @@ export const PreviewTemplateSchema = z.object({
   data: z.record(z.string(), z.unknown()).optional().default({}),
 });
 
+// POST /api/newsletter/render-html — n8n send-time entry point.
+// Resolves the active default template for an edition and renders it.
+// Authenticated via X-Ingestion-Secret (same secret n8n already uses for
+// the /api/ingestion/* and /api/newsletter-sends/save endpoints).
+export const RenderHtmlBodySchema = z.object({
+  edition_id: EditionIdSchema,
+  data: z.record(z.string(), z.unknown()).optional().default({}),
+});
+
 // ============================================
 // Migration 013 — per-genre user ingestion URLs
 // ============================================

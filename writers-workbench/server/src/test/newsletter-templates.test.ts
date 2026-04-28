@@ -91,6 +91,23 @@ describe('newsletter-render — helpers + deepMerge', () => {
     expect(() => renderTemplate('{{#if foo}}unterminated', {})).toThrow(TemplateCompileError);
   });
 
+  it('markdown_to_html helper converts markdown to HTML inside a template', () => {
+    const result = renderTemplate(
+      '<article>{{{markdown_to_html lead.body_md}}}</article>',
+      { lead: { body_md: '# Hi\n\nBody **bold**.' } },
+    );
+    expect(result.html).toMatch(/<h1>Hi<\/h1>/);
+    expect(result.html).toMatch(/<strong>bold<\/strong>/);
+  });
+
+  it('markdown_to_html helper returns empty string for null input', () => {
+    const result = renderTemplate(
+      'BEFORE{{{markdown_to_html maybeMissing}}}AFTER',
+      { maybeMissing: null },
+    );
+    expect(result.html).toBe('BEFOREAFTER');
+  });
+
   it('renders the seeded Workbench template happily with sample data', () => {
     // Use a tiny snippet of the real seed — happy-path proof that the
     // helper set is sufficient for the actual newsletter shape.
@@ -547,6 +564,116 @@ describe('POST /api/newsletter/templates/:id/preview', () => {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: {} }),
       });
       expect(r.status).toBe(404);
+    });
+  });
+});
+
+// -------------------------------------------------------------------------
+// T4 — POST /api/newsletter/render-html (n8n send-time entry point).
+// -------------------------------------------------------------------------
+describe('POST /api/newsletter/render-html', () => {
+  const TEST_INGESTION_SECRET = 'render-html-test-secret';
+
+  beforeEach(() => {
+    process.env.INGESTION_SECRET = TEST_INGESTION_SECRET;
+  });
+
+  it('renders the active default template for the edition', async () => {
+    seed({
+      edition_id: 'ai-news',
+      is_default: true,
+      active: true,
+      html: '<p>{{lead.headline}}</p>',
+      sample_data: { lead: { headline: 'sample-fallback' } },
+    });
+    await withServer(async (base) => {
+      const r = await fetch(`${base}/api/newsletter/render-html`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Ingestion-Secret': TEST_INGESTION_SECRET },
+        body: JSON.stringify({ edition_id: 'ai-news', data: { lead: { headline: 'real-runtime' } } }),
+      });
+      expect(r.status).toBe(200);
+      const j = await r.json() as { html: string };
+      expect(j.html).toContain('<p>real-runtime</p>');
+    });
+  });
+
+  it('falls back to sample_data when runtime data is empty', async () => {
+    seed({
+      edition_id: 'ai-news',
+      is_default: true,
+      active: true,
+      html: '<p>{{lead.headline}}</p>',
+      sample_data: { lead: { headline: 'fallback' } },
+    });
+    await withServer(async (base) => {
+      const r = await fetch(`${base}/api/newsletter/render-html`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Ingestion-Secret': TEST_INGESTION_SECRET },
+        body: JSON.stringify({ edition_id: 'ai-news' }),
+      });
+      const j = await r.json() as { html: string };
+      expect(j.html).toContain('<p>fallback</p>');
+    });
+  });
+
+  it('returns 404 NO_DEFAULT_TEMPLATE when no active default exists', async () => {
+    seed({ edition_id: 'ai-news', is_default: false, active: true });
+    await withServer(async (base) => {
+      const r = await fetch(`${base}/api/newsletter/render-html`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Ingestion-Secret': TEST_INGESTION_SECRET },
+        body: JSON.stringify({ edition_id: 'ai-news' }),
+      });
+      expect(r.status).toBe(404);
+      const j = await r.json() as { error: { code: string } };
+      expect(j.error.code).toBe('NO_DEFAULT_TEMPLATE');
+    });
+  });
+
+  it('rejects without X-Ingestion-Secret (401)', async () => {
+    seed({ edition_id: 'ai-news', is_default: true, active: true });
+    await withServer(async (base) => {
+      const r = await fetch(`${base}/api/newsletter/render-html`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ edition_id: 'ai-news' }),
+      });
+      expect(r.status).toBe(401);
+    });
+  });
+
+  it('rejects bogus edition_id format (400)', async () => {
+    await withServer(async (base) => {
+      const r = await fetch(`${base}/api/newsletter/render-html`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Ingestion-Secret': TEST_INGESTION_SECRET },
+        body: JSON.stringify({ edition_id: 'Not_A_Slug' }),
+      });
+      expect(r.status).toBe(400);
+    });
+  });
+
+  it('passes through markdown_to_html helper end-to-end', async () => {
+    seed({
+      edition_id: 'ai-news',
+      is_default: true,
+      active: true,
+      html: '<article>{{{markdown_to_html lead.body_md}}}</article>',
+      sample_data: {},
+    });
+    await withServer(async (base) => {
+      const r = await fetch(`${base}/api/newsletter/render-html`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Ingestion-Secret': TEST_INGESTION_SECRET },
+        body: JSON.stringify({
+          edition_id: 'ai-news',
+          data: { lead: { body_md: '## Heading\n\nSome **bold**.' } },
+        }),
+      });
+      const j = await r.json() as { html: string };
+      expect(j.html).toMatch(/<h2>Heading<\/h2>/);
+      expect(j.html).toMatch(/<strong>bold<\/strong>/);
     });
   });
 });
