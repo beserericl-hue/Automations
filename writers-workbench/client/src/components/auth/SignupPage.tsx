@@ -3,6 +3,10 @@ import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import PasswordInput from '../shared/PasswordInput';
 
+// Hidden until Supabase Google provider is configured. See LoginPage.tsx for
+// the same flag — kept identical so toggling one toggles both surfaces.
+const googleEnabled = import.meta.env.VITE_GOOGLE_OAUTH_ENABLED === 'true';
+
 export default function SignupPage() {
   const { signUp, signInWithGoogle, user, loading } = useAuth();
   const [email, setEmail] = useState('');
@@ -119,21 +123,25 @@ export default function SignupPage() {
           </button>
         </form>
 
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-200 dark:border-gray-700" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-white px-2 text-gray-500 dark:bg-gray-900">or</span>
-          </div>
-        </div>
+        {googleEnabled && (
+          <>
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200 dark:border-gray-700" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-2 text-gray-500 dark:bg-gray-900">or</span>
+              </div>
+            </div>
 
-        <button
-          onClick={signInWithGoogle}
-          className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
-        >
-          Continue with Google
-        </button>
+            <button
+              onClick={signInWithGoogle}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+            >
+              Continue with Google
+            </button>
+          </>
+        )}
 
         <p className="text-center text-sm text-gray-500">
           Already have an account?{' '}

@@ -17,8 +17,13 @@ test.describe('Login Page', () => {
     await expect(loginPage.signInButton).toBeVisible();
   });
 
-  test('renders Google OAuth button', async () => {
-    await expect(loginPage.googleButton).toBeVisible();
+  test('Google OAuth button is hidden when provider is disabled', async () => {
+    // VITE_GOOGLE_OAUTH_ENABLED defaults to "false" until Supabase Google
+    // provider is configured (Client ID/Secret + redirect URI). Showing the
+    // button before then makes it look broken because Supabase rejects
+    // signInWithOAuth with "provider is not enabled". Flip this assertion
+    // (and add a setup step that sets the env var) once OAuth is wired up.
+    await expect(loginPage.googleButton).toHaveCount(0);
   });
 
   test('renders forgot password and sign up links', async () => {

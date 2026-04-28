@@ -149,6 +149,8 @@ function UserManagement() {
   const [newTierName, setNewTierName] = useState<string>('standard');
   const [newBilling, setNewBilling] = useState<'monthly' | 'annual' | 'none'>('monthly');
   const [newIsFree, setNewIsFree] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
   const [lockTarget, setLockTarget] = useState<AdminUser | null>(null);
   const [creditTarget, setCreditTarget] = useState<AdminUser | null>(null);
   const [editTarget, setEditTarget] = useState<AdminUser | null>(null);
@@ -170,19 +172,24 @@ function UserManagement() {
   });
 
   const createMutation = useMutation({
-    mutationFn: () =>
-      adminFetch('/users-with-subscription', {
+    mutationFn: () => {
+      const body: Record<string, unknown> = {
+        phone: newPhone,
+        display_name: newName,
+        email: newEmail,
+        role: newRole,
+        tier_name: newIsFree ? 'free_full' : newTierName,
+        billing_cycle: newIsFree ? 'none' : newBilling,
+        is_free: newIsFree,
+      };
+      // Only send password if admin filled it in. Empty/undefined skips
+      // Supabase Auth account creation (admin can set it later via Edit).
+      if (newPassword.trim().length > 0) body.password = newPassword;
+      return adminFetch('/users-with-subscription', {
         method: 'POST',
-        body: JSON.stringify({
-          phone: newPhone,
-          display_name: newName,
-          email: newEmail,
-          role: newRole,
-          tier_name: newIsFree ? 'free_full' : newTierName,
-          billing_cycle: newIsFree ? 'none' : newBilling,
-          is_free: newIsFree,
-        }),
-      }),
+        body: JSON.stringify(body),
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       setCreating(false);
@@ -193,7 +200,14 @@ function UserManagement() {
       setNewTierName('standard');
       setNewBilling('monthly');
       setNewIsFree(false);
-      addToast('User and subscription created successfully', 'success');
+      setNewPassword('');
+      setNewPasswordConfirm('');
+      addToast(
+        newPassword
+          ? 'User created with login credentials'
+          : 'User created (no password — admin must set one before they can log in)',
+        'success',
+      );
     },
     onError: (err: Error) => addToast(err.message, 'error'),
   });
@@ -255,18 +269,23 @@ function UserManagement() {
         password?: string;
       };
     }) =>
-      adminFetch<{ user_id: string; results: Record<string, { ok: boolean; error?: string }> }>(
+      adminFetch<{ user_id: string; results: Record<string, { ok: boolean; error?: string; note?: string }> }>(
         `/users/${encodeURIComponent(userId)}/full`,
         { method: 'POST', body: JSON.stringify(updates) },
       ),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       setEditTarget(null);
-      // Surface partial failures (e.g. Supabase admin password reset failed)
-      const fields = (data as { results?: Record<string, { ok: boolean; error?: string }> })?.results ?? {};
+      // Surface per-field outcomes — partial failures and any informational
+      // notes (e.g. "Created Supabase Auth account and linked it").
+      const fields =
+        (data as { results?: Record<string, { ok: boolean; error?: string; note?: string }> })?.results ?? {};
       const failed = Object.entries(fields).filter(([, r]) => !r.ok);
+      const notes = Object.entries(fields)
+        .filter(([, r]) => r.ok && r.note)
+        .map(([k, r]) => `${k}: ${r.note}`);
       if (failed.length === 0) {
-        addToast('User updated', 'success');
+        addToast(notes.length ? `User updated. ${notes.join('; ')}` : 'User updated', 'success');
       } else {
         addToast(
           `Saved with ${failed.length} issue(s): ${failed.map(([k, r]) => `${k}: ${r.error ?? 'failed'}`).join(', ')}`,
@@ -402,11 +421,42 @@ function UserManagement() {
                 <input type="checkbox" checked={newIsFree} onChange={(e) => setNewIsFree(e.target.checked)} /> Free account (free_full)
               </label>
             </div>
+            <div className="md:col-span-2 grid gap-3 md:grid-cols-2">
+              <PasswordInput
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Password (optional, ≥ 8 chars)"
+                autoComplete="new-password"
+                className={inputClass}
+              />
+              <PasswordInput
+                value={newPasswordConfirm}
+                onChange={(e) => setNewPasswordConfirm(e.target.value)}
+                placeholder="Confirm password"
+                autoComplete="new-password"
+                className={inputClass}
+              />
+            </div>
+            {newPassword.length > 0 && newPassword.length < 8 ? (
+              <p className="md:col-span-2 text-xs text-red-600 dark:text-red-400">Password must be at least 8 characters.</p>
+            ) : newPassword && newPasswordConfirm && newPassword !== newPasswordConfirm ? (
+              <p className="md:col-span-2 text-xs text-red-600 dark:text-red-400">Passwords do not match.</p>
+            ) : !newPassword ? (
+              <p className="md:col-span-2 text-xs text-gray-500 dark:text-gray-400">
+                Leave password blank to provision a profile only — the user must finish signup or have an admin set a password before they can log in.
+              </p>
+            ) : null}
           </div>
           <div className="flex gap-2">
             <button
               onClick={() => createMutation.mutate()}
-              disabled={!newPhone.trim() || !newName.trim() || !newEmail.trim() || createMutation.isPending}
+              disabled={
+                !newPhone.trim() ||
+                !newName.trim() ||
+                !newEmail.trim() ||
+                (newPassword.length > 0 && (newPassword.length < 8 || newPassword !== newPasswordConfirm)) ||
+                createMutation.isPending
+              }
               className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm text-white hover:bg-brand-700 disabled:opacity-50"
             >
               {createMutation.isPending ? 'Creating...' : 'Create'}

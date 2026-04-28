@@ -228,6 +228,11 @@ export const CreateUserWithSubscriptionSchema = z.object({
   tier_name: z.string().min(1).max(50),
   billing_cycle: z.enum(['monthly', 'annual', 'none']).optional().default('none'),
   is_free: z.boolean().optional().default(false),
+  // Optional initial password. When provided, the route also creates a
+  // Supabase Auth account so the user can log in immediately. Without it,
+  // the user is provisioned in users_v2 only and must either complete
+  // signup themselves or have an admin set a password later.
+  password: z.string().min(8, 'Password must be at least 8 characters').optional(),
 });
 
 export const SignupSubscribeSchema = z.object({

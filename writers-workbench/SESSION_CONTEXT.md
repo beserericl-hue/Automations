@@ -1579,3 +1579,42 @@ The first hotfix attempt CI-failed with strict-mode violation on 4 noauth tests 
 Same list as above (CRON_SECRET, Sprint 9 Stripe, auto-trial on signup skip, Supabase Site URL + Redirect URLs allowlist on both Supabase projects).
 
 ---
+
+## 2026-04-28 (continued, second pass) — v1.1.2 admin-create / auth-link hotfix (queued)
+
+### Bug surfaced on PROD
+
+User opened Admin → Edit User on PROD for user `JR` (`+17063338699`, `racemert@yahoo.com`), set a password + email, hit Save. The `users_v2.email` and `app_config_v2.recipient_email` rows did persist, but the password didn't, and `auth.users` had **no row at all** for that email. JR could not log in.
+
+**Root cause**: `POST /api/admin/users-with-subscription` (admin-create user) only inserts into `users_v2` — it never creates a corresponding Supabase Auth account. When admin then opened Edit User and set a password, `POST /api/admin/users/:id/full` saw `existing.supabase_auth_uid === null` and returned `password: { ok: false, error: 'User has no linked Supabase Auth UUID' }` in per-field results. The toast said "Saved with 1 issue(s): …" which was easy to miss given how unobtrusive the partial-failure framing is.
+
+### Fix (committed to develop, pending hotfix → PROD)
+
+- **`POST /admin/users/:id/full`** ([server/src/routes/admin.ts](writers-workbench/server/src/routes/admin.ts)) — when password is provided AND `supabase_auth_uid IS NULL`, the route now calls `supabase.auth.admin.createUser({ email, password, email_confirm: true })` and writes the new UUID back into `users_v2.supabase_auth_uid`. Returns `{ ok: true, note: 'Created Supabase Auth account and linked it' }` so the UI can distinguish "reset" vs "first-time provisioning."
+- **`POST /admin/users-with-subscription`** ([server/src/routes/admin.ts](writers-workbench/server/src/routes/admin.ts)) + `CreateUserWithSubscriptionSchema` ([server/src/schemas.ts](writers-workbench/server/src/schemas.ts)) — accept optional `password` (≥ 8 chars). When supplied, route creates the Supabase Auth account *before* the `users_v2` insert, links the UID in the same insert, and rolls back the auth user if the profile insert fails. Without a password, behavior is unchanged (profile-only — admin must set a password later via Edit User before user can log in).
+- **AdminPanel Create User form** ([client/src/components/admin/AdminPanel.tsx](writers-workbench/client/src/components/admin/AdminPanel.tsx)) — added two `<PasswordInput>` fields (password + confirm) plus inline validation (min length 8, must match). Disabled state on Create button rejects mismatch. Toast after success differs: "User created with login credentials" vs "User created (no password — admin must set one before they can log in)".
+- **EditUserDialog toast** — surfaces `note` field from per-field results so admin sees "User updated. password: Created Supabase Auth account and linked it" when the link-on-first-set path fires.
+
+### Lesson — silent gap between users_v2 and auth.users
+
+The two-table model (admin-provisioned `users_v2` row + a `auth.users` row created at user signup time) was always assumed to converge once the user signed up themselves. Admin-create-user with no follow-on signup left a silent dangling profile that looked correct in the admin UI (showed in the user list, took an email, took an edit) but had no `auth.users` counterpart. Lesson: any row in `users_v2` whose `supabase_auth_uid` is NULL and isn't pending a magic-link signup is broken in a way the admin UI didn't surface. Going forward: (a) admin-create form takes a password and creates the auth row eagerly; (b) Edit User auto-creates the auth row when admin sets a password on a profile-only user. Optional next step: surface a "no login" badge in the user list when `supabase_auth_uid` is NULL.
+
+### Google OAuth status (separate finding from this session)
+
+`/auth/v1/settings` on both PROD (`faklxfakgzkpkbxfihzh`) and DEV (`gvbvwcnmjkdpclcisqrr`) returns `external.google: false`. The "Continue with Google" button on the login page is wired correctly client-side (`supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })`), but Supabase has the Google provider disabled, so it fails before any OAuth round-trip. To enable: (1) create a Google Cloud OAuth 2.0 Web client; (2) add `https://faklxfakgzkpkbxfihzh.supabase.co/auth/v1/callback` (and the DEV equivalent) as an Authorized redirect URI in Google Cloud; (3) paste Client ID + Secret into Supabase Dashboard → Authentication → Providers → Google → Enable. Until then, the button should be hidden or disabled — currently it's exposed and looks broken to users. (Not part of this hotfix; tracking as a separate item.)
+
+### JR's account on PROD — repaired
+
+One-shot service-role patch ran during this session (Eric chose path b). Sequence: `POST /auth/v1/admin/users` with `{email: 'racemert@yahoo.com', password: 'Wr!ters1', email_confirm: true}` → returned UID `3657ca48-48e5-403a-9087-4bb4bb5101b1` → `PATCH /rest/v1/users_v2?user_id=eq.+17063338699` set `supabase_auth_uid` to that UID → `POST /auth/v1/token?grant_type=password` smoke-test returned a valid `access_token` (login_ok). JR can sign in with `racemert@yahoo.com` / `Wr!ters1`.
+
+### Google OAuth button hidden behind flag
+
+Pending the actual provider setup, the "Continue with Google" button is hidden on both Login and Signup. New env var `VITE_GOOGLE_OAUTH_ENABLED` (default `false`) gates the entire `<>or … Continue with Google</>` block in [LoginPage.tsx](writers-workbench/client/src/components/auth/LoginPage.tsx) + [SignupPage.tsx](writers-workbench/client/src/components/auth/SignupPage.tsx). E2E `login.spec.ts` updated to `await expect(loginPage.googleButton).toHaveCount(0)` until OAuth is enabled. Documented in `.env.example`. Flip to `true` on both Railway services after configuring Supabase + Google Cloud.
+
+To finish Google OAuth (separate task, not in this hotfix):
+1. Google Cloud Console → APIs & Services → Credentials → "Create credentials" → "OAuth client ID" → Application type "Web application".
+2. Authorized redirect URIs: add `https://faklxfakgzkpkbxfihzh.supabase.co/auth/v1/callback` (PROD) and `https://gvbvwcnmjkdpclcisqrr.supabase.co/auth/v1/callback` (DEV).
+3. Copy Client ID + Secret. Supabase Dashboard → Authentication → Providers → Google → Enabled, paste credentials. Repeat for DEV project.
+4. On Railway, set `VITE_GOOGLE_OAUTH_ENABLED=true` on both services. Redeploy.
+
+---

@@ -625,7 +625,7 @@ adminRouter.post(
   '/users-with-subscription',
   validateBody(CreateUserWithSubscriptionSchema),
   async (req: Request, res: Response) => {
-    const { phone, display_name, email, role, tier_name, billing_cycle, is_free } = req.body;
+    const { phone, display_name, email, role, tier_name, billing_cycle, is_free, password } = req.body;
     const supabase = getSupabaseAdmin();
 
     try {
@@ -647,6 +647,31 @@ adminRouter.post(
         return;
       }
 
+      // If admin supplied a password, create the Supabase Auth account first
+      // so we can store the linked UID on the users_v2 row in the same insert.
+      // We do this BEFORE the users_v2 insert so a duplicate-email or other
+      // auth failure doesn't leave a half-provisioned profile row behind.
+      let supabaseAuthUid: string | null = null;
+      if (password) {
+        const { data: created, error: createErr } = await supabase.auth.admin.createUser({
+          email: email.trim(),
+          password,
+          email_confirm: true,
+          user_metadata: { provisioned_by_admin: true, target_user_id: phone },
+        });
+        if (createErr || !created?.user?.id) {
+          res.status(400).json({
+            success: false,
+            error: {
+              code: 'AUTH_CREATE_FAILED',
+              message: createErr?.message ?? 'Failed to create Supabase Auth account',
+            },
+          });
+          return;
+        }
+        supabaseAuthUid = created.user.id;
+      }
+
       const { data: user, error: userErr } = await supabase
         .from('users_v2')
         .insert({
@@ -655,10 +680,17 @@ adminRouter.post(
           display_name: display_name.trim(),
           email: email.trim(),
           role: role || 'user',
+          supabase_auth_uid: supabaseAuthUid,
         })
         .select()
         .single();
-      if (userErr) throw userErr;
+      if (userErr) {
+        // Roll back the auth account so the form can be retried.
+        if (supabaseAuthUid) {
+          await supabase.auth.admin.deleteUser(supabaseAuthUid).catch(() => undefined);
+        }
+        throw userErr;
+      }
 
       const periodStart = new Date();
       const periodEnd = is_free ? null : new Date(periodStart.getTime() + 30 * 24 * 3600 * 1000);
@@ -1236,7 +1268,7 @@ adminRouter.post('/users/:id/full', validateBody(AdminUserFullUpdateSchema), asy
   // Confirm target exists.
   const { data: existing } = await supabase
     .from('users_v2')
-    .select('user_id, supabase_auth_uid')
+    .select('user_id, email, supabase_auth_uid')
     .eq('user_id', targetId)
     .maybeSingle();
   if (!existing) {
@@ -1244,13 +1276,18 @@ adminRouter.post('/users/:id/full', validateBody(AdminUserFullUpdateSchema), asy
     return;
   }
 
-  const results: Record<string, { ok: boolean; error?: string }> = {};
+  const results: Record<string, { ok: boolean; error?: string; note?: string }> = {};
 
   // 1. Profile (users_v2)
+  let effectiveEmail = (existing as { email: string | null }).email;
   if (display_name !== undefined || email !== undefined) {
     const updates: Record<string, unknown> = {};
     if (display_name !== undefined) updates.display_name = display_name.trim();
-    if (email !== undefined) updates.email = email && email.trim() !== '' ? email.trim() : null;
+    if (email !== undefined) {
+      const trimmed = email && email.trim() !== '' ? email.trim() : null;
+      updates.email = trimmed;
+      effectiveEmail = trimmed;
+    }
     const { error } = await supabase.from('users_v2').update(updates).eq('user_id', targetId);
     results.profile = error ? { ok: false, error: error.message } : { ok: true };
   }
@@ -1268,12 +1305,17 @@ adminRouter.post('/users/:id/full', validateBody(AdminUserFullUpdateSchema), asy
     results[key] = error ? { ok: false, error: error.message } : { ok: true };
   }
 
-  // 3. Password — Supabase Auth admin updateUserById
+  // 3. Password — Supabase Auth admin updateUserById, OR createUser if the
+  // user was provisioned by an admin and never finished signup (no auth UUID).
+  // Admin-created users (POST /admin/users-with-subscription) only get a
+  // users_v2 row; they have no auth.users entry until they complete signup.
+  // When an admin sets a password from the Edit dialog, we treat that as
+  // "finalize the signup": create the auth account with email + password,
+  // mark email_confirm so they can log in immediately, then link the UUID
+  // back into users_v2.
   if (password !== undefined) {
     const authUid = (existing as { supabase_auth_uid: string | null }).supabase_auth_uid;
-    if (!authUid) {
-      results.password = { ok: false, error: 'User has no linked Supabase Auth UUID (account never finished signup)' };
-    } else {
+    if (authUid) {
       const { error } = await supabase.auth.admin.updateUserById(authUid, { password });
       if (error) {
         results.password = { ok: false, error: error.message };
@@ -1281,6 +1323,45 @@ adminRouter.post('/users/:id/full', validateBody(AdminUserFullUpdateSchema), asy
       } else {
         results.password = { ok: true };
         logger.info({ targetId, by: req.realUserId ?? req.userId }, 'admin: password reset by admin');
+      }
+    } else if (!effectiveEmail) {
+      results.password = {
+        ok: false,
+        error:
+          'User has no email on file — cannot create an auth account. Set the email field and save again.',
+      };
+    } else {
+      const { data: created, error: createErr } = await supabase.auth.admin.createUser({
+        email: effectiveEmail,
+        password,
+        email_confirm: true,
+        user_metadata: { provisioned_by_admin: true, target_user_id: targetId },
+      });
+      if (createErr || !created?.user?.id) {
+        results.password = {
+          ok: false,
+          error: createErr?.message ?? 'Failed to create Supabase Auth account',
+        };
+        logger.warn({ targetId, err: createErr }, 'admin: auth account creation failed');
+      } else {
+        const newUid = created.user.id;
+        const { error: linkErr } = await supabase
+          .from('users_v2')
+          .update({ supabase_auth_uid: newUid })
+          .eq('user_id', targetId);
+        if (linkErr) {
+          results.password = {
+            ok: false,
+            error: `Auth account created but failed to link UUID: ${linkErr.message}`,
+          };
+          logger.error({ targetId, newUid, err: linkErr }, 'admin: failed to link auth UID');
+        } else {
+          results.password = { ok: true, note: 'Created Supabase Auth account and linked it' };
+          logger.info(
+            { targetId, newUid, by: req.realUserId ?? req.userId },
+            'admin: created auth account for admin-provisioned user',
+          );
+        }
       }
     }
   }
