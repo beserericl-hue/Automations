@@ -1462,3 +1462,62 @@ User noted at session end that **another side sprint is in flight on a different
 4. **Side-sprint integration** (whatever the user has in flight elsewhere).
 
 ---
+
+## 2026-04-28 — v1.1.0 RELEASED to PROD (Sprint 8 + onboarding tour + admin lifecycle + newsletter S1-S4 + per-user ingestion)
+
+First release on the v1.1 line. Tag `v1.1.0` at commit `f392403` (merge of `release/v1.1` → `main` via PR #56).
+
+### What's now on PROD
+
+- **Migrations 008 → 012 applied** to PROD Supabase (`faklxfakgzkpkbxfihzh`) via session pooler. All idempotent (CREATE TABLE IF NOT EXISTS pattern). Verified seed:
+  ```
+     user_id    | legacy_role | effective_role
+  --------------+-------------+----------------
+   +14105914612 | admin       | superuser     -- Eric — seeded by migration 011
+   +17063338699 | user        | (none)        -- Horace — no meta row
+  ```
+  5 tiers seeded. Eric has a `free_full` subscription (1000/1000 credits) on PROD.
+
+- **15 n8n workflows promoted DEV → PROD** via `scripts/promote-dev-to-prod.py --apply`. 9 unchanged, 0 errors. Promotion log at [`writers-workbench/workflows/promotion-log.md`](writers-workbench/workflows/promotion-log.md). Notable promoted workflows: `PROD - The Author Agent` (3 new tools), `PROD - Worker - Write Chapter` (Sprint 12 continuity merge + S12-2 context builder), all the `send_email` migrations to Postal, the QA chapter rewrite.
+
+- **PROD Railway env vars synced from DEV** (`bubbly-solace` project, `production` env, `WritersWorkbench` service). 10 secrets copied: `APPROVAL_SECRET`, `DRY_RUN_EMAIL`, `EMAIL_SECRET`, `INGESTION_SECRET`, `NEWSLETTER_CALLBACK_SECRET`, `POSTAL_API_KEY`, `POSTAL_API_URL`, `REPLY_TO_EMAIL`, `SENDER_EMAIL`, `SENDER_NAME`. The user confirmed DEV's `POSTAL_API_KEY` already pointed at the prod-tier mail server in Postal, so the copy is correct end-to-end (live emails will deliver, not be Development-mode-swallowed).
+  - **Still unset on PROD:** `CRON_SECRET` (DEV doesn't have it either — no external scheduler is wired yet). Sprint 8's `/api/cron/*` routes return 503 until set; not a regression because nothing currently calls those endpoints.
+
+### Git topology after the release
+
+- `main` HEAD: `f392403` (merge PR #56, tagged `v1.1.0`)
+- `develop` HEAD: `f392403` (fast-forwarded post-release per CLAUDE.md release rule)
+- `release/v1.0` HEAD: `f392403` (advanced by `git push origin main:release/v1.0` — see Railway-deploy-source note below)
+- Branches synced — develop has nothing main doesn't have.
+
+### Critical for the next release: Railway PROD deploys from `release/v1.0`, NOT `main`
+
+Discovered mid-release: PROD Railway's "deploy on push to" branch is configured as `release/v1.0` (per the 2026-04-21 SESSION_CONTEXT note — *"`release/v1.0` = tracks main for PROD Railway deploys"*). Merging to `main` **does not redeploy PROD**. The release-day step that actually ships code to PROD is fast-forwarding `release/v1.0` to `main`'s HEAD:
+```
+git push origin main:release/v1.0
+```
+This was done at the end of this release. The branch name (`release/v1.0`) is now misleading — it carries v1.1 — but it's what Railway watches. Two cleaner options for the next release: either (a) rename the branch on Railway to `release/v1.1` and stop advancing v1.0, or (b) reconfigure Railway PROD to deploy from `main` directly and decommission the `release/v1.X` branches as deploy refs (let tags + GH Releases be the immutable record). Option (b) is what most teams do; pick when convenient.
+
+### What's in v1.1.0 (all on PROD now)
+
+- **Sprint 8** — RBAC (superuser/admin/user), 5 subscription tiers, credit ledger with chat-proxy deduction + 402 + exhaustion modal, superuser impersonation with full read AND write data plane (every list/detail view + every mutation routes through `/api/impersonate/{data,write}/*` with audit trail in `impersonation_log.actions_taken`), trial cron + Postal warning emails, AdminPanel rebuilt with 7 tabs and inline Edit/Lock/Adjust-Credits/Impersonate/Set-Tier actions.
+- **Onboarding tour** — anchored, spotlight-cutout product tour with smart 4-way placement and ResizeObserver tracking. `data-tour` attributes on sidebar, EveOrb, credits pill, topbar chat button.
+- **Admin tier-assignment fixes** — Set Tier dialog covering all 5 tiers including comp; UPSERT subscription endpoint; graceful "no subscription" path in Adjust Credits with one-click hand-off to the tier dialog; explicit "no money charged" copy on admin balance adjustments.
+- **Newsletter sprints S1–S4** (parallel work that landed during Sprint 8) — migration 012 + edition TS types, server endpoints + tests, n8n workflow rewrite + stage-emit callback + approvals SSE, client sidebar + 8 route stubs + useNewsletterEvents hook.
+- **Side sprint** (PR #55) — per-user ingestion URLs + admin/superuser ingestion read.
+
+### PROD Railway smoke (post-deploy)
+
+Deploy of `f392403` confirmed via `/api/health` showing the new SHA + `checks.{supabase,redis,postal}` field set (the v1.0 baseline only reported `supabase`, so the expanded checks shape is itself proof the new code is running).
+
+### Known follow-ups (all lower priority than the release itself)
+
+- **Set `CRON_SECRET` on PROD** when the trial-check / credit-reset / trial-warnings cron is actually scheduled externally.
+- **Sprint 9 — Stripe integration (47 pts).** Prereq Sprint 8 — done. Replaces the placeholder credit-purchase flow with real money movement (Checkout Sessions for subscriptions, PaymentIntent for credit packs, webhooks for fulfilment, Customer Portal for self-service).
+- **Auto-trial on signup skip.** Tiny follow-up: have Onboarding's "Skip" path auto-create a trial subscription so users who skip tier selection have a balance and chat doesn't 402 on their first message.
+
+### Tier-isolation note for the next n8n promotion
+
+The current `scripts/promote-dev-to-prod.py` swaps Supabase URL/keys + webhook paths + executeWorkflow refs. It does NOT swap n8n credential IDs (e.g., the `httpHeaderAuth` credentials backing `X-Email-Secret` / `X-Ingestion-Secret`). That means PROD workflows still reference DEV-side credential IDs — and because we copied DEV's secret values onto PROD Railway, the auth handshake works end-to-end. If you ever want true credential separation per tier, the script needs a credential-id mapping pass and PROD-side credentials need to exist in n8n.
+
+---
