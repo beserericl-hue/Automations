@@ -34,6 +34,18 @@ const SourceBrowser = lazyRetry(() => import('./components/content/SourceBrowser
 const SuperuserPanel = lazyRetry(() => import('./components/superuser/SuperuserPanel'));
 const CreditsPage = lazyRetry(() => import('./components/credits/CreditsPage'));
 
+// Compose Newsletter 2a (S4) — newsletter route stubs. S6/S7/S8 fill in the
+// Generate / Execution Status / Approvals real pages; the rest stay stubs
+// until Phase 2b.
+const NewsletterHome = lazyRetry(() => import('./components/newsletter/NewsletterHome'));
+const NewsletterGenerate = lazyRetry(() => import('./components/newsletter/NewsletterGenerate'));
+const ExecutionStatus = lazyRetry(() => import('./components/newsletter/ExecutionStatus'));
+const PendingApprovals = lazyRetry(() => import('./components/newsletter/PendingApprovals'));
+const ApprovalDetail = lazyRetry(() => import('./components/newsletter/ApprovalDetail'));
+const ScheduledSends = lazyRetry(() => import('./components/newsletter/ScheduledSends'));
+const NewsletterDetail = lazyRetry(() => import('./components/newsletter/NewsletterDetail'));
+const IngestionBrowser = lazyRetry(() => import('./components/newsletter/IngestionBrowser'));
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -78,6 +90,17 @@ export default function App() {
                     <Route path="admin/*" element={<AdminPanel />} />
                     <Route path="superuser/*" element={<SuperuserPanel />} />
                     <Route path="credits" element={<CreditsPage />} />
+                    {/* Compose Newsletter 2a (S4) — singular /newsletter prefix.
+                        Note: /newsletters (plural) above redirects to the legacy
+                        Content Library filter; do not collapse the two. */}
+                    <Route path="newsletter" element={<NewsletterHome />} />
+                    <Route path="newsletter/generate" element={<NewsletterGenerate />} />
+                    <Route path="newsletter/execution/:id" element={<ExecutionStatus />} />
+                    <Route path="newsletter/approvals" element={<PendingApprovals />} />
+                    <Route path="newsletter/approvals/:token" element={<ApprovalDetail />} />
+                    <Route path="newsletter/sends" element={<ScheduledSends />} />
+                    <Route path="newsletter/sends/:id" element={<NewsletterDetail />} />
+                    <Route path="newsletter/ingestion" element={<IngestionBrowser />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
                   </Suspense>

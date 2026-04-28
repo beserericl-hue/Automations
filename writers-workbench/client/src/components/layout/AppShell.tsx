@@ -67,6 +67,15 @@ export default function AppShell({ children }: AppShellProps) {
               queryClient.invalidateQueries({ queryKey: ['dashboard-recent'] });
               queryClient.invalidateQueries({ queryKey: ['content-list'] });
             }
+          } else if (payload.event === 'newsletter.stage') {
+            // Compose Newsletter 2a (S4): re-emit on the window so
+            // useNewsletterEvents() consumers can subscribe without opening a
+            // second EventSource. Same pattern as chat-job-status above.
+            window.dispatchEvent(new CustomEvent('newsletter-stage', { detail: payload.data }));
+          } else if (payload.event === 'newsletter.approval.created') {
+            window.dispatchEvent(new CustomEvent('newsletter-approval-created', { detail: payload.data }));
+          } else if (payload.event === 'newsletter.approval.resolved') {
+            window.dispatchEvent(new CustomEvent('newsletter-approval-resolved', { detail: payload.data }));
           }
         } catch {
           // Ignore malformed events
