@@ -67,11 +67,12 @@ function reset() {
 function buildSelectBuilder<T>(rowsFn: () => T[], errorFn: () => string | undefined) {
   const filters: Record<string, unknown> = {};
   const notFilters: Record<string, unknown> = {};
+  let limitN: number | undefined;
   const builder: Record<string, unknown> = {
     eq(col: string, val: unknown) { filters[col] = val; return builder; },
     neq(col: string, val: unknown) { notFilters[col] = val; return builder; },
     order() { return builder; },
-    limit() { return builder; },
+    limit(n: number) { limitN = n; return builder; },
     maybeSingle() {
       const err = errorFn();
       if (err) return Promise.resolve({ data: null, error: { message: err, code: '99' } });
@@ -98,7 +99,8 @@ function buildSelectBuilder<T>(rowsFn: () => T[], errorFn: () => string | undefi
         }
         return true;
       });
-      return Promise.resolve({ data: matches, error: null }).then(onFulfilled);
+      const limited = limitN ? matches.slice(0, limitN) : matches;
+      return Promise.resolve({ data: limited, error: null }).then(onFulfilled);
     },
   };
   return builder;
@@ -691,6 +693,72 @@ describe('Stage callback endpoint (S3)', () => {
       const data = sseBroadcasts[0].event.data as Record<string, unknown>;
       expect(data.stage).toBe('error');
       expect(String(data.detail)).toContain('Claude API 503');
+    });
+  });
+});
+
+// -----------------------------------------------------------------------------
+// S6 — GET /api/newsletter/sends
+// Powers the Home page's "Next scheduled" tile and the "Recent runs" table.
+// -----------------------------------------------------------------------------
+
+describe('GET /api/newsletter/sends (S6)', () => {
+  beforeEach(() => {
+    state.sends.push(
+      { id: 's1', user_id: TEST_USER,         send_date: '2026-04-25', edition_id: 'ai-news', markdown_body: null, status: 'sent',      sent_at: '2026-04-25T08:00:00Z', created_at: '2026-04-25T07:00:00Z' },
+      { id: 's2', user_id: TEST_USER,         send_date: '2026-04-26', edition_id: 'ai-news', markdown_body: null, status: 'scheduled', sent_at: null,                    created_at: '2026-04-25T22:00:00Z' },
+      { id: 's3', user_id: TEST_USER,         send_date: '2026-04-26', edition_id: 'ai-news', markdown_body: null, status: 'failed',    sent_at: null,                    created_at: '2026-04-26T02:00:00Z' },
+      { id: 's4', user_id: '+19999999999',    send_date: '2026-04-26', edition_id: 'romance', markdown_body: null, status: 'sent',      sent_at: '2026-04-26T08:00:00Z', created_at: '2026-04-26T07:00:00Z' },
+    );
+  });
+
+  it('returns the caller\'s sends only', async () => {
+    await withServer(async (base) => {
+      const r = await fetch(`${base}/api/newsletter/sends`);
+      expect(r.status).toBe(200);
+      const j = await r.json() as { sends: Array<{ id: string; user_id: string }> };
+      expect(j.sends.every((s) => s.user_id === TEST_USER)).toBe(true);
+      expect(j.sends.map((s) => s.id).sort()).toEqual(['s1', 's2', 's3']);
+    });
+  });
+
+  it('filters by status=scheduled with limit=1 (Next scheduled tile pattern)', async () => {
+    await withServer(async (base) => {
+      const r = await fetch(`${base}/api/newsletter/sends?status=scheduled&limit=1`);
+      const j = await r.json() as { sends: Array<{ id: string; status: string }> };
+      expect(j.sends).toHaveLength(1);
+      expect(j.sends[0].id).toBe('s2');
+      expect(j.sends[0].status).toBe('scheduled');
+    });
+  });
+
+  it('limit param caps the response', async () => {
+    await withServer(async (base) => {
+      const r = await fetch(`${base}/api/newsletter/sends?limit=2`);
+      const j = await r.json() as { sends: unknown[] };
+      expect(j.sends.length).toBeLessThanOrEqual(2);
+    });
+  });
+
+  it('rejects bad status value (400)', async () => {
+    await withServer(async (base) => {
+      const r = await fetch(`${base}/api/newsletter/sends?status=NOT_A_REAL_STATUS`);
+      expect(r.status).toBe(400);
+    });
+  });
+
+  it('rejects out-of-range limit (400)', async () => {
+    await withServer(async (base) => {
+      const r = await fetch(`${base}/api/newsletter/sends?limit=999`);
+      expect(r.status).toBe(400);
+    });
+  });
+
+  it('filters by edition_id', async () => {
+    await withServer(async (base) => {
+      const r = await fetch(`${base}/api/newsletter/sends?edition_id=ai-news`);
+      const j = await r.json() as { sends: Array<{ id: string }> };
+      expect(j.sends.map((s) => s.id).sort()).toEqual(['s1', 's2', 's3']);
     });
   });
 });

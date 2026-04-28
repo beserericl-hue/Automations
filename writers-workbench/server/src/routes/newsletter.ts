@@ -36,6 +36,7 @@ import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import {
   GenerateSchema,
   NewsletterEditionIdParamSchema,
+  NewsletterSendsQuerySchema,
   StageCallbackSchema,
   ApprovalResolveSchema,
   ApprovalsOpenQuerySchema,
@@ -436,6 +437,73 @@ newsletterRouter.get(
     });
   },
 );
+
+// --------------------------------------------------------------------
+// Compose Newsletter 2a (S6) — sends list for the Home page
+//
+// Powers the "Next scheduled send" tile (?status=scheduled&limit=1) and the
+// "Recent runs" table (?limit=10) on /newsletter. Always pinned to the
+// caller's user_id; the impersonation-aware requireAuth ensures admins
+// see the impersonated user's runs when active.
+// --------------------------------------------------------------------
+
+/**
+ * @openapi
+ * /newsletter/sends:
+ *   get:
+ *     tags: [Newsletter]
+ *     summary: List the caller's newsletter sends, newest first
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         required: false
+ *         schema: { type: string, enum: [draft, scheduled, sending, sent, failed, cancelled] }
+ *       - in: query
+ *         name: edition_id
+ *         required: false
+ *         schema: { type: string }
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+ *     responses:
+ *       200: { description: "{success, sends: NewsletterSend[]}" }
+ *       400: { description: Validation error }
+ *       401: { description: Missing or invalid auth }
+ */
+newsletterRouter.get('/sends', requireAuth, async (req: Request, res: Response) => {
+  const parsed = NewsletterSendsQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({
+      success: false,
+      error: { code: 'VALIDATION_ERROR', fields: parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message })) },
+    });
+    return;
+  }
+  const { status, edition_id, limit } = parsed.data;
+  const userId = req.userId!;
+  const supabase = getSupabaseAdmin();
+
+  let q = supabase
+    .from('newsletter_sends_v2')
+    .select('id, user_id, edition_id, execution_id, issue_number, send_date, subject, preheader, status, scheduled_send_at, sent_at, recipient_count, delivery_provider, error, created_at, updated_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (status) q = q.eq('status', status);
+  if (edition_id) q = q.eq('edition_id', edition_id);
+
+  const { data, error } = await q;
+  if (error) {
+    logger.error({ error, userId }, 'newsletter sends list failed');
+    res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: error.message } });
+    return;
+  }
+
+  res.json({ success: true, sends: data ?? [] });
+});
 
 // --------------------------------------------------------------------
 // Compose Newsletter 2a (S5) — in-app approvals API

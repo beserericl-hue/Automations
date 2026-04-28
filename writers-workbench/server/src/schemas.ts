@@ -328,6 +328,23 @@ export const NewsletterEditionIdParamSchema = z.object({
   id: EditionIdSchema,
 });
 
+// GET /api/newsletter/sends — query params used by the Home page tiles
+// (S6) for the "next scheduled" tile and the "recent runs" table.
+export const NewsletterSendStatusSchema = z.enum([
+  'draft',
+  'scheduled',
+  'sending',
+  'sent',
+  'failed',
+  'cancelled',
+]);
+
+export const NewsletterSendsQuerySchema = z.object({
+  status: NewsletterSendStatusSchema.optional(),
+  edition_id: EditionIdSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(10),
+});
+
 // ============================================
 // Migration 013 — per-genre user ingestion URLs
 // ============================================
