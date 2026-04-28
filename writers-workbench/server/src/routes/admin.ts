@@ -734,6 +734,7 @@ adminRouter.put(
   validateBody(ChangeSubscriptionSchema),
   async (req: Request, res: Response) => {
     const { tier_name, billing_cycle, reset_credits } = req.body;
+    const targetId = String(req.params.id);
     const supabase = getSupabaseAdmin();
 
     const { data: tier, error: tierErr } = await supabase
@@ -746,20 +747,58 @@ adminRouter.put(
       return;
     }
 
-    const updates: Record<string, unknown> = {
+    // UPSERT so admins can both *create* a subscription on a user that has
+    // none (e.g. a self-signup that skipped tier selection, or an
+    // admin-provisioned account) and *change* an existing one.
+    const { data: existing } = await supabase
+      .from('user_subscriptions')
+      .select('id, credits_remaining')
+      .eq('user_id', targetId)
+      .maybeSingle();
+
+    const isNew = !existing;
+    const periodStart = new Date();
+    const cycle = billing_cycle ?? (tier.trial_days > 0 ? 'none' : 'monthly');
+    const trialEnd = tier.trial_days > 0
+      ? new Date(periodStart.getTime() + tier.trial_days * 24 * 3600 * 1000)
+      : null;
+    const periodEnd =
+      cycle === 'annual'
+        ? new Date(periodStart.getTime() + 365 * 24 * 3600 * 1000)
+        : cycle === 'monthly'
+          ? new Date(periodStart.getTime() + 30 * 24 * 3600 * 1000)
+          : null;
+
+    const row: Record<string, unknown> = {
+      user_id: targetId,
       tier_id: tier.id,
+      status: 'active',
+      billing_cycle: cycle,
+      auto_renew: cycle !== 'none',
+      created_by: req.realUserId ?? req.userId ?? null,
     };
-    if (billing_cycle) updates.billing_cycle = billing_cycle;
-    if (reset_credits !== false) {
-      updates.credits_remaining = tier.monthly_credits;
-      updates.credits_used_this_period = 0;
-      updates.current_period_start = new Date().toISOString();
+
+    if (isNew) {
+      // New subscription: full reset of period + credits regardless of
+      // reset_credits flag (there's nothing to preserve).
+      row.current_period_start = periodStart.toISOString();
+      row.current_period_end = periodEnd ? periodEnd.toISOString() : null;
+      row.trial_start = trialEnd ? periodStart.toISOString() : null;
+      row.trial_end = trialEnd ? trialEnd.toISOString() : null;
+      row.credits_remaining = tier.monthly_credits;
+      row.credits_used_this_period = 0;
+    } else if (reset_credits !== false) {
+      // Existing subscription: respect reset_credits (default true). Refresh
+      // period_start so the next billing cycle starts now.
+      row.current_period_start = periodStart.toISOString();
+      row.current_period_end = periodEnd ? periodEnd.toISOString() : null;
+      row.credits_remaining = tier.monthly_credits;
+      row.credits_used_this_period = 0;
     }
 
     const { data, error } = await supabase
       .from('user_subscriptions')
-      .update(updates)
-      .eq('user_id', req.params.id)
+      .upsert(row, { onConflict: 'user_id' })
       .select()
       .single();
 
@@ -768,18 +807,22 @@ adminRouter.put(
       return;
     }
 
-    if (reset_credits !== false) {
+    // Emit a credit_transactions row when credits were reset (or initialised
+    // on a new sub) so the audit trail explains why the balance jumped.
+    if (isNew || reset_credits !== false) {
       await supabase.from('credit_transactions').insert({
-        user_id: req.params.id,
+        user_id: targetId,
         amount: tier.monthly_credits,
         balance_after: tier.monthly_credits,
         transaction_type: 'admin_adjustment',
-        description: `Tier change to '${tier_name}' — credits reset`,
+        description: isNew
+          ? `Subscription created — tier '${tier_name}' (${tier.monthly_credits} credits)`
+          : `Tier change to '${tier_name}' — credits reset`,
         reference_id: req.realUserId ?? req.userId ?? null,
       });
     }
 
-    res.json({ success: true, data });
+    res.status(isNew ? 201 : 200).json({ success: true, data });
   },
 );
 
