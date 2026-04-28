@@ -23,22 +23,36 @@ All listed here so reviewers know what's _not_ shipping this window.
 
 ## Status
 
-| Story | Title | Pts | Priority | Status |
-|---|---|---|---|---|
-| **S1** | Supabase migration 012 | 2 | P0 | planned |
-| **S2** | Server — `/api/newsletter/editions` + `/generate` + `/execution/:id/status` | 3 | P0 | planned |
-| **S3** | n8n — form-trigger `Edition Id` field + 9 stage-emit nodes + callback endpoint | 2 | P0 | planned |
-| **S4** | Client — sidebar entry + 5 route stubs + `useNewsletterEvents` hook | 2 | P0 | planned |
-| **S5** | Server — in-app approvals endpoints | 2 | P0 | planned |
-| **S6** | Pages — `NewsletterHome` + `NewsletterGenerate` | 5 | P0 | planned |
-| **S7** | Pages — `ExecutionStatus` (stage strip + live log + inline resolve) 🔑 | 8 | P0 | planned |
-| **S8** | Pages — `PendingApprovals` + `ApprovalDetail` | 3 | P1 | planned |
-| **S9** | Smoke — server + client vitest + fixture `simulate-run` endpoint | 3 | P0 | planned |
-| **S10** | Docs — update handoff README + workflow doc §3 phase markers | 1 | P0 | planned |
+| Story | Title | Pts | Priority | Status | PR |
+|---|---|---|---|---|---|
+| **S1** | Supabase migration 012 | 2 | P0 | ✅ done | [#44](https://github.com/beserericl-hue/Automations/pull/44) |
+| **S2** | Server — `/api/newsletter/editions` + `/generate` + `/execution/:id/status` | 3 | P0 | ✅ done | [#45](https://github.com/beserericl-hue/Automations/pull/45) |
+| **S3** | n8n webhook trigger + 9 stage-emit nodes + callback endpoint + approvals SSE | 2 | P0 | ✅ done | [#46](https://github.com/beserericl-hue/Automations/pull/46) / [#47](https://github.com/beserericl-hue/Automations/pull/47) / [#48](https://github.com/beserericl-hue/Automations/pull/48) |
+| **S4** | Client — sidebar entry + 8 route stubs + `useNewsletterEvents` hook | 2 | P0 | ✅ done | [#52](https://github.com/beserericl-hue/Automations/pull/52) |
+| **S5** | Server — in-app approvals endpoints + shared resolve core | 2 | P0 | ✅ done | [#58](https://github.com/beserericl-hue/Automations/pull/58) |
+| **S6** | Pages — `NewsletterHome` + `NewsletterGenerate` | 5 | P0 | ✅ done | [#59](https://github.com/beserericl-hue/Automations/pull/59) |
+| **S7** | Pages — `ExecutionStatus` (stage strip + live log + inline resolve) 🔑 | 8 | P0 | ✅ done | [#64](https://github.com/beserericl-hue/Automations/pull/64) |
+| **S8** | Pages — `PendingApprovals` + `ApprovalDetail` | 3 | P1 | ✅ done | [#65](https://github.com/beserericl-hue/Automations/pull/65) |
+| **S9** | Smoke — `simulate-run` test-only endpoint + fixture + 5 vitests | 3 | P0 | ✅ done | [#66](https://github.com/beserericl-hue/Automations/pull/66) |
+| **S10** | Docs — sprint markers + workflow-ids registry + user-facing feature doc | 1 | P0 | ✅ done | this PR |
 
-**Total:** 10 stories, **31 points**.
+**Total:** 10 stories, **31 points** — all shipped to DEV. PROD waits for release-day promotion.
 
-No sprint is a commitment to _all_ P1 work landing; S8 may slip into a cleanup week.
+### Side work that landed alongside the sprint
+
+| | What | PR |
+|---|---|---|
+| **migration 013** | per-user genre URLs + admin/superuser ingestion read RLS (data-ownership half of the side sprint flagged in 2026-04-27 SESSION_CONTEXT) | [#55](https://github.com/beserericl-hue/Automations/pull/55) |
+| **Newsletter Templates sprint** | `newsletter_templates_v2` + Handlebars render lib + 6 endpoints + TemplatesList/TemplateEditor UI + Generate-page Preview button + `markdown_to_html` helper | [#60](https://github.com/beserericl-hue/Automations/pull/60) / [#61](https://github.com/beserericl-hue/Automations/pull/61) / [#62](https://github.com/beserericl-hue/Automations/pull/62) |
+| **n8n auth follow-up** | Verified `headerAuth` works with rotated `INGESTION_SECRET` | [#49 closed](https://github.com/beserericl-hue/Automations/issues/49) |
+
+### Remaining release-day work (tracked, deferred)
+
+| | What | Issue |
+|---|---|---|
+| n8n send-time render | Replace `combine_markdown_content` with HTTP Request to `/api/newsletter/render-html` (T4 follow-up). Requires Publish in n8n UI. | [#63](https://github.com/beserericl-hue/Automations/issues/63) |
+| PROD migration | Apply migrations 013 + 014 to PROD Supabase as part of release v1.2 | release-day |
+| PROD workflow promotion | `scripts/promote-dev-to-prod.py` for the Compose Newsletter 2a + Templates work | release-day |
 
 ---
 
