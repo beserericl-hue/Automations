@@ -46,6 +46,7 @@ import {
   CreateNewsletterTemplateSchema,
   UpdateNewsletterTemplateSchema,
   PreviewTemplateSchema,
+  RenderHtmlBodySchema,
 } from '../schemas.js';
 import { logger } from '../lib/logger.js';
 import { pushSseEvent } from './session.js';
@@ -1086,6 +1087,88 @@ newsletterRouter.post(
       }
       logger.error({ err }, 'unexpected template preview error');
       res.status(500).json({ success: false, error: { code: 'INTERNAL', message: 'Unexpected error during template render' } });
+    }
+  },
+);
+
+// --------------------------------------------------------------------
+// Newsletter Templates Sprint (T4) — n8n send-time render endpoint.
+//
+// POST /api/newsletter/render-html
+//   { edition_id: 'ai-news', data: {...} } → { success, html, warnings }
+//
+// Auth: X-Ingestion-Secret header (same shared secret n8n already uses
+// for /api/ingestion/* and /api/newsletter-sends/save). The endpoint is
+// not session-authenticated — it's a server-to-server contract.
+//
+// Resolution flow:
+//   1. Find the active default template for the supplied edition_id.
+//   2. Render it with `data` merged on top of the row's sample_data.
+//   3. Return the html so the workflow can persist it as
+//      newsletter_sends_v2.html_body via /api/newsletter-sends/save.
+//
+// On any failure (no template, parse error, render error) the endpoint
+// returns a non-2xx with a structured error code; n8n's HTTP Request
+// node should be configured with onError: continueRegularOutput so the
+// workflow can fall back to its existing inline `<pre>`-wrapped html_body
+// if rendering fails.
+// --------------------------------------------------------------------
+
+const requireIngestionSecret = requireSharedSecret('X-Ingestion-Secret', 'INGESTION_SECRET');
+
+newsletterRouter.post(
+  '/render-html',
+  requireIngestionSecret,
+  validateBody(RenderHtmlBodySchema),
+  async (req: Request, res: Response) => {
+    const body = req.body as import('zod').infer<typeof RenderHtmlBodySchema>;
+    const supabase = getSupabaseAdmin();
+
+    const { data: row, error } = await supabase
+      .from('newsletter_templates_v2')
+      .select('id, html, sample_data')
+      .eq('edition_id', body.edition_id)
+      .eq('is_default', true)
+      .eq('active', true)
+      .maybeSingle();
+
+    if (error) {
+      logger.error({ error, edition_id: body.edition_id }, 'render-html: template lookup failed');
+      res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: error.message } });
+      return;
+    }
+    if (!row) {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: 'NO_DEFAULT_TEMPLATE',
+          message: `No active default template found for edition '${body.edition_id}'. Mark one as default in Newsletter → Templates.`,
+        },
+      });
+      return;
+    }
+
+    const r = row as { id: string; html: string; sample_data: Record<string, unknown> };
+
+    try {
+      const result = renderTemplate(r.html, body.data, { sampleData: r.sample_data });
+      res.json({
+        success: true,
+        template_id: r.id,
+        html: result.html,
+        warnings: result.warnings,
+      });
+    } catch (err) {
+      if (err instanceof TemplateCompileError) {
+        res.status(400).json({ success: false, error: { code: 'TEMPLATE_COMPILE_ERROR', message: err.message } });
+        return;
+      }
+      if (err instanceof TemplateRenderError) {
+        res.status(500).json({ success: false, error: { code: 'TEMPLATE_RENDER_ERROR', message: err.message } });
+        return;
+      }
+      logger.error({ err, edition_id: body.edition_id }, 'render-html: unexpected error');
+      res.status(500).json({ success: false, error: { code: 'INTERNAL', message: 'Unexpected error' } });
     }
   },
 );

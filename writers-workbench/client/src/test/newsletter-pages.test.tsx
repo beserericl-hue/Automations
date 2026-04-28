@@ -313,6 +313,66 @@ describe('NewsletterGenerate', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: /generate newsletter/i })).not.toBeDisabled());
   });
 
+  // The Preview button is disabled until editions load + the useEffect
+  // picks the first edition. Wait for that before clicking.
+  async function waitForPreviewEnabled(): Promise<HTMLButtonElement> {
+    await waitFor(() => {
+      const b = screen.getByRole('button', { name: /preview template/i }) as HTMLButtonElement;
+      expect(b.disabled).toBe(false);
+    });
+    return screen.getByRole('button', { name: /preview template/i }) as HTMLButtonElement;
+  }
+
+  it('Preview button renders default template in a modal iframe (T4)', async () => {
+    setApiFetchImpl((path: string) => {
+      if (path === '/api/newsletter/editions') return { success: true, editions: [seedEdition] };
+      if (path.endsWith('/last-sent-markdown')) return { success: true, markdown: null };
+      if (path.startsWith('/api/newsletter/templates?edition_id=ai-news')) {
+        return {
+          success: true,
+          templates: [
+            { id: 'tpl-default', name: 'The Workbench (default)', description: null, edition_id: 'ai-news', user_id: null, source_type: 'system', sample_data: {}, is_default: true, active: true, created_at: '', updated_at: '' },
+          ],
+        };
+      }
+      if (path === '/api/newsletter/templates/tpl-default/preview') {
+        return { success: true, html: '<html><body><h1>Preview body</h1></body></html>', warnings: [] };
+      }
+      return Promise.reject(new Error('unstubbed: ' + path));
+    });
+
+    const NewsletterGenerate = (await import('../components/newsletter/NewsletterGenerate')).default;
+    renderWithProviders(<NewsletterGenerate />);
+
+    const btn = await waitForPreviewEnabled();
+    fireEvent.click(btn);
+
+    expect(await screen.findByRole('dialog', { name: /template preview/i })).toBeInTheDocument();
+
+    await waitFor(() => {
+      const iframe = screen.getByTitle('Template preview iframe') as HTMLIFrameElement;
+      expect(iframe.srcdoc).toContain('Preview body');
+    });
+  });
+
+  it('Preview button surfaces a clear error when no default template exists for the edition (T4)', async () => {
+    setApiFetchImpl((path: string) => {
+      if (path === '/api/newsletter/editions') return { success: true, editions: [seedEdition] };
+      if (path.endsWith('/last-sent-markdown')) return { success: true, markdown: null };
+      if (path.startsWith('/api/newsletter/templates?edition_id=ai-news')) {
+        return { success: true, templates: [] };
+      }
+      return Promise.reject(new Error('unstubbed: ' + path));
+    });
+
+    const NewsletterGenerate = (await import('../components/newsletter/NewsletterGenerate')).default;
+    renderWithProviders(<NewsletterGenerate />);
+    const btn = await waitForPreviewEnabled();
+    fireEvent.click(btn);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/No template found/i);
+  });
+
   it('prefills the previous-content textarea from /editions/:id/last-sent-markdown', async () => {
     installMocks({
       editions: [seedEdition],

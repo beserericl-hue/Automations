@@ -22,6 +22,13 @@
  * HTML produced by the AI pipeline. Two-stash escapes by default.
  */
 import Handlebars from 'handlebars';
+import { marked } from 'marked';
+
+// marked is configured once at module load. `gfm: true` matches the dialect
+// the AI pipeline emits; `breaks: false` means a single newline is NOT
+// auto-converted to <br>, which keeps paragraph spacing predictable when
+// the AI produces well-formed paragraphs.
+marked.setOptions({ gfm: true, breaks: false });
 
 export interface RenderResult {
   html: string;
@@ -35,6 +42,16 @@ function registerHelpers(): void {
     const n = typeof idx === 'number' ? idx + 1 : Number(idx) + 1;
     if (!Number.isFinite(n)) return '';
     return String(n).padStart(2, '0');
+  });
+  // Templates can call {{{markdown_to_html foo_md}}} to embed AI-generated
+  // markdown content inside the layout. The triple-stash matters: marked
+  // returns trusted HTML and Handlebars must not escape it. Returning a
+  // SafeString here means callers can also use double-stash in templates
+  // where they prefer not to think about escaping.
+  Handlebars.registerHelper('markdown_to_html', (value: unknown) => {
+    if (value == null || value === '') return new Handlebars.SafeString('');
+    const html = marked.parse(String(value), { async: false }) as string;
+    return new Handlebars.SafeString(html);
   });
   Handlebars.registerHelper('format_date', (value: unknown, format: unknown) => {
     if (!value) return '';
