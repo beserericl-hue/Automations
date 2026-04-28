@@ -1,0 +1,101 @@
+{
+  "comment": "Canonical newsletter run fixture (S9). Used by the simulate-run endpoint to replay a full execution's worth of events end-to-end. Stage event order matches the real workflow's emit_stage_* nodes (S3).",
+
+  "edition_id": "ai-news",
+  "userId": "+14105914612",
+
+  "stage_events": [
+    { "stage": "gathering",                 "detail": "started ingestion search" },
+    { "stage": "selecting_stories",         "detail": "picked 7 stories" },
+    { "stage": "awaiting_stories_approval", "detail": "approval token tok-stories-aaaaaaaaaaaaaaaaaaaa" },
+    { "stage": "stories_approved",          "detail": "writing subject line" },
+    { "stage": "awaiting_subject_approval", "detail": "approval token tok-subject-bbbbbbbbbbbbbbbbbbbb" },
+    { "stage": "subject_approved",          "detail": "writing segments" },
+    { "stage": "writing_segment",           "detail": "segment 1/7" },
+    { "stage": "segments_done",             "detail": "assembling final" },
+    { "stage": "saved",                     "detail": "issue scheduled 2026-04-29T10:00:00Z" }
+  ],
+
+  "approvals": [
+    {
+      "token": "tok-stories-aaaaaaaaaaaaaaaaaaaa",
+      "stage": "stories",
+      "execution_id": "exec-fixture",
+      "approval_url": "http://localhost:3001/approvals/tok-stories-aaaaaaaaaaaaaaaaaaaa",
+      "decision": "approve",
+      "feedback": ""
+    },
+    {
+      "token": "tok-subject-bbbbbbbbbbbbbbbbbbbb",
+      "stage": "subject_line",
+      "execution_id": "exec-fixture",
+      "approval_url": "http://localhost:3001/approvals/tok-subject-bbbbbbbbbbbbbbbbbbbb",
+      "decision": "approve",
+      "feedback": ""
+    }
+  ],
+
+  "stories_payload": {
+    "top_selected_stories": [
+      {
+        "title": "OpenAI drops a privacy-focused model — and the trade-off is real",
+        "summary": "OpenAI quietly shipped a new model this week tuned for local inference and strict data boundaries.",
+        "external_source_urls": ["https://openai.com/blog/privacy-model"],
+        "identifiers": ["2026-04-26/openai-privacy-model.openai"]
+      },
+      {
+        "title": "Karpathy: a 1.8B model can match a 1.8T giant on practical tasks",
+        "summary": "An X thread argues that smaller models can match much larger ones if you do the data work.",
+        "external_source_urls": ["https://x.com/karpathy/status/123"],
+        "identifiers": ["2026-04-26/karpathy-1-8b.x"]
+      },
+      {
+        "title": "Anthropic publishes a new post-training recipe",
+        "summary": "Anthropic detailed a post-training recipe focused on safer, more predictable outputs.",
+        "external_source_urls": ["https://anthropic.com/news/post-training"],
+        "identifiers": ["2026-04-26/anthropic-post-training.anthropic"]
+      },
+      {
+        "title": "How one solo dev shipped a $30k/mo writing tool",
+        "summary": "A breakdown of the bootstrapping path from idea to $30k MRR.",
+        "external_source_urls": ["https://indiehackers.com/post/30k-mrr"],
+        "identifiers": ["2026-04-26/30k-writing-tool.indiehackers"]
+      },
+      {
+        "title": "The case against RAG for most internal search",
+        "summary": "Argues that classical search beats RAG for most enterprise document use cases.",
+        "external_source_urls": ["https://substack.example/no-rag"],
+        "identifiers": ["2026-04-26/no-rag-internal.substack"]
+      },
+      {
+        "title": "Postal v3.3 ships native DKIM rotation",
+        "summary": "Postal 3.3 lands automatic DKIM key rotation, simplifying multi-tenant email setups.",
+        "external_source_urls": ["https://postalserver.io/blog/3-3"],
+        "identifiers": ["2026-04-26/postal-3-3.postalserver"]
+      },
+      {
+        "title": "Eighty frontier models. Zero setup. Free for builders.",
+        "summary": "Nvidia Inception expands to managed access to Llama, Mistral, DeepSeek, and 77 more frontier models.",
+        "external_source_urls": ["https://nvidia.com/inception/announce"],
+        "identifiers": ["2026-04-26/nvidia-inception.nvidia"]
+      }
+    ]
+  },
+
+  "subject_payload": {
+    "subject_line": "👀 OpenAI drops a privacy-focused model",
+    "pre_header_text": "Plus: Karpathy says 1,800x smaller can match a 1.8T giant.",
+    "additional_subject_lines": [
+      "Privacy AI is real now",
+      "What 7 builders actually shipped this week"
+    ],
+    "subject_line_reasoning": "Hooks attention with the 'eye' emoji and a concrete launch claim.",
+    "pre_header_text_reasoning": "Compounds the curiosity gap by hinting at a numeric headline."
+  },
+
+  "saved_payload": {
+    "issue_number": 43,
+    "scheduled_send_at": "2026-04-29T10:00:00Z",
+    "subject": "👀 OpenAI drops a privacy-focused model"
+  }
+}
