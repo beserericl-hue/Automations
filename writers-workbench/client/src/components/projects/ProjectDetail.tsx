@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
+import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import ExportDialog from '../export/ExportDialog';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import ProjectEditForm from './ProjectEditForm';
@@ -11,6 +12,7 @@ import SocialMediaPanel from '../social/SocialMediaPanel';
 import CostDashboard from '../cost/CostDashboard';
 import { sendWebhookCommand } from '../../lib/webhook';
 import CommandDialog from '../shared/CommandDialog';
+import RewriteWithResearchModal from '../content/RewriteWithResearchModal';
 import type { WritingProject, PublishedContent, StoryBibleEntry, ResearchReport, GenreConfig, StoryArc, OutlineCharacter, OutlineChapter, ChapterOutline, SubChapter } from '../../types/database';
 
 const TABS = ['overview', 'outline', 'chapters', 'bible', 'art', 'social', 'research', 'cost', 'export'] as const;
@@ -32,7 +34,7 @@ export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { profile } = useUser();
+  const { profile, isImpersonating } = useUser();
   const [searchParams, setSearchParams] = useSearchParams();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [cascadeInfo, setCascadeInfo] = useState<string[]>([]);
@@ -45,10 +47,15 @@ export default function ProjectDetail() {
     setSearchParams({ tab }, { replace: true });
   };
 
-  // Project data
+  // Project data (Sprint 8: routes through impersonation proxy when active)
   const { data: project, isLoading, isError, error } = useQuery({
-    queryKey: ['project-detail', id],
+    queryKey: ['project-detail', id, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<WritingProject>>(`/api/impersonate/data/projects/${id}`);
+        if (!res.data) throw new Error('Project not found');
+        return res.data;
+      }
       const { data, error } = await supabase
         .from('writing_projects_v2')
         .select('*')
@@ -63,9 +70,25 @@ export default function ProjectDetail() {
   });
 
   // Chapters
+  type ChapterRow = Pick<PublishedContent, 'id' | 'title' | 'chapter_number' | 'status' | 'updated_at'> & { content_text: string | null };
   const { data: chapters } = useQuery({
-    queryKey: ['project-chapters', id],
+    queryKey: ['project-chapters', id, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<PublishedContent[]>>(
+          `/api/impersonate/data/content?project_id=${encodeURIComponent(id!)}&type=chapter&limit=500`,
+        );
+        return ((res.data ?? []) as PublishedContent[])
+          .map((c) => ({
+            id: c.id,
+            title: c.title,
+            chapter_number: c.chapter_number,
+            status: c.status,
+            updated_at: c.updated_at,
+            content_text: c.content_text ?? null,
+          }) as ChapterRow)
+          .sort((a, b) => (a.chapter_number ?? 0) - (b.chapter_number ?? 0));
+      }
       const { data, error } = await supabase
         .from('published_content_v2')
         .select('id, title, chapter_number, status, content_text, updated_at')
@@ -75,15 +98,19 @@ export default function ProjectDetail() {
         .is('deleted_at', null)
         .order('chapter_number', { ascending: true });
       if (error) throw error;
-      return data as (Pick<PublishedContent, 'id' | 'title' | 'chapter_number' | 'status' | 'updated_at'> & { content_text: string | null })[];
+      return data as ChapterRow[];
     },
     enabled: !!id && !!userId,
   });
 
   // Story Bible entries
   const { data: bibleEntries } = useQuery({
-    queryKey: ['project-bible', id],
+    queryKey: ['project-bible', id, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<StoryBibleEntry[]>>(`/api/impersonate/data/story-bible/${id}`);
+        return res.data ?? [];
+      }
       const { data, error } = await supabase
         .from('story_bible_v2')
         .select('*')
@@ -101,8 +128,12 @@ export default function ProjectDetail() {
   // Research reports — show all user research, not filtered by genre
   // Genre filter was too strict (research for a project may be tagged with a different genre)
   const { data: researchReports } = useQuery({
-    queryKey: ['project-research', id],
+    queryKey: ['project-research', id, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<ResearchReport[]>>('/api/impersonate/data/research?limit=30');
+        return res.data ?? [];
+      }
       const { data, error } = await supabase
         .from('research_reports_v2')
         .select('*')
@@ -149,9 +180,17 @@ export default function ProjectDetail() {
   });
 
   // Outline version info
+  interface OutlineVersionInfo {
+    totalVersions: number;
+    latestVersion: { version_number: number; created_at: string; revision_note: string | null } | null;
+  }
   const { data: outlineVersionInfo } = useQuery({
-    queryKey: ['outline-versions-info', id],
-    queryFn: async () => {
+    queryKey: ['outline-versions-info', id, isImpersonating],
+    queryFn: async (): Promise<OutlineVersionInfo> => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<OutlineVersionInfo>>(`/api/impersonate/data/outline-versions-info/${id}`);
+        return res.data ?? { totalVersions: 0, latestVersion: null };
+      }
       const { data, error, count } = await supabase
         .from('outline_versions_v2')
         .select('version_number, created_at, revision_note', { count: 'exact' })
@@ -168,9 +207,14 @@ export default function ProjectDetail() {
     enabled: !!id && !!userId,
   });
 
-  // Soft delete — also soft-deletes all child content (no orphans)
+  // Soft delete — also soft-deletes all child content (no orphans).
+  // During impersonation, the server proxy performs the same cascade atomically.
   const deleteMutation = useMutation({
     mutationFn: async () => {
+      if (isImpersonating) {
+        await apiFetch(`/api/impersonate/write/projects/${id}`, { method: 'DELETE' });
+        return;
+      }
       const now = new Date().toISOString();
 
       // Soft-delete all child content first (chapters, short stories, etc.)
@@ -337,7 +381,7 @@ export default function ProjectDetail() {
           />
         )}
         {activeTab === 'outline' && <OutlineTab outline={outline} storyArc={storyArc ?? null} projectTitle={project.title} userId={userId!} writtenChapterNumbers={new Set((chapters || []).map(c => c.chapter_number).filter((n): n is number => n != null))} projectUpdatedAt={project.updated_at} outlineVersionInfo={outlineVersionInfo ?? null} />}
-        {activeTab === 'chapters' && <ChaptersTab chapters={chapters} projectTitle={project.title} userId={userId!} />}
+        {activeTab === 'chapters' && <ChaptersTab chapters={chapters} projectTitle={project.title} projectType={project.project_type} userId={userId!} />}
         {activeTab === 'bible' && <BibleTab entries={bibleEntries} projectId={id!} />}
         {activeTab === 'art' && <ArtTab projectId={id!} />}
         {activeTab === 'social' && <SocialTab projectId={id!} />}
@@ -841,15 +885,21 @@ function OutlineTab({ outline, storyArc, projectTitle, userId, writtenChapterNum
 function ChaptersTab({
   chapters,
   projectTitle,
+  projectType,
   userId,
 }: {
   chapters: (Pick<PublishedContent, 'id' | 'title' | 'chapter_number' | 'status' | 'updated_at'> & { content_text: string | null })[] | undefined;
   projectTitle: string;
+  projectType: string | null | undefined;
   userId: string;
 }) {
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogConfig, setDialogConfig] = useState<{ title: string; description: string; sendLabel: string; buildCommand: (notes: string) => string } | null>(null);
+  const [rewriteResearchTarget, setRewriteResearchTarget] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
 
   if (!chapters?.length) {
     return <EmptyState message="No chapters written yet. Use the chat or Eve to write your first chapter." />;
@@ -865,7 +915,7 @@ function ChaptersTab({
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Words</th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Status</th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Updated</th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 w-20">Actions</th>
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 w-56">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -901,23 +951,45 @@ function ChaptersTab({
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-400">{new Date(ch.updated_at).toLocaleDateString()}</td>
                 <td className="px-4 py-3">
-                  <button
-                    disabled={isPending}
-                    onClick={() => {
-                      setDialogConfig({
-                        title: `Rewrite ${chapterLabel}`,
-                        description: `Rewrite "${ch.title}" based on the chapter outline and book outline.`,
-                        sendLabel: 'Rewrite Chapter',
-                        buildCommand: (notes) => `rewrite ${chapterLabel} of ${projectTitle}. IMPORTANT: Follow the chapter outline and book outline exactly — use the outlined sub-chapters, characters, arc beats, and scene briefs. Do not deviate from the outline structure.` + (notes ? ` ADDITIONAL INSTRUCTIONS: ${notes}` : ''),
-                      });
-                      setPendingAction(actionKey);
-                      setDialogOpen(true);
-                    }}
-                    className="rounded border border-green-300 px-2 py-1 text-[10px] font-medium text-green-600 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-950 disabled:opacity-50"
-                    title="Rewrite this chapter"
-                  >
-                    Rewrite
-                  </button>
+                  <div className="flex gap-1.5">
+                    <button
+                      disabled={isPending}
+                      onClick={() => {
+                        setDialogConfig({
+                          title: `Rewrite ${chapterLabel}`,
+                          description: `Rewrite "${ch.title}" based on the chapter outline and book outline.`,
+                          sendLabel: 'Rewrite Chapter',
+                          buildCommand: (notes) => `rewrite ${chapterLabel} of ${projectTitle}. IMPORTANT: Follow the chapter outline and book outline exactly — use the outlined sub-chapters, characters, arc beats, and scene briefs. Do not deviate from the outline structure.` + (notes ? ` ADDITIONAL INSTRUCTIONS: ${notes}` : ''),
+                        });
+                        setPendingAction(actionKey);
+                        setDialogOpen(true);
+                      }}
+                      className="rounded-lg px-3 py-1.5 text-xs font-medium border border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-950 disabled:opacity-50 whitespace-nowrap"
+                      title="Rewrite this chapter from the outline"
+                    >
+                      Rewrite
+                    </button>
+                    <button
+                      disabled={isPending}
+                      onClick={() =>
+                        setRewriteResearchTarget({
+                          id: ch.id,
+                          label:
+                            ch.chapter_number === 0
+                              ? 'Prologue'
+                              : ch.chapter_number === 999
+                                ? 'Epilogue'
+                                : ch.chapter_number != null
+                                  ? `Chapter ${ch.chapter_number}`
+                                  : ch.title || 'Chapter',
+                        })
+                      }
+                      className="rounded-lg px-3 py-1.5 text-xs font-medium border border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-950 disabled:opacity-50 whitespace-nowrap"
+                      title="Rewrite this chapter grounded in real research"
+                    >
+                      Rewrite with research
+                    </button>
+                  </div>
                 </td>
               </tr>
             );
@@ -939,6 +1011,23 @@ function ChaptersTab({
           title={dialogConfig.title}
           description={dialogConfig.description}
           sendLabel={dialogConfig.sendLabel}
+        />
+      )}
+
+      {/* Rewrite-with-research modal (S12-10). The project-level chapters
+          list doesn't eagerly load per-chapter metadata, so we pass
+          hasQaReport=false — the user can still tick "Use last Q/A
+          report" in the modal and the tool will look for one on the
+          chapter row server-side. projectType comes from the project
+          the Chapters tab belongs to; the modal uses it for the
+          auto-derived citation mode display. */}
+      {rewriteResearchTarget && (
+        <RewriteWithResearchModal
+          contentId={rewriteResearchTarget.id}
+          chapterLabel={rewriteResearchTarget.label}
+          hasQaReport={false}
+          projectType={projectType}
+          onClose={() => setRewriteResearchTarget(null)}
         />
       )}
     </div>

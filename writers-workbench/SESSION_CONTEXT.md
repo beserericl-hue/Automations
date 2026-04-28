@@ -1,6 +1,6 @@
 # The Writers Workbench — Session Context Document
 
-**Last Updated:** 2026-04-11
+**Last Updated:** 2026-04-26
 **Purpose:** Read this document at the start of any new Claude Code session working on this project. It contains every key decision, architectural choice, and constraint needed to continue development without re-learning the codebase.
 
 ---
@@ -676,3 +676,789 @@ First production release of The Writers Workbench. Establishes the baseline for 
 - Supabase V2 (unchanged): `https://faklxfakgzkpkbxfihzh.supabase.co`
 - n8n V2 hub (unchanged): `roMDypuMXHv6ugaZ` on `https://n8n.agileadautomation.com`
 - ElevenLabs Beta agent (unchanged): `agent_2801kks580vnf5q80j3bd0n0x45v`
+
+---
+
+## Session 2026-04-21 — Sprint 10.a complete, Sprint 10.b in flight
+
+**Read this section to resume work.** Everything above is historical context; this section reflects the current state of the system as of the end of the 2026-04-21 working session.
+
+### Sprint 10.a (PROD/DEV tier separation) — SHIPPED
+
+**What changed (the big picture):**
+We reframed the original blue-green cutover plan into a simpler two-tier model after realizing mid-sprint that the blue-green pattern conflicted with how the user thought about the system. End state:
+
+- **PROD tier** = what real users hit. Never modified during a sprint except by hotfix or release-time promotion.
+- **DEV tier** = a parallel copy of everything for developer use. All sprint work happens here.
+
+The two tiers are isolated across every layer: database, n8n workflows, Railway services, ElevenLabs agent.
+
+**Databases (Supabase):**
+- **PROD**: `faklxfakgzkpkbxfihzh.supabase.co` — labeled "Writers Assistant PROD" in dashboard. Unchanged. Production users' real data lives here.
+- **DEV**: `gvbvwcnmjkdpclcisqrr.supabase.co` — new project, labeled "Writers Assistant DEV". Populated from PROD via the clone scripts at the start of the sprint (byte-identical row counts + storage).
+- Session-pooler endpoints (needed for psql / pg_dump — direct db.* hosts are IPv6-only):
+  - PROD: `postgresql://postgres.faklxfakgzkpkbxfihzh:<pwd>@aws-0-us-west-2.pooler.supabase.com:5432/postgres`
+  - DEV: `postgresql://postgres.gvbvwcnmjkdpclcisqrr:<pwd>@aws-1-us-east-2.pooler.supabase.com:5432/postgres`
+- DB server is PostgreSQL 17 — use `postgresql@17` brew cask for pg_dump (v15 refuses to dump from v17).
+- Auth users: DEV's `auth.users` was populated by a manual admin API call (Supabase auth schemas aren't cloned by `pg_dump`). The DEV auth user has the same UUID as the PROD one so `users_v2.supabase_auth_uid` still links.
+
+**n8n workflows on `n8n.agileadautomation.com`:**
+- 24 `PROD - <name>` workflows (renamed from the `V2` suffix). Webhook `/webhook/author_request_v2`. IDs unchanged.
+- 24 `DEV - <name>` workflows — clones with:
+  - DEV Supabase URL/key substituted
+  - Webhook paths rewritten `_v2` → `_dev`, `-v2` → `-dev`
+  - `executeWorkflow` / `toolWorkflow` refs rewired so DEV workflows only call sibling DEV workflows
+  - `webhookId`s regenerated to avoid activation collisions with PROD
+- All 48 active. The full PROD→DEV id map lives in `scripts/workflow-id-map.json`.
+- DEV hub webhook: `https://n8n.agileadautomation.com/webhook/author_request_dev`
+- DEV brainstorm webhook: `https://n8n.agileadautomation.com/webhook/brainstorm_story_dev`
+
+**ElevenLabs:**
+- **PROD Eve** `agent_2801kks580vnf5q80j3bd0n0x45v` — renamed to `Writing Assistant PROD`. Tool `tool_2301kksb78ygewvv3q3cm82wcfjs` (`forward_writing_request_v2`) pointing at PROD webhook.
+- **DEV Eve** `agent_0001kpr667v6ffctex0a8dt4fk71` — name `Writing Assistant Dev`. Dedicated tool `tool_0801kprf5a14ee9b5ts7b8d2tetf` (`forward_writing_request_dev`) pointing at DEV webhook.
+- The DEV agent used to share the PROD tool id — now it has its own so webhook edits don't cross tiers.
+
+**Railway:**
+- Two services in the `bubbly-solace` project, one per environment:
+  - `writersworkbench-production.up.railway.app` → PROD Supabase, PROD webhooks, `NODE_ENV=production`
+  - `writersworkbenchdev-production.up.railway.app` → DEV Supabase, DEV webhooks, `NODE_ENV=development`
+- Each env has its own Redis service (added late in session):
+  - Production env: Redis named `Redis`
+  - Development env: Redis named `Redis_Dev`
+- `REDIS_URL` env var on each Workbench service uses reference syntax: `${{Redis.REDIS_PRIVATE_URL}}` (prod) / `${{Redis_Dev.REDIS_PRIVATE_URL}}` (dev) — exact service-name match matters.
+- `/api/health` now returns `version`, `deployed_at`, `environment`, `checks.supabase`, `checks.redis`. Environment derived from `NODE_ENV`.
+- **ALLOWED_ORIGINS gotcha**: must equal the service's own public URL, otherwise crossorigin JS/CSS requests 500 and the page appears blank. Documented in `CLAUDE.md`.
+
+**Governance (enforced by CI on every PR):**
+- `CLAUDE.md` — three-tier baseline protection (V1 frozen, PROD frozen except release/hotfix, DEV active).
+- `writers-workbench/docs/workflow-governance.md` — the DEV→PROD promotion flow, hotfix flow, what-breaks-if-you-ignore-it.
+- `writers-workbench/docs/schema-governance.md` — the 9 base tables (the 7 named ones plus `content_versions_v2`, `outline_versions_v2`) are immutable. Any migration numbered 008+ may not `ALTER` / `DROP` / `RENAME` a base table. Migrations 001-007 are frozen (SHA-256 pinned in `writers-workbench/migrations/.baseline-hashes.json`).
+- `scripts/check-base-table-immutability.py` + `scripts/test-check-base-table-immutability.sh` enforce the above. Wired into GitHub Actions as the `Schema Governance Check` job; added to **main's required status checks** (main now requires 4 checks).
+
+**Key scripts added (all in `scripts/`):**
+- `clone-supabase-schema.sh` — apply `supabase_setup_v2.sql` + numbered migrations to a target DB
+- `clone-supabase-data.sh` — `pg_dump --data-only` → `pg_restore` (no `--disable-triggers` — Supabase pooler role can't disable system triggers)
+- `migrate-storage.py` — clone every Supabase Storage bucket/object via REST API (idempotent, 5-way concurrency)
+- `clone-prod-to-dev.py` — idempotent workflow cloner (runs PROD → DEV transformation: creds, webhook paths, execute refs, webhookIds)
+- `promote-dev-to-prod.py` — release-time promotion script (reverse of above). Default is `--dry-run`. Currently reports 9 workflows with cosmetic `cachedResultName` drift; those will be swept by the first real release.
+- `verify-env-isolation.py` — 3-layer system test (workflow config / data isolation / Railway env). **All 3 layers currently pass.**
+- `check-base-table-immutability.py` + `test-check-base-table-immutability.sh` — schema governance CI
+- `workflow-id-map.json` — authoritative PROD id → DEV id table (24 entries)
+
+**PRs merged this sprint:**
+- #5, #6, #7 — deploy markers hotfixes (version/environment/deployed_at in `/api/health`)
+- #8 — Sprint 10.a bulk (governance docs, scripts, PROD/DEV workflow renames/clones, migration, isolation test)
+- #9 — CLAUDE.md note about tier-specific Railway env vars (learned the hard way via the CORS incident)
+
+### Sprint 10.b (Redis + BullMQ job queue) — IN FLIGHT
+
+**Status:** 13 / 34 points shipped (S10b-1 and S10b-2 merged). S10b-3 is next.
+
+**S10b-1 (shipped, PR #10):**
+- `bullmq@^5` and `ioredis@^5` added to server deps.
+- `server/src/lib/redis.ts` — lazy IORedis client with `maxRetriesPerRequest: null` (required by BullMQ), exponential retry up to 10s, READONLY auto-reconnect, event logging.
+- `server/src/lib/queue.ts` — BullMQ Queue factory with name registry, default job options (attempts=3, exponential backoff, bounded retention).
+- `/api/health` new `checks.redis` field (ok / error / skipped).
+- Shutdown handler now async — drains queues and closes Redis alongside the HTTP server.
+- 12 new unit tests, all passing. `REDIS_URL=${{Redis.REDIS_PRIVATE_URL}}` wired on both PROD and DEV Railway services. Dev `/api/health` confirms `"redis": "ok"`.
+
+**S10b-2 (shipped, PR #11):**
+- `migrations/008_job_queue.sql` — creates `public.job_queue_v2` (BullMQ lifecycle audit). 4 indexes, RLS (users read own, service_role full), FK to `users_v2(user_id)`. Additive only — governance check passes. **Applied live to DEV Supabase; PROD untouched.**
+- `server/src/lib/jobs/types.ts` — `QueueName`, `PriorityTier`, `QUEUE_SETTINGS` with concurrency + timeout per tier (sync 10/30s, medium 4/120s, heavy 2/1200s, background 3/300s), job payload interfaces.
+- `server/src/lib/jobs/classifier.ts` — regex-rule message classifier mirroring the hub's `preprocess_message` logic. First-match-wins; unmatched → `medium-ops/chat_generic`.
+- `server/src/lib/jobs/n8n-worker.ts` — BullMQ Worker factory. 2xx → ok, 4xx → ok:false (non-retryable), 5xx/network → throw (BullMQ retries).
+- `server/src/lib/jobs/job-tracker.ts` — `addTrackedJob()` enqueues + inserts `job_queue_v2` row atomically; `attachTrackerToQueue()` listens to `QueueEvents` and mirrors status transitions, computes `duration_ms` on terminal states.
+- `server/src/lib/queue.ts` — added `getNamedQueue(tier)` typed helper + `initAllNamedQueues()`.
+- 33 new unit tests. Full suite: **169/169 passing.**
+
+**What's NOT yet happening:**
+- Nothing is actually enqueuing on these queues yet. The scaffolding exists but `/api/chat/*` still hits n8n directly.
+
+### S10b-3 — Next up (not yet started)
+
+**Story:** Migrate `/api/chat/*` off direct webhook calls onto queued `N8nWebhookJob` dispatch. Server-Sent Events stream BullMQ progress back to the client. 8 pts, P0.
+
+**What the code does now (for context):**
+- Client calls `POST /api/chat/proxy` with `{ user_message_request, caller_id }`.
+- Server POSTs straight to `VITE_N8N_WEBHOOK_URL` (dev: `/webhook/author_request_dev`, prod: `/webhook/author_request_v2`).
+- Returns the n8n response body.
+- For heavy operations this can tie up a request for 10-20 minutes.
+
+**What S10b-3 will change:**
+- Server classifies the message via `jobs/classifier.ts`.
+- Calls `addTrackedJob()` to enqueue the `N8nWebhookJob` on the correct tier queue.
+- Responds immediately with `{ jobId, trackerRowId }`.
+- Second endpoint `GET /api/chat/stream/:jobId` streams SSE events (waiting → active → progress → completed/failed).
+- `n8n-worker` Workers must be started at server boot — add to `index.ts`.
+- `job-tracker` event listeners must be attached — add to `index.ts`.
+
+### Developer reference — what to know to resume
+
+**Current branch state:**
+- `main` = v1.0.0 (PROD Railway)
+- `develop` = integration branch. All recent merges (Sprint 10.a, S10b-1, S10b-2). DEV Railway auto-deploys from here.
+- `release/v1.0` = tracks main for PROD Railway deploys.
+- No open feature branches at session end. Next work should branch `feature/s10b-3-chat-proxy-migration` off `develop`.
+
+**Branch protection on main:** 4 required status checks (`TypeScript & Lint`, `Unit Tests`, `Production Build`, `Schema Governance Check`). E2E is not required (known broken — Issue #3). Admin push blocked.
+
+**Credentials (for your terminal / Railway dashboard — not in repo):**
+- DB password is the same for PROD and DEV (user's choice — noted).
+- PROD service-role key starts `sb_secret_huxH…`
+- DEV service-role key starts `sb_secret_8GDV…`
+- ElevenLabs API key starts `sk_cb81…`
+- n8n API key lives in `writers-workbench/.env` under `N8N_API_KEY`. Same key works for both PROD and DEV workflows on the shared instance.
+- Test user: `eric@agileadtesting.com` exists on both PROD and DEV auth; same password.
+
+**Active test + isolation baseline:**
+- Run `scripts/verify-env-isolation.py` to confirm the three-layer isolation still holds. All 3 layers passed at session end.
+- Run `python3 scripts/check-base-table-immutability.py` locally or in CI — passes with migrations 001-008 as of end of session.
+
+**Files / folders to know:**
+- `CLAUDE.md` — project-wide rules (baseline protection, git branching, governance cross-references, Railway env-var gotchas).
+- `writers-workbench/docs/workflow-governance.md` — full PROD/DEV workflow rules + promotion flow.
+- `writers-workbench/docs/schema-governance.md` — base-table immutability rule + meta-table pattern.
+- `writers-workbench/docs/railway-deployment.md` — all services, env vars, cost baseline.
+- `writers-workbench/migrations/` — SQL migrations 001-008. `.baseline-hashes.json` pins 001-007.
+- `writers-workbench/server/src/lib/jobs/` — types, classifier, n8n-worker, job-tracker (all from S10b-2).
+- `writers-workbench/server/src/lib/redis.ts` + `queue.ts` — from S10b-1.
+- `scripts/workflow-id-map.json` — PROD→DEV workflow id map.
+
+**Tests:** 169/169 server tests pass (as of S10b-2 merge). Run:
+```
+cd writers-workbench/server && npx vitest run
+```
+
+**Immediate to-do list at start of next session:**
+1. Verify dev Railway picked up the S10b-2 merge (`/api/health` should still show `"redis": "ok"` and migration 008's new table should be reachable — table already applied manually).
+2. Start S10b-3: branch `feature/s10b-3-chat-proxy-migration`. First subtask is updating `routes/chat.ts` to use `addTrackedJob` instead of direct `fetch`.
+3. Decide SSE vs. polling for the new `/api/chat/stream/:jobId` endpoint — SSE preferred but Railway has a 10-minute connection timeout to be aware of for heavy-ops jobs.
+4. After S10b-3: S10b-4 (per-user concurrency + admin dashboard, 5 pts), then S10b-5 (Redis session store, 8 pts).
+
+**Gotchas learned in this session (save yourself the time):**
+- Supabase direct `db.<ref>.supabase.co` hostnames are IPv6-only on new projects. Use the session pooler URI for psql / pg_dump.
+- `pg_dump --disable-triggers` fails on Supabase because the pooler role can't disable RI_* system triggers. Drop the flag.
+- `pg_dump` version must be ≥ server version (pg17 server, pg15 client fails).
+- Supabase Schema Editor changes don't appear in the `migrations/` directory unless you explicitly add them — we found 2 views (`content_metrics_v2`, `token_usage_daily_v2`) that existed on PROD but in no migration. Clone via `pg_dump --schema-only` catches drift.
+- n8n workflow `webhookId` fields are globally unique per instance. Cloned workflows inherit the PROD webhookId and fail to activate with "webhook conflict". Regenerate all `webhookId`s on clone (including on `chatTrigger`, `gmail`, `wait`, etc. nodes — any node that carries one).
+- n8n's PUT API rejects unknown `settings` keys (e.g. `binaryMode`). Strip to the allow-list in `scripts/clone-prod-to-dev.py` before PUT.
+- Railway variable references use the exact service name: `${{Redis.REDIS_PRIVATE_URL}}`. If the service is named `Redis_Dev`, the reference must match.
+- ElevenLabs agent tools are shared server-side — duplicating an agent clones its `tool_ids` but not the tool itself. Create a new tool for DEV, update `tool_ids` on the DEV agent.
+- BullMQ requires `maxRetriesPerRequest: null` on its Redis connection — that's in `server/src/lib/redis.ts`. Do not change.
+
+**Final sanity snapshot at session end:**
+- Dev `/api/health`: `{status: ok, environment: development, version: <recent-sha>, checks: {supabase: ok, redis: ok}}`
+- Prod `/api/health`: `{status: ok, environment: production, version: 2771300…, checks: {supabase: ok}}` (no redis field — prod still on pre-S10b-1 code via `release/v1.0`; that's expected; prod picks up the new check at next release)
+- Isolation test: 3/3 layers green.
+
+---
+
+## Session 2026-04-22 to 2026-04-23 — Sprint 10.a/10.b wrap + Newsletter S7 (Postal) install
+
+**Read this section to resume. Everything above is earlier context.**
+
+### Sprint 10.a — CLOSED (on main at v1.0, all release work done in prior session)
+
+No new 10.a work in this session. State unchanged:
+- PROD/DEV tier separation enforced via CLAUDE.md and `scripts/check-base-table-immutability.py`.
+- 24 `PROD - <name>` + 24 `DEV - <name>` workflows on `n8n.agileadautomation.com`.
+- Two Railway Workbench services + two Redis services, one per environment.
+- Schema governance CI check required on main.
+
+### Sprint 10.b — IN FLIGHT (3 PRs open, stacked against develop)
+
+All three remaining stories coded, tested, pushed. Each PR has its own CI-green feature branch. Stacked so the chain needs to merge in order: #13 → #14 → #15. Merge cleanly by retargeting #14 to `develop` after #13 merges, then #15 after #14.
+
+| Story | Points | PR | Base | Status |
+|-------|--------|----|----|--------|
+| S10b-1 Redis + BullMQ library | 5 | #10 | develop | Merged (prior session) |
+| S10b-2 Job queue schema + priority | 8 | #11 | develop | Merged (prior session) |
+| S10b-3 Chat proxy → queue dispatch | 8 | [#13](https://github.com/beserericl-hue/Automations/pull/13) | develop | Open, all 4 required checks green |
+| S10b-4 Per-user concurrency + admin queue dashboard | 5 | [#14](https://github.com/beserericl-hue/Automations/pull/14) | feature/s10b-3-... | Open, stacked |
+| S10b-5 Session store + SSE pub/sub → Redis | 8 | [#15](https://github.com/beserericl-hue/Automations/pull/15) | feature/s10b-4-... | Open, stacked |
+
+**S10b-3 — Migrate chat proxy onto BullMQ + SSE progress**
+- `server/src/routes/chat.ts` classifies every inbound message via `jobs/classifier.ts`. Sync tier (list/retrieve/approve) keeps the direct n8n fetch; async tier (write/brainstorm/generate) enqueues to the priority-matched BullMQ queue and returns `{jobId, trackerRowId, status:'queued'}`.
+- New `N8N_HUB_WEBHOOK_URL` env var (full URL). Falls back to the legacy `${N8N_API_URL}/webhook/author_request_v2` so prod keeps working without env changes. Dev needs `N8N_HUB_WEBHOOK_URL=https://n8n.agileadautomation.com/webhook/author_request_dev` set before/on deploy.
+- `server/src/routes/jobs.ts` — user-scoped jobs API (list, stats, detail, status, cancel). Cancel only allowed for `waiting`/`delayed`.
+- `server/src/lib/jobs/sse-forwarder.ts` + `boot.ts` — at server boot, start one BullMQ Worker per queue, attach the tracker (S10b-2) and a new SSE forwarder that pushes `job-status` events to the user's SSE channel as queue events fire.
+- `server/src/routes/session.ts` — `pushSseEvent(userId, event)` exported so the forwarder can push without a round-trip.
+- `client/src/components/chat/ChatDrawer.tsx` — async responses render Queued → Processing → Complete/Failed pills. Active job IDs persist in localStorage so a refresh restores state.
+- `client/src/components/layout/AppShell.tsx` — fans `job-status` SSE events to the window so ChatDrawer can subscribe.
+- 11 new server tests, 3 new client component tests, 1 updated S4-6 test. Full suite 335/335 green at merge.
+
+**S10b-4 — Per-user concurrency gate + admin queue dashboard**
+- `server/src/lib/jobs/concurrency.ts` — `tryAcquireUserSlot` / `releaseUserSlot` / `getUserCounts` using Redis `INCR`/`DECR` with 30-min TTL safety valve. `DEFAULT_LIMITS`: 3 total / 1 heavy per user.
+- `server/src/lib/jobs/n8n-worker.ts` — processor acquires before HTTP, releases in `finally` on ok path. On refusal, calls `job.moveToDelayed(Date.now()+5s, token)` and throws BullMQ's `DelayedError` (not a retry).
+- `server/src/routes/admin.ts` — `GET /api/admin/queues`: queue depths per tier (`waiting`, `active`, `delayed`, `completed`, `failed`), configured concurrency, DEFAULT_LIMITS, top 20 users by active job count, total in-flight. Returns 503 when `REDIS_URL` is unset.
+- `client/src/components/admin/AdminPanel.tsx` — new **Queues** tab with 10s auto-refresh.
+- 10 new server tests.
+
+**S10b-5 — Session store + SSE fan-out to Redis**
+- `server/src/lib/session-store.ts` — `SessionStore` interface. Redis impl uses hash-per-user key `session:{userId}` with key-level 30-min TTL, `SCAN` for count. Critical detail: `isActive` uses `HEXISTS` before the `MULTI` so an expired key doesn't get resurrected by `HSET lastActivity`. In-memory fallback for local dev without Redis.
+- `server/src/lib/sse-pubsub.ts` — `publishSseEvent` uses main Redis for PUBLISH; dedicated second IORedis connection for subscriber mode (IORedis won't let you SUBSCRIBE on the same client as PUBLISH). Ref-counted per-channel local handler map — only SUBSCRIBE on first local listener per user channel; UNSUBSCRIBE on last.
+- `server/src/routes/session.ts` — refactored. `pushSseEvent` is now async and publishes. Every endpoint (register, unregister, active, content-ready, events) goes through the two abstractions.
+- `server/src/routes/health.ts` — new `active_sessions` field in payload. Failure to read does not fail the health check.
+- `server/src/lib/jobs/sse-forwarder.ts` — `SsePushFn` widened to sync-or-async return.
+- `server/src/index.ts` — `closeSsePubsub` in graceful shutdown alongside `closeAllQueues` + `closeRedis`.
+- 12 new server tests.
+
+**Test counts at end of 10.b work:**
+- Server: 119 (base) + 11 (S10b-3) + 10 (S10b-4) + 12 (S10b-5) = 152 passing across the stack
+- Client: 217 passing
+- Typecheck + production build: clean on all three branches
+
+### Newsletter Sprint S7 — Postal install complete (supports Sprint 11)
+
+Postal 3.3.5 stack is live in Railway `N8N-MCP` project, production environment:
+
+| Service | Role | State |
+|---------|------|-------|
+| `postal-mariadb` | metadata + per-server DBs | Active, 5 GB volume at `/var/lib/mysql` |
+| `postal-web` | admin UI + HTTP API | Active, volume at `/config`, public at `postal-admin.courseworx.media` |
+| `postal-worker` | outbound mail processor | Active, own `/config` volume with same postal.yml + signing.key |
+
+Not installed: `postal-rabbitmq` (Postal 3.x dropped it) and `postal-smtp` (only needed for inbound mail; out of scope for API-only sending).
+
+**Inside Postal:**
+- Organization `Courseworx Media`, slug `courseworx-media`
+- Sending domain `courseworx.media` verified (SPF + DKIM green in Postal; published on Cloudflare with grey-cloud on the Return Path CNAME)
+- Two mail servers:
+  - `writers-workbench-mail-prod` — mode Live — API key saved offline
+  - `writers-workbench-mail-dev` — mode Development (Postal swallows sends and logs only) — API key saved offline
+- Admin user `eric@agileadtesting.com` on the Postal admin UI
+
+**Gotchas captured in the runbook** (`writers-workbench/docs/postal-install-runbook.md`, committed on branch `docs/postal-install-runbook`, PR [#16](https://github.com/beserericl-hue/Automations/pull/16)):
+- Postal 3.x image tag `:3` does NOT exist on GHCR — only `:latest` and specific versions like `:3.3.5`
+- `postal start` is NOT a real command. The three processes are `postal web-server`, `postal worker`, `postal smtp-server`, each as its own Railway service with its own `/config` volume
+- Postal `config/puma.rb` reads `BIND_ADDRESS` + `PORT` env vars. Default is loopback. On Railway set `BIND_ADDRESS=0.0.0.0` and `PORT=8080`, then set Networking target port to 8080
+- Postal creates a separate MySQL database per mail server (`postal-server-1`, `postal-server-2`, ...). MariaDB user needs `GRANT ALL PRIVILEGES ON \`postal-%\`.* TO 'postal'@'%'` or Build Server returns 500
+- Postal's `ActionDispatch::HostAuthorization` only lets the `web_hostname` from `postal.yml` access the UI. Any other URL returns 403
+- The "LIVE" badge on mail server tiles means "server active/online," NOT "Live mode". To verify mode: `/org/<slug>/servers/<server>/edit` (or Settings → Server Settings in the two-level nav)
+
+### `/api/email/send` endpoint — SHIPPED (PR #17 merged to develop)
+
+Workbench-side HTTP API that dispatches mail through Postal. `server/src/lib/email.ts` is the Postal client (handles DRY_RUN_EMAIL, signature headers, attachments). `server/src/routes/email.ts` is the route, gated by `X-Email-Secret` header and an in-memory 30/min-per-user_id rate limit. 12 new server tests. Full server suite 119/119 after merge.
+
+**Env vars on `WritersWorkbenchDev` (set in this session):**
+- `POSTAL_API_URL=https://postal-admin.courseworx.media/api/v1`
+- `POSTAL_API_KEY=<dev-api-key>` (from `writers-workbench-mail-dev` credentials)
+- `EMAIL_SECRET=30c8dc2b3a1339a996c1dff20e5ea28d6e466870cef7635a9a4723819877431d`
+- `SENDER_EMAIL=eve@courseworx.media`
+- `SENDER_NAME=The Writers Workbench (Dev)`
+- `REPLY_TO_EMAIL=support@courseworx.media`
+- `DRY_RUN_EMAIL=false` (flipped off after dry-run smoke test passed)
+
+**Smoke tests executed live:**
+- Dry-run: `POST /api/email/send` → `{success:true, message_id:"dry-run-...", mode:"dry-run"}` — 200
+- Live (Postal actually called): `POST /api/email/send` → `{success:true, message_id:"f8c95e3c-...@rp.postal.courseworx.media", mode:"sent"}` — 200
+- `/api/health` shows `checks.postal: ok`
+
+Dev mail server is in Development mode so no mail reaches real inboxes — Postal UI's Messages tab logs every send for inspection.
+
+### Fintech architecture proposal — separate branch
+
+A customer-facing architecture document for Dewayne Ballard lives on `docs/fintech-architecture-ballard` (committed `fintech-architecture-ballard.md` + `fintech-architecture-ballard.pdf` at repo root). Describes multi-tenant Supabase design, RLS, Stripe entitlements, loan amortization at scale, audit logging, regulatory reporting, multi-currency, ACH vs card reconciliation, RLS CI test harness, and Supabase security posture for fintech workloads. No code — architectural prose. Not merged; reference branch only.
+
+### Branch state at session end
+
+- `main` = v1.0.0 (PROD Railway). Unchanged.
+- `develop` = all prior merges + PR #17 (email endpoint). Dev Railway picks up on merge.
+- Open PRs: **#13** (S10b-3, targeting develop), **#14** (S10b-4, targeting S10b-3 branch), **#15** (S10b-5, targeting S10b-4 branch), **#16** (Postal runbook, targeting develop, docs-only).
+
+### Immediate to-do list for next session
+
+1. Review + merge PR #13 (S10b-3). **Before merge:** set `N8N_HUB_WEBHOOK_URL=https://n8n.agileadautomation.com/webhook/author_request_dev` on the dev Workbench service so async jobs hit DEV n8n — otherwise the fallback sends dev queue jobs to PROD webhook.
+2. Retarget PR #14 to `develop`, review, merge.
+3. Retarget PR #15 to `develop`, review, merge. Sprint 10.b closes at 34/34 pts once all three are in.
+4. Merge PR #16 (docs-only, no risk).
+5. Kick off **Sprint 11** — migrate 15 V2 `DEV - ...` n8n workflows from Gmail node to HTTP Request → `/api/email/send`. Workflow-editing work; promotion DEV → PROD via `scripts/promote-dev-to-prod.py` at end of sprint.
+
+### Gotchas captured in this session
+
+- `gh pr merge` on a stacked PR with E2E-only failures succeeds because E2E is not a required check; proceed with squash merge. Chain merges by retargeting the next PR's base from the predecessor feature branch to `develop` after each merge.
+- `railway ssh` fails with "Your application is not running or in a unexpected state" if the service is crash-looping or scaled to zero. Workaround pattern: set Custom Start Command to `sleep infinity`, redeploy, SSH in, fix the `/config` or env issue, set start command to the real entrypoint, redeploy.
+- Postal's `docker-entrypoint.sh` just waits for `WAIT_FOR_TARGETS` and execs `$@`. The `ENTRYPOINT` is the wait script; the `CMD` is whatever you pass. Railway's "Custom Start Command" overrides `CMD`, so you write the full subcommand (`postal web-server` / `postal worker`).
+- Cloudflare: the Return Path CNAME under Postal's sending domain MUST be grey cloud (DNS only). Orange-clouding breaks the return-path handshake and causes bounces to fail in non-obvious ways.
+- For cross-environment visibility, `checks.postal` in `/api/health` skips the reachability probe when `DRY_RUN_EMAIL=true` (by design — no point pinging Postal if we're not going to call it).
+
+### Final sanity snapshot at session end
+
+- Dev `/api/health`: `{status:ok, environment:development, version:68da1456, checks:{supabase:ok, redis:ok, postal:ok}}`
+- Prod `/api/health`: unchanged since last release; will pick up email endpoint + `checks.postal` at next release/v1.1 cut
+- Postal stack: 3/3 services Active, DKIM + SPF green, 2 mail servers provisioned, both API keys in hand
+- Sprint 10.a: closed. Sprint 10.b: 34/34 pts of code + tests committed across 3 open PRs pending review.
+
+---
+
+## Session 2026-04-23 — Newsletter Migration sprint S1–S3 shipped
+
+**Read this section to resume work on the Newsletter Migration sprint.** Everything above is historical context for other sprints. This session pushed the Newsletter Migration sprint (`writers-workbench/sprint-newsletter-migration.md`, v1.1, 11 stories / 39 points) through its first three stories on branch `feature/newsletter-sprint-s1`, which was cut from `develop` in a sibling worktree (`../Automations-newsletter-s1`) so the in-flight S10b-3 work in the main worktree wouldn't be disturbed.
+
+The Newsletter workflows were **not** touched by Sprint 10.a's PROD/DEV rename — they stayed on their original IDs on `n8n.agileadautomation.com`. This sprint migrates them directly to `V2` suffixes (not `DEV -`/`PROD -`) per the sprint doc, which predates 10.a. At release time this naming will reconcile, but for now `V2` is the sprint's working suffix.
+
+### S1 (Scrape URL wire-up) — SHIPPED
+
+- Cloned `Node - Scrape Url` (`bXBsnU4d6OseXWho`) → **`Node - Scrape Url V2` (`BJaUNEt6PPIqbWLa`)**, active, Firecrawl credential `oWli4irymtVqSDyC` preserved. Node IDs regenerated on clone.
+- Legacy duplicate `glJfsY6KaO0aoX0A` renamed to `[OLD] Node - Scrape Url` (was wired to the broken `BZku8v1a2K12iFGQ` "OpenAI" httpHeaderAuth cred — kept inactive as dead weight).
+- Live scrape verification deferred to S4's ingestion dry-run per the sprint doc.
+- ID registry lives at [`writers-workbench/docs/newsletter-migration-workflow-ids.md`](writers-workbench/docs/newsletter-migration-workflow-ids.md) so S4 can look the V2 id up.
+
+### S2 (Supabase schema + storage bucket) — SHIPPED
+
+- Migration [`writers-workbench/migrations/009_newsletter_ingestion.sql`](writers-workbench/migrations/009_newsletter_ingestion.sql) — 100% additive, schema governance check green.
+- Three new tables, all FK-partitioned on `users_v2(user_id)` with `ON DELETE CASCADE`:
+  - `content_ingestion_v2` — one row per scraped item. Metadata only; body blobs live in Supabase Storage. Soft delete via `deleted_at`.
+  - `newsletter_approvals_v2` — open approval gates keyed by public token. 48h default expiry.
+  - `newsletter_sends_v2` — finished newsletters parked `status='scheduled'` with `scheduled_send_at = now() + 24h` for the future calendar cron.
+- RLS via `get_current_user_id()` on all three (own-row SELECT + ALL); service role bypasses.
+- Shared `updated_at` trigger function `newsletter_touch_updated_at()` on `content_ingestion_v2` + `newsletter_sends_v2`.
+- Private `newsletter-ingestion` storage bucket (10 MB, md/html/plain mime allowlist). Service-role-only for this sprint; Phase 2 UI opens it up.
+- **Applied live to DEV Supabase** (`gvbvwcnmjkdpclcisqrr`, PG 17.6). PROD (`faklxfakgzkpkbxfihzh`) untouched. FK violation probe, RLS enable probe, index count probe, bucket probe all verified.
+- TypeScript types `ContentIngestion`, `NewsletterApproval`, `NewsletterSend` + union helpers added to `client/src/types/database.ts` for Phase 2 UI.
+- `.env.example` stubbed with the 11 newsletter-sprint env vars (most are server-side; the n8n side uses credentials + hardcoded workflow JSON, not env vars — see decision below).
+
+### S3 (Supabase-backed ingestion endpoints) — SHIPPED
+
+Three Express routes under `/api/ingestion`, all gated on an `X-Ingestion-Secret` shared-header middleware:
+- `POST /api/ingestion/upload` — uploads `{markdown, html}` pair to the `newsletter-ingestion` bucket and upserts one row. On partial failure (blob up, DB insert down) the blobs are cleaned up. FK violation returns 400 `FK_VIOLATION` so callers can tell client error from server breakage.
+- `GET /api/ingestion/search?prefix=&user_id=&type_not=` — metadata-only listing by key prefix (`2026-04-23/`). Capped at 500 rows.
+- `GET /api/ingestion/get/:key` — URL-decodes key, returns metadata + both blobs. 404 when row is missing, 500 `BLOB_MISSING` when row exists but storage has been wiped.
+
+Files:
+- [`server/src/middleware/shared-secret.ts`](writers-workbench/server/src/middleware/shared-secret.ts) — reusable factory. S7/S9/S11 will reuse for `X-Email-Secret` / `X-Approval-Secret`.
+- [`server/src/routes/ingestion.ts`](writers-workbench/server/src/routes/ingestion.ts) — three endpoints + OpenAPI annotations.
+- [`server/src/schemas.ts`](writers-workbench/server/src/schemas.ts) — `IngestionKeySchema`, `IngestionUploadSchema`, `IngestionSearchQuerySchema`. Key regex rejects `..`, leading `/`, null bytes, and `.md` / `.html` suffixes (server appends).
+- [`server/src/test/ingestion.test.ts`](writers-workbench/server/src/test/ingestion.test.ts) — **17/17 passing**, in-memory Supabase fake mocks storage + table builder chain.
+- [`server/src/index.ts`](writers-workbench/server/src/index.ts) — router registered behind `generalLimiter`.
+
+Path traversal guard is belt-and-braces: Zod in the schema + a runtime check in the route after URL decoding the `:key` param. Either alone would catch the sprint-doc test cases; having both means a future schema relaxation can't silently open a hole.
+
+Full server suite: **124/124 passing** (includes 17 new).
+
+### Key operational decision — n8n configuration path (no env vars)
+
+**Finding:** n8n Community edition does not allow `$env.*` references in expressions, which the original sprint doc assumed. `WORKBENCH_URL`, `INGESTION_SECRET`, `NEWSLETTER_USER_ID` etc. cannot ship as n8n env vars.
+
+**Decision:** per-tier n8n **`httpHeaderAuth` credentials** for each shared secret; URLs and identity values **hardcoded in the workflow JSON** and substituted by `scripts/clone-prod-to-dev.py` during release promotion (same mechanism already used for the Supabase URL substitution). Same pattern as the existing Firecrawl credential (`oWli4irymtVqSDyC`). This avoids a per-iteration Supabase lookup on the high-frequency ingestion path (50–100 calls per run), keeps secrets out of workflow JSON, and fits the existing DEV/PROD credential-pair convention.
+
+The Express side keeps using Railway env vars — that's unaffected.
+
+### Secrets wired this session (DEV tier only)
+
+Three 256-bit hex secrets per tier were generated; only the DEV ones were deployed. PROD secrets remain in the user's vault for release-time promotion.
+
+**Pre-existing state discovered mid-session (did not overwrite):**
+- Postal is **already installed** as three Railway services in the `N8N-MCP` project: `postal-web`, `postal-mariadb`, `postal-worker`. The sprint doc's S7 is therefore partly done — infrastructure exists, DNS and domain config are presumably in place (reachable at `postal-admin.courseworx.media` per env config). What S7 still needs is the Express `/api/email/send` endpoint and the reachability health check.
+- `WritersWorkbenchDev` service already had `EMAIL_SECRET`, `POSTAL_API_KEY`, `POSTAL_API_URL`, `SENDER_EMAIL=eve@courseworx.media`, `SENDER_NAME=The Writers Workbench (Dev)`, `REPLY_TO_EMAIL=support@courseworx.media`. Existing `EMAIL_SECRET` value was reused instead of overwritten with the one generated this session.
+
+**Dev Railway env vars added this session (`N8N-MCP` project, `WritersWorkbenchDev` service):**
+- `INGESTION_SECRET` — new (generated this session)
+- `APPROVAL_SECRET` — new (generated this session)
+- (`EMAIL_SECRET` left at existing value)
+
+**n8n `httpHeaderAuth` credentials created this session on `n8n.agileadautomation.com`:**
+
+| Credential name | ID | Header |
+|---|---|---|
+| `DEV Workbench Ingestion Secret` | `jQBRJbmiUeTk8c11` | `X-Ingestion-Secret` |
+| `DEV Workbench Approval Secret`  | `ytjKAO1BESVf6Cnz` | `X-Approval-Secret` |
+| `DEV Workbench Email Secret`     | `kxrSg24PIR2Npfvw` | `X-Email-Secret` (value = existing Railway `EMAIL_SECRET`) |
+
+PROD secrets and PROD credentials are not yet created — they land at release-time promotion.
+
+### PR #19 — draft against `develop`
+
+`feature/newsletter-sprint-s1` pushed to origin and a draft PR (#19) is open against `develop`. Once the operational tasks above are done and the PR flips to ready + merges, dev Railway auto-deploys and `/api/ingestion/*` becomes reachable. Smoke test after that:
+```
+curl -H 'X-Ingestion-Secret: <dev secret>' \
+  'https://writersworkbenchdev-production.up.railway.app/api/ingestion/search?prefix=NEVER/&user_id=%2B14105914612'
+```
+Expected: `{"success":true,"items":[]}`.
+
+### S4 — Next up (not yet started)
+
+**Story:** Clone `AI News Data Ingestion Orig` (`53SlwZMS21gpvz3H`) to `AI News Data Ingestion V2`, rewire its six S3/proxy nodes to hit the new `/api/ingestion/*` endpoints, and repoint its `scrape_url` `executeWorkflow` node at `BJaUNEt6PPIqbWLa` (replacing the broken `qVEM2rCD1jlJPeRs`). 3 pts, P0.
+
+**Unblocks needed before S4 can run end-to-end:**
+1. Wire the DEV `INGESTION_SECRET` into Railway dev service env + an n8n `httpHeaderAuth` credential.
+2. Confirm DEV Express exposes `/api/ingestion/*` once the branch deploys (right now the feature branch is unmerged; dev Railway tracks `develop`).
+
+### Developer reference — what to know to resume
+
+**Branch state:**
+- `feature/newsletter-sprint-s1` — carries S1 + MCP fix + S2 + S3 (4 commits ahead of `develop`).
+- `develop` — unchanged since S10b-2.
+- `feature/s10b-3-chat-proxy-migration` — active in a different session, different worktree. Do not touch.
+
+**Worktree layout (this session):**
+- Main worktree: `/Users/ericbeser/Documents/GitHub/Automations` — S10b-3 session's working copy, do not modify.
+- Newsletter worktree: `/Users/ericbeser/Documents/GitHub/Automations-newsletter-s1` — where all Newsletter sprint work happens. Has its own `node_modules` (installed this session).
+
+**Commits on the feature branch this session:**
+- `2921dd8` — S1 (Node - Scrape Url V2 + legacy dup retired)
+- `eb8bc55` — Point n8n MCP at the correct self-hosted instance (see next paragraph)
+- `3014c98` — S2 (migration 009, types, env.example)
+- `718c905` — S3 (ingestion endpoints, shared-secret middleware, 17 tests)
+
+**`.mcp.json` drift fix:** was pointing at `https://agiletesting.app.n8n.cloud` with an unrelated API key. Every n8n-mcp call was 404-ing because all project workflows (Newsletter, PROD/DEV tiers, Author Agent tools) live on `https://n8n.agileadautomation.com`. Fixed via `eb8bc55`; the correct key was already in `writers-workbench/.env` as `N8N_API_KEY`. The fix doesn't take effect until Claude Code reloads MCP config. Until then: use direct curl against the REST API.
+
+**DEV Supabase pooler (confirmed working this session):**
+- `PGHOST=aws-1-us-east-2.pooler.supabase.com PGPORT=5432 PGUSER=postgres.gvbvwcnmjkdpclcisqrr PGDATABASE=postgres PGPASSWORD=<user vault> /usr/local/opt/postgresql@17/bin/psql`
+
+**Files / folders to know for Newsletter sprint:**
+- [`writers-workbench/sprint-newsletter-migration.md`](writers-workbench/sprint-newsletter-migration.md) — the sprint plan (v1.1).
+- [`writers-workbench/docs/newsletter-migration-workflow-ids.md`](writers-workbench/docs/newsletter-migration-workflow-ids.md) — running registry of n8n workflow IDs (authoritative for S4 wiring).
+- [`writers-workbench/migrations/009_newsletter_ingestion.sql`](writers-workbench/migrations/009_newsletter_ingestion.sql) — applied to DEV.
+- [`writers-workbench/server/src/routes/ingestion.ts`](writers-workbench/server/src/routes/ingestion.ts) + [`middleware/shared-secret.ts`](writers-workbench/server/src/middleware/shared-secret.ts).
+
+**Tests:** 124/124 server, 214/214 client pass on the feature branch.
+
+**Immediate to-do at start of next session:**
+1. Flip PR #19 from draft to ready, merge to `develop` once reviewed (auto-deploys dev Railway).
+2. Once deployed, smoke-test: `curl -H 'X-Ingestion-Secret: <dev>' 'https://writersworkbenchdev-production.up.railway.app/api/ingestion/search?prefix=NEVER/&user_id=%2B14105914612'` → expect `{success:true,items:[]}`.
+3. Begin S4 — clone `AI News Data Ingestion Orig`, rewire 6 S3/proxy nodes to `/api/ingestion/*`, point `scrape_url` at `BJaUNEt6PPIqbWLa`. Use n8n credential `jQBRJbmiUeTk8c11` on the new HTTP Request nodes.
+
+**Gotchas learned this session:**
+- n8n Community edition disallows `$env.*` in expressions. Shared secrets must live in `httpHeaderAuth` credentials; non-secret config must be hardcoded (and substituted at promotion) or read from `app_config_v2`.
+- Cloudflare fronts `n8n.agileadautomation.com` and blocks Python `urllib`'s default user-agent with error 1010. `curl` works fine; Python needs a browser UA or prefer `subprocess.run(['curl', ...])`.
+- n8n `POST /workflows` and `PUT /workflows/:id` allow only `name`, `nodes`, `connections`, `settings` (and `settings` itself only allows a small allowlist — `binaryMode`, `callerPolicy`, `availableInMCP` etc. get rejected). Strip incoming source workflows before re-posting.
+- The v1.1 sprint doc was written before Sprint 10.a's PROD/DEV rename completed. Newsletter workflows weren't in scope for the rename and keep their original IDs — do not search for `PROD - AI News Data Ingestion` or `DEV - Node - Scrape Url`, they don't exist. The sprint's own `V2` suffix is the working naming.
+
+**Final sanity snapshot at session end:**
+- Migration 009 applied live to DEV; PROD untouched.
+- `Node - Scrape Url V2` (`BJaUNEt6PPIqbWLa`) active on n8n with preserved Firecrawl cred.
+- Feature branch `feature/newsletter-sprint-s1` = 4 commits ahead of `develop`, unpushed.
+- Server suite: 124/124. Client suite: 214/214. Schema governance: 9/9 migrations / base tables clean.
+
+---
+
+## 2026-04-24 — Sprint 12 consistency fixes + UI MVP (honest status)
+
+### What actually shipped this session
+
+**1. Workflow changes (live on DEV n8n):**
+- `DEV - Worker - Write Chapter` (fsKRGkzphWT62rja) — 26 → 32 nodes:
+  - `build_chapter_context` executeWorkflow node inserted between `get_project_data` and `research_topic`; calls S12-2 context builder `jJe84zB3U1HA9xVv`.
+  - `build_sub_chapter_prompts` patched: prepends the S12-2 context document to every sub-chapter system prompt and adds a **LOCKED CHARACTER ROSTER / FINAL CHECK** block above the existing CHARACTER NAME RULES.
+  - Continuity merge chain (`continuity_prepare` → `continuity_merge_llm` → `continuity_finalize`, with `continuity_merge_claude` as ai_languageModel) inserted between `concatenate_chapter` and `update_story_bible`. Skips the LLM pass for chapters with ≤2 sub-chapters.
+  - `write_timing` node added after `set_result` — writes `execution_time_ms` / `queue_wait_ms` / `llm_time_ms` to `token_usage_v2` (fails open). Requires migration 011 (applied).
+- `DEV - Tool - Rewrite Chapter with Research` (O8EWqLrqxcTJiWGN) — fixed two bugs discovered in smoke testing:
+  - `load_chapter` now selects `content_text` (the real column), not `content`; `package_and_save` PATCHes `content_text` too.
+  - `rewrite_llm` chainLlm node uses `promptType=define` + concatenated `text`, not the broken `messages.messageValues` shape.
+- `DEV - Sub - Research Pipeline` (ACgIg1WPkIipiy5o) — same chainLlm fix on `derive_questions_llm`.
+
+**2. Workbench code (PR pending):**
+- New `POST /api/content/:id/rewrite-with-research` endpoint (`server/src/routes/content-actions.ts`) — validates input, resolves chapter + project, enqueues a heavy-ops BullMQ job with a pre-formed prompt that forces the hub to call `rewrite_chapter_with_research`. 5 vitest tests covering auth / validation / enqueue.
+- `RewriteWithResearchModal.tsx` + button wired into `ContentDetail.tsx` — appears only for `content_type='chapter'`. Collects `research_focus`, `use_qa_report`, `style_directives`, and citation mode (auto/invisible/inline). Submission posts to the new endpoint; progress surfaces through the existing SSE `chat-job-status` event.
+- Migration 011 (`token_usage_v2` timing columns) applied to DEV Supabase.
+
+**3. E2E verified (exec 13819 on 2026-04-24):**
+- User prompt → DEV hub → Gemini → `rewrite_chapter_with_research` → Research Pipeline (ACgIg1WPkIipiy5o exec 13820, success, 10s) → Claude Sonnet rewrite → DB writes.
+- Research report `94089947-77f8-415c-9227-16a273814d07` persisted with topic prefix `[Chapter 7 Rewrite] ...`.
+- `published_content_v2.content_text` updated for chapter `d91a5aad-...` (46,532 chars); `metadata.last_rewrite` records the research_report_id + timestamp + `citations_in_prose: false`.
+- Fiction mode correctly derived (project_type=`story` → `citations_in_prose: false`); **zero** footnote markers in the rewritten prose.
+
+### Deferred to next sprint (design doc needed)
+- **S12-3 true parallel sub-chapter fan-out.** n8n's loop model serializes iterations by design; real parallelism requires moving sub-chapter writing to BullMQ jobs on the Workbench. Explicit separate sprint.
+
+### Known gotchas / context for the next session
+- n8n's `POST /workflows/{id}/deactivate` returns 403 on DEV hub + DEV worker; PUT-in-place works anyway. Scripts now tolerate the 403 and continue.
+- n8n chainLlm nodes **require** `promptType: 'define'` + `text` field. The `messages.messageValues` form errors with "No prompt specified. Expected to find the prompt in an input field called 'chatInput'". Watch for this in any future chainLlm creation.
+- `published_content_v2.content_text` (not `content`), no top-level `summary` or `word_count` columns — those live in `metadata` JSONB.
+- `content_versions_v2.content_text` (not `content`), `change_note` (not `change_summary`), `changed_by` (not `version_type`).
+- Hub `preprocess_message` has aggressive pre-routing: mentioning "Q/A report" in the user_message_request shortcuts to `direct_qa_chapter` and skips the Agent entirely. When smoke-testing tools through the hub, avoid QA-trigger keywords in the test prompt.
+- Hub webhook `/webhook/author_request_dev` expects payload to be flat JSON (n8n wraps it under `body` automatically). Double-wrapping with `{"body": {...}}` ends up as `body.body.*` and silently fails.
+- Cloudflare times out long hub responses at ~100s with 524. Async (queued) operations are unaffected; sync call-to-tool through the hub that takes more than 90s will get a 524 on the client side while the tool keeps running server-side.
+
+### Status of earlier Sprint 12 PRs
+- **PR #28 (S12-5 timing + performance dashboard)** — open.
+- **PR #29 (S12-2 context builder)** — open.
+- **PR #30 (S12-6/7/9 rewrite-with-research)** — open, but the scripts in that PR have the schema + chainLlm bugs. This session's updated scripts supersede them. When #30 merges, rebase this session's branch; if #30 is closed in favor of this one, note it in the merge message.
+
+---
+
+## 2026-04-26 — Sprint 12 Track C complete; Track A deferred to dedicated sprints
+
+### What this session shipped (PR #40 → develop)
+
+**Track C — Reviewer/Editor Tools (24 pts, all green):**
+
+1. **S12-11 — Genre Compliance Evaluator** (`evaluate_genre_compliance`, wf `e9LEpCM5L7zVpQxl`). Computed-before validator (server computes `evidence.context` from the verified `evidence.quote` position rather than trusting Claude's context field — defends against fabrication). Three-stream output: `prose_adaptations`, `outline_adaptations`, `observations`. Persists to `published_content_v2.metadata.genre_eval`. Wired to DEV hub via `evaluate_genre_compliance` tool node + `ui:evaluate-genre` source bypass. **Already shipped in earlier session — no changes here.**
+
+2. **S12-12 — Character Drift Scanner** (`scan_character_drift`, wf `fJWDHXhle345f6jY`). **Major pivot from LLM-based to deterministic regex algorithm** (`scanner_algorithm: 'deterministic-regex-v4'`) driven by user feedback ("create an algorithm that will work for all chapter sizes"). Cuts wall time from 5+ min to <1 sec, eliminates parse failures, eliminates token-limit issues, eliminates fabrication risk. Detects three drift classes:
+   - **Phase 0 (NEW)** — reverse-order drift (`<Surname>, <canonical first>` case-file form). Required structural anchor before the surname token (e.g. "Case #2851:", "Subject Name:", "Detainee:") so it doesn't false-fire on sentence-boundary commas like "...her careful English, Mason found..." or paragraph breaks like "\n\nDownstairs, Craig...".
+   - **Phase 1** — canonical matches with longest-first pattern ordering and consumed-range masking; bare surname now in `allowed_set` so "Reyes" alone for "Captain Vael Reyes" doesn't false-flag.
+   - **Phase 2** — forward drift candidates (`<canonical first> <unknown surname>`).
+   - **Phase 3** — unknown-person mentions with **shape-based** noise filter (no story-name hardcoding). HONORIFICS expanded to be genre-agnostic (added political/royalty/religious/sci-fi titles — "senator", "lord", "pastor", "captain", "elder", etc.). HEADER_TOKENS catch bureaucratic/place/institution shapes (clause, statute, county, conclave, guild, etc.). Per-project `outline._scanner_exclusions: string[]` hook for the long tail.
+   - Persists to `writing_projects_v2.outline._character_drift_scan` (NOT `metadata` — base-table immutability).
+   - **Result on *The Invisible Wall*:** 1 real drift surfaced (Ch5 "Rodriguez, Elena"), 144→32 unknowns (78% noise drop), 0 false positives. Multi-genre smoke (sci-fi/romance/fantasy/political) all clean.
+
+3. **S12-13 — Shared Annotations UI** (NEW story added mid-sprint; was option 4 in the prior Q&A). Three new endpoints in `server/src/routes/content-actions.ts`:
+   - `GET /api/content/:id/annotations` — merges `metadata.genre_eval` + `outline._character_drift_scan` for the chapter, normalised to `UnifiedAnnotation[]`. Honours `metadata.dismissed_annotations`. Auto-derives `replacement_text` for reverse-order drift (`Rodriguez, Elena` → `Morales, Elena`).
+   - `POST /api/content/:id/annotations/apply` — precise span replacement (no LLM rewrite). Snapshots prior text into `content_versions_v2` with `change_note: annotation_apply:<source>:<id>` BEFORE mutating. Returns 422 on stale anchor (target text no longer present). Marks annotation dismissed.
+   - `POST /api/content/:id/annotations/dismiss` — adds annotation id to `metadata.dismissed_annotations` array.
+   - Annotation ID is deterministic: `<source>:<chapter_number>:<kind>:<evidence_normalised>` so the same flag on a re-scan collapses onto the same row.
+   - New `client/src/components/content/AnnotationsPanel.tsx` (305 lines) wired into `ContentDetail.tsx` for chapters. Two source sections (drift first, genre second). Each row: severity badge, evidence quote in blockquote, suggested replacement in green box, Apply / Dismiss buttons.
+   - 4 new vitest tests (GET merge + Apply happy path + 422 stale + Dismiss). 9/9 total content-actions tests pass.
+
+4. **S12-2 patch** — `Build Chapter Context` (wf `jJe84zB3U1HA9xVv`) `build_context` Code node updated. Replaced `### Characters` block with `### LOCKED CHARACTER ROSTER` directive ("Use ONLY the canonical name forms... `name_variants` is the COMPLETE allowed set... anything outside it is drift") plus a `name_variants:` line per character that combines declared `c.name_variants[]`, the canonical full name, and the bare first-name. Downstream rewrite/worker tools now see the canonical roster.
+
+**Hand-fix verification (real Ch5 fix):**
+- Ran the apply-endpoint code path directly against DEV Supabase: replaced the 1 occurrence of "Rodriguez, Elena" with "Morales, Elena" in chapter `d2063a9f-c8ea-47c8-ba43-067bbcd5e858` (The Efficiency Report).
+- Snapshotted prior text into `content_versions_v2` (version_number=2, changed_by=`annotation_apply`).
+- Marked annotation `drift_scan:5:reverse_order_drift:Rodriguez, Elena` as dismissed.
+- Re-scan confirmed 0 drift flags. Same code path the deployed apply endpoint will use — proves the surface end-to-end before merge.
+
+### Track A — DEFERRED to dedicated sprints (Sprints 16–18)
+
+S12-1 (remove rate_limit_delay), S12-3 (parallel fan-out), S12-4 (continuity merge), S12-5 (timing + dashboard) **removed from Sprint 12** and re-planned at the END of the sprint sequence (after Sprint 15 load test). The user's reasoning, captured verbatim:
+
+> "The purpose of the wait node between sub chapters was the max limit that claude put on token processing and the exhorbitant number of tokens required to write the sub chapter. We had to make a tradeoff between quality of output and time. The write chapter process needs the architecture looked at to reduce the processing load, and to queue up processes that are not token hogs. We need to analyse the output to determine how the quality chapter writing can be accomplished by different LLM's or a combination of LLMs. Break down the sprints so that we can make this architectual change without the risks you have shown in this sprint."
+
+This is now Sprints 16 (analysis/profiling), 17 (LLM bake-off + quality benchmarks), 18 (architecture refactor + safe rollout). Full breakdown lives in `sprint_document_v2.md` Sprints 16–18 sections (added this session).
+
+### Workflow IDs touched this session
+- `fJWDHXhle345f6jY` — DEV - Tool - Scan Character Drift (deterministic algorithm v4 deployed)
+- `jJe84zB3U1HA9xVv` — DEV - Sub - Build Chapter Context (LOCKED CHARACTER ROSTER patch)
+- `FLA6xIDEvejihQLP` — DEV - The Author Agent (already wired; verified no changes needed this session)
+- `e9LEpCM5L7zVpQxl` — DEV - Tool - Evaluate Genre Compliance (verified; no changes)
+- `O8EWqLrqxcTJiWGN` — DEV - Tool - Rewrite Chapter with Research (verified; no changes)
+
+### Critical context for the next session
+
+**Drift scanner — algorithm choices that are easy to misunderstand:**
+- `NON_PERSON_PATTERNS` is intentionally **short and universal** (calendar, US states, generic constitutional terms, agency acronyms via `^[A-Z]{2,5}\d{0,3}$`). Story-specific names DO NOT belong here — that broke for The Invisible Wall mid-session and was reverted.
+- `HEADER_TOKENS` is the workhorse: any token in a short phrase (≤5 tokens) that matches a bureaucratic/place/institution suffix → filter. Genre-agnostic.
+- `outline._scanner_exclusions: string[]` is the per-project escape hatch — the user can mark "Yick Wo", "Justice Brennan", etc. as known-non-person without code changes. **No UI to edit this list yet.**
+- `HONORIFICS` is consulted in two places: `stripHonorifics()` for matching and `honorificRe` in Phase 3. Both **derive from the same Set** so additions stay in sync.
+- The reverse-order Phase 0 anchor list is intentionally narrow — only fires after structural form-field markers (Case #, Name:, Subject:, etc.). No `^\s*$/` start-of-line anchor — that false-fires on every paragraph break.
+
+**S12-13 hand-fix — what happens server-side:**
+1. GET `/api/content/:id/annotations` rebuilds annotations on every fetch (no annotation table; flags live in source JSON).
+2. Apply does `text.split(target).join(replacement)` — **all** occurrences of the exact target are replaced. For a case-file table that drifts twice in the same chapter, both get fixed in one click.
+3. Version snapshot uses the real schema: `(content_id, user_id, version_number, content_text, changed_by, change_note)`. version_number is computed via `select … order desc limit 1`. NOT `snapshot_reason` — that field doesn't exist.
+4. Stale anchor → 422 (not 500) so the client can show a "rescan needed" CTA.
+
+**Sprint 11 (Postal email migration) — status unchanged this session.** The Newsletter Agent migration sprint installed Postal and migrated 1 newsletter workflow. The other 15 V2 workflows still send via Gmail OAuth (cred `CPCSZOInV8Zj1PI1`). Sprint 11 stories (S11-1 through S11-5) remain open — no work this session. Independent of Sprint 12.
+
+**Open follow-ups (small):**
+- The deterministic scanner still surfaces ~20 long-tail noise items per typical chapter (Yick Wo, Wong Wing, Justice Brennan, Crown Victoria, etc.). These are the per-project `_scanner_exclusions` candidates — UI for editing this list is NOT built yet.
+- AnnotationsPanel doesn't yet show inline gutter markers in the RichTextEditor — only the side panel. Spec called for both; spec was descoped to ship the panel first.
+- S12-13 has no e2e Playwright test yet — only vitest unit tests on the server endpoints.
+- After PR #40 merges and dev Railway redeploys, the AnnotationsPanel needs a manual UI smoke (open the project's Ch5 — drift annotation should be empty since we hand-fixed it; open Ch7 if it has flags; click Apply; verify text update + version row).
+
+**PR open at end of session:** [#40 — S12-11/12/13: genre eval, deterministic drift scanner, shared annotations UI](https://github.com/beserericl-hue/Automations/pull/40)
+
+---
+
+## 2026-04-26 (continued) — PR #40 merged, sprint-state audit, stale PRs closed
+
+Continuation of the same working session, after the initial Track C ship + Sprint replan above.
+
+### PR #40 merged via admin override (commit `1ff111a` at 19:46 UTC)
+
+GitHub branch protection on `develop` requires 1 approving review and the PR author cannot self-approve. With both the commits and the PR authored under the user's git identity (`beser.ericl@gmail.com`), `gh pr review --approve` returned `Review Can not approve your own pull request`. User authorised admin merge; closed via `gh pr merge 40 --merge --admin --delete-branch`.
+
+**Two CI fix commits landed before the merge:**
+
+1. **`dab3b58`** — `fix(s12-13 tests): make update-chain thenable typing match strict tsconfig`. The CI's `tsc -p server/tsconfig.json` is stricter than the local config; the original `then` shim signature `(resolve: (v: unknown) => unknown) => unknown` rejected `undefined` for `onfulfilled`. Replaced with a proper `PromiseLike` whose `then` accepts the standard `onfulfilled/onrejected` pair. 9/9 tests still pass.
+
+2. **`e0425b6`** — `ci(e2e): pass VITE_SUPABASE_* secrets to chromium-noauth Playwright run`. The `.github/workflows/ci.yml` `e2e-tests` job runs `npx playwright test --project=chromium-noauth` which spawns `npm run dev:client` (Vite dev server). The dev server initialises the Supabase client. **Without `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` in the env**, auth misbehaves and route guards inconsistently leave unauthenticated users on `/`, `/chapters`, etc. instead of redirecting to `/login`. All 18 noauth tests then fail (5 in `login.spec.ts`, 13 in `sprint2-navigation.spec.ts`) with the same `15s timeout waiting for "The Writers Workbench" heading`. Fix: propagate the same env-var block already used by the `npm run build` step on line 102 into the noauth playwright step. **Important context:** this was a long-standing latent bug — the `e2e-tests` job has `if: github.event_name == 'pull_request'`, so pushes to `develop` SKIP it, and develop's history shows `E2E Tests (Chromium): skipped` on every recent run. PR #40 was the first PR in a while to actually exercise it.
+
+### Three stale Sprint 12 PRs closed (no merge)
+
+After the merge, the following Sprint 12 PRs were still open with no path to merge:
+
+| PR | Why closed |
+|---|---|
+| **#28** S12-5: timing telemetry + performance dashboard | S12-5 was deferred to Sprint 18-5 in this session's replan. Sprint 18 instruments the new chapter-writer architecture, not the legacy worker — merging #28 would add code that gets ripped out. |
+| **#29** S12-2: Build Chapter Context sub-workflow | Superseded by PR #31. The actual context builder shipped from #31. |
+| **#30** S12-6/7/9: credibility-first chapter rewrite with research | Superseded by PR #31. The 2026-04-24 SESSION_CONTEXT note flagged this branch's scripts as having schema + chainLlm bugs that #31 fixed; merging would re-introduce broken code. |
+
+`gh pr list --state open` returned zero remaining PRs after the close-out.
+
+### Sprint state audit — corrections to earlier-in-session statements
+
+Mid-session I told the user **"Sprint 10.b is in flight"** when asked what's next. That was wrong — I anchored on the 2026-04-21 SESSION_CONTEXT entry which truthfully said 10.b was in flight at that date, but later sessions completed the remaining stories. Verified state as of 2026-04-26:
+
+**Sprint 10.a — SHIPPED** (per 2026-04-21 session entry; verified by PR list — #5/6/7 deploy markers, #8 bulk, #9 CLAUDE.md note all merged; PROD/DEV tier separation visible across Supabase, n8n, ElevenLabs, Railway).
+
+**Sprint 10.b — SHIPPED** (verified by `gh pr list`):
+- S10b-1 → PR #10 ✅
+- S10b-2 → PR #11 ✅
+- S10b-3 → PR #13 ✅
+- S10b-4 → PR #20 ✅ (#14 was the original PR for this story; closed and superseded by #20)
+- S10b-5 → PR #15 ✅
+
+**Sprint 11 — DEV-complete, awaiting release** (corrects another wrong claim in the earlier 2026-04-26 entry above which said "the other 15 V2 workflows still send via Gmail OAuth"). Verified via direct n8n inventory (`/api/v1/workflows?limit=250`):
+- **DEV tier**: 14 of 14 email-sending workflows are on Postal (`/api/email/send`); zero on Gmail.
+- **PROD tier**: 14 of 14 still on Gmail; zero on Postal — by design, awaits release-day promotion via `scripts/promote-dev-to-prod.py`.
+- S11-1/S11-2/S11-3 don't have per-story commits because the migration was a single sweep via `scripts/s11-migrate-gmail-to-postal.py` (`b9303aa`).
+- S11-4 → PR #23 ✅ (Redis-backed email rate limiter)
+- S11-5 → PR #24 ✅ (bounce + complaint webhook + admin UI)
+
+**Sprint 12 — DEV-complete after PR #40 merge.**
+- Track A (S12-1/3/4/5, 26 pts) moved to Sprints 16/17/18 (3-sprint architecture programme with quality harness + LLM bake-off + safe rollout).
+- Track B (S12-0/2/6/7/8/9) shipped via PR #31 et al earlier in sprint.
+- Track C (S12-11/12/13) shipped via PR #40 this session.
+
+### User feedback captured this session
+
+> "we won't update Prod until release day."
+
+Codifying as: any sprint whose DEV-side work is complete is **effectively done from a development perspective**, even if the workflow tier separation governance still labels it "open" until the release-day promotion runs. Don't loop back to such sprints when asked "what's next to work on" — they're done; only release runs them.
+
+> "Sprints are not left undone without explicit permission first."
+
+Reaffirmed governance rule. The Track A removal from Sprint 12 in this session WAS explicit (user wrote: *"Can Track A become a separate sprints. Move it to the end of the other sprints..."*). Future deferrals must follow the same pattern: explicit user direction, captured in the sprint doc with a back-link.
+
+### Where things actually stand at end of session
+
+- `develop` HEAD is `1ff111a` (PR #40 merge). Local `develop` synced.
+- Open PRs: **0**.
+- DEV Railway will auto-deploy PR #40 within ~3 min of the merge — `AnnotationsPanel` UI + `/api/content/:id/annotations` endpoints become live then.
+- DEV Supabase has the Ch5 hand-fix applied (commit-equivalent persisted state, see "Hand-fix verification" above).
+- DEV n8n has the deterministic drift scanner v4 + LOCKED CHARACTER ROSTER context patch live.
+- PROD untouched — no production resources modified this session.
+
+**Recommended next sprint:** Sprint 8 (Multi-tenant RBAC, 55 pts) per the v2 doc's recommended order. Sprint 8 details aren't in `sprint_document_v2.md` — they live in the original `sprint_document.md`. If picking up Sprint 8 in a future session, start by extracting the actual Sprint 8 stories from there.
+
+**Process lesson noted:** When asked "what is the next sprint?" or "what's open in sprint X", do NOT anchor on a single SESSION_CONTEXT entry. Cross-reference with `gh pr list --state all` and `git log --all --oneline | grep <sprint id>` before answering. Twice this session that anchor-on-one-entry pattern produced a wrong answer that the user had to push back on.
+
+---
+
+## 2026-04-27 — Sprint 8 shipped to DEV (RBAC + tiers + credits + impersonation read/write); onboarding tour rewrite
+
+### What shipped this session
+
+Two PRs merged to `develop` (squash, admin override per the develop branch-protection rule that blocks self-approval):
+
+- **PR #50** — `feat(sprint-8)` at `2f4f1c3`. Sprint 8 in full plus the gap fixes from the 2026-04-26 sessions plus write impersonation plus the role-change endpoint plus inline Edit-user.
+- **PR #51** — `feat(onboarding)` at `780cc22`. Anchored, spotlight-cutout product tour. Each step now positions next to the actual UI element it talks about.
+
+DEV `/api/health` confirmed live at `780cc22` (deployed 2026-04-27T13:49:38Z). `checks.supabase`/`redis`/`postal` all `ok`.
+
+### Sprint 8 — DEV-complete (PROD untouched)
+
+10 stories / 55 pts shipped. Spec is in `sprint_document.md` (original Sprint 8 section). Adapted away from the spec's literal SQL because the spec called for `ALTER users_v2` which the schema-governance check on migrations ≥008 forbids; used the meta-table pattern the doc itself prescribes for that case.
+
+#### Migration 011 — what's actually in DEV Supabase (`gvbvwcnmjkdpclcisqrr`)
+
+Applied 2026-04-26. PROD Supabase (`faklxfakgzkpkbxfihzh`) does NOT have it yet — apply at release-day.
+
+Six new tables (all additive — `scripts/check-base-table-immutability.py` passes):
+
+| Table | Purpose |
+|---|---|
+| `user_account_meta_v2` | Account lifecycle: `account_status` (active/locked/suspended/pending), `locked_at`, `locked_by`, `locked_reason`. PK = `user_id`, FK CASCADE to `users_v2`. Absence of a row = active. |
+| `user_role_meta_v2` | Elevated role (`'superuser'` or `'admin'`). Absence of a row = ordinary user. The legacy `users_v2.role` column from migration 001 is left untouched (its frozen CHECK doesn't accept `'superuser'`); effective role = `COALESCE(user_role_meta_v2.role, users_v2.role, 'user')`. |
+| `subscription_tiers` | 5 seeded tiers: `trial` (200/mo, 30d, 0¢), `standard` (100/mo, $19.99, $199/yr; default for self-signup), `pro` (500/mo, $49.99, $499/yr, all features), `paid_full` (1000/mo, $49.99, $499/yr), `free_full` (1000/mo, 0¢, admin-provisioned only — `publicly_selectable=false`). Each row has `features` JSONB (`kdp_export`, `cover_art`, `social_media`, `max_projects`) and `credit_purchase_price_cents` (default 100¢ = $1.00/credit). |
+| `user_subscriptions` | One per user. Tracks tier_id, status, billing_cycle, period_start/end, trial_start/end, credits_remaining, credits_used_this_period, auto_renew, trial_warnings_sent JSONB array. UNIQUE on user_id. |
+| `credit_transactions` | Audit ledger. Five `transaction_type` values: `monthly_reset`, `usage`, `admin_adjustment`, `purchase`, `refund`. Includes `balance_after` so a single row tells you the running balance at that moment. |
+| `impersonation_log` | Superuser audit trail. `actions_taken` JSONB array — each successful write through the impersonation-write proxy appends an entry capped at 500 per session. UNIQUE active session per superuser via partial index. |
+
+Helper functions (parallel — no `CREATE OR REPLACE` on existing functions the base tables depend on):
+
+- `is_admin_v2()` — `true` if the JWT's `auth.uid()` user has `user_role_meta_v2.role IN ('admin','superuser')`
+- `is_superuser_v2()` — strictly superuser
+- `is_account_active_v2()` — `false` if `user_account_meta_v2.account_status` is anything but `active`
+- `get_user_effective_role_v2(p_user_id)` — `COALESCE` of meta + legacy
+
+Role-escalation trigger `prevent_role_meta_escalation` on `user_role_meta_v2` (INSERT/UPDATE/DELETE): blocks non-superuser callers. Service role bypasses (auth.uid() IS NULL).
+
+#### User seed — what's in DEV right now
+
+Verified live via psql against DEV pooler:
+
+```
+   user_id    | legacy_role | effective_role
+--------------+-------------+----------------
+ +14105914612 | admin       | superuser     -- Eric (granted by migration seed; legacy column is admin because the v1 CHECK can't store 'superuser')
+ +17063338699 | user        | (none)        -- Horace (test user; no meta row, no subscription)
+```
+
+Eric's user_subscriptions row: tier `free_full`, status `active`, billing_cycle `none`, credits_remaining `1000`. Eric also has `user_account_meta_v2.account_status = 'active'`.
+
+Horace has NO subscription row — credits show as 0 in the UI and chat will 402 once it's wired to the credit gate. Open follow-up below.
+
+#### Server endpoints added
+
+All under `/api/*`. Full list in `server/src/routes/`:
+
+- `creditsRouter` — `/credits/{balance,pricing,transactions,purchase}`
+- `superuserRouter` — `/superuser/{impersonate,impersonate/active,impersonate/log,tiers,tiers/:id,tiers/:id/deactivate,config}`
+- `tiersRouter` — `/tiers` (public, no auth — for signup pricing page)
+- `cronRouter` — `/cron/{trial-check,credit-reset,trial-warnings}` gated by `X-Cron-Secret`. `trial-warnings` resolves the recipient email then calls Postal `sendEmail()` with 7d/3d/1d HTML templates. Marks `trial_warnings_sent` regardless of email outcome to avoid spamming on hard-bounce.
+- `impersonateDataRouter` — `/impersonate/data/{dashboard, projects[/:id], projects-summary, content[/:id], research[/:id], story-bible/:projectId, outline-versions[-info]/:projectId, content-versions/:contentId, images[/:id], social-posts, trash, search, token-usage, provenance/:contentId, outlines}`. Superuser-only. Service role + filter by `req.userId` (which is the impersonated id when `X-Impersonate-User` is set + the superuser has an active impersonation_log row).
+- `impersonateWriteRouter` — `/impersonate/write/{projects/:id[+/restore], content/:id[+/restore], content-versions, story-bible[/:id], research/:id[+/restore], images[/:id], social-posts/:id}`. Same gate, plus requires `req.isImpersonating === true`. Field whitelists per resource. Every successful write appends an audit entry to `impersonation_log.actions_taken`.
+- `cronRouter`'s trial-warning Postal integration uses the existing `EMAIL_SECRET` + Postal mail server credentials already wired on the dev Workbench Railway service.
+
+Auth middleware (`server/src/middleware/auth.ts`) extended:
+
+- `requireAuth` loads role meta + account meta + subscription in parallel, blocks `account_status !== 'active'` (except superusers, who bypass account-status), honors `X-Impersonate-User` header.
+- New: `requireSuperuser`, `requireTierFeature(name)`, `requireCredits(amount)`. `requireAdmin` now treats superuser as admin (hierarchy: superuser > admin > user).
+
+`/api/chat/proxy` now does pre-flight credit check (returns 402 INSUFFICIENT_CREDITS with `creditsRequired` + `creditsRemaining`); deducts on success; sets `X-Credits-Remaining` header. Cost lookup is configurable via `app_config_v2.sprint8_superuser_config.credit_costs` with hard-coded defaults (write 5, brainstorm 3, research 2, cover_art 10, social 3, list/retrieve 0).
+
+`/api/admin/users/:id/role` is the canonical role-change endpoint. Writes to `user_role_meta_v2` (insert for `admin`/`superuser`, delete for `user`); only superusers can grant elevated roles; cannot demote yourself. The legacy `PUT /api/admin/users/:id` still updates name/email but cannot set role to `'superuser'` (the legacy CHECK rejects it).
+
+#### Client UI added
+
+- New routes: `/credits` (CreditsPage with Buy More Credits + transaction history), `/superuser` (SuperuserPanel with Impersonation, Tier Management, System Config tabs).
+- Banners mounted in AppShell: `ImpersonationBanner` (live timer, End button) and `TrialBanner` (turns red ≤3d).
+- Sidebar: credit pill (color-coded green/amber/red), Credits link, Superuser link (visible only to superusers).
+- AdminPanel rebuilt:
+  - 7 tabs: User Management, Subscriptions, Revenue, System Metrics, Workflows, Queues, Email Bounces.
+  - User row shows tier badge, account status, credits, trial countdown when applicable.
+  - Inline role dropdown: `user` / `admin` / `superuser` (admin/superuser disabled with `(superuser only)` label for non-superuser callers). Default value reads from `effective_role` not legacy column.
+  - Action buttons per row: **Edit** (display_name + email modal), **Lock** (with reason), **Unlock**, **Credits** (delta + reason), **Impersonate** (superuser only; disabled while another impersonation session is active).
+  - Subscriptions tab: filter by tier/status, sortable.
+  - Revenue tab: MRR, ARR, active paid/free/trial counts, breakdown by tier.
+- Onboarding flow: 2-step (profile → tier-selection via PricingCards). Calls `POST /api/account/subscribe`. Annual/monthly toggle. "Most Popular" ribbon on Pro.
+
+#### Impersonation data plane — every read view in the app honors it
+
+When `useUser().isImpersonating === true`:
+Dashboard, ProjectList, ProjectDetail (all six tabs' data: project + chapters + story bible + research + outline versions), ContentLibrary, ContentDetail, ResearchList, ResearchDetail, ImageGallery, ImageDetail, SocialMediaPanel, StoryBiblePanel, TrashView, OutlineList, VersionHistory drawer, ProvenancePanel, CostDashboard, Sidebar's My Projects expandable, TopBar breadcrumb title resolution, TopBar global search.
+
+Every write the impersonator triggers persists as the target user with an audit entry:
+ProjectEditForm save, ProjectDetail delete (cascade), ContentDetail save / status / schedule / cover-image / delete + content_versions snapshot, StoryBiblePanel + EntryForm CRUD, ResearchDetail save/delete, ResearchList delete, TrashView restore, ContentLibrary bulk approve/publish/delete (one PATCH per id for per-resource audit), AnnotationsPanel apply/dismiss (now via `apiFetch`).
+
+Server-mediated routes that already used `req.userId` (image generation, chat/brainstorm, rewrite-with-research, Q/A) work transparently during impersonation — they just see the swapped userId.
+
+#### Onboarding tour (PR #51)
+
+Replaces the old centered-modal tutorial with anchored popovers + spotlight cutouts. `data-tour` attributes added to `aside` (sidebar), the EveOrb wrapper, the credits pill, and the topbar chat button. Each step has a `target` selector + preferred `placement` (top/bottom/left/right/center). Smart placement falls back to the side with the most viewport room. Spotlight uses the `box-shadow: 0 0 0 9999px rgba(0,0,0,0.7)` inset trick for the dimmed cutout. Re-measures on resize, scroll, and DOM reflow via ResizeObserver. Smooth-scrolls offscreen targets into view.
+
+### Tests + build state
+
+- **508/508 tests passing** at end of session (PR #51 squash).
+- Sprint 8 added: server `sprint8-qa.test.ts` (14), `sprint8-gaps.test.ts` (3), `sprint8-impersonate-write.test.ts` (3); client `sprint8-qa.test.tsx` (18), `sprint8-gaps.test.tsx` (5).
+- TypeScript: clean both workspaces.
+- Production build: clean.
+- Schema governance: clean (migration 011 is additive only).
+
+### Known follow-ups (deliberately deferred)
+
+- **Self-signups should auto-create a trial subscription.** Current state: if a user finishes signup but skips tier-selection, they have no `user_subscriptions` row and credits show 0. Chat 402s once they try anything. Pragmatic fix: have the onboarding "Skip" path call `/api/account/subscribe { tier_name: 'trial' }` automatically. Test user Horace (+17063338699) is in this state right now — useful for testing the credit-exhaustion flow.
+- **`UserSettings` profile edits via impersonation:** not wired to the write proxy. Admin Panel "Edit user" modal covers this need.
+- **`GenreList` private genre management via impersonation:** not wired (low-priority surface).
+- **Stripe (Sprint 9) replaces the placeholder credit-purchase flow.** Right now `POST /api/credits/purchase` records the intent + bumps the balance immediately, no money moves. Sprint 9 plugs this through Checkout Sessions + PaymentIntent + webhook fulfilment.
+
+### Side sprint flagged by the user — incoming integration
+
+User noted at session end that **another side sprint is in flight on a different workflow** that will integrate into Writers Workbench. Details TBD when that work surfaces. Anyone picking up the next session: when integrating, route any new auth-protected endpoints through `requireAuth` (so the impersonation header is honored automatically) and append the user's writes to `impersonation_log.actions_taken` if the new flow can be triggered during impersonation. Use `data-tour` attributes on any prominent new UI elements so they can be added to the onboarding tour later.
+
+### Open PRs at end of session: 0
+
+`develop` HEAD is `780cc22` (PR #51 merge). Sprint 8 + tour live on dev. PROD on v1.0 still — no Sprint 8 anywhere on prod.
+
+### What the next session should pick up (in this order, your call)
+
+1. **Release Sprint 8 to PROD.** Apply migration 011 to PROD Supabase (`faklxfakgzkpkbxfihzh`); cut a `release/v1.1` branch from `develop`; PR to `main`; deploy. Eric is already seeded as superuser in DEV — the same `INSERT … WHERE EXISTS` guard in the migration will seed him in PROD too.
+2. **Sprint 9 — Stripe Integration (47 pts).** Prereq Sprint 8 (done). Replaces the placeholder purchase flow with real money movement.
+3. **Auto-trial on skip.** Tiny follow-up to fix the "0 credits after signup" gap.
+4. **Side-sprint integration** (whatever the user has in flight elsewhere).
+
+---

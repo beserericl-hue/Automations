@@ -1,5 +1,12 @@
 // TypeScript types matching the V2 Supabase schema (supabase_setup_v2.sql)
 
+// Legacy column on users_v2.role (frozen by migration 001 CHECK constraint).
+// Sprint 8 adds 'superuser' as an effective role via the user_role_meta_v2
+// table — the legacy column never holds 'superuser'.
+export type LegacyUserRole = 'user' | 'admin' | 'editor' | 'viewer';
+export type EffectiveUserRole = 'user' | 'admin' | 'superuser';
+export type AccountStatus = 'active' | 'locked' | 'suspended' | 'pending';
+
 export interface UserProfile {
   id: string;
   user_id: string; // phone number (E.164) — primary key across all V2 tables
@@ -8,7 +15,12 @@ export interface UserProfile {
   email: string | null;
   bcc_email: string | null;
   preferences: Record<string, unknown>;
-  role: 'user' | 'admin' | 'editor' | 'viewer';
+  role: LegacyUserRole;
+  // Sprint 8: effective role from COALESCE(user_role_meta_v2.role, users_v2.role).
+  // Surfaced by the server / client query; not stored on users_v2 directly.
+  effective_role?: EffectiveUserRole;
+  // Sprint 8: from user_account_meta_v2; defaults to 'active' when no meta row exists.
+  account_status?: AccountStatus;
   supabase_auth_uid: string | null;
   created_at: string;
   updated_at: string;
@@ -273,4 +285,234 @@ export interface ContentIndex {
   content_path: string;
   scraped_at: string;
   metadata: Record<string, unknown>;
+}
+
+// Migration 013 — per-user ingestion URLs scoped to a genre. The seeded
+// public URLs still live in the text[] columns on genre_config_v2; this
+// table holds user-added URLs and admin-curated public additions.
+export type GenreIngestionUrlType = 'rss' | 'source' | 'subreddit' | 'goodreads';
+export type GenreIngestionUrlVisibility = 'public' | 'private';
+
+export interface GenreIngestionUrl {
+  id: string;
+  genre_slug: string;
+  url: string;
+  url_type: GenreIngestionUrlType;
+  visibility: GenreIngestionUrlVisibility;
+  created_by_user_id: string;
+  label: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ContentIngestionType = 'article' | 'reddit_post' | 'tweet' | 'newsletter';
+
+export interface RedditMetadata {
+  score?: number;
+  num_comments?: number;
+  author?: string;
+  subreddit?: string;
+  reddit_id?: string;
+  flair?: string | null;
+}
+
+export interface ContentIngestion {
+  id: string;
+  key: string;
+  user_id: string;
+  type: ContentIngestionType;
+  title: string | null;
+  authors: string | null;
+  source_name: string;
+  source_url: string | null;
+  external_source_urls: string[];
+  image_urls: string[];
+  reddit_metadata: RedditMetadata | null;
+  published_timestamp: string | null;
+  feed_url: string | null;
+  storage_path_md: string;
+  storage_path_html: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export type NewsletterApprovalStage = 'stories' | 'subject_line';
+export type NewsletterApprovalDecision = 'approve' | 'revise';
+
+export interface NewsletterApproval {
+  id: string;
+  token: string;
+  user_id: string;
+  execution_id: string;
+  resume_url: string;
+  stage: NewsletterApprovalStage;
+  payload: Record<string, unknown>;
+  created_at: string;
+  resolved_at: string | null;
+  expires_at: string;
+  decision: NewsletterApprovalDecision | null;
+  feedback: string | null;
+  // Compose Newsletter 2a (migration 012). Backfilled to 'ai-news' on
+  // existing rows; required for new rows once S2/S3 wire up the route.
+  edition_id: string | null;
+}
+
+// Compose Newsletter 2a — newsletter editions (migration 012)
+export interface NewsletterEdition {
+  id: string;
+  display_name: string;
+  subheader: string;
+  genre: string;
+  description: string | null;
+  newsletter_name: string;
+  primary_color: string;
+  paper_color: string;
+  enabled: boolean;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type NewsletterSendStatus =
+  | 'draft'
+  | 'scheduled'
+  | 'sending'
+  | 'sent'
+  | 'failed'
+  | 'cancelled';
+
+export interface NewsletterSend {
+  id: string;
+  user_id: string;
+  send_date: string;
+  subject: string;
+  preheader: string | null;
+  html_body: string;
+  markdown_body: string | null;
+  scheduled_send_at: string | null;
+  status: NewsletterSendStatus;
+  sent_at: string | null;
+  recipient_count: number | null;
+  delivery_provider: string | null;
+  provider_message_id: string | null;
+  error: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  // Compose Newsletter 2a (migration 012). Backfilled to 'ai-news' on
+  // existing rows. execution_id is the n8n execution id captured by the
+  // webhook trigger's Respond to Webhook node (S3). issue_number is
+  // assigned at save time in Phase 2b.
+  edition_id: string | null;
+  execution_id: string | null;
+  issue_number: number | null;
+}
+
+// =====================================================================
+// Sprint 8: RBAC, subscription tiers, credits, impersonation
+// =====================================================================
+
+export interface UserAccountMeta {
+  user_id: string;
+  account_status: AccountStatus;
+  locked_at: string | null;
+  locked_by: string | null;
+  locked_reason: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserRoleMeta {
+  user_id: string;
+  role: 'superuser' | 'admin';
+  granted_at: string;
+  granted_by: string | null;
+  notes: string | null;
+}
+
+export interface TierFeatures {
+  kdp_export: boolean;
+  cover_art: boolean;
+  social_media: boolean;
+  max_projects: number;
+  [key: string]: boolean | number | string;
+}
+
+export type TierName = 'standard' | 'pro' | 'trial' | 'paid_full' | 'free_full' | string;
+
+export interface SubscriptionTier {
+  id: string;
+  name: TierName;
+  display_name: string;
+  description: string | null;
+  monthly_credits: number;
+  monthly_price_cents: number;
+  annual_price_cents: number;
+  credit_purchase_price_cents: number;
+  features: TierFeatures;
+  is_default: boolean;
+  publicly_selectable: boolean;
+  trial_days: number;
+  sort_order: number;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type SubscriptionStatus = 'active' | 'expired' | 'cancelled' | 'past_due';
+export type BillingCycle = 'monthly' | 'annual' | 'none';
+
+export interface UserSubscription {
+  id: string;
+  user_id: string;
+  tier_id: string;
+  status: SubscriptionStatus;
+  billing_cycle: BillingCycle;
+  current_period_start: string;
+  current_period_end: string | null;
+  trial_start: string | null;
+  trial_end: string | null;
+  credits_remaining: number;
+  credits_used_this_period: number;
+  auto_renew: boolean;
+  trial_warnings_sent: string[];
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Joined view returned by the server when fetching the current user's subscription.
+export interface UserSubscriptionWithTier extends UserSubscription {
+  tier: SubscriptionTier;
+}
+
+export type CreditTransactionType =
+  | 'monthly_reset'
+  | 'usage'
+  | 'admin_adjustment'
+  | 'purchase'
+  | 'refund';
+
+export interface CreditTransaction {
+  id: string;
+  user_id: string;
+  amount: number;
+  balance_after: number;
+  transaction_type: CreditTransactionType;
+  description: string | null;
+  reference_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface ImpersonationLog {
+  id: string;
+  superuser_id: string;
+  target_user_id: string;
+  started_at: string;
+  ended_at: string | null;
+  reason: string | null;
+  actions_taken: Array<Record<string, unknown>>;
 }

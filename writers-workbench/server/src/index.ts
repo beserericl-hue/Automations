@@ -15,8 +15,23 @@ import { exportRouter } from './routes/export.js';
 import { adminRouter } from './routes/admin.js';
 import { brainstormRouter } from './routes/brainstorm.js';
 import { accountRouter } from './routes/account.js';
-import { sessionRouter } from './routes/session.js';
+import { sessionRouter, pushSseEvent } from './routes/session.js';
 import { imagesRouter } from './routes/images.js';
+import { emailRouter } from './routes/email.js';
+import { ingestionRouter } from './routes/ingestion.js';
+import { approvalsApiRouter, approvalsPublicRouter } from './routes/approvals.js';
+import { newsletterSendsRouter } from './routes/newsletter-sends.js';
+import { newsletterRouter, newsletterCallbackRouter } from './routes/newsletter.js';
+import { genresRouter, adminGenreUrlsRouter } from './routes/genres.js';
+import { jobsRouter } from './routes/jobs.js';
+import { contentActionsRouter } from './routes/content-actions.js';
+import { creditsRouter } from './routes/credits.js';
+import { superuserRouter } from './routes/superuser.js';
+import { tiersRouter } from './routes/tiers.js';
+import { cronRouter } from './routes/cron.js';
+import { impersonateDataRouter } from './routes/impersonate-data.js';
+import { impersonateWriteRouter } from './routes/impersonate-write.js';
+import type { JobInfrastructure } from './lib/jobs/boot.js';
 import { swaggerSpec } from './swagger.js';
 import swaggerUi from 'swagger-ui-express';
 
@@ -104,7 +119,9 @@ app.use('/api/export', exportLimiter);
 app.use('/api/brainstorm', brainstormLimiter);
 app.use('/api/admin', generalLimiter);
 
-app.use(express.json({ limit: '10mb' }));
+// 30 MB: newsletter ingestion uploads can carry markdown up to 10 MB + html up
+// to 10 MB (see IngestionUploadSchema) plus metadata, plus any future headroom.
+app.use(express.json({ limit: '30mb' }));
 
 // API documentation
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
@@ -125,8 +142,53 @@ app.use('/api/session', generalLimiter);
 app.use('/api/session', sessionRouter);
 app.use('/api/images', generalLimiter);
 app.use('/api/images', imagesRouter);
+app.use('/api/email', generalLimiter);
+app.use('/api/email', emailRouter);
+app.use('/api/ingestion', generalLimiter);
+app.use('/api/ingestion', ingestionRouter);
+app.use('/api/approvals', generalLimiter);
+app.use('/api/approvals', approvalsApiRouter);
+// Public-facing approval form (no /api prefix — users click this from an email).
+// Mount express.urlencoded() first so POST /approvals/:token/resolve can parse
+// the standard HTML form submission.
+app.use('/approvals', express.urlencoded({ extended: true }));
+app.use('/approvals', generalLimiter);
+app.use('/approvals', approvalsPublicRouter);
+app.use('/api/newsletter-sends', generalLimiter);
+app.use('/api/newsletter-sends', newsletterSendsRouter);
+app.use('/api/newsletter', generalLimiter);
+app.use('/api/newsletter', newsletterRouter);
 app.use('/api/callback', generalLimiter);
 app.use('/api/callback', sessionRouter);
+// Newsletter stage-emit callback (S3) — POST /api/callback/newsletter-stage.
+// Auth via X-Callback-Secret header (NEWSLETTER_CALLBACK_SECRET env). The
+// router is mounted on the same /api/callback prefix as sessionRouter; no
+// path conflicts because session.ts has /content-ready / /eve-knowledge etc.
+app.use('/api/callback', newsletterCallbackRouter);
+// Migration 013 — per-genre user ingestion URLs. The base /api/genres
+// route is user-callable (requireAuth inside); admin-only cross-user view
+// nests under /api/admin/genre-urls (requireAuth + requireAdmin inside).
+app.use('/api/genres', generalLimiter);
+app.use('/api/genres', genresRouter);
+app.use('/api/admin/genre-urls', generalLimiter);
+app.use('/api/admin/genre-urls', adminGenreUrlsRouter);
+
+app.use('/api/jobs', generalLimiter);
+app.use('/api/jobs', jobsRouter);
+app.use('/api/content', generalLimiter);
+app.use('/api/content', contentActionsRouter);
+app.use('/api/credits', generalLimiter);
+app.use('/api/credits', creditsRouter);
+app.use('/api/superuser', generalLimiter);
+app.use('/api/superuser', superuserRouter);
+app.use('/api/tiers', generalLimiter);
+app.use('/api/tiers', tiersRouter);
+app.use('/api/cron', generalLimiter);
+app.use('/api/cron', cronRouter);
+app.use('/api/impersonate/data', generalLimiter);
+app.use('/api/impersonate/data', impersonateDataRouter);
+app.use('/api/impersonate/write', generalLimiter);
+app.use('/api/impersonate/write', impersonateWriteRouter);
 
 // Centralized error handler (must be after routes)
 app.use(errorHandler);
@@ -153,22 +215,75 @@ const server = app.listen(PORT, () => {
   logger.info(`The Writers Workbench API running on http://localhost:${PORT}`);
 });
 
+// Start BullMQ workers + queue-event listeners (tracker + SSE forwarder)
+// if Redis is configured. The chat proxy enqueues async jobs onto these
+// queues; without workers, jobs would pile up forever.
+let jobInfra: JobInfrastructure | null = null;
+if (process.env.REDIS_URL) {
+  void (async () => {
+    try {
+      const { startJobInfrastructure } = await import('./lib/jobs/boot.js');
+      jobInfra = startJobInfrastructure(pushSseEvent);
+    } catch (err) {
+      logger.error({ err }, 'Failed to start job infrastructure');
+    }
+  })();
+}
+
 // Graceful shutdown
-function shutdown(signal: string) {
+async function shutdown(signal: string) {
   logger.info(`${signal} received — shutting down gracefully`);
-  server.close(() => {
-    logger.info('All connections closed. Exiting.');
-    process.exit(0);
+
+  // Stop accepting new HTTP connections first
+  const httpClosed = new Promise<void>((resolve) => {
+    server.close(() => resolve());
   });
 
-  // Force exit after 10 seconds if connections don't drain
+  // Drain BullMQ queues and close Redis — only if the module has been
+  // loaded and REDIS_URL was set (otherwise we never opened a connection)
+  const queuesClosed = (async () => {
+    if (!process.env.REDIS_URL) return;
+    try {
+      if (jobInfra) {
+        const { stopJobInfrastructure } = await import('./lib/jobs/boot.js');
+        await stopJobInfrastructure(jobInfra);
+      }
+      const { closeAllQueues } = await import('./lib/queue.js');
+      const { closeRedis } = await import('./lib/redis.js');
+      const { closeSsePubsub } = await import('./lib/sse-pubsub.js');
+      await closeAllQueues();
+      await closeSsePubsub();
+      await closeRedis();
+    } catch (err) {
+      logger.error({ err }, 'shutdown: queue/redis close failed');
+    }
+  })();
+
+  try {
+    await Promise.all([httpClosed, queuesClosed]);
+    logger.info('All connections closed. Exiting.');
+    process.exit(0);
+  } catch (err) {
+    logger.error({ err }, 'shutdown: error during drain');
+    process.exit(1);
+  }
+}
+
+// Force exit after 10 seconds if graceful shutdown stalls
+function armShutdownTimer() {
   setTimeout(() => {
     logger.error('Could not close connections in time. Forcing shutdown.');
     process.exit(1);
-  }, 10_000);
+  }, 10_000).unref();
 }
 
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => {
+  armShutdownTimer();
+  void shutdown('SIGTERM');
+});
+process.on('SIGINT', () => {
+  armShutdownTimer();
+  void shutdown('SIGINT');
+});
 
 export { app };

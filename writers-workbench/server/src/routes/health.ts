@@ -46,6 +46,41 @@ healthRouter.get('/', async (_req, res) => {
     checks.supabase = 'skipped';
   }
 
+  // Redis connectivity
+  if (process.env.REDIS_URL) {
+    try {
+      const { redisHealthy } = await import('../lib/redis.js');
+      checks.redis = (await redisHealthy()) ? 'ok' : 'error';
+    } catch {
+      checks.redis = 'error';
+    }
+  } else {
+    checks.redis = 'skipped';
+  }
+
+  // Postal reachability (only when DRY_RUN_EMAIL is not set)
+  if (process.env.POSTAL_API_URL && process.env.DRY_RUN_EMAIL !== 'true') {
+    try {
+      const { postalReachable } = await import('../lib/email.js');
+      checks.postal = (await postalReachable()) ? 'ok' : 'error';
+    } catch {
+      checks.postal = 'error';
+    }
+  } else {
+    checks.postal = 'skipped';
+  }
+
+  // S10b-5: active session count (comes from Redis when configured,
+  // in-memory store otherwise). Shown for ops visibility. Failure to
+  // read the count does not make the overall health check degraded.
+  let activeSessions: number | null = null;
+  try {
+    const { getSessionStore } = await import('../lib/session-store.js');
+    activeSessions = await getSessionStore().count();
+  } catch {
+    activeSessions = null;
+  }
+
   const hasErrors = Object.values(checks).some((v) => v === 'error');
 
   res.status(hasErrors ? 503 : 200).json({
@@ -56,5 +91,6 @@ healthRouter.get('/', async (_req, res) => {
     deployed_at: DEPLOYED_AT,
     timestamp: new Date().toISOString(),
     checks,
+    active_sessions: activeSessions,
   });
 });

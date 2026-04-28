@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
+import { apiFetch, type ApiEnvelope } from '../../lib/api';
 
 interface ProvenancePanelProps {
   contentId: string;
@@ -22,12 +23,16 @@ interface ProvenanceSource {
 
 export default function ProvenancePanel({ contentId }: ProvenancePanelProps) {
   const [expanded, setExpanded] = useState(false);
-  const { profile } = useUser();
+  const { profile, isImpersonating } = useUser();
   const userId = profile?.user_id;
 
   const { data: sources, isLoading } = useQuery({
-    queryKey: ['provenance', contentId, userId],
+    queryKey: ['provenance', contentId, userId, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<ProvenanceSource[]>>(`/api/impersonate/data/provenance/${contentId}`);
+        return res.data ?? [];
+      }
       // Join content_usage_v2 with content_index to get source details
       const { data, error } = await supabase
         .from('content_usage_v2')

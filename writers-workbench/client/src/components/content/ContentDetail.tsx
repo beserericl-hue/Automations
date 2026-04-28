@@ -3,20 +3,23 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
+import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import RichTextEditor from '../editor/RichTextEditor';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import VersionHistory from './VersionHistory';
 import ImageGallery from '../images/ImageGallery';
 import { contentToHtml } from '../../lib/content-utils';
 import QAReportPanel from './QAReportPanel';
+import AnnotationsPanel from './AnnotationsPanel';
 import ProvenancePanel from './ProvenancePanel';
+import RewriteWithResearchModal from './RewriteWithResearchModal';
 import type { PublishedContent, GeneratedImage } from '../../types/database';
 
 export default function ContentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { profile } = useUser();
+  const { profile, isImpersonating } = useUser();
   const userId = profile?.user_id;
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -25,10 +28,16 @@ export default function ContentDetail() {
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const [scheduleDate, setScheduleDate] = useState('');
   const [showImagePicker, setShowImagePicker] = useState(false);
+  const [showRewriteModal, setShowRewriteModal] = useState(false);
 
   const { data: item, isLoading, isError, error } = useQuery({
-    queryKey: ['content-detail', id],
+    queryKey: ['content-detail', id, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<PublishedContent>>(`/api/impersonate/data/content/${id}`);
+        if (!res.data) throw new Error('Content not found');
+        return res.data;
+      }
       const { data, error } = await supabase
         .from('published_content_v2')
         .select('*')
@@ -46,6 +55,24 @@ export default function ContentDetail() {
   const saveMutation = useMutation({
     mutationFn: async (html: string) => {
       setSaveStatus('saving');
+
+      if (isImpersonating) {
+        await apiFetch(`/api/impersonate/write/content/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ content_text: html }),
+        });
+        await apiFetch('/api/impersonate/write/content-versions', {
+          method: 'POST',
+          body: JSON.stringify({
+            content_id: id,
+            content_text: html,
+            changed_by: 'web_editor_impersonation',
+            change_note: 'Auto-saved during superuser impersonation',
+          }),
+        });
+        return;
+      }
+
       const { error } = await supabase
         .from('published_content_v2')
         .update({
@@ -90,7 +117,6 @@ export default function ContentDetail() {
     mutationFn: async (newStatus: string) => {
       const updates: Record<string, unknown> = {
         status: newStatus,
-        updated_at: new Date().toISOString(),
       };
       if (newStatus === 'published') {
         updates.published_at = new Date().toISOString();
@@ -101,9 +127,17 @@ export default function ContentDetail() {
         delete meta.schedule_date;
         updates.metadata = meta;
       }
+
+      if (isImpersonating) {
+        await apiFetch(`/api/impersonate/write/content/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(updates),
+        });
+        return;
+      }
       const { error } = await supabase
         .from('published_content_v2')
-        .update(updates)
+        .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', id!)
         .eq('user_id', userId!);
       if (error) throw error;
@@ -120,6 +154,13 @@ export default function ContentDetail() {
   const scheduleMutation = useMutation({
     mutationFn: async (dateStr: string) => {
       const meta = { ...(item?.metadata || {}), schedule_date: dateStr };
+      if (isImpersonating) {
+        await apiFetch(`/api/impersonate/write/content/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'scheduled', metadata: meta }),
+        });
+        return;
+      }
       const { error } = await supabase
         .from('published_content_v2')
         .update({
@@ -144,6 +185,10 @@ export default function ContentDetail() {
   // Soft delete mutation
   const deleteMutation = useMutation({
     mutationFn: async () => {
+      if (isImpersonating) {
+        await apiFetch(`/api/impersonate/write/content/${id}`, { method: 'DELETE' });
+        return;
+      }
       const { error } = await supabase
         .from('published_content_v2')
         .update({ deleted_at: new Date().toISOString() })
@@ -162,6 +207,13 @@ export default function ContentDetail() {
   // Cover image mutation
   const coverImageMutation = useMutation({
     mutationFn: async (imagePath: string | null) => {
+      if (isImpersonating) {
+        await apiFetch(`/api/impersonate/write/content/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ cover_image_path: imagePath }),
+        });
+        return;
+      }
       const { error } = await supabase
         .from('published_content_v2')
         .update({ cover_image_path: imagePath, updated_at: new Date().toISOString() })
@@ -291,6 +343,16 @@ export default function ContentDetail() {
             </button>
           )}
 
+          {item.content_type === 'chapter' && (
+            <button
+              onClick={() => setShowRewriteModal(true)}
+              title="Rewrite this chapter grounded in real research (S12-6)"
+              className="rounded-lg px-3 py-1.5 text-xs font-medium border border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-950"
+            >
+              Rewrite with research
+            </button>
+          )}
+
           <button
             onClick={handleDeleteClick}
             className="rounded-lg px-3 py-1.5 text-xs font-medium border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950"
@@ -299,6 +361,20 @@ export default function ContentDetail() {
           </button>
         </div>
       </div>
+
+      {showRewriteModal && item.content_type === 'chapter' && (
+        <RewriteWithResearchModal
+          contentId={item.id}
+          chapterLabel={
+            item.chapter_number != null ? `Chapter ${item.chapter_number}` : item.title || 'Chapter'
+          }
+          hasQaReport={!!(item.metadata as Record<string, unknown> | null | undefined)?.['last_qa_report']}
+          projectType={
+            (item.metadata as Record<string, unknown> | null | undefined)?.['project_type'] as string | undefined
+          }
+          onClose={() => setShowRewriteModal(false)}
+        />
+      )}
 
       {/* Cover image banner */}
       {item.cover_image_path ? (
@@ -402,6 +478,9 @@ export default function ContentDetail() {
           userId={userId!}
         />
       )}
+
+      {/* S12-13 — shared review-annotations panel (drift_scan + genre_eval) */}
+      {item.content_type === 'chapter' && <AnnotationsPanel contentId={id!} />}
 
       {/* Sources / Provenance */}
       <ProvenancePanel contentId={id!} />

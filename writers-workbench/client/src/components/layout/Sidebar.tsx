@@ -3,6 +3,8 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
+import { usePermissions } from '../../hooks/usePermissions';
+import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import EveOrb from '../eve/EveOrb';
 import type { WritingProject } from '../../types/database';
 
@@ -12,16 +14,24 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ open, onToggle }: SidebarProps) {
-  const { profile } = useUser();
+  const { profile, isImpersonating } = useUser();
+  const { isAdmin, isSuperuser, creditsRemaining, creditsMonthly } = usePermissions();
   const userId = profile?.user_id;
   const location = useLocation();
   const [projectsExpanded, setProjectsExpanded] = useState(true);
   const [referenceExpanded, setReferenceExpanded] = useState(false);
+  const [newsletterExpanded, setNewsletterExpanded] = useState(false);
 
   // Fetch projects for expandable sidebar section
   const { data: projects } = useQuery({
-    queryKey: ['sidebar-projects', userId],
+    queryKey: ['sidebar-projects', userId, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<Pick<WritingProject, 'id' | 'title' | 'status' | 'updated_at'>[]>>(
+          '/api/impersonate/data/projects-summary?limit=20',
+        );
+        return res.data ?? [];
+      }
       const { data, error } = await supabase
         .from('writing_projects_v2')
         .select('id, title, status, updated_at')
@@ -39,13 +49,19 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
   const projectCount = projects?.length ?? 0;
   const isProjectRoute = location.pathname.startsWith('/projects');
   const isReferenceRoute = ['/genres', '/story-arcs', '/research', '/sources', '/cost'].some(p => location.pathname.startsWith(p));
+  // Newsletter section: distinct prefix from the legacy /newsletters redirect
+  // (which goes to /library?type=newsletter) — startsWith('/newsletter')
+  // matches both /newsletter/* and /newsletters, so be specific.
+  const isNewsletterRoute = location.pathname === '/newsletter' || location.pathname.startsWith('/newsletter/');
 
   // Auto-expand sections when navigating into them
   if (isProjectRoute && !projectsExpanded) setProjectsExpanded(true);
   if (isReferenceRoute && !referenceExpanded) setReferenceExpanded(true);
+  if (isNewsletterRoute && !newsletterExpanded) setNewsletterExpanded(true);
 
   return (
     <aside
+      data-tour="sidebar"
       className={`${
         open ? 'w-56' : 'w-14'
       } flex flex-col border-r border-gray-200 bg-gray-50 transition-all duration-200 dark:border-gray-800 dark:bg-gray-900 overflow-hidden shrink-0`}
@@ -150,6 +166,96 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
         {/* Outlines */}
         <SidebarLink to="/outlines" icon={OutlineIcon} label="Outlines" open={open} />
 
+        {/* Newsletter — collapsible section (Compose Newsletter 2a) */}
+        <div>
+          <button
+            onClick={() => open ? setNewsletterExpanded(!newsletterExpanded) : undefined}
+            className={`flex w-full items-center gap-3 px-3 py-2 text-sm whitespace-nowrap ${
+              open ? '' : 'justify-center'
+            } ${
+              isNewsletterRoute
+                ? 'bg-brand-50 text-brand-700 font-medium dark:bg-brand-950 dark:text-brand-300'
+                : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+            }`}
+            title={!open ? 'Newsletter' : undefined}
+          >
+            <NewsletterIcon className="h-5 w-5 shrink-0" />
+            {open && (
+              <>
+                <span className="flex-1 text-left truncate">Newsletter</span>
+                <ChevronIcon expanded={newsletterExpanded} />
+              </>
+            )}
+          </button>
+
+          {open && newsletterExpanded && (
+            <div className="ml-4 border-l border-gray-200 dark:border-gray-700">
+              <NavLink
+                to="/newsletter"
+                end
+                className={({ isActive }) =>
+                  `flex items-center gap-2 px-3 py-1.5 text-xs whitespace-nowrap ${
+                    isActive
+                      ? 'text-brand-700 font-medium dark:text-brand-300'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  }`
+                }
+              >
+                Home
+              </NavLink>
+              <NavLink
+                to="/newsletter/generate"
+                className={({ isActive }) =>
+                  `flex items-center gap-2 px-3 py-1.5 text-xs whitespace-nowrap ${
+                    isActive
+                      ? 'text-brand-700 font-medium dark:text-brand-300'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  }`
+                }
+              >
+                Generate
+              </NavLink>
+              <NavLink
+                to="/newsletter/approvals"
+                className={({ isActive }) =>
+                  `flex items-center justify-between gap-2 px-3 py-1.5 text-xs whitespace-nowrap ${
+                    isActive
+                      ? 'text-brand-700 font-medium dark:text-brand-300'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  }`
+                }
+              >
+                <span>Pending approvals</span>
+                {/* Badge slot — count populated by S5/S8 once the in-app approvals API ships. */}
+              </NavLink>
+              <NavLink
+                to="/newsletter/sends"
+                className={({ isActive }) =>
+                  `flex items-center gap-2 px-3 py-1.5 text-xs whitespace-nowrap ${
+                    isActive
+                      ? 'text-brand-700 font-medium dark:text-brand-300'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  }`
+                }
+              >
+                Sends
+              </NavLink>
+              <NavLink
+                to="/newsletter/ingestion"
+                className={({ isActive }) =>
+                  `flex items-center gap-2 px-3 py-1.5 text-xs whitespace-nowrap ${
+                    isActive
+                      ? 'text-brand-700 font-medium dark:text-brand-300'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  }`
+                }
+              >
+                Ingestion
+              </NavLink>
+            </div>
+          )}
+        </div>
+
         {/* Divider */}
         <div className="my-2 mx-3 border-t border-gray-200 dark:border-gray-700" />
 
@@ -244,21 +350,71 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
 
       {/* Bottom section */}
       <div className="border-t border-gray-200 py-2 dark:border-gray-800">
-        {open && <EveOrb />}
-        {!open && (
-          <div className="flex justify-center py-2" title="Talk to Eve">
-            <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
-            </svg>
+        <div data-tour="eve">
+          {open && <EveOrb />}
+          {!open && (
+            <div className="flex justify-center py-2" title="Talk to Eve">
+              <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+              </svg>
+            </div>
+          )}
+        </div>
+        {open && (
+          <div data-tour="credits-pill">
+            <CreditPill remaining={creditsRemaining} monthly={creditsMonthly} />
           </div>
         )}
+        <SidebarLink to="/credits" icon={CreditIcon} label="Credits" open={open} />
         <SidebarLink to="/trash" icon={TrashIcon} label="Trash" open={open} />
         <SidebarLink to="/settings" icon={SettingsIcon} label="Settings" open={open} />
-        {profile?.isAdmin && (
+        {isAdmin && (
           <SidebarLink to="/admin" icon={AdminIcon} label="Admin" open={open} />
+        )}
+        {isSuperuser && (
+          <SidebarLink to="/superuser" icon={SuperuserIcon} label="Superuser" open={open} />
         )}
       </div>
     </aside>
+  );
+}
+
+function CreditPill({ remaining, monthly }: { remaining: number; monthly: number }) {
+  const pct = monthly > 0 ? Math.max(0, Math.min(100, (remaining / monthly) * 100)) : 0;
+  const color = pct < 15 ? 'bg-red-500' : pct < 40 ? 'bg-amber-500' : 'bg-green-500';
+  return (
+    <div className="px-3 pb-2">
+      <div className="text-[10px] uppercase tracking-wide text-gray-500">Credits</div>
+      <div className="flex items-center gap-2">
+        <span className="font-mono text-xs">
+          {remaining}
+          {monthly > 0 && <span className="text-gray-400"> / {monthly}</span>}
+        </span>
+      </div>
+      {monthly > 0 && (
+        <div className="mt-1 h-1.5 w-full overflow-hidden rounded bg-gray-200 dark:bg-gray-800">
+          <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CreditIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <circle cx="12" cy="12" r="9" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6M12 9v6" />
+    </svg>
+  );
+}
+
+function SuperuserIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l9 4v6c0 5-4 8-9 8s-9-3-9-8V7l9-4z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4" />
+    </svg>
   );
 }
 
@@ -364,6 +520,14 @@ function OutlineIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+    </svg>
+  );
+}
+
+function NewsletterIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75v6a2.25 2.25 0 002.25 2.25h15a2.25 2.25 0 002.25-2.25v-6m-19.5 0v-6A2.25 2.25 0 014.5 4.5h15a2.25 2.25 0 012.25 2.25v6m-19.5 0h19.5M7.5 9h3M7.5 12h3M7.5 15h3" />
     </svg>
   );
 }

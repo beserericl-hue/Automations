@@ -1,40 +1,31 @@
 import { Router, Request, Response } from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { logger } from '../lib/logger.js';
+import { getSessionStore } from '../lib/session-store.js';
+import { publishSseEvent, subscribeSseEvents } from '../lib/sse-pubsub.js';
 
 const router = Router();
 
-// In-memory session store (keyed by user_id)
-// In production, use Redis or database — fine for single-instance Railway deploy
-interface WebSession {
-  userId: string;
-  channel: 'web';
-  registeredAt: number;
-  lastActivity: number;
-}
-
-const activeSessions = new Map<string, WebSession>();
-const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
-
-// SSE clients (keyed by user_id, multiple clients per user possible)
-interface SSEClient {
-  res: Response;
-  userId: string;
-  connectedAt: number;
-}
-
-const sseClients: SSEClient[] = [];
-
-// Cleanup expired sessions every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [userId, session] of activeSessions) {
-    if (now - session.lastActivity > SESSION_TIMEOUT_MS) {
-      activeSessions.delete(userId);
-      logger.info({ userId }, 'Session expired due to inactivity');
-    }
+/**
+ * Public helper for internal code paths (BullMQ queue-event listeners
+ * in particular) that need to push an event onto the user's SSE stream.
+ *
+ * Under Redis: the event is PUBLISHed to `sse:{userId}` and fans out to
+ * every instance that currently has an SSE subscriber for this user.
+ * Without Redis: the event is delivered via the in-process EventEmitter.
+ * Either way callers do not have to know which backend is in use.
+ */
+export async function pushSseEvent(
+  userId: string,
+  event: Record<string, unknown>,
+): Promise<number> {
+  try {
+    return await publishSseEvent(userId, event);
+  } catch (err) {
+    logger.error({ err, userId }, 'pushSseEvent: publish failed');
+    return 0;
   }
-}, 5 * 60 * 1000);
+}
 
 /**
  * @openapi
@@ -51,19 +42,16 @@ setInterval(() => {
  *       401:
  *         description: Missing or invalid auth token
  */
-router.post('/register', requireAuth, (req: Request, res: Response) => {
+router.post('/register', requireAuth, async (req: Request, res: Response) => {
   const userId = req.userId!;
-  const now = Date.now();
-
-  activeSessions.set(userId, {
-    userId,
-    channel: 'web',
-    registeredAt: now,
-    lastActivity: now,
-  });
-
-  logger.info({ userId }, 'Web session registered');
-  res.json({ success: true, channel: 'web' });
+  try {
+    await getSessionStore().register(userId);
+    logger.info({ userId }, 'Web session registered');
+    res.json({ success: true, channel: 'web' });
+  } catch (err) {
+    logger.error({ err, userId }, 'session register: store failed');
+    res.status(500).json({ success: false, error: { code: 'INTERNAL', message: 'Failed to register session' } });
+  }
 });
 
 /**
@@ -81,11 +69,16 @@ router.post('/register', requireAuth, (req: Request, res: Response) => {
  *       401:
  *         description: Missing or invalid auth token
  */
-router.delete('/unregister', requireAuth, (req: Request, res: Response) => {
+router.delete('/unregister', requireAuth, async (req: Request, res: Response) => {
   const userId = req.userId!;
-  activeSessions.delete(userId);
-  logger.info({ userId }, 'Web session unregistered');
-  res.json({ success: true });
+  try {
+    await getSessionStore().unregister(userId);
+    logger.info({ userId }, 'Web session unregistered');
+    res.json({ success: true });
+  } catch (err) {
+    logger.error({ err, userId }, 'session unregister: store failed');
+    res.status(500).json({ success: false, error: { code: 'INTERNAL', message: 'Failed to unregister session' } });
+  }
 });
 
 /**
@@ -112,24 +105,18 @@ router.delete('/unregister', requireAuth, (req: Request, res: Response) => {
  *       400:
  *         description: Missing user_id parameter
  */
-router.get('/active', (req: Request, res: Response) => {
+router.get('/active', async (req: Request, res: Response) => {
   const userId = req.query.user_id as string;
   if (!userId) {
     res.status(400).json({ success: false, error: { code: 'BAD_REQUEST', message: 'user_id query parameter required' } });
     return;
   }
-
-  const session = activeSessions.get(userId);
-  const now = Date.now();
-
-  if (session && now - session.lastActivity <= SESSION_TIMEOUT_MS) {
-    // Refresh activity timestamp
-    session.lastActivity = now;
-    res.json({ active: true, channel: session.channel });
-  } else {
-    // Clean up expired session if present
-    if (session) activeSessions.delete(userId);
-    res.json({ active: false, channel: null });
+  try {
+    const active = await getSessionStore().isActive(userId);
+    res.json({ active, channel: active ? 'web' : null });
+  } catch (err) {
+    logger.error({ err, userId }, 'session active: store failed');
+    res.status(500).json({ success: false, error: { code: 'INTERNAL', message: 'Failed to check session' } });
   }
 });
 
@@ -152,7 +139,7 @@ router.get('/active', (req: Request, res: Response) => {
  *       400:
  *         description: Missing user_id
  */
-router.post('/content-ready', (req: Request, res: Response) => {
+router.post('/content-ready', async (req: Request, res: Response) => {
   const { user_id, content_title, content_type, content_id } = req.body;
 
   if (!user_id) {
@@ -168,15 +155,7 @@ router.post('/content-ready', (req: Request, res: Response) => {
     timestamp: new Date().toISOString(),
   };
 
-  // Push to all SSE clients for this user
-  let delivered = 0;
-  for (const client of sseClients) {
-    if (client.userId === user_id) {
-      client.res.write(`data: ${JSON.stringify(event)}\n\n`);
-      delivered++;
-    }
-  }
-
+  const delivered = await pushSseEvent(user_id, event);
   logger.info({ user_id, content_title, delivered }, 'Content-ready callback received');
   res.json({ success: true, delivered });
 });
@@ -234,34 +213,34 @@ router.get('/events', async (req: Request, res: Response) => {
 
   const userId = req.userId!;
 
-  // Set SSE headers
+  // SSE headers
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive',
-    'X-Accel-Buffering': 'no', // Disable nginx buffering
+    'X-Accel-Buffering': 'no',
   });
 
-  // Send initial connection event
   res.write(`data: ${JSON.stringify({ type: 'connected', timestamp: new Date().toISOString() })}\n\n`);
 
-  const client: SSEClient = {
-    res,
-    userId,
-    connectedAt: Date.now(),
-  };
-  sseClients.push(client);
+  // Subscribe this connection to the user's pub/sub channel. Events
+  // published elsewhere (same instance or another one via Redis) are
+  // forwarded to this response stream.
+  const unsubscribe = await subscribeSseEvents(userId, (event) => {
+    try {
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+    } catch (err) {
+      logger.error({ err, userId }, 'sse write failed');
+    }
+  });
 
-  // Heartbeat every 30s to keep connection alive
   const heartbeat = setInterval(() => {
     res.write(`: heartbeat\n\n`);
   }, 30_000);
 
-  // Cleanup on disconnect
   req.on('close', () => {
     clearInterval(heartbeat);
-    const idx = sseClients.indexOf(client);
-    if (idx !== -1) sseClients.splice(idx, 1);
+    void unsubscribe();
     logger.info({ userId }, 'SSE client disconnected');
   });
 });

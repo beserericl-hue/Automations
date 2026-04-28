@@ -2,15 +2,20 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
+import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import type { WritingProject } from '../../types/database';
 
 export default function OutlineList() {
-  const { profile } = useUser();
+  const { profile, isImpersonating } = useUser();
   const userId = profile?.user_id;
 
   const { data: projects, isLoading, isError, error } = useQuery({
-    queryKey: ['outlines', userId],
+    queryKey: ['outlines', userId, isImpersonating],
     queryFn: async () => {
+      if (isImpersonating) {
+        const res = await apiFetch<ApiEnvelope<WritingProject[]>>('/api/impersonate/data/outlines');
+        return res.data ?? [];
+      }
       const { data, error } = await supabase
         .from('writing_projects_v2')
         .select('*')
