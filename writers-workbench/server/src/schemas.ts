@@ -139,6 +139,21 @@ export const ApprovalResolveSchema = z.object({
   feedback: z.string().max(5000).optional().default(''),
 });
 
+// Compose Newsletter 2a (S5) — query schema for the in-app
+// `GET /api/newsletter/approvals/open` endpoint. Both filters are optional;
+// the user-id filter is pinned server-side to the session.
+export const ApprovalsOpenQuerySchema = z.object({
+  execution_id: z.string().min(1).max(200).optional(),
+  stage: ApprovalStageSchema.optional(),
+});
+
+// Token shape lives in approvals.ts as `isValidToken` (24+ char base64url).
+// Mirroring it here so requireParams-style middleware can consume it
+// without importing from a route file.
+export const ApprovalTokenParamSchema = z.object({
+  token: z.string().regex(/^[A-Za-z0-9_-]{20,128}$/, 'token format invalid'),
+});
+
 // ============================================
 // Newsletter Migration sprint (S11 newsletter-sends save)
 // ============================================

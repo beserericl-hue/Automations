@@ -28,6 +28,7 @@ import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import { ApprovalCreateSchema, ApprovalResolveSchema } from '../schemas.js';
 import { logger } from '../lib/logger.js';
 import { pushSseEvent } from './session.js';
+import { resolveApproval } from '../lib/approvals.js';
 
 // Mount by caller:
 //   app.use('/api/approvals', approvalsApiRouter)
@@ -376,110 +377,46 @@ approvalsPublicRouter.post(
     }
     const { decision, feedback } = parsed.data;
 
-    const supabase = getSupabaseAdmin();
-    // Fetch the row first — we need the resume_url and need to verify state.
-    const { data: existing, error: lookupErr } = await supabase
-      .from('newsletter_approvals_v2')
-      .select('*')
-      .eq('token', token)
-      .maybeSingle();
+    // Public surface — token is the credential, no session-user enforcement.
+    // S5 extracted the resolve core into lib/approvals.ts; the in-app
+    // counterpart at /api/newsletter/approvals/:token/resolve calls the same
+    // function with sessionUserId set so behavior never drifts.
+    const result = await resolveApproval({ token, decision, feedback });
+    const row = result.row;
 
-    if (lookupErr) {
-      logger.error({ lookupErr, token }, 'approvals resolve: lookup failed');
-      res.status(500).type('html').send(pageShell('Lookup error', '<h1>Lookup error</h1>'));
-      return;
+    switch (result.status) {
+      case 'lookup_error':
+        res.status(500).type('html').send(pageShell('Lookup error', '<h1>Lookup error</h1>'));
+        return;
+      case 'not_found':
+        res.status(404).type('html').send(pageShell('Not found', '<h1>Not found</h1>'));
+        return;
+      case 'already_resolved':
+        res.status(409).type('html').send(row ? renderResolved(row) : pageShell('Already resolved', '<h1>Already resolved</h1>'));
+        return;
+      case 'expired':
+        res.status(410).type('html').send(row ? renderExpired(row) : pageShell('Expired', '<h1>Expired</h1>'));
+        return;
+      case 'update_error':
+        res.status(500).type('html').send(pageShell('Update error', '<h1>Update error</h1>'));
+        return;
+      case 'resume_failed':
+        res.status(502).type('html').send(
+          pageShell(
+            'Decision recorded, but workflow resume failed',
+            `<h1>Decision recorded</h1><p class="gone">Your <strong>${htmlEscape(decision)}</strong> was saved, but resuming the newsletter workflow failed. The on-call operator can rerun the workflow manually if needed.</p>`,
+          ),
+        );
+        return;
+      case 'forbidden':
+        // Not reachable from the public endpoint (we don't pass sessionUserId)
+        // — but compile-time exhaustiveness keeps the switch honest if a new
+        // status is added later.
+        res.status(403).type('html').send(pageShell('Forbidden', '<h1>Forbidden</h1>'));
+        return;
+      case 'ok':
+        res.status(200).type('html').send(renderThankYou(decision));
+        return;
     }
-    if (!existing) {
-      res.status(404).type('html').send(pageShell('Not found', '<h1>Not found</h1>'));
-      return;
-    }
-
-    const row = existing as ApprovalRow;
-    if (row.resolved_at) {
-      res.status(409).type('html').send(renderResolved(row));
-      return;
-    }
-    if (new Date(row.expires_at).getTime() <= Date.now()) {
-      res.status(410).type('html').send(renderExpired(row));
-      return;
-    }
-
-    // Conditional UPDATE to prevent races: only succeeds if resolved_at
-    // is still NULL and expires_at hasn't passed. Supabase can't do "WHERE
-    // expires_at > now()" in a single .update() chain without a stored
-    // function, so we issue the update with the is('resolved_at', null)
-    // guard and re-check after.
-    const nowIso = new Date().toISOString();
-    const { data: updated, error: updateErr } = await supabase
-      .from('newsletter_approvals_v2')
-      .update({ resolved_at: nowIso, decision, feedback })
-      .eq('token', token)
-      .is('resolved_at', null)
-      .select()
-      .maybeSingle();
-
-    if (updateErr) {
-      logger.error({ updateErr, token }, 'approvals resolve: update failed');
-      res.status(500).type('html').send(pageShell('Update error', '<h1>Update error</h1>'));
-      return;
-    }
-    if (!updated) {
-      // A concurrent request already resolved it — render the 409 page.
-      res.status(409).type('html').send(renderResolved(row));
-      return;
-    }
-
-    // POST the decision back to the n8n Wait node. Best-effort — even if this
-    // fails, the DB already has the decision; the reviewer's action isn't
-    // lost. We report 502 so they can retry if they'd like.
-    let resumed = true;
-    try {
-      const resp = await fetch(row.resume_url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision, feedback }),
-      });
-      if (!resp.ok) {
-        resumed = false;
-        logger.warn({ token, status: resp.status }, 'approvals resolve: n8n resume returned non-2xx');
-      }
-    } catch (err) {
-      resumed = false;
-      logger.error({ err, token }, 'approvals resolve: n8n resume POST failed');
-    }
-
-    // Compose Newsletter 2a (S3): broadcast `newsletter.approval.resolved`
-    // to the workflow user's SSE channel so their pending-approvals list
-    // can drop this row and the running execution's progress strip can
-    // advance to the next stage. Best-effort — the user-facing response
-    // is the thank-you page either way. Done unconditionally (even on a
-    // 502 resume failure) because the DB row IS resolved.
-    try {
-      await pushSseEvent(row.user_id, {
-        event: 'newsletter.approval.resolved',
-        data: {
-          token,
-          stage: row.stage,
-          execution_id: row.execution_id,
-          decision,
-          feedback,
-          resumed,
-        },
-      });
-    } catch (err) {
-      logger.warn({ err, userId: row.user_id, token }, 'approvals resolve: SSE broadcast failed');
-    }
-
-    if (!resumed) {
-      res.status(502).type('html').send(
-        pageShell(
-          'Decision recorded, but workflow resume failed',
-          `<h1>Decision recorded</h1><p class="gone">Your <strong>${htmlEscape(decision)}</strong> was saved, but resuming the newsletter workflow failed. The on-call operator can rerun the workflow manually if needed.</p>`,
-        ),
-      );
-      return;
-    }
-
-    res.status(200).type('html').send(renderThankYou(decision));
   },
 );
