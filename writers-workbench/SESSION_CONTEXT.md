@@ -1483,6 +1483,16 @@ First release on the v1.1 line. Tag `v1.1.0` at commit `f392403` (merge of `rele
 - **PROD Railway env vars synced from DEV** (`bubbly-solace` project, `production` env, `WritersWorkbench` service). 10 secrets copied: `APPROVAL_SECRET`, `DRY_RUN_EMAIL`, `EMAIL_SECRET`, `INGESTION_SECRET`, `NEWSLETTER_CALLBACK_SECRET`, `POSTAL_API_KEY`, `POSTAL_API_URL`, `REPLY_TO_EMAIL`, `SENDER_EMAIL`, `SENDER_NAME`. The user confirmed DEV's `POSTAL_API_KEY` already pointed at the prod-tier mail server in Postal, so the copy is correct end-to-end (live emails will deliver, not be Development-mode-swallowed).
   - **Still unset on PROD:** `CRON_SECRET` (DEV doesn't have it either — no external scheduler is wired yet). Sprint 8's `/api/cron/*` routes return 503 until set; not a regression because nothing currently calls those endpoints.
 
+#### Post-copy fixes — two values that came over wrongly and had to be corrected on PROD
+
+The blanket DEV → PROD copy left two tier-sensitive values pointing at DEV resources. Both were caught by visual inspection and fixed mid-session:
+
+- **`N8N_HUB_WEBHOOK_URL`** had `/webhook/author_request_dev` (DEV hub). On PROD this MUST be `/webhook/author_request_v2`. With the wrong value, every chat call on PROD would have routed to the DEV n8n hub — which uses DEV Supabase + DEV tool workflows. Real users' writes would land in the DEV tier (or worse, DEV workflows would write to PROD Supabase via the user_id passthrough, since PROD Workbench was telling DEV n8n to operate on PROD users). **This is the exact failure mode flagged in the 2026-04-21 SESSION_CONTEXT entry's CLAUDE.md callout — the same hidden cross-tier wiring.** Fixed: `N8N_HUB_WEBHOOK_URL=https://n8n.agileadautomation.com/webhook/author_request_v2`.
+
+- **`SENDER_NAME=The Writers Workbench (Dev)`** — would have appeared in real users' inboxes as the From-display name. Cosmetic, but real. Fixed: `SENDER_NAME=The Writers Workbench`.
+
+**Lesson for the next release:** when copying secrets DEV → PROD by name, NEVER blanket-copy non-secret config (URLs, display names, mode flags, branch refs). Audit every value field one by one. Better: maintain a per-tier `prod-overrides.env` checked into the repo (with secrets read from a separate vault) so the two sets are reviewable.
+
 ### Git topology after the release
 
 - `main` HEAD: `f392403` (merge PR #56, tagged `v1.1.0`)
