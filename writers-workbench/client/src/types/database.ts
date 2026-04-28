@@ -287,6 +287,30 @@ export interface ContentIndex {
   metadata: Record<string, unknown>;
 }
 
+// Migration 014 — Handlebars-templated newsletter HTML stored per
+// edition. Branding (masthead, palette, footer) is baked into each
+// template literally; only AI-generated content has Handlebars
+// placeholders. See writers-workbench/docs/newsletter-templates-sprint.md.
+export type NewsletterTemplateSourceType = 'system' | 'user';
+
+export interface NewsletterTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  edition_id: string | null;
+  user_id: string | null;
+  source_type: NewsletterTemplateSourceType;
+  html: string;
+  sample_data: Record<string, unknown>;
+  is_default: boolean;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// List endpoint omits `html` for size; clients refetch via GET /:id.
+export type NewsletterTemplateListItem = Omit<NewsletterTemplate, 'html'>;
+
 // Migration 013 — per-user ingestion URLs scoped to a genre. The seeded
 // public URLs still live in the text[] columns on genre_config_v2; this
 // table holds user-added URLs and admin-curated public additions.

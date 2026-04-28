@@ -41,10 +41,16 @@ import {
   ApprovalResolveSchema,
   ApprovalsOpenQuerySchema,
   ApprovalTokenParamSchema,
+  NewsletterTemplatesQuerySchema,
+  NewsletterTemplateIdParamSchema,
+  CreateNewsletterTemplateSchema,
+  UpdateNewsletterTemplateSchema,
+  PreviewTemplateSchema,
 } from '../schemas.js';
 import { logger } from '../lib/logger.js';
 import { pushSseEvent } from './session.js';
 import { resolveApproval } from '../lib/approvals.js';
+import { renderTemplate, TemplateCompileError, TemplateRenderError } from '../lib/newsletter-render.js';
 
 export const newsletterRouter = Router();
 
@@ -691,6 +697,395 @@ newsletterRouter.post(
       case 'update_error':
         res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: 'Database operation failed' } });
         return;
+    }
+  },
+);
+
+// --------------------------------------------------------------------
+// Newsletter Templates Sprint (T2) — template CRUD + preview render.
+//
+// All five endpoints are session-authenticated. The migration's RLS does
+// the per-row visibility enforcement, but the route also explicitly
+// caps incoming `user_id` to req.userId on create — only admins can
+// create system templates, where user_id is null.
+// --------------------------------------------------------------------
+
+interface DbNewsletterTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  edition_id: string | null;
+  user_id: string | null;
+  source_type: 'system' | 'user';
+  html: string;
+  sample_data: Record<string, unknown>;
+  is_default: boolean;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+function isAdminCaller(req: Request): boolean {
+  return req.effectiveRole === 'admin' || req.effectiveRole === 'superuser';
+}
+
+/**
+ * @openapi
+ * /newsletter/templates:
+ *   get:
+ *     tags: [Newsletter]
+ *     summary: List newsletter templates visible to the caller (system + own; admin sees all)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: query
+ *         name: edition_id
+ *         schema: { type: string }
+ *       - in: query
+ *         name: include_inactive
+ *         schema: { type: boolean, default: false }
+ *     responses:
+ *       200: { description: "{success, templates: NewsletterTemplate[]}" }
+ *       400: { description: Validation }
+ *       401: { description: Missing or invalid auth }
+ */
+newsletterRouter.get('/templates', requireAuth, async (req: Request, res: Response) => {
+  const parsed = NewsletterTemplatesQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({
+      success: false,
+      error: { code: 'VALIDATION_ERROR', fields: parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message })) },
+    });
+    return;
+  }
+  const { edition_id, include_inactive } = parsed.data;
+  const userId = req.userId!;
+  const supabase = getSupabaseAdmin();
+
+  let q = supabase
+    .from('newsletter_templates_v2')
+    .select('id, name, description, edition_id, user_id, source_type, sample_data, is_default, active, created_at, updated_at')
+    .order('is_default', { ascending: false })
+    .order('updated_at', { ascending: false });
+  if (edition_id) q = q.eq('edition_id', edition_id);
+  if (!include_inactive) q = q.eq('active', true);
+  // Service role bypasses RLS; we apply the same visibility logic in code.
+  if (!isAdminCaller(req)) {
+    q = q.or(`user_id.is.null,user_id.eq.${encodeURIComponent(userId)}`);
+  }
+
+  const { data, error } = await q;
+  if (error) {
+    logger.error({ error, userId }, 'newsletter templates list failed');
+    res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: error.message } });
+    return;
+  }
+
+  // Note: we deliberately omit `html` from the list response. It can be
+  // 100KB+ per row and the list view doesn't need it. The detail GET
+  // pulls it explicitly.
+  res.json({ success: true, templates: data ?? [] });
+});
+
+/**
+ * @openapi
+ * /newsletter/templates/{id}:
+ *   get:
+ *     tags: [Newsletter]
+ *     summary: Fetch a single newsletter template (incl. html + sample_data)
+ *     security: [{ bearerAuth: [] }]
+ */
+newsletterRouter.get('/templates/:id', requireAuth, async (req: Request, res: Response) => {
+  const parsed = NewsletterTemplateIdParamSchema.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'id must be a UUID' } });
+    return;
+  }
+  const userId = req.userId!;
+  const supabase = getSupabaseAdmin();
+
+  const { data, error } = await supabase
+    .from('newsletter_templates_v2')
+    .select('*')
+    .eq('id', parsed.data.id)
+    .maybeSingle();
+
+  if (error) {
+    res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: error.message } });
+    return;
+  }
+  if (!data) {
+    res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Template not found' } });
+    return;
+  }
+  const row = data as DbNewsletterTemplate;
+  if (row.user_id !== null && row.user_id !== userId && !isAdminCaller(req)) {
+    // Hide private templates from non-owners. Same response as a missing row
+    // so we don't leak existence.
+    res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Template not found' } });
+    return;
+  }
+  res.json({ success: true, template: row });
+});
+
+/**
+ * @openapi
+ * /newsletter/templates:
+ *   post:
+ *     tags: [Newsletter]
+ *     summary: Create a newsletter template
+ *     security: [{ bearerAuth: [] }]
+ */
+newsletterRouter.post(
+  '/templates',
+  requireAuth,
+  validateBody(CreateNewsletterTemplateSchema),
+  async (req: Request, res: Response) => {
+    const body = req.body as import('zod').infer<typeof CreateNewsletterTemplateSchema>;
+    const userId = req.userId!;
+
+    // System templates require admin; otherwise force user_id to caller.
+    let user_id: string | null;
+    if (body.source_type === 'system') {
+      if (!isAdminCaller(req)) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Only admins can create system templates' },
+        });
+        return;
+      }
+      user_id = null;
+    } else {
+      user_id = userId;
+    }
+
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from('newsletter_templates_v2')
+      .insert({
+        name: body.name,
+        description: body.description ?? null,
+        edition_id: body.edition_id ?? null,
+        user_id,
+        source_type: body.source_type,
+        html: body.html,
+        sample_data: body.sample_data,
+        is_default: body.is_default,
+        active: body.active,
+      })
+      .select('*')
+      .single();
+
+    if (error) {
+      const code = (error as { code?: string }).code;
+      if (code === '23505') {
+        // Trips the partial-unique idx_newsletter_templates_v2_default if
+        // another active default already exists for this edition.
+        res.status(409).json({
+          success: false,
+          error: { code: 'DEFAULT_EXISTS', message: 'Another active default template already exists for this edition. Demote it first.' },
+        });
+        return;
+      }
+      logger.error({ error, userId }, 'newsletter templates insert failed');
+      res.status(500).json({ success: false, error: { code: 'DB_INSERT_FAILED', message: error.message } });
+      return;
+    }
+
+    res.status(201).json({ success: true, template: data });
+  },
+);
+
+/**
+ * @openapi
+ * /newsletter/templates/{id}:
+ *   put:
+ *     tags: [Newsletter]
+ *     summary: Update a newsletter template (own + admin)
+ *     security: [{ bearerAuth: [] }]
+ */
+newsletterRouter.put(
+  '/templates/:id',
+  requireAuth,
+  validateBody(UpdateNewsletterTemplateSchema),
+  async (req: Request, res: Response) => {
+    const params = NewsletterTemplateIdParamSchema.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'id must be a UUID' } });
+      return;
+    }
+    const body = req.body as import('zod').infer<typeof UpdateNewsletterTemplateSchema>;
+    const userId = req.userId!;
+    const supabase = getSupabaseAdmin();
+
+    // Look up first so we can apply ownership rules + return 404 vs 403 explicitly.
+    const { data: existing, error: lookupErr } = await supabase
+      .from('newsletter_templates_v2')
+      .select('id, user_id')
+      .eq('id', params.data.id)
+      .maybeSingle();
+
+    if (lookupErr) {
+      res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: lookupErr.message } });
+      return;
+    }
+    if (!existing) {
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Template not found' } });
+      return;
+    }
+    const owner = (existing as { user_id: string | null }).user_id;
+    if (owner !== userId && !isAdminCaller(req)) {
+      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'You can only update your own templates' } });
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('newsletter_templates_v2')
+      .update(body)
+      .eq('id', params.data.id)
+      .select('*')
+      .maybeSingle();
+
+    if (error) {
+      const code = (error as { code?: string }).code;
+      if (code === '23505') {
+        res.status(409).json({
+          success: false,
+          error: { code: 'DEFAULT_EXISTS', message: 'Another active default template already exists for this edition.' },
+        });
+        return;
+      }
+      res.status(500).json({ success: false, error: { code: 'DB_UPDATE_FAILED', message: error.message } });
+      return;
+    }
+    res.json({ success: true, template: data });
+  },
+);
+
+/**
+ * @openapi
+ * /newsletter/templates/{id}:
+ *   delete:
+ *     tags: [Newsletter]
+ *     summary: Delete a template (own + admin); refuses default+active
+ *     security: [{ bearerAuth: [] }]
+ */
+newsletterRouter.delete('/templates/:id', requireAuth, async (req: Request, res: Response) => {
+  const parsed = NewsletterTemplateIdParamSchema.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'id must be a UUID' } });
+    return;
+  }
+  const userId = req.userId!;
+  const supabase = getSupabaseAdmin();
+
+  const { data: existing, error: lookupErr } = await supabase
+    .from('newsletter_templates_v2')
+    .select('id, user_id, is_default, active')
+    .eq('id', parsed.data.id)
+    .maybeSingle();
+
+  if (lookupErr) {
+    res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: lookupErr.message } });
+    return;
+  }
+  if (!existing) {
+    res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Template not found' } });
+    return;
+  }
+  const row = existing as { user_id: string | null; is_default: boolean; active: boolean };
+  if (row.user_id !== userId && !isAdminCaller(req)) {
+    res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'You can only delete your own templates' } });
+    return;
+  }
+  if (row.is_default && row.active) {
+    // Refuse to delete an active default — caller must unset is_default
+    // first so the edition isn't left without a renderer.
+    res.status(409).json({
+      success: false,
+      error: { code: 'IS_DEFAULT', message: 'Cannot delete an active default template — unset is_default first' },
+    });
+    return;
+  }
+
+  const { error: delErr } = await supabase
+    .from('newsletter_templates_v2')
+    .delete()
+    .eq('id', parsed.data.id);
+  if (delErr) {
+    res.status(500).json({ success: false, error: { code: 'DB_DELETE_FAILED', message: delErr.message } });
+    return;
+  }
+  res.json({ success: true });
+});
+
+/**
+ * @openapi
+ * /newsletter/templates/{id}/preview:
+ *   post:
+ *     tags: [Newsletter]
+ *     summary: Render the template against optional data merged on top of sample_data
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               data: { type: object }
+ *     responses:
+ *       200: { description: "{success, html, warnings}" }
+ *       400: { description: Compile or validation error }
+ *       401: { description: Missing or invalid auth }
+ *       404: { description: Template not visible to caller }
+ *       500: { description: Render error }
+ */
+newsletterRouter.post(
+  '/templates/:id/preview',
+  requireAuth,
+  validateBody(PreviewTemplateSchema),
+  async (req: Request, res: Response) => {
+    const params = NewsletterTemplateIdParamSchema.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'id must be a UUID' } });
+      return;
+    }
+    const body = req.body as import('zod').infer<typeof PreviewTemplateSchema>;
+    const userId = req.userId!;
+    const supabase = getSupabaseAdmin();
+
+    const { data, error } = await supabase
+      .from('newsletter_templates_v2')
+      .select('html, sample_data, user_id')
+      .eq('id', params.data.id)
+      .maybeSingle();
+    if (error) {
+      res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: error.message } });
+      return;
+    }
+    if (!data) {
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Template not found' } });
+      return;
+    }
+    const row = data as { html: string; sample_data: Record<string, unknown>; user_id: string | null };
+    if (row.user_id !== null && row.user_id !== userId && !isAdminCaller(req)) {
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Template not found' } });
+      return;
+    }
+
+    try {
+      const result = renderTemplate(row.html, body.data, { sampleData: row.sample_data });
+      res.json({ success: true, html: result.html, warnings: result.warnings });
+    } catch (err) {
+      if (err instanceof TemplateCompileError) {
+        res.status(400).json({ success: false, error: { code: 'TEMPLATE_COMPILE_ERROR', message: err.message } });
+        return;
+      }
+      if (err instanceof TemplateRenderError) {
+        res.status(500).json({ success: false, error: { code: 'TEMPLATE_RENDER_ERROR', message: err.message } });
+        return;
+      }
+      logger.error({ err }, 'unexpected template preview error');
+      res.status(500).json({ success: false, error: { code: 'INTERNAL', message: 'Unexpected error during template render' } });
     }
   },
 );

@@ -346,6 +346,69 @@ export const NewsletterSendsQuerySchema = z.object({
 });
 
 // ============================================
+// Newsletter Templates Sprint (T2 — server endpoints)
+// ============================================
+
+// 1 MB caps mirror the express body limit applied to /api/newsletter/*.
+// Sample data + html are stored as TEXT and JSONB respectively in
+// newsletter_templates_v2; allowing a generous-but-bounded size keeps
+// the body parser predictable and stops a runaway accidental paste.
+const TEMPLATE_HTML_MAX = 1024 * 1024;
+const TEMPLATE_SAMPLE_MAX_KB = 256; // sample_data JSON
+const TEMPLATE_NAME_MAX = 200;
+const TEMPLATE_DESC_MAX = 2000;
+
+const TemplateNameSchema = z.string().min(1, 'name is required').max(TEMPLATE_NAME_MAX);
+const TemplateHtmlSchema = z.string().min(1, 'html is required').max(TEMPLATE_HTML_MAX, 'html too large (max 1 MB)');
+const TemplateSampleDataSchema = z
+  .record(z.string(), z.unknown())
+  .refine((v) => JSON.stringify(v).length <= TEMPLATE_SAMPLE_MAX_KB * 1024, {
+    message: `sample_data too large (max ${TEMPLATE_SAMPLE_MAX_KB} KB)`,
+  });
+
+export const TemplateSourceTypeSchema = z.enum(['system', 'user']);
+
+export const NewsletterTemplatesQuerySchema = z.object({
+  edition_id: EditionIdSchema.optional(),
+  include_inactive: z.coerce.boolean().optional().default(false),
+});
+
+export const NewsletterTemplateIdParamSchema = z.object({
+  id: z.string().uuid('id must be a UUID'),
+});
+
+export const CreateNewsletterTemplateSchema = z.object({
+  name: TemplateNameSchema,
+  description: z.string().max(TEMPLATE_DESC_MAX).optional().nullable(),
+  edition_id: EditionIdSchema.optional().nullable(),
+  // Setting source_type='system' is enforced server-side: only admins may
+  // create system rows (and that path nulls the user_id). Plain users
+  // omit this field and get source_type='user'.
+  source_type: TemplateSourceTypeSchema.optional().default('user'),
+  html: TemplateHtmlSchema,
+  sample_data: TemplateSampleDataSchema.optional().default({}),
+  is_default: z.boolean().optional().default(false),
+  active: z.boolean().optional().default(true),
+});
+
+export const UpdateNewsletterTemplateSchema = z.object({
+  name: TemplateNameSchema.optional(),
+  description: z.string().max(TEMPLATE_DESC_MAX).optional().nullable(),
+  edition_id: EditionIdSchema.optional().nullable(),
+  html: TemplateHtmlSchema.optional(),
+  sample_data: TemplateSampleDataSchema.optional(),
+  is_default: z.boolean().optional(),
+  active: z.boolean().optional(),
+}).refine((v) => Object.keys(v).length > 0, { message: 'no fields supplied' });
+
+// POST /api/newsletter/templates/:id/preview body — caller-supplied data
+// merged on top of the row's sample_data before rendering. Top-level keys
+// only — deep merge happens inside the render lib.
+export const PreviewTemplateSchema = z.object({
+  data: z.record(z.string(), z.unknown()).optional().default({}),
+});
+
+// ============================================
 // Migration 013 — per-genre user ingestion URLs
 // ============================================
 
