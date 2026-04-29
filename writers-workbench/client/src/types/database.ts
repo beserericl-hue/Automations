@@ -397,6 +397,29 @@ export interface NewsletterEdition {
   user_id: string;
   created_at: string;
   updated_at: string;
+  // Migration 017 additions — flow-fixes sprint
+  stamp_url?: string | null;
+  signature_name?: string | null;
+  signature_role?: string | null;
+  cadence?: 'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | null;
+  cadence_send_time?: string | null;
+}
+
+// Newsletter Flow Fixes Sprint — subscribers (migration 017)
+export type NewsletterSubscriberStatus = 'active' | 'unsubscribed' | 'bounced';
+
+export interface NewsletterSubscriber {
+  id: string;
+  user_id: string;
+  edition_id: string;
+  email: string;
+  display_name: string | null;
+  status: NewsletterSubscriberStatus;
+  source: string | null;
+  subscribed_at: string;
+  unsubscribed_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 // Multi-User Newsletters Sprint — feed sources (migration 016)

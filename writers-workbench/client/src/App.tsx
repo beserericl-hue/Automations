@@ -54,6 +54,8 @@ const TemplateEditor = lazyRetry(() => import('./components/newsletter/TemplateE
 const EditionsList = lazyRetry(() => import('./components/newsletter/EditionsList'));
 const EditionEditor = lazyRetry(() => import('./components/newsletter/EditionEditor'));
 const FeedsList = lazyRetry(() => import('./components/newsletter/FeedsList'));
+// Newsletter Flow Fixes Sprint — onboarding wizard for new editions
+const EditionSetupWizard = lazyRetry(() => import('./components/newsletter/EditionSetupWizard'));
 
 export default function App() {
   return (
@@ -122,6 +124,7 @@ export default function App() {
                     <Route path="newsletter/editions/new" element={<EditionEditor />} />
                     <Route path="newsletter/editions/:id" element={<EditionEditor />} />
                     <Route path="newsletter/editions/:id/feeds" element={<FeedsList />} />
+                    <Route path="newsletter/editions/:id/setup" element={<EditionSetupWizard />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
                   </Suspense>

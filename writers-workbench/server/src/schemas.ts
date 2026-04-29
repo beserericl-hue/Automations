@@ -338,6 +338,8 @@ const HexColorSchema = z
   .regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, 'must be a hex color like #14288c');
 
 // CREATE — POST /api/newsletter/editions
+const CadenceSchema = z.enum(['none', 'daily', 'weekly', 'biweekly', 'monthly']);
+
 export const CreateNewsletterEditionSchema = z.object({
   id: EditionIdSchema,
   display_name: z.string().min(1).max(120),
@@ -348,6 +350,12 @@ export const CreateNewsletterEditionSchema = z.object({
   primary_color: HexColorSchema.optional().default('#14288c'),
   paper_color: HexColorSchema.optional().default('#fbf8f2'),
   enabled: z.boolean().optional().default(true),
+  // Mig 017 additions — all optional on create.
+  stamp_url: z.string().url().max(2000).nullable().optional(),
+  signature_name: z.string().max(120).nullable().optional(),
+  signature_role: z.string().max(120).nullable().optional(),
+  cadence: CadenceSchema.optional().default('none'),
+  cadence_send_time: z.string().max(40).nullable().optional(),
 });
 
 // UPDATE — PUT /api/newsletter/editions/:id (all fields optional, none is "no-op")
@@ -361,8 +369,37 @@ export const UpdateNewsletterEditionSchema = z
     primary_color: HexColorSchema.optional(),
     paper_color: HexColorSchema.optional(),
     enabled: z.boolean().optional(),
+    stamp_url: z.string().url().max(2000).nullable().optional(),
+    signature_name: z.string().max(120).nullable().optional(),
+    signature_role: z.string().max(120).nullable().optional(),
+    cadence: CadenceSchema.optional(),
+    cadence_send_time: z.string().max(40).nullable().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'at least one field must be provided' });
+
+// ============================================
+// Newsletter Flow Fixes — subscribers
+// ============================================
+const SubscriberEmailSchema = z.string().email('email must be a valid address').max(254);
+const SubscriberStatusSchema = z.enum(['active', 'unsubscribed', 'bounced']);
+
+export const CreateSubscriberSchema = z.object({
+  email: SubscriberEmailSchema,
+  display_name: z.string().max(200).nullable().optional(),
+  source: z.string().max(60).nullable().optional(),
+  status: SubscriberStatusSchema.optional().default('active'),
+});
+
+export const UpdateSubscriberSchema = z
+  .object({
+    display_name: z.string().max(200).nullable().optional(),
+    status: SubscriberStatusSchema.optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: 'at least one field must be provided' });
+
+export const SubscriberIdParamSchema = z.object({
+  id: z.string().uuid('id must be a UUID'),
+});
 
 // ============================================
 // Multi-User Newsletters Sprint — feed sources

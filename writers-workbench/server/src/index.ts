@@ -23,6 +23,7 @@ import { approvalsApiRouter, approvalsPublicRouter } from './routes/approvals.js
 import { newsletterSendsRouter } from './routes/newsletter-sends.js';
 import { newsletterRouter, newsletterCallbackRouter } from './routes/newsletter.js';
 import { feedsRouter, feedsCronRouter } from './routes/newsletter-feeds.js';
+import { editionExtrasRouter } from './routes/newsletter-edition-extras.js';
 import { genresRouter, adminGenreUrlsRouter } from './routes/genres.js';
 import { jobsRouter } from './routes/jobs.js';
 import { contentActionsRouter } from './routes/content-actions.js';
@@ -162,6 +163,10 @@ app.use('/api/newsletter', newsletterRouter);
 // Multi-User Newsletters Sprint — feed sources CRUD (mounted under same
 // /api/newsletter prefix; routes start with /editions/:id/feeds and /feeds/:id).
 app.use('/api/newsletter', feedsRouter);
+// Newsletter Flow Fixes — logo upload + subscribers CRUD (mounted under
+// /api/newsletter; routes are /editions/:id/logo, /editions/:id/subscribers,
+// /subscribers/:id).
+app.use('/api/newsletter', editionExtrasRouter);
 // Cron worker callbacks. Distinct prefix because requests are auth'd by
 // X-Ingestion-Secret rather than session JWT — keeps the access pattern obvious.
 app.use('/api/newsletter/cron', feedsCronRouter);

@@ -17,6 +17,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '../../lib/api';
 import { useNewsletterEvents } from '../../lib/newsletter/sse';
 import EditionBadge from './EditionBadge';
+import HelpButton from './HelpButton';
 import StatusPill from './StatusPill';
 import type {
   NewsletterEdition,
@@ -121,12 +122,15 @@ export default function NewsletterHome() {
             Compose and schedule editions.
           </p>
         </div>
-        <Link
-          to="/newsletter/generate"
-          className="inline-flex items-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700"
-        >
-          Generate newsletter →
-        </Link>
+        <div className="flex items-center gap-3">
+          <HelpButton section="home" />
+          <Link
+            to="/newsletter/generate"
+            className="inline-flex items-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700"
+          >
+            Generate newsletter →
+          </Link>
+        </div>
       </header>
 
       {/* Tiles */}

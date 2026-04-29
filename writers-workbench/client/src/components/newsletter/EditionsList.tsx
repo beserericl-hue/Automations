@@ -12,6 +12,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { apiFetch, ApiError } from '../../lib/api';
 import EditionBadge from './EditionBadge';
+import HelpButton from './HelpButton';
 import type { NewsletterEdition } from '../../types/database';
 
 interface EditionsResponse { success: boolean; editions: NewsletterEdition[] }
@@ -52,12 +53,15 @@ export default function EditionsList() {
             Each edition has its own branding, default template, and feed sources.
           </p>
         </div>
-        <Link
-          to="/newsletter/editions/new"
-          className="inline-flex items-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700"
-        >
-          New newsletter
-        </Link>
+        <div className="flex items-center gap-3">
+          <HelpButton section="editions" />
+          <Link
+            to="/newsletter/editions/new"
+            className="inline-flex items-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700"
+          >
+            New newsletter
+          </Link>
+        </div>
       </header>
 
       {error && (

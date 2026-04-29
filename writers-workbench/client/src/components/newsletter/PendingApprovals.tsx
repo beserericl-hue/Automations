@@ -14,6 +14,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '../../lib/api';
 import EditionBadge from './EditionBadge';
+import HelpButton from './HelpButton';
 import StatusPill from './StatusPill';
 import type { NewsletterApprovalStage, NewsletterEdition } from '../../types/database';
 
@@ -76,11 +77,14 @@ export default function PendingApprovals() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Pending approvals</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Stories and subject-line approvals waiting on a human decision.
-        </p>
+      <header className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Pending approvals</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Stories and subject-line approvals waiting on a human decision.
+          </p>
+        </div>
+        <HelpButton section="approvals" />
       </header>
 
       <section className="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">

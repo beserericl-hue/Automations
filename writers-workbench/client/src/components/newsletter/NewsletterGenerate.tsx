@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch, ApiError } from '../../lib/api';
 import EditionBadge from './EditionBadge';
+import HelpButton from './HelpButton';
 import type { NewsletterEdition, NewsletterTemplateListItem } from '../../types/database';
 
 interface EditionsResponse {
@@ -63,6 +64,7 @@ function formatLongDate(yyyyMmDd: string): string {
 export default function NewsletterGenerate() {
   const navigate = useNavigate();
   const [editionId, setEditionId] = useState<string>('');
+  const [templateId, setTemplateId] = useState<string>(''); // empty = use edition's default
   const [sendDate, setSendDate] = useState<string>(todayIso());
   const [previousContent, setPreviousContent] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
@@ -90,6 +92,21 @@ export default function NewsletterGenerate() {
   useEffect(() => {
     if (!editionId && editions[0]) setEditionId(editions[0].id);
   }, [editionId, editions]);
+
+  // Templates for the chosen edition. The dropdown shows them all; "" =
+  // "use the active default" so users without preferences can ignore it.
+  const templatesQuery = useQuery({
+    queryKey: ['newsletter-templates', editionId],
+    queryFn: () => apiFetch<TemplatesListResponse>(
+      `/api/newsletter/templates?edition_id=${encodeURIComponent(editionId)}&include_inactive=false`,
+    ),
+    enabled: !!editionId,
+    staleTime: 30_000,
+  });
+  const templates = templatesQuery.data?.templates ?? [];
+  // Reset template selection when the edition changes — a non-default
+  // template from the previous edition would be a confusing leftover.
+  useEffect(() => { setTemplateId(''); }, [editionId]);
 
   // Pre-fill "Previous Newsletter Content" textarea from the edition's
   // most recent send. Only fires after an edition is selected.
@@ -175,11 +192,14 @@ export default function NewsletterGenerate() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Generate newsletter</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Pick an edition, set the send date, and optionally paste prior content so the model avoids duplicate coverage.
-        </p>
+      <header className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Generate newsletter</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Pick an edition, set the send date, and optionally override the template or paste prior content so the model avoids duplicate coverage.
+          </p>
+        </div>
+        <HelpButton section="generate" />
       </header>
 
       <form onSubmit={handleSubmit} className="space-y-5 rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900">
@@ -210,6 +230,30 @@ export default function NewsletterGenerate() {
               {selectedEdition && <EditionBadge edition={selectedEdition} />}
             </div>
           )}
+        </div>
+
+        {/* Template (optional override) */}
+        <div>
+          <label htmlFor="template" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">
+            Template
+            <span className="ml-2 text-xs font-normal text-gray-400">
+              defaults to the active default for this edition
+            </span>
+          </label>
+          <select
+            id="template"
+            value={templateId}
+            onChange={(e) => setTemplateId(e.target.value)}
+            disabled={submitting || !editionId || templatesQuery.isLoading}
+            className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+          >
+            <option value="">(default for this edition)</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}{t.is_default ? ' — default' : ''}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Send date */}
