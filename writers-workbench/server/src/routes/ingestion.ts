@@ -372,6 +372,41 @@ ingestionRouter.get('/mine', requireAuth, async (req: Request, res: Response) =>
   res.json({ success: true, items: data ?? [] });
 });
 
+// GET /api/ingestion/mine/days — list dates that have ingested rows for the
+// caller, with counts. Powers the IngestionBrowser sidebar so users can jump
+// to days with content rather than guessing.
+ingestionRouter.get('/mine/days', requireAuth, async (req: Request, res: Response) => {
+  const userId = req.userId!;
+  const supabase = getSupabaseAdmin();
+  // Pull keys + created_at; group on the client because Postgres-RPC for
+  // a counts-by-day rollup would need a function we haven't migrated.
+  const { data, error } = await supabase
+    .from('content_ingestion_v2')
+    .select('key, created_at, type')
+    .eq('user_id', userId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .limit(2000);
+  if (error) {
+    res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: error.message } });
+    return;
+  }
+  const counts = new Map<string, { date: string; total: number; types: Record<string, number> }>();
+  for (const row of (data ?? []) as Array<{ key: string; created_at: string; type: string }>) {
+    const day = (row.key || '').slice(0, 10) || row.created_at.slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+    let entry = counts.get(day);
+    if (!entry) {
+      entry = { date: day, total: 0, types: {} };
+      counts.set(day, entry);
+    }
+    entry.total += 1;
+    entry.types[row.type] = (entry.types[row.type] ?? 0) + 1;
+  }
+  const days = Array.from(counts.values()).sort((a, b) => (a.date > b.date ? -1 : 1));
+  res.json({ success: true, days });
+});
+
 // GET /api/ingestion/mine/get?key=YYYY-MM-DD/slug.source
 ingestionRouter.get('/mine/get', requireAuth, async (req: Request, res: Response) => {
   const userId = req.userId!;
