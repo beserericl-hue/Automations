@@ -1197,7 +1197,7 @@ newsletterRouter.post(
 
     const { data, error } = await supabase
       .from('newsletter_templates_v2')
-      .select('html, sample_data, user_id')
+      .select('html, sample_data, user_id, edition_id')
       .eq('id', params.data.id)
       .maybeSingle();
     if (error) {
@@ -1208,14 +1208,45 @@ newsletterRouter.post(
       res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Template not found' } });
       return;
     }
-    const row = data as { html: string; sample_data: Record<string, unknown>; user_id: string | null };
+    const row = data as { html: string; sample_data: Record<string, unknown>; user_id: string | null; edition_id: string | null };
     if (row.user_id !== null && row.user_id !== userId && !isAdminCaller(req)) {
       res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Template not found' } });
       return;
     }
 
+    // If the template is bound to an edition, merge that edition's
+    // overrides (stamp_url, signoff fields) so the preview matches what
+    // the n8n send-time render would produce. Without this, the preview
+    // shows the template's hardcoded fallback (e.g. the broken
+    // /static/logos/courseworx-stamp-black.png) even when the user has
+    // already uploaded a real logo on the edition.
+    let editionData: Record<string, unknown> = {};
+    if (row.edition_id) {
+      const { data: editionRow } = await supabase
+        .from('newsletter_editions_v2')
+        .select('stamp_url, signature_name, signature_role')
+        .eq('id', row.edition_id)
+        .maybeSingle();
+      const ed = (editionRow ?? {}) as { stamp_url?: string | null; signature_name?: string | null; signature_role?: string | null };
+      if (ed.stamp_url) editionData.stamp_url = ed.stamp_url;
+      if (ed.signature_name || ed.signature_role) {
+        editionData.signoff = {
+          ...(ed.signature_name ? { signature_name: ed.signature_name } : {}),
+          ...(ed.signature_role ? { role: ed.signature_role } : {}),
+        };
+      }
+    }
+    const incomingSignoff = (body.data as { signoff?: Record<string, unknown> })?.signoff ?? {};
+    const mergedData = {
+      ...editionData,
+      ...body.data,
+      ...(editionData.signoff
+        ? { signoff: { ...(editionData.signoff as Record<string, unknown>), ...incomingSignoff } }
+        : {}),
+    };
+
     try {
-      const result = renderTemplate(row.html, body.data, { sampleData: row.sample_data });
+      const result = renderTemplate(row.html, mergedData, { sampleData: row.sample_data });
       res.json({ success: true, html: result.html, warnings: result.warnings });
     } catch (err) {
       if (err instanceof TemplateCompileError) {
