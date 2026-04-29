@@ -80,7 +80,7 @@ newsletterRouter.get('/editions', requireAuth, async (req: Request, res: Respons
 
   const { data, error } = await supabase
     .from('newsletter_editions_v2')
-    .select('id, display_name, subheader, genre, description, newsletter_name, primary_color, paper_color, enabled, user_id, created_at, updated_at')
+    .select('id, display_name, subheader, genre, description, newsletter_name, primary_color, paper_color, enabled, stamp_url, signature_name, signature_role, cadence, cadence_send_time, user_id, created_at, updated_at')
     .eq('user_id', userId)
     .eq('enabled', true)
     .order('created_at', { ascending: true });
@@ -111,7 +111,7 @@ newsletterRouter.post(
     const { data, error } = await supabase
       .from('newsletter_editions_v2')
       .insert({ ...body, user_id: userId })
-      .select('id, display_name, subheader, genre, description, newsletter_name, primary_color, paper_color, enabled, user_id, created_at, updated_at')
+      .select('id, display_name, subheader, genre, description, newsletter_name, primary_color, paper_color, enabled, stamp_url, signature_name, signature_role, cadence, cadence_send_time, user_id, created_at, updated_at')
       .single();
 
     if (error) {
@@ -155,7 +155,7 @@ newsletterRouter.put(
       .update(body)
       .eq('id', params.data.id)
       .eq('user_id', userId)
-      .select('id, display_name, subheader, genre, description, newsletter_name, primary_color, paper_color, enabled, user_id, created_at, updated_at')
+      .select('id, display_name, subheader, genre, description, newsletter_name, primary_color, paper_color, enabled, stamp_url, signature_name, signature_role, cadence, cadence_send_time, user_id, created_at, updated_at')
       .maybeSingle();
 
     if (error) {
@@ -1265,13 +1265,20 @@ newsletterRouter.post(
     const body = req.body as import('zod').infer<typeof RenderHtmlBodySchema>;
     const supabase = getSupabaseAdmin();
 
-    const { data: row, error } = await supabase
-      .from('newsletter_templates_v2')
-      .select('id, html, sample_data')
-      .eq('edition_id', body.edition_id)
-      .eq('is_default', true)
-      .eq('active', true)
-      .maybeSingle();
+    const [{ data: row, error }, { data: editionRow }] = await Promise.all([
+      supabase
+        .from('newsletter_templates_v2')
+        .select('id, html, sample_data')
+        .eq('edition_id', body.edition_id)
+        .eq('is_default', true)
+        .eq('active', true)
+        .maybeSingle(),
+      supabase
+        .from('newsletter_editions_v2')
+        .select('stamp_url, signature_name, signature_role')
+        .eq('id', body.edition_id)
+        .maybeSingle(),
+    ]);
 
     if (error) {
       logger.error({ error, edition_id: body.edition_id }, 'render-html: template lookup failed');
@@ -1291,8 +1298,25 @@ newsletterRouter.post(
 
     const r = row as { id: string; html: string; sample_data: Record<string, unknown> };
 
+    // Merge per-edition overrides into the data. Order matters: the n8n
+    // payload (body.data) wins over edition-row overrides which win over
+    // template sample_data. So a real send can still override stamp_url
+    // ad-hoc, but defaults to whatever the user set on the edition.
+    const ed = (editionRow ?? {}) as { stamp_url?: string | null; signature_name?: string | null; signature_role?: string | null };
+    const incomingSignoff = (body.data as { signoff?: Record<string, unknown> })?.signoff ?? {};
+    const editionData: Record<string, unknown> = {};
+    if (ed.stamp_url) editionData.stamp_url = ed.stamp_url;
+    if (ed.signature_name || ed.signature_role) {
+      editionData.signoff = {
+        ...(ed.signature_name ? { signature_name: ed.signature_name } : {}),
+        ...(ed.signature_role ? { role: ed.signature_role } : {}),
+        ...incomingSignoff,
+      };
+    }
+    const mergedData = { ...editionData, ...body.data, ...(editionData.signoff ? { signoff: editionData.signoff } : {}) };
+
     try {
-      const result = renderTemplate(r.html, body.data, { sampleData: r.sample_data });
+      const result = renderTemplate(r.html, mergedData, { sampleData: r.sample_data });
       res.json({
         success: true,
         template_id: r.id,

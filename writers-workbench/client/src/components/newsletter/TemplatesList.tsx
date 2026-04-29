@@ -11,6 +11,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, ApiError } from '../../lib/api';
 import EditionBadge from './EditionBadge';
+import HelpButton from './HelpButton';
 import type {
   NewsletterEdition,
   NewsletterTemplateListItem,
@@ -76,12 +77,15 @@ export default function TemplatesList() {
             Branded HTML layouts. The default for each edition is what the AI pipeline uses at send time.
           </p>
         </div>
-        <Link
-          to="/newsletter/templates/new"
-          className="inline-flex items-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700"
-        >
-          New template
-        </Link>
+        <div className="flex items-center gap-3">
+          <HelpButton section="templates" />
+          <Link
+            to="/newsletter/templates/new"
+            className="inline-flex items-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700"
+          >
+            New template
+          </Link>
+        </div>
       </header>
 
       <div className="flex flex-wrap items-center gap-4 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">

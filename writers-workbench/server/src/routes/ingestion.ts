@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { requireAuth } from '../middleware/auth.js';
 import { requireSharedSecret } from '../middleware/shared-secret.js';
 import { validateBody } from '../middleware/validate.js';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
@@ -332,4 +333,77 @@ ingestionRouter.get('/get/:key(*)', requireIngestionSecret, async (req: Request,
   ]);
 
   res.json({ success: true, ...row, markdown, html });
+});
+
+// ---------------------------------------------------------------------------
+// Session-authenticated proxies for the in-app Ingestion Browser.
+// The shared-secret routes above are server-to-server only; the browser
+// never sees X-Ingestion-Secret. These routes scope to the caller's
+// user_id automatically and accept friendlier query shapes.
+// ---------------------------------------------------------------------------
+
+// GET /api/ingestion/mine?date=YYYY-MM-DD&type_not=newsletter
+ingestionRouter.get('/mine', requireAuth, async (req: Request, res: Response) => {
+  const userId = req.userId!;
+  const date = String(req.query.date ?? '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'date must be YYYY-MM-DD' } });
+    return;
+  }
+  const typeNot = req.query.type_not ? String(req.query.type_not) : 'newsletter';
+
+  const supabase = getSupabaseAdmin();
+  let q = supabase
+    .from('content_ingestion_v2')
+    .select('id, key, user_id, type, title, authors, source_name, source_url, external_source_urls, image_urls, reddit_metadata, published_timestamp, feed_url, storage_path_md, storage_path_html, created_at, updated_at')
+    .eq('user_id', userId)
+    .is('deleted_at', null)
+    .like('key', `${date}/%`)
+    .order('created_at', { ascending: false })
+    .limit(MAX_SEARCH_RESULTS);
+  if (typeNot && typeNot !== 'any') q = q.neq('type', typeNot);
+
+  const { data, error } = await q;
+  if (error) {
+    logger.error({ error, userId, date }, 'ingestion/mine list failed');
+    res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: error.message } });
+    return;
+  }
+  res.json({ success: true, items: data ?? [] });
+});
+
+// GET /api/ingestion/mine/get?key=YYYY-MM-DD/slug.source
+ingestionRouter.get('/mine/get', requireAuth, async (req: Request, res: Response) => {
+  const userId = req.userId!;
+  const rawKey = String(req.query.key ?? '');
+  if (isUnsafeKey(rawKey)) {
+    res.status(400).json({ success: false, error: { code: 'INVALID_KEY', message: 'key failed safety validation' } });
+    return;
+  }
+  const supabase = getSupabaseAdmin();
+  const { data: row, error } = await supabase
+    .from('content_ingestion_v2')
+    .select('id, key, user_id, type, title, authors, source_name, source_url, external_source_urls, image_urls, reddit_metadata, published_timestamp, feed_url, storage_path_md, storage_path_html, created_at, updated_at')
+    .eq('key', rawKey)
+    .eq('user_id', userId)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (error) {
+    res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: error.message } });
+    return;
+  }
+  if (!row) {
+    res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'No ingestion row found for that key' } });
+    return;
+  }
+  const [mdRes, htmlRes] = await Promise.all([
+    supabase.storage.from(BUCKET).download(row.storage_path_md),
+    supabase.storage.from(BUCKET).download(row.storage_path_html),
+  ]);
+  if (mdRes.error || !mdRes.data || htmlRes.error || !htmlRes.data) {
+    res.status(500).json({ success: false, error: { code: 'BLOB_MISSING', message: 'Row exists but blob missing from storage' } });
+    return;
+  }
+  const [markdown, html] = await Promise.all([mdRes.data.text(), htmlRes.data.text()]);
+  res.json({ success: true, item: row, markdown, html });
 });

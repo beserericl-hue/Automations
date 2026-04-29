@@ -226,6 +226,17 @@ function buildSelectBuilder() {
 
 const fakeSupabase = {
   from(table: string) {
+    // /render-html now also reads newsletter_editions_v2 to merge stamp_url
+    // + signature overrides (mig 017). Tests don't care about overrides;
+    // return an empty edition row so the merge no-ops.
+    if (table === 'newsletter_editions_v2') {
+      const builder: Record<string, unknown> = {
+        select() { return builder; },
+        eq() { return builder; },
+        maybeSingle() { return Promise.resolve({ data: null, error: null }); },
+      };
+      return builder;
+    }
     if (table !== 'newsletter_templates_v2') throw new Error('unexpected table: ' + table);
     return {
       select: () => buildSelectBuilder(),

@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, ApiError } from '../../lib/api';
+import HelpButton from './HelpButton';
 import type { NewsletterEdition, NewsletterFeedSource } from '../../types/database';
 
 interface EditionsResponse { success: boolean; editions: NewsletterEdition[] }
@@ -101,13 +102,16 @@ export default function FeedsList() {
             RSS / Reddit / source URLs the cron worker polls to populate this newsletter's content pool.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => { setShowAdd(true); setEditingId(null); }}
-          className="inline-flex items-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700"
-        >
-          Add feed
-        </button>
+        <div className="flex items-center gap-3">
+          <HelpButton section="feeds" />
+          <button
+            type="button"
+            onClick={() => { setShowAdd(true); setEditingId(null); }}
+            className="inline-flex items-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700"
+          >
+            Add feed
+          </button>
+        </div>
       </header>
 
       {error && (
