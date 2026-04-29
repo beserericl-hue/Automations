@@ -40,13 +40,13 @@ Once V2 workflows are in front of real customers, **they become the immutable pr
 
 Sprint 10.a below builds this governance. All subsequent sprints MUST do their workflow changes on Dev, not V2.
 
-### Sprint 8 and 9 (carried forward)
+### Sprint 8 and 9 (carried forward — Sprint 8 SHIPPED 2026-04-27; Sprint 9 still pending)
 
-These were designed in the original sprint doc but never executed:
-- **[Sprint 8](sprint_document.md#sprint-8-multi-tenant-rbac-subscription-tiers--credits-2-weeks):** Multi-Tenant RBAC, Subscription Tiers & Credits (10 stories, 55 pts)
-- **[Sprint 9](sprint_document.md#sprint-9-stripe-integration--payment-processing-2-weeks):** Stripe Integration & Payment Processing (9 stories, 47 pts)
+These were designed in the original sprint doc:
+- **[Sprint 8](sprint_document.md#sprint-8-multi-tenant-rbac-subscription-tiers--credits-2-weeks):** Multi-Tenant RBAC, Subscription Tiers & Credits — ✅ **SHIPPED** via PR #50, released as v1.1 (PR #56). Admin lifecycle follow-ups: PRs #51 (onboarding tour), #53 (subscription assignment), #54 (Full Access Comp tier), #57 (password toggle + admin Edit User parity), #55 (per-user ingestion URLs side-sprint).
+- **[Sprint 9](sprint_document.md#sprint-9-stripe-integration--payment-processing-2-weeks):** Stripe Integration & Payment Processing — ⏳ **NOT STARTED** (47 pts, 9 stories). Sprint 9 wires real Stripe payment flows on top of the RBAC + tiers + credits system Sprint 8 already built.
 
-They remain planned. Recommended sequencing: **10 (done) → 10.a → 10.b → 11 → 12 → 8 → 9 → 13 → 14 → 15**. Sprints 8 and 9 benefit from the queue (10.b) for billing events and the email infrastructure (Newsletter Agent sprint's S7 + Sprint 11) for payment receipts / trial expiry notifications.
+Recommended sequencing from here: **9 → 13 → 14 → 15 → 16 → 17 → 18**. Sprint 9 is the obvious next step — Stripe extends what Sprint 8 already built and is the highest-leverage product work remaining.
 
 ---
 
@@ -85,7 +85,8 @@ They remain planned. Recommended sequencing: **10 (done) → 10.a → 10.b → 1
 
 ## Sprint 10.a: Full Tier Separation — DB, Workflows, Agent
 
-**Status:** In progress (S10a-1 done 2026-04-19) | **Points:** 49 | **Duration:** ~3 weeks | **Priority:** P0
+**Status:** ✅ **SHIPPED** (released v1.1 — PR #56) | **Points:** 49 | **Duration:** ~3 weeks | **Priority:** P0
+Stories collapsed at delivery: PRs #5/6/7 (deploy markers / S10a-0 hotfixes), PR #8 (Sprint 10.a bulk — governance docs + scripts + PROD/DEV workflow renames + clones + migration + isolation tests, covering S10a-1 through S10a-11), PR #9 (CLAUDE.md tier-specific Railway env var rules). End state: PROD + DEV Supabase, 24 PROD + 24 DEV n8n workflows, two Railway services with their own Redis, two ElevenLabs Eve agents, schema governance CI check enforcing base-table immutability.
 
 **Goal:** Establish a three-tier architecture (V1 baseline / V2 production / Dev) across every layer customers touch: Supabase database, n8n workflows, ElevenLabs Eve agent. Cement the coding discipline that makes this sustainable: base tables are immutable; all schema extensions go in meta tables.
 
@@ -684,7 +685,8 @@ S10a-5 (schema governance) ─────────────────�
 
 ## Sprint 10.b: Redis + BullMQ Job Queue Foundation
 
-**Status:** Planned | **Points:** 34 | **Duration:** 2 weeks | **Priority:** P0
+**Status:** ✅ **SHIPPED** (released as part of v1.1 — PR #56) | **Points:** 34 | **Duration:** 2 weeks | **Priority:** P0
+Stories: S10b-1 (PR #10), S10b-2 (#11), S10b-3 (#13), S10b-4 (#20, #14 superseded), S10b-5 (#15) — all merged.
 
 **Goal:** Stand up Redis on Railway, add BullMQ to the Express server, migrate async operations from direct n8n webhook calls to queued jobs. This sets the foundation for horizontal scaling and makes long-running writes reliable.
 
@@ -911,8 +913,9 @@ S10a-5 (schema governance) ─────────────────�
 
 ## Sprint 11: Postal Email Migration Completion
 
-**Status:** Planned | **Points:** 21 | **Duration:** 1.5 weeks | **Priority:** P1
-**Prerequisite:** Newsletter Agent Migration sprint S7 must be complete (Postal installed + configured)
+**Status:** 🟡 **DEV-COMPLETE** (PROD on next release) | **Points:** 21 | **Duration:** 1.5 weeks | **Priority:** P1
+**Prerequisite:** Newsletter Agent Migration sprint S7 must be complete (Postal installed + configured) — done 2026-04-23
+Stories: S11-1/2/3 swept by `scripts/s11-migrate-gmail-to-postal.py` (commit b9303aa) — DEV n8n inventory now shows 14 of 14 email-sending workflows on Postal, 0 on Gmail. S11-4 (PR #23 Redis rate limiter), S11-5 (PR #24 bounce webhook + admin UI). PROD still on Gmail by design — flips on release-day promotion via `scripts/promote-dev-to-prod.py`.
 
 **Goal:** The Newsletter Agent Migration sprint installs Postal and migrates newsletter flows. This sprint **retires Gmail OAuth entirely** by migrating the other 15 V2 workflows (blog, chapter, short story, brainstorm, etc.) to the shared `/api/email/send` → Postal path. Also adds bounce/complaint handling, FBL configuration, and per-user email rate limiting backed by Redis.
 
@@ -1050,7 +1053,8 @@ S10a-5 (schema governance) ─────────────────�
 
 ## Sprint 12: Chapter Writer — Research/Rewrite Tool + Reviewer/Editor Tools
 
-**Status:** In progress (Track B + Track C shipped on PR #40, Track A deferred) | **Points:** 47 | **Duration:** ~3 weeks | **Priority:** P0
+**Status:** 🟡 **DEV-COMPLETE** — Tracks B + C shipped, Track A moved to Sprints 16–18 | **Points:** 47 | **Duration:** ~3 weeks | **Priority:** P0
+Tracks B + C: PRs #31–#39 (consistency fixes + UI MVP + hotfixes), PR #40 (S12-11/12/13 — genre eval, deterministic drift scanner, shared annotations UI), PR #71 (story-bible extraction restored after sub-chapter regression). Track A (S12-1, S12-3, S12-4, S12-5 = parallelization) **moved to Sprints 16–18** with quality-harness gating per user direction 2026-04-26.
 
 **Goal:** Two co-shipped capabilities for the chapter pipeline:
 1. **Research/Rewrite Tool (23 pts):** A quick `maxIterations` hotfix to unblock multi-step requests today + new composite tool so the user can say one natural-language sentence to Eve and get a revised chapter that:
@@ -1514,21 +1518,45 @@ See [`docs/railway-deployment.md`](docs/railway-deployment.md) for the full Rail
 
 ---
 
-## Sprint 14: Cloudflare R2 Storage Migration
+## Sprint 14: Storage strategy review (NOT necessarily R2)
 
-**Status:** Planned | **Points:** 34 | **Duration:** 2 weeks | **Priority:** P2
+**Status:** Planned, scope under review (2026-04-29) | **Points:** TBD after S14-0 decision | **Duration:** 1–2 weeks | **Priority:** P2
 
-**Goal:** Move blob storage from Supabase Storage to Cloudflare R2 (zero egress fees, more control). Supabase stays for Postgres data; only the blobs move.
+**Original Sprint 14 plan was "migrate to Cloudflare R2".** The user pushed back on 2026-04-29: *"why are we using R2 storage? We can use storage on Supabase or R2 storage on Railway."* That's a fair question — Supabase Storage already works today (cover images, generated assets, ingestion HTML), and Railway now offers S3-compatible object storage as a managed service inside the same Railway project. Adding R2 introduces a third vendor and another credential surface.
 
-### Stories (summary)
+This sprint is rescoped to **make the storage decision deliberately**, not assume R2.
 
-- **S14-1 (5 pts):** R2 bucket provisioning + S3-compatible client setup
-- **S14-2 (8 pts):** Storage service + migration script (S3-compatible client, bulk migration from Supabase Storage → R2)
-- **S14-3 (8 pts):** Update n8n workflows (Dev) to read/write R2 instead of Supabase Storage
-- **S14-4 (5 pts):** Frontend storage URL migration (image components)
-- **S14-5 (8 pts):** Supabase cutover + verification + rollback plan
+### S14-0: Storage strategy decision (3 pts) | P0 | NEW — pre-requisite
 
-**Depends on:** Sprint 10.a
+**Goal:** A written decision document that picks one of three options for blob storage going forward.
+
+**Options to compare:**
+
+| Option | Where data lives | Pros | Cons |
+|---|---|---|---|
+| **A — Stay on Supabase Storage** | Supabase project (PROD = `faklxfakgzkpkbxfihzh`, DEV = `gvbvwcnmjkdpclcisqrr`) | Already working. One vendor for DB + storage. RLS reuses existing user_id auth. Costs bundled into Supabase plan. | Egress costs scale with reads. Supabase storage is built on Cloudflare R2 anyway, so we're already paying R2 indirectly. |
+| **B — Railway native object storage** | Railway managed service (S3-compatible) inside the existing `bubbly-solace` project | Single vendor for compute + storage. Same env var + secrets surface. No cross-region latency. Bills consolidated with Railway compute. | Newer service — less battle-tested. Migrating off-Railway in the future would need another move. Cost per GB unclear vs R2. |
+| **C — Cloudflare R2 directly** | Standalone R2 bucket | Zero egress. Cheapest per GB at scale. Can put a custom CDN domain in front. | Third vendor. Another credential to rotate. Migration cost (Sprint 14 as originally planned). Authentication is S3-style, not Supabase RLS — would need a Workbench-side proxy for per-user access control. |
+
+**Tasks:**
+- [ ] Quantify current Supabase Storage usage (GB stored, GB egressed/month) to know whether cost is even a real driver yet
+- [ ] Run a 1-week egress-cost sample on the dev environment
+- [ ] Write the decision in `writers-workbench/docs/storage-strategy-2026.md`
+- [ ] If decision is Option A (stay on Supabase), this sprint is effectively done — just close it out and remove from roadmap. If B or C, scope out the migration sprint stories below.
+
+**Definition of Done:** A signed decision document. Sprint 14 either closes (Option A) or proceeds with Options-B/C-specific stories.
+
+### Stories (only execute IF S14-0 picks Option B or C)
+
+These were the original R2-migration stories. Adapt them to Option B (Railway native) if that's the choice:
+
+- **S14-1 (5 pts):** Bucket provisioning + S3-compatible client setup
+- **S14-2 (8 pts):** Storage service + migration script (bulk copy from Supabase Storage → new target)
+- **S14-3 (8 pts):** Update n8n workflows (Dev) to read/write the new target instead of Supabase Storage
+- **S14-4 (5 pts):** Frontend storage URL migration (image components, signed URLs)
+- **S14-5 (8 pts):** Supabase Storage cutover + verification + rollback plan
+
+**Depends on:** Sprint 10.a + S14-0 decision
 
 ---
 
@@ -1550,17 +1578,43 @@ See [`docs/railway-deployment.md`](docs/railway-deployment.md) for the full Rail
 
 ---
 
-## Sprint 16: Chapter Writer — Profiling & Quality-Comparison Harness (no architecture change)
+## Sprint 16: Chapter Writer — Profiling, Quality Harness & Test Workflow (no architecture change to live writer)
 
-**Status:** Planned | **Points:** 21 | **Duration:** 2 weeks | **Priority:** P1 | **Pre-requisite for 17 & 18**
+**Status:** Planned | **Points:** 26 | **Duration:** 2 weeks | **Priority:** P1 | **Pre-requisite for 17 & 18**
 
-**Goal:** Before we touch the chapter writer's architecture, build the **measurement infrastructure** that lets us prove an alternative writer doesn't regress on quality. Today there is no harness, no baseline, and no agreed-on quality metric. The original Sprint 12 Track A plan ("Chapter content quality unchanged (manual review)") is not a real DoD — humans don't notice prose regressions across 50,000 words. This sprint produces the rulers.
+**Goal:** Before touching the chapter writer's architecture, build the **measurement infrastructure** that lets us prove an alternative writer doesn't regress on quality, AND stand up a separate, isolated test write_chapter workflow we can hammer with timing/perf experiments without disturbing real users. Today there is no harness, no baseline, no agreed-on quality metric, and no isolated test target. The original Sprint 12 Track A plan ("Chapter content quality unchanged (manual review)") is not a real DoD — humans don't notice prose regressions across 50,000 words. This sprint produces the rulers AND the lab bench.
 
-**Why now:** The 120s `rate_limit_delay` Wait node in `Worker - Write Chapter V2 Dev` is a deliberate trade-off against (a) Anthropic's per-minute output-token rate limit and (b) the high token cost per sub-chapter (~5000 words × ~1.3 tokens/word × N sub-chapters). Removing it is a 5-minute change but the quality risks are real. We need to know what we're trading for what before we choose a new architecture in Sprint 17.
+**Architectural constraint captured 2026-04-29 (user's verbatim framing):**
 
-**Governance:** All work read-only against `Worker - Write Chapter V2 Dev`. NO mutations to live workflows. New tooling lives in `scripts/` and `writers-workbench/server/src/quality/`.
+> "We are NOT using worker n8n instances (Enterprise v). We have to create multiple write chapter workflows and load balance them to get better performance. We have to make sure we don't max out tokens to get errors on Claude LLMs. This is why we had the timer for the subchapter."
+
+The 120s `rate_limit_delay` Wait node in `Worker - Write Chapter V2 Dev` was a deliberate trade-off against Anthropic's per-minute output-token rate limit + the high token cost per sub-chapter (~5000 words × ~1.3 tokens/word × N sub-chapters). It was the simplest token-rate-protection mechanism available without n8n Enterprise's queue mode. **Sprints 16/17/18 must keep that constraint front and centre — no proposal that ignores Anthropic per-minute caps survives review.**
+
+The strategy this sprint locks in:
+1. Stand up a **`DEV - Worker - Write Chapter (TEST)` workflow** — a clone of the live worker we can mutate freely. Same I/O contract; different workflow ID; never receives real user traffic.
+2. Build profiling + quality-scoring tooling that reads from BOTH the live and TEST workers.
+3. Establish a 15-chapter golden baseline corpus from the live worker.
+
+Sprint 17 then runs experiments against the TEST workflow only. Sprint 18 promotes the chosen design.
+
+**Governance:** Read-only against `DEV - Worker - Write Chapter` (the live worker). NO mutations to live workflows. The TEST workflow is a separate workflow ID. New tooling lives in `scripts/` and `writers-workbench/server/src/quality/`.
 
 ### Stories
+
+#### S16-0: Stand up `DEV - Worker - Write Chapter (TEST)` (5 pts) | P0 | NEW
+
+**Goal:** A separate workflow we can run timing/perf experiments against without affecting real users. Same I/O contract as the live worker so the harness can target either by workflow ID.
+
+**Developer Tasks:**
+- [ ] Clone `DEV - Worker - Write Chapter` (id `fsKRGkzphWT62rja`) → `DEV - Worker - Write Chapter (TEST)` via the existing `clone-prod-to-dev.py` pattern (same code-substitution rules).
+- [ ] New workflow ID recorded in `scripts/workflow-id-map.json` under a `test_workflows` key.
+- [ ] Wire it to receive only test traffic — Workbench-side `triggerChapterWrite({ workflow: 'live'|'test' })` flag, `live` is the default.
+- [ ] Confirm the TEST workflow runs end-to-end against a known baseline chapter and produces output indistinguishable from the live worker (within token-count noise) when no experimental changes are applied.
+
+**QA / DoD:**
+- [ ] TEST workflow ID added to `workflow-id-map.json`.
+- [ ] One control run (TEST = unchanged clone) produces a chapter with quality scores within ±5% of the live worker on the same outline.
+- [ ] No real user traffic ever touches the TEST workflow.
 
 #### S16-1: Profile current chapter writer (5 pts) | P0
 
@@ -1620,148 +1674,193 @@ See [`docs/railway-deployment.md`](docs/railway-deployment.md) for the full Rail
 **QA / DoD:**
 - [ ] Running the harness with `writer_a == writer_b` against a baseline chapter shows ~0 score delta and ≤10% time variance — proves the harness itself is stable.
 
-### Sprint 16 totals: 21 pts
+### Sprint 16 totals: 26 pts
 
-**Depends on:** Sprint 12 complete. Sprint 10.b ideally complete (queue infra makes parallel-writer experiments easier).
+**Depends on:** Sprint 12 complete. Sprint 10.b complete (queue infra is required for the rate-limiter work in Sprint 17/18, and the harness piggybacks on it).
 
-**Does NOT change any production behaviour.** Pure measurement.
+**Does NOT change any production behaviour.** Pure measurement + new isolated TEST workflow.
 
 ---
 
-## Sprint 17: LLM Bake-off + Architecture Spike (no production rollout)
+## Sprint 17: LLM Bake-off + Multi-Instance Architecture Spike (no production rollout)
 
-**Status:** Planned | **Points:** 26 | **Duration:** 2 weeks | **Priority:** P1
+**Status:** Planned | **Points:** 29 | **Duration:** 2 weeks | **Priority:** P1
 
-**Goal:** Use the Sprint 16 harness to answer two architectural questions before we change anything:
-1. **Is the right answer different LLMs?** Specifically: can a smaller/cheaper/faster LLM write parts of a sub-chapter (scaffolding, dialogue beats, sensory description) without quality loss, while only the "hard" parts use Claude Sonnet/Opus?
-2. **Is the right answer architectural change?** Specifically: where should sub-chapter parallelism live (n8n SplitInBatches vs Workbench BullMQ vs hybrid), and how do we manage the Anthropic per-minute token rate without a hand-rolled Wait node?
+**Architectural constraint (must hold throughout):** No n8n Enterprise queue mode is available — sub-chapter parallelism inside a single workflow doesn't actually parallelise (n8n's loop model serialises by design, and even SplitInBatches only multiplexes execution, not Anthropic API calls). The only mechanism that produces real concurrency on this stack is **multiple distinct write_chapter workflow instances**, dispatched by a Workbench-side load balancer. Each instance still has to respect Anthropic's per-minute token cap — so the load balancer also has to be the rate-limit gatekeeper.
 
-This is a SPIKE — produces decisions and prototypes, not production code.
+**Goal:** Use the Sprint 16 harness + TEST workflow to answer three concrete questions:
+
+1. **LLM choice (per-genre)** — does any cheaper/faster model match Sonnet 4.5 quality on parts or all of a chapter?
+2. **Multi-instance topology** — how many parallel write_chapter workflow instances do we run, and what's the dispatch + token-rate-tracking design?
+3. **Continuity merge worth keeping?** — does the post-concat merge pass actually move the quality score or is it a no-op?
+
+This is a SPIKE — produces decisions and prototypes against the TEST workflow. **No live workflow is modified.**
 
 ### Stories
 
 #### S17-1: Single-LLM bake-off — Sonnet vs alternatives (8 pts) | P0
 
 **Developer Tasks:**
-- [ ] Run the S16-3 baseline corpus through 6 alternative single-LLM writers, identical prompt + context:
-  - Claude Sonnet 4.6 (current default)
-  - Claude Sonnet 4.7
+- [ ] Run the S16-3 baseline corpus through alternative single-LLM writers via TEST workflow, identical prompt + context:
+  - Claude Sonnet 4.5 / 4.6 / 4.7
   - Claude Haiku 4.5 (cheap/fast)
   - Claude Opus 4.7 (premium)
-  - Gemini 2.5 Pro
-  - Gemini 2.5 Flash
-  - GPT-4o
-  - GPT-4o-mini
-- [ ] Score each output against the baseline via the S16-2 framework. Capture cost (input + output tokens × model pricing) and wall time.
-- [ ] Build a scorecard: per-genre quality vs cost vs time per LLM. Identify any model that matches Sonnet quality at <50% cost or <50% time.
+  - Gemini 2.5 Pro / Flash
+  - GPT-4o / GPT-4o-mini
+- [ ] Score each output against the baseline via the S16-2 framework. Capture: cost (input + output tokens × model pricing), wall time, **observed Anthropic-per-minute-token consumption**, and any 429 errors encountered.
+- [ ] Build a scorecard: per-genre quality vs cost vs time vs token-rate per LLM. Identify any model that matches Sonnet quality at <50% cost or <50% time.
 
 **QA / DoD:**
-- [ ] Scorecard markdown in `writers-workbench/docs/llm-bakeoff-2026.md` with one row per (genre × model).
+- [ ] Scorecard markdown in `writers-workbench/docs/llm-bakeoff-2026.md`.
 - [ ] Recommended single-LLM default for each of the 3 genres (may all be Sonnet — that's a valid answer).
 
-#### S17-2: Multi-LLM composition experiments (8 pts) | P1
+#### S17-2: Multi-LLM composition experiments (5 pts) | P1
 
 **Developer Tasks:**
-- [ ] Try 4 multi-LLM compositions on the baseline corpus:
+- [ ] Try 4 multi-LLM compositions on the baseline corpus via TEST workflow:
   - **(a) Scaffolder + Prose** — Haiku expands the sub-chapter outline into a beat-by-beat plan; Sonnet writes the prose against the plan
   - **(b) Draft + Polish** — Haiku writes a fast draft; Sonnet does a polish pass
   - **(c) Per-element specialisation** — Haiku for setting/sensory, Sonnet for dialogue, Opus for the climax sub-chapter only
-  - **(d) Cache-leveraged Sonnet-only** — single LLM but with explicit cache reuse: emit a long stable system prompt + chapter context once, hit the cache for every sub-chapter (validates the Sonnet cache savings claim)
-- [ ] Score, compare to single-LLM baseline. Cost / quality / time trade-off table.
+  - **(d) Cache-leveraged Sonnet-only** — emit a long stable system prompt + chapter context once, hit the prompt cache for every sub-chapter (validates the Sonnet cache savings claim)
+- [ ] Score, compare to single-LLM baseline. Cost / quality / time / token-rate trade-off table.
 
 **QA / DoD:**
-- [ ] Decision: which composition (if any) ships in Sprint 18 vs single-LLM Sonnet default.
+- [ ] Decision: which composition (if any) ships in Sprint 18 vs single-LLM default.
 - [ ] Documented trade-offs of the rejected compositions (so we don't re-litigate later).
 
-#### S17-3: Architecture spike — three options, pick one (8 pts) | P0
+#### S17-3: Multi-instance architecture spike + Anthropic token-rate gatekeeper (13 pts) | P0 | RESHAPED 2026-04-29
 
-**Developer Tasks:** Build a tiny prototype of each option, run a 5-sub-chapter chapter through each, measure rate-limit behaviour:
-- **Option A — n8n native parallel.** SplitInBatches with batch size = N sub-chapters. Verify whether n8n actually parallelises the Anthropic calls or serializes them internally. (Strong suspicion from prior session notes that it serializes.)
-- **Option B — Workbench BullMQ fan-out.** New `/api/chapter/write` endpoint enqueues N sub-chapter jobs to a `chapter-sub` BullMQ queue with `concurrency` controlled by Workbench config. n8n only orchestrates the trigger + concat + QA. Anthropic rate-limit honored via the existing BullMQ rate-limiter.
-- **Option C — Hybrid.** n8n keeps the per-sub-chapter LLM calls but the wait between them is replaced by a Workbench-side rate-limiter check (the worker calls `/api/rate/anthropic/wait?tokens=5000` which blocks until tokens are available, then returns).
+**The actual question:** with no n8n Enterprise queue mode, how do we run multiple chapter writes concurrently without busting Anthropic's per-minute output-token cap?
 
-**QA / DoD:**
-- [ ] One of the three is recommended in writing with measured rate-limit handling, true wall-time, and architectural risk per option.
-- [ ] Recommended option becomes the foundation for Sprint 18.
+**Approach: N parallel `DEV - Worker - Write Chapter` instances + Workbench dispatcher + token-rate gatekeeper.**
 
-#### S17-4: Continuity-merge experiment (2 pts) | P1
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                     Workbench (Railway)                            │
+│                                                                    │
+│   POST /api/chapter/write                                          │
+│       │                                                            │
+│       ▼                                                            │
+│   ChapterDispatcher                                                │
+│       │  1. Estimate tokens needed (≈ N_sub × 5000 tokens out)     │
+│       │  2. Reserve from AnthropicTokenBudget (Redis bucket,       │
+│       │     per-minute window, slides forward)                     │
+│       │     - if not enough: enqueue, retry on next refill         │
+│       │  3. Pick the next free worker_instance_id (round-robin     │
+│       │     least-busy across N instances)                         │
+│       │                                                            │
+│       └──> POST /webhook/write_chapter_<i>  (n8n)                  │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+                  │              │              │
+                  ▼              ▼              ▼
+          ┌─────────────┐┌─────────────┐┌─────────────┐
+          │ Worker WC 1 ││ Worker WC 2 ││ Worker WC N │   (n8n)
+          │ (no Wait)   ││ (no Wait)   ││ (no Wait)   │
+          │ Sub-chapter ││ Sub-chapter ││ Sub-chapter │
+          │  loop calls ││  loop calls ││  loop calls │
+          │  Claude     ││  Claude     ││  Claude     │
+          └─────────────┘└─────────────┘└─────────────┘
+                  │              │              │
+                  └──────┬───────┴──────┬───────┘
+                         ▼              ▼
+                 Anthropic API (rate-limited at gatekeeper, not n8n)
+```
 
 **Developer Tasks:**
-- [ ] Take 3 baseline chapters that were generated as N sub-chapters today and rewrite their concatenation through a "merge pass" Claude call (the original S12-4 spirit but on already-good prose).
-- [ ] Score before/after via S16-2.
+- [ ] Build `AnthropicTokenBudget` service in Workbench: Redis-backed sliding-window counter sized to ~80% of the current Anthropic tier's per-minute output-token cap. Reserve/consume/release API. Configurable cap by env var so we can tune as the tier changes.
+- [ ] Build `ChapterDispatcher` Workbench-side: queues incoming chapter-write requests, calls AnthropicTokenBudget.reserve() before dispatch, retries on next refill if reservation fails. Uses BullMQ from Sprint 10.b for backpressure and persistence.
+- [ ] Clone the TEST workflow into 3 copies (`DEV - Worker - Write Chapter (TEST 1/2/3)`) — different webhook paths, identical logic. **Remove** the 120s rate_limit_delay Wait node from each since the rate gate now lives in Workbench, not n8n.
+- [ ] Run 3 simultaneous chapter writes through the dispatcher → 3 instances. Measure wall time, observed Anthropic 429 count (target: 0), token-budget reservation accuracy.
+- [ ] Compare to baseline: 3 sequential writes through the live worker (with the 120s wait still in place). Document the speedup factor + any quality regression vs baseline scores from Sprint 16.
 
 **QA / DoD:**
-- [ ] Determines whether continuity merge actually moves the score or is a no-op (which would let us drop the story from Sprint 18).
+- [ ] Workbench `AnthropicTokenBudget` unit tests cover: reserve/release happy path, exhaust + retry, sliding-window expiry, multi-process correctness via Redis Lua script.
+- [ ] 3-instance concurrent test: zero 429 errors across 50 chapter writes, wall time ≥2× faster than the baseline 3-sequential, quality scores within ±5% of baseline.
+- [ ] Decision document: number of instances to deploy in Sprint 18 (1, 3, 5, …), token-budget cap setting, whether to also add a per-user concurrency cap on top.
 
-### Sprint 17 totals: 26 pts
+#### S17-4: Continuity-merge experiment (3 pts) | P1
+
+**Developer Tasks:**
+- [ ] Take 3 baseline chapters that were generated as N sub-chapters today and rewrite their concatenation through a "merge pass" Claude call (the original S12-4 spirit, but on already-good prose). Run on TEST workflow.
+- [ ] Score before/after via S16-2. Note the additional token cost — the merge pass also has to fit inside the AnthropicTokenBudget.
+
+**QA / DoD:**
+- [ ] Determines whether continuity merge actually moves the score or is a no-op (which would let us drop the story from Sprint 18 and save the merge-pass tokens).
+
+### Sprint 17 totals: 29 pts
 
 **Depends on:** Sprint 16 (harness + baseline must exist).
 
-**Does NOT change any production behaviour.** Spike outputs are prototypes + decisions.
+**Does NOT change any production behaviour.** All experiments run against TEST workflow instances. Spike outputs are prototypes + decisions.
 
 ---
 
-## Sprint 18: Chapter Writer — Safe Architecture Rollout
+## Sprint 18: Chapter Writer — Multi-Instance Load-Balanced Rollout
 
 **Status:** Planned | **Points:** 34 | **Duration:** 3 weeks | **Priority:** P1
 
-**Goal:** Implement the Sprint 17 winning architecture + LLM choice on a NEW workflow (`Worker - Write Chapter V2 Dev v2`), run it side-by-side against the legacy writer, and shift traffic via feature flag only when the side-by-side data proves no regression.
+**Goal:** Promote the Sprint 17 winning design into production: N parallel chapter-write workflow instances behind the Workbench dispatcher, Anthropic token-rate gatekeeper, no in-workflow Wait nodes. Roll out via shadow mode → percentage shift → archive of the legacy single-instance worker.
+
+**Architectural constraint (preserved from S16/S17):** No n8n Enterprise. The 120s wait was the original token-rate guardrail. The new design moves that responsibility into the Workbench `AnthropicTokenBudget` service so we can run N instances concurrently without busting per-minute caps.
 
 **Why this shape:** This is the high-risk sprint. The risk model from the original Sprint 12 Track A — "promote a rewritten worker on Friday and pray nothing breaks" — is replaced by:
-- A second workflow exists alongside the legacy one
-- Every chapter-write request runs through BOTH workflows for the first week
-- Quality scores from each are recorded
+- N new workflow instances exist alongside the legacy single-instance one
+- Every chapter-write request runs through BOTH systems for the first week (shadow mode)
+- Quality scores + token-rate accuracy + 429-error counts from each are recorded
 - Traffic shifts only when delta is provably ≤ threshold
 
 ### Stories
 
-#### S18-1: Implement winning architecture as `Worker - Write Chapter V2 Dev v2` (13 pts) | P0
+#### S18-1: Promote multi-instance architecture to DEV (13 pts) | P0
 
 **Developer Tasks:**
-- [ ] Whatever Sprint 17 picked: build it. Live next to the legacy worker, NOT replacing it. Different workflow ID.
-- [ ] Wire the same triggers, same I/O contract — interchangeable from the hub's point of view.
-- [ ] Use the LLM choice from S17 (default Sonnet, possibly multi-LLM composition).
-- [ ] Anthropic rate-limit handled via the chosen mechanism (BullMQ rate-limiter / wait endpoint / SplitInBatches — whichever S17 picked).
+- [ ] Promote `AnthropicTokenBudget` + `ChapterDispatcher` services from Sprint 17 prototype to DEV-quality code (full tests, error handling, env-var config, admin observability).
+- [ ] Deploy N production workflow instances `DEV - Worker - Write Chapter (i)` for i in 1..N (N decided in S17-3). Each: identical to the live worker but with the 120s wait removed and the per-instance webhook path baked in.
+- [ ] Add `triggerChapterWrite` Workbench helper that routes through the dispatcher. The hub is unchanged — `Worker - Write Chapter` is still the canonical name from the hub's point of view; the dispatcher fan-outs internally.
+- [ ] LLM choice from S17-1 / S17-2 applied (default Sonnet 4.5 + cache reuse if S17-2 picked option (d)).
 
 **QA / DoD:**
-- [ ] New workflow runs end-to-end against 5 baseline chapters successfully.
-- [ ] Wall time ≤ 50% of legacy on the same chapters.
-- [ ] Quality scores within 5% of baseline on every dimension.
+- [ ] N instances live on DEV, all responding to test traffic.
+- [ ] Workbench dispatcher passes 50-chapter concurrent test with 0 Anthropic 429 errors and wall time ≥(N/1.5)× faster than the legacy single-worker baseline.
+- [ ] Quality scores within 5% of the Sprint 16 baseline on every dimension across 15 test chapters.
 
-#### S18-2: Side-by-side runner + delta dashboard (8 pts) | P0
+#### S18-2: Shadow-mode runner + delta dashboard (8 pts) | P0
 
 **Developer Tasks:**
-- [ ] Add a feature flag `CHAPTER_WRITER_SHADOW_MODE=true|false` (Workbench env var). When true, every chapter-write request runs BOTH workflows in parallel, returns the legacy result to the user, and records both outputs + their quality scores to `chapter_writer_shadow_v2`.
-- [ ] Admin dashboard at `/admin/chapter-writer-shadow` shows last 30 days of deltas: per-dimension score delta, time delta, token delta, cost delta, side-by-side prose snippets for any chapter where delta > threshold.
+- [ ] Feature flag `CHAPTER_WRITER_SHADOW_MODE=true|false` (Workbench env var). When true, every chapter-write request runs BOTH the legacy single-instance worker AND the new N-instance dispatcher path, returns the legacy result to the user, and records both outputs + their quality scores to `chapter_writer_shadow_v2`.
+- [ ] Admin dashboard at `/admin/chapter-writer-shadow`: per-dimension score delta, time delta, token delta, cost delta, **token-rate-headroom remaining**, side-by-side prose snippets for any chapter where delta > threshold.
+- [ ] Alert if the new path generates a 429 from Anthropic (the rate gatekeeper failed — must investigate before shifting traffic).
 
 **QA / DoD:**
-- [ ] Shadow mode runs cleanly for 1 week against real user traffic without affecting user-facing behaviour.
+- [ ] Shadow mode runs cleanly for 1 week against real DEV user traffic without affecting user-facing behaviour.
 - [ ] Dashboard shows actionable per-chapter delta data.
+- [ ] Zero unauthorised 429s during shadow-mode week.
 
 #### S18-3: Continuity merge pass (5 pts) | P1 — if S17-4 found it valuable
 
 **Developer Tasks:**
-- [ ] Add the merge pass to the new workflow per Sprint 17's findings.
-- [ ] Skip if Sprint 17 concluded merge is a no-op for the chosen architecture.
+- [ ] Add the merge pass to each instance per Sprint 17's findings.
+- [ ] Skip entirely if Sprint 17 concluded merge is a no-op for the chosen architecture.
 
 #### S18-4: Traffic-shift rollout (5 pts) | P0
 
 **Developer Tasks:**
 - [ ] Replace `CHAPTER_WRITER_SHADOW_MODE` with `CHAPTER_WRITER_PRIMARY=legacy|new` and a per-user split percentage `CHAPTER_WRITER_NEW_PCT=0..100`.
-- [ ] Day 1: 10% of new chapter requests use the new writer, rest fall through to legacy. Both outputs still scored.
-- [ ] Day 4: if no regression, 50%.
-- [ ] Day 7: if no regression, 100%.
-- [ ] Day 14: legacy workflow archived (renamed `… LEGACY`, deactivated). Workbench code path that called legacy removed.
+- [ ] Day 1: 10% of new chapter requests use the multi-instance dispatcher, rest fall through to legacy. Both outputs still scored.
+- [ ] Day 4: if no regression and zero 429s, 50%.
+- [ ] Day 7: if still clean, 100%.
+- [ ] Day 14: legacy single-instance worker archived (renamed `… LEGACY`, deactivated). Workbench code path that called legacy removed.
 
 **QA / DoD:**
-- [ ] 100% traffic on new writer for ≥7 days with quality scores matching baseline.
+- [ ] 100% traffic on new path for ≥7 days with quality scores matching baseline AND zero 429 errors.
 - [ ] Legacy workflow safely archived.
 - [ ] No user-reported quality regression.
 
-#### S18-5: Performance dashboard + telemetry (3 pts) | P1
+#### S18-5: Performance + token-rate dashboard (3 pts) | P1
 
 **Developer Tasks:**
-- [ ] What S12-5 originally promised: per-chapter wall time, per-sub-chapter time, queue wait, P95 — but on the new workflow's metrics only (legacy metrics archived).
+- [ ] What S12-5 originally promised + the new token-rate metrics: per-chapter wall time, per-sub-chapter time, dispatcher queue wait, P95 latency, Anthropic per-minute token consumption (rolling 5-min average), 429 count.
 - [ ] Cost per chapter chart so we can detect cost regressions from LLM-mix changes.
 
 **QA / DoD:**
@@ -1769,55 +1868,74 @@ This is a SPIKE — produces decisions and prototypes, not production code.
 
 ### Sprint 18 totals: 34 pts
 
-**Depends on:** Sprints 16 + 17. Cannot start until S17 picks the architecture.
+**Depends on:** Sprints 16 + 17. Cannot start until S17-3 picks the instance count + token budget.
 
-**This is the only sprint that changes the live chapter writer.** All risk concentrates here, but it's gated behind shadow-mode + percentage rollout + provable quality scores.
+**This is the only sprint that changes the live chapter writer path.** Risk concentrates here, gated behind shadow-mode + percentage rollout + zero-429 enforcement + provable quality scores.
 
 ---
 
 ## Sprint sequencing at a glance
 
 ```
-Completed: 10 ✓
+Shipped:  10  ✓
+          10.a ✓ (released v1.1)
+          10.b ✓ (released v1.1)
+          8    ✓ (released v1.1)
+          11   ✓ DEV-complete (PROD on next release)
+          12   ✓ DEV-complete (Track A moved to 16/17/18)
 
 Next (ordered):
-  10.a ────▶ 10.b ───┬──▶ 11 ──┐
-                     │         │
-                     └─▶ 12 ───┤
-                               │
-                               ├──▶ 8 ──▶ 9 ──▶ 13 ──▶ 14 ──▶ 15 ──▶ 16 ──▶ 17 ──▶ 18
-                               │
-                               └─(option to skip 13/14 until pain justifies)
+   ┌──> 9 ──> 13 ──> 14 ──> 15 ──> 16 ──> 17 ──> 18
+   │
+ START
 ```
 
-**Recommended order:** 10.a → 10.b → 11 → 12 → 8 → 9 → 13 → 14 → 15 → 16 → 17 → 18
+**Recommended order from here:** 9 → 13 → 14 → 15 → 16 → 17 → 18
 
-**Why 16/17/18 at the end:** 16–18 is the chapter-writer architecture programme (deferred Track A from Sprint 12). It needs the queue infrastructure from 10.b, runs against the load-tested production environment from 15, and changes the most-touched workflow in the system — so it goes last. The 3-sprint shape (Profile → Spike → Safe Rollout) is the user-mandated alternative to the original "rip-and-replace" Track A. See the user's framing captured at the top of Sprint 16.
+**Why 16/17/18 at the end:** 16–18 is the chapter-writer architecture programme (deferred Track A from Sprint 12). It runs against a load-tested production environment from Sprint 15, depends on the queue infrastructure from 10.b (already shipped), and changes the most-touched workflow in the system — so it goes last. The 3-sprint shape (Profile + TEST workflow → LLM bake-off + multi-instance spike → Safe Rollout) is the user-mandated alternative to the original "rip-and-replace" Track A. See Sprint 16 header for the constraint statement (no n8n Enterprise; multi-instance load balancing is the only path; 120s wait was the original token-rate guardrail).
 
-**Alternative (product-features-first):** 10.a → 8 → 9 → 10.b → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18 — if customer demand for multi-tenancy + billing outweighs the need for scaling infrastructure. 16/17/18 stay last in either ordering.
+**Alternative orderings:**
+- **Skip 13/14 until pain justifies** — n8n migration to Railway and storage migration are infra-only. If Sprint 9 (Stripe) and Sprint 16-18 (chapter-writer perf) are higher-priority for customers, run them and defer 13/14 indefinitely.
+- **Run 13 in parallel with 16/17/18** — independent workstreams. n8n migration doesn't touch the chapter writer's logic, only the host.
 
 ---
 
 ## Total
 
-| Sprint | Status | Points |
-|--------|--------|--------|
-| 10 | ✅ complete (S10-5 validated via PRs #2, #4; S10-6 consolidated into 10.a) | 34 |
-| 10.a | in progress (S10a-1 done 2026-04-19; +S10a-0 CI/CD verification added) | 49 |
-| 10.b | planned | 34 |
-| 8 | planned (carried) | 55 |
-| 9 | planned (carried) | 47 |
-| 11 | planned | 21 |
-| 12 | in progress — Tracks B + C shipped (PR #40); Track A moved to Sprints 16–18 | 47 |
-| 13 | planned — refreshed 2026-04-20 (independent instances, not queue mode) | 34 |
-| 14 | planned | 34 |
-| 15 | planned | 34 |
-| 16 | planned 2026-04-26 — chapter writer profiling + quality harness (no architecture change) | 21 |
-| 17 | planned 2026-04-26 — LLM bake-off + architecture spike (no production rollout) | 26 |
-| 18 | planned 2026-04-26 — safe architecture rollout (shadow mode + traffic shift) | 34 |
-| **Total remaining** | | **436 pts** |
+> **Source of truth note (2026-04-29):** The status column below is verified against `gh pr list --state all` and `git log --all` as of 2026-04-29 18:30 UTC. Earlier versions of this table lagged reality (e.g. Sprint 8 was marked "planned" after PR #50 had already shipped + been released as v1.1). When this table disagrees with `gh pr list`, **`gh pr list` wins** — update this row immediately. Do not anchor sprint-state answers on this doc alone.
 
-At 34 pts/sprint (2-week cadence), that's **~26 weeks (13 sprints) of work**. 10.a is a 3-week sprint at 49 pts; 12 is a 3-week sprint at 47 pts; 18 is a 3-week sprint at 34 pts. Product-facing sprints (8, 9) can run in parallel with infrastructure sprints since they touch different layers. Sprints 16/17/18 must run sequentially — each depends on the prior one's output.
+| Sprint | Status | Points | Evidence |
+|--------|--------|--------|---------|
+| 10 | ✅ released v1.0 | 34 | PR #1 (2026-04-17) |
+| 10.a | ✅ released v1.1 | 49 | PRs #5/6/7 (deploy markers) + #8 (bulk) + #9 (CLAUDE.md), released via PR #56 |
+| 10.b | ✅ released v1.1 | 34 | PRs #10/11/13/15/20 (S10b-1..5), released via PR #56 |
+| **8** | **✅ released v1.1** (RBAC + tiers + credits + impersonation; admin tier UI follow-ups #53/54/57) | 55 | PR #50, #53, #54, #57; released via PR #56 |
+| 11 | 🟡 DEV-complete; PROD on next release | 21 | DEV: 14 of 14 email workflows on Postal (verified via n8n API). PRs #16/17/23/24. PROD migration runs on release day per workflow governance. |
+| 12 | 🟡 DEV-complete (Tracks B + C); Track A moved to Sprints 16–18 | 47 | PRs #31–#40, #71 (story-bible hotfix). Released portions: chapter rewrite + reviewer/editor tools live on DEV. |
+| 9 | ⏳ NOT STARTED — Stripe wiring (RBAC + tiers + credits already done in 8) | 47 | No `Sprint 9` PRs. The Stripe-specific work is what remains. |
+| 13 | ⏳ NOT STARTED — n8n on Railway (independent instances, not queue mode) | 34 | No `S13-*` PRs. |
+| 14 | ⏳ NOT STARTED + scope review needed (Supabase Storage vs Railway native vs R2) | 3 firm + 34 conditional | See revised Sprint 14 below — original "migrate to R2" assumption needs justification via S14-0 decision. |
+| 15 | ⏳ NOT STARTED — load test + monitoring | 34 | No `S15-*` PRs. |
+| 16 | ⏳ NOT STARTED — profiling + quality harness + isolated TEST workflow (revised 2026-04-29) | 26 | Pre-req for 17/18. Adds S16-0 to clone the live worker into a TEST workflow. |
+| 17 | ⏳ NOT STARTED — LLM bake-off + **multi-instance** architecture spike (revised 2026-04-29) | 29 | Decisions only, no production change. S17-3 reshaped: N parallel workflow instances + Workbench `AnthropicTokenBudget` + `ChapterDispatcher`. NOT n8n Enterprise queue mode. |
+| 18 | ⏳ NOT STARTED — multi-instance load-balanced rollout (revised 2026-04-29) | 34 | Sprint 18 is the only sprint that touches the live writer; gated by 16 + 17. |
+| **Total remaining** | | **241 pts** (+34 conditional on Sprint 14 storage migration if Option B/C) | |
+
+### Side sprints not in this v2 doc (separately tracked)
+
+These are real shipped or in-flight work that lives outside the v2 sprint queue:
+
+- **Newsletter Agent Migration** (S1–S4): merged via PRs #19, #21, #22, #25, #26 (DEV-complete; PROD on next release)
+- **Compose Newsletter 2a** (S1–S10): merged via PRs #41–#48, #52, #58, #59, #64–#67 (sprint complete per PR #67)
+- **Newsletter Templates** (T1–T4): merged via PRs #60, #61, #62 + #73 (template preview fix)
+- **Multi-User Newsletters**: merged via PR #69
+- **Newsletter Flow Fixes**: merged via PR #70
+- **Newsletter fan-out + cadence + bounces + CSV import**: merged via PR #74
+- **IngestionBrowser improvements**: merged via PR #72
+- **Onboarding tour**: merged via PR #51
+- **Open**: PR #68 — issue #63 send-time HTML render via `/api/newsletter/render-html`
+
+At 34 pts/sprint (2-week cadence), the 241 remaining points are **~14 weeks (7 sprints) of work**. Sprint 18 is a 3-week sprint at 34 pts. Sprints 16/17/18 must run sequentially — each depends on the prior one's output. Sprint 9 (Stripe) and Sprints 13/14 (infra) can run in parallel with the 16/17/18 chapter-writer programme since they touch different layers.
 
 ---
 
