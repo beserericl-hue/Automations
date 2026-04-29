@@ -1,6 +1,6 @@
 # The Writers Workbench — Session Context Document
 
-**Last Updated:** 2026-04-26
+**Last Updated:** 2026-04-29
 **Purpose:** Read this document at the start of any new Claude Code session working on this project. It contains every key decision, architectural choice, and constraint needed to continue development without re-learning the codebase.
 
 ---
@@ -1616,5 +1616,123 @@ To finish Google OAuth (separate task, not in this hotfix):
 2. Authorized redirect URIs: add `https://faklxfakgzkpkbxfihzh.supabase.co/auth/v1/callback` (PROD) and `https://gvbvwcnmjkdpclcisqrr.supabase.co/auth/v1/callback` (DEV).
 3. Copy Client ID + Secret. Supabase Dashboard → Authentication → Providers → Google → Enabled, paste credentials. Repeat for DEV project.
 4. On Railway, set `VITE_GOOGLE_OAUTH_ENABLED=true` on both services. Redeploy.
+
+---
+
+## 2026-04-29 — Hotfix: story-bible extraction restored (DEV + PROD)
+
+### What broke
+
+Visible to the user via the Story Bible tab on every project written under the new sub-chapter architecture:
+
+> "No story bible entries yet. They are created automatically when you write chapters."
+
+*The Invisible Wall* (id `366ca0a0-18e8-45a5-83da-a6b3d23d760b`) — 7 chapters, 0 entries. *The Familiar* (written under V1 single-LLM era) — still has 15 entries. The split was the symptom that pinpointed the regression: anything written by `Worker - Write Chapter` after the sub-chapter migration had been silently failing to populate `story_bible_v2` for ~2 weeks.
+
+### Root cause (concrete, not hand-wavy)
+
+In the sub-chapter parallel-write architecture, each `write_sub_chapter` agent emits prose only — not the JSON envelope (`{chapter_text, new_story_bible_entries}`) that the original V1 single-LLM writer returned. The downstream `concatenate_chapter` Code node then **hardcodes**:
+
+```js
+new_story_bible_entries: []
+```
+
+— regardless of chapter content. The further-downstream `update_story_bible` node correctly reads `output.new_story_bible_entries` and inserts each entry into `story_bible_v2`, but it has been receiving an empty array on every chapter write since the migration. **No error, no log, no signal** — it's a silent functional regression. Drift scanner kept flagging the same characters as "unknown" on every scan because they never made it into the bible.
+
+### Fix
+
+Inserted a deterministic 4-node extraction stage **between** `continuity_finalize` and `update_story_bible`:
+
+```
+continuity_finalize
+   ↓
+extract_bible_prepare    (Code: build do-not-emit list + prompt)
+   ↓
+extract_bible_llm        (chainLlm, Sonnet 4.5, 4096 tokens, temp 0.2)
+   ↑ (ai_languageModel)
+extract_bible_claude     (lmChatAnthropic)
+   ↓
+extract_bible_finalize   (Code: defensive JSON parse, merge onto envelope)
+   ↓
+update_story_bible       (UNCHANGED — now sees a populated array)
+```
+
+**Prompt design highlights** (lives in `EXTRACT_PREPARE_CODE` of `scripts/hotfix-add-story-bible-extractor.py`):
+- Reads existing `story_bible_v2` rows + outline characters and passes them as a **"do NOT re-emit"** list. Prevents duplicates on every chapter write.
+- Strict JSON output. Finalize node tolerates code fences and partial JSON via the same defensive parser pattern as drift scanner / genre eval.
+- Conservative — explicit instructions to skip generic mentions ("the agent", "a guard") and only emit plot-load-bearing entities.
+- The `update_story_bible` Code node already wraps inserts in try/catch so even malformed Claude output can't fail the chapter write.
+
+### Workflows touched
+
+| Tier | Workflow | ID | Change |
+|---|---|---|---|
+| DEV | `DEV - Worker - Write Chapter` | `fsKRGkzphWT62rja` | + 4 extraction nodes, rewired |
+| PROD | `PROD - Worker - Write Chapter` | `VxO2eG6uvImqaPA2` | + 4 extraction nodes, rewired |
+| DEV | `DEV - Sub - Backfill Story Bible (one-shot)` | `hXkfrkuiWbJtJlEl` | NEW — standalone backfill workflow |
+
+### Backfill — *The Invisible Wall* (DEV)
+
+Built `scripts/hotfix-backfill-story-bible.py` that deploys a standalone webhook workflow and drives it per-chapter (re-extracts entries from existing chapters without rewriting prose). Run results:
+
+| Chapter | Entries inserted |
+|---|---|
+| 1 | 4 |
+| 2 | 6 |
+| 3 | 7 |
+| 4 | 4 |
+| 5 | 8 |
+| 6 | 3 |
+| 7 | 5 |
+| **Total** | **37** (11 chars / 11 events / 11 items / 4 locations) |
+
+User confirmed dev Workbench shows the populated bible.
+
+### Hotfix flow followed (CLAUDE.md)
+
+1. Branched `hotfix/story-bible-extraction` from `main`
+2. Committed scripts + runbook
+3. Deployed to DEV worker via `--target dev`
+4. Verified DEV (chain wired, backfill produced 37 entries)
+5. User confirmed visible
+6. Deployed to PROD worker via `--target prod CONFIRM_PROD=yes`
+7. Opened PR #71 → `main`
+8. Admin-merged after CI green (commit `d55baaf`)
+9. Cherry-picked to `develop` (merge commit `c63cb94`)
+
+### Files in the hotfix (all on main + develop now)
+
+- `scripts/hotfix-add-story-bible-extractor.py` — idempotent deploy script with `--target dev|prod`. PROD requires `CONFIRM_PROD=yes` in env.
+- `scripts/hotfix-backfill-story-bible.py` — one-shot backfill driver. Deploys standalone webhook workflow + drives it per-chapter.
+- `writers-workbench/docs/hotfix-2026-04-29-story-bible-extraction.md` — runbook (root cause, deploy commands, lessons, gotchas).
+
+### Two new gotchas captured for next session
+
+1. **n8n PUT validator on this version rejects nearly every key inside `settings`** — `errorWorkflow`, `executionTimeout`, `binaryMode`, `callerPolicy`, `availableInMCP` all return HTTP 400 `request/body/settings must NOT have additional properties`. **Empirically only `executionOrder` is accepted.** Send `{executionOrder: "v1"}` and let n8n preserve the rest. The drift scanner deploys worked because DEV's settings happened to be cleaner; PROD has more keys and triggered the rejection.
+
+2. **CI workflow has a `paths` filter** in `.github/workflows/ci.yml`:
+   ```yaml
+   paths:
+     - 'writers-workbench/**'
+     - 'workflows/**'
+     - 'scripts/check-base-table-immutability.py'
+     - ...
+   ```
+   Scripts-only PRs to `main` (e.g. `scripts/hotfix-*.py`) **do not trigger CI** and therefore can never satisfy `main`'s required-status-check gate (TypeScript & Lint, Unit Tests, Production Build, Schema Governance Check). Workaround: include a docs file under `writers-workbench/docs/` as part of any scripts-only hotfix targeting `main`. We did this for #71 — the runbook served that purpose AND is genuinely useful.
+
+### PROD backfill not done
+
+Existing PROD projects with empty bibles will start populating from the next chapter write forward. **No PROD backfill was run** because it's a per-customer cost decision (Anthropic tokens — ~$0.10–0.30 per project depending on chapter count). To backfill a specific PROD project later:
+
+```bash
+N8N_API_KEY=...  python3 scripts/hotfix-backfill-story-bible.py \
+  --project-id <uuid>  --user-id <user_id>
+```
+
+The current backfill script targets the DEV webhook. To run against PROD, either deploy a PROD-tier copy of the backfill workflow first (mirror via `clone-prod-to-dev.py` in reverse) or change `WEBHOOK_PATH` in the script to a `_v2` suffix and deploy it to PROD.
+
+### Cross-system value (architectural payoff)
+
+The drift scanner (S12-12) had been flagging Pastor Williams, Mrs. Chen, Maria Santos, Agent Martinez/Rodriguez/Thompson, Mr. Peterson, etc. as "unknown characters" on every scan because they never landed in `story_bible_v2`. With this fix, they flow into the bible automatically and the next drift scan recognizes them as canon. **The two systems now feed each other** — exactly the architecture we wanted but didn't have.
 
 ---
