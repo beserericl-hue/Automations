@@ -47,6 +47,8 @@ import {
   UpdateNewsletterTemplateSchema,
   PreviewTemplateSchema,
   RenderHtmlBodySchema,
+  CreateNewsletterEditionSchema,
+  UpdateNewsletterEditionSchema,
 } from '../schemas.js';
 import { logger } from '../lib/logger.js';
 import { pushSseEvent } from './session.js';
@@ -93,6 +95,115 @@ newsletterRouter.get('/editions', requireAuth, async (req: Request, res: Respons
   }
 
   res.json({ success: true, editions: data ?? [] });
+});
+
+// POST /api/newsletter/editions — create a new edition owned by the caller.
+// 409 on duplicate id; 400 on validation; 500 otherwise.
+newsletterRouter.post(
+  '/editions',
+  requireAuth,
+  validateBody(CreateNewsletterEditionSchema),
+  async (req: Request, res: Response) => {
+    const userId = req.userId!;
+    const body = req.body as import('zod').infer<typeof CreateNewsletterEditionSchema>;
+    const supabase = getSupabaseAdmin();
+
+    const { data, error } = await supabase
+      .from('newsletter_editions_v2')
+      .insert({ ...body, user_id: userId })
+      .select('id, display_name, subheader, genre, description, newsletter_name, primary_color, paper_color, enabled, user_id, created_at, updated_at')
+      .single();
+
+    if (error) {
+      const code = (error as { code?: string }).code;
+      if (code === '23505') {
+        res.status(409).json({
+          success: false,
+          error: { code: 'DUPLICATE_ID', message: `Edition id "${body.id}" already exists` },
+        });
+        return;
+      }
+      logger.error({ error, userId }, 'newsletter editions insert failed');
+      res.status(500).json({ success: false, error: { code: 'DB_INSERT_FAILED', message: error.message } });
+      return;
+    }
+    res.status(201).json({ success: true, edition: data });
+  },
+);
+
+// PUT /api/newsletter/editions/:id — partial update; owner only.
+newsletterRouter.put(
+  '/editions/:id',
+  requireAuth,
+  validateBody(UpdateNewsletterEditionSchema),
+  async (req: Request, res: Response) => {
+    const params = NewsletterEditionIdParamSchema.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', fields: params.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message })) },
+      });
+      return;
+    }
+    const userId = req.userId!;
+    const body = req.body as import('zod').infer<typeof UpdateNewsletterEditionSchema>;
+    const supabase = getSupabaseAdmin();
+
+    // Filter by id + user_id so a non-owner update returns 0 rows -> 404.
+    const { data, error } = await supabase
+      .from('newsletter_editions_v2')
+      .update(body)
+      .eq('id', params.data.id)
+      .eq('user_id', userId)
+      .select('id, display_name, subheader, genre, description, newsletter_name, primary_color, paper_color, enabled, user_id, created_at, updated_at')
+      .maybeSingle();
+
+    if (error) {
+      logger.error({ error, userId, id: params.data.id }, 'newsletter editions update failed');
+      res.status(500).json({ success: false, error: { code: 'DB_UPDATE_FAILED', message: error.message } });
+      return;
+    }
+    if (!data) {
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Edition not found' } });
+      return;
+    }
+    res.json({ success: true, edition: data });
+  },
+);
+
+// DELETE /api/newsletter/editions/:id — soft-delete by setting enabled=false.
+// Hard delete is intentionally not exposed because newsletter_sends_v2 +
+// newsletter_approvals_v2 carry FK references to edition_id.
+newsletterRouter.delete('/editions/:id', requireAuth, async (req: Request, res: Response) => {
+  const params = NewsletterEditionIdParamSchema.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({
+      success: false,
+      error: { code: 'VALIDATION_ERROR', fields: params.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message })) },
+    });
+    return;
+  }
+  const userId = req.userId!;
+  const supabase = getSupabaseAdmin();
+
+  const { data, error } = await supabase
+    .from('newsletter_editions_v2')
+    .update({ enabled: false })
+    .eq('id', params.data.id)
+    .eq('user_id', userId)
+    .select('id')
+    .maybeSingle();
+
+  if (error) {
+    logger.error({ error, userId, id: params.data.id }, 'newsletter editions delete failed');
+    res.status(500).json({ success: false, error: { code: 'DB_UPDATE_FAILED', message: error.message } });
+    return;
+  }
+  if (!data) {
+    res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Edition not found' } });
+    return;
+  }
+  res.json({ success: true });
 });
 
 /**
@@ -510,6 +621,35 @@ newsletterRouter.get('/sends', requireAuth, async (req: Request, res: Response) 
   }
 
   res.json({ success: true, sends: data ?? [] });
+});
+
+// GET /api/newsletter/sends/:id — single send with full html + markdown.
+// Owner-only; selects all columns the detail page needs to render the
+// final email + lineage sidebar.
+newsletterRouter.get('/sends/:id', requireAuth, async (req: Request, res: Response) => {
+  const id = String(req.params.id ?? '').trim();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'id must be a UUID' } });
+    return;
+  }
+  const userId = req.userId!;
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from('newsletter_sends_v2')
+    .select('id, user_id, edition_id, execution_id, issue_number, send_date, subject, preheader, html_body, markdown_body, status, scheduled_send_at, sent_at, recipient_count, delivery_provider, provider_message_id, error, metadata, created_at, updated_at')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) {
+    logger.error({ error, userId, id }, 'newsletter send detail failed');
+    res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: error.message } });
+    return;
+  }
+  if (!data) {
+    res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Send not found' } });
+    return;
+  }
+  res.json({ success: true, send: data });
 });
 
 // --------------------------------------------------------------------

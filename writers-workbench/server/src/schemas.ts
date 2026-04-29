@@ -332,6 +332,91 @@ export const NewsletterEditionIdParamSchema = z.object({
   id: EditionIdSchema,
 });
 
+// Hex color (3 or 6 char) — used for edition branding fields.
+const HexColorSchema = z
+  .string()
+  .regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, 'must be a hex color like #14288c');
+
+// CREATE — POST /api/newsletter/editions
+export const CreateNewsletterEditionSchema = z.object({
+  id: EditionIdSchema,
+  display_name: z.string().min(1).max(120),
+  subheader: z.string().min(1).max(200),
+  genre: z.string().min(1).max(60),
+  description: z.string().max(2000).optional().nullable(),
+  newsletter_name: z.string().min(1).max(200),
+  primary_color: HexColorSchema.optional().default('#14288c'),
+  paper_color: HexColorSchema.optional().default('#fbf8f2'),
+  enabled: z.boolean().optional().default(true),
+});
+
+// UPDATE — PUT /api/newsletter/editions/:id (all fields optional, none is "no-op")
+export const UpdateNewsletterEditionSchema = z
+  .object({
+    display_name: z.string().min(1).max(120).optional(),
+    subheader: z.string().min(1).max(200).optional(),
+    genre: z.string().min(1).max(60).optional(),
+    description: z.string().max(2000).nullable().optional(),
+    newsletter_name: z.string().min(1).max(200).optional(),
+    primary_color: HexColorSchema.optional(),
+    paper_color: HexColorSchema.optional(),
+    enabled: z.boolean().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: 'at least one field must be provided' });
+
+// ============================================
+// Multi-User Newsletters Sprint — feed sources
+// ============================================
+export const FeedUrlTypeSchema = z.enum(['rss', 'reddit', 'source', 'firecrawl_scrape']);
+
+const FeedUrlSchema = z
+  .string()
+  .max(2000, 'url too long')
+  .url('url must be an absolute http(s) URL')
+  .refine((u) => /^https?:\/\//i.test(u), { message: 'url must use http or https' });
+
+const FeedNameSchema = z.string().min(1, 'name is required').max(200);
+const FeedIntervalSchema = z
+  .number()
+  .int()
+  .min(5, 'minimum interval is 5 minutes')
+  .max(1440, 'maximum interval is 1440 minutes (24h)');
+
+export const CreateNewsletterFeedSchema = z.object({
+  name: FeedNameSchema,
+  url: FeedUrlSchema,
+  url_type: FeedUrlTypeSchema,
+  fetch_interval_minutes: FeedIntervalSchema.optional().default(240),
+  active: z.boolean().optional().default(true),
+});
+
+export const UpdateNewsletterFeedSchema = z
+  .object({
+    name: FeedNameSchema.optional(),
+    url: FeedUrlSchema.optional(),
+    url_type: FeedUrlTypeSchema.optional(),
+    fetch_interval_minutes: FeedIntervalSchema.optional(),
+    active: z.boolean().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: 'at least one field must be provided' });
+
+export const FeedIdParamSchema = z.object({
+  id: z.string().uuid('id must be a UUID'),
+});
+
+// Cron worker callback: result of one feed fetch.
+export const FeedRunCallbackSchema = z.object({
+  items_fetched: z.number().int().nonnegative().optional(),
+  items_uploaded: z.number().int().nonnegative().optional(),
+  items_skipped_existing: z.number().int().nonnegative().optional(),
+  error_message: z.string().max(2000).nullable().optional(),
+});
+
+// /feeds/due query: limit how many feeds the cron picks up per tick.
+export const FeedsDueQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(500).optional().default(100),
+});
+
 // GET /api/newsletter/sends — query params used by the Home page tiles
 // (S6) for the "next scheduled" tile and the "recent runs" table.
 export const NewsletterSendStatusSchema = z.enum([

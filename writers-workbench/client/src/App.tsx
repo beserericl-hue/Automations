@@ -50,6 +50,11 @@ const IngestionBrowser = lazyRetry(() => import('./components/newsletter/Ingesti
 const TemplatesList = lazyRetry(() => import('./components/newsletter/TemplatesList'));
 const TemplateEditor = lazyRetry(() => import('./components/newsletter/TemplateEditor'));
 
+// Multi-User Newsletters Sprint — editions CRUD + per-edition feeds
+const EditionsList = lazyRetry(() => import('./components/newsletter/EditionsList'));
+const EditionEditor = lazyRetry(() => import('./components/newsletter/EditionEditor'));
+const FeedsList = lazyRetry(() => import('./components/newsletter/FeedsList'));
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -112,6 +117,11 @@ export default function App() {
                     <Route path="newsletter/templates" element={<TemplatesList />} />
                     <Route path="newsletter/templates/new" element={<TemplateEditor />} />
                     <Route path="newsletter/templates/:id" element={<TemplateEditor />} />
+                    {/* Multi-User Newsletters Sprint — editions CRUD + per-edition feeds */}
+                    <Route path="newsletter/editions" element={<EditionsList />} />
+                    <Route path="newsletter/editions/new" element={<EditionEditor />} />
+                    <Route path="newsletter/editions/:id" element={<EditionEditor />} />
+                    <Route path="newsletter/editions/:id/feeds" element={<FeedsList />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
                   </Suspense>
