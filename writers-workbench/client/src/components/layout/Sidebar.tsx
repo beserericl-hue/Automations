@@ -264,6 +264,18 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
               >
                 Templates
               </NavLink>
+              <NavLink
+                to="/newsletter/editions"
+                className={({ isActive }) =>
+                  `flex items-center gap-2 px-3 py-1.5 text-xs whitespace-nowrap ${
+                    isActive
+                      ? 'text-brand-700 font-medium dark:text-brand-300'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  }`
+                }
+              >
+                My newsletters
+              </NavLink>
             </div>
           )}
         </div>

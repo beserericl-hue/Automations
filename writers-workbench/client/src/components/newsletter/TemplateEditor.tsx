@@ -23,6 +23,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, ApiError } from '../../lib/api';
+import { lintTemplate, sanitizeImportedHtml } from '../../lib/template-linter';
 import type { NewsletterEdition, NewsletterTemplate } from '../../types/database';
 
 interface EditionsResponse { success: boolean; editions: NewsletterEdition[] }
@@ -73,6 +74,12 @@ export default function TemplateEditor() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [sampleDataError, setSampleDataError] = useState<string | null>(null);
+  const [showImport, setShowImport] = useState(false);
+  const [importDraft, setImportDraft] = useState('');
+  const [importBanner, setImportBanner] = useState<string | null>(null);
+
+  // Re-run linter on every html change. Cheap (regex over <1MB).
+  const lint = useMemo(() => lintTemplate(html), [html]);
 
   const editionsQuery = useQuery({
     queryKey: ['newsletter-editions'],
@@ -214,6 +221,13 @@ export default function TemplateEditor() {
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => { setShowImport(true); setImportDraft(''); setImportBanner(null); }}
+            disabled={saving}
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            Import HTML
+          </button>
+          <button
             onClick={() => runPreview()}
             disabled={isCreate || saving}
             className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
@@ -229,6 +243,32 @@ export default function TemplateEditor() {
           </button>
         </div>
       </header>
+
+      {showImport && (
+        <ImportHtmlDrawer
+          draft={importDraft}
+          onChangeDraft={setImportDraft}
+          onClose={() => setShowImport(false)}
+          onApply={() => {
+            const { html: clean, removed } = sanitizeImportedHtml(importDraft);
+            if (!clean.trim()) {
+              setImportBanner('Pasted HTML was empty after sanitizing.');
+              return;
+            }
+            setHtml(clean);
+            setShowImport(false);
+            setImportBanner(removed.length > 0
+              ? `Imported. Stripped: ${Array.from(new Set(removed)).join(', ')}.`
+              : 'Imported.');
+          }}
+        />
+      )}
+      {importBanner && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+          {importBanner}
+          <button onClick={() => setImportBanner(null)} className="ml-2 underline">Dismiss</button>
+        </div>
+      )}
 
       {saveError && (
         <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
@@ -329,6 +369,38 @@ export default function TemplateEditor() {
         </div>
       </div>
 
+      {/* Placeholder linter — surfaces unknown / missing tokens. */}
+      <div className="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+        <header className="border-b border-gray-100 px-4 py-2 dark:border-gray-800">
+          <h2 className="text-sm font-medium">Placeholders</h2>
+          <p className="text-xs text-gray-400">
+            {lint.totalTokens} token{lint.totalTokens === 1 ? '' : 's'} detected.
+            {' '}
+            {lint.hasBodyMdFallback ? '✓ {{{markdown_to_html body_md}}} fallback present.' : 'Tip: include {{{markdown_to_html body_md}}} so single-blob markdown sends still render with this template.'}
+          </p>
+        </header>
+        <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-3">
+          <TokenList
+            label="Recognized"
+            tone="ok"
+            tokens={Array.from(new Set(lint.recognized.map((t) => t.identifier))).sort()}
+            emptyHint="No recognized tokens — the template won't pull anything from the AI payload."
+          />
+          <TokenList
+            label="Unknown"
+            tone="warn"
+            tokens={Array.from(new Set(lint.unknown.map((t) => t.identifier))).sort()}
+            emptyHint="No unknown tokens — every {{x}} maps to the canonical schema."
+          />
+          <TokenList
+            label="Missing required"
+            tone="bad"
+            tokens={lint.missing}
+            emptyHint="All required tokens present."
+          />
+        </div>
+      </div>
+
       {/* Sample data */}
       <div className="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
         <header className="border-b border-gray-100 px-4 py-2 dark:border-gray-800">
@@ -351,6 +423,66 @@ export default function TemplateEditor() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+interface ImportDrawerProps {
+  draft: string;
+  onChangeDraft: (s: string) => void;
+  onClose: () => void;
+  onApply: () => void;
+}
+
+function ImportHtmlDrawer({ draft, onChangeDraft, onClose, onApply }: ImportDrawerProps) {
+  return (
+    <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 dark:border-brand-900/40 dark:bg-brand-950/20">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Import HTML</h2>
+        <button type="button" onClick={onClose} className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400">Close</button>
+      </div>
+      <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
+        Paste a complete HTML email below. We'll strip <code>&lt;script&gt;</code>, <code>on*</code> handlers, and <code>javascript:</code> URLs before importing. The placeholder linter will tell you which Handlebars tokens map to the canonical schema.
+      </p>
+      <textarea
+        value={draft}
+        onChange={(e) => onChangeDraft(e.target.value)}
+        spellCheck={false}
+        className="mt-3 block min-h-[260px] w-full resize-y rounded border border-gray-300 bg-white p-2 font-mono text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+        placeholder="<!doctype html>..."
+        aria-label="Imported HTML"
+      />
+      <div className="mt-3 flex items-center gap-3">
+        <button onClick={onApply} className="rounded bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700">
+          Replace template HTML
+        </button>
+        <button onClick={onClose} className="rounded border border-gray-300 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TokenList({
+  label, tone, tokens, emptyHint,
+}: { label: string; tone: 'ok' | 'warn' | 'bad'; tokens: string[]; emptyHint: string }) {
+  const cls =
+    tone === 'ok'
+      ? 'border-emerald-200 bg-emerald-50/40 text-emerald-700 dark:border-emerald-900/30 dark:bg-emerald-950/20 dark:text-emerald-300'
+      : tone === 'warn'
+        ? 'border-amber-200 bg-amber-50/40 text-amber-700 dark:border-amber-900/30 dark:bg-amber-950/20 dark:text-amber-300'
+        : 'border-red-200 bg-red-50/40 text-red-700 dark:border-red-900/30 dark:bg-red-950/20 dark:text-red-300';
+  return (
+    <div className={`rounded border ${cls} p-3 text-xs`}>
+      <div className="font-semibold mb-2">{label} ({tokens.length})</div>
+      {tokens.length === 0 ? (
+        <p className="text-gray-500 dark:text-gray-400">{emptyHint}</p>
+      ) : (
+        <ul className="space-y-0.5 font-mono">
+          {tokens.map((t) => <li key={t}>{`{{${t}}}`}</li>)}
+        </ul>
+      )}
     </div>
   );
 }

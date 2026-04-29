@@ -1,0 +1,576 @@
+{
+  "name": "DEV - Newsletter Ingestion (Multi-User Cron)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "b9644370-385a-428e-8efd-611c5b7f8712",
+      "name": "cron_trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://writersworkbenchdev-production.up.railway.app/api/newsletter/cron/feeds/due",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "100"
+            }
+          ]
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "44a93e79-5c45-456f-86b9-2022e06a9579",
+      "name": "fetch_due_feeds",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        240
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "jQBRJbmiUeTk8c11",
+          "name": "DEV Workbench Ingestion Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json || {};\nreturn (r.feeds || []).map(f => ({json: f}));"
+      },
+      "id": "61877b10-e4ab-42e2-9016-bf264ba8b610",
+      "name": "extract_feeds",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "eeab4f81-e12f-4156-bf60-6ddda7c4b549",
+      "name": "split_per_feed",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        960,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "51cdb43c-31b5-4c37-aadb-7d8fa151236f",
+                    "leftValue": "={{ $json.url_type }}",
+                    "rightValue": "rss",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "rss"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "abf1565a-2931-4f70-a63a-e4201e01d8c1",
+                    "leftValue": "={{ $json.url_type }}",
+                    "rightValue": "reddit",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reddit"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "710306f0-b4bc-49fd-8637-112a9b89e178",
+                    "leftValue": "={{ $json.url_type }}",
+                    "rightValue": "source",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "source"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "ba218356-e58b-45cd-9928-d879f6d2d31f",
+                    "leftValue": "={{ $json.url_type }}",
+                    "rightValue": "firecrawl_scrape",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "firecrawl_scrape"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "none"
+        }
+      },
+      "id": "09d30db5-b505-45b3-8b84-9d84e4b3a558",
+      "name": "switch_url_type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1200,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "autodetect"
+            }
+          }
+        }
+      },
+      "id": "bf220ce5-1de8-46b3-9a47-43a6ce11ad9b",
+      "name": "fetch_rss_or_json",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "writers-workbench/1.0 (newsletter ingestion)"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "autodetect"
+            }
+          }
+        }
+      },
+      "id": "bc2569c2-3065-4f78-a937-0c2048d0ae8e",
+      "name": "fetch_reddit_or_json",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const feed = $('split_per_feed').item.json;\nconst payload = $json || {};\nconst raw = Array.isArray(payload.items) ? payload.items\n  : (Array.isArray(payload) ? payload : []);\nconst items = raw.map(it => ({\n  title: it.title || it.title_text || '(untitled)',\n  url: it.url || it.link || '',\n  source_name: it.source || feed.name || '',\n  source_url: it.url || it.link || '',\n  feed_url: feed.url,\n  body_html: it.content_html || it.content || it.description_html || it.description || '',\n  body_text: it.content_text || it.summary || '',\n  image_urls: (it.image ? [it.image] : (it.attachments || []).map(a => a.url).filter(Boolean)),\n  published_timestamp: it.date_published || it.pubDate || it.created_utc || null,\n  type: feed.url_type === 'reddit' ? 'reddit_post' : 'article',\n}));\nreturn items.map(json => ({json: {...json, _feed: feed}}));\n"
+      },
+      "id": "31a26be7-eab0-4916-a867-d52a6c3289f6",
+      "name": "normalize_items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const it = $json;\nconst today = new Date().toISOString().slice(0,10);\nconst slug = (it.title || 'untitled').toLowerCase()\n  .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g,'').slice(0,80) || 'untitled';\nconst sourceTag = (it._feed.name || 'feed').toLowerCase()\n  .replace(/[^a-z0-9]+/g,'-').slice(0,40);\nreturn [{ json: { ...it, key: `${today}/${slug}.${sourceTag}` } }];\n"
+      },
+      "id": "5d3659ee-03cd-40e0-848f-5e43338fc347",
+      "name": "build_key",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://writersworkbenchdev-production.up.railway.app/api/ingestion/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "prefix",
+              "value": "={{ $json.key }}"
+            },
+            {
+              "name": "user_id",
+              "value": "={{ $json._feed.user_id }}"
+            }
+          ]
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "255495f3-d215-4a52-a305-0f7751781034",
+      "name": "search_existing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2160,
+        240
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "jQBRJbmiUeTk8c11",
+          "name": "DEV Workbench Ingestion Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f3ecdbac-5c31-4123-b018-e6f727faa1b2",
+              "leftValue": "={{ ($json.items || []).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "0d5e830e-5dbb-4802-aad5-8cc5d583a495",
+      "name": "drop_existing",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2400,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://writersworkbenchdev-production.up.railway.app/api/ingestion/upload",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"key\": {{ JSON.stringify($json.key) }},\n  \"user_id\": {{ JSON.stringify($json._feed.user_id) }},\n  \"type\": {{ JSON.stringify($json.type) }},\n  \"title\": {{ JSON.stringify($json.title) }},\n  \"source_name\": {{ JSON.stringify($json.source_name) }},\n  \"source_url\": {{ JSON.stringify($json.source_url) }},\n  \"feed_url\": {{ JSON.stringify($json.feed_url) }},\n  \"image_urls\": {{ JSON.stringify($json.image_urls || []) }},\n  \"published_timestamp\": {{ JSON.stringify($json.published_timestamp) }},\n  \"markdown\": {{ JSON.stringify($json.body_text || $json.body_html || \"\") }},\n  \"html\": {{ JSON.stringify($json.body_html || \"\") }}\n}",
+        "options": {}
+      },
+      "id": "66e39246-e46b-4db8-ae02-54b159ee4346",
+      "name": "upload_content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        180
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "jQBRJbmiUeTk8c11",
+          "name": "DEV Workbench Ingestion Secret"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://writersworkbenchdev-production.up.railway.app/api/newsletter/cron/feeds/' + $('split_per_feed').item.json.id + '/runs' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"items_uploaded\": 1}",
+        "options": {}
+      },
+      "id": "04ee8d67-5af0-48c6-b36a-f08436401f6e",
+      "name": "report_run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2880,
+        240
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "jQBRJbmiUeTk8c11",
+          "name": "DEV Workbench Ingestion Secret"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "cron_trigger": {
+      "main": [
+        [
+          {
+            "node": "fetch_due_feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch_due_feeds": {
+      "main": [
+        [
+          {
+            "node": "extract_feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "extract_feeds": {
+      "main": [
+        [
+          {
+            "node": "split_per_feed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "split_per_feed": {
+      "main": [
+        [
+          {
+            "node": "switch_url_type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "switch_url_type": {
+      "main": [
+        [
+          {
+            "node": "fetch_rss_or_json",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "fetch_reddit_or_json",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "fetch_rss_or_json",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "fetch_rss_or_json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch_rss_or_json": {
+      "main": [
+        [
+          {
+            "node": "normalize_items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch_reddit_or_json": {
+      "main": [
+        [
+          {
+            "node": "normalize_items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "normalize_items": {
+      "main": [
+        [
+          {
+            "node": "build_key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "build_key": {
+      "main": [
+        [
+          {
+            "node": "search_existing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "search_existing": {
+      "main": [
+        [
+          {
+            "node": "drop_existing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "drop_existing": {
+      "main": [
+        [
+          {
+            "node": "upload_content",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "upload_content": {
+      "main": [
+        [
+          {
+            "node": "report_run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

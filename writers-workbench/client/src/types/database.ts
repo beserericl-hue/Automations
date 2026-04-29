@@ -399,6 +399,25 @@ export interface NewsletterEdition {
   updated_at: string;
 }
 
+// Multi-User Newsletters Sprint — feed sources (migration 016)
+export type NewsletterFeedUrlType = 'rss' | 'reddit' | 'source' | 'firecrawl_scrape';
+
+export interface NewsletterFeedSource {
+  id: string;
+  user_id: string;
+  edition_id: string;
+  name: string;
+  url: string;
+  url_type: NewsletterFeedUrlType;
+  active: boolean;
+  fetch_interval_minutes: number;
+  last_fetched_at: string | null;
+  last_item_count: number | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export type NewsletterSendStatus =
   | 'draft'
   | 'scheduled'

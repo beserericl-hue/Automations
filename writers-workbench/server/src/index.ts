@@ -22,6 +22,7 @@ import { ingestionRouter } from './routes/ingestion.js';
 import { approvalsApiRouter, approvalsPublicRouter } from './routes/approvals.js';
 import { newsletterSendsRouter } from './routes/newsletter-sends.js';
 import { newsletterRouter, newsletterCallbackRouter } from './routes/newsletter.js';
+import { feedsRouter, feedsCronRouter } from './routes/newsletter-feeds.js';
 import { genresRouter, adminGenreUrlsRouter } from './routes/genres.js';
 import { jobsRouter } from './routes/jobs.js';
 import { contentActionsRouter } from './routes/content-actions.js';
@@ -158,6 +159,12 @@ app.use('/api/newsletter-sends', generalLimiter);
 app.use('/api/newsletter-sends', newsletterSendsRouter);
 app.use('/api/newsletter', generalLimiter);
 app.use('/api/newsletter', newsletterRouter);
+// Multi-User Newsletters Sprint — feed sources CRUD (mounted under same
+// /api/newsletter prefix; routes start with /editions/:id/feeds and /feeds/:id).
+app.use('/api/newsletter', feedsRouter);
+// Cron worker callbacks. Distinct prefix because requests are auth'd by
+// X-Ingestion-Secret rather than session JWT — keeps the access pattern obvious.
+app.use('/api/newsletter/cron', feedsCronRouter);
 app.use('/api/callback', generalLimiter);
 app.use('/api/callback', sessionRouter);
 // Newsletter stage-emit callback (S3) — POST /api/callback/newsletter-stage.
