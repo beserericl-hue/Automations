@@ -1,28 +1,25 @@
 /**
  * IngestionBrowser — inspect the raw articles the cron worker has scraped
- * into content_ingestion_v2 for a given date.
+ * into content_ingestion_v2. Now defaults to the most recent day that has
+ * any content (rather than today, which is often empty); shows a sidebar
+ * of "days with content"; surfaces a "Manage feeds" shortcut so users can
+ * jump straight to where new ingestion URLs are added.
  *
- *  - Date picker (defaults to today)
- *  - Table of ingested rows from /api/ingestion/search?prefix={date}/&user_id={me}&type_not=newsletter
- *  - Click-to-expand drawer: GET /api/ingestion/get/{key} → markdown + html tabs
+ * Each row shows title, type, source URL, published date, AND scanned date.
  *
- * Uses the X-Ingestion-Secret-protected ingestion routes via the same
- * shared-secret pattern the cron uses; the public-API frontend instead
- * goes through a session-authed proxy. We piggyback on the existing
- * /api/ingestion/search and /api/ingestion/get/:key routes — they already
- * accept a session JWT through requireIngestionSecret? No — those are
- * shared-secret-only. So this page calls a session-auth wrapper.
+ * Calls (all session-authed; the cron's shared-secret routes are kept
+ * separate so the browser never sees the secret):
  *
- * The wrapper doesn't exist yet; we add a thin GET /api/ingestion/mine
- * route in the server. For now though, route via the existing endpoints
- * with the X-Ingestion-Secret header would be wrong (the secret would
- * leak to the browser). The simplest correct thing is a NEW session-auth
- * route that filters by req.userId. We keep the cron-only routes as-is.
+ *   GET /api/ingestion/mine/days
+ *   GET /api/ingestion/mine?date=YYYY-MM-DD
+ *   GET /api/ingestion/mine/get?key=YYYY-MM-DD/slug.source
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch, ApiError } from '../../lib/api';
 import HelpButton from './HelpButton';
+import type { NewsletterEdition } from '../../types/database';
 
 interface IngestionItem {
   id: string;
@@ -46,14 +43,42 @@ interface GetResponse {
   markdown: string;
   html: string;
 }
+interface DaysResponse {
+  success: boolean;
+  days: Array<{ date: string; total: number; types: Record<string, number> }>;
+}
+interface EditionsResponse { success: boolean; editions: NewsletterEdition[] }
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
 export default function IngestionBrowser() {
+  // Days-with-content sidebar — always loaded so the picker has options.
+  const daysQuery = useQuery({
+    queryKey: ['ingestion-days'],
+    queryFn: () => apiFetch<DaysResponse>('/api/ingestion/mine/days'),
+    staleTime: 30_000,
+  });
+  const days = daysQuery.data?.days ?? [];
+
+  // Default to the most recent day with content (rather than today, which is
+  // often empty when the cron hasn't fired yet). User can change with the
+  // picker or sidebar.
   const [date, setDate] = useState<string>(todayIso());
+  const [dateTouched, setDateTouched] = useState(false);
+  useEffect(() => {
+    if (!dateTouched && days[0]) setDate(days[0].date);
+  }, [days, dateTouched]);
+
   const [openKey, setOpenKey] = useState<string | null>(null);
+
+  const editionsQuery = useQuery({
+    queryKey: ['newsletter-editions'],
+    queryFn: () => apiFetch<EditionsResponse>('/api/newsletter/editions'),
+    staleTime: 60_000,
+  });
+  const firstEdition = editionsQuery.data?.editions?.[0] ?? null;
 
   const listQuery = useQuery({
     queryKey: ['ingestion-list', date],
@@ -67,99 +92,158 @@ export default function IngestionBrowser() {
     for (const it of listQuery.data?.items ?? []) m.set(it.key, it);
     return m;
   }, [listQuery.data]);
+  const items = listQuery.data?.items ?? [];
+
+  const totalAcrossAllDays = days.reduce((acc, d) => acc + d.total, 0);
 
   return (
     <div className="space-y-4">
       <header className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Ingestion browser</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Ingestion library</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Raw articles the cron scraped into content_ingestion_v2. The newsletter generator reads from this pool.
+            Every article the cron scraped from your feeds. {totalAcrossAllDays.toLocaleString()} total across {days.length} {days.length === 1 ? 'day' : 'days'}.
           </p>
         </div>
-        <HelpButton section="ingestion" />
+        <div className="flex items-center gap-3">
+          {firstEdition && (
+            <Link
+              to={`/newsletter/editions/${encodeURIComponent(firstEdition.id)}/feeds`}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              Manage feeds →
+            </Link>
+          )}
+          <HelpButton section="ingestion" />
+        </div>
       </header>
 
-      <div className="flex flex-wrap items-center gap-4 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-        <label className="flex items-center gap-2 text-sm">
-          <span className="text-gray-700 dark:text-gray-200">Date:</span>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-          />
-        </label>
-        {listQuery.data && (
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            {listQuery.data.items.length} items
-          </span>
-        )}
-      </div>
-
-      <section className="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
-        {listQuery.isLoading ? (
-          <div className="p-6 text-sm text-gray-400">Loading…</div>
-        ) : listQuery.isError ? (
-          <div className="p-6 text-sm text-red-600 dark:text-red-300">
-            {(listQuery.error as ApiError).message ?? 'Failed to load.'}
-          </div>
-        ) : (listQuery.data?.items ?? []).length === 0 ? (
-          <div className="p-12 text-center text-sm text-gray-400">
-            No items for {date}. Try yesterday, or check the Feeds page for last-fetch errors.
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-              <tr>
-                <th className="px-4 py-2">Title</th>
-                <th className="px-4 py-2">Type</th>
-                <th className="px-4 py-2">Source</th>
-                <th className="px-4 py-2">Published</th>
-                <th className="px-4 py-2 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(listQuery.data?.items ?? []).map((it) => (
-                <tr key={it.key} className="border-t border-gray-100 dark:border-gray-800">
-                  <td className="px-4 py-2 max-w-md">
-                    <button
-                      type="button"
-                      onClick={() => setOpenKey(it.key)}
-                      className="text-left font-medium text-gray-900 hover:text-brand-700 dark:text-gray-100 dark:hover:text-brand-300"
-                    >
-                      {it.title || '(untitled)'}
-                    </button>
-                    <div className="mt-0.5 text-xs text-gray-400 truncate">{it.key}</div>
-                  </td>
-                  <td className="px-4 py-2 text-xs text-gray-700 dark:text-gray-300">{it.type}</td>
-                  <td className="px-4 py-2">
-                    {it.source_url ? (
-                      <a href={it.source_url} target="_blank" rel="noreferrer" className="text-xs text-brand-700 hover:underline dark:text-brand-300">
-                        {it.source_name || 'source ↗'}
-                      </a>
-                    ) : (
-                      <span className="text-xs text-gray-500">{it.source_name ?? '—'}</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">
-                    {it.published_timestamp ? new Date(it.published_timestamp).toLocaleDateString() : '—'}
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setOpenKey(it.key)}
-                      className="text-xs font-medium text-brand-700 hover:text-brand-800 dark:text-brand-300"
-                    >
-                      View
-                    </button>
-                  </td>
-                </tr>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[220px_1fr]">
+        {/* Days sidebar */}
+        <aside className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Days with content</h2>
+          {daysQuery.isLoading ? (
+            <div className="text-xs text-gray-400">Loading…</div>
+          ) : days.length === 0 ? (
+            <div className="text-xs text-gray-400">
+              No ingested articles yet. The cron polls every 30 min — once your feeds' fetch intervals elapse, content will appear here.
+            </div>
+          ) : (
+            <ul className="space-y-0.5 max-h-96 overflow-y-auto">
+              {days.map((d) => (
+                <li key={d.date}>
+                  <button
+                    type="button"
+                    onClick={() => { setDate(d.date); setDateTouched(true); }}
+                    className={`flex w-full items-center justify-between rounded px-2 py-1 text-left text-xs ${
+                      d.date === date
+                        ? 'bg-brand-100 text-brand-800 dark:bg-brand-900/30 dark:text-brand-200'
+                        : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    <span>{d.date}</span>
+                    <span className="font-mono text-[10px] text-gray-500 dark:text-gray-400">{d.total}</span>
+                  </button>
+                </li>
               ))}
-            </tbody>
-          </table>
-        )}
-      </section>
+            </ul>
+          )}
+        </aside>
+
+        {/* Main pane */}
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-gray-700 dark:text-gray-200">Date:</span>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => { setDate(e.target.value); setDateTouched(true); }}
+                className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+              />
+            </label>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {listQuery.isLoading ? 'Loading…' : `${items.length} ${items.length === 1 ? 'article' : 'articles'}`}
+            </span>
+          </div>
+
+          <section className="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+            {listQuery.isLoading ? (
+              <div className="p-6 text-sm text-gray-400">Loading…</div>
+            ) : listQuery.isError ? (
+              <div className="p-6 text-sm text-red-600 dark:text-red-300">
+                {(listQuery.error as ApiError).message ?? 'Failed to load.'}
+              </div>
+            ) : items.length === 0 ? (
+              <div className="p-12 text-center text-sm text-gray-400">
+                No items for {date}.
+                {firstEdition && (
+                  <>
+                    {' '}Check the{' '}
+                    <Link to={`/newsletter/editions/${encodeURIComponent(firstEdition.id)}/feeds`} className="underline">
+                      Feeds page
+                    </Link>{' '}for last-fetch errors.
+                  </>
+                )}
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                  <tr>
+                    <th className="px-4 py-2">Title</th>
+                    <th className="px-4 py-2">Type</th>
+                    <th className="px-4 py-2">Source</th>
+                    <th className="px-4 py-2">Published</th>
+                    <th className="px-4 py-2">Scanned</th>
+                    <th className="px-4 py-2 text-right">View</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((it) => (
+                    <tr key={it.key} className="border-t border-gray-100 dark:border-gray-800">
+                      <td className="px-4 py-2 max-w-md">
+                        <button
+                          type="button"
+                          onClick={() => setOpenKey(it.key)}
+                          className="text-left font-medium text-gray-900 hover:text-brand-700 dark:text-gray-100 dark:hover:text-brand-300"
+                        >
+                          {it.title || '(untitled)'}
+                        </button>
+                        <div className="mt-0.5 text-xs text-gray-400 truncate font-mono">{it.key}</div>
+                      </td>
+                      <td className="px-4 py-2 text-xs text-gray-700 dark:text-gray-300">{it.type}</td>
+                      <td className="px-4 py-2 max-w-xs">
+                        {it.source_url ? (
+                          <a href={it.source_url} target="_blank" rel="noreferrer" className="text-xs text-brand-700 hover:underline dark:text-brand-300 break-all">
+                            {it.source_name || hostnameOf(it.source_url)} ↗
+                          </a>
+                        ) : (
+                          <span className="text-xs text-gray-500">{it.source_name ?? '—'}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">
+                        {it.published_timestamp ? new Date(it.published_timestamp).toLocaleDateString() : '—'}
+                      </td>
+                      <td className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">
+                        {new Date(it.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setOpenKey(it.key)}
+                          className="text-xs font-medium text-brand-700 hover:text-brand-800 dark:text-brand-300"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+        </div>
+      </div>
 
       {openKey && itemsByKey.get(openKey) && (
         <IngestionDrawer
@@ -169,6 +253,14 @@ export default function IngestionBrowser() {
       )}
     </div>
   );
+}
+
+function hostnameOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url.slice(0, 40);
+  }
 }
 
 interface DrawerProps { item: IngestionItem; onClose: () => void }
@@ -194,6 +286,7 @@ function IngestionDrawer({ item, onClose }: DrawerProps) {
               <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-500 dark:text-gray-400">
                 <span>type: <span className="font-medium text-gray-700 dark:text-gray-200">{item.type}</span></span>
                 {item.source_name && <span>source: <span className="font-medium text-gray-700 dark:text-gray-200">{item.source_name}</span></span>}
+                <span>scanned: <span className="font-medium text-gray-700 dark:text-gray-200">{new Date(item.created_at).toLocaleString()}</span></span>
                 {item.source_url && <a href={item.source_url} target="_blank" rel="noreferrer" className="text-brand-700 underline dark:text-brand-300">open original ↗</a>}
               </div>
             </div>
