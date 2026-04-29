@@ -248,6 +248,23 @@ emailRouter.post('/webhook/postal', async (req: Request, res: Response) => {
       return;
     }
 
+    // Mig 017: when a delivery hard-bounces, mark every matching subscriber
+    // row 'bounced' so the cadence cron stops trying to send to them. Soft
+    // bounces (Held / DSNReceived) we leave alone — those usually retry.
+    const isHardFailure = eventType === 'MessageBounced' || eventType === 'MessageDeliveryFailed';
+    if (isHardFailure && msg.to) {
+      const lower = msg.to.toLowerCase().trim();
+      const { error: subErr } = await supabase
+        .from('newsletter_subscribers_v2')
+        .update({ status: 'bounced', unsubscribed_at: new Date().toISOString() })
+        .ilike('email', lower)
+        .eq('status', 'active');
+      if (subErr) {
+        // Non-fatal: bounce event is already persisted to email_bounces_v2.
+        logger.error({ err: subErr, to: msg.to }, 'email/webhook: subscriber bounce-flip failed');
+      }
+    }
+
     logger.info({ eventType, to: msg.to }, 'email/webhook: recorded bounce event');
     res.json({ success: true });
   } catch (err) {

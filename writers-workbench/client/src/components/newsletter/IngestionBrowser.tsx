@@ -15,7 +15,7 @@
  *   GET /api/ingestion/mine/get?key=YYYY-MM-DD/slug.source
  */
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch, ApiError } from '../../lib/api';
 import HelpButton from './HelpButton';
@@ -62,11 +62,14 @@ export default function IngestionBrowser() {
   });
   const days = daysQuery.data?.days ?? [];
 
-  // Default to the most recent day with content (rather than today, which is
-  // often empty when the cron hasn't fired yet). User can change with the
-  // picker or sidebar.
-  const [date, setDate] = useState<string>(todayIso());
-  const [dateTouched, setDateTouched] = useState(false);
+  // ?date=YYYY-MM-DD URL param wins over both today and most-recent-with-data.
+  // Lets approval-page chips deep-link into a specific day.
+  const [searchParams] = useSearchParams();
+  const dateParam = searchParams.get('date');
+  const [date, setDate] = useState<string>(
+    dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : todayIso(),
+  );
+  const [dateTouched, setDateTouched] = useState(!!dateParam);
   useEffect(() => {
     if (!dateTouched && days[0]) setDate(days[0].date);
   }, [days, dateTouched]);

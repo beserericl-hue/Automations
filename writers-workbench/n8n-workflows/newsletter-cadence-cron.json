@@ -1,0 +1,160 @@
+{
+  "name": "DEV - Newsletter Cadence Cron",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "90141b37-ea72-4349-a13e-e473c778f021",
+      "name": "cron_trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://writersworkbenchdev-production.up.railway.app/api/newsletter/cron/editions/due",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "830cf31e-7971-4276-b855-1242442a2e84",
+      "name": "fetch_due_editions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        240
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "jQBRJbmiUeTk8c11",
+          "name": "DEV Workbench Ingestion Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json || {};\nreturn (r.editions || []).map(e => ({json: e}));"
+      },
+      "id": "df3d376c-bfb1-4829-a3bc-6e03f2490da3",
+      "name": "extract_editions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "912ad765-bccf-482f-8774-d7efc3cfe471",
+      "name": "split_per_edition",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        960,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.agileadautomation.com/webhook/compose-newsletter-dev",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  Date: new Date().toISOString().slice(0,10),\n  \"Edition Id\": $json.edition_id,\n  \"Previous Newsletter Content\": \"\"\n}) }}",
+        "options": {}
+      },
+      "id": "0f540ed6-b61d-410c-9a47-3737bb459eb1",
+      "name": "post_to_webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        240
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "jQBRJbmiUeTk8c11",
+          "name": "DEV Workbench Ingestion Secret"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "cron_trigger": {
+      "main": [
+        [
+          {
+            "node": "fetch_due_editions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch_due_editions": {
+      "main": [
+        [
+          {
+            "node": "extract_editions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "extract_editions": {
+      "main": [
+        [
+          {
+            "node": "split_per_edition",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "split_per_edition": {
+      "main": [
+        [
+          {
+            "node": "post_to_webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -33,7 +33,7 @@ const NEWSLETTER_HELP: Record<HelpSection, HelpDoc> = {
         <ul className="mt-2 list-disc space-y-1 pl-5">
           <li><strong>In-flight</strong> — the currently running n8n execution (if any). Click to see its progress.</li>
           <li><strong>Pending approvals</strong> — drafts waiting for your green-light. Stories first, then subject line.</li>
-          <li><strong>Next scheduled send</strong> — the next cadence-driven send (Phase 2b).</li>
+          <li><strong>Next scheduled send</strong> — the next cadence-driven send (set per-newsletter under Schedule).</li>
           <li><strong>Recent runs</strong> — your last 10 newsletter executions, click any row for the rendered HTML.</li>
         </ul>
       </>
