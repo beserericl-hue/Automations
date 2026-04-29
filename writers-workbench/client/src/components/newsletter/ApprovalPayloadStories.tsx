@@ -4,10 +4,11 @@
  * (per design doc §4.3) — top_selected_stories, where each entry has:
  *   { title, summary, identifiers: string[], external_source_urls: string[] }
  *
- * For Phase 2a we don't open the full ingestion drawer; the source-URL
- * chips link directly to the URL. The ingestion browser (Phase 2b)
- * upgrades this to a drawer that fetches the stored markdown.
+ * Source-URL chips link to the original article. Ingestion identifiers
+ * (the keys into content_ingestion_v2) link into the in-app Ingestion
+ * Library drawer for the day prefix encoded in the key.
  */
+import { Link } from 'react-router-dom';
 
 interface Story {
   title?: string;
@@ -77,11 +78,24 @@ export default function ApprovalPayloadStories({ payload }: Props) {
               <details className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 <summary className="cursor-pointer">Source identifiers ({(s.identifiers ?? []).length})</summary>
                 <ul className="mt-1 space-y-0.5 break-all font-mono">
-                  {(s.identifiers ?? []).map((id) => (
-                    <li key={id}>{id}</li>
-                  ))}
+                  {(s.identifiers ?? []).map((id) => {
+                    const dayMatch = /^(\d{4}-\d{2}-\d{2})\//.exec(id);
+                    return (
+                      <li key={id}>
+                        {dayMatch ? (
+                          <Link
+                            to={`/newsletter/ingestion?date=${dayMatch[1]}`}
+                            className="text-brand-700 hover:underline dark:text-brand-300"
+                          >
+                            {id}
+                          </Link>
+                        ) : (
+                          id
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
-                <p className="mt-1 italic">Ingestion browser not yet available — Phase 2b.</p>
               </details>
             )}
           </li>

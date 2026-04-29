@@ -22,20 +22,41 @@ export default function EditionsList() {
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [includeDisabled, setIncludeDisabled] = useState(false);
 
   const editionsQuery = useQuery({
-    queryKey: ['newsletter-editions'],
-    queryFn: () => apiFetch<EditionsResponse>('/api/newsletter/editions'),
+    queryKey: ['newsletter-editions', { includeDisabled }],
+    queryFn: () => apiFetch<EditionsResponse>(
+      includeDisabled
+        ? '/api/newsletter/editions?include_disabled=1'
+        : '/api/newsletter/editions',
+    ),
     staleTime: 30_000,
   });
   const editions = editionsQuery.data?.editions ?? [];
 
   async function handleDisable(e: NewsletterEdition) {
-    if (!confirm(`Disable "${e.display_name}"? It will stop appearing in the Generate page and template list. You can re-create it with the same id later.`)) return;
+    if (!confirm(`Disable "${e.display_name}"? It will stop appearing in the Generate page and template list, but you can re-enable it from the disabled view.`)) return;
     setBusyId(e.id);
     setError(null);
     try {
       await apiFetch(`/api/newsletter/editions/${encodeURIComponent(e.id)}`, { method: 'DELETE' });
+      await qc.invalidateQueries({ queryKey: ['newsletter-editions'] });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Unexpected error');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleReenable(e: NewsletterEdition) {
+    setBusyId(e.id);
+    setError(null);
+    try {
+      await apiFetch(`/api/newsletter/editions/${encodeURIComponent(e.id)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ enabled: true }),
+      });
       await qc.invalidateQueries({ queryKey: ['newsletter-editions'] });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unexpected error');
@@ -70,6 +91,18 @@ export default function EditionsList() {
         </div>
       )}
 
+      <div className="flex items-center gap-4 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={includeDisabled}
+            onChange={(e) => setIncludeDisabled(e.target.checked)}
+            className="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+          />
+          <span className="text-gray-700 dark:text-gray-200">Show disabled</span>
+        </label>
+      </div>
+
       <section className="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
         {editionsQuery.isLoading ? (
           <div className="p-6 text-sm text-gray-400">Loading…</div>
@@ -86,6 +119,7 @@ export default function EditionsList() {
                 <th className="px-4 py-2">Slug</th>
                 <th className="px-4 py-2">Genre</th>
                 <th className="px-4 py-2">Subheader</th>
+                <th className="px-4 py-2">Status</th>
                 <th className="px-4 py-2 text-right">Updated</th>
                 <th className="px-4 py-2 text-right">Actions</th>
               </tr>
@@ -107,6 +141,13 @@ export default function EditionsList() {
                   <td className="px-4 py-2 font-mono text-xs text-gray-500 dark:text-gray-400">{e.id}</td>
                   <td className="px-4 py-2 text-gray-700 dark:text-gray-300">{e.genre}</td>
                   <td className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 max-w-sm truncate">{e.subheader}</td>
+                  <td className="px-4 py-2">
+                    {e.enabled ? (
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">active</span>
+                    ) : (
+                      <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">disabled</span>
+                    )}
+                  </td>
                   <td className="px-4 py-2 text-right text-xs text-gray-500 dark:text-gray-400">{formatDate(e.updated_at)}</td>
                   <td className="px-4 py-2 text-right">
                     <div className="flex items-center justify-end gap-3">
@@ -122,13 +163,23 @@ export default function EditionsList() {
                       >
                         Edit
                       </button>
-                      <button
-                        onClick={() => handleDisable(e)}
-                        disabled={busyId === e.id}
-                        className="text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50 dark:text-red-400"
-                      >
-                        {busyId === e.id ? 'Disabling…' : 'Disable'}
-                      </button>
+                      {e.enabled ? (
+                        <button
+                          onClick={() => handleDisable(e)}
+                          disabled={busyId === e.id}
+                          className="text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50 dark:text-red-400"
+                        >
+                          {busyId === e.id ? 'Disabling…' : 'Disable'}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleReenable(e)}
+                          disabled={busyId === e.id}
+                          className="text-xs font-medium text-emerald-700 hover:text-emerald-800 disabled:opacity-50 dark:text-emerald-300"
+                        >
+                          {busyId === e.id ? 'Re-enabling…' : 'Re-enable'}
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

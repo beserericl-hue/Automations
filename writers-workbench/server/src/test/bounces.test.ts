@@ -68,6 +68,11 @@ function installSupabaseStub(opts: {
   chain.order = vi.fn(() => chain);
   chain.limit = vi.fn(() => chain);
   chain.eq = vi.fn(() => chain);
+  // The bounce webhook now also patches newsletter_subscribers_v2 on hard
+  // failures (.update().ilike().eq()). The chain has to terminate (be
+  // awaitable), so .eq returns a thenable resolving to no-error.
+  chain.update = vi.fn(() => chain);
+  chain.ilike = vi.fn(() => chain);
   chain.then = (resolve: (v: unknown) => unknown) =>
     Promise.resolve(opts.selectResult ?? { data: [], error: null }).then(resolve);
   (mocks.supabaseStub.from as ReturnType<typeof vi.fn>).mockReturnValue(chain);

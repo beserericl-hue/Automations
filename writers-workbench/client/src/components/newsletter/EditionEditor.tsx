@@ -471,6 +471,13 @@ function readAsBase64(file: File): Promise<string> {
 // flow stays in one screen so users don't get lost.
 // ---------------------------------------------------------------------------
 
+interface CsvImportResponse {
+  success: boolean;
+  inserted: number;
+  skipped_duplicate: number;
+  invalid: number;
+}
+
 function SubscribersPanel({ editionId }: { editionId: string }) {
   const qc = useQueryClient();
   const subsQuery = useQuery({
@@ -485,6 +492,38 @@ function SubscribersPanel({ editionId }: { editionId: string }) {
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  // CSV import state
+  const csvFileRef = useRef<HTMLInputElement>(null);
+  const [importBanner, setImportBanner] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+
+  async function handleCsvPick(file: File) {
+    setError(null);
+    setImportBanner(null);
+    if (file.size > 4 * 1024 * 1024) {
+      setError('CSV file is over 4 MB. Split it into smaller files first.');
+      return;
+    }
+    setImporting(true);
+    try {
+      const csv = await file.text();
+      const res = await apiFetch<CsvImportResponse>(
+        `/api/newsletter/editions/${encodeURIComponent(editionId)}/subscribers/import`,
+        { method: 'POST', body: JSON.stringify({ csv, source: 'csv-import' }) },
+      );
+      setImportBanner(
+        `Imported ${res.inserted} new ${res.inserted === 1 ? 'subscriber' : 'subscribers'}. ` +
+        `Skipped ${res.skipped_duplicate} duplicate, ${res.invalid} invalid.`,
+      );
+      await qc.invalidateQueries({ queryKey: ['newsletter-subscribers', editionId] });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'CSV import failed');
+    } finally {
+      setImporting(false);
+      if (csvFileRef.current) csvFileRef.current.value = '';
+    }
+  }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -542,14 +581,42 @@ function SubscribersPanel({ editionId }: { editionId: string }) {
 
   return (
     <section className="space-y-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-      <header className="flex items-center justify-between">
+      <header className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Subscribers</h2>
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {activeCount} active · {subs.length} total
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          <input
+            ref={csvFileRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={(ev) => {
+              const f = ev.target.files?.[0];
+              if (f) void handleCsvPick(f);
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => csvFileRef.current?.click()}
+            disabled={importing}
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+            title="Bulk import emails from a .csv (header: email[, display_name])"
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+        </div>
       </header>
+
+      {importBanner && (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200">
+          {importBanner}
+          <button onClick={() => setImportBanner(null)} className="ml-2 underline">Dismiss</button>
+        </div>
+      )}
 
       <form onSubmit={handleAdd} className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_1fr_auto]">
         <input type="email" required placeholder="someone@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} />

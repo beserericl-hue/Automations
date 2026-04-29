@@ -27,10 +27,10 @@ interface OpenApproval {
   created_at: string;
   expires_at: string;
   approval_url: string | null;
-  // Edition isn't persisted on newsletter_approvals_v2 directly; the
-  // execution carries it via SSE. For S8 we don't have a per-row edition
-  // and the table just shows the universal "ai-news" badge for now.
-  // Phase 2b can extend the row + the server query.
+  // Edition is denormalized onto newsletter_approvals_v2 (mig 012) but
+  // not yet surfaced in the in-app approvals list. Future cleanup: pull
+  // edition_id into the SELECT and render the badge per-row instead of
+  // hardcoding "ai-news" in callers.
 }
 
 interface ApprovalsOpenResponse {

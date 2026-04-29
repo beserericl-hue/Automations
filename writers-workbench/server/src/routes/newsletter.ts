@@ -77,13 +77,18 @@ export const newsletterCallbackRouter = Router();
 newsletterRouter.get('/editions', requireAuth, async (req: Request, res: Response) => {
   const userId = req.userId!;
   const supabase = getSupabaseAdmin();
+  // include_disabled=1 returns soft-deleted editions too. Default behavior
+  // (when the flag is absent or any other value) keeps the historical
+  // enabled-only filter so existing callers don't change.
+  const includeDisabled = String(req.query.include_disabled ?? '').trim() === '1';
 
-  const { data, error } = await supabase
+  let q = supabase
     .from('newsletter_editions_v2')
     .select('id, display_name, subheader, genre, description, newsletter_name, primary_color, paper_color, enabled, stamp_url, signature_name, signature_role, cadence, cadence_send_time, user_id, created_at, updated_at')
     .eq('user_id', userId)
-    .eq('enabled', true)
     .order('created_at', { ascending: true });
+  if (!includeDisabled) q = q.eq('enabled', true);
+  const { data, error } = await q;
 
   if (error) {
     logger.error({ error, userId }, 'newsletter editions list failed');

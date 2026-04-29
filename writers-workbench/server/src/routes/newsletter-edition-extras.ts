@@ -13,6 +13,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
+import { requireSharedSecret } from '../middleware/shared-secret.js';
 import { validateBody } from '../middleware/validate.js';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import {
@@ -24,6 +25,10 @@ import {
 import { logger } from '../lib/logger.js';
 
 export const editionExtrasRouter = Router();
+// Cron-secret variants — n8n calls these from the cadence + send workflows.
+export const editionExtrasCronRouter = Router();
+
+const requireIngestionSecret = requireSharedSecret('X-Ingestion-Secret', 'INGESTION_SECRET');
 
 const SUB_COLUMNS = 'id, user_id, edition_id, email, display_name, status, source, subscribed_at, unsubscribed_at, created_at, updated_at';
 
@@ -302,3 +307,253 @@ editionExtrasRouter.delete('/subscribers/:id', requireAuth, async (req: Request,
   }
   res.json({ success: true });
 });
+
+// ---------------------------------------------------------------------------
+// CSV import — POST /editions/:id/subscribers/import
+//   body: { csv: string, default_status?: 'active'|'unsubscribed', source?: string }
+// Header detection: first row must contain at least an "email" header.
+// Optional headers: "name" or "display_name" (either spelling).
+// Other columns are ignored.
+// Idempotent: ON CONFLICT DO NOTHING via the existing
+//   uq_subscribers_email_per_edition unique index. Returns counts:
+//     { inserted, skipped_duplicate, invalid }
+// ---------------------------------------------------------------------------
+
+const CsvImportSchema = z.object({
+  // 4 MB cap on the raw CSV body — covers ~80k typical rows; keeps memory
+  // pressure bounded.
+  csv: z.string().min(1).max(4 * 1024 * 1024),
+  default_status: z.enum(['active', 'unsubscribed']).optional().default('active'),
+  source: z.string().max(60).optional().default('csv-import'),
+});
+
+function parseCsvLine(line: string): string[] {
+  // Minimal RFC-4180 single-line parser: handles quoted fields with commas
+  // and double-quote-escaped quotes inside a field. Doesn't handle embedded
+  // newlines (we split the file on \n first, which is fine for email
+  // address lists — none of the values legitimately contain newlines).
+  const out: string[] = [];
+  let cur = '';
+  let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQ) {
+      if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+      else if (ch === '"') { inQ = false; }
+      else { cur += ch; }
+    } else {
+      if (ch === ',') { out.push(cur); cur = ''; }
+      else if (ch === '"' && cur === '') { inQ = true; }
+      else { cur += ch; }
+    }
+  }
+  out.push(cur);
+  return out.map((s) => s.trim());
+}
+
+editionExtrasRouter.post(
+  '/editions/:id/subscribers/import',
+  requireAuth,
+  validateBody(CsvImportSchema),
+  async (req: Request, res: Response) => {
+    const params = NewsletterEditionIdParamSchema.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'invalid edition id' } });
+      return;
+    }
+    const userId = req.userId!;
+    const editionId = params.data.id;
+    const body = req.body as z.infer<typeof CsvImportSchema>;
+    const supabase = getSupabaseAdmin();
+
+    // Confirm ownership before parsing (don't waste cycles on someone else's edition).
+    const { data: edition } = await supabase
+      .from('newsletter_editions_v2')
+      .select('id')
+      .eq('id', editionId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (!edition) {
+      res.status(404).json({ success: false, error: { code: 'EDITION_NOT_FOUND', message: 'Edition not found or not yours' } });
+      return;
+    }
+
+    // Strip BOM and normalize line endings, then split.
+    const normalized = body.csv.replace(/^﻿/, '').replace(/\r\n?/g, '\n');
+    const lines = normalized.split('\n').filter((l) => l.length > 0);
+    if (lines.length < 1) {
+      res.status(400).json({ success: false, error: { code: 'EMPTY_CSV', message: 'CSV is empty' } });
+      return;
+    }
+
+    // Find the email column. If the first row looks like a header, use it;
+    // otherwise treat the whole file as a single "email" column.
+    const headerCells = parseCsvLine(lines[0]).map((c) => c.toLowerCase());
+    let emailIdx = headerCells.indexOf('email');
+    let nameIdx = headerCells.indexOf('display_name');
+    if (nameIdx === -1) nameIdx = headerCells.indexOf('name');
+    let dataLines = lines;
+    if (emailIdx !== -1) {
+      dataLines = lines.slice(1); // strip header
+    } else if (headerCells.length === 1 && /@/.test(headerCells[0])) {
+      // Single-column file with no header — assume it's all emails.
+      emailIdx = 0;
+    } else {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'NO_EMAIL_COLUMN',
+          message: 'CSV must have an "email" column header (or be a single-column list of emails).',
+        },
+      });
+      return;
+    }
+
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const rows: Array<{
+      user_id: string; edition_id: string; email: string;
+      display_name: string | null; source: string; status: 'active' | 'unsubscribed';
+    }> = [];
+    let invalid = 0;
+    const seen = new Set<string>();
+    for (const ln of dataLines) {
+      const cells = parseCsvLine(ln);
+      const email = (cells[emailIdx] ?? '').toLowerCase().trim();
+      if (!email || !EMAIL_RE.test(email) || email.length > 254) { invalid++; continue; }
+      if (seen.has(email)) continue; // dedupe within the file before hitting the DB
+      seen.add(email);
+      const display_name = nameIdx >= 0 ? (cells[nameIdx] ?? '').trim() || null : null;
+      rows.push({
+        user_id: userId,
+        edition_id: editionId,
+        email,
+        display_name,
+        source: body.source,
+        status: body.default_status,
+      });
+    }
+
+    if (rows.length === 0) {
+      res.json({ success: true, inserted: 0, skipped_duplicate: 0, invalid });
+      return;
+    }
+
+    // Insert in chunks. Postgres rejects very large parameter counts; chunk
+    // size of 1000 keeps us comfortably under any common limit.
+    const CHUNK = 1000;
+    let totalInserted = 0;
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const chunk = rows.slice(i, i + CHUNK);
+      // Use a duplicate-tolerant upsert: existing rows (matching the
+      // (user_id, edition_id, lower(email)) unique index) are kept untouched
+      // because we don't update on conflict.
+      const { data, error } = await supabase
+        .from('newsletter_subscribers_v2')
+        .upsert(chunk, {
+          onConflict: 'user_id,edition_id,email',
+          ignoreDuplicates: true,
+        })
+        .select('id');
+      if (error) {
+        logger.error({ error, editionId, userId, chunk_size: chunk.length }, 'csv import insert failed');
+        res.status(500).json({ success: false, error: { code: 'DB_INSERT_FAILED', message: error.message } });
+        return;
+      }
+      totalInserted += (data ?? []).length;
+    }
+
+    res.status(201).json({
+      success: true,
+      inserted: totalInserted,
+      skipped_duplicate: rows.length - totalInserted,
+      invalid,
+    });
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Cron-secret routes — for the n8n send workflow + cadence cron.
+// ---------------------------------------------------------------------------
+
+// GET /api/newsletter/cron/editions/:id/subscribers
+// Returns active recipients for the edition. Used by the
+// share_newsletter_msg_email node to fan out to the subscriber list.
+editionExtrasCronRouter.get(
+  '/editions/:id/subscribers',
+  requireIngestionSecret,
+  async (req: Request, res: Response) => {
+    const params = NewsletterEditionIdParamSchema.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'invalid edition id' } });
+      return;
+    }
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from('newsletter_subscribers_v2')
+      .select('id, email, display_name, status')
+      .eq('edition_id', params.data.id)
+      .eq('status', 'active')
+      .limit(5000);
+    if (error) {
+      res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: error.message } });
+      return;
+    }
+    res.json({
+      success: true,
+      subscribers: data ?? [],
+      emails: (data ?? []).map((r) => r.email as string),
+    });
+  },
+);
+
+// GET /api/newsletter/cron/editions/due
+// Returns editions that are enabled, have cadence != 'none', and are due
+// for an auto-generated send. "Due" means: cadence_send_time has elapsed
+// since the most-recent newsletter_sends_v2 row for the edition (or
+// since edition.created_at if there are no prior sends).
+//
+// cadence_send_time is free-form ("HH:MM" or "HH:MM dow"). For Phase 1 we
+// compute interval days from cadence (daily=1, weekly=7, biweekly=14,
+// monthly=30) and compare against the most recent send_date. Time-of-day
+// + day-of-week gating is a follow-up.
+editionExtrasCronRouter.get(
+  '/editions/due',
+  requireIngestionSecret,
+  async (_req: Request, res: Response) => {
+    const supabase = getSupabaseAdmin();
+    const { data: editions, error } = await supabase
+      .from('newsletter_editions_v2')
+      .select('id, user_id, cadence, cadence_send_time, created_at')
+      .eq('enabled', true)
+      .neq('cadence', 'none');
+    if (error) {
+      res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: error.message } });
+      return;
+    }
+    const intervalDays: Record<string, number> = {
+      daily: 1, weekly: 7, biweekly: 14, monthly: 30,
+    };
+    const now = Date.now();
+    const due: Array<{ edition_id: string; user_id: string; days_since_last: number }> = [];
+    for (const ed of (editions ?? []) as Array<{ id: string; user_id: string; cadence: string; cadence_send_time: string | null; created_at: string }>) {
+      const days = intervalDays[ed.cadence];
+      if (!days) continue;
+      // Pull last send_date for this edition.
+      const { data: lastSend } = await supabase
+        .from('newsletter_sends_v2')
+        .select('send_date, created_at')
+        .eq('edition_id', ed.id)
+        .eq('user_id', ed.user_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const baseline = lastSend?.created_at ?? ed.created_at;
+      const baselineMs = new Date(baseline).getTime();
+      const elapsedDays = (now - baselineMs) / (24 * 60 * 60 * 1000);
+      if (elapsedDays >= days) {
+        due.push({ edition_id: ed.id, user_id: ed.user_id, days_since_last: Math.floor(elapsedDays) });
+      }
+    }
+    res.json({ success: true, editions: due });
+  },
+);

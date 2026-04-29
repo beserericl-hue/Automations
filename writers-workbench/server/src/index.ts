@@ -23,7 +23,7 @@ import { approvalsApiRouter, approvalsPublicRouter } from './routes/approvals.js
 import { newsletterSendsRouter } from './routes/newsletter-sends.js';
 import { newsletterRouter, newsletterCallbackRouter } from './routes/newsletter.js';
 import { feedsRouter, feedsCronRouter } from './routes/newsletter-feeds.js';
-import { editionExtrasRouter } from './routes/newsletter-edition-extras.js';
+import { editionExtrasRouter, editionExtrasCronRouter } from './routes/newsletter-edition-extras.js';
 import { genresRouter, adminGenreUrlsRouter } from './routes/genres.js';
 import { jobsRouter } from './routes/jobs.js';
 import { contentActionsRouter } from './routes/content-actions.js';
@@ -167,6 +167,8 @@ app.use('/api/newsletter', feedsRouter);
 // /api/newsletter; routes are /editions/:id/logo, /editions/:id/subscribers,
 // /subscribers/:id).
 app.use('/api/newsletter', editionExtrasRouter);
+// Cadence + send fan-out cron-secret routes (n8n-only).
+app.use('/api/newsletter/cron', editionExtrasCronRouter);
 // Cron worker callbacks. Distinct prefix because requests are auth'd by
 // X-Ingestion-Secret rather than session JWT — keeps the access pattern obvious.
 app.use('/api/newsletter/cron', feedsCronRouter);
