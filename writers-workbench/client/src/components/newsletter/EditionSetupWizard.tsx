@@ -2,9 +2,11 @@
  * Edition Setup Wizard — runs immediately after creating a new edition.
  *
  * Three steps, each skippable:
- *   1. Add feeds — start the user with a "Copy 6 starter AI feeds"
- *      button + manual add form. Without this, the new newsletter has
- *      nothing in its content pool.
+ *   1. Add feeds — if the edition's genre has curated URLs in
+ *      genre_config_v2, offer a one-click "Copy N feeds from <genre>"
+ *      that hits POST /editions/:id/feeds/import-from-genre. If the
+ *      genre has no feeds, fall through to the "open the full editor"
+ *      link only.
  *   2. Confirm template — preview the active default for this edition;
  *      offer "Customize" (link to TemplateEditor) or "Use as-is".
  *   3. Add first subscriber — pre-fills with the user's own email so
@@ -29,14 +31,20 @@ interface FeedsResponse { success: boolean; feeds: NewsletterFeedSource[] }
 interface TemplatesResponse { success: boolean; templates: NewsletterTemplateListItem[] }
 interface PreviewResponse { success: boolean; html: string }
 
-const STARTER_FEEDS: Array<{ name: string; url: string; url_type: NewsletterFeedSource['url_type']; fetch_interval_minutes: number }> = [
-  { name: 'OpenAI Blog',           url: 'https://rss.app/feeds/v1.1/6BnoYYEtnCHXfHj0.json', url_type: 'rss',    fetch_interval_minutes: 240 },
-  { name: 'Anthropic Blog',        url: 'https://rss.app/feeds/v1.1/OFdSUsziElw0rkpx.json', url_type: 'rss',    fetch_interval_minutes: 240 },
-  { name: 'Google AI Blog',        url: 'https://rss.app/feeds/v1.1/2CtvCsOtZS35jJgp.json', url_type: 'rss',    fetch_interval_minutes: 240 },
-  { name: 'Hacker News (AI)',      url: 'https://rss.app/feeds/v1.1/jf3MZ9ZlVZhrVEjD.json', url_type: 'rss',    fetch_interval_minutes: 180 },
-  { name: 'r/OpenAI',              url: 'https://rss.app/feeds/v1.1/1LDBacY8BC2qJaZh.json', url_type: 'reddit', fetch_interval_minutes: 180 },
-  { name: 'The Neuron',            url: 'https://rss.app/feeds/e2QjBpEDLPfVUeoI.xml',       url_type: 'rss',    fetch_interval_minutes: 240 },
-];
+interface GenreSummary {
+  genre_slug: string;
+  genre_name: string;
+  description: string | null;
+  visibility: 'public' | 'private';
+  feed_counts: { rss: number; sources: number; subreddits: number; total: number };
+}
+interface GenresResponse { success: boolean; genres: GenreSummary[] }
+interface GenreImportResponse {
+  success: boolean;
+  genre: string;
+  inserted: number;
+  skipped_duplicate: number;
+}
 
 type Step = 'feeds' | 'template' | 'subscriber' | 'done';
 
@@ -92,7 +100,7 @@ export default function EditionSetupWizard() {
         ))}
       </ol>
 
-      {step === 'feeds' && <FeedsStep editionId={editionId} onNext={() => setStep('template')} qc={qc} />}
+      {step === 'feeds' && <FeedsStep editionId={editionId} editionGenre={edition.genre} onNext={() => setStep('template')} qc={qc} />}
       {step === 'template' && <TemplateStep editionId={editionId} onNext={() => setStep('subscriber')} />}
       {step === 'subscriber' && <SubscriberStep editionId={editionId} userEmail={profile?.email ?? null} userName={null} onNext={() => setStep('done')} qc={qc} />}
       {step === 'done' && (
@@ -124,8 +132,9 @@ export default function EditionSetupWizard() {
 }
 
 interface StepProps { editionId: string; onNext: () => void; qc: ReturnType<typeof useQueryClient> }
+interface FeedsStepProps extends StepProps { editionGenre: string }
 
-function FeedsStep({ editionId, onNext, qc }: StepProps) {
+function FeedsStep({ editionId, editionGenre, onNext, qc }: FeedsStepProps) {
   const feedsQuery = useQuery({
     queryKey: ['newsletter-feeds', editionId],
     queryFn: () => apiFetch<FeedsResponse>(`/api/newsletter/editions/${encodeURIComponent(editionId)}/feeds`),
@@ -133,28 +142,37 @@ function FeedsStep({ editionId, onNext, qc }: StepProps) {
   });
   const feeds = feedsQuery.data?.feeds ?? [];
 
+  // Pull genre summaries so we can show "Copy N feeds from <genre>".
+  const genresQuery = useQuery({
+    queryKey: ['newsletter-genres'],
+    queryFn: () => apiFetch<GenresResponse>('/api/genres'),
+    staleTime: 60_000,
+  });
+  const matchedGenre = (genresQuery.data?.genres ?? []).find(
+    (g) => g.genre_slug === editionGenre,
+  ) ?? null;
+  const totalGenreFeeds = matchedGenre?.feed_counts.total ?? 0;
+
   const [busy, setBusy] = useState(false);
+  const [importBanner, setImportBanner] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function copyStarter() {
+  async function importFromGenre() {
+    if (!matchedGenre) return;
     setBusy(true);
     setError(null);
+    setImportBanner(null);
     try {
-      // Best-effort: post each feed; ignore 409 duplicates so the button is idempotent.
-      for (const f of STARTER_FEEDS) {
-        try {
-          await apiFetch(`/api/newsletter/editions/${encodeURIComponent(editionId)}/feeds`, {
-            method: 'POST',
-            body: JSON.stringify(f),
-          });
-        } catch (err) {
-          if (err instanceof ApiError && err.code === 'DUPLICATE_URL') continue;
-          throw err;
-        }
-      }
+      const r = await apiFetch<GenreImportResponse>(
+        `/api/newsletter/editions/${encodeURIComponent(editionId)}/feeds/import-from-genre`,
+        { method: 'POST', body: JSON.stringify({ genre_slug: matchedGenre.genre_slug }) },
+      );
+      setImportBanner(
+        `Imported ${r.inserted} new feed${r.inserted === 1 ? '' : 's'} from ${matchedGenre.genre_name}. Skipped ${r.skipped_duplicate} duplicate.`,
+      );
       await qc.invalidateQueries({ queryKey: ['newsletter-feeds', editionId] });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to copy feeds');
+      setError(err instanceof ApiError ? err.message : 'Failed to import feeds from genre');
     } finally {
       setBusy(false);
     }
@@ -175,17 +193,36 @@ function FeedsStep({ editionId, onNext, qc }: StepProps) {
         <>
           <div className="rounded-md border border-gray-200 p-3 text-sm dark:border-gray-700">
             <strong>{feeds.length}</strong> feed{feeds.length === 1 ? '' : 's'} attached.
-            {feeds.length === 0 && (
+            {matchedGenre && totalGenreFeeds > 0 && (
               <button
                 type="button"
-                onClick={copyStarter}
+                onClick={importFromGenre}
                 disabled={busy}
                 className="ml-3 rounded bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               >
-                {busy ? 'Copying…' : 'Copy 6 starter AI feeds'}
+                {busy
+                  ? 'Importing…'
+                  : `Copy ${totalGenreFeeds} feed${totalGenreFeeds === 1 ? '' : 's'} from ${matchedGenre.genre_name}`}
               </button>
             )}
+            {matchedGenre && totalGenreFeeds === 0 && (
+              <span className="ml-3 text-xs text-gray-500 dark:text-gray-400">
+                The "{matchedGenre.genre_name}" genre has no feeds configured yet.
+              </span>
+            )}
+            {!matchedGenre && !genresQuery.isLoading && (
+              <span className="ml-3 text-xs text-gray-500 dark:text-gray-400">
+                No matching genre found. Add feeds manually below.
+              </span>
+            )}
           </div>
+
+          {importBanner && (
+            <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200">
+              {importBanner}
+              <button onClick={() => setImportBanner(null)} className="ml-2 underline">Dismiss</button>
+            </div>
+          )}
 
           <Link
             to={`/newsletter/editions/${encodeURIComponent(editionId)}/feeds`}

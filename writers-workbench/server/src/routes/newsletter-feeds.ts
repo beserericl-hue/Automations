@@ -22,6 +22,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
 import { requireSharedSecret } from '../middleware/shared-secret.js';
 import { validateBody } from '../middleware/validate.js';
@@ -213,6 +214,125 @@ feedsRouter.delete('/feeds/:id', requireAuth, async (req: Request, res: Response
   }
   res.json({ success: true });
 });
+
+// ---------------------------------------------------------------------------
+// POST /api/newsletter/editions/:id/feeds/import-from-genre
+//   body: { genre_slug: string }
+// Copies the genre's seeded URLs (genre_config_v2.rss_feed_urls,
+// .source_urls, .subreddit_names) into newsletter_feed_sources_v2 for the
+// caller's edition. Idempotent via the existing
+// uq_feed_sources_dup unique index on (user_id, edition_id, lower(url)).
+// Returns counts: { inserted, skipped_duplicate }.
+//
+// Subreddit names are converted to a Reddit feed URL of the shape
+// https://www.reddit.com/r/<name>/.json — the multi-user cron worker
+// already accepts url_type='reddit' for that path.
+// ---------------------------------------------------------------------------
+// Lightweight inline schema — co-located with the route since it's only
+// used here. The genre_slug regex matches genre_config_v2's slug shape.
+const ImportFromGenreSchema = z.object({
+  genre_slug: z.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/, 'genre_slug must be slug-style'),
+});
+
+feedsRouter.post(
+  '/editions/:id/feeds/import-from-genre',
+  requireAuth,
+  validateBody(ImportFromGenreSchema),
+  async (req: Request, res: Response) => {
+    const params = NewsletterEditionIdParamSchema.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'invalid edition id' } });
+      return;
+    }
+    const userId = req.userId!;
+    const editionId = params.data.id;
+    const body = req.body as { genre_slug: string };
+    const supabase = getSupabaseAdmin();
+
+    // Confirm edition ownership.
+    const { data: edition } = await supabase
+      .from('newsletter_editions_v2')
+      .select('id')
+      .eq('id', editionId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (!edition) {
+      res.status(404).json({ success: false, error: { code: 'EDITION_NOT_FOUND', message: 'Edition not found or not yours' } });
+      return;
+    }
+
+    // Pull the genre. Visible if public (user_id IS NULL) or own.
+    const { data: genre, error: genreErr } = await supabase
+      .from('genre_config_v2')
+      .select('genre_slug, genre_name, user_id, rss_feed_urls, source_urls, subreddit_names')
+      .eq('genre_slug', body.genre_slug)
+      .eq('active', true)
+      .or(`user_id.is.null,user_id.eq.${encodeURIComponent(userId)}`)
+      .maybeSingle();
+    if (genreErr) {
+      logger.error({ genreErr, userId, slug: body.genre_slug }, 'genre lookup failed during import');
+      res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: genreErr.message } });
+      return;
+    }
+    if (!genre) {
+      res.status(404).json({ success: false, error: { code: 'GENRE_NOT_FOUND', message: `Genre "${body.genre_slug}" not visible` } });
+      return;
+    }
+
+    type Row = {
+      user_id: string; edition_id: string; name: string; url: string;
+      url_type: 'rss' | 'reddit' | 'source' | 'firecrawl_scrape';
+      fetch_interval_minutes: number; active: boolean;
+    };
+    const rows: Row[] = [];
+    const seen = new Set<string>();
+    function add(name: string, url: string, url_type: Row['url_type'], interval = 240) {
+      const key = `${url_type}::${url.toLowerCase()}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      rows.push({ user_id: userId, edition_id: editionId, name, url, url_type, fetch_interval_minutes: interval, active: true });
+    }
+    for (const u of (genre.rss_feed_urls ?? []) as string[]) {
+      if (typeof u !== 'string' || !u.trim()) continue;
+      add(`${genre.genre_name} — RSS`, u.trim(), 'rss', 240);
+    }
+    for (const u of (genre.source_urls ?? []) as string[]) {
+      if (typeof u !== 'string' || !u.trim()) continue;
+      add(`${genre.genre_name} — source`, u.trim(), 'source', 240);
+    }
+    for (const sub of (genre.subreddit_names ?? []) as string[]) {
+      if (typeof sub !== 'string' || !sub.trim()) continue;
+      const cleaned = sub.trim().replace(/^r\//i, '');
+      const redditUrl = `https://www.reddit.com/r/${cleaned}/.json`;
+      add(`r/${cleaned}`, redditUrl, 'reddit', 180);
+    }
+
+    if (rows.length === 0) {
+      res.json({ success: true, inserted: 0, skipped_duplicate: 0, genre: genre.genre_slug });
+      return;
+    }
+
+    const { data: inserted, error: insErr } = await supabase
+      .from('newsletter_feed_sources_v2')
+      .upsert(rows, {
+        onConflict: 'user_id,edition_id,url',
+        ignoreDuplicates: true,
+      })
+      .select('id');
+    if (insErr) {
+      logger.error({ insErr, userId, editionId, slug: body.genre_slug }, 'import-from-genre insert failed');
+      res.status(500).json({ success: false, error: { code: 'DB_INSERT_FAILED', message: insErr.message } });
+      return;
+    }
+    const newCount = (inserted ?? []).length;
+    res.status(201).json({
+      success: true,
+      genre: genre.genre_slug,
+      inserted: newCount,
+      skipped_duplicate: rows.length - newCount,
+    });
+  },
+);
 
 // ---------------------------------------------------------------------------
 // Cron worker callbacks (X-Ingestion-Secret guarded — no user JWT)

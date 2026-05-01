@@ -36,6 +36,62 @@ function isAdminCaller(req: Request): boolean {
 }
 
 // ----------------------------------------------------------------------
+// GET /api/genres
+//
+// List active genres visible to the caller, with per-row feed counts:
+//   - public genres: user_id IS NULL
+//   - own private genres: user_id = caller
+//   - admins/superusers see everything
+// Counts collapse rss_feed_urls + source_urls + subreddit_names into a
+// single "feeds" total so the EditionEditor can show
+// "AI & Marketing Technology — 9 feeds" in the genre dropdown.
+// ----------------------------------------------------------------------
+genresRouter.get('/', requireAuth, async (req: Request, res: Response) => {
+  const userId = req.userId!;
+  const supabase = getSupabaseAdmin();
+
+  let q = supabase
+    .from('genre_config_v2')
+    .select('id, user_id, genre_slug, genre_name, description, rss_feed_urls, source_urls, subreddit_names, active')
+    .eq('active', true)
+    .order('genre_slug', { ascending: true });
+  if (!isAdminCaller(req)) {
+    // Public OR own. PostgREST filter syntax for an OR across two columns.
+    q = q.or(`user_id.is.null,user_id.eq.${encodeURIComponent(userId)}`);
+  }
+
+  const { data, error } = await q;
+  if (error) {
+    logger.error({ error, userId }, 'genres list failed');
+    res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: error.message } });
+    return;
+  }
+
+  const rows = (data ?? []) as Array<{
+    id: string; user_id: string | null; genre_slug: string; genre_name: string;
+    description: string | null;
+    rss_feed_urls: string[] | null; source_urls: string[] | null; subreddit_names: string[] | null;
+    active: boolean;
+  }>;
+
+  const genres = rows.map((r) => {
+    const rss = r.rss_feed_urls?.length ?? 0;
+    const sources = r.source_urls?.length ?? 0;
+    const subs = r.subreddit_names?.length ?? 0;
+    return {
+      id: r.id,
+      genre_slug: r.genre_slug,
+      genre_name: r.genre_name,
+      description: r.description,
+      visibility: r.user_id === null ? 'public' : 'private',
+      feed_counts: { rss, sources, subreddits: subs, total: rss + sources + subs },
+    };
+  });
+
+  res.json({ success: true, genres });
+});
+
+// ----------------------------------------------------------------------
 // GET /api/genres/:slug/urls
 // ----------------------------------------------------------------------
 genresRouter.get('/:slug/urls', requireAuth, async (req: Request, res: Response) => {
