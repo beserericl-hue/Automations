@@ -29,6 +29,15 @@ interface SaveResponse { success: boolean; edition: NewsletterEdition }
 interface SubscribersResponse { success: boolean; subscribers: NewsletterSubscriber[] }
 interface LogoResponse { success: boolean; stamp_url: string; storage_path: string }
 
+interface GenreSummary {
+  genre_slug: string;
+  genre_name: string;
+  description: string | null;
+  visibility: 'public' | 'private';
+  feed_counts: { rss: number; sources: number; subreddits: number; total: number };
+}
+interface GenresResponse { success: boolean; genres: GenreSummary[] }
+
 const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
 const CADENCE_OPTIONS: Array<{ value: NonNullable<NewsletterEdition['cadence']>; label: string }> = [
   { value: 'none',     label: 'None — only when I click Generate' },
@@ -84,6 +93,14 @@ export default function EditionEditor() {
     staleTime: 30_000,
     enabled: isEdit,
   });
+
+  // Genre dropdown options. Public + own private genres, with feed counts.
+  const genresQuery = useQuery({
+    queryKey: ['newsletter-genres'],
+    queryFn: () => apiFetch<GenresResponse>('/api/genres'),
+    staleTime: 60_000,
+  });
+  const genres = genresQuery.data?.genres ?? [];
 
   const existing = useMemo(
     () => (isEdit ? editionsQuery.data?.editions.find((e) => e.id === routeId) ?? null : null),
@@ -244,8 +261,38 @@ export default function EditionEditor() {
             <input type="text" value={form.subheader} onChange={(ev) => set('subheader', ev.target.value)} className={inputCls} maxLength={200} required />
           </Field>
 
-          <Field label="Genre *" hint="Free-form category. Editorial signal for AI tone.">
-            <input type="text" value={form.genre} onChange={(ev) => set('genre', ev.target.value)} className={inputCls} maxLength={60} required />
+          <Field
+            label="Genre *"
+            hint={
+              genresQuery.isLoading
+                ? 'Loading genres…'
+                : 'Pick from your configured genres. The genre\'s curated feeds can be auto-imported in the next step.'
+            }
+          >
+            <select
+              value={form.genre}
+              onChange={(ev) => set('genre', ev.target.value)}
+              className={inputCls}
+              required
+              disabled={genresQuery.isLoading}
+            >
+              <option value="" disabled>— Select a genre —</option>
+              {genres.map((g) => (
+                <option key={g.genre_slug} value={g.genre_slug}>
+                  {g.genre_name} ({g.genre_slug})
+                  {g.feed_counts.total > 0
+                    ? ` — ${g.feed_counts.total} feed${g.feed_counts.total === 1 ? '' : 's'}`
+                    : ''}
+                  {g.visibility === 'private' ? ' · private' : ''}
+                </option>
+              ))}
+              {/* Existing edition could have a stale genre value not in the
+                  active list (deleted / inactive). Surface it as a fallback
+                  option so the form doesn't visibly drop the value. */}
+              {form.genre && !genres.some((g) => g.genre_slug === form.genre) && (
+                <option value={form.genre}>{form.genre} (legacy)</option>
+              )}
+            </select>
           </Field>
 
           <Field label="Description" hint="Optional. What this newsletter is about; not shown to subscribers.">
