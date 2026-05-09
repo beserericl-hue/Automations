@@ -1736,3 +1736,228 @@ The current backfill script targets the DEV webhook. To run against PROD, either
 The drift scanner (S12-12) had been flagging Pastor Williams, Mrs. Chen, Maria Santos, Agent Martinez/Rodriguez/Thompson, Mr. Peterson, etc. as "unknown characters" on every scan because they never landed in `story_bible_v2`. With this fix, they flow into the bible automatically and the next drift scan recognizes them as canon. **The two systems now feed each other** — exactly the architecture we wanted but didn't have.
 
 ---
+
+---
+
+## 2026-05-01 — Newsletter sprint cluster + Genre dropdown + PROD story-bible backfill
+
+This entry captures one long working session that produced **6 merged PRs**, applied **2 DEV migrations**, deployed **2 new n8n workflows**, modified the existing **Content - Newsletter Agent V2 workflow**, and **backfilled story bible entries on PROD** for The Invisible Wall. Read this if you're picking up the newsletter feature or the PROD bible backfill in a new session.
+
+### Repo state at end of session
+
+- **Current branch (this worktree):** `develop` (synced with origin)
+- **Latest commit on develop:** `3945761 EditionEditor Genre is a dropdown + setup wizard imports feeds from genre (#75)`
+- **Latest commit on main:** `d55baaf` (no main updates this session — newsletter work all went develop-only per the workflow-governance contract; promotion to main is a release-time operation)
+- **Untracked files in working tree (intentional, all leftover from prior unrelated sessions):**
+  - `author_agent_script_only.md`, `loom_script_author_agent.md`, `talkroute_hubspot_zapier_integration_plan.md` (drafts/notes)
+  - `scripts/__pycache__/` (transient python cache; safe to delete)
+  - `scripts/hotfix-backfill-story-bible-prod.py` (NEW this session — see backfill section)
+  - `writers-workbench/Course Worx Media Design System.zip` (design assets handoff)
+  - `writers-workbench/client/.vite/` (build cache; safe to delete)
+  - `writers-workbench/docs/newsletter-test.md` (NEW — committed via #69? no, still untracked; should be committed)
+  - `writers-workbench/handoff/`, `writers-workbench/workflows/` (handoff dirs)
+- **Open PRs:** only #68 (Issue #63 — wire n8n send-time render through /api/newsletter/render-html). Its work was landed via PR #69; #68 should be closed manually.
+
+### PRs merged this session (in order)
+
+| # | Title | Sha on develop | What it shipped |
+|---|---|---|---|
+| 69 | Multi-User Newsletters Sprint — editions CRUD + DB-driven feeds + template import + send detail | (squashed) | Migration 016 (`newsletter_feed_sources_v2` + `newsletter_ingestion_runs_v2`); editions CRUD routes; n8n cron `JAQ8rmCaDoddqt2k` (DEV - Newsletter Ingestion Multi-User Cron); seed of 17 baseline feeds; EditionsList/EditionEditor/FeedsList/NewsletterDetail; Import HTML + linter; user guide. |
+| 70 | Newsletter Flow Fixes Sprint | `8280122` | Migration 017 (logo storage bucket + stamp_url/signature_name/signature_role/cadence/cadence_send_time on editions; subscribers table); logo upload UI; Real IngestionBrowser + ScheduledSends; EditionSetupWizard onboarding; HelpButton on every screen. |
+| 72 | IngestionBrowser library view + days sidebar + Scanned column | `e683303` | Default to most-recent-with-data; `GET /api/ingestion/mine/days`; Scanned column; Manage feeds shortcut. |
+| 73 | Template preview merges edition overrides | `d8ed656` | `/api/newsletter/templates/:id/preview` now reads the edition row + merges stamp_url + signoff into the Handlebars data so the editor preview shows the uploaded logo. |
+| 74 | Fan-out + cadence + bounce + CSV | `273878c` | Subscriber fan-out (replaced hardcoded `eric@agileadtesting.com`); new n8n workflow `7l1z4uMS9kdkYIT4` (DEV - Newsletter Cadence Cron, **active**, hourly); re-enable disabled newsletters; Postal bounce auto-flips subscriber.status; CSV import with idempotent upsert + counts; cleaned all "Phase 2b" stale strings. |
+| 75 | EditionEditor Genre is a dropdown + setup wizard imports feeds from genre | `3945761` | `GET /api/genres` (active genres + feed counts); Genre `<input>` → `<select>`; `POST /editions/:id/feeds/import-from-genre` (idempotent); SetupWizard step 1 button reads "Copy N feeds from <genre>" instead of hardcoded 6. |
+
+### Migrations applied
+
+- **Migration 016** (`newsletter_feed_sources.sql`) — applied to DEV Supabase only. Tables: `newsletter_feed_sources_v2`, `newsletter_ingestion_runs_v2`. RLS scoped to owner; service-role bypass for cron.
+- **Migration 017** (`newsletter_logos_subscribers_signoff.sql`) — applied to DEV only. Adds 5 columns to `newsletter_editions_v2`; new `newsletter_subscribers_v2` table; new `newsletter-logos` storage bucket (public-read, authenticated-write).
+- **PROD Supabase has neither yet.** Promotion at release time via `scripts/promote-dev-to-prod.py`.
+
+### n8n workflow changes
+
+| Workflow | ID | State after session |
+|---|---|---|
+| `DEV - Newsletter Ingestion (Multi-User Cron)` | `JAQ8rmCaDoddqt2k` | NEW — created via REST API + activated. Hourly (every 30 min) schedule. 13 nodes. Replaces the legacy 17-trigger hardcoded `AI News Data Ingestion V2`. |
+| `DEV - Newsletter Cadence Cron` | `7l1z4uMS9kdkYIT4` | NEW — created + activated. Hourly schedule trigger → /api/newsletter/cron/editions/due → SplitInBatches → POST /webhook/compose-newsletter-dev. 5 nodes. |
+| `Content - Newsletter Agent V2` | `bMvMKyK8obwYZmNb` | Modified — added 2 nodes (`fetch_subscribers`, `send_to_subscribers`) after `save_scheduled_newsletter`. Total 100 → 102 nodes. **Operator step pending — see below.** |
+| `AI News Data Ingestion V2` (legacy) | `2T3TwGHhdGQlTpQ5` | Still **active**. n8n REST `/deactivate` returned 403 (see `feedback_n8n_deactivate_403.md`). Will keep running until disabled in the UI. Harmless because the new cron's `search_existing` step dedupes against `content_ingestion_v2`. |
+| `PROD - Worker - Write Chapter` | `VxO2eG6uvImqaPA2` | **Already had** the 4 `extract_bible_*` hotfix nodes (PR #71 from previous session). Confirmed via REST API. Active. 36 nodes. |
+| `DEV - Worker - Write Chapter` | `fsKRGkzphWT62rja` | Same — 4 extract_bible nodes. Active. 36 nodes. |
+
+### **Outstanding operator step** — Publish in n8n UI
+
+The PUT to `Content - Newsletter Agent V2` (id `bMvMKyK8obwYZmNb`) added the `fetch_subscribers` + `send_to_subscribers` nodes, but n8n 2.x runtime activeVersion needs a UI Publish click before it picks up the new nodes (see `feedback_n8n_2x_publish_flow.md`). Until then, the next newsletter generation will still hit the OLD path (which writes to `newsletter_sends_v2` but doesn't fan out to subscribers).
+
+**Steps for next operator:**
+1. Open https://n8n.agileadautomation.com/workflow/bMvMKyK8obwYZmNb
+2. Refresh the workflow tab (Cmd-R)
+3. Top-right Published dropdown → click Publish (⌘P)
+4. Trigger a generation via /newsletter/generate; verify the actual send arrives in `eric@agileadtesting.com` inbox.
+
+### PROD story-bible backfill — DONE this session
+
+User reported The Invisible Wall on PROD had no Story Bible entries even though the hotfix shipped. Investigation:
+
+- The n8n PROD - Worker - Write Chapter workflow DID have all 4 `extract_bible_*` nodes (hotfix runtime fix is in place since Apr 29).
+- But the hotfix only fires on chapters written *after* the deploy. Existing chapters (written Apr 13–18) had empty bibles.
+- Existing `scripts/hotfix-backfill-story-bible.py` is hardcoded for DEV (DEV_SUPABASE_URL, DEV-only credential recovery, DEV workflow name).
+
+Wrote a new script: **`scripts/hotfix-backfill-story-bible-prod.py`** (untracked; not committed yet — should be) that's a self-contained PROD backfill: reads PROD Supabase via service-role REST, calls Anthropic API directly (Claude Sonnet 4.5, temp=0.2, max_tokens=4096) using the same prompt the n8n extract_bible_prepare node builds, parses + inserts into `story_bible_v2` on PROD. URL-encodes user_id (PostgREST treats `+` as space — gotcha). Idempotent dedupe via (entry_type, lower(name)) check.
+
+Run result on PROD for The Invisible Wall (project_id `366ca0a0-18e8-45a5-83da-a6b3d23d760b`, user `+14105914612`):
+
+```
+Before: 0 entries
+After: 43 entries
+Per chapter: ch1: 4, ch2: 6, ch3: 8, ch4: 5, ch5: 9, ch6: 2, ch7: 9
+By type: character 16, event 12, item 11, location 4
+```
+
+DEV had 37; PROD got 43. Same prompt, slight stochasticity. **Confirmed in the UI**: refresh the production Story Bible tab and the 43 rows appear.
+
+To backfill any other PROD project later:
+
+```bash
+cd /Users/ericbeser/Documents/GitHub/Automations
+# .env vars are auto-read from writers-workbench/.env
+python3 scripts/hotfix-backfill-story-bible-prod.py \
+  --project-id <uuid> --user-id "+1XXXXXXXXXX" \
+  [--dry-run]   # parse + show counts without inserting
+  [--only-chapter N]  # backfill a single chapter
+```
+
+The script aborts if `SUPABASE_URL` doesn't start with the PROD prefix `https://faklxfakgzkpkbxfihzh` — defensive check so it can never accidentally hit DEV.
+
+### Newsletter test plan
+
+`writers-workbench/docs/newsletter-test.md` (untracked) is a **114-test end-to-end manual QA plan** covering everything the cluster shipped. PDF version at `writers-workbench/docs/newsletter-test.pdf` (32 pages, letter-size, weasyprint output). User has run through it; **T-01.4 was reported failing due to browser cache — confirmed by inspecting the deployed `EditionsList-Bopw34eF.js` chunk which contains all the new strings ("Show disabled", "Re-enable", etc.). User needs to hard-refresh.**
+
+### Production user manual
+
+Regenerated `writers-workbench/docs/PRODUCTION_WEB_UI_USER_MANUAL.pdf` — **56 pages, 6.6 MB**, screenshots embedded. Uses absolute file:// URLs to resolve the `screenshots/` dir (relative refs broke when pandoc emitted HTML to /tmp/). The MD itself is from 2026-04-29 14:08 (covers projects/library/Eve/etc.) but does **not have a dedicated Newsletter chapter** for the work in this cluster. If the user wants the production manual to cover newsletters end-to-end, append the contents of `newsletter-user-guide.md` as a new chapter and re-run the pandoc → weasyprint pipeline (commands in the docs/ dir's bash history).
+
+### Memory updates this session
+
+Added two entries (already saved to `~/.claude/projects/.../memory/`):
+
+- `feedback_n8n_2x_publish_flow.md` — refresh-then-Publish flow needed after REST PUTs to existing workflows.
+- `feedback_n8n_deactivate_403.md` — n8n public API rejects `/deactivate` on already-active workflows; needs UI toggle.
+- `project_multi_user_newsletters_sprint.md` — pointer to the merged PR #69.
+
+### What I'd pick up first in a new session
+
+1. **Close PR #68** manually — it's stale (its work landed via PR #69 + #70).
+2. **Commit the untracked artifacts** if they should be tracked:
+   - `scripts/hotfix-backfill-story-bible-prod.py` — definitely commit; it's a real operator tool.
+   - `writers-workbench/docs/newsletter-test.md` + `newsletter-test.pdf` — commit if you want the test plan in source control.
+   - `writers-workbench/docs/newsletter-ingestion-feeds-baseline.md` — commit (already discussed in PR #69 thread).
+   - The big-zip and the misc *.md drafts at repo root — leave alone or .gitignore.
+3. **Have the user click Publish** in n8n on `Content - Newsletter Agent V2` so the subscriber fan-out goes live. Until then, the cron pipeline writes the rendered email to `newsletter_sends_v2` but no actual email goes out to subscribers.
+4. **Verify a real generation end-to-end.** With #2 done, trigger /newsletter/generate, walk the approval flow, and confirm `eric@agileadtesting.com` receives the rendered email with the uploaded logo + custom signoff.
+5. **Apply migrations 016 + 017 to PROD** when the customer is ready. They're additive; CI passes.
+
+### Audit items still outstanding (from the post-PR-74 review)
+
+These were explicitly NOT in the PR cluster — flag for next sprint planning:
+
+1. **Recurring schedule UI is decorative** — `cadence` + `cadence_send_time` columns exist + UI sets them, but the cadence cron only checks day-interval expiration, not time-of-day or day-of-week. Phase 2 of the cron should parse `cadence_send_time` (e.g. "09:00 fri") for proper scheduling.
+2. **Subscribers count not enforced anywhere** — no UI shows total subscribers per edition on the EditionsList page. (Easy add: column + count.)
+3. **Bounce → subscriber flip is reactive only**. No retroactive cleanup over historical `email_bounces_v2` rows. (Discussed as separate ~5-line script.)
+4. **Approvals UX gaps** still open: in-place story editing, A/B subject picker, expiry banner. Multi-day, lowest urgency.
+5. **Pending-approvals badge in sidebar** is wired-but-empty — populate the count from `/api/newsletter/approvals/open?count_only=1`.
+6. **No dashboard for cron health** — need a UI on `newsletter_ingestion_runs_v2` so users can see "next fire" / per-feed run history without psql.
+7. **Story-source chips on Approval payload** now deep-link into IngestionBrowser via `?date=YYYY-MM-DD` (PR #74 change). Test it once you've triggered a real run.
+
+---
+
+## 2026-04-29 (continued) — Sprint state audit + sprint doc full accuracy pass + Sprints 14/16/17/18 rearchitected
+
+This session continued past the story-bible hotfix into a sprint-state audit + sprint doc rewrite. Three things were wrong before this pass:
+1. The v2 sprint doc Total table was lagging reality by ~3 sprints.
+2. Sprint 14 had assumed Cloudflare R2 migration without justification.
+3. Sprints 16/17/18 had assumed a single-rewrite architecture incompatible with the actual constraint (no n8n Enterprise queue mode).
+
+### Sprint state — verified vs gh pr list + git log on 2026-04-29
+
+The status column in `sprint_document_v2.md` Total table was stale. Corrections (commit `d80d6ac`):
+
+| Sprint | Was | Now (verified) |
+|---|---|---|
+| 8 (RBAC + tiers + credits + impersonation) | "planned (carried)" | ✅ **SHIPPED v1.1** via PR #50 + admin follow-ups #51/53/54/55/57 |
+| 10.a | "in progress" | ✅ **SHIPPED v1.1** via PRs #5/6/7/8/9 |
+| 10.b | "planned" | ✅ **SHIPPED v1.1** — all 5 stories merged (#10, #11, #13, #15, #20) |
+| 11 (Postal migration) | "planned" | 🟡 **DEV-COMPLETE** — verified live n8n inventory: 14/14 DEV email workflows on Postal, 0 on Gmail. PROD still on Gmail by design (release-day promotion). |
+| 12 | "in progress" | 🟡 **DEV-COMPLETE** — Tracks B + C shipped (PRs #31–#40, #71); Track A moved to Sprints 16–18 |
+
+A new "Source of truth" preamble on the Total table directs future readers to `gh pr list --state all` when this doc disagrees. The lesson, restated three times in-session: **do not anchor sprint-state answers on this doc alone.**
+
+A "Side sprints not in this v2 doc" section was added capturing the Newsletter Agent Migration, Compose Newsletter 2a (S1–S10 via PRs #41–#67), Newsletter Templates (T1–T4 via #60/#61/#62/#73), Multi-User Newsletters (#69), Newsletter Flow Fixes (#70), Newsletter fan-out + cadence + bounces + CSV import (#74), IngestionBrowser improvements (#72), and the Onboarding tour (#51) — all real shipped work that lives outside the v2 sprint queue.
+
+**Total remaining: 436 pts → 241 pts** (+34 conditional on Sprint 14 storage migration if Option B/C).
+
+### Sprint 14 rescoped — storage decision not assumed migration
+
+User pushback 2026-04-29: *"why are we using R2 storage? We can use storage on Supabase or R2 storage on Railway."* Sprint 14 was renamed to "Storage strategy review (NOT necessarily R2)" with new pre-requisite story:
+
+**S14-0 Storage strategy decision (3 pts) | P0 | NEW** — produces a written decision document picking among:
+- **Option A — Stay on Supabase Storage.** Already working. Bundled into Supabase plan. (Note: Supabase Storage is built on R2 anyway, so we're already paying R2 indirectly.)
+- **Option B — Railway native object storage.** Same vendor as compute. New, less battle-tested.
+- **Option C — Cloudflare R2 directly.** Cheapest at scale. Third vendor. Migration cost.
+
+Stories S14-1..5 only execute **IF** S14-0 picks Option B or C. Sprint 14 is now 3 firm pts + 34 conditional.
+
+### Sprints 16/17/18 rearchitected — multi-instance load balancing (NOT n8n Enterprise queue)
+
+User-mandated constraint captured 2026-04-29 verbatim:
+
+> "We are NOT using worker n8n instances (Enterprise v). We have to create multiple write chapter workflows and load balance them to get better performance. We have to make sure we don't max out tokens to get errors on Claude LLMs. This is why we had the timer for the subchapter."
+
+Concrete sprint-doc impact (commit `d80d6ac`):
+
+**Sprint 16** (21→26 pts). Added **S16-0**: stand up `DEV - Worker - Write Chapter (TEST)` — a clone of the live worker, separate workflow ID, never receives real user traffic. The harness in S16-1..4 reads from BOTH the live worker (for baseline) and the TEST worker (for experiments). Workflow id will be recorded in `scripts/workflow-id-map.json` under a new `test_workflows` key.
+
+**Sprint 17** (26→29 pts). S17-3 reshaped from "n8n native vs BullMQ vs hybrid" into the actual problem: **N parallel workflow instances + Workbench `ChapterDispatcher` + Redis-backed `AnthropicTokenBudget` gatekeeper**. The gatekeeper takes over the 120s `rate_limit_delay` Wait node's job by:
+
+1. Reserving estimated output tokens (~5000 tokens × N_sub_chapters per chapter) from a per-minute sliding window before dispatch
+2. Holding/queueing requests when budget is exhausted, retrying on next refill
+3. Selecting an idle worker from N parallel instances (round-robin least-busy)
+
+The Wait node disappears from the per-instance worker because the rate gate now lives in Workbench. The architecture diagram is in the sprint doc — keep it in sync if the design changes.
+
+**Sprint 18** (still 34 pts). Promotes the Sprint 17 prototype to DEV-quality (full tests, observability, error handling), deploys N production instances behind the dispatcher, runs shadow-mode for a week, then 10%/50%/100% traffic shift, then archives the legacy single-instance worker. **Zero-429 enforcement gates each rollout step** — if Anthropic returns a 429 during shadow mode, the rollout pauses for investigation.
+
+### Sequencing diagram updated
+
+Old diagram showed the full chain starting from 10.a. New diagram shows what's actually shipped (10/10.a/10.b/8/11/12) and the remaining queue starting at Sprint 9.
+
+```
+Shipped:  10  ✓
+          10.a ✓ (released v1.1)
+          10.b ✓ (released v1.1)
+          8    ✓ (released v1.1)
+          11   ✓ DEV-complete (PROD on next release)
+          12   ✓ DEV-complete (Track A moved to 16/17/18)
+
+Next (ordered): 9 → 13 → 14 → 15 → 16 → 17 → 18
+```
+
+### Recommended next sprint
+
+**Sprint 9 (Stripe billing, 47 pts).** Sprint 8 already shipped RBAC + tiers + credits + impersonation; Sprint 9 wires real Stripe payment flows on top. Highest-leverage remaining product work.
+
+### Process note for next session
+
+The lesson that took three sprint-state mistakes this session to learn:
+
+> When asked "what's next?", "is X done?", "what's open?" — **do NOT anchor on `sprint_document_v2.md` alone**. Always cross-reference:
+> - `gh pr list --state all --limit 200`
+> - `git log --all --oneline | grep -iE 'sprint X|SX-'`
+>
+> The doc is a planning artifact. PRs + commits are reality. When they disagree, reality wins and the doc gets updated.
+
+This rule is now baked into the Total-table preamble in `sprint_document_v2.md`.
+
+---
+
