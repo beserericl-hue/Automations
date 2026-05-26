@@ -48,7 +48,7 @@ export default defineConfig({
     // Authenticated tests — depend on setup, reuse saved auth state
     {
       name: 'chromium',
-      testMatch: /authenticated\.spec\.ts|sprint3-crud\.spec\.ts|sprint5-observability\.spec\.ts|sprint7-critical-paths\.spec\.ts|qa-button-verify\.spec\.ts|image-debug\.spec\.ts|chapter-outline-version\.spec\.ts|capture-manual-screenshots\.spec\.ts/,
+      testMatch: /authenticated\.spec\.ts|sprint3-crud\.spec\.ts|sprint5-observability\.spec\.ts|sprint7-critical-paths\.spec\.ts|qa-button-verify\.spec\.ts|image-debug\.spec\.ts|chapter-outline-version\.spec\.ts|capture-manual-screenshots\.spec\.ts|newsletter-fullflow\.spec\.ts|sprint-regression-suite\.spec\.ts/,
       dependencies: ['setup'],
       use: {
         ...devices['Desktop Chrome'],
@@ -65,11 +65,23 @@ export default defineConfig({
   ...(REMOTE_BASE_URL
     ? {}
     : {
-        webServer: {
-          command: 'npm run dev:client',
-          url: 'http://localhost:5173',
-          reuseExistingServer: !process.env.CI,
-          timeout: 30_000,
-        },
+        // Two-process startup: Vite on 5173 (served to the browser) AND the
+        // Express server on 3001 (Vite proxies /api/* to it). Without Express
+        // running, anything that hits /api/health / /api/credits returns 404
+        // from Vite's catch-all and the authenticated suite breaks.
+        webServer: [
+          {
+            command: 'npm run dev:client',
+            url: 'http://localhost:5173',
+            reuseExistingServer: !process.env.CI,
+            timeout: 30_000,
+          },
+          {
+            command: 'npm run dev:server',
+            url: 'http://localhost:3001/api/health',
+            reuseExistingServer: !process.env.CI,
+            timeout: 60_000,
+          },
+        ],
       }),
 });
