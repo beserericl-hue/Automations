@@ -29,65 +29,42 @@ export class NewsletterPage {
 
   // --- Navigation helpers (route directly; sidebar nav is regression-tested separately) ---
 
-  async gotoHome() {
-    await this.page.goto('/newsletter');
-    await this.page.waitForLoadState('networkidle');
+  /**
+   * Navigate to a route and wait for the page to be "ready":
+   *   1. domcontentloaded (the app keeps SSE streams open so `networkidle` never resolves)
+   *   2. Header element visible (signals React layout has rendered)
+   *   3. <main> has at least some text content (signals route-level component has rendered past "Loading…")
+   *
+   * Without step 3, tests that assert immediately on content after navigation
+   * race the React render and produce flaky "element not visible" failures.
+   */
+  private async gotoAndSettle(path: string) {
+    await this.page.goto(path);
+    await this.page.waitForLoadState('domcontentloaded');
+    // Header is rendered by AppShell once auth + user resolve.
+    await this.page.locator('header, aside').first().waitFor({ state: 'visible', timeout: 15_000 });
+    // Wait until <main> has rendered something beyond the boilerplate "Loading…".
+    await expect.poll(
+      async () => {
+        const text = (await this.page.locator('main').textContent().catch(() => null)) ?? '';
+        return text.trim().length > 0 && !/^\s*Loading\.{0,3}\s*$/i.test(text.trim());
+      },
+      { timeout: 10_000 },
+    ).toBeTruthy();
   }
 
-  async gotoEditions() {
-    await this.page.goto('/newsletter/editions');
-    await this.page.waitForLoadState('networkidle');
-  }
-
-  async gotoNewEdition() {
-    await this.page.goto('/newsletter/editions/new');
-    await this.page.waitForLoadState('networkidle');
-  }
-
-  async gotoEdition(id: string) {
-    await this.page.goto(`/newsletter/editions/${id}`);
-    await this.page.waitForLoadState('networkidle');
-  }
-
-  async gotoFeeds(editionId: string) {
-    await this.page.goto(`/newsletter/editions/${editionId}/feeds`);
-    await this.page.waitForLoadState('networkidle');
-  }
-
-  async gotoSetupWizard(editionId: string) {
-    await this.page.goto(`/newsletter/editions/${editionId}/setup`);
-    await this.page.waitForLoadState('networkidle');
-  }
-
-  async gotoGenerate() {
-    await this.page.goto('/newsletter/generate');
-    await this.page.waitForLoadState('networkidle');
-  }
-
-  async gotoApprovals() {
-    await this.page.goto('/newsletter/approvals');
-    await this.page.waitForLoadState('networkidle');
-  }
-
-  async gotoSends() {
-    await this.page.goto('/newsletter/sends');
-    await this.page.waitForLoadState('networkidle');
-  }
-
-  async gotoIngestion() {
-    await this.page.goto('/newsletter/ingestion');
-    await this.page.waitForLoadState('networkidle');
-  }
-
-  async gotoTemplates() {
-    await this.page.goto('/newsletter/templates');
-    await this.page.waitForLoadState('networkidle');
-  }
-
-  async gotoNewTemplate() {
-    await this.page.goto('/newsletter/templates/new');
-    await this.page.waitForLoadState('networkidle');
-  }
+  async gotoHome() { await this.gotoAndSettle('/newsletter'); }
+  async gotoEditions() { await this.gotoAndSettle('/newsletter/editions'); }
+  async gotoNewEdition() { await this.gotoAndSettle('/newsletter/editions/new'); }
+  async gotoEdition(id: string) { await this.gotoAndSettle(`/newsletter/editions/${id}`); }
+  async gotoFeeds(editionId: string) { await this.gotoAndSettle(`/newsletter/editions/${editionId}/feeds`); }
+  async gotoSetupWizard(editionId: string) { await this.gotoAndSettle(`/newsletter/editions/${editionId}/setup`); }
+  async gotoGenerate() { await this.gotoAndSettle('/newsletter/generate'); }
+  async gotoApprovals() { await this.gotoAndSettle('/newsletter/approvals'); }
+  async gotoSends() { await this.gotoAndSettle('/newsletter/sends'); }
+  async gotoIngestion() { await this.gotoAndSettle('/newsletter/ingestion'); }
+  async gotoTemplates() { await this.gotoAndSettle('/newsletter/templates'); }
+  async gotoNewTemplate() { await this.gotoAndSettle('/newsletter/templates/new'); }
 
   // --- Sidebar Newsletter nav ---
 
@@ -108,15 +85,15 @@ export class NewsletterPage {
 
   /** Header `?` HelpButton that opens the feature drawer. */
   get helpButton(): Locator {
-    // HelpButton renders an icon-only button with aria-label "Help".
-    return this.page.getByRole('button', { name: /help/i }).first();
+    // HelpButton has visible text "?" and `title="Help: <section title>"`.
+    // No aria-label → match by title attribute prefix.
+    return this.page.locator('button[title^="Help:"]').first();
   }
 
   get helpDrawer(): Locator {
-    // Right-side drawer renders as an aside or div with role="dialog".
-    return this.page.locator('[role="dialog"], aside[aria-modal="true"]').filter({
-      has: this.page.getByRole('button', { name: /close/i }),
-    });
+    // Drawer is the div with role="dialog" aria-modal="true" that wraps the
+    // backdrop button (aria-label="Close help") AND the inner panel.
+    return this.page.locator('[role="dialog"][aria-modal="true"]').first();
   }
 
   /** "New newsletter" button on EditionsList header. */

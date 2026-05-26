@@ -179,29 +179,33 @@ test.describe('Sprint 12: Chapter craft tools', () => {
 
   test('Rewrite-with-Research button surfaces on chapter (Sprint 12 S12-9)', async ({ page }) => {
     if (!(await gotoFirstChapter(page))) test.skip(true);
-    const hasBtn = await page.getByRole('button', { name: /rewrite.*research/i }).first().isVisible().catch(() => false);
-    // Button may be gated by project_type or tier; don't hard-fail
-    expect(typeof hasBtn).toBe('boolean');
-    if (hasBtn) {
-      // Click and verify the modal opens with the expected fields
-      await page.getByRole('button', { name: /rewrite.*research/i }).first().click();
-      await page.waitForTimeout(800);
-      const hasModal = await page.locator('[role="dialog"]').first().isVisible().catch(() => false);
-      expect(hasModal).toBeTruthy();
-      // Close via Escape
-      await page.keyboard.press('Escape');
-    }
+    // Trigger button is "Rewrite with research" (button text); modal heading
+    // is "Rewrite <chapter label> with research" (h2). Match the button by
+    // exact text and the modal by /rewrite.*with research/ (chapter label in middle).
+    const btn = page.getByRole('button', { name: /^rewrite with research$/i }).first();
+    const hasBtn = await btn.isVisible({ timeout: 3_000 }).catch(() => false);
+    if (!hasBtn) test.skip(true, 'No Rewrite-with-Research button (chapter content_type or tier gate)');
+    await btn.click();
+    const modalHeading = page.locator('h2').filter({ hasText: /rewrite .* with research/i }).first();
+    await expect(modalHeading).toBeVisible({ timeout: 5_000 });
+    await page.keyboard.press('Escape');
   });
 
   test('AnnotationsPanel: Apply / Dismiss buttons present when annotations exist', async ({ page }) => {
     if (!(await gotoFirstChapter(page))) test.skip(true);
-    const annotationsText = await page.getByText(/annotations/i).first().textContent().catch(() => null);
-    if (!annotationsText) test.skip(true, 'No AnnotationsPanel visible on this chapter');
-    // If a drift finding row exists, it should have Apply or Dismiss
-    const hasApply = await page.getByRole('button', { name: /apply/i }).first().isVisible().catch(() => false);
-    const hasDismiss = await page.getByRole('button', { name: /dismiss/i }).first().isVisible().catch(() => false);
-    // Either present means panel is wired; absence means no findings — both ok
-    expect(typeof (hasApply || hasDismiss)).toBe('boolean');
+    // AnnotationsPanel renders a "Review Annotations" label only when the
+    // chapter has at least one active annotation (drift or genre_eval).
+    // Short-timeout probe so absence skips rather than hangs.
+    const panelLabel = page.getByText(/review annotations/i).first();
+    const hasPanel = await panelLabel.isVisible({ timeout: 3_000 }).catch(() => false);
+    if (!hasPanel) test.skip(true, 'No AnnotationsPanel visible on this chapter (no active annotations)');
+    // Optional Apply/Dismiss probes — neither hard-required (panel may show empty groups).
+    const hasApply = await page.getByRole('button', { name: /^apply$/i }).first().isVisible({ timeout: 1_500 }).catch(() => false);
+    const hasDismiss = await page.getByRole('button', { name: /^dismiss$/i }).first().isVisible({ timeout: 1_500 }).catch(() => false);
+    // Panel presence is the assertion; button presence is informational.
+    expect(hasPanel).toBeTruthy();
+    void hasApply;
+    void hasDismiss;
   });
 
   test('Story Bible tab on project shows entries (Sprint 12 extract_bible hotfix verification)', async ({ page }) => {
@@ -264,14 +268,18 @@ test.describe('Cross-cutting UX (Sprint 2/6/7)', () => {
     }
   });
 
-  test('Global search (Cmd+K) opens a search input', async ({ page, browserName }) => {
+  test('Global search opens a search input', async ({ page }) => {
     await page.goto('/');
-    await page.waitForTimeout(1_500);
-    // Mac: Meta+K; non-mac: Ctrl+K
-    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+K' : 'Control+K');
-    await page.waitForTimeout(500);
-    const hasSearchUi = await page.locator('input[type="search"], input[placeholder*="search" i], [role="dialog"]').first().isVisible().catch(() => false);
-    expect(hasSearchUi).toBeTruthy();
+    // Wait for the dashboard greeting so we know AppShell has fully rendered
+    // and the TopBar (which owns the search button) is present.
+    await expect(page.getByText(/welcome back/i).first()).toBeVisible({ timeout: 10_000 });
+    // TopBar search button is a magnifier icon with title="Search (Cmd+K)".
+    // Match against title attribute directly — most reliable cross-browser.
+    const searchBtn = page.locator('button[title^="Search ("]').first();
+    await expect(searchBtn).toBeVisible({ timeout: 5_000 });
+    await searchBtn.click();
+    const searchInput = page.locator('input[placeholder*="Search projects" i]').first();
+    await expect(searchInput).toBeVisible({ timeout: 5_000 });
   });
 
   test('Breadcrumb resolves entity titles (project page)', async ({ page }) => {

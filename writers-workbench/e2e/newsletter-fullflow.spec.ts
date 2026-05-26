@@ -64,9 +64,12 @@ test.describe(SECTION(0, 'Pre-flight'), () => {
     expect(response.ok()).toBeTruthy();
     const body = await response.json();
     expect(body.status).toBe('ok');
-    expect(body.checks?.supabase).toBe('ok');
-    expect(body.checks?.redis).toBe('ok');
-    expect(body.checks?.postal).toBe('ok');
+    // Each check is either 'ok' (deployed) or 'skipped' (local — service not configured).
+    // What we care about is "not 'error'".
+    const okOrSkipped = (v: unknown) => v === 'ok' || v === 'skipped';
+    expect(okOrSkipped(body.checks?.supabase)).toBeTruthy();
+    expect(okOrSkipped(body.checks?.redis)).toBeTruthy();
+    expect(okOrSkipped(body.checks?.postal)).toBeTruthy();
     // For deployed DEV expect 'development'; for PROD expect 'production'. Don't assert hard.
     expect(['development', 'production']).toContain(body.environment);
   });
@@ -98,7 +101,9 @@ test.describe(SECTION(1, 'My newsletters (Editions list)'), () => {
     await nl.gotoEditions();
     await nl.helpButton.click();
     await expect(nl.helpDrawer).toBeVisible();
-    await nl.helpDrawer.getByRole('button', { name: /close/i }).click();
+    // Two "close" buttons exist: backdrop (aria-label="Close help") and
+    // header (visible text "Close"). Pick the header one explicitly.
+    await nl.helpDrawer.getByRole('button', { name: 'Close', exact: true }).click();
     await expect(nl.helpDrawer).not.toBeVisible({ timeout: 5_000 });
   });
 
@@ -120,10 +125,12 @@ test.describe(SECTION(1, 'My newsletters (Editions list)'), () => {
 
   test('T-01.6 — At least one edition or empty state', async ({ page }) => {
     await nl.gotoEditions();
-    await page.waitForTimeout(1_500);
-    const hasRow = await nl.firstEditionRow.isVisible().catch(() => false);
-    const hasEmpty = await page.getByText(/no newsletters yet/i).isVisible().catch(() => false);
-    expect(hasRow || hasEmpty).toBeTruthy();
+    // Wait for data fetch by polling for either a row OR empty-state copy.
+    await expect.poll(async () => {
+      const hasRow = await nl.firstEditionRow.isVisible().catch(() => false);
+      const hasEmpty = await page.getByText(/no newsletters yet|create your first/i).first().isVisible().catch(() => false);
+      return hasRow || hasEmpty;
+    }, { timeout: 10_000 }).toBeTruthy();
   });
 });
 
@@ -265,10 +272,12 @@ test.describe(SECTION(6, 'Templates'), () => {
 
   test('T-06.3 — At least one default template visible or empty state', async ({ page }) => {
     await nl.gotoTemplates();
-    await page.waitForTimeout(1_500);
-    const hasTemplates = await page.locator('table tbody tr, [class*="template-card"]').first().isVisible().catch(() => false);
-    const hasEmpty = await page.getByText(/no templates|create.*template/i).first().isVisible().catch(() => false);
-    expect(hasTemplates || hasEmpty).toBeTruthy();
+    // Poll for content-or-empty-state so a slow first-render doesn't fail.
+    await expect.poll(async () => {
+      const hasTemplates = await page.locator('table tbody tr, [class*="template-card"]').first().isVisible().catch(() => false);
+      const hasEmpty = await page.getByText(/no templates|create.*template/i).first().isVisible().catch(() => false);
+      return hasTemplates || hasEmpty;
+    }, { timeout: 10_000 }).toBeTruthy();
   });
 
   test('T-06.4 — No console / object errors', async ({ page }) => {
@@ -281,9 +290,12 @@ test.describe(SECTION(6, 'Templates'), () => {
 test.describe(SECTION(7, 'Generate newsletter'), () => {
   test('T-07.1 — Generate page renders', async ({ page }) => {
     await nl.gotoGenerate();
-    const heading = await page.getByRole('heading', { name: /generate/i }).first().isVisible().catch(() => false);
-    const mainText = await page.locator('main').textContent();
-    expect(heading || (mainText && mainText.toLowerCase().includes('generate'))).toBeTruthy();
+    // Poll until either the heading is present or main text contains "generate".
+    await expect.poll(async () => {
+      const heading = await page.getByRole('heading', { name: /generate/i }).first().isVisible().catch(() => false);
+      const mainText = (await page.locator('main').textContent()) || '';
+      return heading || mainText.toLowerCase().includes('generate');
+    }, { timeout: 10_000 }).toBeTruthy();
   });
 
   test('T-07.2 — Edition picker present', async ({ page }) => {
@@ -321,8 +333,11 @@ test.describe(SECTION(9, 'Send flow (sends + scheduled)'), () => {
     await nl.gotoSends();
     const main = page.locator('main');
     await expect(main).toBeVisible();
-    const text = (await main.textContent())?.toLowerCase() || '';
-    expect(text.includes('send') || text.includes('scheduled') || text.includes('no')).toBeTruthy();
+    // Poll main text — content fetches asynchronously after navigation.
+    await expect.poll(async () => {
+      const text = (await main.textContent())?.toLowerCase() || '';
+      return text.includes('send') || text.includes('scheduled') || text.includes('no');
+    }, { timeout: 10_000 }).toBeTruthy();
   });
 
   test('T-09.2 — Send detail route exists (if a send exists)', async ({ page }) => {
@@ -352,8 +367,10 @@ test.describe(SECTION(10, 'Ingestion browser'), () => {
     await page.waitForTimeout(2_000);
     // Look for either a calendar / date picker / sidebar with date labels
     const hasDateUi = await page.locator('input[type="date"], [class*="date"], [class*="days"], aside').first().isVisible().catch(() => false);
-    // Don't hard fail; UI variation is possible
-    expect(hasDateUi || (await page.locator('main').textContent())?.length).toBeGreaterThan(0);
+    const mainTextLen = (await page.locator('main').textContent())?.length ?? 0;
+    // Pass if either the date UI is present OR main has rendered any content
+    // (UI variation is acceptable; we just want the page to not be blank).
+    expect(hasDateUi || mainTextLen > 0).toBeTruthy();
   });
 
   test('T-10.3 — Deep link with ?date= query param parses without error', async ({ page }) => {
