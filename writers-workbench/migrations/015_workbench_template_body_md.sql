@@ -1,4 +1,32 @@
-<!doctype html>
+-- ============================================
+-- Migration 015 — Newsletter Templates: extend Workbench template with
+-- a {{body_md}} fallback zone for the n8n send-time render path.
+--
+-- Tier: DEV first. PROD waits for release-day promotion.
+--
+-- Governance: additive — only updates the seeded template row's html
+-- column. No new tables, no schema changes. Schema-governance check
+-- still passes (no base-table mutations).
+--
+-- Why: the n8n `Content - Newsletter Agent V2` workflow produces a
+-- single markdown body (`set_full_newsletter.full_newsletter_content`)
+-- rather than structured sections. Issue #63 wires that body into a
+-- new render_html_template HTTP Request node calling
+-- /api/newsletter/render-html. For the rendered HTML to actually look
+-- like the Course Worx Workbench template (instead of the existing
+-- `<pre>markdown</pre>` fallback), the seeded template needs a
+-- generic markdown-body zone.
+--
+-- The new {{markdown_to_html body_md}} block sits between the
+-- intro paragraph and the (currently-unused-by-the-pipeline) structured
+-- sections. When the AI pipeline eventually produces structured data
+-- (lead/sponsor/pull_quote/trending), those will render below the
+-- markdown body and the body_md zone collapses on the {{#if body_md}}
+-- guard.
+-- ============================================
+
+UPDATE newsletter_templates_v2
+SET html = $tpl$<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -189,3 +217,6 @@
 
 </body>
 </html>
+$tpl$,
+    updated_at = now()
+WHERE id = '00000000-0000-4000-8000-000000000001';
