@@ -24,7 +24,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "https://writersworkbenchdev-production.up.railway.app/api/newsletter/cron/editions/due",
+        "url": "https://writersworkbench-develop.up.railway.app/api/newsletter/cron/editions/due",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {}

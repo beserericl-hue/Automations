@@ -24,7 +24,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "https://writersworkbenchdev-production.up.railway.app/api/newsletter/cron/feeds/due",
+        "url": "https://writersworkbench-develop.up.railway.app/api/newsletter/cron/feeds/due",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
@@ -276,7 +276,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "https://writersworkbenchdev-production.up.railway.app/api/ingestion/search",
+        "url": "https://writersworkbench-develop.up.railway.app/api/ingestion/search",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
@@ -344,7 +344,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://writersworkbenchdev-production.up.railway.app/api/ingestion/upload",
+        "url": "https://writersworkbench-develop.up.railway.app/api/ingestion/upload",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
@@ -380,7 +380,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ 'https://writersworkbenchdev-production.up.railway.app/api/newsletter/cron/feeds/' + $('split_per_feed').item.json.id + '/runs' }}",
+        "url": "={{ 'https://writersworkbench-develop.up.railway.app/api/newsletter/cron/feeds/' + $('split_per_feed').item.json.id + '/runs' }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
