@@ -1,0 +1,20 @@
+[project]
+name = "chapter-step"
+version = "0.1.0"
+description = "Writer Engine step service: chapter"
+requires-python = ">=3.12"
+dependencies = [
+    "writer-engine",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/chapter_step"]
+
+[tool.uv.sources]
+writer-engine = { workspace = true }

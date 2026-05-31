@@ -1,0 +1,152 @@
+# Local engine stack — redis + gateway + orchestrator + all 19 step services.
+# Each step service runs on its own port; the orchestrator's NewsletterOrchestrator + LibraryRetrieveOrchestrator
+# pick the right URL from env or fall back to the docker-compose service hostname.
+x-step-defaults: &step-defaults
+  env_file: .env
+  environment:
+    REDIS_URL: redis://redis:6379/0
+  depends_on:
+    redis:
+      condition: service_healthy
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  gateway:
+    build: { context: ., dockerfile: services/gateway/Dockerfile }
+    image: writer-engine/gateway
+    ports: ["8000:8000"]
+    env_file: .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      ORCHESTRATOR_URL: http://orchestrator:8001
+    depends_on:
+      redis: { condition: service_healthy }
+
+  orchestrator:
+    build: { context: ., dockerfile: services/orchestrator/Dockerfile }
+    image: writer-engine/orchestrator
+    ports: ["8001:8001"]
+    env_file: .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      LIBRARY_RETRIEVE_STEP_URL: http://library-retrieve-step:8002
+      GATHER_STEP_URL: http://gather-step:8010
+      PICK_STEP_URL: http://pick-step:8011
+      SUBJECT_STEP_URL: http://subject-step:8012
+      SCRAPE_STEP_URL: http://scrape-step:8013
+      SEGMENT_STEP_URL: http://segment-step:8014
+      IMAGE_STEP_URL: http://image-step:8015
+      ASSEMBLE_STEP_URL: http://assemble-step:8016
+      RENDER_STEP_URL: http://render-step:8017
+      PERSIST_STEP_URL: http://persist-step:8018
+      DELIVER_STEP_URL: http://deliver-step:8019
+    depends_on:
+      redis: { condition: service_healthy }
+
+  library-retrieve-step:
+    build: { context: ., dockerfile: services/library_retrieve_step/Dockerfile }
+    image: writer-engine/library-retrieve-step
+    ports: ["8002:8002"]
+    <<: *step-defaults
+
+  # ----- F2 newsletter step services -----
+  gather-step:
+    build: { context: ., dockerfile: services/gather_step/Dockerfile }
+    image: writer-engine/gather-step
+    ports: ["8010:8010"]
+    <<: *step-defaults
+  pick-step:
+    build: { context: ., dockerfile: services/pick_step/Dockerfile }
+    image: writer-engine/pick-step
+    ports: ["8011:8011"]
+    <<: *step-defaults
+  subject-step:
+    build: { context: ., dockerfile: services/subject_step/Dockerfile }
+    image: writer-engine/subject-step
+    ports: ["8012:8012"]
+    <<: *step-defaults
+  scrape-step:
+    build: { context: ., dockerfile: services/scrape_step/Dockerfile }
+    image: writer-engine/scrape-step
+    ports: ["8013:8013"]
+    <<: *step-defaults
+  segment-step:
+    build: { context: ., dockerfile: services/segment_step/Dockerfile }
+    image: writer-engine/segment-step
+    ports: ["8014:8014"]
+    <<: *step-defaults
+  image-step:
+    build: { context: ., dockerfile: services/image_step/Dockerfile }
+    image: writer-engine/image-step
+    ports: ["8015:8015"]
+    <<: *step-defaults
+  assemble-step:
+    build: { context: ., dockerfile: services/assemble_step/Dockerfile }
+    image: writer-engine/assemble-step
+    ports: ["8016:8016"]
+    <<: *step-defaults
+  render-step:
+    build: { context: ., dockerfile: services/render_step/Dockerfile }
+    image: writer-engine/render-step
+    ports: ["8017:8017"]
+    <<: *step-defaults
+  persist-step:
+    build: { context: ., dockerfile: services/persist_step/Dockerfile }
+    image: writer-engine/persist-step
+    ports: ["8018:8018"]
+    <<: *step-defaults
+  deliver-step:
+    build: { context: ., dockerfile: services/deliver_step/Dockerfile }
+    image: writer-engine/deliver-step
+    ports: ["8019:8019"]
+    <<: *step-defaults
+
+  # ----- F1 write-workshop step services -----
+  chapter-step:
+    build: { context: ., dockerfile: services/chapter_step/Dockerfile }
+    image: writer-engine/chapter-step
+    ports: ["8020:8020"]
+    <<: *step-defaults
+  research-step:
+    build: { context: ., dockerfile: services/research_step/Dockerfile }
+    image: writer-engine/research-step
+    ports: ["8021:8021"]
+    <<: *step-defaults
+  brainstorm-step:
+    build: { context: ., dockerfile: services/brainstorm_step/Dockerfile }
+    image: writer-engine/brainstorm-step
+    ports: ["8022:8022"]
+    <<: *step-defaults
+  media-step:
+    build: { context: ., dockerfile: services/media_step/Dockerfile }
+    image: writer-engine/media-step
+    ports: ["8023:8023"]
+    <<: *step-defaults
+  library-step:
+    build: { context: ., dockerfile: services/library_step/Dockerfile }
+    image: writer-engine/library-step
+    ports: ["8024:8024"]
+    <<: *step-defaults
+  story-bible-step:
+    build: { context: ., dockerfile: services/story_bible_step/Dockerfile }
+    image: writer-engine/story-bible-step
+    ports: ["8025:8025"]
+    <<: *step-defaults
+  approval-step:
+    build: { context: ., dockerfile: services/approval_step/Dockerfile }
+    image: writer-engine/approval-step
+    ports: ["8026:8026"]
+    <<: *step-defaults
+  notify-step:
+    build: { context: ., dockerfile: services/notify_step/Dockerfile }
+    image: writer-engine/notify-step
+    ports: ["8027:8027"]
+    <<: *step-defaults

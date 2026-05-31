@@ -340,6 +340,105 @@ newsletterRouter.get(
  *       500: { description: NOT_CONFIGURED if N8N_NEWSLETTER_WEBHOOK_URL or INGESTION_SECRET missing, or upstream n8n error }
  *       502: { description: n8n webhook returned a non-2xx response }
  */
+// NEWSLETTER_BACKEND switches the /generate upstream between the legacy n8n webhook (default) and the new
+// Python Writer Engine. The UI contract (response shape, SSE channel, approval routes) is identical so flipping
+// this env var is the cutover knob. See engine-framework + engine-framework-sprints F2-8.
+type NewsletterBackend = 'n8n' | 'python';
+function getBackend(): NewsletterBackend {
+  return (process.env.NEWSLETTER_BACKEND ?? 'n8n').toLowerCase() === 'python' ? 'python' : 'n8n';
+}
+
+interface UpstreamGenerateResult {
+  executionId: string;
+  editionId?: string;
+}
+
+async function triggerN8nWebhook(
+  body: import('zod').infer<typeof GenerateSchema>,
+): Promise<{ ok: true; data: UpstreamGenerateResult } | { ok: false; status: number; code: string; message: string }> {
+  const webhookUrl = process.env.N8N_NEWSLETTER_WEBHOOK_URL;
+  const ingestionSecret = process.env.INGESTION_SECRET;
+  if (!webhookUrl) return { ok: false, status: 500, code: 'NOT_CONFIGURED', message: 'N8N_NEWSLETTER_WEBHOOK_URL not set' };
+  if (!ingestionSecret) return { ok: false, status: 500, code: 'NOT_CONFIGURED', message: 'INGESTION_SECRET not set' };
+
+  // The keys here match the form-trigger field labels n8n preserves on the webhook side too, so
+  // set_trigger_inputs (S3) can normalize either shape into one.
+  const webhookBody = {
+    Date: body.send_date,
+    'Previous Newsletter Content': body.previous_newsletter_content ?? '',
+    'Edition Id': body.edition_id,
+  };
+
+  let upstream: Response | undefined;
+  try {
+    upstream = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Ingestion-Secret': ingestionSecret },
+      body: JSON.stringify(webhookBody),
+    }) as unknown as Response;
+  } catch (err) {
+    logger.error({ err, webhookUrl }, 'newsletter generate: n8n webhook fetch threw');
+    return { ok: false, status: 502, code: 'UPSTREAM_FETCH_FAILED', message: 'Could not reach n8n webhook' };
+  }
+  if (!upstream || !('ok' in upstream) || !upstream.ok) {
+    const status = (upstream as unknown as { status?: number })?.status ?? 0;
+    return { ok: false, status: 502, code: 'UPSTREAM_NON_2XX', message: `n8n webhook returned ${status}` };
+  }
+  let payload: { executionId?: string; editionId?: string } = {};
+  try {
+    payload = await (upstream as unknown as { json(): Promise<unknown> }).json() as typeof payload;
+  } catch {
+    return { ok: false, status: 502, code: 'UPSTREAM_BAD_BODY', message: 'n8n webhook response was not JSON' };
+  }
+  if (!payload.executionId) {
+    return { ok: false, status: 502, code: 'UPSTREAM_MISSING_EXECUTION_ID', message: 'n8n response missing executionId' };
+  }
+  return { ok: true, data: { executionId: payload.executionId, editionId: payload.editionId } };
+}
+
+async function triggerEngine(
+  body: import('zod').infer<typeof GenerateSchema>,
+  userId: string,
+): Promise<{ ok: true; data: UpstreamGenerateResult } | { ok: false; status: number; code: string; message: string }> {
+  const engineUrl = process.env.NEWSLETTER_SERVICE_URL;
+  const serviceSecret = process.env.SERVICE_SHARED_SECRET;
+  if (!engineUrl) return { ok: false, status: 500, code: 'NOT_CONFIGURED', message: 'NEWSLETTER_SERVICE_URL not set' };
+  if (!serviceSecret) return { ok: false, status: 500, code: 'NOT_CONFIGURED', message: 'SERVICE_SHARED_SECRET not set' };
+
+  const engineBody = {
+    edition_id: body.edition_id,
+    send_date: body.send_date,
+    user_id: userId,
+    previous_newsletter_content: body.previous_newsletter_content ?? '',
+    max_stories: 5,
+  };
+  let upstream: Response | undefined;
+  try {
+    upstream = await fetch(`${engineUrl.replace(/\/+$/, '')}/internal/newsletter/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Service-Secret': serviceSecret },
+      body: JSON.stringify(engineBody),
+    }) as unknown as Response;
+  } catch (err) {
+    logger.error({ err, engineUrl }, 'newsletter generate: engine fetch threw');
+    return { ok: false, status: 502, code: 'UPSTREAM_FETCH_FAILED', message: 'Could not reach Writer Engine' };
+  }
+  if (!upstream || !('ok' in upstream) || !upstream.ok) {
+    const status = (upstream as unknown as { status?: number })?.status ?? 0;
+    return { ok: false, status: 502, code: 'UPSTREAM_NON_2XX', message: `engine returned ${status}` };
+  }
+  let payload: { execution_id?: string; result?: string } = {};
+  try {
+    payload = await (upstream as unknown as { json(): Promise<unknown> }).json() as typeof payload;
+  } catch {
+    return { ok: false, status: 502, code: 'UPSTREAM_BAD_BODY', message: 'engine response was not JSON' };
+  }
+  if (!payload.execution_id) {
+    return { ok: false, status: 502, code: 'UPSTREAM_MISSING_EXECUTION_ID', message: 'engine response missing execution_id' };
+  }
+  return { ok: true, data: { executionId: payload.execution_id, editionId: body.edition_id } };
+}
+
 newsletterRouter.post(
   '/generate',
   requireAuth,
@@ -348,24 +447,7 @@ newsletterRouter.post(
     const body = req.body as import('zod').infer<typeof GenerateSchema>;
     const userId = req.userId!;
 
-    const webhookUrl = process.env.N8N_NEWSLETTER_WEBHOOK_URL;
-    const ingestionSecret = process.env.INGESTION_SECRET;
-    if (!webhookUrl) {
-      res.status(500).json({
-        success: false,
-        error: { code: 'NOT_CONFIGURED', message: 'N8N_NEWSLETTER_WEBHOOK_URL not set on server (S3 sets this after the webhook trigger is added).' },
-      });
-      return;
-    }
-    if (!ingestionSecret) {
-      res.status(500).json({
-        success: false,
-        error: { code: 'NOT_CONFIGURED', message: 'INGESTION_SECRET not set on server' },
-      });
-      return;
-    }
-
-    // Edition must exist, be enabled, and be owned by the caller.
+    // Edition must exist, be enabled, and be owned by the caller. This check runs for both backends.
     const supabase = getSupabaseAdmin();
     const { data: edition, error: editionErr } = await supabase
       .from('newsletter_editions_v2')
@@ -391,72 +473,26 @@ newsletterRouter.post(
       return;
     }
 
-    // The keys here match the form-trigger field labels n8n preserves on
-    // the webhook side too, so set_trigger_inputs (S3) can normalize either
-    // shape into one.
-    const webhookBody = {
-      Date: body.send_date,
-      'Previous Newsletter Content': body.previous_newsletter_content ?? '',
-      'Edition Id': body.edition_id,
-    };
+    const backend = getBackend();
+    const result = backend === 'python'
+      ? await triggerEngine(body, userId)
+      : await triggerN8nWebhook(body);
 
-    let upstream: Response | undefined;
-    try {
-      upstream = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Ingestion-Secret': ingestionSecret,
-        },
-        body: JSON.stringify(webhookBody),
-      }) as unknown as Response;
-    } catch (err) {
-      logger.error({ err, webhookUrl }, 'newsletter generate: n8n webhook fetch threw');
-      res.status(502).json({
+    if (!result.ok) {
+      logger.error({ backend, code: result.code, message: result.message }, 'newsletter generate: upstream failed');
+      res.status(result.status).json({
         success: false,
-        error: { code: 'UPSTREAM_FETCH_FAILED', message: 'Could not reach n8n webhook' },
-      });
-      return;
-    }
-
-    if (!upstream || !('ok' in upstream) || !upstream.ok) {
-      const status = (upstream as unknown as { status?: number })?.status ?? 0;
-      let detail = '';
-      try { detail = await (upstream as unknown as { text(): Promise<string> }).text(); } catch { /* best-effort */ }
-      logger.error({ status, detail, webhookUrl }, 'newsletter generate: n8n returned non-2xx');
-      res.status(502).json({
-        success: false,
-        error: { code: 'UPSTREAM_NON_2XX', message: `n8n webhook returned ${status}` },
-      });
-      return;
-    }
-
-    let payload: { executionId?: string; editionId?: string } = {};
-    try {
-      payload = await (upstream as unknown as { json(): Promise<unknown> }).json() as typeof payload;
-    } catch (err) {
-      logger.error({ err }, 'newsletter generate: n8n webhook returned non-JSON body');
-      res.status(502).json({
-        success: false,
-        error: { code: 'UPSTREAM_BAD_BODY', message: 'n8n webhook response was not JSON' },
-      });
-      return;
-    }
-
-    if (!payload.executionId) {
-      logger.error({ payload }, 'newsletter generate: n8n response missing executionId');
-      res.status(502).json({
-        success: false,
-        error: { code: 'UPSTREAM_MISSING_EXECUTION_ID', message: 'n8n webhook response did not include executionId — confirm the Respond to Webhook node is wired (S3).' },
+        error: { code: result.code, message: result.message },
       });
       return;
     }
 
     res.json({
       success: true,
-      executionId: payload.executionId,
-      editionId: payload.editionId ?? body.edition_id,
+      executionId: result.data.executionId,
+      editionId: result.data.editionId ?? body.edition_id,
       started: true,
+      backend,
     });
   },
 );
