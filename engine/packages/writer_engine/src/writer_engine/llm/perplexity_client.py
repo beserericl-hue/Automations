@@ -56,6 +56,7 @@ class PerplexityAdapter:
         usage = payload.get("usage", {})
         input_tokens = int(usage.get("prompt_tokens", 0))
         output_tokens = int(usage.get("completion_tokens", 0))
+        citations = tuple(str(c) for c in (payload.get("citations") or []) if c)
 
         LLM_CALLS.labels(service=self._service, provider=self.provider, model=model, status="ok").inc()
         if input_tokens:
@@ -73,6 +74,7 @@ class PerplexityAdapter:
             output_tokens=output_tokens,
             model=model,
             provider=self.provider,
+            citations=citations,
         )
 
     async def aclose(self) -> None:

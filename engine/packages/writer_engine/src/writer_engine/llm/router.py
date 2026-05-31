@@ -24,6 +24,7 @@ class LLMResponse:
     cache_write_tokens: int = 0
     model: str = ""
     provider: str = ""
+    citations: tuple[str, ...] = ()
 
 
 class LLMAdapter(Protocol):
