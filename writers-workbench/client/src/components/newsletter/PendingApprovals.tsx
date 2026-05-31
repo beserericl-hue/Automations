@@ -46,6 +46,7 @@ interface EditionsResponse {
 const STAGE_LABEL: Record<NewsletterApprovalStage, string> = {
   stories: 'Stories',
   subject_line: 'Subject',
+  image: 'Cover Image',
 };
 
 export default function PendingApprovals() {
