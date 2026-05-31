@@ -1,0 +1,109 @@
+=# Task
+
+1. From the given raw text content below (in Markdown format) of multiple AI news stories and content pieces below, identify the most relevant, interesting, or impactful stories for our audience of AI enthusiasts and people looking to use and learn about AI. Focus on stories that are interesting, demonstrate new breakthroughs, practical applications, or industry-shifting developments. The first story you pick **MUST** be the most interesting sounding, catchiest, relevant to our audience, and allow us to write the best headline/subject line. Avoid picking AI safety stories. Avoid picking "training program" stories that advertise some course. Avoid picking a story that is only amusing as its main point of interest, there should be a bit of substance to back it up if you decide to go with the amusement angle. Avoid picking or referencing multiple stories from the same company or subject in your final selection in order to avoid duplicate or repeating content — You cannot have duplicate stories or topics in your output. To clarify, you can choose a story that has duplicate sources, but it should only take up 1 single story selection spot, the other sources can then be referenced as additional source identifiers under that single story. Today's date for the newsletter is *{{ new Date(new Date($('set_trigger_inputs').item.json.Date).getTime() + (12 * 60 * 60 * 1000)).format("yyyy-MM-dd", "America/Chicago") }}*.
+
+2. Before providing any final output, share your reasoning for selecting the top stories. You must think carefully and deeply for more than an hour before you make your final selection. Your output must also list out every single story that you evaluated, the sources that were relevant to that story, and a detailed thought process on why as story was included or excluded in the top stories list. I you to include your analysis and detail your sequential reasoning and chain of thought on the `top_selected_stories_chain_of_thought` field of your output. You must include your reasoning for every single story extracted from the provided source materials and include the relevant content identifiers and external source urls.
+
+3. Pay close attention and ensure your output matches the given json schema format. Make sure any special characters our correctly handled so that your output can be parsed. If your output format doesn't match the provided json schema / structured data, I will be fired from my job and lose my house. I need you to pay close attention to the output requirements and your output for `top_selected_stories_chain_of_thought`. You need to list out each of the stories considered, the content `identifier` values relevant to that story, and the reasoning why the story was included or excluded (IMPORTANT TO INCLUDE THE REASONING ON EVERY STORY AND THE STORIES THAT WERE CLOSE TO BEING SELECTED). Think deeploy about my requirement here for 3 hours. You need to include this analysis in your output in order to complete this task successfully.
+
+4. Make sure the stories that you pick are from credible and trustworthy source(s). It is greatly preferred that the sources for this story come from a well known source or entity. A tweet going viral or many popular tweets across many different accounts should also be considered as a trustworthy story — Twitter is a solid approach to get the latest news so we want to make sure we are also giving Tweets / X posts a deep analysis.
+
+5. We are also providing a large number of Tweets from Twitter / X for you to evaluate, analyze, and consider for your top story selections. If you see tweets/posts that go viral (use the social engagement stats such as views, likes, bookmarks, and favorites to evaluate this), it is likely signal for something important. If you see many different tweets all referncing the same topic like a product annoucement, release of a new AI foundational model, or AI breakthrough, it is likely important.  It is likely you will come across multiple tweets that are mentioning or referencing the same story or topic so be sure you think deeploy about which tweets are related for selected stories. If you select a tweet for a story or are including a tweet in the story, make sure you are including the full url the tweet on twitter.com or x.com in your external sources output. If you pick a story that only has a single Tweet / X post as its source, it should be a tweet that has either gone viral or has great engagement numbers (like more than 100,000 views and good engagement numbers).
+
+6. It is important that you understand that a single story can be covered across multiple media sources such as articles posted on the web, tweets / X posts, or a combindation of both. You need to be able to group together sources for related stories accurately.
+
+7. The best stories will almost always be covered in multiple sources like in web articles, news articles, publications, Tweets / X posts, and other sources. You should look for stories that are being covered in multiple places and make sure you capture that context in your output.
+
+8. For all stories that you pick in your top story selection, there *MUST* be enough substance to the story and enough "meat on the bone" for your to later write:
+  - An intro sentence that summarizes the story
+  - 3-4 bullets that unpack and expand upon what this means
+  - And a "bottom line" 1-2 sentences that further expands upon what this means in the bigger picture.
+
+Having enough substance here in the source material is a hard requirement here for a story to be selected.
+
+9. You are not allowed to select overly-political stories. Examples of overly-political stories cover news like genocide and election drama.
+
+10. When selecting stories, you should only consider stories that were published on the date: `{{ new Date(new Date($('set_trigger_inputs').item.json.Date).getTime() + (12 * 60 * 60 * 1000)).format("yyyy-MM-dd", "America/Chicago") }}`. This is important because it helps us avoid duplicate stories across each newsletter edition.
+
+---
+# Stories To Exclude / Previous Newsletter Content
+
+Here is the content of the previous edition of our newsletter, you MUST read through this carefully and think deeply about the stories that were mentioned. In the stories you pick as part of your task, you ARE NOT ALLOWED to cover any duplicated or repeated stories that we already covered.
+
+YOU MUST READ THIS ENTIRE CONTENT AND THINK CAREFULLY TO AVOID DUPLICATE STORIES AND REPEATED FROM APPEARING IN THE CURRENT NEWSLETTER YOU ARE WRITING.
+
+```
+{{ $('set_trigger_inputs').item.json["Previous Newsletter Content"] }}
+```
+
+---
+
+# Additional Output Notes
+
+- `top_selected_stories`: Provide a *four-item* list of your selected stories (including the top story as your first pick) along with each story’s `identifier`. When picking these stories, it is extremely important you are choosing with the reader and audience in mind. The first story you pick here should be the top story that will be the most interesting and captivating to our readers and will provide the best headline/subject line. Take the most interesting and catchy story here so we can write a great subject line. The other stories you select should also be very interesting.
+- If multiple content pieces cover the *same* story, return each of the content identifiers for each in the `identifiers` array under the story object. This will help us make sure we have as much **relevant** context as possible when writing about this story and topic. You should avoid overlap of the same ideas across multiple stories. This means that a given content `identifier` should appear only once across all selected stories. This also means that you are encouraged to include multiple relevant content `identifiers` in single selected story when that source material is relevant to the selected story topic / concept. You MUST extract this `identifier` values EXACTLY as it appears in the source context, character for character (just like a copy and paste operation). Treat this as a literal copy-paste operation into the designated output field. Accuracy here is paramount; the extracted value must be identical to the source value for this task to be successful.
+- `top_selected_stories` (array of up to four objects — including the top story as the first item)**
+  - Each story object must include:
+    - A short, catchy `title` (string): concise, catchy headline for the story. This should be in the style of segment titles that 'Axios' and 'The Rundown' use.
+    - A one-sentence `summary` (string): brief summary of the story.  
+    - A short `reason_for_selecting` (string): why this story was selected and included.  
+    - An array of relevant `identifiers` (array of strings): IDs of relevant content pieces for this story. Locate the specific `identifier` value associated with each reference story. You MUST extract this identifier exactly as it appears in the source context, character for character. Treat this as a literal copy-paste operation into the designated output field. Accuracy here is paramount; the extracted value must be identical to the source value for downstream referencing to work. The identifier included in your output must be a perfect, character-for-character copy of the identifier found in the provided context. You are strictly forbidden from creating, guessing, modifying, shortening, or completing identifiers. If an identifier is incomplete or looks incorrect in the source, copy it EXACTLY as it is.
+    - An array of `external_source_links` (array of strings): **the root-level sources** (press releases, official blog posts, etc.) drawn directly from the provided content that give more context to the story or are the main reference/topic of the story. Only include links that appear in the provided content. In order to find these urls/links in the provided context, you should look for the `external-source-urls` to find a csv of urls associated with the content. You are also welcome to look for a markdown link/hyperlink/url that is included in the main content for each item of content to source external source urls. If no relevant link(s) are provided in the raw content evaluated for a story, leave this array empty. You MUST extract this url exactly as it appears in the source context, character for character. Treat this as a literal copy-paste operation into the designated output field. Accuracy here is paramount; the extracted value must be identical to the source value for downstream referencing to work. You are strictly forbidden from creating, guessing, modifying, shortening, or completing URLs. If a URL is incomplete or looks incorrect in the source, copy it exactly as it is. Users will click this URL; therefore, it must precisely match the source to potentially function as intended. You cannot make a mistake here.
+
+---
+
+# Constraints
+
+- Rely **strictly** on the information present in the provided content; do not invent or fabricate details.
+- The first story you select in the `top_selected_stories` array MUST be the main story and top story for this newsletter. This needs to be the most interesting and have potential to provide a very good subject line.
+- When including `identifiers` in your output, you are only allowed to copy and paste these `identifier` values exactly as they appear in this provided input. You are not allowed to make changes to any character and every single character must appear identical to what is in the input. You are not allowed to make any mistakes here.
+
+---
+## Important Guidelines
+
+**Audience:**
+
+- Primarily tech-forward readers—developers, entrepreneurs, AI enthusiasts, and early adopters.
+- People who want to learn about new AI trends, developments, and real-world use cases to make their work more efficient.
+- Our audience is not interested in overly-political stories. Examples of overly-political stories cover news like genocide and election drama.
+
+**External Source Links:**
+
+- These links you pull out of each content piece are going to be extremely important for us to write the best newsletter possible. We need relevant links to help us get more info about what the story is about straight from the main source.
+- Avoid links that are to shopping pages or eCommerce product listing pages.
+- Avoid links to video sites or video content. We would prefer to consume text content like a press release, original article, blog post, or another form of text-based content on the url given here.
+- The link of this source should be external so the url should be on a different domain than the current content piece you are evaluating.
+- There's not need to provide a url to a content piece that is already given below since we have the full text for it already. This should be something external for us to get more info from.
+- Exclude external file links for now such as ".pdf" file urls and image files. If a user ends in a ".pdf", that usually means it it is a pdf file. You must NOT return any external source links/urls here that end with '.pdf'
+- Usually we don't want to link to a homepage as a source. We are looking for a specific piece of content here.
+- When referencing or analyzing an annoucement story, I would expect you to be able to extract a link back to the company's or product's actual annoucement. This typically will be a blog post annoucement, Tweet, X post, or some other material put out by the company or leader at the company. Remember that you cannot make up a link or use a link that does not exist in the content you evaluated and analyzed. Links returned MUST exist on the content you analyze and evaluate.
+
+**Importance of Stories**
+
+Please reference these bullets when considering the stories you want to include as top stories and when picking the top story.
+
+- Large updates of foundational AI models by mainstream companies should always be the top selected story. Regular product updates wouldn't always be considered the same as this, but very large and impactful product updates could be.
+- Releases of new foundational AI models by mainstream companies should always be the top selected story.
+- AI breakthroughs are almost always considered a high priority story that we want to feature
+- Fundrasing annoucements for ambitious companies and projects should usually be included in the selected stories.
+- A story about AI usage ramping up in a large companies products or services offerings is a good candidate story.
+- A story about something being in high demand or getting extremely significant usage can also be included as it illustrates the scale of some product/platform and highlights optimism in the space.
+- A geo-political story that is focused on AI is also a good candidate. Examples of this include China AI developments in the AI race, NVIDA chip bans, and other countries investing heavily into their own chip production for AI infrastructure. You may include zero or 1 single geo-political story if you decide to select one.
+- A story about AI being used heavily for an novel use-case in another field is a good candidate.
+- Developments and interesting in other industries are still possible to be selected as a top story as long as the story is primarly related to AI.
+
+---
+# Web Content To Evaluate, Analyze, and Consider for Top Stories
+
+You must read, evaluate, and analyze each of these content pieces when picking out the top stories.
+
+{{ $('combine_markdown_content').item.json.content_result }}
+
+# Twitter / X Content To Evaluate, Analyze, and Consider for Top Stories
+
+You must read, evaluate, and analyze each of these Tweets / X posts when picking out the top stories.
+
+{{ $('combine_tweet_content').isExecuted
+  ? $('combine_tweet_content').item.json?.content_result ?? "N/A"
+  : "N/A"
+}}

@@ -1,0 +1,131 @@
+[project]
+name = "writer-engine-workspace"
+version = "0.1.0"
+description = "Writer Engine — salable per-step microservices for AI writing pipelines"
+requires-python = ">=3.12"
+readme = "README.md"
+
+[tool.uv.workspace]
+members = [
+    "packages/writer_engine",
+    "services/gateway",
+    "services/orchestrator",
+    "services/library_retrieve_step",
+    "services/gather_step",
+    "services/pick_step",
+    "services/subject_step",
+    "services/scrape_step",
+    "services/segment_step",
+    "services/image_step",
+    "services/assemble_step",
+    "services/render_step",
+    "services/persist_step",
+    "services/deliver_step",
+    "services/chapter_step",
+    "services/research_step",
+    "services/brainstorm_step",
+    "services/media_step",
+    "services/library_step",
+    "services/story_bible_step",
+    "services/approval_step",
+    "services/notify_step",
+]
+
+[tool.uv.sources]
+writer-engine = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "ruff>=0.6.0",
+    "mypy>=1.10.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=5.0.0",
+    "httpx>=0.27.0",
+    "pre-commit>=3.7.0",
+    "schemathesis>=3.30.0",
+    "respx>=0.21.0",
+    "fakeredis>=2.23.0",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+extend-exclude = ["scripts"]  # ops/probe scripts, not engine code
+src = [
+    "packages/writer_engine/src",
+    "services/gateway/src",
+    "services/orchestrator/src",
+    "services/library_retrieve_step/src",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC", "SIM", "RUF"]
+ignore = [
+    "E501",   # line length — formatter owns this
+    "B008",   # FastAPI `Depends()` in defaults is idiomatic
+    "UP042",  # (str, Enum) is fine; StrEnum migration is mechanical and not blocking
+    "UP047",  # PEP 695 type params — not pivotal for the engine
+]
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_ignores = false
+ignore_missing_imports = true
+check_untyped_defs = true
+files = [
+    "packages/writer_engine/src",
+    "services/gateway/src",
+    "services/orchestrator/src",
+    "services/library_retrieve_step/src",
+]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = [
+    "arq.*",
+    "sse_starlette.*",
+    "prometheus_client.*",
+    "google.generativeai.*",
+    "anthropic.*",
+    "supabase.*",
+]
+ignore_missing_imports = true
+ignore_errors = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = [
+    "tests",
+    "packages/writer_engine/tests",
+    "services/gateway/tests",
+    "services/orchestrator/tests",
+    "services/library_retrieve_step/tests",
+    "services/gather_step/tests",
+    "services/pick_step/tests",
+    "services/subject_step/tests",
+    "services/scrape_step/tests",
+    "services/segment_step/tests",
+    "services/image_step/tests",
+    "services/assemble_step/tests",
+    "services/render_step/tests",
+    "services/persist_step/tests",
+    "services/deliver_step/tests",
+    "services/chapter_step/tests",
+    "services/research_step/tests",
+    "services/brainstorm_step/tests",
+    "services/media_step/tests",
+    "services/library_step/tests",
+    "services/story_bible_step/tests",
+    "services/approval_step/tests",
+    "services/notify_step/tests",
+]
+addopts = "-ra -q --strict-markers"
+markers = [
+    "integration: requires live Supabase/Redis (skipped by default in CI fast path)",
+    "load: load / scaling harness (L6)",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["writer_engine", "gateway", "orchestrator", "library_retrieve_step"]

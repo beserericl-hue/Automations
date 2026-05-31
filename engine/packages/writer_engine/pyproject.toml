@@ -1,0 +1,31 @@
+[project]
+name = "writer-engine"
+version = "0.1.0"
+description = "Writer Engine — the salable Python library that step services and orchestrators import"
+requires-python = ">=3.12"
+authors = [{ name = "Writer Engine contributors" }]
+readme = "README.md"
+
+dependencies = [
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.3.0",
+    "httpx>=0.27.0",
+    "structlog>=24.1.0",
+    "prometheus-client>=0.20.0",
+    "redis>=5.0.0",
+    "arq>=0.26.0",
+    "anthropic>=0.39.0",
+    "google-generativeai>=0.7.0",
+    "supabase>=2.7.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "sse-starlette>=2.1.0",
+    "tenacity>=8.5.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/writer_engine"]

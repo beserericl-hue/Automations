@@ -1,0 +1,35 @@
+name: engine-ci
+on:
+  pull_request:
+    paths: ["engine/**"]
+  push:
+    branches: ["develop", "main"]
+    paths: ["engine/**"]
+
+jobs:
+  lint-type-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: engine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - name: install
+        run: uv sync --all-extras
+      - name: ruff
+        run: uv run ruff check .
+      - name: mypy
+        run: uv run mypy
+      - name: pytest (L0-L4 smoke)
+        run: uv run pytest -q -m "not integration and not load"
+
+  compose-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: engine
+    steps:
+      - uses: actions/checkout@v4
+      - name: docker compose build
+        run: docker compose build

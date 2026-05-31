@@ -1,0 +1,5 @@
+[build]
+# This file is read by `railway up` from the engine/ root. It tells Railway which Dockerfile to build for the
+# CURRENT deploy. Swapped between runtime and gateway before each deploy. The per-service config (Railway UI →
+# Settings → Source → Dockerfile Path) is empty, so this fallback wins.
+dockerfilePath = "services/gateway/Dockerfile"

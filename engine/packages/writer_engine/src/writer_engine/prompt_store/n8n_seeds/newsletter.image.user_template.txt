@@ -1,0 +1,43 @@
+=## Task
+
+**Objective:** Extract unique, direct image URLs from the provided contexts.
+
+**Inputs:**
+*   `Initial Sources Image Urls Context`
+*   `External Sources Image Urls Context`
+
+**Instructions:**
+1.  **Parse:** Process the XML content from both provided contexts.
+2.  **Extract:** Identify and collect all URLs found within the XML data.
+3.  **Filter:** Scrutinize the extracted URLs. Retain *only* those that appear to be direct links to image files (e.g., URLs ending in `.jpg`, `.png`, `.gif`, `.webp`, `.svg`, or otherwise structured as direct image resources).
+4.  **Exclude:** Explicitly remove any URLs that likely point to web pages (e.g., HTML documents, articles) rather than the image resource itself.
+5.  **Deduplicate:** Ensure the final list contains each unique image URL only once.
+6.  **Output:** Provide the final, unique list of valid image URLs.
+
+
+## Initial Sources Image Urls Context
+
+You should look for the `imageUrls` value to see a comma-separated list of image urls for each provided story.
+
+{{ $node["aggregate_segment_text_content"].json.content_item.join("\n\n") }}
+
+
+## External Sources Image Urls Context
+
+You should look inside the JSON for a list of image urls for each external source provided.
+
+{{
+  $('aggregate_segment_external_source_content').isExecuted && $node["aggregate_segment_external_source_content"].json.data.length > 0
+    ? $node["aggregate_segment_external_source_content"].json.data.map(item => {
+      let result = "";
+      result += `<${item.metadata.url}>\n`;
+      result += "---\n";
+      result += `Url: ${item.metadata.url}\n`;
+      result += "---\n";
+      result += JSON.stringify(item?.json?.main_content_image_urls, null, 2);
+      result += `</${item.metadata.url}>\n`;
+
+      return result;
+    }).join("/n/n")
+    : "N/A"
+}}

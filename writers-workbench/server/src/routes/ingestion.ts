@@ -305,16 +305,25 @@ ingestionRouter.get('/get/:key(*)', requireIngestionSecret, async (req: Request,
     return;
   }
 
-  // Pull both blobs in parallel.
+  // The newsletter pipeline only consumes `markdown`; the html blob is often
+  // 100x larger (multi-MB) and downloading it for every gathered story
+  // overwhelms the n8n -> server transfer (ECONNRESET). Callers can opt out of
+  // the html blob with ?include_html=0; the default keeps the full envelope.
+  const includeHtml = !['0', 'false', 'no'].includes(
+    String(req.query.include_html ?? '').toLowerCase(),
+  );
+
   const [mdRes, htmlRes] = await Promise.all([
     supabase.storage.from(BUCKET).download(row.storage_path_md),
-    supabase.storage.from(BUCKET).download(row.storage_path_html),
+    includeHtml
+      ? supabase.storage.from(BUCKET).download(row.storage_path_html)
+      : Promise.resolve(null),
   ]);
 
-  if (mdRes.error || !mdRes.data || htmlRes.error || !htmlRes.data) {
+  if (mdRes.error || !mdRes.data || (htmlRes !== null && (htmlRes.error || !htmlRes.data))) {
     // Row exists but blob is gone — this is a real corruption signal, not a 404.
     logger.error(
-      { key, mdErr: mdRes.error, htmlErr: htmlRes.error },
+      { key, mdErr: mdRes.error, htmlErr: htmlRes?.error },
       'ingestion get: blob missing from storage for existing row',
     );
     res.status(500).json({
@@ -327,10 +336,8 @@ ingestionRouter.get('/get/:key(*)', requireIngestionSecret, async (req: Request,
     return;
   }
 
-  const [markdown, html] = await Promise.all([
-    mdRes.data.text(),
-    htmlRes.data.text(),
-  ]);
+  const markdown = await mdRes.data.text();
+  const html = htmlRes?.data ? await htmlRes.data.text() : '';
 
   res.json({ success: true, ...row, markdown, html });
 });
