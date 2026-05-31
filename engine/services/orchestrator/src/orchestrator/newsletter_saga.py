@@ -186,6 +186,8 @@ class NewsletterSagaDriver:
             execution_id=execution_id,
             stage="awaiting_stories_approval",
             payload=picked.model_dump(mode="json"),
+            user_id=cfg.get("user_id") or None,
+            edition_id=cfg.get("edition_id") or None,
         )
         await self._advance(
             execution_id,
@@ -217,6 +219,8 @@ class NewsletterSagaDriver:
             execution_id=execution_id,
             stage="awaiting_subject_approval",
             payload=proposal.model_dump(mode="json"),
+            user_id=st["cfg"].get("user_id") or None,
+            edition_id=st["cfg"].get("edition_id") or None,
         )
         await self._advance(
             execution_id,
@@ -278,6 +282,8 @@ class NewsletterSagaDriver:
                 "image_options_by_story": st.get("image_options_by_story") or [],
                 "segments": st.get("segments_data") or [],
             },
+            user_id=st["cfg"].get("user_id") or None,
+            edition_id=st["cfg"].get("edition_id") or None,
         )
         await self._advance(
             execution_id,

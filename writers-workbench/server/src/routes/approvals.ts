@@ -46,8 +46,8 @@ interface ApprovalRow {
   token: string;
   user_id: string;
   execution_id: string;
-  resume_url: string;
-  stage: 'stories' | 'subject_line';
+  resume_url: string | null;
+  stage: 'stories' | 'subject_line' | 'image';
   payload: Record<string, unknown>;
   created_at: string;
   resolved_at: string | null;
@@ -106,7 +106,8 @@ ${bodyHtml}
 }
 
 function renderForm(row: ApprovalRow): string {
-  const stageLabel = row.stage === 'stories' ? 'Top Stories' : 'Subject Line';
+  const stageLabel =
+    row.stage === 'stories' ? 'Top Stories' : row.stage === 'image' ? 'Cover Image' : 'Subject Line';
   const payloadJson = JSON.stringify(row.payload, null, 2);
   return pageShell(
     `Newsletter approval — ${stageLabel}`,

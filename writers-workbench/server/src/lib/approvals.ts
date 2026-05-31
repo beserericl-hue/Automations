@@ -24,8 +24,9 @@ export interface ApprovalRow {
   token: string;
   user_id: string;
   execution_id: string;
-  resume_url: string;
-  stage: 'stories' | 'subject_line';
+  /** n8n Wait-node resume URL. NULL for engine-backed rows (migration 023). */
+  resume_url: string | null;
+  stage: 'stories' | 'subject_line' | 'image';
   payload: Record<string, unknown>;
   created_at: string;
   resolved_at: string | null;
@@ -54,6 +55,20 @@ export interface ResolveOptions {
    * the 24-byte token IS the credential there.
    */
   sessionUserId?: string;
+  /**
+   * Optional image-gate selection forwarded to the engine resolve endpoint
+   * as `chosen_images`. Ignored on the n8n path. Only meaningful for the
+   * engine's third (image) HITL gate.
+   */
+  chosenImages?: unknown;
+}
+
+// NEWSLETTER_BACKEND=python routes the whole newsletter pipeline through the
+// Writer Engine, whose HITL gates live in the engine's own Redis store rather
+// than an n8n Wait node. Mirrors getBackend() in routes/newsletter.ts (kept
+// local to avoid a routes->lib->routes import cycle).
+function isEngineBacked(): boolean {
+  return (process.env.NEWSLETTER_BACKEND ?? 'n8n').toLowerCase() === 'python';
 }
 
 export interface ResolveResult {
@@ -65,7 +80,7 @@ export interface ResolveResult {
 }
 
 export async function resolveApproval(opts: ResolveOptions): Promise<ResolveResult> {
-  const { token, decision, feedback, sessionUserId } = opts;
+  const { token, decision, feedback, sessionUserId, chosenImages } = opts;
   const supabase = getSupabaseAdmin();
 
   // Fetch the row first — we need the resume_url, the user_id (for
@@ -123,25 +138,67 @@ export async function resolveApproval(opts: ResolveOptions): Promise<ResolveResu
     return { status: 'already_resolved', row };
   }
 
-  // Best-effort POST to the n8n Wait node's resume_url. Even when this
-  // fails, the DB row IS resolved — callers should still surface the
-  // outcome (502 on the public form, 502 on the in-app endpoint), but the
-  // SSE broadcast still fires unconditionally so the UI doesn't show a
-  // phantom open approval.
+  // Resume the upstream workflow. The DB row is already marked resolved above,
+  // so any resume failure surfaces as 'resume_failed' (502) WITHOUT losing the
+  // decision, and the SSE broadcast still fires unconditionally so the UI never
+  // shows a phantom open approval.
+  //
+  // Engine-backed sagas (NEWSLETTER_BACKEND=python) keep their HITL gate in the
+  // Writer Engine's Redis store, not an n8n Wait node — POST the decision to the
+  // engine's service-secret-authed resolve endpoint, which resolves the gate and
+  // advances the saga. The n8n path keeps POSTing to the row's resume_url.
   let resumed = true;
-  try {
-    const resp = await fetch(row.resume_url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ decision, feedback }),
-    });
-    if (!resp.ok) {
+  if (isEngineBacked()) {
+    const engineUrl = process.env.NEWSLETTER_SERVICE_URL;
+    const serviceSecret = process.env.SERVICE_SHARED_SECRET;
+    if (!engineUrl || !serviceSecret) {
       resumed = false;
-      logger.warn({ token, status: resp.status }, 'resolveApproval: n8n resume returned non-2xx');
+      logger.error(
+        { token },
+        'resolveApproval: engine backend but NEWSLETTER_SERVICE_URL/SERVICE_SHARED_SECRET unset',
+      );
+    } else {
+      try {
+        const engineBody: Record<string, unknown> = { decision, feedback };
+        if (chosenImages !== undefined) engineBody.chosen_images = chosenImages;
+        const resp = await fetch(
+          `${engineUrl.replace(/\/+$/, '')}/internal/newsletter/approvals/${encodeURIComponent(token)}/resolve`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Service-Secret': serviceSecret },
+            body: JSON.stringify(engineBody),
+          },
+        );
+        if (!resp.ok) {
+          resumed = false;
+          logger.warn({ token, status: resp.status }, 'resolveApproval: engine resolve returned non-2xx');
+        }
+      } catch (err) {
+        resumed = false;
+        logger.error({ err, token }, 'resolveApproval: engine resolve POST failed');
+      }
     }
-  } catch (err) {
-    resumed = false;
-    logger.error({ err, token }, 'resolveApproval: n8n resume POST failed');
+  } else {
+    const resumeUrl = row.resume_url;
+    if (!resumeUrl) {
+      resumed = false;
+      logger.error({ token }, 'resolveApproval: n8n row missing resume_url');
+    } else {
+      try {
+        const resp = await fetch(resumeUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ decision, feedback }),
+        });
+        if (!resp.ok) {
+          resumed = false;
+          logger.warn({ token, status: resp.status }, 'resolveApproval: n8n resume returned non-2xx');
+        }
+      } catch (err) {
+        resumed = false;
+        logger.error({ err, token }, 'resolveApproval: n8n resume POST failed');
+      }
+    }
   }
 
   // SSE broadcast — `resumed` is part of the payload so the in-app UI can

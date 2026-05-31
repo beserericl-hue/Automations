@@ -362,7 +362,7 @@ export interface ContentIngestion {
   deleted_at: string | null;
 }
 
-export type NewsletterApprovalStage = 'stories' | 'subject_line';
+export type NewsletterApprovalStage = 'stories' | 'subject_line' | 'image';
 export type NewsletterApprovalDecision = 'approve' | 'revise';
 
 export interface NewsletterApproval {
