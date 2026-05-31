@@ -178,23 +178,26 @@ export async function resolveApproval(opts: ResolveOptions): Promise<ResolveResu
         logger.error({ err, token }, 'resolveApproval: engine resolve POST failed');
       }
     }
-  } else if (!row.resume_url) {
-    resumed = false;
-    logger.error({ token }, 'resolveApproval: n8n row missing resume_url');
   } else {
-    try {
-      const resp = await fetch(row.resume_url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision, feedback }),
-      });
-      if (!resp.ok) {
-        resumed = false;
-        logger.warn({ token, status: resp.status }, 'resolveApproval: n8n resume returned non-2xx');
-      }
-    } catch (err) {
+    const resumeUrl = row.resume_url;
+    if (!resumeUrl) {
       resumed = false;
-      logger.error({ err, token }, 'resolveApproval: n8n resume POST failed');
+      logger.error({ token }, 'resolveApproval: n8n row missing resume_url');
+    } else {
+      try {
+        const resp = await fetch(resumeUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ decision, feedback }),
+        });
+        if (!resp.ok) {
+          resumed = false;
+          logger.warn({ token, status: resp.status }, 'resolveApproval: n8n resume returned non-2xx');
+        }
+      } catch (err) {
+        resumed = false;
+        logger.error({ err, token }, 'resolveApproval: n8n resume POST failed');
+      }
     }
   }
 
