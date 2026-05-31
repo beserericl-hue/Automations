@@ -16,3 +16,16 @@ image.png
 
 # HTML reports (but NOT client/index.html)
 /*.html
+
+# Obsidian per-user files
+knowledgebase/*/.obsidian/workspace.json
+knowledgebase/*/.obsidian/workspace-mobile.json
+knowledgebase/*/.obsidian/cache
+knowledgebase/*/.obsidian/plugins
+knowledgebase/*/.obsidian/themes
+
+# CSHSE is a separate project — never track its files in this repo
+**/CSHSE/
+*cshse*
+*CSHSE*
+*[Ss]tevenson*

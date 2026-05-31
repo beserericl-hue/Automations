@@ -1,6 +1,6 @@
 # The Writers Workbench — Session Context Document
 
-**Last Updated:** 2026-04-29
+**Last Updated:** 2026-05-31
 **Purpose:** Read this document at the start of any new Claude Code session working on this project. It contains every key decision, architectural choice, and constraint needed to continue development without re-learning the codebase.
 
 ---
@@ -1958,6 +1958,180 @@ The lesson that took three sprint-state mistakes this session to learn:
 > The doc is a planning artifact. PRs + commits are reality. When they disagree, reality wins and the doc gets updated.
 
 This rule is now baked into the Total-table preamble in `sprint_document_v2.md`.
+
+---
+
+## Session 2026-05-28 — Gate 1 newsletter PROD-ship + PROD Redis outage fix
+
+(Scope: Writers Workbench / Automations only. CSHSE is a separate project — explicitly excluded from this handoff.)
+
+### Work-ordering frame (set 2026-05-25)
+Authoritative sequencing now lives in the wiki: `knowledgebase/Writers Workbench Wiki/Engineering/sprints/work-ordering-2026-05.md`. Five hard gates, supersedes the old `9→13→14→15→16→17→18` order:
+1. **Gate 1 — Newsletter PROD ship** (in progress)
+2. Gate 2 — Sprint 15 testbed
+3. Gate 3 — Python backend rewrite (Sprints 16-22)
+4. Gate 4 — B2B platform (Sprints 23-27)
+5. Gate 5 — Sprint 9 Stripe (LAST)
+Rule: no PR merges to `main` until newsletter dev is 100% complete.
+
+### Gate 1 status
+- DONE 1.1 E2E suite green (fixed 7 selector/timing failures from first authed run; commit `db4264e`)
+- DONE 1.2 PR #76 (E2E suite) merged to `develop` (`24e7b35`)
+- DONE 1.3 PR #68 merged to `develop` (`46e87c5`) — was NOT stale; carried migration 015 + the render-html node
+- DONE 1.4 PROD Supabase migrations **013/014/015/016/017 applied + verified** (`faklxfakgzkpkbxfihzh`, us-west-2 session pooler). public tables 30->35; seeded Workbench template html=12573 w/ `body_md`.
+- TODO 1.5 newsletter n8n workflows DEV->PROD — NOT started (see runbook)
+- TODO 1.6 seed PROD demo / 1.7 PROD smoke / 1.8 release tag -> main
+
+### PROD Redis outage (found + FIXED this session)
+PROD `/api/health` was hanging. Root cause: the **PROD Redis** service (bubbly-solace / production env) had been DOWN since a **2026-05-19 SIGTERM** with no restart — BullMQ + SSE dead, app otherwise up (Supabase-backed routes fine). Fix: redeployed PROD Redis -> then PROD Workbench (its deploy healthcheck gates on `/api/health`, so Redis had to come up first). PROD now `{supabase:ok, redis:ok, postal:ok}` in 0.59s. Captured in auto-memory `prod-redis-outage-risk` + wiki `prod-redis-outage-risk`. **Latent risk:** no uptime alerting; DEV Redis + DEV Workbench both have Railway app-sleep on.
+
+### Newsletter <-> n8n architecture (corrected after live audit)
+- App triggers generation via a SINGLE env var **`N8N_NEWSLETTER_WEBHOOK_URL`** (`server/src/routes/newsletter.ts:351`), no tier suffix. It is **UNSET on BOTH develop and production** -> the in-app "Generate" button has never worked end-to-end on either tier.
+- 4 newsletter workflows, all DEV-wired (callbacks -> `writersworkbench-develop`), NO PROD copies:
+  - `Content - Newsletter Agent V2` (`bMvMKyK8obwYZmNb`) — formTrigger + webhook (path `compose-newsletter-dev`), ~30 callbacks
+  - `AI News Data Ingestion V2` (`2T3TwGHhdGQlTpQ5`) — 17 RSS/schedule triggers, no webhook
+  - `DEV - Newsletter Cadence Cron` (`7l1z4uMS9kdkYIT4`) — scheduleTrigger
+  - `DEV - Newsletter Ingestion (Multi-User Cron)` (`JAQ8rmCaDoddqt2k`) — scheduleTrigger
+- `scripts/promote-dev-to-prod.py` does UPDATE-in-place only -> it CANNOT create these; first promotion is a manual create.
+- Callback secrets (`INGESTION_SECRET`, `NEWSLETTER_CALLBACK_SECRET`, `EMAIL_SECRET`) are IDENTICAL across DEV/PROD envs -> PROD workflow copies reuse existing n8n credentials (no new creds).
+- Railway env audit: NODE_ENV, SUPABASE_URL, VITE_SUPABASE_URL, ALLOWED_ORIGINS all correct per tier. Postal = one shared server (`postal-admin.courseworx.media`). Only ONE `WritersWorkbench` service, deployed in develop + production envs (no stray dupe). The "WritersWorkbenchDev" seen earlier lives in the separate **N8N-MCP** Railway project.
+
+### NEXT ACTION (resume here)
+**Step 0 of the runbook** — prove newsletter on DEV before any PROD change:
+1. Set on DEV WritersWorkbench (bubbly-solace develop): `N8N_NEWSLETTER_WEBHOOK_URL = https://n8n.agileadautomation.com/webhook/compose-newsletter-dev`
+2. Redeploy DEV Workbench; run a real generation from the DEV UI; verify a row lands in DEV `newsletter_sends_v2` with the Workbench masthead.
+Then Steps 1-6: create the 4 PROD workflow copies (callbacks -> `writersworkbench-production`, webhook path `compose-newsletter-dev`->`compose-newsletter-v2`), set PROD env var -> `compose-newsletter-v2`, add 4 pairs to `scripts/workflow-id-map.json`, seed, smoke, release tag.
+
+Full procedure: `knowledgebase/Writers Workbench Wiki/Engineering/operations/newsletter-prod-ship-runbook.md`
+Quick resume: run `bash scripts/session-resume.sh`
+
+### Reference / connection notes
+- PROD Supabase psql: session pooler `aws-0-us-west-2.pooler.supabase.com:5432`, user `postgres.faklxfakgzkpkbxfihzh` (direct `db.<ref>.supabase.co` is IPv6-only — won't resolve from this Mac).
+- n8n: `https://n8n.agileadautomation.com`, API key in `.mcp.json`.
+- Railway: `railway login` (OAuth token expires); bubbly-solace project `87cb760d-784b-42cc-920f-712483a81664`, envs develop `7b03b69a...` / production `e56e386b...`; WritersWorkbench service `94786b29...`; PROD Redis service `1bffebfe...`. Read env via GraphQL `variables` query with the CLI accessToken from `~/.railway/config.json`.
+- **SECURITY TODO:** the PROD Postgres password was typed into this session's shell history — rotate it (Supabase -> Project Settings -> Database -> Reset password).
+
+### Open follow-ups (not blocking Gate 1)
+- Non-fatal `YAMLSemanticError` in `server/src/routes/newsletter-sends.ts:31` (OpenAPI doc comment) — server starts fine; cleanup later.
+- 27-file DEV-URL consolidation changes still uncommitted in working tree (separate small PR to `develop`).
+- Empty 0-byte orphan `knowledgebase/Writers Workbench Wiki/promotion-dev-to-prod.md` (duplicate basename of the real `Engineering/operations/` page) — delete pending confirm.
+
+---
+
+
+## Session 2026-05-31 — Engine framework foundation + F2 newsletter saga + F1-A research
+
+(Scope: Writers Workbench / Automations only. CSHSE explicitly excluded.)
+
+### Strategic pivot — frame change since 2026-05-28
+
+Gate 1 ("Newsletter PROD ship via n8n") is **superseded** by an earlier-than-planned execution of the Python-engine rewrite. Same end goal (working newsletter on PROD), different mechanism: instead of stabilising the n8n compose-newsletter workflow + four supporting workflows on PROD, the newsletter pipeline is now a Python microservice in the new `engine/` workspace. The same workspace will absorb the F1-A write-workshop ports (chapter / chapter-qa / research / brainstorm / media / library) — at F1-B exit, the entire writing engine is in Python and the n8n hub becomes an HTTP shim.
+
+Reasoning, in short: replicating fragile n8n workflows to PROD was already going to be ~2 weeks of risky DEV→PROD plumbing per the runbook. Spending that time on a Python rewrite delivers the same UX (UI-driven newsletter generation with 3 HITL gates), avoids the duplication, and unblocks F1-A directly. The engine is gated behind an env flip (`NEWSLETTER_BACKEND=python|n8n`) so falling back to n8n is one variable change away.
+
+Authoritative sequencing: [[engine-framework-sprints]] (F0 done · F1-A starting · F2 newsletter saga shipped in PR #77 · F2.5 chapter algo optimisation deferred to its own sprint · F1-B cutover last).
+
+### What shipped this session — PR #77 (open, awaiting merge)
+
+Branch: `feature/engine-foundation` → `develop`. Two commits:
+- `50d561d` — F0 foundation + F2 newsletter saga + WW backend switch (293 files / +31,298 lines)
+- `346fc0d` — F1-A prereqs #1 #3 #4 (12 files / +755 lines, 22 new tests)
+
+**Engine workspace** (`engine/`) — uv workspace with 21 members:
+- `packages/writer_engine` — shared library: LLM router (`AnthropicAdapter` with prompt-caching, `GeminiAdapter`, `PerplexityAdapter` now with `citations` field), durable `SagaStateRepo` (Redis 30-day TTL + InMemory variant), step-service framework (`build_step_app` + `StepInput/StepOutput`), prompt store with `n8n_seeds/` (8 verbatim n8n prompts), Postal client with cc/bcc/headers/attachments, Supabase client, structured-output helpers (`extract_and_parse`, `try_repair_json`), Redis-backed `AnthropicBudget` sliding-window gatekeeper (Tier-4 defaults).
+- `services/gateway` — public FastAPI app at `/internal/newsletter/generate` etc., service-secret auth.
+- `services/orchestrator` — runs the newsletter saga with 3 HITL gates (stories / subject / image), arq worker advances, `apply_decision` translates approve/revise to state transitions with `MAX_REVISIONS_PER_GATE=2`. Saga state route renamed `/pipelines/newsletter/saga-state/{id}` to avoid collision with the generic `/pipelines/{pipeline}/state/{id}`.
+- `services/runtime` — combined image: orchestrator + arq worker + all 10 step services as background uvicorns on `localhost:8002 + 8010-8019` (per F2-3 pragmatic deploy, no per-step containers yet).
+- 86 pytest tests (27 in commit 1, 59 added in commit 2's prereqs batch).
+
+**WW Express server** — `routes/newsletter.ts` carries `NEWSLETTER_BACKEND=python|n8n` flag. When `python`, `/api/newsletter/generate` POSTs to `${NEWSLETTER_SERVICE_URL}/internal/newsletter/generate` with `X-Service-Secret`. UI contract is identical — cutover is one env flip.
+
+**F1-A pre-pre-req (already landed in PR #77):** `ProviderNotRegistered(KeyError)` typed exception in `writer_engine.llm.router`. Step services catch only this when falling back to fixtures; real LLM 429/500/validation errors bubble up unmasked.
+
+### Railway DEV state (deployed, healthy)
+
+Two new services in `bubbly-solace / develop`:
+- `writer-engine-gateway` (`f87274f7-...`) → `https://writer-engine-gateway-develop.up.railway.app` — `/admin/health` returns `{"status":"ok","service":"gateway"}`. PORT=8000.
+- `writer-engine-runtime` (`8e87e53d-...`) → `https://writer-engine-runtime-develop.up.railway.app` — `/admin/health` returns `{"status":"ok","service":"orchestrator"}`. PORT=8001.
+- Shared Redis at `redis.railway.internal`. Gateway → runtime over private network (`ORCHESTRATOR_URL=http://writer-engine-runtime.railway.internal:8001`).
+- `SERVICE_SHARED_SECRET` shared with WW DEV.
+
+WW DEV (`bubbly-solace / develop`) env vars set this session:
+- `NEWSLETTER_BACKEND=python`
+- `NEWSLETTER_SERVICE_URL=http://writer-engine-gateway.railway.internal:8000`
+- `SERVICE_SHARED_SECRET=<matches gateway>`
+
+Direct synthetic call proven: `POST /internal/newsletter/generate` returns `{"execution_id":"…","result":"queued"}` — saga starts, arq enqueues. **Saga-state lookup still 500s in the deployed runtime** because the route rename + ProviderNotRegistered narrowing haven't picked up CI/CD yet (Railway dedupes identical-content `railway up` uploads). The fix lands when PR #77 merges and CI/CD deploys.
+
+### F1-A research workflow synthesis (waqxrgsgp)
+
+8 agents, 716k tokens, 185 tool uses. Output captured in [[architecture/python-backend/f1a-decisions]] + full per-module specs in `/private/tmp/claude-501/-Users-ericbeser-Documents-GitHub-Automations/a750398d-5418-430a-9a6a-378588f41dd2/tasks/waqxrgsgp.output` (will fold into wiki pages once PR #77 merges).
+
+**Six modules, ~9,000 LOC total:**
+- `chapter_step` (~2,400 LOC) — write / extract-bible
+- `chapter_qa_step` (~2,100 LOC) — qa / scan-drift / evaluate-genre / format-kindle
+- `research_step` (~320 LOC) — derive → Perplexity → synth
+- `brainstorm_step` (~1,400 LOC) — story + edit + chapter with 3-layer LOCKED CHARACTER ROSTER
+- `media_step` (~1,300 LOC) — cover-art (KIE.AI + DALL-E fallback) + social + scrape + scrape-ingest
+- `library_step + notify_step` (~1,450 LOC) — Manage Library + Story Bible + approval emails + Postal-backed notify
+
+**Recommended port order (low → high risk):** `research` → `library + story-bible + notify` → `brainstorm` → `media` → `chapter_qa` → `chapter`. Save the load-bearing chapter port for last so the framework is proven before the highest-value module ships.
+
+**Six prereqs identified — three landed in PR #77, three remain:**
+| # | Status | Module |
+|---|---|---|
+| 1 | ✅ in PR #77 | `PostalClient.send()` cc/bcc/reply_to/sender/headers/attachments/tag — 4 tests |
+| 2 | ⏳ next PR | `writer_engine.library_helpers/` (email_recipients, title_resolver, chapter_number, versions, story_bible, jsonb_merge) + Prime-Directive prompt block |
+| 3 | ✅ in PR #77 | `writer_engine.llm.json_extractor` (try_repair_json + extract_and_parse), `LLMResponse.citations` field, Perplexity citations — 11 tests |
+| 4 | ✅ in PR #77 | `writer_engine.rate_limit.AnthropicBudget` Redis sliding-window per-model gatekeeper, Tier-4 defaults baked in — 7 tests |
+| 5 | ⏳ next PR | `writer_engine.embeddings` (embed_texts + match_writing_documents RPC + re_embed_project async) behind `ENABLE_PYTHON_EMBEDDINGS` flag |
+| 6 | ⏳ next PR | Extend `EngineSettings` with new env vars (anthropic budget overrides, model pins, tier flag, feature flags, `*_STEP_URL`s) |
+
+### Decisions locked this session (cite [[f1a-decisions]])
+
+- **Model lineup pinned:** `claude-sonnet-4-6` (default), `claude-haiku-4-5-20251001` (cheap fan-out), `claude-opus-4-8` (hardest polish + chapter-wide continuity merge).
+- **Anthropic Tier 4 confirmed via probe** of `anthropic-ratelimit-*` headers on production key `5LhCYKsaFO3fF7II`:
+  - Sonnet 4.6 / Haiku 4.5: 450k input TPM, 90k output TPM, 1000 RPM
+  - Opus 4.8: **2,000,000** input TPM, 200k output TPM, 1000 RPM (largest of the three)
+  - Output TPM is the binding constraint for parallel sub-chapter writes — ~5 chapters/min on Sonnet, ~12 chapters/min on `hybrid-draft-polish` (Haiku writes + Sonnet polishes, two pools).
+- **Format-kindle uses `python-docx`** — the research workflow agent mis-claimed "Google Docs batch ops + Drive share." The live implementation at [`writers-workbench/server/src/routes/export.ts:2`](../../writers-workbench/server/src/routes/export.ts#L2) uses the `docx` npm package with all 17 KDP page sizes baked in. Python port mirrors it: no OAuth, no Drive, ~250 LOC. NOT a blocker.
+- **HITL gate count = 3** (stories / subject / image) — image gate is the user's call, even though the n8n flow only had two.
+- **BOTH delivery** — Postal email + permalink to Supabase-hosted archive.
+- **Gemini 2.5 Pro** is the picker model.
+- **Branching:** `feature/engine-foundation` from `develop`, PR to `develop`. The runtime + gateway services auto-deploy via Railway CI/CD on `develop` merge (same as `WritersWorkbench`).
+
+### Two known integration gaps (NOT in PR #77)
+
+1. **UI's resolveApproval still routes to n8n.** `routes/newsletter.ts` POST `/approvals/:token/resolve` calls `lib/approvals.ts` which resumes the n8n workflow. The engine's HITL gates live in its own Redis-backed token store, not in `newsletter_approvals_v2`. **Until a `getBackend()`-aware branch lands in `lib/approvals.ts` that POSTs to `${NEWSLETTER_SERVICE_URL}/internal/newsletter/approvals/{token}/resolve`, the UI "Approve" button does nothing for engine-backed sagas.** Half-day of WW server work; was scoped as F2-7 in the engine sprint plan.
+
+2. **Saga-state route fix not live.** PR #77 ships the rename, but the deployed runtime is still on the colliding `/pipelines/newsletter/state/` path. UI status reads will 500 until the merge triggers CI/CD.
+
+### Outstanding decisions (open for user)
+
+- **Order of attack** for F1-A — agree with `research → library+notify → brainstorm → media → chapter_qa → chapter`? Or lead with chapter so the highest-value module ships first (riskier).
+- **Format-kindle in F1-A or deferred?** Recommend included (small port, real win for KDP users).
+- **Save per-module specs as wiki pages?** Recommend yes; folder `Engineering/architecture/python-backend/f1a-specs/`.
+
+### Reference / connection notes (unchanged from 2026-05-28, plus engine)
+
+- Engine gateway / runtime URLs in [[deployment]] (`engine/docs/deployment.md`).
+- PR #77: <https://github.com/beserericl-hue/Automations/pull/77>
+- Workflow research output: `/private/tmp/claude-501/-Users-ericbeser-Documents-GitHub-Automations/a750398d-5418-430a-9a6a-378588f41dd2/tasks/waqxrgsgp.output`
+- **SECURITY TODO carried forward:** rotate PROD Postgres password (typed into a prior shell history); rotate the 4 API keys (Gemini, Perplexity, OpenAI, Firecrawl) that passed through chat in the 2026-05-30 session.
+
+### NEXT ACTION (resume here)
+
+1. **Merge PR #77** to `develop`. CI/CD deploys engine (gateway + runtime) and WW DEV simultaneously.
+2. After merge, verify:
+   - `curl https://writer-engine-runtime-develop.up.railway.app/openapi.json | jq '.paths | keys'` → should include `/pipelines/newsletter/saga-state/{execution_id}`.
+   - Direct synthetic gateway call still returns `execution_id`.
+   - Saga state lookup against that execution_id now returns 200 with stage state.
+3. **Land the engine-backed `lib/approvals.ts` branch** (~half day) — necessary before the UI smoke is truly end-to-end. Routes resolve POSTs to engine when the saga is engine-backed.
+4. **Drive UI-triggered newsletter generation** through the Python engine — first real end-to-end proof of F0+F1+F2. Will email the test subscriber + write a permalink.
+5. **F1-A start.** Open a new PR `feature/engine-f1a-prereqs-2` with the three remaining prereqs (library_helpers + embeddings + EngineSettings expansion). Then port modules in the recommended order; each module ships as its own PR with module-specific tests, behind a per-tool routing flag in the n8n hub.
+
+Full procedure: [[engine-framework-sprints]] + [[f1a-decisions]].
+Quick resume: `bash scripts/session-resume.sh` (still works — points at runbook; new entries supersede earlier ones).
 
 ---
 
