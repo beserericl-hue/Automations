@@ -1,0 +1,13 @@
+# Railway config-as-code for the writer-engine-GATEWAY service.
+#
+# Point the writer-engine-gateway service at this file:
+#   Railway → writer-engine-gateway → Settings → Config-as-code → Path = railway.gateway.toml
+#   (Root Directory must be /writers-workbench/engine so paths below resolve.)
+#
+# See railway.runtime.toml for why each service has its own file rather than a shared
+# railway.toml (the shared file forced the gateway Dockerfile onto the runtime and
+# caused the 2026-05-31 outage).
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "services/gateway/Dockerfile"
