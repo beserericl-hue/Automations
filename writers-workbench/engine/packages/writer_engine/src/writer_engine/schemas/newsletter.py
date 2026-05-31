@@ -8,7 +8,41 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+def _coerce_str_list(v: Any) -> Any:
+    """Coerce the messy shapes LLMs emit for a ``list[str]`` field into a clean list of strings.
+
+    The picker (Gemini) frequently returns ``identifiers`` (and sometimes ``external_source_links``)
+    as a dict like ``{"id": "<uuid>"}`` or a list of such dicts, instead of a flat list of id
+    strings. Pydantic then rejects the whole ``PickedStories`` payload ("Input should be a valid
+    list"). Normalise here in a ``mode="before"`` validator. Never raises — anything we can't make
+    sense of is returned unchanged so pydantic produces its normal validation error.
+    """
+
+    def _one(item: Any) -> str | None:
+        if item is None:
+            return None
+        if isinstance(item, str):
+            return item
+        if isinstance(item, dict):
+            for key in ("id", "identifier", "uuid", "url", "link"):
+                if key in item and item[key] is not None:
+                    return str(item[key])
+            vals = [x for x in item.values() if x is not None]
+            return str(vals[0]) if vals else None
+        return str(item)
+
+    if v is None:
+        return []
+    if isinstance(v, str):
+        return [v]
+    if isinstance(v, dict):
+        v = [v]
+    if isinstance(v, list):
+        return [s for s in (_one(x) for x in v) if s is not None and s != ""]
+    return v  # unknown shape — let pydantic raise its normal error
 
 
 class IngestedArticle(BaseModel):
@@ -36,6 +70,11 @@ class SelectedStory(BaseModel):
     summary: str
     identifiers: list[str] = Field(default_factory=list)
     external_source_links: list[str] = Field(default_factory=list)
+
+    @field_validator("identifiers", "external_source_links", mode="before")
+    @classmethod
+    def _normalise_str_lists(cls, v: Any) -> Any:
+        return _coerce_str_list(v)
 
 
 class PickedStories(BaseModel):
