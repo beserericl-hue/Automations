@@ -54,8 +54,50 @@ class EngineSettings(BaseSettings):
     # Picker model (decision #2)
     picker_model: str = Field(default="gemini-2.5-pro", alias="PICKER_MODEL")
 
+    # Anthropic model pins (F1-A — see [[f1a-decisions]] § model lineup). Strategy slots resolve to
+    # these concrete ids; overridable per-env without code change.
+    model_default: str = Field(default="claude-sonnet-4-6", alias="MODEL_DEFAULT")
+    model_cheap: str = Field(default="claude-haiku-4-5-20251001", alias="MODEL_CHEAP")
+    model_premium: str = Field(default="claude-opus-4-8", alias="MODEL_PREMIUM")
+
+    # Anthropic rate-limit budget (F1-A prereq #4). Empty string = use the baked-in Tier-4
+    # DEFAULT_LIMITS in writer_engine.rate_limit.anthropic_budget. Set to override per env/tier.
+    anthropic_tier: str = Field(default="", alias="ANTHROPIC_TIER")
+    anthropic_budget_overrides: str = Field(default="", alias="ANTHROPIC_BUDGET_OVERRIDES")
+
+    # Postal delivery defaults (F1-A prereq #1 — PostalClient cc/bcc/sender/reply_to/headers).
+    postal_sender: str = Field(default="", alias="POSTAL_SENDER")
+    postal_sender_name: str = Field(default="", alias="SENDER_NAME")
+    postal_reply_to: str = Field(default="", alias="REPLY_TO_EMAIL")
+    postal_default_bcc: str = Field(default="", alias="POSTAL_DEFAULT_BCC")
+
+    # Feature flags (F1-A). Embeddings default OFF → falls through to the n8n shim.
+    enable_python_embeddings: bool = Field(default=False, alias="ENABLE_PYTHON_EMBEDDINGS")
+
+    # Embeddings (F1-A prereq #5). OpenAI text-embedding model + the pgvector match RPC name.
+    embedding_model: str = Field(default="text-embedding-3-small", alias="EMBEDDING_MODEL")
+    embedding_match_rpc: str = Field(
+        default="match_writing_documents", alias="EMBEDDING_MATCH_RPC"
+    )
+
     # Inter-service
     orchestrator_url: str = Field(default="http://localhost:8001", alias="ORCHESTRATOR_URL")
+
+    # Per-step service URLs (F1-A — runtime container binds these on localhost; orchestrator dials
+    # them). Defaults match services/runtime/entrypoint.sh.
+    gather_step_url: str = Field(default="http://localhost:8010", alias="GATHER_STEP_URL")
+    pick_step_url: str = Field(default="http://localhost:8011", alias="PICK_STEP_URL")
+    subject_step_url: str = Field(default="http://localhost:8012", alias="SUBJECT_STEP_URL")
+    scrape_step_url: str = Field(default="http://localhost:8013", alias="SCRAPE_STEP_URL")
+    segment_step_url: str = Field(default="http://localhost:8014", alias="SEGMENT_STEP_URL")
+    image_step_url: str = Field(default="http://localhost:8015", alias="IMAGE_STEP_URL")
+    assemble_step_url: str = Field(default="http://localhost:8016", alias="ASSEMBLE_STEP_URL")
+    render_step_url: str = Field(default="http://localhost:8017", alias="RENDER_STEP_URL")
+    persist_step_url: str = Field(default="http://localhost:8018", alias="PERSIST_STEP_URL")
+    deliver_step_url: str = Field(default="http://localhost:8019", alias="DELIVER_STEP_URL")
+    library_retrieve_step_url: str = Field(
+        default="http://localhost:8002", alias="LIBRARY_RETRIEVE_STEP_URL"
+    )
 
     # Observability
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
