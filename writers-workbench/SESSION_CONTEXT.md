@@ -2169,3 +2169,22 @@ A concurrent Claude Code process in this project repeatedly flooded the shared t
 
 ---
 
+## Session 2026-05-31 (cont. 2) — engine relocated, runtime recovered, migration 023 applied
+
+(Supersedes the carry-forwards in the previous (cont.) entry. All Writers Workbench / Automations only.)
+
+### Resolved since last entry
+- **Engine relocated** `engine/` → **`writers-workbench/engine/`** (PR #80). One repo (origin `Automations`); engine services on Railway were just missing a GitHub source link, now repo-connected (Root `/writers-workbench/engine`, branch `develop`).
+- **Railway build config fixed** (PR #81 removed the shared `railway.toml` that forced the gateway Dockerfile onto every service; PR #82 added per-service `railway.runtime.toml`/`railway.gateway.toml`). **The fix that actually worked = `RAILWAY_DOCKERFILE_PATH` env var per service** (set via CLI: runtime→`services/runtime/Dockerfile`, gateway→`services/gateway/Dockerfile`); setting it auto-triggers a rebuild. Without an explicit Dockerfile pin Railway falls back to its Railpack auto-builder, which fails on this uv workspace ("No start command detected"). **Do NOT `railway up` these services anymore — repo-connected is the source of truth.**
+- **DEV runtime RECOVERED:** `/admin/health` → `{"service":"orchestrator"}`, gateway healthy, `saga-state` route live. Gateway saga `POST /internal/newsletter/generate` → 200 + execution_id; `GET …/executions/{id}/state` → 200. (Root cause of the outage was the runtime building the gateway image via the shared railway.toml, compounded by my CLI `railway up` — self-inflicted, now fixed.)
+- **Migration 023 APPLIED + verified on DEV Supabase** (`gvbvwcnmjkdpclcisqrr`). DEV's correct **Session-pooler host is `aws-1-us-east-2.pooler.supabase.com`** (an earlier `aws-0-us-west-2` guess was PROD's region → `tenant not found`); user set the correct DSN as `DATABASE_URL` on WW-develop. Post-state confirmed: stage CHECK = `('stories','subject_line','image')`, `resume_url` nullable = YES. Smoke: the exact engine mirror insert (`stage='image'`, `resume_url` NULL, real `user_id` FK) succeeds in a rolled-back txn — would have failed pre-023. **F2-7 engine→UI approval mirror is now fully functional on DEV.**
+
+### Still open
+- **Pick-step bug (real, pre-existing F2 bug):** first real DEV saga run reached `stage=error` at the **pick** step — the picker LLM returns `identifiers` as a dict `{"id": "<uuid>"}` but the `PickedStories` schema wants a `list` (10 validation errors). Proves `gather` DID return articles for the `ai-news` edition (so DEV is NOT contentless for that edition). Fix in `writers-workbench/engine/services/pick_step/` + the `PickedStories` schema. See memory `pick-step-identifiers-bug`.
+- **F1-A prereqs-2** (no DB): `library_helpers/` (#2) + `embeddings/` flag-wiring (#5) + `EngineSettings` env expansion (#6). NOTE: verified neither `library_helpers/` nor `embeddings/` exists in `writer_engine` yet — all three are net-new (earlier notes claiming `embeddings/` exists were wrong).
+
+### Deploy note (corrected)
+Engine CI/CD is **repo-connected Railway builds** (merge to `develop` rebuilds the connected services), NOT `railway up` and NOT GitHub Actions (no `deploy-engine.yml`). Per-service Dockerfile is pinned via `RAILWAY_DOCKERFILE_PATH`.
+
+---
+
