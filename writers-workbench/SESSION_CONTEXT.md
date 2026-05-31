@@ -2135,3 +2135,37 @@ Quick resume: `bash scripts/session-resume.sh` (still works — points at runboo
 
 ---
 
+## Session 2026-05-31 (cont.) — F2-7 shipped, engine relocated under writers-workbench/, Railway repo-connect
+
+(Scope: Writers Workbench / Automations only.)
+
+### Merged to `develop` this session
+- **PR #77 / #78 / #79** — F2-7 (engine-backed UI approval resolve) + the docs-URL fix. F2-7 = `hitl.create_approval` threads `user_id`/`edition_id` and mirrors to `newsletter_approvals_v2` only when `user_id` present (old mirror omitted the NOT NULL/FK user_id → swallowed insert → UI 404); `_TABLE_STAGE` maps verbose `awaiting_*_approval` → short `stories|subject_line|image` for the mirror only; saga threads ids into all 3 gates; migration `023_engine_approval_mirror.sql` (stage CHECK += `image`, `resume_url` nullable); WW `lib/approvals.ts` posts engine resolves to `${NEWSLETTER_SERVICE_URL}/internal/newsletter/approvals/{token}/resolve` when `NEWSLETTER_BACKEND=python`; client `image` stage rendered. A client-tsc regression I merged (missing `image` key in `PendingApprovals.tsx` STAGE_LABEL) was hot-fixed in `abc6296`.
+- **PR #80** — **moved `engine/` → `writers-workbench/engine/`** (188-file pure rename). All Writers Workbench code now lives under `writers-workbench/`. There is ONE git repo (origin `Automations`); no second repo was ever created — the earlier confusion was that the Railway engine services had no GitHub **source link** (created via CLI `railway up`).
+- **PR #81** — **deleted `writers-workbench/engine/railway.toml`**. `develop` now at `cfd6135`.
+
+### Railway engine deployment — switched from CLI to repo-connected (IMPORTANT)
+- The `writer-engine-runtime` + `writer-engine-gateway` services were originally created with CLI `railway up` (tarball upload, no repo link). This session they were **connected to the GitHub repo** (`beserericl-hue/Automations`, branch `develop`, Root Directory `/writers-workbench/engine`).
+- **Root cause of the DEV runtime outage (502 "orchestrator unreachable"):** the shared `engine/railway.toml` hardcoded `dockerfilePath = "services/gateway/Dockerfile"`. On repo-connected builds that build-config file **overrides the per-service Dockerfile Path UI setting**, so `writer-engine-runtime` built+ran the **gateway** image (`uvicorn gateway.main` on :8000) instead of the orchestrator (`entrypoint.sh` on :8001). PR #81 removes that file so each service uses its own Dockerfile Path:
+  - `writer-engine-runtime` → `services/runtime/Dockerfile` (orchestrator + 10 step uvicorns + arq, :8001)
+  - `writer-engine-gateway` → `services/gateway/Dockerfile` (:8000)
+- **The outage was self-inflicted:** I redeployed the runtime via CLI `railway up` from the develop head, and `railway.toml` made it build the gateway. DO NOT mix CLI `railway up` with repo-connected builds — repo-connect is now the single source of truth; never `railway up` these services again.
+- ⏳ **OPEN at handoff:** after PR #81, the runtime must be **redeployed from `develop`** with Dockerfile Path `services/runtime/Dockerfile`. Until that redeploy lands, runtime `/admin/health` still 502s (its live image predates the fix). Verify recovery: runtime `/admin/health` → `{"service":"orchestrator"}`, then gateway `POST /internal/newsletter/generate` (X-Service-Secret) → `execution_id`, then `GET /internal/newsletter/executions/{id}/state` → 200.
+
+### Migration 023 — applied? NO. Blocked on DSN.
+`023_engine_approval_mirror.sql` is committed but **NOT yet run against DEV Supabase** (`gvbvwcnmjkdpclcisqrr`). The `DATABASE_URL` set on the WW-develop Railway service points at the **wrong pooler region** (`aws-0-us-west-2` = PROD's region) → psql fails `FATAL: (ENOTFOUND) tenant/user postgres.gvbvwcnmjkdpclcisqrr not found`. Need the DEV project's correct **Session pooler** connection string (Supabase dashboard → Project Settings → Database → Connection string → Session pooler) — it has the right `aws-0-<region>` host. The direct host `db.<ref>.supabase.co` is IPv6-only and won't resolve from this Mac. Until 023 runs, the F2-7 engine→UI approval mirror is inert on DEV.
+
+### DEV data gap (blocks a full HITL-gate smoke)
+DEV Supabase: 3 users, **0 enabled `newsletter_editions_v2`, 0 `content_ingestion_v2`** → the engine saga `gather` short-circuits to `skipped_no_content`, so a full UI-driven gate smoke needs an edition + ingested content seeded first.
+
+### NEXT
+1. (User) Redeploy runtime from develop w/ `services/runtime/Dockerfile`; I verify health + saga smoke.
+2. (User) Provide correct DEV Session-pooler DSN; I run + verify migration 023.
+3. Seed a DEV edition + content for the full 3-gate smoke.
+4. **F1-A prereqs-2** (`feature/engine-f1a-prereqs-2`, no DB needed): library_helpers (#2) + embeddings flag-wiring (#5, `ENABLE_PYTHON_EMBEDDINGS` gate) + EngineSettings env expansion (#6). Then F1-A module ports: research → library+story-bible+notify → brainstorm → media → chapter_qa → chapter (format-kindle included).
+
+### Harness note
+A concurrent Claude Code process in this project repeatedly flooded the shared temp fs (`/tmp/claude-501`) to ENOSPC, intermittently suppressing/garbling Bash stdout and cascade-cancelling parallel tool batches. Worked around with single sequential calls + rc/file-based verification + the Monitor tool. Several mid-turn status claims that came from cancelled calls were corrected against `git`/`curl` ground truth — the record above is the verified state.
+
+---
+
