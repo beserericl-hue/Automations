@@ -1,17 +1,17 @@
 name: engine-ci
 on:
   pull_request:
-    paths: ["engine/**"]
+    paths: ["writers-workbench/engine/**"]
   push:
     branches: ["develop", "main"]
-    paths: ["engine/**"]
+    paths: ["writers-workbench/engine/**"]
 
 jobs:
   lint-type-test:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: engine
+        working-directory: writers-workbench/engine
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: engine
+        working-directory: writers-workbench/engine
     steps:
       - uses: actions/checkout@v4
       - name: docker compose build
