@@ -32,7 +32,7 @@ As of Sprint 10.a (2026-04-20), the 24 active **PROD - &lt;name&gt;** n8n workfl
 - **DEV Supabase**: project `gvbvwcnmjkdpclcisqrr.supabase.co` (labeled "Writers Assistant DEV") — populated as a clone of PROD for realistic test data; not a replacement for PROD
 - **DEV hub**: `DEV - The Author Agent` (webhook `/webhook/author_request_dev`)
 - **DEV tool workflows**: one `DEV - &lt;name&gt;` per PROD workflow (mapping in [`scripts/workflow-id-map.json`](scripts/workflow-id-map.json))
-- DEV workflows are consumed by the dev Writer's Workbench at `writersworkbenchdev-production.up.railway.app`
+- DEV workflows are consumed by the dev Writer's Workbench at `writersworkbench-develop.up.railway.app`
 - DEV copies point at DEV Supabase; their `executeWorkflow` refs point only at sibling DEV workflows (never into PROD)
 
 ### If a subagent or automated process needs to touch ANY PROD resource, STOP and ask the user first.
@@ -41,7 +41,7 @@ As of Sprint 10.a (2026-04-20), the 24 active **PROD - &lt;name&gt;** n8n workfl
 
 Some env vars are tier-specific and easy to miss when configuring a Railway service. Getting them wrong produces confusing failures.
 
-- `ALLOWED_ORIGINS` — must be the service's own public URL. On the dev service use `https://writersworkbenchdev-production.up.railway.app`; on prod use `https://writersworkbench-production.up.railway.app`. The client bundles reference JS and CSS with `crossorigin`, which makes the browser send an `Origin` header on same-origin requests; if that origin isn't whitelisted the server rejects every asset with CORS 500 and the page appears blank. (We hit this during Sprint 10.a smoke testing.)
+- `ALLOWED_ORIGINS` — must be the service's own public URL. On the dev service use `https://writersworkbench-develop.up.railway.app`; on prod use `https://writersworkbench-production.up.railway.app`. The client bundles reference JS and CSS with `crossorigin`, which makes the browser send an `Origin` header on same-origin requests; if that origin isn't whitelisted the server rejects every asset with CORS 500 and the page appears blank. (We hit this during Sprint 10.a smoke testing.)
 - `NODE_ENV` — `production` on prod, `development` on dev. The `/api/health` `environment` field is derived from this; if both services report the same value you cannot tell deploys apart.
 - `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` / `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` — the dev service hits DEV Supabase, prod hits PROD. Keys must match their URL or auth fails with misleading errors.
 - `VITE_N8N_WEBHOOK_URL` / `N8N_BRAINSTORM_WEBHOOK_URL` — dev uses `_dev` webhook suffix (calls DEV hub + DEV tool workflows); prod uses `_v2` (calls PROD hub + PROD tool workflows). Mismatch causes dev writes to land in PROD Supabase via the wrong tier.
