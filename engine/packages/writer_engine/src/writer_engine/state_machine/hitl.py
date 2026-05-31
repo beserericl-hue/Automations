@@ -47,6 +47,25 @@ class HitlGate:
 
 _in_memory: dict[str, HitlGate] = {}
 
+# The engine's internal gate stages are verbose ("awaiting_stories_approval"),
+# but the Workbench UI + the newsletter_approvals_v2 CHECK constraint speak a
+# short vocabulary ("stories" / "subject_line" / "image"). The Supabase mirror
+# (and only the mirror) translates through this map. Redis / HitlGate.stage
+# keep the verbose form because the saga's apply_decision routes on it.
+_TABLE_STAGE: dict[str, str] = {
+    "awaiting_stories_approval": "stories",
+    "awaiting_subject_approval": "subject_line",
+    "awaiting_image_approval": "image",
+    # pass-throughs so callers may use either form
+    "stories": "stories",
+    "subject_line": "subject_line",
+    "image": "image",
+}
+
+
+def _table_stage(stage: str) -> str:
+    return _TABLE_STAGE.get(stage, "stories")
+
 
 def _now_ms() -> int:
     return int(time.time() * 1000)
@@ -106,9 +125,17 @@ async def create_approval(
     execution_id: UUID,
     stage: str,
     payload: dict[str, Any] | None = None,
+    user_id: str | None = None,
+    edition_id: str | None = None,
     ttl_seconds: int = 7 * 24 * 60 * 60,
 ) -> HitlGate:
-    """Create an approval gate. Writes to Redis (primary), Supabase (mirror), and in-memory (fallback)."""
+    """Create an approval gate. Writes to Redis (primary), Supabase (mirror), and in-memory (fallback).
+
+    ``user_id`` is required for the Supabase mirror — newsletter_approvals_v2.user_id is NOT NULL and
+    FKs to users_v2, and the Workbench in-app resolve route enforces session-user ownership against it.
+    When ``user_id`` is absent (tests, the local docker-compose demo) the mirror is skipped; Redis +
+    in-memory still hold the gate so the saga resumes.
+    """
     gate = HitlGate(
         token=secrets.token_urlsafe(24),
         execution_id=execution_id,
@@ -120,27 +147,28 @@ async def create_approval(
     # 1. Redis (best-effort).
     await _redis_write(gate)
 
-    # 2. Supabase (mirror for the existing UI routes).
+    # 2. Supabase (mirror for the existing UI routes). Only when we have the user_id the
+    #    NOT NULL / FK / ownership-check all require. resume_url is omitted (n8n-only; nullable
+    #    as of migration 023) — the Workbench resolves engine rows via the engine endpoint, not
+    #    a Wait-node URL. The stage is mapped to the table's short vocabulary.
     try:
         from writer_engine.config import get_settings
         from writer_engine.supabase.client import get_supabase_admin
 
         settings = get_settings()
-        if settings.supabase_url and settings.supabase_service_role_key:
+        if settings.supabase_url and settings.supabase_service_role_key and user_id:
+            row: dict[str, Any] = {
+                "token": gate.token,
+                "user_id": user_id,
+                "execution_id": str(execution_id),
+                "stage": _table_stage(stage),
+                "payload": gate.payload,
+                "expires_at": _iso_from_ms(gate.expires_at_ms),
+            }
+            if edition_id:
+                row["edition_id"] = edition_id
             client = await get_supabase_admin()
-            await (
-                client.table("newsletter_approvals_v2")
-                .insert(
-                    {
-                        "token": gate.token,
-                        "execution_id": str(execution_id),
-                        "stage": stage,
-                        "payload": gate.payload,
-                        "expires_at": _iso_from_ms(gate.expires_at_ms),
-                    }
-                )
-                .execute()
-            )
+            await client.table("newsletter_approvals_v2").insert(row).execute()
     except Exception:
         pass
 
@@ -183,7 +211,7 @@ async def resolve_approval(
         from writer_engine.supabase.client import get_supabase_admin
 
         settings = get_settings()
-        if settings.supabase_url and settings.supabase_service_role_key:
+        if settings.supabase_url and settings.supabase_service_role_key and gate.resolved_at_ms is not None:
             client = await get_supabase_admin()
             await (
                 client.table("newsletter_approvals_v2")

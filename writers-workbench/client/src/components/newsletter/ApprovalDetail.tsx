@@ -65,7 +65,13 @@ export default function ApprovalDetail() {
           ← Pending approvals
         </Link>
         <h1 className="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">
-          {approval ? (approval.stage === 'subject_line' ? 'Subject line approval' : 'Stories approval') : 'Approval'}
+          {approval
+            ? approval.stage === 'subject_line'
+              ? 'Subject line approval'
+              : approval.stage === 'image'
+              ? 'Cover image approval'
+              : 'Stories approval'
+            : 'Approval'}
         </h1>
         {token && (
           <p className="mt-0.5 font-mono text-xs text-gray-500 dark:text-gray-400">
