@@ -1,0 +1,16 @@
+# Railway config-as-code for the writer-engine-RUNTIME service.
+#
+# Point the writer-engine-runtime service at this file:
+#   Railway → writer-engine-runtime → Settings → Config-as-code → Path = railway.runtime.toml
+#   (Root Directory must be /writers-workbench/engine so paths below resolve.)
+#
+# Why a per-service file: a single shared railway.toml would force ONE dockerfilePath
+# on every service that reads it — which is exactly what built the gateway image into
+# the runtime service and caused the 2026-05-31 outage. Each service gets its own file.
+#
+# Without an explicit builder=DOCKERFILE + dockerfilePath, Railway falls back to its
+# Railpack auto-builder, which fails on this uv workspace with "No start command detected".
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "services/runtime/Dockerfile"
