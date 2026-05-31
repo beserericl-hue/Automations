@@ -618,7 +618,7 @@ Explicitly _not_ in this sprint:
 
 Scope notes for Claude Code:
 
-- **Do all DB + server work against DEV** (`writersworkbenchdev-production.up.railway.app`, DEV Supabase). Mirror cred patterns from S9 + S11. Do **not** touch PROD credentials; they'll be minted at promotion time.
+- **Do all DB + server work against DEV** (`writersworkbench-develop.up.railway.app`, DEV Supabase). Mirror cred patterns from S9 + S11. Do **not** touch PROD credentials; they'll be minted at promotion time.
 - **Do not alter** `Content - Newsletter Agent V2`'s existing 87 nodes' parameters or expressions. Every S3 node is additive — the only edits to existing nodes are: (a) the `form_trigger` gets an `Edition Id` field, (b) edges that previously fed `search_markdown_objects` now route through the new `set_trigger_inputs` node first.
 - **Emit-node credentials** must use the `genericCredentialType: httpHeaderAuth` pattern, same as every other outbound call to the Workbench (`oWli4irymtVqSDyC`, `jQBRJbmiUeTk8c11`, `ytjKAO1BESVf6Cnz`, `kxrSg24PIR2Npfvw`).
 - **Webhook trigger** uses the existing `DEV Workbench Ingestion Secret` (`jQBRJbmiUeTk8c11`) as `headerAuth` — no new cred required for it. The new `DEV Workbench Newsletter Callback Secret` is only for the 9 emit nodes calling back into the Workbench.

@@ -34,7 +34,7 @@ Today, to publish _The Workbench — Dispatches from the Machine Room_ (AI news 
 1. Opens an n8n-hosted public form URL in a browser.
 2. Types a date, hits submit.
 3. Switches to Gmail to wait for `Newsletter {Date} — Selected Stories` to arrive.
-4. Clicks an _"Open approval form"_ button in the email to land on an SSR page at `writersworkbenchdev-production.up.railway.app/approvals/:token`.
+4. Clicks an _"Open approval form"_ button in the email to land on an SSR page at `writersworkbench-develop.up.railway.app/approvals/:token`.
 5. Picks Approve or Revise, types feedback, submits.
 6. Back to Gmail, waits for the subject-line approval email.
 7. Repeats steps 4–5.

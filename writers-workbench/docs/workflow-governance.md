@@ -17,7 +17,7 @@ That model worked while the only user was the developer. Once real customers are
 |------|-------------|----------|---------|-------------|------------------|
 | **V1 (Orig)** | `... Orig` | PROD | `/webhook/author_request` | Nothing (frozen) | NEVER modify without explicit user permission |
 | **PROD** | `PROD - <name>` | PROD Supabase (`faklxfakgzkpkbxfihzh`) | `/webhook/author_request_v2` | Production Writer's Workbench (`writersworkbench-production.up.railway.app`) | Touched only by hotfixes or Dev→Prod promotion. No ad-hoc sprint edits. |
-| **DEV** | `DEV - <name>` | DEV Supabase (`gvbvwcnmjkdpclcisqrr`) | `/webhook/author_request_dev` | Dev Writer's Workbench (`writersworkbenchdev-production.up.railway.app`) | Free to modify during sprints. Source of truth for "what PROD will look like next release." |
+| **DEV** | `DEV - <name>` | DEV Supabase (`gvbvwcnmjkdpclcisqrr`) | `/webhook/author_request_dev` | Dev Writer's Workbench (`writersworkbench-develop.up.railway.app`) | Free to modify during sprints. Source of truth for "what PROD will look like next release." |
 
 ## The n8n-git parallel
 
@@ -43,7 +43,7 @@ Within each tier, webhook paths are suffixed accordingly (`_v2` on PROD hub, `_d
 
 **Only `DEV - <name>` workflows.** PROD workflows are untouchable outside release time (see promotion flow below) or a hotfix.
 
-Corollary: the DEV Writer's Workbench (`writersworkbenchdev-production.up.railway.app`) hits the DEV hub webhook, which calls DEV tool workflows, which write to the DEV database. Production reads and writes stay on PROD — completely isolated tiers, even though they share the same n8n instance.
+Corollary: the DEV Writer's Workbench (`writersworkbench-develop.up.railway.app`) hits the DEV hub webhook, which calls DEV tool workflows, which write to the DEV database. Production reads and writes stay on PROD — completely isolated tiers, even though they share the same n8n instance.
 
 ## Promotion flow (Dev → Prod)
 

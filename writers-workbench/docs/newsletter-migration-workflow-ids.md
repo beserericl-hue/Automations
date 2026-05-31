@@ -48,8 +48,8 @@ PROD credentials don't exist yet. They'll be created at release promotion using 
 `AI News Data Ingestion V2` (`2T3TwGHhdGQlTpQ5`) was built by cloning Orig (80 nodes) with six structural transformations:
 
 1. **7 S3/proxy nodes dropped** — `upload_temp_markdown`, `copy_markdown`, `delete_temp_markdown`, `upload_temp_html`, `copy_html`, `delete_temp_html`, `search_existing_resource`. None of the `s3` resource operations against the `data-ingestion` bucket or `api.aitools.inc` proxy calls remain.
-2. **`search_existing` added** — HTTP Request v4.2, GET `https://writersworkbenchdev-production.up.railway.app/api/ingestion/search?prefix={{$json.uploadFileName}}&user_id=+14105914612`, cred `jQBRJbmiUeTk8c11`. Same position as the old `search_existing_resource`.
-3. **`upload_content` added** — HTTP Request v4.2, POST `https://writersworkbenchdev-production.up.railway.app/api/ingestion/upload`, cred `jQBRJbmiUeTk8c11`. Body is a single JSON expression that assembles `{key, user_id, type, title, authors, source_name, source_url, external_source_urls, image_urls, reddit_metadata?, published_timestamp, feed_url, markdown, html}` from the earlier nodes. `type` maps `feedType` to one of the four allowed ingestion types; anything unrecognized falls back to `article`.
+2. **`search_existing` added** — HTTP Request v4.2, GET `https://writersworkbench-develop.up.railway.app/api/ingestion/search?prefix={{$json.uploadFileName}}&user_id=+14105914612`, cred `jQBRJbmiUeTk8c11`. Same position as the old `search_existing_resource`.
+3. **`upload_content` added** — HTTP Request v4.2, POST `https://writersworkbench-develop.up.railway.app/api/ingestion/upload`, cred `jQBRJbmiUeTk8c11`. Body is a single JSON expression that assembles `{key, user_id, type, title, authors, source_name, source_url, external_source_urls, image_urls, reddit_metadata?, published_timestamp, feed_url, markdown, html}` from the earlier nodes. `type` maps `feedType` to one of the four allowed ingestion types; anything unrecognized falls back to `article`.
 4. **Edges rewired**:
    - `get_identity → search_existing → skip_existing_resources`
    - `try_extract_external_sources → upload_content`
@@ -236,7 +236,7 @@ Express routes on the Workbench server that replace the Slack `sendAndWait` gate
 | `GET /approvals/:token` | Token is credential | SSR HTML form with radio Approve/Revise + feedback textarea. Renders gone/expired page for resolved or expired rows. |
 | `POST /approvals/:token/resolve` | Token is credential | Validates the submission, transactionally UPDATEs the row (only when `resolved_at IS NULL`), POSTs `{decision, feedback}` to the stored `resume_url` (n8n Wait node webhook). Returns a thank-you page on success, 409 on double-submit, 410 on expired, 502 if n8n resume fails (decision already persisted — not lost). |
 
-Dev Railway env: `APPROVAL_SECRET` and `APPROVAL_BASE_URL=https://writersworkbenchdev-production.up.railway.app` set via `railway variable set`.
+Dev Railway env: `APPROVAL_SECRET` and `APPROVAL_BASE_URL=https://writersworkbench-develop.up.railway.app` set via `railway variable set`.
 
 **Tests:** [`server/src/test/approvals.test.ts`](../server/src/test/approvals.test.ts) — 18/18 passing. In-memory Supabase fake + scoped fetch mock (only intercepts calls to the simulated n8n resume URL, passes everything else through). Covers: auth 401, missing `APPROVAL_BASE_URL` 500, invalid stage 400, FK violation 400, form rendering, expired/resolved pages, approve + revise happy paths, double-submit 409, expired row 410, resume fail 502, network exception 502, malformed-token rejection.
 
@@ -323,7 +323,7 @@ Orig (`4DQ7DmA9pFtXzsKX`) and `AI News Data Ingestion Orig` (`53SlwZMS21gpvz3H`)
 
 ### URL substitution at promotion
 
-`WORKBENCH_URL` (dev: `writersworkbenchdev-production.up.railway.app`, prod: `writersworkbench-production.up.railway.app`) is hardcoded in the two new HTTP Request nodes. `scripts/clone-prod-to-dev.py` and its reverse `promote-dev-to-prod.py` already do URL substitution for the Supabase URL; extending to `WORKBENCH_URL` is a one-line tweak (add it to the substitution table) at DEV → PROD promotion time.
+`WORKBENCH_URL` (dev: `writersworkbench-develop.up.railway.app`, prod: `writersworkbench-production.up.railway.app`) is hardcoded in the two new HTTP Request nodes. `scripts/clone-prod-to-dev.py` and its reverse `promote-dev-to-prod.py` already do URL substitution for the Supabase URL; extending to `WORKBENCH_URL` is a one-line tweak (add it to the substitution table) at DEV → PROD promotion time.
 
 ## MCP config drift
 
@@ -415,7 +415,7 @@ Expected: `200 {"executionId":"<id>","editionId":"ai-news"}`. If you see `403 WW
 
 All 10 stories shipped to DEV. PROD waits for release-day promotion.
 
-### Server endpoints added (live on DEV `writersworkbenchdev-production.up.railway.app`)
+### Server endpoints added (live on DEV `writersworkbench-develop.up.railway.app`)
 
 | Endpoint | Story |
 |---|---|

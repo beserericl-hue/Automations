@@ -564,7 +564,7 @@ Ping me when Phase 7 is done and I'll open that PR.
 
 ```bash
 # Dev dry-run
-curl -X POST https://writersworkbenchdev-production-*.up.railway.app/api/email/send \
+curl -X POST https://writersworkbench-develop.up.railway.app/api/email/send \
   -H "Content-Type: application/json" \
   -H "X-Email-Secret: 30c8dc2b3a1339a996c1dff20e5ea28d6e466870cef7635a9a4723819877431d" \
   -d '{"to":"your@email.com","subject":"Postal smoke test","html":"<p>hi</p>"}'
