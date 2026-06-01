@@ -249,12 +249,16 @@ class NewsletterSagaDriver:
                 execution_id=execution_id,
                 payload={"urls": story.external_source_links},
             )
-            scraped = scrape_out.payload.get("scraped") or []
+            # scrape failures are non-fatal — the segment can still be written from the source
+            # markdown alone, so we degrade to no scraped content rather than aborting the run.
+            scraped = [] if scrape_out.status is StepStatus.ERROR else (scrape_out.payload.get("scraped") or [])
             image_out = await run_step_via_http(
                 _step("image"),
                 execution_id=execution_id,
                 payload={"story": story_payload, "scraped_images": []},
             )
+            if image_out.status is StepStatus.ERROR:
+                raise RuntimeError(f"image step error for {story.title!r}: {image_out.error}")
             image_options_by_story.append(image_out.payload)
             seg_out = await run_step_via_http(
                 _step("segment"),
@@ -265,6 +269,10 @@ class NewsletterSagaDriver:
                     "image_options": image_out.payload.get("options") or [],
                 },
             )
+            # A failed segment must abort the run — silently appending the empty error payload
+            # produced a blank newsletter body (5 empty segments) on an earlier DEV run.
+            if seg_out.status is StepStatus.ERROR:
+                raise RuntimeError(f"segment step error for {story.title!r}: {seg_out.error}")
             segments_data.append(seg_out.payload)
 
         await self._advance(

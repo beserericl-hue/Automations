@@ -56,6 +56,10 @@ async def handler(inp: StepInput) -> StepOutput:
         seg = await _write(router, story, sources, image_options, model)
     except ProviderNotRegistered:
         seg = _fixture(story)
+    # The model sometimes omits the title; backfill the authoritative story title so downstream
+    # stages (image gate, chosen-image matching, assemble) can key on it reliably.
+    if not seg.story_title:
+        seg.story_title = str(story.get("title") or "Story")
     return StepOutput(
         execution_id=inp.execution_id,
         step_name=STEP_NAME,
