@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 def _coerce_str_list(v: Any) -> Any:
@@ -90,6 +90,54 @@ class SubjectLineProposal(BaseModel):
     additional_subject_lines: list[str] = Field(default_factory=list)
     subject_line_reasoning: str = ""
     pre_header_text_reasoning: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _unwrap_envelope(cls, data: Any) -> Any:
+        """Flatten the shapes the subject LLM (Gemini) emits into the flat schema.
+
+        Observed in production: the model returns a ``{"primary": {"subject_line": ...,
+        "pre_header_text": ...}, "alternatives": [...]}`` envelope instead of flat fields, which
+        failed validation ("Field required: subject_line"). Unwrap a ``primary`` (or ``recommended``/
+        ``best``) sub-object onto the top level, map common aliases, and pull alternates into
+        ``additional_subject_lines``. Non-dict input is returned unchanged (pydantic raises normally).
+        """
+        if not isinstance(data, dict):
+            return data
+        out = dict(data)
+
+        # 1. Hoist a nested primary/recommended/best envelope onto the top level.
+        for env_key in ("primary", "recommended", "best", "selected"):
+            env = out.get(env_key)
+            if isinstance(env, dict):
+                for k, v in env.items():
+                    out.setdefault(k, v)
+                break
+
+        # 2. Common field aliases.
+        if "subject_line" not in out:
+            for alias in ("subject", "subjectLine", "subject_line_text", "headline"):
+                if alias in out:
+                    out["subject_line"] = out[alias]
+                    break
+        if "pre_header_text" not in out:
+            for alias in ("preheader", "pre_header", "preheader_text", "preview_text", "preheaderText"):
+                if alias in out:
+                    out["pre_header_text"] = out[alias]
+                    break
+
+        # 3. Alternates → additional_subject_lines (list of strings).
+        if not out.get("additional_subject_lines"):
+            for alias in ("alternatives", "alternates", "additional", "other_subject_lines"):
+                alt = out.get(alias)
+                if isinstance(alt, list):
+                    out["additional_subject_lines"] = [
+                        (a.get("subject_line") or a.get("subject") or "") if isinstance(a, dict) else str(a)
+                        for a in alt
+                    ]
+                    break
+
+        return out
 
 
 class StorySegment(BaseModel):
