@@ -28,9 +28,9 @@ gather → pick →[stories gate]→ subject →[subject gate]→ writing_segmen
 | **S-09** | stories gate review + resolve → stories_approved | ✅ verified | approved tokens across both runs; resumed to subject |
 | **S-10** | subject gate review + resolve | ✅ verified | subject + 3 clean alternatives; approved |
 | **S-11** | image gate review + resolve w/ chosen images | ✅ verified (text-only) | 5 stories, 0 image options (articles had none) — empty chosen_images is valid |
-| **S-12** | revise loop (feedback → re-run, bounded) | ⏳ not yet exercised | `apply_decision` handles REVISE w/ MAX_REVISIONS_PER_GATE |
+| **S-12** | revise loop (feedback → re-run, bounded) | ✅ verified | run `2869ba56`: stories `{revise, feedback}` → re-ran pick, `revision_counts.stories` 0→1, returned to gate; selection changed to honour the feedback (dropped GPU/hardware, added open-source/dev-tooling). Bounded by MAX_REVISIONS_PER_GATE. |
 | **S-13** | delivery = Postal fan-out + web permalink | ✅ verified | run `ea8a176e`: `recipients_emailed=1`, real Postal `message_id` `1dff02bf-…@rp.postal.courseworx.media` (authorised From `eve@courseworx.media`); permalink published + HTTP 200 (12.7 KB, masthead present) |
-| **S-14** | empty day → skipped_no_content, no send row | ⏳ to test | gather returns [] → saga skip path |
+| **S-14** | empty day → skipped_no_content, no send row | ✅ verified | run `67183196` on `1999-01-01` (no ingested rows): gather→0 articles→terminal `skipped_no_content`; no `newsletter_sends_v2` row written |
 | **S-15** | expired token resolve → 404 | ✅ (by contract) | `get_approval` returns None → 404 |
 | **S-16** | idempotent persist (replay → same row) | ✅ verified | runs `ed9480fb` + `ea8a176e` both upserted the **same** row `ea4d6b11` (edition_id, send_date) — no duplicate; migration 024 unique index + idempotent_call wrapper |
 | **S-17** | gather reads correct content_ingestion_v2 rows | ✅ verified | 5 stories picked from 12 `2026-05-31/*` rows for the edition user |
@@ -63,13 +63,11 @@ gather → pick →[stories gate]→ subject →[subject gate]→ writing_segmen
 - `newsletter-archive` public storage bucket created (permalink target; was missing).
 - Migration 024 applied to DEV (unique index for persist upsert).
 
-## Residual gaps (not blockers for the DEV end-to-end proof, but open before PROD)
+## Residual gaps
 
-- **S-12 / S-14** — exercise the revise loop and the empty-day `skipped_no_content` path.
-
-(The earlier send-row status-writeback gap is now closed: deliver-svc writes
-`status='sent'`, `sent_at`, `recipient_count`, `provider_message_id` back to the row after a
-successful send — guarded to the real row UUID. See defect #9 below.)
+None on DEV — all of S-07…S-19 are verified (S-12 revise loop and S-14 empty-day skip exercised
+2026-06-01). The earlier send-row status-writeback gap is closed (defect #9). The only remaining
+work is the PROD cutover, which is gated below.
 
 ## Before a PROD cutover (require explicit user authorization — Tier 2/3)
 
