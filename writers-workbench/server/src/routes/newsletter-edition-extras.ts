@@ -516,44 +516,121 @@ editionExtrasCronRouter.get(
 // compute interval days from cadence (daily=1, weekly=7, biweekly=14,
 // monthly=30) and compare against the most recent send_date. Time-of-day
 // + day-of-week gating is a follow-up.
+interface DueEdition {
+  edition_id: string;
+  user_id: string;
+  days_since_last: number;
+}
+
+// Shared "which editions are due?" computation, used by both the read-only
+// GET /editions/due (n8n cron polls it) and the engine-aware POST /editions/run-due.
+async function computeDueEditions(): Promise<DueEdition[]> {
+  const supabase = getSupabaseAdmin();
+  const { data: editions, error } = await supabase
+    .from('newsletter_editions_v2')
+    .select('id, user_id, cadence, cadence_send_time, created_at')
+    .eq('enabled', true)
+    .neq('cadence', 'none');
+  if (error) throw new Error(error.message);
+  const intervalDays: Record<string, number> = {
+    daily: 1, weekly: 7, biweekly: 14, monthly: 30,
+  };
+  const now = Date.now();
+  const due: DueEdition[] = [];
+  for (const ed of (editions ?? []) as Array<{ id: string; user_id: string; cadence: string; cadence_send_time: string | null; created_at: string }>) {
+    const days = intervalDays[ed.cadence];
+    if (!days) continue;
+    const { data: lastSend } = await supabase
+      .from('newsletter_sends_v2')
+      .select('send_date, created_at')
+      .eq('edition_id', ed.id)
+      .eq('user_id', ed.user_id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const baseline = lastSend?.created_at ?? ed.created_at;
+    const elapsedDays = (now - new Date(baseline).getTime()) / (24 * 60 * 60 * 1000);
+    if (elapsedDays >= days) {
+      due.push({ edition_id: ed.id, user_id: ed.user_id, days_since_last: Math.floor(elapsedDays) });
+    }
+  }
+  return due;
+}
+
 editionExtrasCronRouter.get(
   '/editions/due',
   requireIngestionSecret,
   async (_req: Request, res: Response) => {
-    const supabase = getSupabaseAdmin();
-    const { data: editions, error } = await supabase
-      .from('newsletter_editions_v2')
-      .select('id, user_id, cadence, cadence_send_time, created_at')
-      .eq('enabled', true)
-      .neq('cadence', 'none');
-    if (error) {
-      res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: error.message } });
+    try {
+      const due = await computeDueEditions();
+      res.json({ success: true, editions: due });
+    } catch (err) {
+      res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: String((err as Error).message) } });
+    }
+  },
+);
+
+// POST /api/newsletter/cron/editions/run-due
+// Backend-aware cadence trigger (F2-9): computes due editions and enqueues a
+// generation for each via the active backend — the Writer Engine when
+// NEWSLETTER_BACKEND=python, else the n8n compose webhook. A single cron tick
+// fans out to whichever backend is configured, so cadence works post-cutover
+// without changing the cron. Returns a per-edition enqueue result.
+editionExtrasCronRouter.post(
+  '/editions/run-due',
+  requireIngestionSecret,
+  async (_req: Request, res: Response) => {
+    let due: DueEdition[];
+    try {
+      due = await computeDueEditions();
+    } catch (err) {
+      res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: String((err as Error).message) } });
       return;
     }
-    const intervalDays: Record<string, number> = {
-      daily: 1, weekly: 7, biweekly: 14, monthly: 30,
-    };
-    const now = Date.now();
-    const due: Array<{ edition_id: string; user_id: string; days_since_last: number }> = [];
-    for (const ed of (editions ?? []) as Array<{ id: string; user_id: string; cadence: string; cadence_send_time: string | null; created_at: string }>) {
-      const days = intervalDays[ed.cadence];
-      if (!days) continue;
-      // Pull last send_date for this edition.
-      const { data: lastSend } = await supabase
-        .from('newsletter_sends_v2')
-        .select('send_date, created_at')
-        .eq('edition_id', ed.id)
-        .eq('user_id', ed.user_id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      const baseline = lastSend?.created_at ?? ed.created_at;
-      const baselineMs = new Date(baseline).getTime();
-      const elapsedDays = (now - baselineMs) / (24 * 60 * 60 * 1000);
-      if (elapsedDays >= days) {
-        due.push({ edition_id: ed.id, user_id: ed.user_id, days_since_last: Math.floor(elapsedDays) });
+
+    const backend = (process.env.NEWSLETTER_BACKEND ?? 'n8n').toLowerCase() === 'python' ? 'python' : 'n8n';
+    const sendDate = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const results: Array<{ edition_id: string; enqueued: boolean; execution_id?: string; error?: string }> = [];
+
+    for (const d of due) {
+      try {
+        if (backend === 'python') {
+          const engineUrl = process.env.NEWSLETTER_SERVICE_URL;
+          const serviceSecret = process.env.SERVICE_SHARED_SECRET;
+          if (!engineUrl || !serviceSecret) {
+            results.push({ edition_id: d.edition_id, enqueued: false, error: 'NOT_CONFIGURED' });
+            continue;
+          }
+          const resp = await fetch(`${engineUrl.replace(/\/+$/, '')}/internal/newsletter/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Service-Secret': serviceSecret },
+            body: JSON.stringify({ edition_id: d.edition_id, user_id: d.user_id, send_date: sendDate, max_stories: 5 }),
+          });
+          if (!resp.ok) { results.push({ edition_id: d.edition_id, enqueued: false, error: `engine ${resp.status}` }); continue; }
+          const body = await resp.json() as { execution_id?: string };
+          results.push({ edition_id: d.edition_id, enqueued: true, execution_id: body.execution_id });
+        } else {
+          const webhookUrl = process.env.N8N_NEWSLETTER_WEBHOOK_URL;
+          const ingestionSecret = process.env.INGESTION_SECRET;
+          if (!webhookUrl || !ingestionSecret) {
+            results.push({ edition_id: d.edition_id, enqueued: false, error: 'NOT_CONFIGURED' });
+            continue;
+          }
+          const resp = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Ingestion-Secret': ingestionSecret },
+            body: JSON.stringify({ Date: sendDate, 'Previous Newsletter Content': '', 'Edition Id': d.edition_id }),
+          });
+          if (!resp.ok) { results.push({ edition_id: d.edition_id, enqueued: false, error: `n8n ${resp.status}` }); continue; }
+          const body = await resp.json() as { executionId?: string };
+          results.push({ edition_id: d.edition_id, enqueued: true, execution_id: body.executionId });
+        }
+      } catch (err) {
+        logger.error({ err, edition_id: d.edition_id }, 'cadence run-due: enqueue failed');
+        results.push({ edition_id: d.edition_id, enqueued: false, error: 'ENQUEUE_FAILED' });
       }
     }
-    res.json({ success: true, editions: due });
+
+    res.json({ success: true, backend, due: due.length, enqueued: results.filter((r) => r.enqueued).length, results });
   },
 );
