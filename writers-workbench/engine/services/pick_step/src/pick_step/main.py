@@ -48,6 +48,9 @@ async def _pick(
         system=system,
         prompt=user,
         schema=PickedStories,
+        # Output scales with max_stories (each story carries a detailed summary). Give generous
+        # headroom so the JSON is never truncated mid-string ("Unterminated string").
+        max_tokens=max(8192, 2048 * max_stories),
     )
     return picked
 
