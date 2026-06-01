@@ -44,17 +44,19 @@ async def _fetch_subscribers(edition_id: str) -> list[dict[str, Any]]:
 
 
 async def handler(inp: StepInput) -> StepOutput:
+    settings = get_settings()
     edition_id = str(inp.payload.get("edition_id") or "")
     send_id = str(inp.payload.get("send_id") or inp.execution_id)
     html_body = str(inp.payload.get("html_body") or "")
     subject = str(inp.payload.get("subject") or "Newsletter")
-    from_addr = str(inp.payload.get("from_addr") or "newsletter@writersworkbench.local")
+    # Postal authenticates the From domain — the default must be an authorised courseworx.media
+    # sender, not a placeholder .local address (which Postal rejects as UnauthenticatedFromAddress).
+    from_addr = str(inp.payload.get("from_addr") or settings.newsletter_from_address)
 
     permalink = await _publish_permalink(edition_id, send_id, html_body)
     subscribers = await _fetch_subscribers(edition_id)
 
     message_ids: list[str] = []
-    settings = get_settings()
     if settings.postal_api_key and subscribers:
         permalink_block = (
             f'<p style="font-size:12px;color:#555">Read on web: <a href="{permalink}">{permalink}</a></p>'
@@ -64,19 +66,28 @@ async def handler(inp: StepInput) -> StepOutput:
             if "</body>" in html_body
             else (html_body + permalink_block)
         )
+        errors: list[str] = []
         client = PostalClient()
         try:
             for sub in subscribers:
-                res = await client.send(
-                    to=[sub["email"]],
-                    from_addr=from_addr,
-                    subject=subject,
-                    html=html_with_link,
-                )
-                if res.message_id:
-                    message_ids.append(res.message_id)
+                # Resilient per-recipient: one bad address shouldn't drop the whole edition.
+                try:
+                    res = await client.send(
+                        to=[sub["email"]],
+                        from_addr=from_addr,
+                        subject=subject,
+                        html=html_with_link,
+                    )
+                    if res.message_id:
+                        message_ids.append(res.message_id)
+                except Exception as exc:  # collect + decide after the loop
+                    errors.append(f"{sub.get('email')}: {exc}")
         finally:
             await client.aclose()
+        # A total failure (every send errored) is a real delivery failure — fail the step so the
+        # saga surfaces it rather than reaching SENT having mailed no one.
+        if not message_ids and errors:
+            raise RuntimeError(f"all {len(errors)} Postal send(s) failed: {errors[:3]}")
 
     result = DeliveryResult(
         recipients_emailed=len(message_ids),

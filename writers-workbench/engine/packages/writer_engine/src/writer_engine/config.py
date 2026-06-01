@@ -71,6 +71,12 @@ class EngineSettings(BaseSettings):
     # Postal delivery defaults (F1-A prereq #1 — PostalClient cc/bcc/sender/reply_to/headers).
     postal_sender: str = Field(default="", alias="POSTAL_SENDER")
     postal_sender_name: str = Field(default="", alias="SENDER_NAME")
+    # Newsletter From header. MUST be an address Postal is authorised to send from (the
+    # courseworx.media server authenticates the From domain) — an unauthorised From returns a
+    # status=error "UnauthenticatedFromAddress" and the mail is dropped.
+    newsletter_from_address: str = Field(
+        default="eve@courseworx.media", alias="NEWSLETTER_FROM_ADDRESS"
+    )
     postal_reply_to: str = Field(default="", alias="REPLY_TO_EMAIL")
     postal_default_bcc: str = Field(default="", alias="POSTAL_DEFAULT_BCC")
 

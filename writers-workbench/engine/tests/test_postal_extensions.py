@@ -27,7 +27,9 @@ def capture(monkeypatch: pytest.MonkeyPatch) -> _Capture:
     class _Transport(httpx.AsyncBaseTransport):
         async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
             cap.last_body = json.loads(request.content)
-            return httpx.Response(200, json={"data": {"message_id": "fake-mid-123"}})
+            return httpx.Response(
+                200, json={"status": "success", "data": {"message_id": "fake-mid-123"}}
+            )
 
     real_init = httpx.AsyncClient.__init__
 
@@ -101,6 +103,41 @@ async def test_send_attachments_and_headers(capture: _Capture) -> None:
         {"name": "cover.png", "content_type": "image/png", "data": "BASE64"}
     ]
     assert body["tag"] == "newsletter"
+
+
+@pytest.mark.asyncio
+async def test_send_raises_on_postal_error_status(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Postal returns HTTP 200 with status=error for an unauthorised From — must NOT be a phantom
+    success. (Observed live: a placeholder .local From → UnauthenticatedFromAddress, mail dropped.)"""
+
+    class _ErrTransport(httpx.AsyncBaseTransport):
+        async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={
+                    "status": "error",
+                    "data": {
+                        "code": "UnauthenticatedFromAddress",
+                        "message": "The From address is not authorised to send mail from this server",
+                    },
+                },
+            )
+
+    real_init = httpx.AsyncClient.__init__
+
+    def _init(self: httpx.AsyncClient, *args: object, **kwargs: object) -> None:
+        kwargs.setdefault("transport", _ErrTransport())
+        real_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(httpx.AsyncClient, "__init__", _init)
+    client = PostalClient(api_url="http://postal.test", api_key="k")
+    try:
+        with pytest.raises(RuntimeError, match="UnauthenticatedFromAddress"):
+            await client.send(
+                to=["a@example.com"], from_addr="bot@bad.local", subject="s", html="<p>x</p>"
+            )
+    finally:
+        await client.aclose()
 
 
 @pytest.mark.asyncio

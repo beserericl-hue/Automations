@@ -82,10 +82,19 @@ class PostalClient:
         )
         resp.raise_for_status()
         payload = resp.json()
-        return PostalResult(
-            message_id=str(payload.get("data", {}).get("message_id")) if isinstance(payload, dict) else None,
-            status="ok",
-        )
+        if not isinstance(payload, dict):
+            raise RuntimeError(f"Postal returned a non-object response: {payload!r}")
+        # Postal returns HTTP 200 even for failures, signalling them via status=error in the body
+        # (e.g. an unauthorised From → "UnauthenticatedFromAddress"). Surface those loudly instead
+        # of reporting a phantom success — otherwise the saga reaches SENT having mailed no one.
+        status = str(payload.get("status") or "")
+        data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+        if status and status != "success":
+            code = data.get("code")
+            message = data.get("message")
+            raise RuntimeError(f"Postal send failed [{code}]: {message}")
+        mid = data.get("message_id")
+        return PostalResult(message_id=str(mid) if mid else None, status=status or "ok")
 
     async def aclose(self) -> None:
         await self._client.aclose()

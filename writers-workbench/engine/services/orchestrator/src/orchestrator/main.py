@@ -214,15 +214,44 @@ def build_app() -> FastAPI:
         except Exception:
             return {"enqueued": 0, "skipped_reason": "supabase not configured"}
 
-        now_iso = datetime.now(UTC).isoformat()
+        # "Due" is derived from cadence + the last send, mirroring the WW computeDueEditions path
+        # (server/src/routes/newsletter-edition-extras.ts). newsletter_editions_v2 has no
+        # next_scheduled_send_at/send_time/timezone columns — the only cadence columns are
+        # `cadence` and `cadence_send_time`. Compute the interval here instead of an absent column.
+        interval_days = {"daily": 1, "weekly": 7, "biweekly": 14, "monthly": 30}
+        now = datetime.now(UTC)
         resp = await (
             client.table("newsletter_editions_v2")
-            .select("id,user_id,cadence,send_time,timezone")
+            .select("id,user_id,cadence,cadence_send_time,created_at")
             .eq("enabled", True)
-            .lte("next_scheduled_send_at", now_iso)
+            .neq("cadence", "none")
             .execute()
         )
-        due_editions = list(getattr(resp, "data", None) or [])
+        editions = list(getattr(resp, "data", None) or [])
+
+        due_editions: list[dict[str, Any]] = []
+        for ed in editions:
+            days = interval_days.get(str(ed.get("cadence") or ""))
+            if not days:
+                continue
+            last = await (
+                client.table("newsletter_sends_v2")
+                .select("created_at")
+                .eq("edition_id", ed.get("id"))
+                .eq("user_id", ed.get("user_id"))
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            last_rows = list(getattr(last, "data", None) or [])
+            baseline_iso = last_rows[0]["created_at"] if last_rows else ed.get("created_at")
+            try:
+                baseline = datetime.fromisoformat(str(baseline_iso).replace("Z", "+00:00"))
+            except (ValueError, TypeError):
+                due_editions.append(ed)
+                continue
+            if (now - baseline).total_seconds() / 86400.0 >= days:
+                due_editions.append(ed)
 
         enqueued: list[str] = []
         skipped: list[dict[str, Any]] = []
