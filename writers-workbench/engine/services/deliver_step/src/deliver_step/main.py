@@ -26,6 +26,40 @@ async def _publish_permalink(edition_id: str, send_id: str, html: str) -> str:
     return f"{base}/{path}"
 
 
+def _is_uuid(value: str) -> bool:
+    from uuid import UUID
+
+    try:
+        UUID(value)
+        return True
+    except (ValueError, AttributeError):
+        return False
+
+
+async def _mark_sent(send_id: str, recipient_count: int, provider_message_id: str | None) -> None:
+    """Write the send-row lifecycle columns after delivery: status→sent, sent_at, counts, msg id.
+
+    Best-effort and only when ``send_id`` is the real ``newsletter_sends_v2`` UUID (persist ran with
+    Supabase). Without this the row would linger at status='draft' even though the edition shipped.
+    """
+    settings = get_settings()
+    if not settings.supabase_url or not settings.supabase_service_role_key or not _is_uuid(send_id):
+        return
+    from datetime import UTC, datetime
+
+    from writer_engine.supabase.client import get_supabase_admin
+
+    client = await get_supabase_admin()
+    patch: dict[str, Any] = {
+        "status": "sent",
+        "sent_at": datetime.now(UTC).isoformat(),
+        "recipient_count": recipient_count,
+    }
+    if provider_message_id:
+        patch["provider_message_id"] = provider_message_id
+    await client.table("newsletter_sends_v2").update(patch).eq("id", send_id).execute()
+
+
 async def _fetch_subscribers(edition_id: str) -> list[dict[str, Any]]:
     settings = get_settings()
     if not settings.supabase_url:
@@ -88,6 +122,9 @@ async def handler(inp: StepInput) -> StepOutput:
         # saga surfaces it rather than reaching SENT having mailed no one.
         if not message_ids and errors:
             raise RuntimeError(f"all {len(errors)} Postal send(s) failed: {errors[:3]}")
+
+    # Advance the send row's lifecycle to 'sent' now that the edition has actually shipped.
+    await _mark_sent(send_id, len(message_ids), message_ids[0] if message_ids else None)
 
     result = DeliveryResult(
         recipients_emailed=len(message_ids),
