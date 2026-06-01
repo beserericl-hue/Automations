@@ -47,6 +47,33 @@ def test_alternatives_list_of_dicts() -> None:
     assert p.additional_subject_lines == ["A1", "A2"]
 
 
+def test_additional_subject_lines_field_with_dicts() -> None:
+    """The field itself populated with {subject_line: ...} dicts (observed on a live DEV run)."""
+    p = SubjectLineProposal.model_validate(
+        {
+            "subject_line": "S",
+            "pre_header_text": "P",
+            "additional_subject_lines": [
+                {"subject_line": "Your AI brief"},
+                {"subject": "Catch newsletter readers"},
+                "Already a string",
+            ],
+        }
+    )
+    assert p.additional_subject_lines == [
+        "Your AI brief",
+        "Catch newsletter readers",
+        "Already a string",
+    ]
+
+
+def test_additional_subject_lines_drops_empty() -> None:
+    p = SubjectLineProposal.model_validate(
+        {"subject_line": "S", "pre_header_text": "P", "additional_subject_lines": [{}, None, "", "keep"]}
+    )
+    assert p.additional_subject_lines == ["keep"]
+
+
 def test_aliases_subject_and_preheader() -> None:
     p = SubjectLineProposal.model_validate({"subject": "Aliased", "preheader": "Prev"})
     assert p.subject_line == "Aliased"

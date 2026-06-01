@@ -126,16 +126,30 @@ class SubjectLineProposal(BaseModel):
                     out["pre_header_text"] = out[alias]
                     break
 
-        # 3. Alternates → additional_subject_lines (list of strings).
-        if not out.get("additional_subject_lines"):
+        # 3. additional_subject_lines → always a list of plain strings. The model variously emits
+        #    this as the field itself (sometimes a list of {"subject_line": ...} dicts) OR under an
+        #    alias. Source it, then coerce every item dict→string and drop empties.
+        alt_list = out.get("additional_subject_lines")
+        if not isinstance(alt_list, list):
+            alt_list = None
+        if alt_list is None:
             for alias in ("alternatives", "alternates", "additional", "other_subject_lines"):
-                alt = out.get(alias)
-                if isinstance(alt, list):
-                    out["additional_subject_lines"] = [
-                        (a.get("subject_line") or a.get("subject") or "") if isinstance(a, dict) else str(a)
-                        for a in alt
-                    ]
+                cand = out.get(alias)
+                if isinstance(cand, list):
+                    alt_list = cand
                     break
+        if isinstance(alt_list, list):
+            coerced: list[str] = []
+            for a in alt_list:
+                if isinstance(a, dict):
+                    val = a.get("subject_line") or a.get("subject") or a.get("text") or ""
+                elif a is None:
+                    val = ""
+                else:
+                    val = str(a)
+                if val:
+                    coerced.append(val)
+            out["additional_subject_lines"] = coerced
 
         return out
 
