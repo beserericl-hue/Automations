@@ -439,6 +439,59 @@ async function triggerEngine(
   return { ok: true, data: { executionId: payload.execution_id, editionId: body.edition_id } };
 }
 
+// Map an engine saga stage to the coarse UI status the Execution Status page expects
+// (same vocabulary the n8n branch returns: running | waiting | success | error | unknown).
+function mapSagaStageToStatus(stage: string | undefined, sagaStatus: string | undefined): string {
+  if (sagaStatus === 'error' || stage === 'error') return 'error';
+  if (typeof stage === 'string' && stage.startsWith('awaiting_')) return 'waiting';
+  if (stage === 'saved' || stage === 'sending' || stage === 'sent' || stage === 'skipped_no_content') {
+    return 'success';
+  }
+  return 'running';
+}
+
+// Read newsletter execution status from the Writer Engine (NEWSLETTER_BACKEND=python). Returns the
+// same stripped shape as the n8n branch so the UI is backend-agnostic.
+async function fetchEngineStatus(
+  executionId: string,
+): Promise<
+  | { ok: true; data: { executionId: string; status: string; stage: string | null } }
+  | { ok: false; status: number; code: string; message: string }
+> {
+  const engineUrl = process.env.NEWSLETTER_SERVICE_URL;
+  const serviceSecret = process.env.SERVICE_SHARED_SECRET;
+  if (!engineUrl) return { ok: false, status: 500, code: 'NOT_CONFIGURED', message: 'NEWSLETTER_SERVICE_URL not set' };
+  if (!serviceSecret) return { ok: false, status: 500, code: 'NOT_CONFIGURED', message: 'SERVICE_SHARED_SECRET not set' };
+
+  let upstream: Response | undefined;
+  try {
+    upstream = await fetch(
+      `${engineUrl.replace(/\/+$/, '')}/internal/newsletter/executions/${encodeURIComponent(executionId)}/state`,
+      { headers: { 'X-Service-Secret': serviceSecret } },
+    ) as unknown as Response;
+  } catch (err) {
+    logger.error({ err, executionId }, 'execution status: engine fetch threw');
+    return { ok: false, status: 502, code: 'UPSTREAM_FETCH_FAILED', message: 'Could not reach Writer Engine' };
+  }
+  const upStatus = (upstream as unknown as { status?: number })?.status ?? 0;
+  if (upStatus === 404) {
+    return { ok: false, status: 404, code: 'NOT_FOUND', message: `engine execution ${executionId} not found` };
+  }
+  if (!upstream || !('ok' in upstream) || !upstream.ok) {
+    return { ok: false, status: 502, code: 'UPSTREAM_NON_2XX', message: `engine returned ${upStatus}` };
+  }
+  let payload: { stage?: string; status?: string } = {};
+  try {
+    payload = await (upstream as unknown as { json(): Promise<unknown> }).json() as typeof payload;
+  } catch {
+    return { ok: false, status: 502, code: 'UPSTREAM_BAD_BODY', message: 'engine response was not JSON' };
+  }
+  return {
+    ok: true,
+    data: { executionId, status: mapSagaStageToStatus(payload.stage, payload.status), stage: payload.stage ?? null },
+  };
+}
+
 newsletterRouter.post(
   '/generate',
   requireAuth,
@@ -528,6 +581,29 @@ newsletterRouter.get(
       res.status(400).json({
         success: false,
         error: { code: 'INVALID_EXECUTION_ID', message: 'execution id format invalid' },
+      });
+      return;
+    }
+
+    // Engine-backed: read saga state from the Writer Engine instead of the n8n public API.
+    // Same response shape so the UI is backend-agnostic.
+    if (getBackend() === 'python') {
+      const engineResult = await fetchEngineStatus(executionId);
+      if (!engineResult.ok) {
+        res.status(engineResult.status).json({
+          success: false,
+          error: { code: engineResult.code, message: engineResult.message },
+        });
+        return;
+      }
+      res.json({
+        success: true,
+        executionId: engineResult.data.executionId,
+        status: engineResult.data.status,
+        mode: 'engine',
+        startedAt: null,
+        stoppedAt: null,
+        lastNodeExecuted: engineResult.data.stage,
       });
       return;
     }
