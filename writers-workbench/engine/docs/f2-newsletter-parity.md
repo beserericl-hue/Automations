@@ -54,6 +54,9 @@ gather → pick →[stories gate]→ subject →[subject gate]→ writing_segmen
    fails the step on a total send failure.
 8. **Cron — wrong columns** (PR #93): engine `/cron/newsletter-cadence` queried non-existent
    columns; rewritten to mirror WW `computeDueEditions`.
+9. **Send-row stuck at draft** (PR #95): deliver-svc now advances the row to `status='sent'` with
+   `sent_at`, `recipient_count`, `provider_message_id` after a successful send (guarded to the
+   real row UUID).
 
 ## Infra prepared on DEV
 
@@ -62,12 +65,11 @@ gather → pick →[stories gate]→ subject →[subject gate]→ writing_segmen
 
 ## Residual gaps (not blockers for the DEV end-to-end proof, but open before PROD)
 
-- **Send-row status writeback** — after delivery the saga reaches `sent`, but the
-  `newsletter_sends_v2` row stays `status='draft'`: deliver-svc does not write back
-  `status='sent'`, `sent_at`, `recipient_count`, or `provider_message_id`. The row content is
-  correct; only the lifecycle columns lag. Small follow-up (a post-delivery update in
-  `_stage_sending`). **Decision for the user:** include in F2 or schedule next.
 - **S-12 / S-14** — exercise the revise loop and the empty-day `skipped_no_content` path.
+
+(The earlier send-row status-writeback gap is now closed: deliver-svc writes
+`status='sent'`, `sent_at`, `recipient_count`, `provider_message_id` back to the row after a
+successful send — guarded to the real row UUID. See defect #9 below.)
 
 ## Before a PROD cutover (require explicit user authorization — Tier 2/3)
 
