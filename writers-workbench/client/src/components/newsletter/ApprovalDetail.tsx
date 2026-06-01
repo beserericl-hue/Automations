@@ -14,6 +14,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../../lib/api';
 import ApprovalPayloadStories from './ApprovalPayloadStories';
 import ApprovalPayloadSubject from './ApprovalPayloadSubject';
+import ApprovalPayloadImage from './ApprovalPayloadImage';
 import ApprovalResolveForm from './ApprovalResolveForm';
 import StatusPill from './StatusPill';
 import type { NewsletterApprovalStage } from '../../types/database';
@@ -95,13 +96,23 @@ export default function ApprovalDetail() {
       ) : (
         <div className="space-y-3 rounded-lg border border-amber-300 bg-amber-50/60 p-4 dark:border-amber-700 dark:bg-amber-950/30">
           <div className="flex items-center gap-2">
-            <StatusPill status={approval.stage === 'stories' ? 'awaiting_stories_approval' : 'awaiting_subject_approval'} />
+            <StatusPill
+              status={
+                approval.stage === 'stories'
+                  ? 'awaiting_stories_approval'
+                  : approval.stage === 'image'
+                  ? 'writing_segment'
+                  : 'awaiting_subject_approval'
+              }
+            />
             <span className="font-mono text-xs text-gray-500 dark:text-gray-400">
               execution {approval.execution_id}
             </span>
           </div>
           {approval.stage === 'stories' ? (
             <ApprovalPayloadStories payload={approval.payload} />
+          ) : approval.stage === 'image' ? (
+            <ApprovalPayloadImage payload={approval.payload} />
           ) : (
             <ApprovalPayloadSubject payload={approval.payload} />
           )}
