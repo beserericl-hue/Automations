@@ -37,6 +37,7 @@ from writer_engine.state_machine.durable import SagaStateRepo
 from writer_engine.state_machine.hitl import ApprovalDecision, create_approval
 from writer_engine.state_machine.progress import emit_progress
 from writer_engine.state_machine.saga import StepRef, run_step_via_http
+from writer_engine.state_machine.workbench_callback import notify_workbench_stage
 
 DEFAULT_PORTS = {
     "gather": 8010,
@@ -422,6 +423,15 @@ class NewsletterSagaDriver:
     ) -> None:
         await self._repo.update(execution_id, stage=next_stage, patch=patch)
         await emit_progress(execution_id, next_stage, message=message)
+        # F2-8: best-effort mirror of the stage to the WW per-user SSE channel (no-op when the
+        # callback secret / workbench URL aren't configured). Never fails the saga.
+        try:
+            state = await self._repo.load(execution_id)
+            await notify_workbench_stage(
+                execution_id, next_stage.value, cfg=state.state.get("cfg"), message=message
+            )
+        except Exception:
+            pass
 
     # ---------- resolve hook ----------
 

@@ -50,6 +50,9 @@ class EngineSettings(BaseSettings):
     # Workbench
     workbench_api_url: str = Field(default="", alias="WORKBENCH_API_URL")
     ingestion_secret: str = Field(default="", alias="INGESTION_SECRET")
+    # Shared with the WW server's /api/callback/newsletter-stage (X-Callback-Secret) so engine-backed
+    # runs can drive the in-app SSE progress strip (F2-8). Empty = callback skipped.
+    newsletter_callback_secret: str = Field(default="", alias="NEWSLETTER_CALLBACK_SECRET")
 
     # Picker model (decision #2)
     picker_model: str = Field(default="gemini-2.5-pro", alias="PICKER_MODEL")
