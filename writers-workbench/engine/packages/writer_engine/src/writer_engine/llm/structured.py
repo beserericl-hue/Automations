@@ -39,10 +39,16 @@ async def complete_structured(
     system: str,
     prompt: str,
     schema: type[T],
-    max_tokens: int = 4096,
+    max_tokens: int = 8192,
     temperature: float = 0.4,
 ) -> tuple[T, LLMResponse]:
-    """Run a single LLM call and validate the JSON output against ``schema``."""
+    """Run a single LLM call and validate the JSON output against ``schema``.
+
+    ``max_tokens`` defaults to 8192 (not 4096): structured outputs that contain several
+    detailed objects — e.g. pick's ``top_selected_stories`` with per-story summaries — were
+    being truncated mid-JSON at 4096 ("Unterminated string"), which then failed json.loads.
+    Callers whose output scales with input (pick, segment) should pass a higher value still.
+    """
     response = await router.complete(
         provider=provider,
         model=model,
