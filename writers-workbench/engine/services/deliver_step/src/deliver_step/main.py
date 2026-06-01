@@ -87,7 +87,13 @@ async def handler(inp: StepInput) -> StepOutput:
     # sender, not a placeholder .local address (which Postal rejects as UnauthenticatedFromAddress).
     from_addr = str(inp.payload.get("from_addr") or settings.newsletter_from_address)
 
-    permalink = await _publish_permalink(edition_id, send_id, html_body)
+    # Prefer the caller-supplied permalink (the Workbench view route, which serves html_body as
+    # text/html so it renders in a browser). Only archive to Supabase Storage when no permalink was
+    # supplied — that storage URL can't render (Supabase serves user HTML as text/plain) but keeps a
+    # raw archive for older callers.
+    permalink = str(inp.payload.get("permalink_url") or "")
+    if not permalink:
+        permalink = await _publish_permalink(edition_id, send_id, html_body)
     subscribers = await _fetch_subscribers(edition_id)
 
     message_ids: list[str] = []

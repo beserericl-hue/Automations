@@ -341,10 +341,18 @@ class NewsletterSagaDriver:
         assembled = AssembledNewsletter.model_validate(st["assembled"])
         edition_id = str(cfg.get("edition_id") or "")
         send_date = str(cfg.get("send_date") or "")
-        send_id_str = f"{edition_id}-{send_date}"
-        permalink_placeholder = (
-            f"{os.environ.get('ARCHIVE_BASE_URL', '').rstrip('/')}/{edition_id}/{send_id_str}.html"
-        )
+        # The "view in browser" permalink points at the Workbench view route, which serves the
+        # stored html_body as text/html. (Supabase Storage force-serves user HTML as text/plain, so
+        # a storage URL never renders in a browser.) Fall back to the storage URL only if WW isn't
+        # configured.
+        ww_base = os.environ.get("WORKBENCH_API_URL", "").rstrip("/")
+        if ww_base:
+            permalink_placeholder = f"{ww_base}/api/newsletter/view/{edition_id}/{send_date}"
+        else:
+            send_id_str = f"{edition_id}-{send_date}"
+            permalink_placeholder = (
+                f"{os.environ.get('ARCHIVE_BASE_URL', '').rstrip('/')}/{edition_id}/{send_id_str}.html"
+            )
         out = await run_step_via_http(
             _step("render"),
             execution_id=execution_id,
@@ -410,6 +418,7 @@ class NewsletterSagaDriver:
                 "send_id": send_id,
                 "html_body": st.get("rendered_html", ""),
                 "subject": subj.subject_line,
+                "permalink_url": st.get("permalink_placeholder", ""),
             },
         )
         delivery = DeliveryResult.model_validate(out.payload)
