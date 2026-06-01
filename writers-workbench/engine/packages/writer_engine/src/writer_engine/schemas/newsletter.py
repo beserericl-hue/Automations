@@ -157,10 +157,37 @@ class SubjectLineProposal(BaseModel):
 class StorySegment(BaseModel):
     """Output of ``segment-svc`` per story — mirrors ``story_segment_output_parser``."""
 
-    story_title: str
-    newsletter_section_content: str
+    story_title: str = ""
+    newsletter_section_content: str = ""
     chosen_image_url: str | None = None
     image_options: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_segment(cls, data: Any) -> Any:
+        """Tolerate the title/content aliases Claude emits for a story segment.
+
+        Observed on live DEV runs: the model omits ``story_title`` and either uses ``title`` or
+        drops the title entirely, and names the body ``content``/``body``/``section`` instead of
+        ``newsletter_section_content``. Map the common aliases so validation passes; the segment
+        service backfills an empty ``story_title`` from the authoritative story title afterwards.
+        """
+        if not isinstance(data, dict):
+            return data
+        out = dict(data)
+        if not out.get("story_title"):
+            for alias in ("title", "headline", "section_title", "story", "name"):
+                val = out.get(alias)
+                if isinstance(val, str) and val.strip():
+                    out["story_title"] = val
+                    break
+        if not out.get("newsletter_section_content"):
+            for alias in ("content", "body", "section_content", "section", "markdown", "text"):
+                val = out.get(alias)
+                if isinstance(val, str) and val.strip():
+                    out["newsletter_section_content"] = val
+                    break
+        return out
 
 
 class ImageOptions(BaseModel):
@@ -188,8 +215,14 @@ class RenderedNewsletter(BaseModel):
 
 
 class NewsletterSendRow(BaseModel):
-    """Shape persisted by ``persist-svc`` to ``newsletter_sends_v2``."""
+    """Domain shape produced by the saga; ``persist-svc`` maps it to ``newsletter_sends_v2`` columns.
 
+    Field names are the engine's own — ``persist-svc._to_db_row`` translates them to the actual
+    table columns (``pre_header_text`` → ``preheader``, status enum, etc.). ``user_id`` is required:
+    the table column is ``NOT NULL`` and FKs ``users_v2``.
+    """
+
+    user_id: str
     edition_id: str
     send_date: str
     subject: str

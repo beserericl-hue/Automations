@@ -12,21 +12,53 @@ from writer_engine.step_service import build_step_app
 
 STEP_NAME = "persist"
 
+# Engine domain status → the newsletter_sends_v2 CHECK enum
+# (draft|scheduled|sending|sent|failed|cancelled). The saga persists a freshly rendered-but-unsent
+# row as "saved"; that is a "draft" in table terms until deliver-svc sends it.
+_DB_STATUS = {
+    "saved": "draft",
+    "draft": "draft",
+    "scheduled": "scheduled",
+    "sending": "sending",
+    "sent": "sent",
+    "failed": "failed",
+    "cancelled": "cancelled",
+}
+
+
+def _to_db_row(row: NewsletterSendRow, execution_id: str) -> dict[str, Any]:
+    """Translate the engine domain row to actual ``newsletter_sends_v2`` columns.
+
+    The table column is ``preheader`` (not ``pre_header_text``), ``status`` is a constrained enum,
+    and ``user_id`` is ``NOT NULL``. Idempotency key for the upsert is ``(edition_id, send_date)``
+    (unique index added in migration 024).
+    """
+    return {
+        "user_id": row.user_id,
+        "edition_id": row.edition_id,
+        "send_date": row.send_date,
+        "subject": row.subject,
+        "preheader": row.pre_header_text,
+        "markdown_body": row.markdown_body,
+        "html_body": row.html_body,
+        "status": _DB_STATUS.get(row.status, "draft"),
+        "metadata": {**(row.metadata or {}), "execution_id": execution_id},
+    }
+
 
 async def _upsert(row: NewsletterSendRow, execution_id: str) -> dict[str, Any]:
     settings = get_settings()
+    db_row = _to_db_row(row, execution_id)
     if not settings.supabase_url or not settings.supabase_service_role_key:
         # Local-only echo when Supabase isn't configured.
-        return {"id": f"local-{execution_id}", **row.model_dump(mode="json")}
+        return {"id": f"local-{execution_id}", **db_row}
     from writer_engine.supabase.client import get_supabase_admin
 
     client = await get_supabase_admin()
-    payload = row.model_dump(mode="json")
-    payload["metadata"] = {**(payload.get("metadata") or {}), "execution_id": execution_id}
     resp = await (
-        client.table("newsletter_sends_v2").upsert(payload, on_conflict="edition_id,send_date").execute()
+        client.table("newsletter_sends_v2").upsert(db_row, on_conflict="edition_id,send_date").execute()
     )
-    rows = getattr(resp, "data", None) or [payload]
+    rows = getattr(resp, "data", None) or [db_row]
     return rows[0]
 
 

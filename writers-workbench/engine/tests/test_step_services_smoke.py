@@ -33,6 +33,7 @@ SERVICES: list[tuple[str, str, dict[str, Any]]] = [
         "persist",
         {
             "row": {
+                "user_id": "+14105914612",
                 "edition_id": "e1",
                 "send_date": "2026-05-30",
                 "subject": "S",

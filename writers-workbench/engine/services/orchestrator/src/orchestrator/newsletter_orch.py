@@ -167,6 +167,7 @@ class NewsletterOrchestrator(OrchestratorBase):
         rendered = RenderedNewsletter.model_validate(ren_out.payload)
 
         send_row = NewsletterSendRow(
+            user_id=str(cfg.get("user_id") or ""),
             edition_id=edition_id,
             send_date=send_date,
             subject=subject_proposal.subject_line,
