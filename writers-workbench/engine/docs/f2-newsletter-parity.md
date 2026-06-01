@@ -57,6 +57,14 @@ gather → pick →[stories gate]→ subject →[subject gate]→ writing_segmen
 9. **Send-row stuck at draft** (PR #95): deliver-svc now advances the row to `status='sent'` with
    `sent_at`, `recipient_count`, `provider_message_id` after a successful send (guarded to the
    real row UUID).
+10. **Template not rendered — raw Handlebars + empty sponsor block** (PR #96): render-svc did naive
+    `.replace()` so the `newsletter_templates_v2` Handlebars template shipped with raw tokens
+    (`{{{markdown_to_html body_md}}}`, `{{#if sponsor}}`), no article bodies, and sample decorative
+    blocks. Now renders THROUGH the template via WW `/api/newsletter/render-html` (same contract as
+    the n8n send path): `body_md` = assembled markdown, decorative sections sent `null` so the
+    renderer hides them instead of using `sample_data`. Verified on the permalink HTML: 0 raw
+    tokens, 6 article `<h2>`s, no sponsor block. Requires `WORKBENCH_API_URL` + `INGESTION_SECRET`
+    on the engine runtime (set on DEV; **add to PROD before cutover**).
 
 ## Infra prepared on DEV
 
@@ -73,7 +81,8 @@ work is the PROD cutover, which is gated below.
 
 - Apply **migration 024** to PROD Supabase and create the **`newsletter-archive`** bucket on PROD
   (both done on DEV here; PROD is frozen without authorization).
-- Verify PROD runtime env (`NEWSLETTER_BACKEND`, step URLs, `POSTAL_API_URL/KEY`,
-  `ARCHIVE_BASE_URL`, `NEWSLETTER_FROM_ADDRESS`) before flipping `NEWSLETTER_BACKEND=python`.
+- Verify PROD runtime env before flipping `NEWSLETTER_BACKEND=python`: `NEWSLETTER_BACKEND`, step
+  URLs, `POSTAL_API_URL/KEY`, `ARCHIVE_BASE_URL`, `NEWSLETTER_FROM_ADDRESS`, and — required for the
+  template render — `WORKBENCH_API_URL` (PROD WW) + `INGESTION_SECRET` (PROD WW's secret).
 - A PROD cutover changes Tier-2 (PROD workflows) / Tier-3 (PROD Supabase) behaviour — **do not
   proceed without explicit user sign-off.**
