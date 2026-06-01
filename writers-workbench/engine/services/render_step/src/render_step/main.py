@@ -81,17 +81,23 @@ def _format_issue_date(send_date: str) -> str:
     return f"{d.strftime('%A')}, {d.strftime('%B')} {d.day}, {d.year}"
 
 
-def _render_data(*, subject: str, preheader: str, markdown_body: str, send_date: str) -> dict[str, Any]:
+def _render_data(
+    *, subject: str, preheader: str, markdown_body: str, send_date: str, view_url: str = ""
+) -> dict[str, Any]:
     """The ``data`` object for /api/newsletter/render-html (mirrors the n8n send payload).
 
     ``body_md`` carries the assembled markdown; the decorative sections are ``None`` (not omitted)
     so the renderer's deepMerge does NOT fall back to the template's ``sample_data`` — that is what
-    hides an empty sponsor/lead/trending block instead of showing a sample placeholder.
+    hides an empty sponsor/lead/trending block instead of showing a sample placeholder. ``view_url``
+    feeds the template's "view in browser" link.
     """
+    issue: dict[str, Any] = {"date": _format_issue_date(send_date)}
+    if view_url:
+        issue["view_url"] = view_url
     return {
         "title": subject,
         "preheader": preheader,
-        "issue": {"date": _format_issue_date(send_date)},
+        "issue": issue,
         "body_md": markdown_body,
         "lead": None,
         "sponsor": None,
@@ -102,7 +108,7 @@ def _render_data(*, subject: str, preheader: str, markdown_body: str, send_date:
 
 
 async def _render_via_workbench(
-    edition_id: str, *, subject: str, preheader: str, markdown_body: str, send_date: str
+    edition_id: str, *, subject: str, preheader: str, markdown_body: str, send_date: str, view_url: str
 ) -> str | None:
     """Render the edition's stored Handlebars template through the Workbench renderer.
 
@@ -115,7 +121,11 @@ async def _render_via_workbench(
     if not base or not secret or not edition_id:
         return None
     data = _render_data(
-        subject=subject, preheader=preheader, markdown_body=markdown_body, send_date=send_date
+        subject=subject,
+        preheader=preheader,
+        markdown_body=markdown_body,
+        send_date=send_date,
+        view_url=view_url,
     )
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=8.0)) as client:
@@ -149,6 +159,7 @@ async def handler(inp: StepInput) -> StepOutput:
         preheader=preheader,
         markdown_body=markdown_body,
         send_date=send_date,
+        view_url=permalink_url,
     )
     if html_body:
         template_id = edition_id

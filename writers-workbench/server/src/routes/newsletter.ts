@@ -770,6 +770,55 @@ newsletterRouter.get('/sends/:id', requireAuth, async (req: Request, res: Respon
 });
 
 // --------------------------------------------------------------------
+// GET /api/newsletter/view/:editionId/:sendDate
+//
+// Public "view in browser" page for a sent newsletter. Serves the stored
+// html_body as text/html so the email's permalink renders as a web page.
+//
+// Why this exists: the rendered HTML is also archived in Supabase Storage,
+// but Supabase force-serves user-uploaded HTML as text/plain (+nosniff) to
+// prevent stored-XSS from its domain — so a storage URL can never render in
+// a browser. This route serves the same html_body from newsletter_sends_v2
+// with the correct content type.
+//
+// Intentionally unauthenticated: a published newsletter is public content,
+// and the email permalink has no session. Keyed by (edition_id, send_date),
+// which is unique per row (migration 024).
+// --------------------------------------------------------------------
+newsletterRouter.get('/view/:editionId/:sendDate', async (req: Request, res: Response) => {
+  const editionId = String(req.params.editionId ?? '').trim();
+  const sendDate = String(req.params.sendDate ?? '').trim().replace(/\.html?$/i, '');
+  if (!/^[a-z0-9][a-z0-9-]{0,62}$/i.test(editionId) || !/^\d{4}-\d{2}-\d{2}$/.test(sendDate)) {
+    res.status(400).type('text/plain').send('Invalid newsletter address.');
+    return;
+  }
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from('newsletter_sends_v2')
+    .select('html_body, subject')
+    .eq('edition_id', editionId)
+    .eq('send_date', sendDate)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    logger.error({ error, editionId, sendDate }, 'newsletter view lookup failed');
+    res.status(500).type('text/plain').send('Could not load this newsletter.');
+    return;
+  }
+  if (!data || !(data as { html_body?: string }).html_body) {
+    res.status(404).type('text/html').send(
+      '<!doctype html><meta charset="utf-8"><title>Not found</title>' +
+        '<p style="font-family:sans-serif;padding:40px">This newsletter is not available.</p>',
+    );
+    return;
+  }
+  // Cache for an hour at the edge; the content is immutable once sent.
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.type('text/html; charset=utf-8').send((data as { html_body: string }).html_body);
+});
+
+// --------------------------------------------------------------------
 // Compose Newsletter 2a (S5) — in-app approvals API
 //
 // Session-authenticated counterparts to the public email-link approval

@@ -30,3 +30,19 @@ def test_render_data_carries_body_and_nulls_decorative() -> None:
     for k in ("lead", "sponsor", "pull_quote", "trending", "workbench_section"):
         assert k in d, f"{k} must be sent so deepMerge overrides the template sample_data"
         assert d[k] is None, f"{k} must be null to hide its block (e.g. no empty sponsor)"
+
+
+def test_render_data_view_url_feeds_issue() -> None:
+    d = _render_data(
+        subject="S",
+        preheader="P",
+        markdown_body="b",
+        send_date="2026-05-31",
+        view_url="https://ww.example/api/newsletter/view/ai-news/2026-05-31",
+    )
+    assert d["issue"]["view_url"] == "https://ww.example/api/newsletter/view/ai-news/2026-05-31"
+
+
+def test_render_data_omits_view_url_when_blank() -> None:
+    d = _render_data(subject="S", preheader="P", markdown_body="b", send_date="2026-05-31")
+    assert "view_url" not in d["issue"]
