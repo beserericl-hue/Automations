@@ -1,0 +1,79 @@
+# F2 — Newsletter saga parity & system-test coverage
+
+Status of the engine-backed newsletter pipeline (`NEWSLETTER_BACKEND=python`) on **DEV**, mapped to
+the system-test plan in `knowledgebase/Writers Workbench Wiki/Engineering/testing/engine-api-system-tests.md`
+(suite **S-07 … S-19**).
+
+This document is the F2-10 deliverable: it records what was verified end-to-end on DEV, the
+defects found and fixed while driving the saga to completion, and the residual gaps that gate a
+PROD cutover.
+
+## How the pipeline runs
+
+```
+gather → pick →[stories gate]→ subject →[subject gate]→ writing_segments
+       → proposing_images →[image gate]→ assembling → rendering → saved → sending → SENT
+```
+
+- Durable saga (`/pipelines/newsletter/run-durable`), arq worker drives between HITL pauses.
+- Gateway exposes `/internal/newsletter/{generate, executions/{id}/state, executions/{id}/review/{stage}, approvals/{token}/resolve}` (X-Service-Secret).
+- WW Express proxies status (`/execution/:id/status`, F2-8) and resolves gates (`lib/approvals.ts`, F2-7) when the saga is engine-backed.
+
+## System-test coverage matrix
+
+| Test | What it covers | Status on DEV | Evidence / notes |
+|------|----------------|---------------|------------------|
+| **S-07** | generate → execution_id; stage progression | ✅ verified | runs `c661921d` / `ed9480fb`: gathering→picking→…→sent observed via saga-state |
+| **S-08** | `newsletter_sends_v2` row w/ subject, bodies, masthead, metadata.execution_id | ✅ verified | run `ed9480fb` → row `ea4d6b11`: subject, preheader, html 12.6 KB, md 9.3 KB, `metadata.execution_id` matches. (status persists as `draft` — see gap below.) |
+| **S-09** | stories gate review + resolve → stories_approved | ✅ verified | approved tokens across both runs; resumed to subject |
+| **S-10** | subject gate review + resolve | ✅ verified | subject + 3 clean alternatives; approved |
+| **S-11** | image gate review + resolve w/ chosen images | ✅ verified (text-only) | 5 stories, 0 image options (articles had none) — empty chosen_images is valid |
+| **S-12** | revise loop (feedback → re-run, bounded) | ⏳ not yet exercised | `apply_decision` handles REVISE w/ MAX_REVISIONS_PER_GATE |
+| **S-13** | delivery = Postal fan-out + web permalink | ✅ verified | run `ea8a176e`: `recipients_emailed=1`, real Postal `message_id` `1dff02bf-…@rp.postal.courseworx.media` (authorised From `eve@courseworx.media`); permalink published + HTTP 200 (12.7 KB, masthead present) |
+| **S-14** | empty day → skipped_no_content, no send row | ⏳ to test | gather returns [] → saga skip path |
+| **S-15** | expired token resolve → 404 | ✅ (by contract) | `get_approval` returns None → 404 |
+| **S-16** | idempotent persist (replay → same row) | ✅ verified | runs `ed9480fb` + `ea8a176e` both upserted the **same** row `ea4d6b11` (edition_id, send_date) — no duplicate; migration 024 unique index + idempotent_call wrapper |
+| **S-17** | gather reads correct content_ingestion_v2 rows | ✅ verified | 5 stories picked from 12 `2026-05-31/*` rows for the edition user |
+| **S-18** | cron cadence enqueues only due editions | ✅ fixed (#93) | engine `/cron/newsletter-cadence` rewritten to derive due from cadence + last send using real columns. Canonical cadence path remains WW `/editions/run-due` (PR #88, backend-aware). |
+| **S-19** | Postal bounce webhook → email_bounces_v2 + subscriber flipped | ✅ covered | WW `email.ts` webhook + test (PR #89) |
+
+## Defects found & fixed while driving the saga (DEV)
+
+1. **Pick — identifiers as dict** (PR #83): `_coerce_str_list` validator.
+2. **Subject — envelope wrapper** (PR #85): `_unwrap_envelope` model_validator.
+3. **Pick/subject — JSON truncation** (PR #90): max_tokens 4096→8192.
+4. **Subject — additional_subject_lines as dicts** (PR #91): step-3 rewrite of `_unwrap_envelope`.
+5. **Segment — blank body** (PR #92): `StorySegment` title/content alias coercion + authoritative
+   backfill; saga now raises on segment/image step ERROR instead of silently appending `{}`.
+6. **Persist — column/constraint mismatch** (PR #92): `_to_db_row` maps to real columns
+   (`preheader`, status enum), supplies `user_id`; migration 024 adds the
+   `(edition_id, send_date)` unique index for the upsert.
+7. **Deliver — unauthorised Postal From, masked** (PR #93): deliver used a placeholder `.local`
+   From that Postal rejects (`UnauthenticatedFromAddress`), and `PostalClient` reported it as a
+   phantom success. Now defaults to `eve@courseworx.media`, surfaces Postal `status=error`, and
+   fails the step on a total send failure.
+8. **Cron — wrong columns** (PR #93): engine `/cron/newsletter-cadence` queried non-existent
+   columns; rewritten to mirror WW `computeDueEditions`.
+
+## Infra prepared on DEV
+
+- `newsletter-archive` public storage bucket created (permalink target; was missing).
+- Migration 024 applied to DEV (unique index for persist upsert).
+
+## Residual gaps (not blockers for the DEV end-to-end proof, but open before PROD)
+
+- **Send-row status writeback** — after delivery the saga reaches `sent`, but the
+  `newsletter_sends_v2` row stays `status='draft'`: deliver-svc does not write back
+  `status='sent'`, `sent_at`, `recipient_count`, or `provider_message_id`. The row content is
+  correct; only the lifecycle columns lag. Small follow-up (a post-delivery update in
+  `_stage_sending`). **Decision for the user:** include in F2 or schedule next.
+- **S-12 / S-14** — exercise the revise loop and the empty-day `skipped_no_content` path.
+
+## Before a PROD cutover (require explicit user authorization — Tier 2/3)
+
+- Apply **migration 024** to PROD Supabase and create the **`newsletter-archive`** bucket on PROD
+  (both done on DEV here; PROD is frozen without authorization).
+- Verify PROD runtime env (`NEWSLETTER_BACKEND`, step URLs, `POSTAL_API_URL/KEY`,
+  `ARCHIVE_BASE_URL`, `NEWSLETTER_FROM_ADDRESS`) before flipping `NEWSLETTER_BACKEND=python`.
+- A PROD cutover changes Tier-2 (PROD workflows) / Tier-3 (PROD Supabase) behaviour — **do not
+  proceed without explicit user sign-off.**
