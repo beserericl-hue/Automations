@@ -154,6 +154,58 @@ describe('POST /api/email/webhook/postal', () => {
     }
   });
 
+  it('flips a matching subscriber to bounced on a hard bounce (S-19)', async () => {
+    // Table-aware stub: record the update applied to newsletter_subscribers_v2.
+    let subscriberUpdate: Record<string, unknown> | null = null;
+    let subscriberStatusFilter: string | null = null;
+    (mocks.supabaseStub.from as ReturnType<typeof vi.fn>).mockReset();
+    (mocks.supabaseStub.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
+      const chain: Record<string, unknown> = {};
+      chain.insert = vi.fn(async (row: unknown) => { mocks.insertedRows.push(row); return { error: null }; });
+      chain.select = vi.fn(() => chain);
+      chain.order = vi.fn(() => chain);
+      chain.limit = vi.fn(() => chain);
+      chain.ilike = vi.fn(() => chain);
+      chain.eq = vi.fn((col: string, val: string) => {
+        if (table === 'newsletter_subscribers_v2' && col === 'status') subscriberStatusFilter = val;
+        return chain;
+      });
+      chain.update = vi.fn((patch: Record<string, unknown>) => {
+        if (table === 'newsletter_subscribers_v2') subscriberUpdate = patch;
+        return chain;
+      });
+      chain.then = (resolve: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(resolve);
+      return chain;
+    });
+
+    const { emailRouter } = await import('../routes/email.js');
+    const app = makeApp((a) => a.use('/api/email', emailRouter));
+    const s = startServer(app);
+    try {
+      const res = await fetch(`http://localhost:${s.port}/api/email/webhook/postal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Postal-Webhook-Secret': 'test-webhook-secret' },
+        body: JSON.stringify({
+          event: 'MessageBounced',
+          uuid: 'evt-hard',
+          timestamp: 1712345678,
+          payload: {
+            message: { id: 7, token: 'msg-hard', to: 'Hard@Example.Test', from: 'eve@courseworx.media', subject: 'x' },
+            bounce: { reason: 'no such user', bounce_type: 'HardBounce' },
+          },
+        }),
+      });
+      expect(res.status).toBe(200);
+      // The subscriber matching the bounced address (case-insensitive, only active rows) is flipped.
+      expect(subscriberUpdate).not.toBeNull();
+      expect((subscriberUpdate as unknown as { status: string }).status).toBe('bounced');
+      expect((subscriberUpdate as unknown as { unsubscribed_at?: string }).unsubscribed_at).toBeTruthy();
+      expect(subscriberStatusFilter).toBe('active');
+    } finally {
+      await s.close();
+    }
+  });
+
   it('ignores unknown event types without persisting', async () => {
     installSupabaseStub({ insertResult: { error: null } });
     const { emailRouter } = await import('../routes/email.js');
