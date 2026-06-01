@@ -355,6 +355,7 @@ class NewsletterSagaDriver:
                 "masthead": "The Workbench",
                 "markdown_body": assembled.markdown_body,
                 "permalink_url": permalink_placeholder,
+                "send_date": send_date,
             },
         )
         rendered = RenderedNewsletter.model_validate(out.payload)

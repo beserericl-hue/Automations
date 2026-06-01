@@ -1,12 +1,24 @@
-"""render-svc — merge the assembled markdown body into the edition's branded HTML template.
+"""render-svc — render the edition's branded Handlebars template via the Workbench renderer.
 
-For F0/F2 build phase the template falls back to a built-in Playfair-Display masthead so the engine renders
-without DB access. The real template fetch from ``newsletter_templates_v2`` happens when Supabase is configured.
+The template (``newsletter_templates_v2``) is what defines the newsletter's look — masthead, lead,
+sponsor, trending, footer — and it is a Handlebars template with helpers (``markdown_to_html``,
+``rank``, ``format_date``) that only the Workbench ``/api/newsletter/render-html`` endpoint can
+render. So render-svc POSTs the assembled content there (the same server-to-server contract the n8n
+send path uses) and uses the returned HTML. The decorative sample sections (lead/sponsor/pull_quote/
+trending/workbench_section) are sent as ``null`` so the template hides them instead of showing its
+``sample_data`` placeholders — that is why an edition with no sponsor renders no sponsor block.
+
+A built-in Playfair-Display fallback template is used only when the Workbench renderer is not
+configured/reachable, so the engine still boots and renders in local/dev without WW.
 """
 
 from __future__ import annotations
 
+import datetime as _dt
 from string import Template
+from typing import Any
+
+import httpx
 
 from writer_engine.config import get_settings
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
@@ -60,23 +72,63 @@ def _markdown_to_html(md: str) -> str:
     return "\n".join(out)
 
 
-async def _fetch_template(edition_id: str) -> str | None:
-    settings = get_settings()
-    if not settings.supabase_url or not settings.supabase_service_role_key:
-        return None
+def _format_issue_date(send_date: str) -> str:
+    """ISO date → "Sunday, May 31, 2026" (matches the n8n render-html payload)."""
     try:
-        from writer_engine.supabase.client import get_supabase_admin
+        d = _dt.date.fromisoformat(send_date)
+    except (ValueError, TypeError):
+        return send_date or ""
+    return f"{d.strftime('%A')}, {d.strftime('%B')} {d.day}, {d.year}"
 
-        client = await get_supabase_admin()
-        resp = await (
-            client.table("newsletter_templates_v2")
-            .select("html")
-            .eq("edition_id", edition_id)
-            .limit(1)
-            .execute()
-        )
-        rows = getattr(resp, "data", None) or []
-        return rows[0]["html"] if rows else None
+
+def _render_data(*, subject: str, preheader: str, markdown_body: str, send_date: str) -> dict[str, Any]:
+    """The ``data`` object for /api/newsletter/render-html (mirrors the n8n send payload).
+
+    ``body_md`` carries the assembled markdown; the decorative sections are ``None`` (not omitted)
+    so the renderer's deepMerge does NOT fall back to the template's ``sample_data`` — that is what
+    hides an empty sponsor/lead/trending block instead of showing a sample placeholder.
+    """
+    return {
+        "title": subject,
+        "preheader": preheader,
+        "issue": {"date": _format_issue_date(send_date)},
+        "body_md": markdown_body,
+        "lead": None,
+        "sponsor": None,
+        "pull_quote": None,
+        "trending": None,
+        "workbench_section": None,
+    }
+
+
+async def _render_via_workbench(
+    edition_id: str, *, subject: str, preheader: str, markdown_body: str, send_date: str
+) -> str | None:
+    """Render the edition's stored Handlebars template through the Workbench renderer.
+
+    Mirrors the production n8n send path's POST to ``/api/newsletter/render-html``. Returns the
+    rendered HTML, or ``None`` when WW isn't configured/reachable (caller falls back).
+    """
+    settings = get_settings()
+    base = (settings.workbench_api_url or "").rstrip("/")
+    secret = settings.ingestion_secret
+    if not base or not secret or not edition_id:
+        return None
+    data = _render_data(
+        subject=subject, preheader=preheader, markdown_body=markdown_body, send_date=send_date
+    )
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=8.0)) as client:
+            resp = await client.post(
+                f"{base}/api/newsletter/render-html",
+                headers={"X-Ingestion-Secret": secret, "Content-Type": "application/json"},
+                json={"edition_id": edition_id, "data": data},
+            )
+        if resp.status_code >= 300:
+            return None
+        body = resp.json()
+        html = body.get("html") if isinstance(body, dict) else None
+        return html if isinstance(html, str) and html.strip() else None
     except Exception:
         return None
 
@@ -88,25 +140,25 @@ async def handler(inp: StepInput) -> StepOutput:
     masthead = str(inp.payload.get("masthead") or "The Workbench")
     markdown_body = str(inp.payload.get("markdown_body") or "")
     permalink_url = str(inp.payload.get("permalink_url") or "")
+    send_date = str(inp.payload.get("send_date") or "")
 
-    body_html = _markdown_to_html(markdown_body)
-
-    template_html = await _fetch_template(edition_id) if edition_id else None
-    if template_html:
-        html_body = (
-            template_html.replace("{{subject}}", subject)
-            .replace("{{preheader}}", preheader)
-            .replace("{{masthead}}", masthead)
-            .replace("{{body}}", body_html)
-            .replace("{{permalink_url}}", permalink_url)
-        )
+    # The stored template defines the newsletter's look; render it through the Workbench renderer.
+    html_body = await _render_via_workbench(
+        edition_id,
+        subject=subject,
+        preheader=preheader,
+        markdown_body=markdown_body,
+        send_date=send_date,
+    )
+    if html_body:
         template_id = edition_id
     else:
+        # Fallback: self-contained template (WW unreachable / not configured / no edition template).
         html_body = DEFAULT_TEMPLATE.substitute(
             subject=subject,
             masthead=masthead,
             preheader=preheader,
-            body=body_html,
+            body=_markdown_to_html(markdown_body),
             permalink_url=permalink_url or "(not yet published)",
         )
         template_id = None
