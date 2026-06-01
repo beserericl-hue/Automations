@@ -215,8 +215,14 @@ class RenderedNewsletter(BaseModel):
 
 
 class NewsletterSendRow(BaseModel):
-    """Shape persisted by ``persist-svc`` to ``newsletter_sends_v2``."""
+    """Domain shape produced by the saga; ``persist-svc`` maps it to ``newsletter_sends_v2`` columns.
 
+    Field names are the engine's own — ``persist-svc._to_db_row`` translates them to the actual
+    table columns (``pre_header_text`` → ``preheader``, status enum, etc.). ``user_id`` is required:
+    the table column is ``NOT NULL`` and FKs ``users_v2``.
+    """
+
+    user_id: str
     edition_id: str
     send_date: str
     subject: str

@@ -359,6 +359,7 @@ class NewsletterSagaDriver:
         )
         rendered = RenderedNewsletter.model_validate(out.payload)
         row = NewsletterSendRow(
+            user_id=str(cfg.get("user_id") or ""),
             edition_id=edition_id,
             send_date=send_date,
             subject=subj.subject_line,
