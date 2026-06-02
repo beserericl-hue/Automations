@@ -530,3 +530,6 @@ Gotcha caught + documented in [`engine/docs/deployment.md`](engine/docs/deployme
 Smoke: `POST /internal/library/retrieve` through gateway → orchestrator → library_retrieve_step → live DEV Supabase round-trip → HTTP 200 with `execution_id` + `items[]`. All env keys (Anthropic, Gemini 2.5 Pro picker, Perplexity, OpenAI, Firecrawl, KIE.AI, Postal, Supabase, INGESTION_SECRET, ARCHIVE_BASE_URL) live in the engine env.
 
 Next: wire WritersWorkbench DEV to point at the engine gateway (`NEWSLETTER_BACKEND=python` + `NEWSLETTER_SERVICE_URL=http://writer-engine-gateway.railway.internal:8000` + matching `SERVICE_SHARED_SECRET`), then trigger a UI-driven newsletter generate to flow through the full Python pipeline.
+
+## [2026-06-02] update | F1-B sequencing — acceptance test gate before PROD flip
+Reorganized F1-B so the PROD cutover (F1-8) is gated behind a formal **acceptance test of the DEV system** (new F1-7.5). Sequence: engine machinery (done, #105–#109) → hub rewiring + shadow (DEV) → **acceptance test on develop (A1 unit · A2 system S-suite · A3 R-CHAPTER-DB regression · A4 L5 parity ≥0.95 over 7-day shadow · A5 UAT)** → PROD flip only after A1–A5 pass + user sign-off. Details in [[f1-test-plan]] §4 and `engine/docs/f1b-hub-routing.md` §4. Updated the F1-B table + cutover-gates note in [[engine-framework-sprints]].
