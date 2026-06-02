@@ -72,7 +72,7 @@ async def _query(question: str, period: str, place: str) -> str:
     try:
         resp = await router.complete(
             provider="perplexity",
-            model="llama-3.1-sonar-large-128k-online",
+            model="sonar-pro",  # llama-3.1-sonar-* models were retired by Perplexity (400)
             system="You are a citation-grounded research assistant. Surface source disagreement.",
             prompt=_build_query_prompt(question, period, place),
             max_tokens=900,
