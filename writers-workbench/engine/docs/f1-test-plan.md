@@ -79,6 +79,21 @@ Suite B from `engine-api-system-tests.md`, one row per tool. Run against the DEV
 - ⏳ **R-SHADOW** (F1-B) — hub routes both n8n + engine for 7 days; shadow-diff dashboard ≥95% agreement before flipping each tool.
 - ⏳ **R-CUTOVER** (F1-B) — after flip, PROD tool dispatches to the engine; smoke each tool on PROD; n8n tool archived (90-day rollback).
 
+## 4. Acceptance test (DEV) — the gate before any PROD flip
+
+The PROD cutover (R-CUTOVER) does NOT begin until this acceptance gate passes on the **develop**
+system and the user signs off. Sequence + details in `docs/f1b-hub-routing.md` §4.
+
+| ID | Gate | Pass condition (on DEV) |
+|----|------|-------------------------|
+| **A1** | Unit | engine CI green on `develop` (full pytest suite) |
+| **A2** | System (§2) | S-CH-*, S-RE, S-BR, S-OUT, S-MED, S-LIB/S-SB, S-APP, S-NOT green on the deployed DEV engine |
+| **A3** | Regression | R-CHAPTER-DB over real DEV outlines — every chapter clears craft-QA ≥0.8 on every dimension |
+| **A4** | Parity (L5) | each write tool ≥0.95 vs n8n baseline, sustained over the ≥7-day DEV shadow |
+| **A5** | UAT | a human runs each tool through the DEV Workbench UI end-to-end and signs off |
+
+**A1–A5 pass → acceptance sign-off recorded → only then schedule the PROD flip (F1-8).**
+
 ---
 
 ## How to run

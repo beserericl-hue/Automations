@@ -134,11 +134,16 @@ green in CI. **~36 pts.**
 
 | ID | Task | Pts | Acceptance |
 |---|---|---|---|
+| **F1-6b** | **Engine machinery (DONE)**: the 8 write-workshop steps deployed in `writer-engine-runtime` + uniform `gateway /internal/write/{tool}` → `orchestrator /pipelines/write/{tool}/run`. | — | verified end-to-end on DEV (a full craft-composed outline returned through the gateway). PRs #105–#109. |
 | **F1-7** | **Hub routing + shadow**: n8n hub `ai_tool`s switch `executeWorkflow` → HTTP to engine per `app_config.python_backend_routing`; DEV shadow (both run, compare) | 5 | DEV end-to-end through engine for all F1 tools; shadow diff dashboard ≥95% agreement |
-| **F1-8** | **DEV→PROD cutover per tool** behind the flag; archive replaced n8n workflows after 7 clean days. Once the last tool flips, the n8n hub itself becomes a candidate for the [[hub-architecture]] port (F4). | 3 | PROD on engine for F1 ops; n8n F1 tool workflows archived (not deleted) |
+| **F1-7.5** | **ACCEPTANCE TEST (DEV) — the gate before PROD.** Run the full F1 acceptance suite on the **develop** system: A1 unit (CI green) · A2 system S-suite on the deployed DEV engine · A3 R-CHAPTER-DB regression (craft-QA ≥0.8) · A4 L5 parity ≥0.95 over the ≥7-day shadow · A5 UAT through the DEV Workbench UI. | 3 | A1–A5 all pass on DEV **and** user signs off. See [[f1-test-plan]] §4 / `engine/docs/f1b-hub-routing.md` §4. |
+| **F1-8** | **DEV→PROD cutover per tool** behind the flag — **starts only after F1-7.5 passes + user go.** Set PROD engine env, flip `python_backend_routing.{tool}=engine`, smoke, archive replaced n8n workflows after 7 clean days. | 3 | PROD on engine for F1 ops; n8n F1 tool workflows archived (not deleted) |
+
+**F1-B sequence:** machinery (done) → hub rewiring + shadow (DEV) → **acceptance test on DEV (gate)** →
+PROD flip. The PROD flip (Tier-2/3) never precedes the DEV acceptance sign-off.
 
 **F1-B exit:** the writing-engine API is fully Python on PROD; n8n hub keeps routing but every tool dispatches
-to `writer-engine-gateway`. **~8 pts.**
+to `writer-engine-gateway`. **~11 pts.**
 
 ---
 
@@ -197,8 +202,10 @@ F0 (foundation, DONE) ──> F2 (newsletter, in flight) ──> F2.5 (chapter a
 - **F0 is the only hard prerequisite** (done); F1-A and F2 can proceed in parallel.
 - **F2.5 lands between F2 and F1-B**: needs the F2 numbers + F1-A's clean Python chapter as the optimization
   target. Running F2.5 before F1-A would optimize n8n behavior the engine is about to discard.
-- **Cutover gates** (F1-B / F3) require: L2 E2E + L5 parity ≥0.95 + relevant L6 targets green for 7 days in DEV
-  shadow.
+- **Cutover gates** (F1-B / F3): the PROD flip is gated behind a **formal acceptance test of the DEV system**
+  (F1-7.5 / [[f1-test-plan]] §4) — A1 unit + A2 system + A3 regression + A4 L5 parity ≥0.95 over a 7-day DEV
+  shadow + A5 UAT — which must pass and be signed off **before** any PROD flip. Acceptance on `develop` first;
+  PROD flip after.
 - **DoD per task** = its [[engine-api-system-tests]] suite(s) green in CI + the DEV deployment.
 
 ## Carryover from the 2026-05-29 session
