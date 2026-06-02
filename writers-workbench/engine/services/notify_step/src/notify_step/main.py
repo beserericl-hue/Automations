@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from writer_engine.config import get_settings
 from writer_engine.postal import send_email
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
 from writer_engine.step_service import build_step_app
@@ -13,9 +14,12 @@ async def _op_email(payload: dict) -> dict:
     to = list(payload.get("to") or [])
     if not to:
         return {"sent": 0}
+    # Postal authenticates the From domain — default to the authorised sender, never a .local
+    # placeholder (which Postal rejects as UnauthenticatedFromAddress and silently drops).
+    from_addr = str(payload.get("from_addr") or get_settings().newsletter_from_address)
     res = await send_email(
         to=to,
-        from_addr=str(payload.get("from_addr") or "engine@writersworkbench.local"),
+        from_addr=from_addr,
         subject=str(payload.get("subject") or "Notification"),
         html=str(payload.get("html") or ""),
     )
