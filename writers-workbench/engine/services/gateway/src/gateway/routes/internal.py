@@ -27,6 +27,14 @@ async def newsletter_generate(body: dict[str, Any]) -> dict[str, Any]:
     return await _forward("POST", f"{settings.orchestrator_url}/pipelines/newsletter/run-durable", json=body)
 
 
+@router.post("/write/{tool}")
+async def write_tool(tool: str, body: dict[str, Any]) -> dict[str, Any]:
+    """F1-B: the n8n hub's ai_tool nodes call here (X-Service-Secret) to dispatch a write-workshop
+    tool to the engine instead of executeWorkflow. Forwards to the orchestrator's write-tool route."""
+    settings = get_settings()
+    return await _forward("POST", f"{settings.orchestrator_url}/pipelines/write/{tool}/run", json=body)
+
+
 @router.get("/newsletter/executions/{execution_id}/review/{stage}")
 async def newsletter_review(execution_id: str, stage: str) -> dict[str, Any]:
     """UI calls here when the operator opens an approval gate — returns the review payload from saga state."""

@@ -23,6 +23,15 @@ start assemble_step.main:app           8016 assemble_step
 start render_step.main:app             8017 render_step
 start persist_step.main:app            8018 persist_step
 start deliver_step.main:app            8019 deliver_step
+# Write-workshop step services (F1-B).
+start chapter_step.main:app            8020 chapter_step
+start research_step.main:app           8021 research_step
+start brainstorm_step.main:app         8022 brainstorm_step
+start media_step.main:app              8023 media_step
+start library_step.main:app            8024 library_step
+start story_bible_step.main:app        8025 story_bible_step
+start approval_step.main:app           8026 approval_step
+start notify_step.main:app             8027 notify_step
 
 # Point orchestrator's saga at localhost for every step.
 export GATHER_STEP_URL="http://localhost:8010"
@@ -36,6 +45,14 @@ export RENDER_STEP_URL="http://localhost:8017"
 export PERSIST_STEP_URL="http://localhost:8018"
 export DELIVER_STEP_URL="http://localhost:8019"
 export LIBRARY_RETRIEVE_STEP_URL="http://localhost:8002"
+export CHAPTER_STEP_URL="http://localhost:8020"
+export RESEARCH_STEP_URL="http://localhost:8021"
+export BRAINSTORM_STEP_URL="http://localhost:8022"
+export MEDIA_STEP_URL="http://localhost:8023"
+export LIBRARY_STEP_URL="http://localhost:8024"
+export STORY_BIBLE_STEP_URL="http://localhost:8025"
+export APPROVAL_STEP_URL="http://localhost:8026"
+export NOTIFY_STEP_URL="http://localhost:8027"
 
 # arq worker drives the saga between HITL pauses.
 echo "starting arq worker"

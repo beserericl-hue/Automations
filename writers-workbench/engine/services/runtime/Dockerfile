@@ -25,6 +25,15 @@ COPY services/assemble_step/pyproject.toml ./services/assemble_step/
 COPY services/render_step/pyproject.toml ./services/render_step/
 COPY services/persist_step/pyproject.toml ./services/persist_step/
 COPY services/deliver_step/pyproject.toml ./services/deliver_step/
+# Write-workshop step services (F1-B).
+COPY services/chapter_step/pyproject.toml ./services/chapter_step/
+COPY services/research_step/pyproject.toml ./services/research_step/
+COPY services/brainstorm_step/pyproject.toml ./services/brainstorm_step/
+COPY services/media_step/pyproject.toml ./services/media_step/
+COPY services/library_step/pyproject.toml ./services/library_step/
+COPY services/story_bible_step/pyproject.toml ./services/story_bible_step/
+COPY services/approval_step/pyproject.toml ./services/approval_step/
+COPY services/notify_step/pyproject.toml ./services/notify_step/
 
 # Source for everything that runs in this container.
 COPY packages/writer_engine/src ./packages/writer_engine/src
@@ -40,6 +49,14 @@ COPY services/assemble_step/src ./services/assemble_step/src
 COPY services/render_step/src ./services/render_step/src
 COPY services/persist_step/src ./services/persist_step/src
 COPY services/deliver_step/src ./services/deliver_step/src
+COPY services/chapter_step/src ./services/chapter_step/src
+COPY services/research_step/src ./services/research_step/src
+COPY services/brainstorm_step/src ./services/brainstorm_step/src
+COPY services/media_step/src ./services/media_step/src
+COPY services/library_step/src ./services/library_step/src
+COPY services/story_bible_step/src ./services/story_bible_step/src
+COPY services/approval_step/src ./services/approval_step/src
+COPY services/notify_step/src ./services/notify_step/src
 
 COPY services/runtime/entrypoint.sh /entrypoint.sh
 

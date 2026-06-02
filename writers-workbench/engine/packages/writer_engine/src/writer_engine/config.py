@@ -107,6 +107,15 @@ class EngineSettings(BaseSettings):
     library_retrieve_step_url: str = Field(
         default="http://localhost:8002", alias="LIBRARY_RETRIEVE_STEP_URL"
     )
+    # Write-workshop step services (F1-B) — same in-container localhost convention.
+    chapter_step_url: str = Field(default="http://localhost:8020", alias="CHAPTER_STEP_URL")
+    research_step_url: str = Field(default="http://localhost:8021", alias="RESEARCH_STEP_URL")
+    brainstorm_step_url: str = Field(default="http://localhost:8022", alias="BRAINSTORM_STEP_URL")
+    media_step_url: str = Field(default="http://localhost:8023", alias="MEDIA_STEP_URL")
+    library_step_url: str = Field(default="http://localhost:8024", alias="LIBRARY_STEP_URL")
+    story_bible_step_url: str = Field(default="http://localhost:8025", alias="STORY_BIBLE_STEP_URL")
+    approval_step_url: str = Field(default="http://localhost:8026", alias="APPROVAL_STEP_URL")
+    notify_step_url: str = Field(default="http://localhost:8027", alias="NOTIFY_STEP_URL")
 
     # Observability
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
