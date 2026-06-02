@@ -30,9 +30,17 @@ async def newsletter_generate(body: dict[str, Any]) -> dict[str, Any]:
 @router.post("/write/{tool}")
 async def write_tool(tool: str, body: dict[str, Any]) -> dict[str, Any]:
     """F1-B: the n8n hub's ai_tool nodes call here (X-Service-Secret) to dispatch a write-workshop
-    tool to the engine instead of executeWorkflow. Forwards to the orchestrator's write-tool route."""
+    tool to the engine instead of executeWorkflow. Forwards to the orchestrator's write-tool route.
+
+    Write tools are synchronous and LLM-heavy (a chapter draft + craft-revision loop can run minutes),
+    so the forward timeout is generous — well above the default used for the fast newsletter calls."""
     settings = get_settings()
-    return await _forward("POST", f"{settings.orchestrator_url}/pipelines/write/{tool}/run", json=body)
+    return await _forward(
+        "POST",
+        f"{settings.orchestrator_url}/pipelines/write/{tool}/run",
+        json=body,
+        timeout_s=600.0,
+    )
 
 
 @router.get("/newsletter/executions/{execution_id}/review/{stage}")
@@ -61,9 +69,11 @@ async def newsletter_state(execution_id: str) -> dict[str, Any]:
     )
 
 
-async def _forward(method: str, url: str, *, json: dict[str, Any] | None = None) -> dict[str, Any]:
+async def _forward(
+    method: str, url: str, *, json: dict[str, Any] | None = None, timeout_s: float = 30.0
+) -> dict[str, Any]:
     settings = get_settings()
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=timeout_s) as client:
         try:
             resp = await client.request(
                 method,
