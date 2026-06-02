@@ -120,6 +120,33 @@ class BrainstormStoryResponse(BaseModel):
     outline: dict[str, object]
 
 
+class StoryOutline(BaseModel):
+    """Craft-composed outline (parity with the DB outline JSONB shape + Follett plot fields)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    title: str = "Untitled"
+    premise: str = ""
+    themes: list[str] = Field(default_factory=list)
+    story_arc_name: str = ""
+    dramatic_question: str = ""
+    wow_factor: str = ""
+    characters: list[dict[str, object]] = Field(default_factory=list)
+    chapters: list[dict[str, object]] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce(cls, data: Any) -> Any:
+        """Tolerate string themes + an {outline:{...}} envelope from the LLM."""
+        if isinstance(data, dict):
+            if isinstance(data.get("outline"), dict):
+                data = data["outline"]
+            themes = data.get("themes")
+            if isinstance(themes, str):
+                data = {**data, "themes": [t.strip() for t in themes.split(",") if t.strip()]}
+        return data
+
+
 class ResearchRequest(BaseModel):
     project_id: UUID | None = None
     topic: str
