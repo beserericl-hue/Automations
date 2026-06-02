@@ -154,21 +154,91 @@ async def _op_write(payload: dict) -> dict:
         "sonnet": settings.model_default,
     }.get(req.llm_strategy, settings.model_default)
     router = get_router(service=STEP_NAME)
+    # Craft-revision loop: the DB regression showed a single pass leaves boring paragraphs / dialogue
+    # below the guide bar (avg ~0.87, no_boring dominant). After the draft, QA it and — if any
+    # dimension is under threshold — revise targeting the findings, bounded by max_craft_passes.
+    max_passes = int(payload.get("max_craft_passes", 1))
+    period = str(payload.get("period") or "contemporary")
     try:
         resp = await router.complete(
             provider="anthropic", model=model, system=system, prompt=user, max_tokens=8192
         )
         text = resp.text.strip()
+        passes = 0
+        final_qa: ChapterCraftQa | None = None
+        while passes < max_passes:
+            qa = await _score_chapter(text, period)
+            final_qa = qa
+            low = _low_dims(qa)
+            if not low:
+                break
+            text = await _revise_chapter(
+                text, low_dims=low, findings=qa.findings, model=model, genre_slug=ctx["genre_slug"]
+            )
+            passes += 1
+            final_qa = None  # re-score on next iteration; if loop ends here, score once more below
+        if max_passes > 0 and final_qa is None:
+            final_qa = await _score_chapter(text, period)
+        scores = (
+            {k: v for k, v in final_qa.model_dump(mode="json").items() if k in QA_DIMS}
+            if final_qa
+            else None
+        )
         out = WriteChapterResponse(
             chapter_id=uuid4(),
             chapter_run_id=req.chapter_run_id,
             content_text=text,
             word_count=len(text.split()),
             sub_chapter_count=req.sub_chapter_count_override or 5,
+            craft_passes=passes,
+            craft_qa=scores,
         )
     except ProviderNotRegistered:
         out = _fixture_chapter(req)
     return out.model_dump(mode="json")
+
+
+_DIM_TO_SEEDS = {
+    "no_boring_paragraphs": ["follett_seeds.prose.no_boring"],
+    "dialogue_follows_guide": ["follett_seeds.prose.dialogue"],
+    "prose_transparent": ["follett_seeds.prose.transparent", "follett_seeds.prose.diction"],
+    "story_turn_density": ["follett_seeds.scene.turn_density"],
+    "period_language_ok": ["follett_seeds.research.period_language"],
+    "character_follows_guide": ["follett_seeds.character.no_milk_and_water"],
+    "outline_follows_guide": ["follett_seeds.plot.outline_gate"],
+}
+
+
+async def _revise_chapter(
+    text: str, *, low_dims: list[str], findings: list[dict], model: str, genre_slug: str
+) -> str:
+    """Targeted craft-revision pass: rewrite the chapter to fix the dimensions that scored low.
+
+    Composes only the seeds for the failing dimensions plus the revision meta-directives
+    (fix-now + daily-rewrite), so the model focuses on the actual gaps without re-litigating the
+    whole craft. Preserves story, characters, and events — this is a polish, not a rewrite.
+    """
+    seeds: list[str] = ["follett_seeds.scene.fix_now", "follett_seeds.prose.daily_rewrite"]
+    for dim in low_dims:
+        seeds.extend(_DIM_TO_SEEDS.get(dim, []))
+    # de-dup, preserve order
+    seeds = list(dict.fromkeys(seeds))
+    system = compose_craft_system(seed_keys=seeds, genre_block=_genre_block(genre_slug))
+    findings_text = "\n".join(
+        f"- [{f.get('dimension', '?')}] {f.get('problem', '')} -> FIX: {f.get('fix', '')}"
+        for f in findings
+    ) or "(no specific findings; apply the craft rules above)"
+    user = (
+        "Revise the chapter below to fix these craft issues, applying the rules in the system "
+        "prompt. PRESERVE the story, characters, events, and POV exactly — improve only the prose, "
+        f"dialogue, pacing, and language. Return the full revised chapter.\n\n"
+        f"CRAFT ISSUES TO FIX ({', '.join(low_dims)}):\n{findings_text}\n\nCHAPTER:\n{text}"
+    )
+    router = get_router(service=STEP_NAME)
+    resp = await router.complete(
+        provider="anthropic", model=model, system=system, prompt=user, max_tokens=8192
+    )
+    return resp.text.strip()
 
 
 def _build_qa_system() -> str:
@@ -204,11 +274,22 @@ def _fixture_qa() -> ChapterCraftQa:
     )
 
 
-async def _op_qa(payload: dict) -> dict:
+QA_DIMS = (
+    "character_follows_guide",
+    "outline_follows_guide",
+    "dialogue_follows_guide",
+    "prose_transparent",
+    "story_turn_density",
+    "no_boring_paragraphs",
+    "period_language_ok",
+)
+CRAFT_THRESHOLD = 0.8
+
+
+async def _score_chapter(text: str, period: str) -> ChapterCraftQa:
+    """Run the craft-QA over a chapter. Fixture when no provider is registered."""
     from writer_engine.config import get_settings
 
-    chapter_text = str(payload.get("chapter_text") or payload.get("content_text") or "")
-    period = str(payload.get("period") or "contemporary")
     router = get_router(service=STEP_NAME)
     try:
         qa, _resp = await complete_structured(
@@ -216,11 +297,23 @@ async def _op_qa(payload: dict) -> dict:
             provider="anthropic",
             model=get_settings().model_default,
             system=_build_qa_system(),
-            prompt=f"PERIOD: {period}\n\nCHAPTER:\n{chapter_text}",
+            prompt=f"PERIOD: {period}\n\nCHAPTER:\n{text}",
             schema=ChapterCraftQa,
         )
+        return qa
     except ProviderNotRegistered:
-        qa = _fixture_qa()
+        return _fixture_qa()
+
+
+def _low_dims(qa: ChapterCraftQa, threshold: float = CRAFT_THRESHOLD) -> list[str]:
+    d = qa.model_dump(mode="json")
+    return [dim for dim in QA_DIMS if d.get(dim, 0.0) < threshold]
+
+
+async def _op_qa(payload: dict) -> dict:
+    chapter_text = str(payload.get("chapter_text") or payload.get("content_text") or "")
+    period = str(payload.get("period") or "contemporary")
+    qa = await _score_chapter(chapter_text, period)
     scores = qa.model_dump(mode="json")
     findings = scores.pop("findings", [])
     return {"chapter_id": payload.get("chapter_id"), "scores": scores, "findings": findings}
