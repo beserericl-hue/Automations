@@ -132,7 +132,7 @@ def build_app() -> FastAPI:
             StepRef(name=tool, url=url(settings)),
             execution_id=UUID(exec_id) if exec_id else uuid4(),
             payload=body,
-            timeout_s=float(body.get("timeout_s") or 180.0),
+            timeout_s=float(body.get("timeout_s") or 600.0),
         )
         return out.model_dump(mode="json")
 
