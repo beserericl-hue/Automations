@@ -131,3 +131,35 @@ class ResearchReportRow(BaseModel):
     topic: str
     questions: list[str]
     report_markdown: str
+
+
+class ResearchQuestion(BaseModel):
+    """One craft-derived research question (follett_seeds.research.derive categories)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    question: str
+    category: Literal[
+        "framework", "daily_life", "object_technology", "profession_role", "geography", "language"
+    ] = "framework"
+    why: str = ""
+
+
+class ResearchPlan(BaseModel):
+    """Output of the derive step — 8-15 scene-generating questions across the craft categories."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    questions: list[ResearchQuestion] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce(cls, data: Any) -> Any:
+        """Tolerate a bare list of questions or {questions:[strings]} from the LLM."""
+        if isinstance(data, list):
+            data = {"questions": data}
+        if isinstance(data, dict):
+            qs = data.get("questions")
+            if isinstance(qs, list):
+                data = {**data, "questions": [{"question": q} if isinstance(q, str) else q for q in qs]}
+        return data
