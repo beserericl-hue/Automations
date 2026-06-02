@@ -76,7 +76,9 @@ async def _op_story(payload: dict) -> dict:
             system=_build_story_system(genre, arc),
             prompt=f"PROJECT REQUIREMENTS:\n{requirements}\n\nGenerate the full outline.",
             schema=StoryOutline,
-            max_tokens=8192,
+            # A full novel outline (50-100 scene beats + characters) overruns 8192 and truncates the
+            # JSON mid-string; give Sonnet generous headroom.
+            max_tokens=32768,
         )
     except ProviderNotRegistered:
         outline = _fixture_outline(payload)
@@ -120,7 +122,9 @@ async def _op_edit_outline(payload: dict) -> dict:
             system=system,
             prompt=f"OUTLINE:\n{outline}\n\nEDITS TO APPLY:\n" + "\n".join(f"- {e}" for e in edits),
             schema=StoryOutline,
-            max_tokens=8192,
+            # A full novel outline (50-100 scene beats + characters) overruns 8192 and truncates the
+            # JSON mid-string; give Sonnet generous headroom.
+            max_tokens=32768,
         )
         return {"applied": len(edits), "outline": edited.model_dump(mode="json")}
     except ProviderNotRegistered:
