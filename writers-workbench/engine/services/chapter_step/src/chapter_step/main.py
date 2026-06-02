@@ -168,6 +168,8 @@ async def _op_write(payload: dict) -> dict:
         final_qa: ChapterCraftQa | None = None
         while passes < max_passes:
             qa = await _score_chapter(text, period)
+            if qa is None:
+                break  # QA unparseable — keep the draft, skip revision
             final_qa = qa
             low = _low_dims(qa)
             if not low:
@@ -286,8 +288,12 @@ QA_DIMS = (
 CRAFT_THRESHOLD = 0.8
 
 
-async def _score_chapter(text: str, period: str) -> ChapterCraftQa:
-    """Run the craft-QA over a chapter. Fixture when no provider is registered."""
+async def _score_chapter(text: str, period: str) -> ChapterCraftQa | None:
+    """Run the craft-QA over a chapter. None when no provider OR the QA JSON can't be parsed.
+
+    A QA parse failure must NOT lose the drafted chapter — the caller treats None as "couldn't
+    score" (skip the revision) rather than erroring the whole write.
+    """
     from writer_engine.config import get_settings
 
     router = get_router(service=STEP_NAME)
@@ -303,6 +309,8 @@ async def _score_chapter(text: str, period: str) -> ChapterCraftQa:
         return qa
     except ProviderNotRegistered:
         return _fixture_qa()
+    except ValueError:
+        return None  # QA JSON failed schema — don't lose the chapter
 
 
 def _low_dims(qa: ChapterCraftQa, threshold: float = CRAFT_THRESHOLD) -> list[str]:
@@ -314,6 +322,9 @@ async def _op_qa(payload: dict) -> dict:
     chapter_text = str(payload.get("chapter_text") or payload.get("content_text") or "")
     period = str(payload.get("period") or "contemporary")
     qa = await _score_chapter(chapter_text, period)
+    if qa is None:
+        return {"chapter_id": payload.get("chapter_id"), "scores": None, "findings": [],
+                "note": "craft-QA JSON could not be parsed"}
     scores = qa.model_dump(mode="json")
     findings = scores.pop("findings", [])
     return {"chapter_id": payload.get("chapter_id"), "scores": scores, "findings": findings}

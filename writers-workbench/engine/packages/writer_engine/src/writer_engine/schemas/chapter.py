@@ -79,6 +79,21 @@ class ChapterCraftQa(BaseModel):
         if not isinstance(data, dict):
             return data
         out = dict(data)
+        # Unwrap a single-key wrapper envelope, e.g. {"chapter_craft_qa": {...}} or {"qa": {...}},
+        # which the model sometimes adds around the real object (observed on a live run).
+        dims = {
+            "character_follows_guide",
+            "outline_follows_guide",
+            "dialogue_follows_guide",
+            "prose_transparent",
+            "story_turn_density",
+            "no_boring_paragraphs",
+            "period_language_ok",
+        }
+        if not (dims & set(out)) and len(out) == 1:
+            inner = next(iter(out.values()))
+            if isinstance(inner, dict):
+                out = dict(inner)
         scores = out.pop("scores", None)
         if isinstance(scores, dict):
             for k, v in scores.items():
@@ -166,10 +181,18 @@ class ResearchQuestion(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     question: str
-    category: Literal[
-        "framework", "daily_life", "object_technology", "profession_role", "geography", "language"
-    ] = "framework"
+    # Free string, not a Literal: the LLM returns the category in many casings/spellings
+    # ("PROFESSION / ROLE", "FRAMEWORK") that a strict enum rejects. Normalised in the validator.
+    category: str = "framework"
     why: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _norm_category(cls, data: Any) -> Any:
+        if isinstance(data, dict) and isinstance(data.get("category"), str):
+            c = data["category"].strip().lower().replace(" / ", "_").replace("/", "_").replace(" ", "_")
+            data = {**data, "category": c or "framework"}
+        return data
 
 
 class ResearchPlan(BaseModel):
