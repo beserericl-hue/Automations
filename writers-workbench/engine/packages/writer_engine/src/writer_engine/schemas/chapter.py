@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class WriteChapterRequest(BaseModel):
@@ -45,6 +45,55 @@ class QaReport(BaseModel):
     chapter_id: UUID
     scores: dict[str, float]
     findings: list[dict[str, str]] = Field(default_factory=list)
+
+
+class ChapterCraftQa(BaseModel):
+    """LLM-scored craft-QA result — "does the chapter follow the writing-craft guides?"
+
+    The dimensions map to the Follett craft rubrics (Writing Craft vault pages): each is the answer
+    to a "does X follow the guide?" question. ``findings`` lists concrete violations with a fix.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    character_follows_guide: float = Field(ge=0.0, le=1.0)
+    outline_follows_guide: float = Field(ge=0.0, le=1.0)
+    dialogue_follows_guide: float = Field(ge=0.0, le=1.0)
+    prose_transparent: float = Field(ge=0.0, le=1.0)
+    story_turn_density: float = Field(ge=0.0, le=1.0)
+    no_boring_paragraphs: float = Field(ge=0.0, le=1.0)
+    period_language_ok: float = Field(ge=0.0, le=1.0)
+    findings: list[dict[str, str]] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _unwrap_scores_envelope(cls, data: Any) -> Any:
+        """Tolerate the ``{"scores": {...}, "findings": [...]}`` envelope the LLM sometimes returns.
+
+        Observed on a live DB regression: the model nests the seven dimensions under a ``scores``
+        key instead of emitting them flat. Hoist them so validation passes, and coerce any score
+        given as a 0-100 int to the 0-1 float the schema expects.
+        """
+        if not isinstance(data, dict):
+            return data
+        out = dict(data)
+        scores = out.pop("scores", None)
+        if isinstance(scores, dict):
+            for k, v in scores.items():
+                out.setdefault(k, v)
+        for dim in (
+            "character_follows_guide",
+            "outline_follows_guide",
+            "dialogue_follows_guide",
+            "prose_transparent",
+            "story_turn_density",
+            "no_boring_paragraphs",
+            "period_language_ok",
+        ):
+            v = out.get(dim)
+            if isinstance(v, (int, float)) and v > 1:
+                out[dim] = round(v / 100.0, 3)
+        return out
 
 
 class DriftFinding(BaseModel):
