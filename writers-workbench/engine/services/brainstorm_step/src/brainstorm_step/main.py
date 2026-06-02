@@ -78,7 +78,7 @@ async def _op_story(payload: dict) -> dict:
             schema=StoryOutline,
             # A full novel outline (50-100 scene beats + characters) overruns 8192 and truncates the
             # JSON mid-string; give Sonnet generous headroom.
-            max_tokens=32768,
+            max_tokens=16384,
         )
     except ProviderNotRegistered:
         outline = _fixture_outline(payload)
@@ -124,7 +124,7 @@ async def _op_edit_outline(payload: dict) -> dict:
             schema=StoryOutline,
             # A full novel outline (50-100 scene beats + characters) overruns 8192 and truncates the
             # JSON mid-string; give Sonnet generous headroom.
-            max_tokens=32768,
+            max_tokens=16384,
         )
         return {"applied": len(edits), "outline": edited.model_dump(mode="json")}
     except ProviderNotRegistered:
