@@ -8,16 +8,18 @@ from __future__ import annotations
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from arq import create_pool
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import status as http_status
 
 from writer_engine.auth import require_service_secret
 from writer_engine.config import get_settings
 from writer_engine.redis_client.client import close_redis
 from writer_engine.state_machine.durable import RedisSagaRepo
 from writer_engine.state_machine.orchestrator import InMemoryStateStore
+from writer_engine.state_machine.saga import StepRef, run_step_via_http
 from writer_engine.telemetry.logging import configure_logging, get_logger
 from writer_engine.telemetry.metrics import HTTP_LATENCY, HTTP_REQUESTS, metrics_app, observe_latency
 
@@ -31,6 +33,19 @@ from .worker import build_redis_settings
 _arq_pool = None
 
 SERVICE = "orchestrator"
+
+# F1-B write-workshop tools the hub can dispatch to (tool name == step STEP_NAME). Values pull the
+# step URL from settings at call time so env overrides apply.
+_WRITE_TOOL_URLS: dict[str, Callable[[Any], str]] = {
+    "chapter": lambda s: s.chapter_step_url,
+    "research": lambda s: s.research_step_url,
+    "brainstorm": lambda s: s.brainstorm_step_url,
+    "media": lambda s: s.media_step_url,
+    "library": lambda s: s.library_step_url,
+    "story_bible": lambda s: s.story_bible_step_url,
+    "approval": lambda s: s.approval_step_url,
+    "notify": lambda s: s.notify_step_url,
+}
 
 
 @asynccontextmanager
@@ -99,6 +114,27 @@ def build_app() -> FastAPI:
         else:
             execution_id = await orch.start(initial_state=body)
         return await orch.run(execution_id, payload=body)
+
+    @app.post("/pipelines/write/{tool}/run", dependencies=[Depends(require_service_secret)])
+    async def run_write_tool(tool: str, body: dict[str, Any]) -> dict[str, Any]:
+        """F1-B: single-call dispatch to a write-workshop step (chapter/research/brainstorm/...).
+
+        The n8n hub's ai_tool nodes POST here (via the gateway) instead of executeWorkflow. The body
+        is the step payload ({op, ...}); the response is the StepOutput. The tool name must match the
+        step service's STEP_NAME (so StepInput.step_name validates).
+        """
+        url = _WRITE_TOOL_URLS.get(tool)
+        if url is None:
+            raise HTTPException(http_status.HTTP_404_NOT_FOUND, detail=f"unknown write tool: {tool}")
+        settings = get_settings()
+        exec_id = body.get("execution_id")
+        out = await run_step_via_http(
+            StepRef(name=tool, url=url(settings)),
+            execution_id=UUID(exec_id) if exec_id else uuid4(),
+            payload=body,
+            timeout_s=float(body.get("timeout_s") or 180.0),
+        )
+        return out.model_dump(mode="json")
 
     @app.get("/pipelines/{pipeline}/state/{execution_id}", dependencies=[Depends(require_service_secret)])
     async def get_state(pipeline: str, execution_id: str) -> dict[str, Any]:
