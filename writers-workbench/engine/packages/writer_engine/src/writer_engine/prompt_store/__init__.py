@@ -8,15 +8,19 @@ Three layers:
 3. ``app_config.prompts`` (Supabase) — true production overrides; reloaded on ``POST /admin/reload-prompts``.
 """
 
+from .follett_seeds import FOLLETT_SEEDS, compose_craft_system, load_follett_seeds
 from .n8n_seeds import N8N_SEED_KEYS, load_n8n_seeds
 from .seeds import DEFAULT_PROMPTS, seed_default_prompts
 from .store import PromptStore, get_prompt_store
 
 __all__ = [
     "DEFAULT_PROMPTS",
+    "FOLLETT_SEEDS",
     "N8N_SEED_KEYS",
     "PromptStore",
+    "compose_craft_system",
     "get_prompt_store",
+    "load_follett_seeds",
     "load_n8n_seeds",
     "seed_default_prompts",
 ]

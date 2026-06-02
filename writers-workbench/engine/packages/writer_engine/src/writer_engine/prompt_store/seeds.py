@@ -79,4 +79,9 @@ def seed_default_prompts() -> int:
     from writer_engine.prompt_store.n8n_seeds import load_n8n_seeds
 
     n8n_count = load_n8n_seeds()
-    return len(DEFAULT_PROMPTS) + n8n_count
+    # Writing-craft layer (Follett seeds) — composed by the F1-A write-workshop steps via
+    # follett_seeds.compose_craft_system(). DB-overridable like every other prompt.
+    from writer_engine.prompt_store.follett_seeds import load_follett_seeds
+
+    follett_count = load_follett_seeds()
+    return len(DEFAULT_PROMPTS) + n8n_count + follett_count
