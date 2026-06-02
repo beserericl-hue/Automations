@@ -33,6 +33,8 @@ class WriteChapterResponse(BaseModel):
     word_count: int
     sub_chapter_count: int
     bible_entries_added: int = 0
+    craft_passes: int = 0  # how many craft-revision passes ran (0 = single draft)
+    craft_qa: dict[str, float] | None = None  # final craft-QA scores when the revision loop ran
 
 
 class BibleEntry(BaseModel):

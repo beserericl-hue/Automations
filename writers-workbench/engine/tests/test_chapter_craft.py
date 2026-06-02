@@ -57,6 +57,36 @@ async def test_op_write_fixture_path() -> None:
     )
     assert out["word_count"] > 0
     assert out["chapter_run_id"] == "00000000-0000-4000-8000-0000000000aa"
+    # No provider in tests -> fixture draft, revision loop is skipped.
+    assert out["craft_passes"] == 0
+
+
+def test_low_dims_flags_under_threshold() -> None:
+    from chapter_step.main import _low_dims
+
+    from writer_engine.schemas.chapter import ChapterCraftQa
+
+    qa = ChapterCraftQa.model_validate(
+        {
+            "character_follows_guide": 0.9,
+            "outline_follows_guide": 0.7,
+            "dialogue_follows_guide": 0.9,
+            "prose_transparent": 0.9,
+            "story_turn_density": 0.9,
+            "no_boring_paragraphs": 0.75,
+            "period_language_ok": 0.9,
+        }
+    )
+    assert set(_low_dims(qa)) == {"outline_follows_guide", "no_boring_paragraphs"}
+
+
+def test_every_qa_dim_has_revision_seeds() -> None:
+    # A low score on any guide dimension must map to targeted revision seeds.
+    from chapter_step.main import _DIM_TO_SEEDS, QA_DIMS
+
+    assert set(_DIM_TO_SEEDS) == set(QA_DIMS)
+    for seeds in _DIM_TO_SEEDS.values():
+        assert seeds and all(s.startswith("follett_seeds.") for s in seeds)
 
 
 @pytest.mark.asyncio
