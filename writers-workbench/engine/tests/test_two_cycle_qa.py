@@ -39,6 +39,15 @@ def test_drift_report_tolerates_wrapper_and_dict_entries() -> None:
     assert d.aligned is False
 
 
+def test_drift_report_flattens_item_dicts() -> None:
+    # the exact shape the live detector returned: [{"item": "..."}]
+    d = DriftReport.model_validate(
+        {"character_drift": [{"item": "Okafor is named chair, then Delgado is chair, then Okafor returns as a delegate"}]}
+    )
+    assert d.character_drift == ["Okafor is named chair, then Delgado is chair, then Okafor returns as a delegate"]
+    assert d.aligned is False
+
+
 def test_drift_system_checks_all_three_axes() -> None:
     s = _build_drift_system()
     assert "story_drift" in s and "character_drift" in s and "research_gaps" in s
