@@ -96,6 +96,12 @@ class ChapterCraftQa(BaseModel):
     story_turn_density: float = Field(ge=0.0, le=1.0)
     no_boring_paragraphs: float = Field(ge=0.0, le=1.0)
     period_language_ok: float = Field(ge=0.0, le=1.0)
+    # Do the characters stay consistent with the established roster/bible (names, traits, relationships,
+    # voice)? Defaults present so a model that omits it doesn't fail the whole QA.
+    character_consistency: float = Field(default=1.0, ge=0.0, le=1.0)
+    # Places the chapter asserts a historical/period fact that should be researched/verified, or where
+    # a researched detail would deepen the scene. Each: a short phrase. Drives "add research if needed".
+    research_gaps: list[str] = Field(default_factory=list)
     findings: list[dict[str, str]] = Field(default_factory=list)
 
     @model_validator(mode="before")
@@ -120,6 +126,7 @@ class ChapterCraftQa(BaseModel):
             "story_turn_density",
             "no_boring_paragraphs",
             "period_language_ok",
+            "character_consistency",
         }
         if not (dims & set(out)) and len(out) == 1:
             inner = next(iter(out.values()))
@@ -129,15 +136,7 @@ class ChapterCraftQa(BaseModel):
         if isinstance(scores, dict):
             for k, v in scores.items():
                 out.setdefault(k, v)
-        for dim in (
-            "character_follows_guide",
-            "outline_follows_guide",
-            "dialogue_follows_guide",
-            "prose_transparent",
-            "story_turn_density",
-            "no_boring_paragraphs",
-            "period_language_ok",
-        ):
+        for dim in dims:
             v = out.get(dim)
             if isinstance(v, (int, float)) and v > 1:
                 out[dim] = round(v / 100.0, 3)
