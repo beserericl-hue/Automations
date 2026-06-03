@@ -41,6 +41,7 @@ async def complete_structured(
     schema: type[T],
     max_tokens: int = 8192,
     temperature: float = 0.4,
+    stream: bool = False,
 ) -> tuple[T, LLMResponse]:
     """Run a single LLM call and validate the JSON output against ``schema``.
 
@@ -56,6 +57,7 @@ async def complete_structured(
         prompt=prompt,
         max_tokens=max_tokens,
         temperature=temperature,
+        stream=stream,
     )
     raw = extract_json(response.text)
     try:

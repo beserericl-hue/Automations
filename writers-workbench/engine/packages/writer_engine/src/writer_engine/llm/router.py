@@ -39,6 +39,7 @@ class LLMAdapter(Protocol):
         max_tokens: int = 4096,
         temperature: float = 0.7,
         cache_system: bool = True,
+        stream: bool = False,
     ) -> LLMResponse: ...
 
 
@@ -61,6 +62,7 @@ class LLMRouter:
         max_tokens: int = 4096,
         temperature: float = 0.7,
         cache_system: bool = True,
+        stream: bool = False,
     ) -> LLMResponse:
         if provider not in self._adapters:
             raise ProviderNotRegistered(f"unknown LLM provider: {provider}")
@@ -71,4 +73,5 @@ class LLMRouter:
             max_tokens=max_tokens,
             temperature=temperature,
             cache_system=cache_system,
+            stream=stream,
         )
