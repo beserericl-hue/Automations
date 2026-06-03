@@ -30,6 +30,7 @@ class PerplexityAdapter:
         max_tokens: int = 4096,
         temperature: float = 0.7,
         cache_system: bool = True,
+        stream: bool = False,  # accepted for protocol parity; ignored
     ) -> LLMResponse:
         messages: list[dict[str, str]] = []
         if system:

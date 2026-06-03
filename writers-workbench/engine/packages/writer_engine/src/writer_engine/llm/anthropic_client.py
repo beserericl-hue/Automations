@@ -31,6 +31,7 @@ class AnthropicAdapter:
         max_tokens: int = 4096,
         temperature: float = 0.7,
         cache_system: bool = True,
+        stream: bool = False,
     ) -> LLMResponse:
         system_blocks: list[dict[str, object]] | None = None
         if system:
@@ -48,8 +49,15 @@ class AnthropicAdapter:
         if system_blocks is not None:
             kwargs["system"] = system_blocks
 
+        # Streaming is required for large outputs (a full-novel outline needs >16k tokens, which the
+        # non-streaming API refuses as "may take >10 minutes"). Stream accumulates the whole message
+        # so the caller still gets one LLMResponse, and it never truncates mid-JSON.
         try:
-            msg = await self._client.messages.create(**kwargs)  # type: ignore[call-overload]
+            if stream:
+                async with self._client.messages.stream(**kwargs) as s:  # type: ignore[call-overload]
+                    msg = await s.get_final_message()
+            else:
+                msg = await self._client.messages.create(**kwargs)  # type: ignore[call-overload]
         except Exception:
             LLM_CALLS.labels(service=self._service, provider=self.provider, model=model, status="error").inc()
             raise
