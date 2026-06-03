@@ -27,25 +27,13 @@ from .library_orch import LibraryRetrieveOrchestrator
 from .newsletter_orch import NewsletterOrchestrator
 from .newsletter_saga import NewsletterSagaDriver
 from .worker import build_redis_settings
+from .write_tools import is_async, resolve_step_url
 
 # When set, the durable saga driver enqueues advance via this arq pool. Tests set it to None and drive
 # advance() directly so they don't need a live Redis + arq worker.
 _arq_pool = None
 
 SERVICE = "orchestrator"
-
-# F1-B write-workshop tools the hub can dispatch to (tool name == step STEP_NAME). Values pull the
-# step URL from settings at call time so env overrides apply.
-_WRITE_TOOL_URLS: dict[str, Callable[[Any], str]] = {
-    "chapter": lambda s: s.chapter_step_url,
-    "research": lambda s: s.research_step_url,
-    "brainstorm": lambda s: s.brainstorm_step_url,
-    "media": lambda s: s.media_step_url,
-    "library": lambda s: s.library_step_url,
-    "story_bible": lambda s: s.story_bible_step_url,
-    "approval": lambda s: s.approval_step_url,
-    "notify": lambda s: s.notify_step_url,
-}
 
 
 @asynccontextmanager
@@ -117,24 +105,53 @@ def build_app() -> FastAPI:
 
     @app.post("/pipelines/write/{tool}/run", dependencies=[Depends(require_service_secret)])
     async def run_write_tool(tool: str, body: dict[str, Any]) -> dict[str, Any]:
-        """F1-B: single-call dispatch to a write-workshop step (chapter/research/brainstorm/...).
+        """F1-B: dispatch to a write-workshop step (chapter/research/brainstorm/...).
 
-        The n8n hub's ai_tool nodes POST here (via the gateway) instead of executeWorkflow. The body
-        is the step payload ({op, ...}); the response is the StepOutput. The tool name must match the
-        step service's STEP_NAME (so StepInput.step_name validates).
+        Heavy tools (chapter fan-out, full-novel outline) default to ASYNC: enqueue an arq job and
+        return ``{job_id, status: "queued"}`` immediately (under the ~300s edge limit); the caller
+        polls ``GET /pipelines/write/jobs/{job_id}``. Pass ``async: false`` to force the synchronous
+        path. The tool name must match the step's STEP_NAME (so StepInput validates).
         """
-        url = _WRITE_TOOL_URLS.get(tool)
+        url = resolve_step_url(tool, get_settings())
         if url is None:
             raise HTTPException(http_status.HTTP_404_NOT_FOUND, detail=f"unknown write tool: {tool}")
-        settings = get_settings()
+
+        if is_async(tool, body):
+            if app.state.arq_pool is None:
+                raise HTTPException(
+                    http_status.HTTP_503_SERVICE_UNAVAILABLE, detail="async queue unavailable"
+                )
+            job = await app.state.arq_pool.enqueue_job(
+                "run_write_tool_job", tool, body, _queue_name="newsletter"
+            )
+            return {"job_id": job.job_id, "status": "queued", "tool": tool}
+
         exec_id = body.get("execution_id")
         out = await run_step_via_http(
-            StepRef(name=tool, url=url(settings)),
+            StepRef(name=tool, url=url),
             execution_id=UUID(exec_id) if exec_id else uuid4(),
             payload=body,
             timeout_s=float(body.get("timeout_s") or 600.0),
         )
         return out.model_dump(mode="json")
+
+    @app.get("/pipelines/write/jobs/{job_id}", dependencies=[Depends(require_service_secret)])
+    async def write_job_status(job_id: str) -> dict[str, Any]:
+        """Poll an async write-tool job: returns {status, result?}. status ∈ queued|in_progress|complete|not_found."""
+        from arq.jobs import Job, JobStatus
+
+        if app.state.arq_pool is None:
+            raise HTTPException(http_status.HTTP_503_SERVICE_UNAVAILABLE, detail="async queue unavailable")
+        job = Job(job_id, redis=app.state.arq_pool, _queue_name="newsletter")
+        status = await job.status()
+        out: dict[str, Any] = {"job_id": job_id, "status": status.value}
+        if status == JobStatus.complete:
+            try:
+                out["result"] = await job.result(timeout=1)
+            except Exception as exc:  # job failed inside the worker
+                out["status"] = "error"
+                out["error"] = str(exc)[:300]
+        return out
 
     @app.get("/pipelines/{pipeline}/state/{execution_id}", dependencies=[Depends(require_service_secret)])
     async def get_state(pipeline: str, execution_id: str) -> dict[str, Any]:
