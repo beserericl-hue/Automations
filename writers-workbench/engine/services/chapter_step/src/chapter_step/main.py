@@ -8,6 +8,7 @@ the service boots and tests run without live keys.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 from uuid import uuid4
 
@@ -172,6 +173,40 @@ async def _plan_subchapters(
         return [SubChapterBrief(beat=f"Part {i + 1}") for i in range(n)]
 
 
+# Meta/scaffolding the model sometimes prepends to prose despite "prose only" — a "Confirmed cast"
+# block (from the locked_roster COPY-FIRST rule), a POV-selector preamble, draft/sub-chapter
+# headings, or a chatty "Here is the revised chapter" lead-in. Stripped so only story prose ships.
+# A leading paragraph is scaffolding if its first line begins with one of these meta labels — a
+# "Confirmed cast" block (locked_roster COPY-FIRST rule), a POV-selector preamble, a draft/sub-chapter
+# heading, or a chatty "Here is the revised chapter" lead-in. Matched at the TOP only.
+_SCAFFOLD_PREFIX = re.compile(
+    r"^\s*[#>*_(\-]*\s*"
+    r"(?:confirmed cast|locked characters?|pov character|pov\b|cast\s*[:.]|"
+    r"why\s+(?:her|his|their|the)\b.*?stake|no locked characters|all characters introduced|"
+    r"this is the opening (?:chapter|scene)|chapter\s+\d+\s*[—:\-].*(?:revised|draft)|"
+    r"full revised draft|revised chapter\b|sub-?chapter\s+\d+|"
+    r"here(?:'s| is)\b[^.]*\b(?:revis|chapter|draft)|i(?:'ve| have)\b[^.]*\brevis)",
+    re.IGNORECASE,
+)
+
+
+def _strip_scaffolding(text: str) -> str:
+    """Drop leading meta/scaffolding paragraphs so the chapter starts on real story prose — not a
+    'Confirmed cast' block, a 'POV CHARACTER: …' preamble, or a '## Chapter N — Revised Draft'
+    heading. Only strips from the TOP and stops at the first real paragraph, never touching prose."""
+    # split into paragraphs on blank lines, keeping it simple
+    paras = re.split(r"\n\s*\n", text.strip())
+    i = 0
+    while i < len(paras):
+        head = paras[i].strip().lstrip("*_>#- ").strip()
+        if head in {"", "---", "***", "___"} or _SCAFFOLD_PREFIX.match(paras[i].strip()):
+            i += 1
+            continue
+        break
+    out = "\n\n".join(paras[i:]).strip()
+    return out or text.strip()
+
+
 async def _write_subchapter(
     *, system: str, header: str, brief: SubChapterBrief, idx: int, total: int,
     prior_tail: str, chapter_number: int, model: str,
@@ -191,7 +226,7 @@ async def _write_subchapter(
     )
     router = get_router(service=STEP_NAME)
     resp = await router.complete(provider="anthropic", model=model, system=system, prompt=user, max_tokens=8192)
-    return resp.text.strip()
+    return _strip_scaffolding(resp.text.strip())
 
 
 # ----------------------------------------------------------------------------------------------
@@ -304,12 +339,16 @@ async def _research_fill(gaps: list[str], *, period: str, title: str) -> str:
 
 
 def _build_correct_system(genre_slug: str) -> str:
-    """QA cycle 2 — drift corrector + research weaver (a structural revision, not a polish)."""
+    """QA cycle 2 — drift corrector + research weaver (a structural revision, not a polish).
+
+    Note: the locked_roster seed is deliberately NOT composed here — its COPY-FIRST rule makes the
+    model print a "Confirmed cast" block into the prose. The roster is supplied in the user prompt as
+    a reference instead, and consistency is enforced by the instruction below.
+    """
     return compose_craft_system(
         seed_keys=[
             "follett_seeds.scene.fix_now",
             "follett_seeds.plot.outline_gate",
-            "follett_seeds.character.locked_roster",
             "follett_seeds.research.local_color",
             "follett_seeds.research.no_dumping",
             "follett_seeds.research.period_language",
@@ -321,12 +360,15 @@ def _build_correct_system(genre_slug: str) -> str:
         "QA cycle 1 and to ground it in researched fact. You MUST:\n"
         "1. Correct every STORY DRIFT item so the chapter matches its planned outline beat and the "
         "arc — restore missing beats, remove contradictions, keep the through-line.\n"
-        "2. Correct every CHARACTER DRIFT item so each character matches the roster (name, age, "
-        "traits, relationships, voice) and stays in character.\n"
-        "3. Weave the RESEARCHED FACTS in naturally as concrete sensory/material detail and accurate "
-        "period language — dramatized, never an info-dump or a list.\n"
-        "PRESERVE the POV, the chapter's place in the story, and its length (do not shorten — this is "
-        "a full-length chapter). Return the FULL revised chapter as prose only (no headings, no notes)."
+        "2. Correct every CHARACTER DRIFT item so each character matches the CHARACTER ROSTER in the "
+        "user prompt (name, age, traits, relationships, voice) and stays in character.\n"
+        "3. Weave the RESEARCHED FACTS in as concrete sensory/material detail and accurate period "
+        "language — dramatized, never an info-dump or a list.\n"
+        "LENGTH — you are ADDING depth, not trimming. The revised chapter MUST be AT LEAST as long as "
+        "the original and should be LONGER once the researched detail is dramatized. Do NOT summarize, "
+        "condense, or drop scenes. PRESERVE the POV and the chapter's place in the story.\n"
+        "OUTPUT — return ONLY the chapter prose. Do NOT print a cast list, a 'Confirmed cast' section, "
+        "a 'POV character' line, chapter/sub-chapter headings, or any notes about what you changed."
     )
 
 
@@ -349,7 +391,7 @@ async def _correct_drift(
         provider="anthropic", model=model, system=_build_correct_system(genre_slug),
         prompt=user, max_tokens=32768, stream=True,
     )
-    return resp.text.strip()
+    return _strip_scaffolding(resp.text.strip())
 
 
 async def _two_cycle_qa(
@@ -376,9 +418,11 @@ async def _two_cycle_qa(
         text, drift=drift, facts=facts, roster_text=roster_text,
         genre_slug=ctx["genre_slug"], model=model,
     )
-    # Guard: a correction that collapses the chapter (truncation/refusal) must not replace good text.
-    if len(revised.split()) < 0.6 * len(text.split()):
-        return text, drift, gaps_filled, 0
+    # The correction must ADD depth, never shorten. If the rewrite came back shorter than the
+    # full-length fanned draft (the model condensed/truncated/refused), keep the draft — the user's
+    # priority is long, deep chapters. A small tolerance absorbs whitespace/markup churn.
+    if len(revised.split()) < 0.97 * len(text.split()):
+        return text, drift, [], 0
     return revised, drift, gaps_filled, 1
 
 

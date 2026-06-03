@@ -7,6 +7,7 @@ from chapter_step.main import (
     _build_correct_system,
     _build_drift_system,
     _chapter_outline_beat,
+    _strip_scaffolding,
 )
 
 from writer_engine.schemas.chapter import DriftReport, WriteChapterResponse
@@ -49,7 +50,39 @@ def test_correct_system_corrects_and_weaves() -> None:
     assert "QA cycle 2" in s
     assert "STORY DRIFT" in s and "CHARACTER DRIFT" in s
     assert "RESEARCHED FACTS" in s
-    assert "PRESERVE" in s  # must not shorten / drop POV
+    assert "AT LEAST as long" in s  # must expand, never condense
+    assert "Confirmed cast" in s  # explicitly forbids printing the cast block
+
+
+def test_strip_scaffolding_removes_confirmed_cast_and_headings() -> None:
+    # the exact leak observed in run 3's chapter 0 correction output
+    leaked = (
+        "**Confirmed cast:**\n\n"
+        "*(No locked characters established yet — this is the opening chapter. All characters "
+        "introduced here become the founding roster.)*\n\n"
+        "---\n\n"
+        "## Chapter 0 — Full Revised Draft\n\n"
+        "### Sub-chapter 1\n\n"
+        "The folding chair had a loose leg, and every time the man shifted his weight the row trembled."
+    )
+    out = _strip_scaffolding(leaked)
+    assert out.startswith("The folding chair")
+    assert "Confirmed cast" not in out and "Full Revised Draft" not in out
+
+
+def test_strip_scaffolding_removes_pov_preamble() -> None:
+    leaked = (
+        "**POV CHARACTER:** Dr. Tayak Moyaone. Her emotional stake is highest because the hearing "
+        "decides whether her community gains legal existence.\n\n"
+        "The committee room smelled of burnt coffee and floor polish."
+    )
+    out = _strip_scaffolding(leaked)
+    assert out.startswith("The committee room")
+
+
+def test_strip_scaffolding_keeps_clean_prose() -> None:
+    clean = "She knelt at the edge of the trench.\n\nThe copper caught the light."
+    assert _strip_scaffolding(clean) == clean
 
 
 def test_chapter_outline_beat_matches_by_number() -> None:
