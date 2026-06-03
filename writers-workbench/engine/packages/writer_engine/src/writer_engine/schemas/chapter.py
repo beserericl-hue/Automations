@@ -198,9 +198,20 @@ class DriftReport(BaseModel):
             elif isinstance(v, str):
                 out[k] = [v] if v.strip() else []
             elif isinstance(v, list):
-                # entries may be {"issue": ...}/{"detail": ...} dicts — flatten to phrases
+                # entries may be {"item": ...}/{"issue": ...}/{"detail": ...} dicts — flatten to phrases
                 out[k] = [
-                    (x if isinstance(x, str) else str(x.get("issue") or x.get("detail") or x.get("problem") or x))
+                    (
+                        x
+                        if isinstance(x, str)
+                        else str(
+                            x.get("item")
+                            or x.get("issue")
+                            or x.get("detail")
+                            or x.get("problem")
+                            or x.get("description")
+                            or x
+                        )
+                    )
                     for x in v
                 ]
         if "aligned" not in out:

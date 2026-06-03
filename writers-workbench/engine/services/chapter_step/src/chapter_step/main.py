@@ -404,18 +404,24 @@ def _build_correct_system(genre_slug: str) -> str:
 
 
 async def _correct_drift(
-    text: str, *, drift: DriftReport, roster_text: str, genre_slug: str, model: str
+    text: str, *, drift: DriftReport, roster_text: str, genre_slug: str, model: str,
+    insist_length: bool = False,
 ) -> str:
     """QA cycle 2: streamed full-chapter revision that corrects story/character drift (research is
     already woven at write-time, so this pass only fixes drift and must not shorten)."""
     router = get_router(service=STEP_NAME)
     sd = "\n".join(f"- {x}" for x in drift.story_drift) or "(none)"
     cd = "\n".join(f"- {x}" for x in drift.character_drift) or "(none)"
+    insist = (
+        "\n\nYOUR PREVIOUS REVISION WAS TOO SHORT. Return the FULL chapter — every scene, at least as "
+        "long as the original. Fix ONLY the drift listed; keep all other prose intact. Do not condense."
+        if insist_length else ""
+    )
     user = (
         f"CHARACTER ROSTER (consistency reference):\n{roster_text}\n\n"
         f"STORY DRIFT TO CORRECT:\n{sd}\n\n"
         f"CHARACTER DRIFT TO CORRECT:\n{cd}\n\n"
-        f"CHAPTER TO REVISE:\n{text}"
+        f"CHAPTER TO REVISE:\n{text}{insist}"
     )
     resp = await router.complete(
         provider="anthropic", model=model, system=_build_correct_system(genre_slug),
@@ -438,13 +444,23 @@ async def _drift_correct_pass(
         return text, None, 0
     if not (drift.story_drift or drift.character_drift):
         return text, drift, 0  # aligned — nothing to correct
+    # Real story/character drift (e.g. a name-continuity bug) is worth correcting even if the rewrite
+    # tightens the prose a little. Accept the correction down to 0.85x the draft; if it comes back
+    # shorter than that, retry once with a hard "return the FULL chapter, at least as long" push, then
+    # keep the longer of the two — but never ship a chapter that collapsed below 0.85x the draft.
+    draft_words = len(text.split())
+    floor = 0.85 * draft_words
     revised = await _correct_drift(
         text, drift=drift, roster_text=roster_text, genre_slug=ctx["genre_slug"], model=model,
     )
-    # A correction that comes back shorter than the full-length draft (condensed/truncated/refused)
-    # is rejected — the user's priority is long, deep chapters. Small tolerance for markup churn.
-    if len(revised.split()) < 0.97 * len(text.split()):
-        return text, drift, 0
+    if len(revised.split()) < floor:
+        retry = await _correct_drift(
+            text, drift=drift, roster_text=roster_text, genre_slug=ctx["genre_slug"], model=model,
+            insist_length=True,
+        )
+        revised = max((revised, retry), key=lambda t: len(t.split()))
+    if len(revised.split()) < floor:
+        return text, drift, 0  # correction kept collapsing — keep the full-length draft
     return revised, drift, 1
 
 
