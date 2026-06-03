@@ -38,7 +38,8 @@ class WriteChapterResponse(BaseModel):
     # Two-cycle QA telemetry: QA cycle 1 detects drift (vs outline/arc/roster) + research gaps;
     # QA cycle 2 corrects the drift and weaves in the researched facts. Surfaced for review.
     drift_report: dict[str, object] | None = None  # DriftReport from QA cycle 1 (pre-correction)
-    research_gaps_filled: list[str] = Field(default_factory=list)  # gaps researched + woven in
+    research_gaps_filled: list[str] = Field(default_factory=list)  # research topics grounded at write-time
+    research_facts: str = ""  # the period facts / local color woven into the chapter as written
     sub_chapter_briefs: list[dict[str, object]] = Field(default_factory=list)  # the chapter's sub-beats
 
 
