@@ -182,6 +182,7 @@ async def _plan_subchapters(
 _SCAFFOLD_PREFIX = re.compile(
     r"^\s*[#>*_(\-]*\s*"
     r"(?:confirmed cast|locked characters?|pov character|pov\b|cast\s*[:.]|"
+    r"validation\b|scene check|craft check|bme check|"
     r"why\s+(?:her|his|their|the)\b.*?stake|no locked characters|all characters introduced|"
     r"this is the opening (?:chapter|scene)|chapter\s+\d+\s*[—:\-].*(?:revised|draft)|"
     r"full revised draft|revised chapter\b|sub-?chapter\s+\d+|"
@@ -193,13 +194,19 @@ _SCAFFOLD_PREFIX = re.compile(
 def _strip_scaffolding(text: str) -> str:
     """Drop leading meta/scaffolding paragraphs so the chapter starts on real story prose — not a
     'Confirmed cast' block, a 'POV CHARACTER: …' preamble, or a '## Chapter N — Revised Draft'
-    heading. Only strips from the TOP and stops at the first real paragraph, never touching prose."""
-    # split into paragraphs on blank lines, keeping it simple
+    heading. Only strips from the TOP, only SHORT label-like paragraphs (so embedded prose is never
+    lost), and stops at the first real paragraph."""
     paras = re.split(r"\n\s*\n", text.strip())
     i = 0
     while i < len(paras):
-        head = paras[i].strip().lstrip("*_>#- ").strip()
-        if head in {"", "---", "***", "___"} or _SCAFFOLD_PREFIX.match(paras[i].strip()):
+        p = paras[i].strip()
+        head = p.lstrip("*_>#- ").strip()
+        if head in {"", "---", "***", "___"}:
+            i += 1
+            continue
+        # Only strip a meta paragraph when it's short enough to be a label/heading, not a prose
+        # paragraph that merely starts with a meta-ish word.
+        if _SCAFFOLD_PREFIX.match(p) and len(p.split()) <= 30:
             i += 1
             continue
         break
@@ -209,20 +216,29 @@ def _strip_scaffolding(text: str) -> str:
 
 async def _write_subchapter(
     *, system: str, header: str, brief: SubChapterBrief, idx: int, total: int,
-    prior_tail: str, chapter_number: int, model: str,
+    prior_tail: str, chapter_number: int, model: str, grounding: str = "",
 ) -> str:
-    """Write one sub-chapter (~2-3k words) with continuity from the prior sub-chapter's tail."""
+    """Write one sub-chapter (~2-3k words) with continuity from the prior sub-chapter's tail and the
+    pre-fetched research grounding woven in."""
     continuity = (
         f"\n\nCONTINUE SEAMLESSLY from the end of the previous sub-chapter (do NOT restate it; pick up "
         f"the thread). Tail of the previous sub-chapter:\n…{prior_tail}" if prior_tail else ""
+    )
+    grounding_block = (
+        f"\n\nRESEARCH GROUNDING — weave the relevant facts below into THIS sub-chapter as concrete "
+        f"sensory/material detail and accurate period language (dramatized, never an info-dump or a "
+        f"list). Use what fits this beat; carry the rest into later sub-chapters:\n{grounding}"
+        if grounding else ""
     )
     user = (
         f"{header}\n\nYou are writing SUB-CHAPTER {idx + 1} of {total} of chapter {chapter_number}.\n"
         f"This sub-chapter's beat: {brief.title} — {brief.beat}"
         f"{(' (POV: ' + brief.pov_character + ')') if brief.pov_character else ''}\n"
         f"Write this sub-chapter in full (rich, scene-driven prose, not a summary), following the craft "
-        f"rules in the system prompt. Do NOT write a chapter heading or 'Sub-chapter N' label — write the "
-        f"prose only.{continuity}"
+        f"rules in the system prompt.{grounding_block}\n\n"
+        f"OUTPUT — story prose ONLY. Do NOT print a chapter or 'Sub-chapter N' heading, a 'Validation' "
+        f"or BEGINNING/MIDDLE/END checklist, a 'Confirmed cast' / 'POV character' label, or any notes — "
+        f"just the prose.{continuity}"
     )
     router = get_router(service=STEP_NAME)
     resp = await router.complete(provider="anthropic", model=model, system=system, prompt=user, max_tokens=8192)
@@ -308,34 +324,49 @@ async def _detect_drift(
         return None
 
 
-async def _research_fill(gaps: list[str], *, period: str, title: str) -> str:
-    """QA cycle 1.5: fetch concrete period facts / local color for the flagged gaps via Perplexity.
+def _facts_topics(facts: str, limit: int = 14) -> list[str]:
+    """Pull short topic labels out of a Perplexity facts block (bolded leads or bullet heads) so the
+    QA summary can report WHAT was grounded, not just that something was."""
+    topics: list[str] = []
+    for ln in facts.splitlines():
+        ln = ln.strip()
+        m = re.match(r"^[-*•]\s*\*{0,2}([^:*]{4,80})\*{0,2}\s*[:—-]", ln) or re.match(r"^\*{2}([^*:]{4,80})\*{2}", ln)
+        if m:
+            t = m.group(1).strip(" *—-:")
+            if t and t.lower() not in {x.lower() for x in topics}:
+                topics.append(t)
+        if len(topics) >= limit:
+            break
+    return topics
 
-    Returns a compact, citable facts block to weave into the chapter, or "" when no gaps / no
-    Perplexity provider. One batched call covers all gaps.
+
+async def _chapter_research(beat: str, *, period: str, title: str) -> tuple[str, list[str]]:
+    """Pre-write research grounding (Perplexity): given the chapter's planned beat, fetch SPECIFIC
+    period facts / local color / material culture / real events to weave into the scene as it is
+    written. Returns (facts_text, topic_labels). Empty on no provider / error — writing still proceeds.
     """
-    gaps = [g for g in (gaps or []) if str(g).strip()][:12]
-    if not gaps:
-        return ""
+    if not str(beat).strip():
+        return "", []
     router = get_router(service=STEP_NAME)
     shape = (
-        f'For a historical novel "{title}" set in {period}, give SPECIFIC, period-accurate factual '
-        "detail a novelist can weave into a scene for each item below — material culture, local color, "
-        "real events, terminology, sensory specifics. 2-4 tight factual bullets per item, no preamble, "
-        "no fiction. Items:\n" + "\n".join(f"- {g}" for g in gaps)
+        f'For a chapter of the historical novel "{title}", set in {period}, where: {beat}\n\n'
+        "Give SPECIFIC, period-accurate factual detail a novelist can weave into the scene — material "
+        "culture, local color, geography, real events, terminology, sensory specifics, daily life. "
+        "Use labeled bullets (one topic per bullet, the topic in bold, then 1-3 factual sentences). "
+        "No preamble, no fiction, no plot suggestions — facts only."
     )
     try:
         resp = await router.complete(
             provider="perplexity", model="sonar-pro", system=None, prompt=shape, max_tokens=2048,
         )
     except ProviderNotRegistered:
-        return ""
+        return "", []
     except Exception:
-        return ""
+        return "", []
     facts = resp.text.strip()
     if resp.citations:
         facts += "\n\nSOURCES: " + "; ".join(resp.citations[:8])
-    return facts
+    return facts, _facts_topics(facts)
 
 
 def _build_correct_system(genre_slug: str) -> str:
@@ -356,35 +387,34 @@ def _build_correct_system(genre_slug: str) -> str:
         ],
         genre_block=_genre_block(genre_slug),
     ) + (
-        "\n\nYou are the CORRECTION pass (QA cycle 2). Revise the chapter to FIX the drift found in "
-        "QA cycle 1 and to ground it in researched fact. You MUST:\n"
+        "\n\nYou are the CORRECTION pass (QA cycle 2). The chapter below has drifted from the plan. "
+        "Revise it to FIX that drift while keeping everything that is already right. You MUST:\n"
         "1. Correct every STORY DRIFT item so the chapter matches its planned outline beat and the "
         "arc — restore missing beats, remove contradictions, keep the through-line.\n"
         "2. Correct every CHARACTER DRIFT item so each character matches the CHARACTER ROSTER in the "
         "user prompt (name, age, traits, relationships, voice) and stays in character.\n"
-        "3. Weave the RESEARCHED FACTS in as concrete sensory/material detail and accurate period "
-        "language — dramatized, never an info-dump or a list.\n"
-        "LENGTH — you are ADDING depth, not trimming. The revised chapter MUST be AT LEAST as long as "
-        "the original and should be LONGER once the researched detail is dramatized. Do NOT summarize, "
-        "condense, or drop scenes. PRESERVE the POV and the chapter's place in the story.\n"
+        "3. Keep the existing researched period detail accurate; do not strip it out.\n"
+        "LENGTH — you are FIXING, not trimming. The revised chapter MUST be AT LEAST as long as the "
+        "original. Do NOT summarize, condense, or drop scenes. PRESERVE the POV and the chapter's "
+        "place in the story.\n"
         "OUTPUT — return ONLY the chapter prose. Do NOT print a cast list, a 'Confirmed cast' section, "
-        "a 'POV character' line, chapter/sub-chapter headings, or any notes about what you changed."
+        "a 'POV character' line, a 'Validation' / BEGINNING-MIDDLE-END checklist, chapter or "
+        "sub-chapter headings, or any notes about what you changed."
     )
 
 
 async def _correct_drift(
-    text: str, *, drift: DriftReport, facts: str, roster_text: str, genre_slug: str, model: str
+    text: str, *, drift: DriftReport, roster_text: str, genre_slug: str, model: str
 ) -> str:
-    """QA cycle 2: streamed full-chapter revision that corrects drift + weaves in facts."""
+    """QA cycle 2: streamed full-chapter revision that corrects story/character drift (research is
+    already woven at write-time, so this pass only fixes drift and must not shorten)."""
     router = get_router(service=STEP_NAME)
     sd = "\n".join(f"- {x}" for x in drift.story_drift) or "(none)"
     cd = "\n".join(f"- {x}" for x in drift.character_drift) or "(none)"
-    facts_block = facts or "(no new research — keep existing detail accurate)"
     user = (
         f"CHARACTER ROSTER (consistency reference):\n{roster_text}\n\n"
         f"STORY DRIFT TO CORRECT:\n{sd}\n\n"
         f"CHARACTER DRIFT TO CORRECT:\n{cd}\n\n"
-        f"RESEARCHED FACTS TO WEAVE IN:\n{facts_block}\n\n"
         f"CHAPTER TO REVISE:\n{text}"
     )
     resp = await router.complete(
@@ -394,36 +424,28 @@ async def _correct_drift(
     return _strip_scaffolding(resp.text.strip())
 
 
-async def _two_cycle_qa(
+async def _drift_correct_pass(
     text: str, *, ctx: dict[str, Any], req: WriteChapterRequest, roster_text: str, period: str, model: str
-) -> tuple[str, DriftReport | None, list[str], int]:
-    """Run QA cycle 1 (detect) -> research-fill -> QA cycle 2 (correct). Returns
-    (possibly-revised text, the pre-correction drift report, gaps filled, passes)."""
+) -> tuple[str, DriftReport | None, int]:
+    """QA cycle 1 (detect drift vs outline/arc/roster) -> QA cycle 2 (correct it, only when there is
+    real story/character drift). Research is woven at WRITE-time, not here. Returns
+    (possibly-revised text, the pre-correction drift report, passes)."""
     drift = await _detect_drift(
         text, outline=ctx["outline"], chapter_number=req.chapter_number,
         roster_text=roster_text, period=period, model=model,
     )
     if drift is None:
-        return text, None, [], 0
-    facts = ""
-    gaps_filled: list[str] = []
-    if drift.research_gaps:
-        facts = await _research_fill(drift.research_gaps, period=period, title=ctx["title"])
-        if facts:
-            gaps_filled = list(drift.research_gaps)
-    needs_fix = bool(drift.story_drift or drift.character_drift or facts)
-    if not needs_fix:
-        return text, drift, gaps_filled, 0
+        return text, None, 0
+    if not (drift.story_drift or drift.character_drift):
+        return text, drift, 0  # aligned — nothing to correct
     revised = await _correct_drift(
-        text, drift=drift, facts=facts, roster_text=roster_text,
-        genre_slug=ctx["genre_slug"], model=model,
+        text, drift=drift, roster_text=roster_text, genre_slug=ctx["genre_slug"], model=model,
     )
-    # The correction must ADD depth, never shorten. If the rewrite came back shorter than the
-    # full-length fanned draft (the model condensed/truncated/refused), keep the draft — the user's
-    # priority is long, deep chapters. A small tolerance absorbs whitespace/markup churn.
+    # A correction that comes back shorter than the full-length draft (condensed/truncated/refused)
+    # is rejected — the user's priority is long, deep chapters. Small tolerance for markup churn.
     if len(revised.split()) < 0.97 * len(text.split()):
-        return text, drift, [], 0
-    return revised, drift, gaps_filled, 1
+        return text, drift, 0
+    return revised, drift, 1
 
 
 async def _op_write(payload: dict) -> dict:
@@ -446,10 +468,18 @@ async def _op_write(payload: dict) -> dict:
     roster_text = _roster_text(roster)
     drift_report: DriftReport | None = None
     research_gaps_filled: list[str] = []
+    research_facts = ""
     sub_briefs: list[SubChapterBrief] = []
     router = get_router(service=STEP_NAME)
     try:
         if n_sub > 1:
+            # Pre-write research grounding: pull period facts / local color for this chapter's beat so
+            # the prose is grounded as it's written (woven in, lengthening the chapter) rather than
+            # bolted on by a post-hoc rewrite that tends to shorten it.
+            beat = _chapter_outline_beat(ctx["outline"], req.chapter_number)
+            research_facts, research_gaps_filled = await _chapter_research(
+                beat, period=period, title=ctx["title"]
+            )
             briefs = await _plan_subchapters(ctx, req, n_sub, model)
             sub_briefs = briefs
             sub_texts: list[str] = []
@@ -458,14 +488,14 @@ async def _op_write(payload: dict) -> dict:
                 t = await _write_subchapter(
                     system=system, header=header, brief=brief, idx=i, total=len(briefs),
                     prior_tail=prior_tail, chapter_number=req.chapter_number, model=model,
+                    grounding=research_facts,
                 )
                 sub_texts.append(t)
                 prior_tail = " ".join(t.split()[-800:])
             text = "\n\n".join(sub_texts)
-            # Two-cycle QA on the assembled chapter: cycle 1 detects drift vs outline/arc/roster and
-            # flags research gaps; we research-fill the gaps; cycle 2 corrects the drift and weaves the
-            # facts in (streamed, so a ~12k-word chapter is revised without truncation).
-            text, drift_report, research_gaps_filled, passes = await _two_cycle_qa(
+            # QA cycle 1 (detect drift vs outline/arc/roster) -> QA cycle 2 (correct it) — only fires a
+            # streamed revision when there is real story/character drift. Research is already woven.
+            text, drift_report, passes = await _drift_correct_pass(
                 text, ctx=ctx, req=req, roster_text=roster_text, period=period, model=model,
             )
             final_qa = await _score_chapter(text, period, roster_text)
@@ -508,6 +538,7 @@ async def _op_write(payload: dict) -> dict:
             craft_qa=scores,
             drift_report=drift_report.model_dump(mode="json") if drift_report else None,
             research_gaps_filled=research_gaps_filled,
+            research_facts=research_facts,
             sub_chapter_briefs=[b.model_dump(mode="json") for b in sub_briefs],
         )
     except ProviderNotRegistered:

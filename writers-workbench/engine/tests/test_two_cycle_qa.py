@@ -7,6 +7,7 @@ from chapter_step.main import (
     _build_correct_system,
     _build_drift_system,
     _chapter_outline_beat,
+    _facts_topics,
     _strip_scaffolding,
 )
 
@@ -45,13 +46,25 @@ def test_drift_system_checks_all_three_axes() -> None:
     assert "DETECT" in s  # cycle 1 detects, does not rewrite
 
 
-def test_correct_system_corrects_and_weaves() -> None:
+def test_correct_system_is_drift_only_and_no_shrink() -> None:
     s = _build_correct_system("ancient-history")
     assert "QA cycle 2" in s
     assert "STORY DRIFT" in s and "CHARACTER DRIFT" in s
-    assert "RESEARCHED FACTS" in s
-    assert "AT LEAST as long" in s  # must expand, never condense
-    assert "Confirmed cast" in s  # explicitly forbids printing the cast block
+    assert "AT LEAST as long" in s  # must not condense
+    assert "Confirmed cast" in s and "Validation" in s  # forbids printing scaffolding
+
+
+def test_facts_topics_extracts_labels() -> None:
+    facts = (
+        "- **Cord-marked pottery**: diagnostic of Moyaone-phase assemblages in the tidewater.\n"
+        "- **Lake Superior copper**: traded south along the river paths; isotopically distinct.\n"
+        "**Chenopodium**: a cultivated starchy seed in the Eastern Agricultural Complex.\n"
+        "Some trailing prose with no bullet."
+    )
+    topics = _facts_topics(facts)
+    assert "Cord-marked pottery" in topics
+    assert "Lake Superior copper" in topics
+    assert "Chenopodium" in topics
 
 
 def test_strip_scaffolding_removes_confirmed_cast_and_headings() -> None:
