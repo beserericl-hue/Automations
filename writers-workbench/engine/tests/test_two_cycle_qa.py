@@ -1,0 +1,83 @@
+"""Two-cycle QA: drift detection (cycle 1) + drift correction/research-fill (cycle 2)."""
+
+from __future__ import annotations
+
+from chapter_step.main import (
+    _arc_summary,
+    _build_correct_system,
+    _build_drift_system,
+    _chapter_outline_beat,
+)
+
+from writer_engine.schemas.chapter import DriftReport, WriteChapterResponse
+
+
+def test_drift_report_defaults_aligned_when_no_drift() -> None:
+    d = DriftReport.model_validate({"research_gaps": ["price of a copper pendant"]})
+    assert d.aligned is True
+    assert d.story_drift == [] and d.character_drift == []
+    assert d.research_gaps == ["price of a copper pendant"]
+
+
+def test_drift_report_not_aligned_with_drift() -> None:
+    d = DriftReport.model_validate(
+        {"story_drift": ["chapter skips the hearing beat"], "character_drift": ["Tayak renamed 'Tara'"]}
+    )
+    assert d.aligned is False
+    assert d.story_drift and d.character_drift
+
+
+def test_drift_report_tolerates_wrapper_and_dict_entries() -> None:
+    d = DriftReport.model_validate(
+        {"drift_report": {"story_drift": [{"issue": "missing midpoint reversal"}],
+                          "character_drift": "Nora's age changed"}}
+    )
+    assert d.story_drift == ["missing midpoint reversal"]
+    assert d.character_drift == ["Nora's age changed"]
+    assert d.aligned is False
+
+
+def test_drift_system_checks_all_three_axes() -> None:
+    s = _build_drift_system()
+    assert "story_drift" in s and "character_drift" in s and "research_gaps" in s
+    assert "QA cycle 1" in s
+    assert "DETECT" in s  # cycle 1 detects, does not rewrite
+
+
+def test_correct_system_corrects_and_weaves() -> None:
+    s = _build_correct_system("ancient-history")
+    assert "QA cycle 2" in s
+    assert "STORY DRIFT" in s and "CHARACTER DRIFT" in s
+    assert "RESEARCHED FACTS" in s
+    assert "PRESERVE" in s  # must not shorten / drop POV
+
+
+def test_chapter_outline_beat_matches_by_number() -> None:
+    outline = {"chapters": [
+        {"chapter_number": 0, "title": "Prologue", "beat": "the mound is consecrated"},
+        {"chapter_number": 1, "title": "The Notice", "act": "Act I", "beat": "Tayak gets the condemnation notice"},
+    ]}
+    beat = _chapter_outline_beat(outline, 1)
+    assert "The Notice" in beat and "Act I" in beat and "condemnation" in beat
+
+
+def test_arc_summary_uses_arc_and_premise() -> None:
+    outline = {"story_arc_name": "The Mound", "premise": "a layered excavation"}
+    s = _arc_summary(outline)
+    assert "The Mound" in s and "layered excavation" in s
+
+
+def test_response_carries_two_cycle_telemetry() -> None:
+    from uuid import uuid4
+
+    r = WriteChapterResponse(
+        chapter_id=uuid4(), chapter_run_id=uuid4(), content_text="x", word_count=1,
+        sub_chapter_count=5, craft_passes=1,
+        drift_report={"aligned": False, "story_drift": ["s"], "character_drift": [], "research_gaps": ["g"]},
+        research_gaps_filled=["g"],
+        sub_chapter_briefs=[{"title": "t", "beat": "b", "pov_character": "Tayak"}],
+    )
+    dumped = r.model_dump(mode="json")
+    assert dumped["drift_report"]["story_drift"] == ["s"]
+    assert dumped["research_gaps_filled"] == ["g"]
+    assert dumped["sub_chapter_briefs"][0]["pov_character"] == "Tayak"
