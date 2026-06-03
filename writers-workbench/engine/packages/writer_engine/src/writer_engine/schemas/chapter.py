@@ -37,6 +37,37 @@ class WriteChapterResponse(BaseModel):
     craft_qa: dict[str, float] | None = None  # final craft-QA scores when the revision loop ran
 
 
+class SubChapterBrief(BaseModel):
+    """One sub-chapter beat in a chapter's fan-out plan."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    title: str = ""
+    beat: str = ""
+    pov_character: str = ""
+
+
+class SubChapterPlan(BaseModel):
+    """Plan that splits one chapter into N sub-chapters for depth (F1-1 fan-out)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    subchapters: list[SubChapterBrief] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce(cls, data: Any) -> Any:
+        """Tolerate {subchapters|sub_chapters|chapters: [...]} and bare-string lists."""
+        if isinstance(data, list):
+            data = {"subchapters": data}
+        if isinstance(data, dict):
+            arr = data.get("subchapters") or data.get("sub_chapters") or data.get("chapters")
+            if isinstance(arr, list):
+                norm = [{"beat": x} if isinstance(x, str) else x for x in arr]
+                data = {**data, "subchapters": norm}
+        return data
+
+
 class BibleEntry(BaseModel):
     entry_type: Literal["character", "place", "object", "concept", "event"]
     name: str

@@ -12,13 +12,15 @@ from typing import Any
 from uuid import uuid4
 
 from writer_engine.llm import ProviderNotRegistered, complete_structured, get_router
-from writer_engine.prompt_store import compose_craft_system, get_prompt_store, seed_default_prompts
+from writer_engine.prompt_store import compose_craft_system, seed_default_prompts
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
 from writer_engine.schemas.chapter import (
     BibleEntry,
     ChapterCraftQa,
     DriftFinding,
     DriftScanResult,
+    SubChapterBrief,
+    SubChapterPlan,
     WriteChapterRequest,
     WriteChapterResponse,
 )
@@ -115,18 +117,9 @@ def _fixture_chapter(req: WriteChapterRequest) -> WriteChapterResponse:
     )
 
 
-async def _op_write(payload: dict) -> dict:
-    from writer_engine.config import get_settings
-
-    req = WriteChapterRequest.model_validate(payload)
-    ctx = await _load_context(str(req.project_id))
-    roster = ctx["roster"]
-    revision = bool(payload.get("revision") or req.use_qa_report_as_input)
-    system = _build_write_system(
-        genre_slug=ctx["genre_slug"], outline=ctx["outline"], revision=revision
-    )
-    store = get_prompt_store()
-    parts = [
+def _chapter_header(ctx: dict[str, Any], roster: list, req: WriteChapterRequest) -> str:
+    """Shared context block (project + outline + roster) for the chapter / sub-chapter prompts."""
+    lines = [
         f"PROJECT: {ctx['title']}",
         f"CHAPTER NUMBER: {req.chapter_number}",
         "",
@@ -134,64 +127,142 @@ async def _op_write(payload: dict) -> dict:
         "",
         f"CHARACTER ROSTER:\n{_roster_text(roster)}",
     ]
-    if revision:
-        parts += [
-            "",
-            store.get("follett_seeds.character.locked_roster").format(
-                locked_character_roster=_roster_text(roster)
-            ),
-        ]
     if req.style_directives:
-        parts += ["", "STYLE DIRECTIVES:", *req.style_directives]
-    parts += [
-        "",
-        f"Write chapter {req.chapter_number} in full, following the craft rules in the system prompt.",
-    ]
-    user = "\n".join(parts)
-    settings = get_settings()
-    model = {
-        "haiku": settings.model_cheap,
-        "sonnet": settings.model_default,
-    }.get(req.llm_strategy, settings.model_default)
+        lines += ["", "STYLE DIRECTIVES:", *req.style_directives]
+    return "\n".join(lines)
+
+
+def _plan_system(genre_slug: str, outline: dict[str, Any]) -> str:
+    """System prompt for splitting a chapter into sub-chapter beats (scene-list + escalation seeds)."""
+    return compose_craft_system(
+        seed_keys=["follett_seeds.scene.event_list", "follett_seeds.scene.escalating_turn",
+                   "follett_seeds.scene.bme_check"],
+        genre_block=_genre_block(genre_slug),
+        arc_block=_arc_block(outline),
+    ) + (
+        "\n\nReturn strict JSON matching SubChapterPlan: a list of sub-chapters, each with a title, a "
+        "concrete beat (what happens — a discrete movement of the chapter, NOT a summary), and the POV "
+        "character. The sub-chapters together must cover the whole chapter with a beginning/middle/end "
+        "and at least one story turn each."
+    )
+
+
+async def _plan_subchapters(
+    ctx: dict[str, Any], req: WriteChapterRequest, n: int, model: str
+) -> list[SubChapterBrief]:
+    """Plan up to n sub-chapters for the chapter. Fixture briefs when no provider."""
     router = get_router(service=STEP_NAME)
-    # Craft-revision loop: the DB regression showed a single pass leaves boring paragraphs / dialogue
-    # below the guide bar (avg ~0.87, no_boring dominant). After the draft, QA it and — if any
-    # dimension is under threshold — revise targeting the findings, bounded by max_craft_passes.
-    max_passes = int(payload.get("max_craft_passes", 1))
-    period = str(payload.get("period") or "contemporary")
     try:
-        resp = await router.complete(
-            provider="anthropic", model=model, system=system, prompt=user, max_tokens=8192
+        plan, _ = await complete_structured(
+            router,
+            provider="anthropic",
+            model=model,
+            system=_plan_system(ctx["genre_slug"], ctx["outline"]),
+            prompt=(
+                f"{_chapter_header(ctx, ctx['roster'], req)}\n\n"
+                f"Split chapter {req.chapter_number} into {n} sub-chapters."
+            ),
+            schema=SubChapterPlan,
+            max_tokens=4096,
         )
-        text = resp.text.strip()
-        passes = 0
-        final_qa: ChapterCraftQa | None = None
-        while passes < max_passes:
-            qa = await _score_chapter(text, period)
-            if qa is None:
-                break  # QA unparseable — keep the draft, skip revision
-            final_qa = qa
-            low = _low_dims(qa)
-            if not low:
-                break
-            text = await _revise_chapter(
-                text, low_dims=low, findings=qa.findings, model=model, genre_slug=ctx["genre_slug"]
-            )
-            passes += 1
-            final_qa = None  # re-score on next iteration; if loop ends here, score once more below
-        if max_passes > 0 and final_qa is None:
+        briefs = plan.subchapters[:n]
+        return briefs or [SubChapterBrief(beat=f"Part {i + 1} of chapter {req.chapter_number}") for i in range(n)]
+    except ProviderNotRegistered:
+        return [SubChapterBrief(beat=f"Part {i + 1}") for i in range(n)]
+
+
+async def _write_subchapter(
+    *, system: str, header: str, brief: SubChapterBrief, idx: int, total: int,
+    prior_tail: str, chapter_number: int, model: str,
+) -> str:
+    """Write one sub-chapter (~2-3k words) with continuity from the prior sub-chapter's tail."""
+    continuity = (
+        f"\n\nCONTINUE SEAMLESSLY from the end of the previous sub-chapter (do NOT restate it; pick up "
+        f"the thread). Tail of the previous sub-chapter:\n…{prior_tail}" if prior_tail else ""
+    )
+    user = (
+        f"{header}\n\nYou are writing SUB-CHAPTER {idx + 1} of {total} of chapter {chapter_number}.\n"
+        f"This sub-chapter's beat: {brief.title} — {brief.beat}"
+        f"{(' (POV: ' + brief.pov_character + ')') if brief.pov_character else ''}\n"
+        f"Write this sub-chapter in full (rich, scene-driven prose, not a summary), following the craft "
+        f"rules in the system prompt. Do NOT write a chapter heading or 'Sub-chapter N' label — write the "
+        f"prose only.{continuity}"
+    )
+    router = get_router(service=STEP_NAME)
+    resp = await router.complete(provider="anthropic", model=model, system=system, prompt=user, max_tokens=8192)
+    return resp.text.strip()
+
+
+async def _op_write(payload: dict) -> dict:
+    from writer_engine.config import get_settings
+
+    req = WriteChapterRequest.model_validate(payload)
+    ctx = await _load_context(str(req.project_id))
+    roster = ctx["roster"]
+    revision = bool(payload.get("revision") or req.use_qa_report_as_input)
+    system = _build_write_system(genre_slug=ctx["genre_slug"], outline=ctx["outline"], revision=revision)
+    header = _chapter_header(ctx, roster, req)
+    settings = get_settings()
+    model = {"haiku": settings.model_cheap, "sonnet": settings.model_default}.get(
+        req.llm_strategy, settings.model_default
+    )
+    period = str(payload.get("period") or "contemporary")
+    # Sub-chapter fan-out (F1-1): a chapter is written as N sub-chapters (~2-3k words each) for depth,
+    # so a full chapter reaches n8n-scale length. Default 5; 1 = single-call (short) path.
+    n_sub = max(1, min(int(req.sub_chapter_count_override or 5), 6))
+    router = get_router(service=STEP_NAME)
+    try:
+        if n_sub > 1:
+            briefs = await _plan_subchapters(ctx, req, n_sub, model)
+            sub_texts: list[str] = []
+            prior_tail = ""
+            for i, brief in enumerate(briefs):
+                t = await _write_subchapter(
+                    system=system, header=header, brief=brief, idx=i, total=len(briefs),
+                    prior_tail=prior_tail, chapter_number=req.chapter_number, model=model,
+                )
+                sub_texts.append(t)
+                prior_tail = " ".join(t.split()[-800:])
+            text = "\n\n".join(sub_texts)
+            passes = 0
+            # QA the assembled chapter for the score report (the per-sub-chapter craft seeds enforce
+            # quality during writing; a full-chapter revision pass would truncate a ~12k-word chapter).
             final_qa = await _score_chapter(text, period)
+            sub_count = len(briefs)
+        else:
+            resp = await router.complete(
+                provider="anthropic", model=model, system=system,
+                prompt=f"{header}\n\nWrite chapter {req.chapter_number} in full, following the craft rules.",
+                max_tokens=8192,
+            )
+            text = resp.text.strip()
+            passes = 0
+            final_qa = None
+            max_passes = int(payload.get("max_craft_passes", 1))
+            while passes < max_passes:
+                qa = await _score_chapter(text, period)
+                if qa is None:
+                    break
+                final_qa = qa
+                low = _low_dims(qa)
+                if not low:
+                    break
+                text = await _revise_chapter(text, low_dims=low, findings=qa.findings, model=model, genre_slug=ctx["genre_slug"])
+                passes += 1
+                final_qa = None
+            if max_passes > 0 and final_qa is None:
+                final_qa = await _score_chapter(text, period)
+            sub_count = 1
         scores = (
             {k: v for k, v in final_qa.model_dump(mode="json").items() if k in QA_DIMS}
-            if final_qa
-            else None
+            if final_qa else None
         )
         out = WriteChapterResponse(
             chapter_id=uuid4(),
             chapter_run_id=req.chapter_run_id,
             content_text=text,
             word_count=len(text.split()),
-            sub_chapter_count=req.sub_chapter_count_override or 5,
+            sub_chapter_count=sub_count,
             craft_passes=passes,
             craft_qa=scores,
         )
