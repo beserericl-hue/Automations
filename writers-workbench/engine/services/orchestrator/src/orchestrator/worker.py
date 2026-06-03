@@ -57,3 +57,9 @@ class WorkerSettings:
     max_jobs = 16
     # Keep job results long enough for the UI/hub to poll a multi-minute generation.
     keep_result = 3600
+    # arq's default job_timeout is 300s — too short for a full-novel outline or a 5-sub-chapter
+    # fan-out (10-15 min). Without this, arq kills the job at 300s and retries it forever
+    # (perpetual in_progress -> error). Give heavy write jobs 30 min, and don't re-run expensive
+    # LLM work on a flake more than once.
+    job_timeout = 1800
+    max_tries = 2
