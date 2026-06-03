@@ -12,14 +12,16 @@ Run with::
 from __future__ import annotations
 
 from typing import Any, ClassVar
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from arq.connections import RedisSettings
 
 from writer_engine.config import get_settings
 from writer_engine.state_machine.durable import RedisSagaRepo
+from writer_engine.state_machine.saga import StepRef, run_step_via_http
 
 from .newsletter_saga import NewsletterSagaDriver
+from .write_tools import WORKER_STEP_TIMEOUT_S, resolve_step_url
 
 
 async def advance_newsletter_saga(_ctx: dict[str, Any], execution_id: str) -> dict[str, str]:
@@ -29,12 +31,29 @@ async def advance_newsletter_saga(_ctx: dict[str, Any], execution_id: str) -> di
     return {"execution_id": execution_id, "result": result.value}
 
 
+async def run_write_tool_job(_ctx: dict[str, Any], tool: str, body: dict[str, Any]) -> dict[str, Any]:
+    """Async write-tool job: dispatch to the step service off the request path (no edge timeout).
+
+    The worker has no 300s edge limit, so a sub-chapter fan-out or a full-novel outline can run for
+    minutes. Returns the StepOutput dict, which arq stores as the job result for polling.
+    """
+    url = resolve_step_url(tool, get_settings())
+    if url is None:
+        return {"status": "error", "error": {"code": "UNKNOWN_TOOL", "message": tool}}
+    out = await run_step_via_http(
+        StepRef(name=tool, url=url), execution_id=uuid4(), payload=body, timeout_s=WORKER_STEP_TIMEOUT_S
+    )
+    return out.model_dump(mode="json")
+
+
 def build_redis_settings() -> RedisSettings:
     return RedisSettings.from_dsn(get_settings().redis_url)
 
 
 class WorkerSettings:
     redis_settings = build_redis_settings()
-    functions: ClassVar[list[Any]] = [advance_newsletter_saga]
+    functions: ClassVar[list[Any]] = [advance_newsletter_saga, run_write_tool_job]
     queue_name = "newsletter"
     max_jobs = 16
+    # Keep job results long enough for the UI/hub to poll a multi-minute generation.
+    keep_result = 3600
