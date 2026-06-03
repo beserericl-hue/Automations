@@ -41,27 +41,43 @@ def _arc_block(arc: str) -> str:
     return f"STORY ARC: {arc}. Structure the chapter beats along this arc's points." if arc else ""
 
 
-def _build_story_system(genre: str, arc: str) -> str:
-    """Pure: outline system = prime directive + genre + arc + plot/character seeds + outline gate."""
+def _build_story_system(genre: str, arc: str, title: str = "") -> str:
+    """Pure: outline system = prime directive + genre + arc + plot/character seeds + outline gate.
+
+    Locks the working title (a benchmark project's title must never be renamed) and demands a single
+    coherent, explicitly-named story arc that every chapter is tagged against.
+    """
+    title_lock = (
+        f'TITLE LOCK — the work is titled "{title}". Use this EXACT title in the `title` field. '
+        "Do NOT invent, translate, or 'improve' the title.\n\n" if title else ""
+    )
     return compose_craft_system(
         seed_keys=_STORY_SEEDS, genre_block=_genre_block(genre), arc_block=_arc_block(arc)
     ) + (
-        "\n\nProduce the novel outline as strict JSON matching StoryOutline (title, premise, themes, "
+        "\n\n" + title_lock +
+        "Produce the novel outline as strict JSON matching StoryOutline (title, premise, themes, "
         "story_arc_name, dramatic_question, wow_factor, characters, chapters).\n\n"
         "SCALE — this is a full-length novel, not a short story (Follett-scale). Requirements:\n"
-        "1. CHAPTERS: 50-70 chapters PLUS a Prologue (chapter_number 0) and an Epilogue "
+        "1. CHAPTERS: 60-72 chapters PLUS a Prologue (chapter_number 0) and an Epilogue "
         "(chapter_number = last+1). Each chapter entry is COMPACT — {chapter_number, title, act, "
-        "pov_character, bridge_from_prior, beat} where `beat` is 1-2 sentences on what happens (a "
-        "dramatic movement with a story turn). Keep entries compact so the whole arc fits.\n"
-        "2. CHARACTERS: include EVERY main character — all POV characters and every major supporting "
+        "arc_point, pov_character, bridge_from_prior, beat} where `beat` is 1-2 sentences on what "
+        "happens (a dramatic movement with a story turn). Keep entries compact so the whole arc fits.\n"
+        "2. STORY ARC — name ONE coherent arc in `story_arc_name` and make it a single unbroken "
+        "through-line: setup, escalating complications, a midpoint reversal, a crisis, a climax, and a "
+        "resolution. Tag every chapter's `act` and `arc_point` to its position on that arc. The arc "
+        "must honour the structure the premise implies (e.g. a layered excavation or vision-per-"
+        "artifact premise descends through time in order) — do not flatten or scramble it. No chapter "
+        "may sit off the arc.\n"
+        "3. CHARACTERS: include EVERY main character — all POV characters and every major supporting "
         "character — as {name, role, archetype, off_axis_attribute, dramatic_question, description}. "
         "Do not omit a character who drives events; the cast must be complete enough to write the "
-        "whole novel from this outline alone.\n"
-        "3. COVERAGE: the chapters must cover the COMPLETE arc end-to-end — every major plot event, "
+        "whole novel from this outline alone. Develop each main character along a visible arc.\n"
+        "4. COVERAGE: the chapters must cover the COMPLETE arc end-to-end — every major plot event, "
         "character turning point, and historical/period event the premise implies — so a reader "
         "finishes with a full understanding of the people and the time period.\n\n"
-        "Run the OUTLINE QUALITY GATE on yourself before returning; if it fails (too few chapters, "
-        "missing characters, gaps in the arc), revise and only then return."
+        "Run the OUTLINE QUALITY GATE on yourself before returning; if it fails (wrong title, too few "
+        "chapters, missing characters, an incoherent or scrambled arc, gaps in coverage), revise and "
+        "only then return."
     )
 
 
@@ -79,15 +95,17 @@ def _fixture_outline(payload: dict) -> StoryOutline:
 async def _op_story(payload: dict) -> dict:
     genre = str(payload.get("genre") or payload.get("genre_slug") or "")
     arc = str(payload.get("story_arc") or payload.get("story_arc_name") or "")
+    title = str(payload.get("title") or "")
     requirements = str(payload.get("requirements") or payload.get("premise") or payload.get("title") or "")
     router = get_router(service=STEP_NAME)
+    title_line = f'TITLE (use EXACTLY, do not rename): "{title}"\n\n' if title else ""
     try:
         outline, _resp = await complete_structured(
             router,
             provider="anthropic",
             model=get_settings().model_default,
-            system=_build_story_system(genre, arc),
-            prompt=f"PROJECT REQUIREMENTS:\n{requirements}\n\nGenerate the full outline.",
+            system=_build_story_system(genre, arc, title),
+            prompt=f"{title_line}PROJECT REQUIREMENTS:\n{requirements}\n\nGenerate the full outline.",
             schema=StoryOutline,
             # A 50-70 chapter Follett-scale outline needs >16k tokens; STREAM it so it neither
             # truncates mid-JSON nor trips the non-streaming 10-min guard.

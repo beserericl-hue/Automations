@@ -35,6 +35,11 @@ class WriteChapterResponse(BaseModel):
     bible_entries_added: int = 0
     craft_passes: int = 0  # how many craft-revision passes ran (0 = single draft)
     craft_qa: dict[str, float] | None = None  # final craft-QA scores when the revision loop ran
+    # Two-cycle QA telemetry: QA cycle 1 detects drift (vs outline/arc/roster) + research gaps;
+    # QA cycle 2 corrects the drift and weaves in the researched facts. Surfaced for review.
+    drift_report: dict[str, object] | None = None  # DriftReport from QA cycle 1 (pre-correction)
+    research_gaps_filled: list[str] = Field(default_factory=list)  # gaps researched + woven in
+    sub_chapter_briefs: list[dict[str, object]] = Field(default_factory=list)  # the chapter's sub-beats
 
 
 class SubChapterBrief(BaseModel):
@@ -152,6 +157,54 @@ class DriftFinding(BaseModel):
 class DriftScanResult(BaseModel):
     chapter_id: UUID
     findings: list[DriftFinding] = Field(default_factory=list)
+
+
+class DriftReport(BaseModel):
+    """QA cycle 1 output — does the written chapter drift from the plan?
+
+    ``story_drift``: ways the chapter deviates from the OUTLINE / story arc (wrong or missing beats,
+    events that contradict the planned arc, continuity breaks). ``character_drift``: ways a character
+    acts/looks/sounds inconsistently with the established roster (renamed, changed trait/age/role,
+    out-of-character action, wrong relationship). ``research_gaps``: period facts / local color /
+    events to verify or add. ``aligned`` is True only when none of the three lists has a real issue.
+    QA cycle 2 consumes this to correct the drift and weave in the researched facts.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    aligned: bool = True
+    story_drift: list[str] = Field(default_factory=list)
+    character_drift: list[str] = Field(default_factory=list)
+    research_gaps: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce(cls, data: Any) -> Any:
+        """Tolerate a single-key wrapper, dict-shaped drift entries, and an `aligned` derived from
+        empty lists when the model omits it."""
+        if not isinstance(data, dict):
+            return data
+        out = dict(data)
+        keys = {"story_drift", "character_drift", "research_gaps", "aligned"}
+        if not (keys & set(out)) and len(out) == 1:
+            inner = next(iter(out.values()))
+            if isinstance(inner, dict):
+                out = dict(inner)
+        for k in ("story_drift", "character_drift", "research_gaps"):
+            v = out.get(k)
+            if v is None:
+                out[k] = []
+            elif isinstance(v, str):
+                out[k] = [v] if v.strip() else []
+            elif isinstance(v, list):
+                # entries may be {"issue": ...}/{"detail": ...} dicts — flatten to phrases
+                out[k] = [
+                    (x if isinstance(x, str) else str(x.get("issue") or x.get("detail") or x.get("problem") or x))
+                    for x in v
+                ]
+        if "aligned" not in out:
+            out["aligned"] = not (out.get("story_drift") or out.get("character_drift"))
+        return out
 
 
 class BrainstormStoryRequest(BaseModel):

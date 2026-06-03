@@ -18,6 +18,7 @@ from writer_engine.schemas.chapter import (
     BibleEntry,
     ChapterCraftQa,
     DriftFinding,
+    DriftReport,
     DriftScanResult,
     SubChapterBrief,
     SubChapterPlan,
@@ -193,6 +194,194 @@ async def _write_subchapter(
     return resp.text.strip()
 
 
+# ----------------------------------------------------------------------------------------------
+# Two-cycle QA: (1) detect drift vs outline/arc/roster + research gaps; (1.5) research-fill the
+# gaps; (2) correct the drift and weave the researched facts in. Runs after the fanned chapter is
+# assembled so the correction sees the whole chapter.
+# ----------------------------------------------------------------------------------------------
+
+
+def _chapter_outline_beat(outline: dict[str, Any], chapter_number: int) -> str:
+    """Pull the planned beat for this chapter out of the outline so QA can check drift against it."""
+    chapters = (outline or {}).get("chapters") or []
+    for ch in chapters:
+        if isinstance(ch, dict) and str(ch.get("chapter_number")) == str(chapter_number):
+            bits = [ch.get("title"), ch.get("act"), ch.get("arc_point"), ch.get("beat")]
+            return " | ".join(str(b) for b in bits if b)
+    # outlines without chapter_number: fall back to positional
+    if 0 <= chapter_number < len(chapters) and isinstance(chapters[chapter_number], dict):
+        c = chapters[chapter_number]
+        return " | ".join(str(b) for b in (c.get("title"), c.get("beat")) if b)
+    return "(no matching outline entry — check against premise + arc)"
+
+
+def _arc_summary(outline: dict[str, Any]) -> str:
+    o = outline or {}
+    return " ".join(
+        str(x) for x in (o.get("story_arc_name"), o.get("dramatic_question"), o.get("premise")) if x
+    ) or "(arc not specified — infer from premise)"
+
+
+def _build_drift_system() -> str:
+    """QA cycle 1 — drift reviewer. Checks the chapter against outline+arc+roster."""
+    return compose_craft_system(
+        seed_keys=[
+            "follett_seeds.plot.outline_gate",
+            "follett_seeds.character.locked_roster",
+            "follett_seeds.research.local_color",
+            "follett_seeds.research.period_language",
+            "follett_seeds.research.no_dumping",
+        ],
+    ) + (
+        "\n\nYou are the DRIFT reviewer (QA cycle 1). You do NOT rewrite — you DETECT. Compare the "
+        "CHAPTER against (a) the PLANNED OUTLINE BEAT for this chapter, (b) the overall STORY ARC, and "
+        "(c) the CHARACTER ROSTER, all given in the user prompt. Report:\n"
+        "- story_drift: concrete ways the chapter departs from the planned beat or the arc — a beat "
+        "that's missing/changed, an event that contradicts the arc, a continuity break, a chapter that "
+        "doesn't advance the through-line. Each item names the deviation specifically.\n"
+        "- character_drift: concrete ways a character is inconsistent with the roster or with earlier "
+        "behaviour — renamed, a changed age/trait/role/relationship, an out-of-character action, a "
+        "voice that doesn't match. Name the character and the inconsistency.\n"
+        "- research_gaps: short phrases for period facts / local color / material culture / events the "
+        "chapter should add or verify to feel grounded in its time and place.\n"
+        "Set aligned=true ONLY if story_drift and character_drift are both empty. Be exacting but do "
+        "not invent drift that isn't there. Return strict JSON matching DriftReport."
+    )
+
+
+async def _detect_drift(
+    text: str, *, outline: dict[str, Any], chapter_number: int, roster_text: str, period: str, model: str
+) -> DriftReport | None:
+    """QA cycle 1: structured drift report. None on parse failure (never lose the chapter)."""
+    router = get_router(service=STEP_NAME)
+    prompt = (
+        f"PERIOD: {period}\n\n"
+        f"PLANNED OUTLINE BEAT (chapter {chapter_number}):\n{_chapter_outline_beat(outline, chapter_number)}\n\n"
+        f"STORY ARC:\n{_arc_summary(outline)}\n\n"
+        f"CHARACTER ROSTER (consistency reference):\n{roster_text}\n\n"
+        f"CHAPTER:\n{text}"
+    )
+    try:
+        drift, _resp = await complete_structured(
+            router, provider="anthropic", model=model,
+            system=_build_drift_system(), prompt=prompt, schema=DriftReport, max_tokens=4096,
+        )
+        return drift
+    except ProviderNotRegistered:
+        return DriftReport()
+    except ValueError:
+        return None
+
+
+async def _research_fill(gaps: list[str], *, period: str, title: str) -> str:
+    """QA cycle 1.5: fetch concrete period facts / local color for the flagged gaps via Perplexity.
+
+    Returns a compact, citable facts block to weave into the chapter, or "" when no gaps / no
+    Perplexity provider. One batched call covers all gaps.
+    """
+    gaps = [g for g in (gaps or []) if str(g).strip()][:12]
+    if not gaps:
+        return ""
+    router = get_router(service=STEP_NAME)
+    shape = (
+        f'For a historical novel "{title}" set in {period}, give SPECIFIC, period-accurate factual '
+        "detail a novelist can weave into a scene for each item below — material culture, local color, "
+        "real events, terminology, sensory specifics. 2-4 tight factual bullets per item, no preamble, "
+        "no fiction. Items:\n" + "\n".join(f"- {g}" for g in gaps)
+    )
+    try:
+        resp = await router.complete(
+            provider="perplexity", model="sonar-pro", system=None, prompt=shape, max_tokens=2048,
+        )
+    except ProviderNotRegistered:
+        return ""
+    except Exception:
+        return ""
+    facts = resp.text.strip()
+    if resp.citations:
+        facts += "\n\nSOURCES: " + "; ".join(resp.citations[:8])
+    return facts
+
+
+def _build_correct_system(genre_slug: str) -> str:
+    """QA cycle 2 — drift corrector + research weaver (a structural revision, not a polish)."""
+    return compose_craft_system(
+        seed_keys=[
+            "follett_seeds.scene.fix_now",
+            "follett_seeds.plot.outline_gate",
+            "follett_seeds.character.locked_roster",
+            "follett_seeds.research.local_color",
+            "follett_seeds.research.no_dumping",
+            "follett_seeds.research.period_language",
+            "follett_seeds.prose.daily_rewrite",
+        ],
+        genre_block=_genre_block(genre_slug),
+    ) + (
+        "\n\nYou are the CORRECTION pass (QA cycle 2). Revise the chapter to FIX the drift found in "
+        "QA cycle 1 and to ground it in researched fact. You MUST:\n"
+        "1. Correct every STORY DRIFT item so the chapter matches its planned outline beat and the "
+        "arc — restore missing beats, remove contradictions, keep the through-line.\n"
+        "2. Correct every CHARACTER DRIFT item so each character matches the roster (name, age, "
+        "traits, relationships, voice) and stays in character.\n"
+        "3. Weave the RESEARCHED FACTS in naturally as concrete sensory/material detail and accurate "
+        "period language — dramatized, never an info-dump or a list.\n"
+        "PRESERVE the POV, the chapter's place in the story, and its length (do not shorten — this is "
+        "a full-length chapter). Return the FULL revised chapter as prose only (no headings, no notes)."
+    )
+
+
+async def _correct_drift(
+    text: str, *, drift: DriftReport, facts: str, roster_text: str, genre_slug: str, model: str
+) -> str:
+    """QA cycle 2: streamed full-chapter revision that corrects drift + weaves in facts."""
+    router = get_router(service=STEP_NAME)
+    sd = "\n".join(f"- {x}" for x in drift.story_drift) or "(none)"
+    cd = "\n".join(f"- {x}" for x in drift.character_drift) or "(none)"
+    facts_block = facts or "(no new research — keep existing detail accurate)"
+    user = (
+        f"CHARACTER ROSTER (consistency reference):\n{roster_text}\n\n"
+        f"STORY DRIFT TO CORRECT:\n{sd}\n\n"
+        f"CHARACTER DRIFT TO CORRECT:\n{cd}\n\n"
+        f"RESEARCHED FACTS TO WEAVE IN:\n{facts_block}\n\n"
+        f"CHAPTER TO REVISE:\n{text}"
+    )
+    resp = await router.complete(
+        provider="anthropic", model=model, system=_build_correct_system(genre_slug),
+        prompt=user, max_tokens=32768, stream=True,
+    )
+    return resp.text.strip()
+
+
+async def _two_cycle_qa(
+    text: str, *, ctx: dict[str, Any], req: WriteChapterRequest, roster_text: str, period: str, model: str
+) -> tuple[str, DriftReport | None, list[str], int]:
+    """Run QA cycle 1 (detect) -> research-fill -> QA cycle 2 (correct). Returns
+    (possibly-revised text, the pre-correction drift report, gaps filled, passes)."""
+    drift = await _detect_drift(
+        text, outline=ctx["outline"], chapter_number=req.chapter_number,
+        roster_text=roster_text, period=period, model=model,
+    )
+    if drift is None:
+        return text, None, [], 0
+    facts = ""
+    gaps_filled: list[str] = []
+    if drift.research_gaps:
+        facts = await _research_fill(drift.research_gaps, period=period, title=ctx["title"])
+        if facts:
+            gaps_filled = list(drift.research_gaps)
+    needs_fix = bool(drift.story_drift or drift.character_drift or facts)
+    if not needs_fix:
+        return text, drift, gaps_filled, 0
+    revised = await _correct_drift(
+        text, drift=drift, facts=facts, roster_text=roster_text,
+        genre_slug=ctx["genre_slug"], model=model,
+    )
+    # Guard: a correction that collapses the chapter (truncation/refusal) must not replace good text.
+    if len(revised.split()) < 0.6 * len(text.split()):
+        return text, drift, gaps_filled, 0
+    return revised, drift, gaps_filled, 1
+
+
 async def _op_write(payload: dict) -> dict:
     from writer_engine.config import get_settings
 
@@ -210,10 +399,15 @@ async def _op_write(payload: dict) -> dict:
     # Sub-chapter fan-out (F1-1): a chapter is written as N sub-chapters (~2-3k words each) for depth,
     # so a full chapter reaches n8n-scale length. Default 5; 1 = single-call (short) path.
     n_sub = max(1, min(int(req.sub_chapter_count_override or 5), 6))
+    roster_text = _roster_text(roster)
+    drift_report: DriftReport | None = None
+    research_gaps_filled: list[str] = []
+    sub_briefs: list[SubChapterBrief] = []
     router = get_router(service=STEP_NAME)
     try:
         if n_sub > 1:
             briefs = await _plan_subchapters(ctx, req, n_sub, model)
+            sub_briefs = briefs
             sub_texts: list[str] = []
             prior_tail = ""
             for i, brief in enumerate(briefs):
@@ -224,10 +418,13 @@ async def _op_write(payload: dict) -> dict:
                 sub_texts.append(t)
                 prior_tail = " ".join(t.split()[-800:])
             text = "\n\n".join(sub_texts)
-            passes = 0
-            # QA the assembled chapter for the score report (the per-sub-chapter craft seeds enforce
-            # quality during writing; a full-chapter revision pass would truncate a ~12k-word chapter).
-            final_qa = await _score_chapter(text, period, _roster_text(roster))
+            # Two-cycle QA on the assembled chapter: cycle 1 detects drift vs outline/arc/roster and
+            # flags research gaps; we research-fill the gaps; cycle 2 corrects the drift and weaves the
+            # facts in (streamed, so a ~12k-word chapter is revised without truncation).
+            text, drift_report, research_gaps_filled, passes = await _two_cycle_qa(
+                text, ctx=ctx, req=req, roster_text=roster_text, period=period, model=model,
+            )
+            final_qa = await _score_chapter(text, period, roster_text)
             sub_count = len(briefs)
         else:
             resp = await router.complete(
@@ -265,6 +462,9 @@ async def _op_write(payload: dict) -> dict:
             sub_chapter_count=sub_count,
             craft_passes=passes,
             craft_qa=scores,
+            drift_report=drift_report.model_dump(mode="json") if drift_report else None,
+            research_gaps_filled=research_gaps_filled,
+            sub_chapter_briefs=[b.model_dump(mode="json") for b in sub_briefs],
         )
     except ProviderNotRegistered:
         out = _fixture_chapter(req)
@@ -420,9 +620,30 @@ async def _op_qa(payload: dict) -> dict:
 
 
 async def _op_scan_drift(payload: dict) -> dict:
+    """Standalone QA cycle 1 — detect drift of a chapter vs its outline beat + arc + roster."""
+    from writer_engine.config import get_settings
+
+    text = str(payload.get("chapter_text") or payload.get("content_text") or "")
+    outline = payload.get("outline") or {}
+    chapter_number = int(payload.get("chapter_number") or 0)
+    roster_text = _roster_text(payload.get("roster") or []) if payload.get("roster") else "(none)"
+    period = str(payload.get("period") or "contemporary")
+    drift = await _detect_drift(
+        text, outline=outline, chapter_number=chapter_number,
+        roster_text=roster_text, period=period, model=get_settings().model_default,
+    )
+    if drift is None:
+        return DriftScanResult(
+            chapter_id=payload.get("chapter_id") or uuid4(),
+            findings=[DriftFinding(kind="error", detail="drift QA JSON could not be parsed")],
+        ).model_dump(mode="json")
+    findings = (
+        [DriftFinding(kind="story_drift", detail=d) for d in drift.story_drift]
+        + [DriftFinding(kind="character_drift", detail=d) for d in drift.character_drift]
+        + [DriftFinding(kind="research_gap", detail=d) for d in drift.research_gaps]
+    ) or [DriftFinding(kind="aligned", detail="no drift detected")]
     return DriftScanResult(
-        chapter_id=payload.get("chapter_id") or uuid4(),
-        findings=[DriftFinding(kind="placeholder", detail="no drift detected (F1-2 stub)")],
+        chapter_id=payload.get("chapter_id") or uuid4(), findings=findings
     ).model_dump(mode="json")
 
 

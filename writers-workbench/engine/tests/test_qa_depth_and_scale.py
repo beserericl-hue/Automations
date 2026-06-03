@@ -46,6 +46,15 @@ def test_qa_system_checks_consistency_and_research() -> None:
 
 def test_brainstorm_demands_scale_and_full_cast() -> None:
     s = _build_story_system("ancient-history", "")
-    assert "50-70 chapters" in s
+    assert "60-72 chapters" in s
     assert "Prologue" in s and "Epilogue" in s
     assert "EVERY main character" in s
+    assert "STORY ARC" in s and "arc_point" in s
+
+
+def test_brainstorm_locks_title() -> None:
+    s = _build_story_system("ancient-history", "", "The Burial Mound")
+    assert "TITLE LOCK" in s
+    assert "The Burial Mound" in s
+    # no title -> no lock block
+    assert "TITLE LOCK" not in _build_story_system("ancient-history", "")
