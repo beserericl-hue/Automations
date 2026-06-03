@@ -227,7 +227,7 @@ async def _op_write(payload: dict) -> dict:
             passes = 0
             # QA the assembled chapter for the score report (the per-sub-chapter craft seeds enforce
             # quality during writing; a full-chapter revision pass would truncate a ~12k-word chapter).
-            final_qa = await _score_chapter(text, period)
+            final_qa = await _score_chapter(text, period, _roster_text(roster))
             sub_count = len(briefs)
         else:
             resp = await router.complete(
@@ -240,7 +240,7 @@ async def _op_write(payload: dict) -> dict:
             final_qa = None
             max_passes = int(payload.get("max_craft_passes", 1))
             while passes < max_passes:
-                qa = await _score_chapter(text, period)
+                qa = await _score_chapter(text, period, _roster_text(roster))
                 if qa is None:
                     break
                 final_qa = qa
@@ -251,7 +251,7 @@ async def _op_write(payload: dict) -> dict:
                 passes += 1
                 final_qa = None
             if max_passes > 0 and final_qa is None:
-                final_qa = await _score_chapter(text, period)
+                final_qa = await _score_chapter(text, period, _roster_text(roster))
             sub_count = 1
         scores = (
             {k: v for k, v in final_qa.model_dump(mode="json").items() if k in QA_DIMS}
@@ -279,6 +279,7 @@ _DIM_TO_SEEDS = {
     "period_language_ok": ["follett_seeds.research.period_language"],
     "character_follows_guide": ["follett_seeds.character.no_milk_and_water"],
     "outline_follows_guide": ["follett_seeds.plot.outline_gate"],
+    "character_consistency": ["follett_seeds.character.locked_roster"],
 }
 
 
@@ -315,7 +316,8 @@ async def _revise_chapter(
 
 
 def _build_qa_system() -> str:
-    """Pure: the craft-QA system prompt — score the chapter against the Follett guide rubrics."""
+    """Pure: the craft-QA system prompt — score the chapter against the Follett guide rubrics +
+    character consistency + research gaps."""
     return compose_craft_system(
         seed_keys=[
             "follett_seeds.scene.turn_density",
@@ -323,14 +325,24 @@ def _build_qa_system() -> str:
             "follett_seeds.prose.dialogue",
             "follett_seeds.research.period_language",
             "follett_seeds.character.no_milk_and_water",
+            "follett_seeds.character.locked_roster",
+            "follett_seeds.research.no_dumping",
             "follett_seeds.plot.outline_gate",
         ],
     ) + (
-        "\n\nYou are the craft-QA reviewer. Score the chapter below on each dimension from 0.0 to 1.0 "
+        "\n\nYou are the craft-QA reviewer. Score the chapter below from 0.0 to 1.0 on each dimension "
         "(1.0 = fully follows the guide): character_follows_guide, outline_follows_guide, "
         "dialogue_follows_guide, prose_transparent, story_turn_density, no_boring_paragraphs, "
-        "period_language_ok. For every dimension under 0.8, add a finding {dimension, problem, fix}. "
-        "Return strict JSON matching ChapterCraftQa."
+        "period_language_ok, and character_consistency.\n"
+        "- character_consistency: do the characters stay consistent with the CHARACTER ROSTER given "
+        "in the user prompt and with each other — names, ages, relationships, traits, established "
+        "voice? Any drift (a renamed character, a changed trait, an out-of-character action) lowers "
+        "this score; cite it in findings.\n"
+        "- research_gaps: list short phrases for any historical/period fact the chapter ASSERTS that "
+        "should be verified by research, OR any scene where a researched period detail (a tool, food, "
+        "ritual, price, word) would deepen it. This drives 'add research if needed'.\n"
+        "For every score under 0.8, add a finding {dimension, problem, fix}. "
+        "Return strict JSON matching ChapterCraftQa (include character_consistency and research_gaps)."
     )
 
 
@@ -343,6 +355,8 @@ def _fixture_qa() -> ChapterCraftQa:
         story_turn_density=0.9,
         no_boring_paragraphs=0.9,
         period_language_ok=0.9,
+        character_consistency=0.9,
+        research_gaps=[],
         findings=[],
     )
 
@@ -355,12 +369,14 @@ QA_DIMS = (
     "story_turn_density",
     "no_boring_paragraphs",
     "period_language_ok",
+    "character_consistency",
 )
 CRAFT_THRESHOLD = 0.8
 
 
-async def _score_chapter(text: str, period: str) -> ChapterCraftQa | None:
-    """Run the craft-QA over a chapter. None when no provider OR the QA JSON can't be parsed.
+async def _score_chapter(text: str, period: str, roster_text: str = "") -> ChapterCraftQa | None:
+    """Run the craft-QA over a chapter (incl. character-consistency vs the roster). None when no
+    provider OR the QA JSON can't be parsed.
 
     A QA parse failure must NOT lose the drafted chapter — the caller treats None as "couldn't
     score" (skip the revision) rather than erroring the whole write.
@@ -368,13 +384,14 @@ async def _score_chapter(text: str, period: str) -> ChapterCraftQa | None:
     from writer_engine.config import get_settings
 
     router = get_router(service=STEP_NAME)
+    roster_block = f"CHARACTER ROSTER (check consistency against this):\n{roster_text}\n\n" if roster_text else ""
     try:
         qa, _resp = await complete_structured(
             router,
             provider="anthropic",
             model=get_settings().model_default,
             system=_build_qa_system(),
-            prompt=f"PERIOD: {period}\n\nCHAPTER:\n{text}",
+            prompt=f"PERIOD: {period}\n\n{roster_block}CHAPTER:\n{text}",
             schema=ChapterCraftQa,
         )
         return qa
@@ -392,7 +409,8 @@ def _low_dims(qa: ChapterCraftQa, threshold: float = CRAFT_THRESHOLD) -> list[st
 async def _op_qa(payload: dict) -> dict:
     chapter_text = str(payload.get("chapter_text") or payload.get("content_text") or "")
     period = str(payload.get("period") or "contemporary")
-    qa = await _score_chapter(chapter_text, period)
+    roster_text = _roster_text(payload.get("roster") or []) if payload.get("roster") else ""
+    qa = await _score_chapter(chapter_text, period, roster_text)
     if qa is None:
         return {"chapter_id": payload.get("chapter_id"), "scores": None, "findings": [],
                 "note": "craft-QA JSON could not be parsed"}

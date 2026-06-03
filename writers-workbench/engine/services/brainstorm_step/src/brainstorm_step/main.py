@@ -47,8 +47,21 @@ def _build_story_system(genre: str, arc: str) -> str:
         seed_keys=_STORY_SEEDS, genre_block=_genre_block(genre), arc_block=_arc_block(arc)
     ) + (
         "\n\nProduce the novel outline as strict JSON matching StoryOutline (title, premise, themes, "
-        "story_arc_name, dramatic_question, wow_factor, characters, chapters). Run the OUTLINE "
-        "QUALITY GATE on yourself before returning; if it fails, revise and only then return."
+        "story_arc_name, dramatic_question, wow_factor, characters, chapters).\n\n"
+        "SCALE — this is a full-length novel, not a short story (Follett-scale). Requirements:\n"
+        "1. CHAPTERS: 50-70 chapters PLUS a Prologue (chapter_number 0) and an Epilogue "
+        "(chapter_number = last+1). Each chapter entry is COMPACT — {chapter_number, title, act, "
+        "pov_character, bridge_from_prior, beat} where `beat` is 1-2 sentences on what happens (a "
+        "dramatic movement with a story turn). Keep entries compact so the whole arc fits.\n"
+        "2. CHARACTERS: include EVERY main character — all POV characters and every major supporting "
+        "character — as {name, role, archetype, off_axis_attribute, dramatic_question, description}. "
+        "Do not omit a character who drives events; the cast must be complete enough to write the "
+        "whole novel from this outline alone.\n"
+        "3. COVERAGE: the chapters must cover the COMPLETE arc end-to-end — every major plot event, "
+        "character turning point, and historical/period event the premise implies — so a reader "
+        "finishes with a full understanding of the people and the time period.\n\n"
+        "Run the OUTLINE QUALITY GATE on yourself before returning; if it fails (too few chapters, "
+        "missing characters, gaps in the arc), revise and only then return."
     )
 
 
