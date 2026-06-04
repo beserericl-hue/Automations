@@ -9,6 +9,8 @@ Fixture fallback when no provider is registered.
 
 from __future__ import annotations
 
+import json
+
 from writer_engine.config import get_settings
 from writer_engine.llm import ProviderNotRegistered, complete_structured, get_router
 from writer_engine.prompt_store import compose_craft_system, get_prompt_store, seed_default_prompts
@@ -162,7 +164,91 @@ async def _op_edit_outline(payload: dict) -> dict:
         return {"applied": len(edits), "outline": outline}
 
 
-OPS = {"story": _op_story, "chapter": _op_chapter, "edit-outline": _op_edit_outline}
+def _build_revise_system(title: str) -> str:
+    """Pure: system for a DIRECTIVE-driven outline revision — bigger than edit-outline.
+
+    edit-outline applies a fixed list of small edits and locks the roster against ANY change.
+    revise-outline takes a free-text creative directive (a brainstorm idea from the author) and may
+    substantially restructure — add chapters, add NEW characters, add/interleave whole storylines —
+    while preserving the title, the core premise, and every EXISTING character.
+    """
+    title_lock = (
+        f'TITLE LOCK — the work is titled "{title}". Keep this EXACT title.\n\n' if title else ""
+    )
+    return compose_craft_system(seed_keys=_STORY_SEEDS) + (
+        "\n\n" + title_lock +
+        "You are REVISING an existing novel outline to implement a creative DIRECTIVE from the author. "
+        "Produce the COMPLETE revised outline as strict JSON matching StoryOutline (title, premise, "
+        "themes, story_arc_name, dramatic_question, wow_factor, characters, chapters).\n\n"
+        "PRESERVE: the title; the core premise and its spine; and every EXISTING character — keep their "
+        "names, roles, and arcs. You may DEEPEN an existing character, never silently drop or rename one.\n"
+        "APPLY THE DIRECTIVE IN FULL: you MAY add new chapters, add new POV characters, add and "
+        "interleave whole new storylines, and re-order chapters — exactly as the directive asks. If the "
+        "directive calls for an interwoven second timeline (e.g. the real past lives behind the "
+        "artifacts), write those as FULL dramatized chapters, each with its own POV character who is as "
+        "real, named, and developed as the present-day protagonist — never a summary, a vision, or a "
+        "flashback fragment. Give each such character an entry in `characters`.\n"
+        "STRUCTURE: keep ONE coherent arc; tag every chapter's `act` and `arc_point`; when two timelines "
+        "interleave, make the interleaving deliberate (and note in each chapter's `act` which timeline/"
+        "era it belongs to). Renumber chapters consecutively (Prologue = 0, Epilogue = last). Each "
+        "chapter entry stays COMPACT: {chapter_number, title, act, arc_point, pov_character, "
+        "bridge_from_prior, beat}.\n"
+        "COVERAGE: the revised chapters must cover the whole story end to end with no gaps.\n"
+        "Run the OUTLINE QUALITY GATE on yourself before returning; revise until it passes."
+    )
+
+
+async def _op_revise_outline(payload: dict) -> dict:
+    """Directive-driven outline revision: apply a brainstorm idea to an existing outline.
+
+    Payload: {outline, directive (free text), title?}. Returns the complete revised outline.
+    """
+    outline = dict(payload.get("outline") or {})
+    directive = str(
+        payload.get("directive") or payload.get("idea") or payload.get("requirements") or ""
+    ).strip()
+    title = str(payload.get("title") or outline.get("title") or "")
+    if not directive:
+        return {"revised": False, "outline": outline}
+    if not outline:
+        return {"revised": False, "outline": outline, "error": "no outline to revise"}
+    router = get_router(service=STEP_NAME)
+    try:
+        revised, _resp = await complete_structured(
+            router,
+            provider="anthropic",
+            model=get_settings().model_default,
+            system=_build_revise_system(title),
+            prompt=(
+                f"CURRENT OUTLINE (JSON):\n{json.dumps(outline, ensure_ascii=False)}\n\n"
+                f"REVISION DIRECTIVE (the author's brainstorm idea — apply it fully):\n{directive}\n\n"
+                "Return the COMPLETE revised outline as strict JSON."
+            ),
+            schema=StoryOutline,
+            # A revised outline can carry two interleaved timelines (100+ chapters); stream it so it
+            # neither truncates mid-JSON nor trips the non-streaming 10-min guard.
+            max_tokens=32768,
+            stream=True,
+        )
+        before = len(outline.get("chapters") or [])
+        after = len(revised.chapters)
+        return {
+            "revised": True,
+            "outline": revised.model_dump(mode="json"),
+            "chapters_before": before,
+            "chapters_after": after,
+            "characters_after": len(revised.characters),
+        }
+    except ProviderNotRegistered:
+        return {"revised": False, "outline": outline}
+
+
+OPS = {
+    "story": _op_story,
+    "chapter": _op_chapter,
+    "edit-outline": _op_edit_outline,
+    "revise-outline": _op_revise_outline,
+}
 
 
 async def handler(inp: StepInput) -> StepOutput:
