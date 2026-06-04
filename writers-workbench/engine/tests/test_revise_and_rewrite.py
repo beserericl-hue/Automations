@@ -7,9 +7,53 @@ import asyncio
 from brainstorm_step.main import OPS as BRAINSTORM_OPS
 from brainstorm_step.main import _build_revise_system
 from chapter_step.main import OPS as CHAPTER_OPS
-from chapter_step.main import _build_extract_bible_system, _build_genre_eval_system, _build_rewrite_system
+from chapter_step.main import (
+    _apply_ctx_overrides,
+    _briefs_from_payload,
+    _build_extract_bible_system,
+    _build_genre_eval_system,
+    _build_rewrite_system,
+    _roster_from_outline,
+)
 
 from writer_engine.schemas.chapter import BibleExtract, GenreEval
+
+
+def test_plan_op_registered() -> None:
+    assert "plan" in CHAPTER_OPS  # the explicit outline -> chapter-outline -> narrative middle stage
+
+
+def test_roster_from_outline() -> None:
+    roster = _roster_from_outline({"characters": [
+        {"name": "Saya", "role": "Past POV (1693)", "description": "the woman who ran"},
+        {"name": "Tayak"},
+        {"role": "no name — dropped"},
+    ]})
+    assert roster[0]["name"] == "Saya" and "1693" in roster[0]["description"]
+    assert any(r["name"] == "Tayak" for r in roster)
+    assert len(roster) == 2
+
+
+def test_apply_ctx_overrides_uses_outline_and_derives_roster() -> None:
+    base = {"genre_slug": "g", "title": "DB Title", "outline": {"a": 1}, "roster": []}
+    ov = _apply_ctx_overrides(dict(base), {
+        "title": "The Burial Mound",
+        "outline": {"characters": [{"name": "Yanu", "role": "founding ancestor"}], "chapters": []},
+    })
+    assert ov["title"] == "The Burial Mound"
+    assert ov["outline"]["characters"][0]["name"] == "Yanu"
+    assert ov["roster"][0]["name"] == "Yanu"  # roster derived from the override outline
+
+
+def test_briefs_from_payload_parses_dicts_and_strings() -> None:
+    briefs = _briefs_from_payload({"sub_chapter_briefs": [
+        {"title": "Arrival", "beat": "Saya reaches the river", "pov_character": "Saya"},
+        "She buries the pendant",
+    ]})
+    assert len(briefs) == 2
+    assert briefs[0].title == "Arrival" and briefs[0].pov_character == "Saya"
+    assert briefs[1].beat == "She buries the pendant"
+    assert _briefs_from_payload({}) == []
 
 
 def test_revise_op_registered() -> None:

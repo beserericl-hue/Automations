@@ -71,13 +71,52 @@ def _build_write_system(*, genre_slug: str, outline: dict[str, Any], revision: b
     )
 
 
-async def _load_context(project_id: str) -> dict[str, Any]:
-    """Load genre/outline/title + character roster from Supabase. Fixture when DB is unconfigured."""
+def _roster_from_outline(outline: dict[str, Any]) -> list[dict[str, Any]]:
+    """Derive a {name, description} roster from an outline's `characters` list (so a chapter written
+    from a provided/revised outline checks consistency against THAT outline's cast)."""
+    out = []
+    for c in (outline or {}).get("characters") or []:
+        if isinstance(c, dict) and c.get("name"):
+            desc = " ".join(str(c.get(k, "")) for k in ("role", "description") if c.get(k)).strip()
+            out.append({"name": str(c["name"]), "description": desc})
+    return out
+
+
+def _apply_ctx_overrides(ctx: dict[str, Any], payload: dict[str, Any] | None) -> dict[str, Any]:
+    """Let a caller pass `outline`/`title`/`genre_slug`/`roster` in the payload to override the DB
+    (e.g. write chapters from a revised outline that isn't persisted yet). When an outline override
+    is given without an explicit roster, the roster is derived from that outline's characters."""
+    if not payload:
+        return ctx
+    if payload.get("title"):
+        ctx["title"] = str(payload["title"])
+    if payload.get("genre_slug"):
+        ctx["genre_slug"] = str(payload["genre_slug"])
+    outline_override = payload.get("outline")
+    if isinstance(outline_override, dict) and outline_override:
+        ctx["outline"] = outline_override
+        if not payload.get("roster"):
+            derived = _roster_from_outline(outline_override)
+            if derived:
+                ctx["roster"] = derived
+    roster_override = payload.get("roster")
+    if isinstance(roster_override, list) and roster_override:
+        ctx["roster"] = [
+            r if isinstance(r, dict) else {"name": str(r), "description": ""} for r in roster_override
+        ]
+    return ctx
+
+
+async def _load_context(project_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Load genre/outline/title + character roster from Supabase, then apply any payload overrides.
+    Fixture when DB is unconfigured."""
     from writer_engine.config import get_settings
 
     settings = get_settings()
     if not settings.supabase_url or not settings.supabase_service_role_key:
-        return {"genre_slug": "post-apocalyptic", "title": "Untitled", "outline": {}, "roster": []}
+        return _apply_ctx_overrides(
+            {"genre_slug": "post-apocalyptic", "title": "Untitled", "outline": {}, "roster": []}, payload
+        )
     from writer_engine.supabase.client import get_supabase_admin
 
     client = await get_supabase_admin()
@@ -98,12 +137,15 @@ async def _load_context(project_id: str) -> dict[str, Any]:
         .execute()
     )
     roster = list(getattr(bible_resp, "data", None) or [])
-    return {
-        "genre_slug": proj.get("genre_slug") or "",
-        "title": proj.get("title") or "Untitled",
-        "outline": proj.get("outline") or {},
-        "roster": roster,
-    }
+    return _apply_ctx_overrides(
+        {
+            "genre_slug": proj.get("genre_slug") or "",
+            "title": proj.get("title") or "Untitled",
+            "outline": proj.get("outline") or {},
+            "roster": roster,
+        },
+        payload,
+    )
 
 
 def _roster_text(roster: list[dict[str, Any]]) -> str:
@@ -173,6 +215,50 @@ async def _plan_subchapters(
         return briefs or [SubChapterBrief(beat=f"Part {i + 1} of chapter {req.chapter_number}") for i in range(n)]
     except ProviderNotRegistered:
         return [SubChapterBrief(beat=f"Part {i + 1}") for i in range(n)]
+
+
+def _briefs_from_payload(payload: dict[str, Any]) -> list[SubChapterBrief]:
+    """Use a pre-made chapter outline (sub-chapter plan) from the caller, if supplied — the explicit
+    outline -> chapter-outline -> narrative flow. Accepts `sub_chapter_briefs` or `chapter_outline`."""
+    raw = payload.get("sub_chapter_briefs") or payload.get("chapter_outline") or payload.get("briefs")
+    if isinstance(raw, dict):
+        raw = raw.get("sub_chapter_briefs") or raw.get("subchapters") or raw.get("beats")
+    if not isinstance(raw, list) or not raw:
+        return []
+    out: list[SubChapterBrief] = []
+    for b in raw:
+        if isinstance(b, dict):
+            out.append(SubChapterBrief.model_validate(b))
+        elif isinstance(b, str):
+            out.append(SubChapterBrief(beat=b))
+    return out
+
+
+async def _op_plan(payload: dict) -> dict:
+    """Chapter-outline stage (outline -> CHAPTER OUTLINE -> narrative): produce the sub-chapter plan
+    for one chapter. Accepts an outline/roster override so it can run off a revised, unpersisted
+    outline. The returned `sub_chapter_briefs` can be fed straight back into `write`."""
+    from writer_engine.config import get_settings
+
+    project_id = payload.get("project_id") or "00000000-0000-0000-0000-000000000000"
+    chapter_number = int(payload.get("chapter_number") or 1)
+    chapter_run_id = payload.get("chapter_run_id") or str(uuid4())
+    req = WriteChapterRequest.model_validate(
+        {"project_id": project_id, "chapter_number": chapter_number, "chapter_run_id": chapter_run_id,
+         "sub_chapter_count_override": payload.get("sub_chapter_count_override")}
+    )
+    ctx = await _load_context(str(req.project_id), payload)
+    settings = get_settings()
+    model = {"haiku": settings.model_cheap, "sonnet": settings.model_default}.get(
+        str(payload.get("llm_strategy") or ""), settings.model_default
+    )
+    n_sub = max(1, min(int(req.sub_chapter_count_override or 5), 6))
+    briefs = await _plan_subchapters(ctx, req, n_sub, model)
+    return {
+        "chapter_number": chapter_number,
+        "sub_chapter_briefs": [b.model_dump(mode="json") for b in briefs],
+        "count": len(briefs),
+    }
 
 
 # Meta/scaffolding the model sometimes prepends to prose despite "prose only" — a "Confirmed cast"
@@ -470,7 +556,7 @@ async def _op_write(payload: dict) -> dict:
     from writer_engine.config import get_settings
 
     req = WriteChapterRequest.model_validate(payload)
-    ctx = await _load_context(str(req.project_id))
+    ctx = await _load_context(str(req.project_id), payload)
     roster = ctx["roster"]
     revision = bool(payload.get("revision") or req.use_qa_report_as_input)
     system = _build_write_system(genre_slug=ctx["genre_slug"], outline=ctx["outline"], revision=revision)
@@ -498,7 +584,10 @@ async def _op_write(payload: dict) -> dict:
             research_facts, research_gaps_filled = await _chapter_research(
                 beat, period=period, title=ctx["title"]
             )
-            briefs = await _plan_subchapters(ctx, req, n_sub, model)
+            # Use a pre-made chapter outline if the caller supplied one (the explicit
+            # outline -> chapter-outline -> narrative flow); otherwise plan it now.
+            provided = _briefs_from_payload(payload)
+            briefs = provided or await _plan_subchapters(ctx, req, n_sub, model)
             sub_briefs = briefs
             sub_texts: list[str] = []
             prior_tail = ""
@@ -778,7 +867,10 @@ async def _op_rewrite(payload: dict) -> dict:
         return {"content_text": text, "word_count": len(text.split()), "rewritten": False,
                 "note": "rewrite needs both chapter_text and feedback"}
     project_id = payload.get("project_id")
-    ctx = await _load_context(str(project_id)) if project_id else {"genre_slug": "", "roster": []}
+    ctx = (
+        await _load_context(str(project_id), payload) if project_id
+        else _apply_ctx_overrides({"genre_slug": "", "title": "", "outline": {}, "roster": []}, payload)
+    )
     roster_text = _roster_text(ctx.get("roster") or [])
     settings = get_settings()
     model = {"haiku": settings.model_cheap, "sonnet": settings.model_default}.get(
@@ -878,6 +970,7 @@ async def _op_format_kindle(payload: dict) -> dict:
 
 OPS = {
     "write": _op_write,
+    "plan": _op_plan,
     "rewrite": _op_rewrite,
     "qa": _op_qa,
     "scan-drift": _op_scan_drift,
