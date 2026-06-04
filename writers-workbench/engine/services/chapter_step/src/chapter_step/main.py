@@ -163,13 +163,51 @@ def _fixture_chapter(req: WriteChapterRequest) -> WriteChapterResponse:
     )
 
 
+def _compact_outline_view(outline: dict[str, Any], chapter_number: int) -> str:
+    """A token-lean outline view for a single chapter's prompt: the story's premise + arc, THIS
+    chapter's full entry, and a one-line-per-chapter index of the rest (no per-chapter beats).
+
+    Dumping the entire outline (every chapter's full beat) into every sub-chapter prompt makes the
+    request huge and slow for a long novel (a 96-chapter dual-timeline outline ran ~20min/chapter and
+    risked the 30-min job timeout). The writer only needs THIS chapter in full plus light arc context.
+    """
+    o = outline or {}
+    lines: list[str] = []
+    for k in ("title", "premise", "story_arc_name", "dramatic_question"):
+        if o.get(k):
+            lines.append(f"{k.upper()}: {o[k]}")
+    chapters = o.get("chapters") or []
+    focal = None
+    index: list[str] = []
+    for ch in chapters:
+        if not isinstance(ch, dict):
+            continue
+        num = ch.get("chapter_number")
+        if str(num) == str(chapter_number):
+            focal = ch
+        index.append(
+            f"  {num}. {ch.get('title', '')}"
+            f"{' [' + str(ch.get('act')) + ']' if ch.get('act') else ''}"
+            f"{' (POV ' + str(ch.get('pov_character')) + ')' if ch.get('pov_character') else ''}"
+        )
+    if focal is not None:
+        lines.append("\nTHIS CHAPTER (write this one):")
+        for k in ("chapter_number", "title", "act", "arc_point", "pov_character", "bridge_from_prior", "beat"):
+            if focal.get(k):
+                lines.append(f"  {k}: {focal[k]}")
+    if index:
+        lines.append("\nFULL CHAPTER INDEX (for arc context — titles only):")
+        lines.extend(index)
+    return "\n".join(lines) if lines else str(o)
+
+
 def _chapter_header(ctx: dict[str, Any], roster: list, req: WriteChapterRequest) -> str:
-    """Shared context block (project + outline + roster) for the chapter / sub-chapter prompts."""
+    """Shared context block (project + compact outline + roster) for the chapter prompts."""
     lines = [
         f"PROJECT: {ctx['title']}",
         f"CHAPTER NUMBER: {req.chapter_number}",
         "",
-        f"OUTLINE:\n{ctx['outline']}",
+        f"OUTLINE:\n{_compact_outline_view(ctx['outline'], req.chapter_number)}",
         "",
         f"CHARACTER ROSTER:\n{_roster_text(roster)}",
     ]

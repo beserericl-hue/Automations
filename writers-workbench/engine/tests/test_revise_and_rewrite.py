@@ -113,3 +113,23 @@ def test_bible_extract_normalizes_types_and_drops_invalid() -> None:
 def test_genre_eval_system_mentions_genre() -> None:
     assert "GENRE" in _build_genre_eval_system("ancient-history")
     assert "story-bible" in _build_extract_bible_system()
+
+
+def test_compact_outline_view_is_lean() -> None:
+    from chapter_step.main import _compact_outline_view
+
+    outline = {
+        "title": "The Burial Mound", "premise": "dual timeline", "story_arc_name": "The Descent",
+        "chapters": [
+            {"chapter_number": i, "title": f"Ch{i}", "act": "Act I", "pov_character": "Tayak",
+             "beat": "X" * 400}
+            for i in range(96)
+        ],
+    }
+    view = _compact_outline_view(outline, 44)
+    # focal chapter present in full; the other 95 chapters appear only as a one-line index (no beats)
+    assert "THIS CHAPTER" in view and "chapter_number: 44" in view
+    assert "FULL CHAPTER INDEX" in view
+    # huge: full dump would be ~96*400 chars; the compact view must be far smaller
+    assert len(view) < 6000
+    assert view.count("X" * 400) == 1  # only the focal chapter's long beat is included
