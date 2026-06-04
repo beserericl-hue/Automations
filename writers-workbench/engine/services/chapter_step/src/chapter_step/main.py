@@ -17,10 +17,12 @@ from writer_engine.prompt_store import compose_craft_system, seed_default_prompt
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
 from writer_engine.schemas.chapter import (
     BibleEntry,
+    BibleExtract,
     ChapterCraftQa,
     DriftFinding,
     DriftReport,
     DriftScanResult,
+    GenreEval,
     SubChapterBrief,
     SubChapterPlan,
     WriteChapterRequest,
@@ -738,15 +740,136 @@ async def _op_scan_drift(payload: dict) -> dict:
     ).model_dump(mode="json")
 
 
+def _build_rewrite_system(genre_slug: str) -> str:
+    """Chapter rewrite from author feedback (n8n 'rewrite chapter' parity)."""
+    return compose_craft_system(
+        seed_keys=[
+            "follett_seeds.scene.fix_now",
+            "follett_seeds.prose.daily_rewrite",
+            "follett_seeds.prose.transparent",
+            "follett_seeds.prose.dialogue",
+            "follett_seeds.scene.turn_density",
+            "follett_seeds.research.local_color",
+            "follett_seeds.research.no_dumping",
+        ],
+        genre_block=_genre_block(genre_slug),
+    ) + (
+        "\n\nYou are REWRITING an existing chapter to apply the author's FEEDBACK. Apply every point of "
+        "the feedback faithfully. Preserve the chapter's place in the story, its POV, and the established "
+        "characters (consistent with the CHARACTER ROSTER) unless the feedback explicitly changes them. "
+        "Unless the feedback asks you to cut or shorten, keep the chapter AT LEAST as long as the "
+        "original. OUTPUT — story prose ONLY: no chapter/sub-chapter headings, no 'Confirmed cast' / "
+        "'POV character' / 'Validation' labels, no notes about what you changed."
+    )
+
+
+async def _op_rewrite(payload: dict) -> dict:
+    """Rewrite an existing chapter per author feedback. Ports the n8n chapter-rewrite feature.
+
+    Payload: {chapter_text|content_text, feedback|directive, project_id?, llm_strategy?, allow_shorten?}.
+    """
+    from writer_engine.config import get_settings
+
+    text = str(payload.get("chapter_text") or payload.get("content_text") or "")
+    feedback = str(
+        payload.get("feedback") or payload.get("directive") or payload.get("instructions") or ""
+    ).strip()
+    if not text or not feedback:
+        return {"content_text": text, "word_count": len(text.split()), "rewritten": False,
+                "note": "rewrite needs both chapter_text and feedback"}
+    project_id = payload.get("project_id")
+    ctx = await _load_context(str(project_id)) if project_id else {"genre_slug": "", "roster": []}
+    roster_text = _roster_text(ctx.get("roster") or [])
+    settings = get_settings()
+    model = {"haiku": settings.model_cheap, "sonnet": settings.model_default}.get(
+        str(payload.get("llm_strategy") or ""), settings.model_default
+    )
+    allow_shorten = bool(payload.get("allow_shorten"))
+    router = get_router(service=STEP_NAME)
+    try:
+        resp = await router.complete(
+            provider="anthropic", model=model, system=_build_rewrite_system(ctx.get("genre_slug", "")),
+            prompt=(
+                f"CHARACTER ROSTER (consistency reference):\n{roster_text}\n\n"
+                f"AUTHOR FEEDBACK (apply all of it):\n{feedback}\n\n"
+                f"CHAPTER TO REWRITE:\n{text}"
+            ),
+            max_tokens=32768, stream=True,
+        )
+    except ProviderNotRegistered:
+        return {"content_text": text, "word_count": len(text.split()), "rewritten": False,
+                "note": "no LLM provider"}
+    rewritten = _strip_scaffolding(resp.text.strip())
+    # Guard: a rewrite that collapsed the chapter (when the feedback did not ask to shorten) keeps the
+    # original rather than shipping a truncated/condensed chapter.
+    if not allow_shorten and len(rewritten.split()) < 0.9 * len(text.split()):
+        return {"content_text": text, "word_count": len(text.split()), "rewritten": False,
+                "note": "rewrite came back too short; kept the original"}
+    return {"content_text": rewritten, "word_count": len(rewritten.split()), "rewritten": True}
+
+
+def _build_genre_eval_system(genre_slug: str) -> str:
+    return compose_craft_system(seed_keys=[], genre_block=_genre_block(genre_slug)) + (
+        "\n\nScore from 0.0 to 1.0 how well the chapter below fits and delivers on its GENRE's "
+        "conventions, tone, and reader expectations (1.0 = exemplary). Add 1-4 short notes citing what "
+        "fits and what doesn't. Return strict JSON matching GenreEval {genre_score, notes}."
+    )
+
+
 async def _op_evaluate_genre(payload: dict) -> dict:
-    return {"genre_score": 0.91, "notes": ["F1-2 placeholder"]}
+    """Real LLM genre-fit score for a chapter (F1-2)."""
+    from writer_engine.config import get_settings
+
+    text = str(payload.get("chapter_text") or payload.get("content_text") or "")
+    genre = str(payload.get("genre_slug") or payload.get("genre") or "")
+    if not text:
+        return {"genre_score": None, "notes": ["no chapter text supplied"]}
+    router = get_router(service=STEP_NAME)
+    try:
+        ev, _resp = await complete_structured(
+            router, provider="anthropic", model=get_settings().model_default,
+            system=_build_genre_eval_system(genre), prompt=f"GENRE: {genre}\n\nCHAPTER:\n{text}",
+            schema=GenreEval, max_tokens=1024,
+        )
+        return ev.model_dump(mode="json")
+    except ProviderNotRegistered:
+        return {"genre_score": 0.9, "notes": ["(fixture — no LLM provider)"]}
+    except ValueError:
+        return {"genre_score": None, "notes": ["genre-eval JSON could not be parsed"]}
+
+
+def _build_extract_bible_system() -> str:
+    return compose_craft_system(seed_keys=[]) + (
+        "\n\nExtract the story-bible entries the chapter below introduces or develops: characters, "
+        "places, objects, concepts, and events that matter to continuity. For each give "
+        "{entry_type, name, description} where entry_type is one of character|place|object|concept|"
+        "event and the description is a concise, factual continuity note (traits, role, location, "
+        "significance). Do NOT invent entries not present in the text. Return strict JSON matching "
+        "BibleExtract {entries: [...]}."
+    )
 
 
 async def _op_extract_bible(payload: dict) -> dict:
-    entries = [
-        BibleEntry(entry_type="character", name="Placeholder", description="F1-2 stub").model_dump(mode="json")
-    ]
-    return {"entries": entries, "added": len(entries)}
+    """Real LLM story-bible extraction from a chapter (F1-2)."""
+    from writer_engine.config import get_settings
+
+    text = str(payload.get("chapter_text") or payload.get("content_text") or "")
+    if not text:
+        return {"entries": [], "added": 0, "note": "no chapter text supplied"}
+    router = get_router(service=STEP_NAME)
+    try:
+        extract, _resp = await complete_structured(
+            router, provider="anthropic", model=get_settings().model_default,
+            system=_build_extract_bible_system(), prompt=f"CHAPTER:\n{text}",
+            schema=BibleExtract, max_tokens=4096,
+        )
+        entries = [e.model_dump(mode="json") for e in extract.entries]
+        return {"entries": entries, "added": len(entries)}
+    except ProviderNotRegistered:
+        entries = [BibleEntry(entry_type="character", name="(fixture)", description="no LLM provider").model_dump(mode="json")]
+        return {"entries": entries, "added": len(entries)}
+    except ValueError:
+        return {"entries": [], "added": 0, "note": "extract-bible JSON could not be parsed"}
 
 
 async def _op_format_kindle(payload: dict) -> dict:
@@ -755,6 +878,7 @@ async def _op_format_kindle(payload: dict) -> dict:
 
 OPS = {
     "write": _op_write,
+    "rewrite": _op_rewrite,
     "qa": _op_qa,
     "scan-drift": _op_scan_drift,
     "evaluate-genre": _op_evaluate_genre,

@@ -86,6 +86,65 @@ class QaReport(BaseModel):
     findings: list[dict[str, str]] = Field(default_factory=list)
 
 
+class GenreEval(BaseModel):
+    """LLM genre-fit score for a chapter (F1-2 genre-eval)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    genre_score: float = Field(ge=0.0, le=1.0)
+    notes: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        out = dict(data)
+        if not ({"genre_score", "notes"} & set(out)) and len(out) == 1:
+            inner = next(iter(out.values()))
+            if isinstance(inner, dict):
+                out = dict(inner)
+        v = out.get("genre_score")
+        if isinstance(v, (int, float)) and v > 1:  # 0-100 -> 0-1
+            out["genre_score"] = round(v / 100.0, 3)
+        notes = out.get("notes")
+        if isinstance(notes, str):
+            out["notes"] = [notes] if notes.strip() else []
+        return out
+
+
+_BIBLE_TYPES = {"character", "place", "object", "concept", "event"}
+
+
+class BibleExtract(BaseModel):
+    """A chapter's extracted story-bible entries (F1-2 extract-bible)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    entries: list[BibleEntry] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce(cls, data: Any) -> Any:
+        if isinstance(data, list):
+            data = {"entries": data}
+        if not isinstance(data, dict):
+            return data
+        arr = data.get("entries") or data.get("bible") or data.get("items") or []
+        norm = []
+        for e in arr if isinstance(arr, list) else []:
+            if not isinstance(e, dict):
+                continue
+            t = str(e.get("entry_type") or e.get("type") or "concept").strip().lower()
+            if t not in _BIBLE_TYPES:
+                t = "concept"
+            name = e.get("name") or e.get("title")
+            desc = e.get("description") or e.get("desc") or ""
+            if name:
+                norm.append({"entry_type": t, "name": str(name), "description": str(desc)})
+        return {"entries": norm}
+
+
 class ChapterCraftQa(BaseModel):
     """LLM-scored craft-QA result — "does the chapter follow the writing-craft guides?"
 
