@@ -192,8 +192,12 @@ def _build_revise_system(title: str) -> str:
         "interleave, make the interleaving deliberate (and note in each chapter's `act` which timeline/"
         "era it belongs to). Renumber chapters consecutively (Prologue = 0, Epilogue = last). Each "
         "chapter entry stays COMPACT: {chapter_number, title, act, arc_point, pov_character, "
-        "bridge_from_prior, beat}.\n"
+        "bridge_from_prior, beat} where `beat` is ONE sentence (the dramatic movement only) — do NOT "
+        "write the chapter's prose, dialogue, or multi-sentence summaries in the outline; that bloats "
+        "the JSON and truncates it. The whole outline must fit as compact JSON.\n"
         "COVERAGE: the revised chapters must cover the whole story end to end with no gaps.\n"
+        "STORY ARC — the revision MUST update `story_arc_name`, `premise`, and `dramatic_question` to "
+        "reflect the new direction (do not leave them describing the old version).\n"
         "Run the OUTLINE QUALITY GATE on yourself before returning; revise until it passes."
     )
 
@@ -225,9 +229,10 @@ async def _op_revise_outline(payload: dict) -> dict:
                 "Return the COMPLETE revised outline as strict JSON."
             ),
             schema=StoryOutline,
-            # A revised outline can carry two interleaved timelines (100+ chapters); stream it so it
-            # neither truncates mid-JSON nor trips the non-streaming 10-min guard.
-            max_tokens=32768,
+            # A revised outline can carry two interleaved 100+-chapter timelines and EXPAND on the
+            # input (e.g. dramatized told-stories), so it overran 32768 and truncated mid-JSON. Give
+            # it the model's full 64k output budget, streamed.
+            max_tokens=64000,
             stream=True,
         )
         before = len(outline.get("chapters") or [])
