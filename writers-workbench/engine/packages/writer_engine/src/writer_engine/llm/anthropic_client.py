@@ -16,10 +16,13 @@ class AnthropicAdapter:
     provider: str = "anthropic"
 
     def __init__(self, *, api_key: str | None = None, service: str = "writer-engine") -> None:
-        key = api_key or get_settings().anthropic_api_key
+        settings = get_settings()
+        key = api_key or settings.anthropic_api_key
         if not key:
             raise RuntimeError("Anthropic not configured — set ANTHROPIC_API_KEY")
-        self._client = AsyncAnthropic(api_key=key)
+        # 429 backstop: the SDK retries with exponential backoff honoring Retry-After. The Redis
+        # budget keeps us under the per-minute limit; this catches residual bursts (CR-003 scaling).
+        self._client = AsyncAnthropic(api_key=key, max_retries=settings.anthropic_max_retries)
         self._service = service
 
     async def complete(
