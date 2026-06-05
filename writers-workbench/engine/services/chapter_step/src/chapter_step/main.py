@@ -8,6 +8,7 @@ the service boots and tests run without live keys.
 
 from __future__ import annotations
 
+import asyncio
 import re
 from typing import Any
 from uuid import uuid4
@@ -340,16 +341,34 @@ def _strip_scaffolding(text: str) -> str:
     return out or text.strip()
 
 
+def _subchapter_plan_text(briefs: list[SubChapterBrief]) -> str:
+    """The whole chapter's sub-beats as a compact plan, so a sub-chapter written WITHOUT a prior tail
+    (the parallel path) still knows what comes before and after it and can keep the chapter coherent."""
+    return "CHAPTER PLAN (all sub-chapters, in order — keep yours consistent with these):\n" + "\n".join(
+        f"  {i + 1}. {b.title or '(untitled)'} — {b.beat}" for i, b in enumerate(briefs)
+    )
+
+
 async def _write_subchapter(
     *, system: str, header: str, brief: SubChapterBrief, idx: int, total: int,
-    prior_tail: str, chapter_number: int, model: str, grounding: str = "",
+    prior_tail: str, chapter_number: int, model: str, grounding: str = "", plan_context: str = "",
 ) -> str:
-    """Write one sub-chapter (~2-3k words) with continuity from the prior sub-chapter's tail and the
-    pre-fetched research grounding woven in."""
-    continuity = (
-        f"\n\nCONTINUE SEAMLESSLY from the end of the previous sub-chapter (do NOT restate it; pick up "
-        f"the thread). Tail of the previous sub-chapter:\n…{prior_tail}" if prior_tail else ""
-    )
+    """Write one sub-chapter (~2-3k words). Continuity comes from the prior sub-chapter's tail
+    (sequential path) OR, when there is no prior tail, from the full chapter plan (parallel path).
+    The pre-fetched research grounding is woven in either way."""
+    if prior_tail:
+        continuity = (
+            f"\n\nCONTINUE SEAMLESSLY from the end of the previous sub-chapter (do NOT restate it; pick "
+            f"up the thread). Tail of the previous sub-chapter:\n…{prior_tail}"
+        )
+    elif plan_context and idx > 0:
+        continuity = (
+            f"\n\nThis is sub-chapter {idx + 1}; it is being written alongside the others. Open in a way "
+            f"that flows from sub-chapter {idx} and leads into {idx + 2 if idx + 1 < total else 'the end'} "
+            f"— no recap, no chapter heading.\n\n{plan_context}"
+        )
+    else:
+        continuity = f"\n\n{plan_context}" if plan_context else ""
     grounding_block = (
         f"\n\nRESEARCH GROUNDING — weave the relevant facts below into THIS sub-chapter as concrete "
         f"sensory/material detail and accurate period language (dramatized, never an info-dump or a "
@@ -627,16 +646,31 @@ async def _op_write(payload: dict) -> dict:
             provided = _briefs_from_payload(payload)
             briefs = provided or await _plan_subchapters(ctx, req, n_sub, model)
             sub_briefs = briefs
-            sub_texts: list[str] = []
-            prior_tail = ""
-            for i, brief in enumerate(briefs):
-                t = await _write_subchapter(
-                    system=system, header=header, brief=brief, idx=i, total=len(briefs),
-                    prior_tail=prior_tail, chapter_number=req.chapter_number, model=model,
-                    grounding=research_facts,
-                )
-                sub_texts.append(t)
-                prior_tail = " ".join(t.split()[-800:])
+            # F2.5 optimization: write the sub-chapters CONCURRENTLY (wall-time = slowest sub, not the
+            # sum) when `parallel_subchapters` is set. Each parallel sub is coordinated by the full
+            # chapter plan instead of the prior sub's tail. Default OFF so the sequential prior-tail
+            # path (the validated baseline) is unchanged; the pre/post optimization test flips this.
+            if bool(payload.get("parallel_subchapters")):
+                plan_text = _subchapter_plan_text(briefs)
+                sub_texts = list(await asyncio.gather(*[
+                    _write_subchapter(
+                        system=system, header=header, brief=brief, idx=i, total=len(briefs),
+                        prior_tail="", chapter_number=req.chapter_number, model=model,
+                        grounding=research_facts, plan_context=plan_text,
+                    )
+                    for i, brief in enumerate(briefs)
+                ]))
+            else:
+                sub_texts = []
+                prior_tail = ""
+                for i, brief in enumerate(briefs):
+                    t = await _write_subchapter(
+                        system=system, header=header, brief=brief, idx=i, total=len(briefs),
+                        prior_tail=prior_tail, chapter_number=req.chapter_number, model=model,
+                        grounding=research_facts,
+                    )
+                    sub_texts.append(t)
+                    prior_tail = " ".join(t.split()[-800:])
             text = "\n\n".join(sub_texts)
             # QA cycle 1 (detect drift vs outline/arc/roster) -> QA cycle 2 (correct it) — only fires a
             # streamed revision when there is real story/character drift. Research is already woven.
