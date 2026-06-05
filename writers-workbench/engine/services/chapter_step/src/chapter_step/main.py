@@ -367,10 +367,11 @@ def _cached_write_system(base_system: str, header: str, grounding: str) -> str:
 async def _write_subchapter(
     *, system: str, brief: SubChapterBrief, idx: int, total: int,
     prior_tail: str, chapter_number: int, model: str, plan_context: str = "",
-) -> str:
+) -> tuple[str, int, int]:
     """Write one sub-chapter (~2-3k words). ``system`` is the CACHED per-chapter prefix
     (craft + context + grounding); only the small per-sub beat/continuity goes in the user message.
-    Continuity comes from the prior sub-chapter's tail (sequential) or the chapter plan (parallel)."""
+    Continuity comes from the prior sub-chapter's tail (sequential) or the chapter plan (parallel).
+    Returns (prose, cache_read_tokens, cache_write_tokens) so the caller can report cache hits."""
     if prior_tail:
         continuity = (
             f"\n\nCONTINUE SEAMLESSLY from the end of the previous sub-chapter (do NOT restate it; pick "
@@ -398,7 +399,7 @@ async def _write_subchapter(
     resp = await router.complete(
         provider="anthropic", model=model, system=system, prompt=user, max_tokens=8192, cache_system=True
     )
-    return _strip_scaffolding(resp.text.strip())
+    return _strip_scaffolding(resp.text.strip()), resp.cache_read_tokens, resp.cache_write_tokens
 
 
 # ----------------------------------------------------------------------------------------------
@@ -653,6 +654,7 @@ async def _op_write(payload: dict) -> dict:
     research_gaps_filled: list[str] = []
     research_facts = ""
     sub_briefs: list[SubChapterBrief] = []
+    cache_read = cache_write = 0
     router = get_router(service=STEP_NAME)
     try:
         if n_sub > 1:
@@ -678,23 +680,28 @@ async def _op_write(payload: dict) -> dict:
             # path (the validated baseline) is unchanged; the pre/post optimization test flips this.
             if bool(payload.get("parallel_subchapters")):
                 plan_text = _subchapter_plan_text(briefs)
-                sub_texts = list(await asyncio.gather(*[
+                results = await asyncio.gather(*[
                     _write_subchapter(
                         system=cached_system, brief=brief, idx=i, total=len(briefs),
                         prior_tail="", chapter_number=req.chapter_number, model=model,
                         plan_context=plan_text,
                     )
                     for i, brief in enumerate(briefs)
-                ]))
+                ])
+                sub_texts = [t for t, _cr, _cw in results]
+                cache_read = sum(cr for _t, cr, _cw in results)
+                cache_write = sum(cw for _t, _cr, cw in results)
             else:
                 sub_texts = []
                 prior_tail = ""
                 for i, brief in enumerate(briefs):
-                    t = await _write_subchapter(
+                    t, cr, cw = await _write_subchapter(
                         system=cached_system, brief=brief, idx=i, total=len(briefs),
                         prior_tail=prior_tail, chapter_number=req.chapter_number, model=model,
                     )
                     sub_texts.append(t)
+                    cache_read += cr
+                    cache_write += cw
                     prior_tail = " ".join(t.split()[-800:])
             text = "\n\n".join(sub_texts)
             # QA cycle 1 (detect drift vs outline/arc/roster) -> QA cycle 2 (correct it) — only fires a
@@ -744,6 +751,8 @@ async def _op_write(payload: dict) -> dict:
             research_gaps_filled=research_gaps_filled,
             research_facts=research_facts,
             sub_chapter_briefs=[b.model_dump(mode="json") for b in sub_briefs],
+            cache_read_tokens=cache_read,
+            cache_write_tokens=cache_write,
         )
     except ProviderNotRegistered:
         out = _fixture_chapter(req)
