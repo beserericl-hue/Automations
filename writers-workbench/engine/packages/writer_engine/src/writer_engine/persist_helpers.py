@@ -103,23 +103,36 @@ async def persist_chapter(
 async def persist_bible(
     client: Any, *, project_id: str, user_id: str, entries: list[dict], chapter_number: int | None = None
 ) -> int:
-    """Upsert story-bible entries (W4). De-dups on (project_id, entry_type, name)."""
+    """Persist story-bible entries (W4), de-duped on (project_id, entry_type, name).
+
+    Done as select-then-update/insert rather than a DB upsert: DEV's ``story_bible_v2`` has no UNIQUE
+    constraint on (project_id, entry_type, name), so ``on_conflict`` raises 42P10. Each entry is
+    independently best-effort so one bad row can't abort the rest (or mask the chapter persist).
+    """
     count = 0
     for e in entries:
         name = e.get("name")
         if not name:
             continue
-        await (
-            client.table("story_bible_v2")
-            .upsert(
-                {"user_id": user_id, "project_id": project_id,
-                 "entry_type": e.get("entry_type") or "concept", "name": name,
-                 "description": e.get("description") or "", "last_chapter_seen": chapter_number},
-                on_conflict="project_id,entry_type,name",
+        entry_type = e.get("entry_type") or "concept"
+        row = {
+            "user_id": user_id, "project_id": project_id, "entry_type": entry_type, "name": name,
+            "description": e.get("description") or "", "last_chapter_seen": chapter_number,
+        }
+        try:
+            existing = await (
+                client.table("story_bible_v2").select("id")
+                .eq("project_id", project_id).eq("entry_type", entry_type).eq("name", name)
+                .limit(1).execute()
             )
-            .execute()
-        )
-        count += 1
+            rows = await _rows(existing)
+            if rows:
+                await client.table("story_bible_v2").update(row).eq("id", rows[0]["id"]).execute()
+            else:
+                await client.table("story_bible_v2").insert(row).execute()
+            count += 1
+        except Exception:
+            continue
     return count
 
 
