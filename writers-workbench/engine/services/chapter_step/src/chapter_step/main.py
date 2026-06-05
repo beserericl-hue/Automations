@@ -464,7 +464,10 @@ def _build_drift_system() -> str:
         "- research_gaps: short phrases for period facts / local color / material culture / events the "
         "chapter should add or verify to feel grounded in its time and place.\n"
         "Set aligned=true ONLY if story_drift and character_drift are both empty. Be exacting but do "
-        "not invent drift that isn't there. Return strict JSON matching DriftReport."
+        "not invent drift that isn't there.\n"
+        "Keep EACH finding to ONE short sentence — name the deviation; do NOT quote long passages from "
+        "the chapter (that bloats and truncates the JSON). Return strict JSON matching DriftReport and "
+        "nothing else (no prose before or after)."
     )
 
 
@@ -480,16 +483,23 @@ async def _detect_drift(
         f"CHARACTER ROSTER (consistency reference):\n{roster_text}\n\n"
         f"CHAPTER:\n{text}"
     )
-    try:
-        drift, _resp = await complete_structured(
-            router, provider="anthropic", model=model,
-            system=_build_drift_system(), prompt=prompt, schema=DriftReport, max_tokens=4096,
-        )
-        return drift
-    except ProviderNotRegistered:
-        return DriftReport()
-    except ValueError:
-        return None
+    # Root cause of the ch4 `aligned=None`: at max_tokens=4096 the drift report truncated mid-JSON
+    # (the model quoted long chapter passages in its findings) -> json.loads failed -> None. Give it
+    # room (16k) AND retry once on a parse/validation failure (the model occasionally emits prose
+    # instead of JSON). Only return None if both attempts genuinely fail to parse.
+    for attempt in range(2):
+        try:
+            drift, _resp = await complete_structured(
+                router, provider="anthropic", model=model,
+                system=_build_drift_system(), prompt=prompt, schema=DriftReport, max_tokens=16384,
+            )
+            return drift
+        except ProviderNotRegistered:
+            return DriftReport()
+        except ValueError:
+            if attempt == 1:
+                return None
+    return None
 
 
 def _facts_topics(facts: str, limit: int = 14) -> list[str]:
@@ -1060,6 +1070,79 @@ async def _op_rewrite(payload: dict) -> dict:
     return {"content_text": rewritten, "word_count": len(rewritten.split()), "rewritten": True}
 
 
+async def _load_persisted_chapter(project_id: str, chapter_number: int) -> str:
+    """Read a chapter's persisted text from published_content_v2 (for the repair op)."""
+    from writer_engine.config import get_settings
+
+    settings = get_settings()
+    if not (settings.supabase_url and settings.supabase_service_role_key):
+        return ""
+    from writer_engine.supabase.client import get_supabase_admin
+
+    client = await get_supabase_admin()
+    resp = await (
+        client.table("published_content_v2").select("content_text")
+        .eq("project_id", project_id).eq("content_type", "chapter").eq("chapter_number", chapter_number)
+        .limit(1).execute()
+    )
+    rows = getattr(resp, "data", None) or []
+    return str(rows[0].get("content_text") or "") if rows else ""
+
+
+async def _op_repair(payload: dict) -> dict:
+    """Repair a persisted chapter's drift: re-run QA cycle 1 (detect, now hardened) + QA cycle 2
+    (correct) on the EXISTING chapter text, then re-persist. Use to fix chapters that were written
+    with drift (or whose drift detection failed). Reads the text from the DB when only
+    project_id+chapter_number are given. Pass `persist:true` to write the repaired chapter back."""
+    from writer_engine.config import get_settings
+
+    project_id = payload.get("project_id")
+    chapter_number = int(payload.get("chapter_number") or 0)
+    text = str(payload.get("content_text") or "")
+    if not text and project_id:
+        text = await _load_persisted_chapter(str(project_id), chapter_number)
+    if not text:
+        return {"repaired": False, "reason": "no chapter text (give content_text or project_id+chapter_number)"}
+    ctx = (
+        await _load_context(str(project_id), payload) if project_id
+        else _apply_ctx_overrides({"genre_slug": "", "title": "", "outline": {}, "roster": []}, payload)
+    )
+    roster_text = _roster_text(ctx.get("roster") or [])
+    period = str(payload.get("period") or _outline_chapter_act(ctx.get("outline") or {}, chapter_number) or "contemporary")
+    settings = get_settings()
+    model = {"haiku": settings.model_cheap, "sonnet": settings.model_default}.get(
+        str(payload.get("llm_strategy") or ""), settings.model_default
+    )
+    req = WriteChapterRequest.model_validate({
+        "project_id": project_id or "00000000-0000-0000-0000-000000000000",
+        "chapter_number": chapter_number, "chapter_run_id": payload.get("chapter_run_id") or str(uuid4()),
+    })
+    new_text, drift, passes = await _drift_correct_pass(
+        text, ctx=ctx, req=req, roster_text=roster_text, period=period, model=model,
+    )
+    persist_result = None
+    if passes and payload.get("persist"):
+        out = WriteChapterResponse(
+            chapter_id=uuid4(), chapter_run_id=req.chapter_run_id, content_text=new_text,
+            word_count=len(new_text.split()), sub_chapter_count=0,
+        )
+        persist_result = await _persist_chapter_if_requested(payload, ctx, out)
+    d = drift.model_dump(mode="json") if drift else None
+    return {
+        "repaired": bool(passes), "content_text": new_text, "word_count": len(new_text.split()),
+        "craft_passes": passes, "drift_report": d,
+        "drift_detected": (d is not None and not d.get("aligned", True)) if d else None,
+        "persist": persist_result,
+    }
+
+
+def _outline_chapter_act(outline: dict[str, Any], chapter_number: int) -> str:
+    for ch in (outline or {}).get("chapters") or []:
+        if isinstance(ch, dict) and str(ch.get("chapter_number")) == str(chapter_number):
+            return str(ch.get("act") or "")
+    return ""
+
+
 def _build_genre_eval_system(genre_slug: str) -> str:
     return compose_craft_system(seed_keys=[], genre_block=_genre_block(genre_slug)) + (
         "\n\nScore from 0.0 to 1.0 how well the chapter below fits and delivers on its GENRE's "
@@ -1160,6 +1243,7 @@ OPS = {
     "write": _op_write,
     "plan": _op_plan,
     "rewrite": _op_rewrite,
+    "repair": _op_repair,
     "qa": _op_qa,
     "scan-drift": _op_scan_drift,
     "evaluate-genre": _op_evaluate_genre,

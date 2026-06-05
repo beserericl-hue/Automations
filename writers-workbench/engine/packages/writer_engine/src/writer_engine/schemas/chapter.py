@@ -268,22 +268,24 @@ class DriftReport(BaseModel):
             elif isinstance(v, str):
                 out[k] = [v] if v.strip() else []
             elif isinstance(v, list):
-                # entries may be {"item": ...}/{"issue": ...}/{"detail": ...} dicts — flatten to phrases
-                out[k] = [
-                    (
-                        x
-                        if isinstance(x, str)
-                        else str(
-                            x.get("item")
-                            or x.get("issue")
-                            or x.get("detail")
-                            or x.get("problem")
-                            or x.get("description")
-                            or x
+                # entries may be plain strings, {"item": ...}/{"issue": ...} dicts, or stray None/empty
+                # values — flatten to non-empty phrases (a None element must not crash the validator).
+                flat = []
+                for x in v:
+                    if x is None:
+                        continue
+                    if isinstance(x, str):
+                        s = x
+                    elif isinstance(x, dict):
+                        s = str(
+                            x.get("item") or x.get("issue") or x.get("detail")
+                            or x.get("problem") or x.get("description") or x
                         )
-                    )
-                    for x in v
-                ]
+                    else:
+                        s = str(x)
+                    if s.strip():
+                        flat.append(s)
+                out[k] = flat
         if "aligned" not in out:
             out["aligned"] = not (out.get("story_drift") or out.get("character_drift"))
         return out
