@@ -133,3 +133,29 @@ def test_compact_outline_view_is_lean() -> None:
     # huge: full dump would be ~96*400 chars; the compact view must be far smaller
     assert len(view) < 6000
     assert view.count("X" * 400) == 1  # only the focal chapter's long beat is included
+
+
+def test_story_system_anchors_chapter_count_and_synopsis() -> None:
+    from brainstorm_step.main import _build_story_system
+
+    s = _build_story_system("ancient-history", "", "The Burial Mound", target_chapters=96,
+                            locked_synopsis="A Piscataway archaeologist excavates a mound.")
+    assert "CHAPTER-COUNT ANCHOR" in s and "96" in s
+    assert "LOCKED SYNOPSIS" in s and "Piscataway" in s
+    # no anchor when not supplied
+    assert "CHAPTER-COUNT ANCHOR" not in _build_story_system("ancient-history", "", "X")
+
+
+def test_outline_chapter_title_helper() -> None:
+    from chapter_step.main import _outline_chapter_title
+
+    outline = {"chapters": [{"chapter_number": 0, "title": "Prologue: What the Ground Keeps"},
+                            {"chapter_number": 1, "title": "The Permit"}]}
+    assert _outline_chapter_title(outline, 0) == "Prologue: What the Ground Keeps"
+    assert _outline_chapter_title(outline, 1) == "The Permit"
+    assert _outline_chapter_title(outline, 5) == ""
+
+
+def test_persist_canon_importable() -> None:
+    from writer_engine import persist_helpers
+    assert hasattr(persist_helpers, "persist_canon")
