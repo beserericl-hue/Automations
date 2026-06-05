@@ -349,13 +349,28 @@ def _subchapter_plan_text(briefs: list[SubChapterBrief]) -> str:
     )
 
 
+def _cached_write_system(base_system: str, header: str, grounding: str) -> str:
+    """Prompt-caching: fold the per-chapter shared context (project/outline/roster header + research
+    grounding) into the system block so it is CACHED once and reused across all sub-chapter calls,
+    instead of re-sending it in every (uncached) user message. Only the per-sub beat/continuity then
+    varies, so subs 2..N read the cache (big input-token + cost saving, eases the rate budget)."""
+    parts = [base_system, "PROJECT / OUTLINE / CHARACTER-ROSTER CONTEXT:\n" + header]
+    if grounding:
+        parts.append(
+            "RESEARCH GROUNDING — weave the relevant facts below into the prose as concrete sensory/"
+            "material detail and accurate period language (dramatized, never an info-dump or a list):\n"
+            + grounding
+        )
+    return "\n\n".join(parts)
+
+
 async def _write_subchapter(
-    *, system: str, header: str, brief: SubChapterBrief, idx: int, total: int,
-    prior_tail: str, chapter_number: int, model: str, grounding: str = "", plan_context: str = "",
+    *, system: str, brief: SubChapterBrief, idx: int, total: int,
+    prior_tail: str, chapter_number: int, model: str, plan_context: str = "",
 ) -> str:
-    """Write one sub-chapter (~2-3k words). Continuity comes from the prior sub-chapter's tail
-    (sequential path) OR, when there is no prior tail, from the full chapter plan (parallel path).
-    The pre-fetched research grounding is woven in either way."""
+    """Write one sub-chapter (~2-3k words). ``system`` is the CACHED per-chapter prefix
+    (craft + context + grounding); only the small per-sub beat/continuity goes in the user message.
+    Continuity comes from the prior sub-chapter's tail (sequential) or the chapter plan (parallel)."""
     if prior_tail:
         continuity = (
             f"\n\nCONTINUE SEAMLESSLY from the end of the previous sub-chapter (do NOT restate it; pick "
@@ -369,24 +384,20 @@ async def _write_subchapter(
         )
     else:
         continuity = f"\n\n{plan_context}" if plan_context else ""
-    grounding_block = (
-        f"\n\nRESEARCH GROUNDING — weave the relevant facts below into THIS sub-chapter as concrete "
-        f"sensory/material detail and accurate period language (dramatized, never an info-dump or a "
-        f"list). Use what fits this beat; carry the rest into later sub-chapters:\n{grounding}"
-        if grounding else ""
-    )
     user = (
-        f"{header}\n\nYou are writing SUB-CHAPTER {idx + 1} of {total} of chapter {chapter_number}.\n"
+        f"You are writing SUB-CHAPTER {idx + 1} of {total} of chapter {chapter_number}.\n"
         f"This sub-chapter's beat: {brief.title} — {brief.beat}"
         f"{(' (POV: ' + brief.pov_character + ')') if brief.pov_character else ''}\n"
         f"Write this sub-chapter in full (rich, scene-driven prose, not a summary), following the craft "
-        f"rules in the system prompt.{grounding_block}\n\n"
+        f"rules, the project context, and the research grounding in the system prompt.\n\n"
         f"OUTPUT — story prose ONLY. Do NOT print a chapter or 'Sub-chapter N' heading, a 'Validation' "
         f"or BEGINNING/MIDDLE/END checklist, a 'Confirmed cast' / 'POV character' label, or any notes — "
         f"just the prose.{continuity}"
     )
     router = get_router(service=STEP_NAME)
-    resp = await router.complete(provider="anthropic", model=model, system=system, prompt=user, max_tokens=8192)
+    resp = await router.complete(
+        provider="anthropic", model=model, system=system, prompt=user, max_tokens=8192, cache_system=True
+    )
     return _strip_scaffolding(resp.text.strip())
 
 
@@ -657,6 +668,10 @@ async def _op_write(payload: dict) -> dict:
             provided = _briefs_from_payload(payload)
             briefs = provided or await _plan_subchapters(ctx, req, n_sub, model)
             sub_briefs = briefs
+            # Prompt caching: the craft system + chapter context + research grounding are identical
+            # across all sub-chapters, so fold them into ONE cached system prefix (cache-write on the
+            # first sub, cache-read on the rest) instead of re-sending them in every user message.
+            cached_system = _cached_write_system(system, header, research_facts)
             # F2.5 optimization: write the sub-chapters CONCURRENTLY (wall-time = slowest sub, not the
             # sum) when `parallel_subchapters` is set. Each parallel sub is coordinated by the full
             # chapter plan instead of the prior sub's tail. Default OFF so the sequential prior-tail
@@ -665,9 +680,9 @@ async def _op_write(payload: dict) -> dict:
                 plan_text = _subchapter_plan_text(briefs)
                 sub_texts = list(await asyncio.gather(*[
                     _write_subchapter(
-                        system=system, header=header, brief=brief, idx=i, total=len(briefs),
+                        system=cached_system, brief=brief, idx=i, total=len(briefs),
                         prior_tail="", chapter_number=req.chapter_number, model=model,
-                        grounding=research_facts, plan_context=plan_text,
+                        plan_context=plan_text,
                     )
                     for i, brief in enumerate(briefs)
                 ]))
@@ -676,9 +691,8 @@ async def _op_write(payload: dict) -> dict:
                 prior_tail = ""
                 for i, brief in enumerate(briefs):
                     t = await _write_subchapter(
-                        system=system, header=header, brief=brief, idx=i, total=len(briefs),
+                        system=cached_system, brief=brief, idx=i, total=len(briefs),
                         prior_tail=prior_tail, chapter_number=req.chapter_number, model=model,
-                        grounding=research_facts,
                     )
                     sub_texts.append(t)
                     prior_tail = " ".join(t.split()[-800:])

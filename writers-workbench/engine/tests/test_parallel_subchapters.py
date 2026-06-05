@@ -38,10 +38,21 @@ def test_write_subchapter_plan_context_path_reaches_llm() -> None:
 
     try:
         res = asyncio.run(_write_subchapter(
-            system="s", header="h", brief=SubChapterBrief(beat="x"), idx=1, total=3,
+            system="cached system prefix", brief=SubChapterBrief(beat="x"), idx=1, total=3,
             prior_tail="", chapter_number=1, model="claude-sonnet-4-6",
-            grounding="", plan_context="CHAPTER PLAN ...",
+            plan_context="CHAPTER PLAN ...",
         ))
         assert isinstance(res, str)  # a provider IS configured -> returned prose
     except ProviderNotRegistered:
         pass  # no provider -> reached the LLM call via the plan-context branch (expected)
+
+
+def test_cached_write_system_folds_context_and_grounding() -> None:
+    from chapter_step.main import _cached_write_system
+
+    s = _cached_write_system("CRAFT SYSTEM", "PROJECT: X\nOUTLINE: ...", "Fact: copper traded south.")
+    assert "CRAFT SYSTEM" in s
+    assert "PROJECT / OUTLINE / CHARACTER-ROSTER CONTEXT" in s and "PROJECT: X" in s
+    assert "RESEARCH GROUNDING" in s and "copper traded south" in s
+    # no grounding section when none supplied
+    assert "RESEARCH GROUNDING" not in _cached_write_system("CRAFT", "HEADER", "")
