@@ -609,11 +609,17 @@ async def _correct_drift(
 
 
 async def _drift_correct_pass(
-    text: str, *, ctx: dict[str, Any], req: WriteChapterRequest, roster_text: str, period: str, model: str
+    text: str, *, ctx: dict[str, Any], req: WriteChapterRequest, roster_text: str, period: str,
+    model: str, min_length_ratio: float = 0.85,
 ) -> tuple[str, DriftReport | None, int]:
     """QA cycle 1 (detect drift vs outline/arc/roster) -> QA cycle 2 (correct it, only when there is
     real story/character drift). Research is woven at WRITE-time, not here. Returns
-    (possibly-revised text, the pre-correction drift report, passes)."""
+    (possibly-revised text, the pre-correction drift report, passes).
+
+    ``min_length_ratio`` is the floor below which a (shrinking) correction is rejected. At WRITE time
+    it is 0.85 (a correction shouldn't trim a fresh chapter much). For the REPAIR op it is lower:
+    fixing heavy drift — removing invented characters, deleting duplicated scenes, cutting
+    contradictions — legitimately shortens the chapter, and there the fix is the priority."""
     drift = await _detect_drift(
         text, outline=ctx["outline"], chapter_number=req.chapter_number,
         roster_text=roster_text, period=period, model=model,
@@ -622,12 +628,8 @@ async def _drift_correct_pass(
         return text, None, 0
     if not (drift.story_drift or drift.character_drift):
         return text, drift, 0  # aligned — nothing to correct
-    # Real story/character drift (e.g. a name-continuity bug) is worth correcting even if the rewrite
-    # tightens the prose a little. Accept the correction down to 0.85x the draft; if it comes back
-    # shorter than that, retry once with a hard "return the FULL chapter, at least as long" push, then
-    # keep the longer of the two — but never ship a chapter that collapsed below 0.85x the draft.
     draft_words = len(text.split())
-    floor = 0.85 * draft_words
+    floor = min_length_ratio * draft_words
     revised = await _correct_drift(
         text, drift=drift, roster_text=roster_text, genre_slug=ctx["genre_slug"], model=model,
     )
@@ -638,7 +640,7 @@ async def _drift_correct_pass(
         )
         revised = max((revised, retry), key=lambda t: len(t.split()))
     if len(revised.split()) < floor:
-        return text, drift, 0  # correction kept collapsing — keep the full-length draft
+        return text, drift, 0  # correction collapsed below the floor — keep the original
     return revised, drift, 1
 
 
@@ -1117,8 +1119,12 @@ async def _op_repair(payload: dict) -> dict:
         "project_id": project_id or "00000000-0000-0000-0000-000000000000",
         "chapter_number": chapter_number, "chapter_run_id": payload.get("chapter_run_id") or str(uuid4()),
     })
+    # Repair accepts a shorter result (default floor 0.6): fixing heavy drift — cutting invented
+    # characters, duplicate scenes, contradictions — legitimately shortens the chapter; the fix wins.
+    min_ratio = float(payload.get("min_length_ratio") or 0.6)
     new_text, drift, passes = await _drift_correct_pass(
         text, ctx=ctx, req=req, roster_text=roster_text, period=period, model=model,
+        min_length_ratio=min_ratio,
     )
     persist_result = None
     if passes and payload.get("persist"):
