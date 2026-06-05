@@ -94,6 +94,28 @@ def _fixture_outline(payload: dict) -> StoryOutline:
     )
 
 
+async def _persist_outline_if_requested(payload: dict, outline_dict: dict) -> dict | None:
+    """CR-001 (W2): when `persist` + project_id + user_id are supplied, save the outline to
+    writing_projects_v2.outline (+ a prior-version snapshot). Best-effort — never breaks generation."""
+    if not payload.get("persist"):
+        return None
+    project_id, user_id = payload.get("project_id"), payload.get("user_id")
+    if not (project_id and user_id):
+        return {"persisted": False, "reason": "persist requested but project_id/user_id missing"}
+    settings = get_settings()
+    if not (settings.supabase_url and settings.supabase_service_role_key):
+        return {"persisted": False, "reason": "supabase not configured"}
+    try:
+        from writer_engine.persist_helpers import persist_outline
+        from writer_engine.supabase.client import get_supabase_admin
+
+        client = await get_supabase_admin()
+        await persist_outline(client, project_id=str(project_id), user_id=str(user_id), outline=outline_dict)
+        return {"persisted": True, "project_id": str(project_id)}
+    except Exception as exc:
+        return {"persisted": False, "error": str(exc)[:200]}
+
+
 async def _op_story(payload: dict) -> dict:
     genre = str(payload.get("genre") or payload.get("genre_slug") or "")
     arc = str(payload.get("story_arc") or payload.get("story_arc_name") or "")
@@ -116,7 +138,9 @@ async def _op_story(payload: dict) -> dict:
         )
     except ProviderNotRegistered:
         outline = _fixture_outline(payload)
-    return {"outline": outline.model_dump(mode="json")}
+    outline_dict = outline.model_dump(mode="json")
+    persisted = await _persist_outline_if_requested(payload, outline_dict)
+    return {"outline": outline_dict, "persist": persisted}
 
 
 async def _op_chapter(payload: dict) -> dict:
@@ -237,15 +261,39 @@ async def _op_revise_outline(payload: dict) -> dict:
         )
         before = len(outline.get("chapters") or [])
         after = len(revised.chapters)
+        revised_dict = revised.model_dump(mode="json")
+        persisted = await _persist_outline_if_requested(payload, revised_dict)
         return {
             "revised": True,
-            "outline": revised.model_dump(mode="json"),
+            "outline": revised_dict,
             "chapters_before": before,
             "chapters_after": after,
             "characters_after": len(revised.characters),
+            "persist": persisted,
         }
     except ProviderNotRegistered:
         return {"revised": False, "outline": outline}
+
+
+async def _op_create_project(payload: dict) -> dict:
+    """CR-001 (W1): create a new writing_projects_v2 row; returns its id for the rest of the run."""
+    user_id = str(payload.get("user_id") or "")
+    title = str(payload.get("title") or "Untitled")
+    genre = str(payload.get("genre_slug") or payload.get("genre") or "")
+    if not user_id:
+        return {"created": False, "reason": "user_id required"}
+    settings = get_settings()
+    if not (settings.supabase_url and settings.supabase_service_role_key):
+        return {"created": False, "reason": "supabase not configured"}
+    try:
+        from writer_engine.persist_helpers import create_project
+        from writer_engine.supabase.client import get_supabase_admin
+
+        client = await get_supabase_admin()
+        pid = await create_project(client, user_id=user_id, title=title, genre_slug=genre)
+        return {"created": bool(pid), "project_id": pid, "title": title}
+    except Exception as exc:
+        return {"created": False, "error": str(exc)[:200]}
 
 
 OPS = {
@@ -253,6 +301,7 @@ OPS = {
     "chapter": _op_chapter,
     "edit-outline": _op_edit_outline,
     "revise-outline": _op_revise_outline,
+    "create-project": _op_create_project,
 }
 
 

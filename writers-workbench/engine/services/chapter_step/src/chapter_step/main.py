@@ -722,7 +722,49 @@ async def _op_write(payload: dict) -> dict:
         )
     except ProviderNotRegistered:
         out = _fixture_chapter(req)
-    return out.model_dump(mode="json")
+    result = out.model_dump(mode="json")
+    result["persist"] = await _persist_chapter_if_requested(payload, ctx, out)
+    return result
+
+
+async def _persist_chapter_if_requested(
+    payload: dict, ctx: dict[str, Any], out: WriteChapterResponse
+) -> dict | None:
+    """CR-001 (W3+W4): when `persist` + project_id + user_id are supplied, save the chapter to
+    published_content_v2 (+ a content_versions_v2 snapshot, idempotent on project+chapter_number) and
+    extract + upsert its story-bible entries. Best-effort — never breaks generation."""
+    from writer_engine.config import get_settings
+
+    if not payload.get("persist"):
+        return None
+    project_id, user_id = payload.get("project_id"), payload.get("user_id")
+    if not (project_id and user_id):
+        return {"persisted": False, "reason": "persist requested but project_id/user_id missing"}
+    settings = get_settings()
+    if not (settings.supabase_url and settings.supabase_service_role_key):
+        return {"persisted": False, "reason": "supabase not configured"}
+    chapter_number = int(payload.get("chapter_number") or 0)
+    title = str(payload.get("title") or ctx.get("title") or "Untitled")
+    genre = str(ctx.get("genre_slug") or payload.get("genre_slug") or "")
+    try:
+        from writer_engine.persist_helpers import persist_bible, persist_chapter
+        from writer_engine.supabase.client import get_supabase_admin
+
+        client = await get_supabase_admin()
+        content_id = await persist_chapter(
+            client, project_id=str(project_id), user_id=str(user_id), chapter_number=chapter_number,
+            title=f"{title} — Chapter {chapter_number}", content_text=out.content_text, genre_slug=genre,
+            metadata={"chapter_run_id": str(out.chapter_run_id), "word_count": out.word_count,
+                      "sub_chapter_count": out.sub_chapter_count, "craft_qa": out.craft_qa},
+        )
+        bible = await _op_extract_bible({"content_text": out.content_text})
+        added = await persist_bible(
+            client, project_id=str(project_id), user_id=str(user_id),
+            entries=bible.get("entries") or [], chapter_number=chapter_number,
+        )
+        return {"persisted": True, "content_id": content_id, "bible_entries": added}
+    except Exception as exc:
+        return {"persisted": False, "error": str(exc)[:200]}
 
 
 _DIM_TO_SEEDS = {

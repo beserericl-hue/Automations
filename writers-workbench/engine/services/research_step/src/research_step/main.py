@@ -119,7 +119,38 @@ async def _op_run(payload: dict) -> dict:
     ]
     report = await _synthesize(req.topic, qa, characters)
     row = ResearchReportRow(id=uuid4(), topic=req.topic, questions=questions, report_markdown=report)
-    return {"row": row.model_dump(mode="json"), "qa": qa}
+    persisted = await _persist_research_if_requested(payload, req.topic, report, genre)
+    return {"row": row.model_dump(mode="json"), "qa": qa, "persist": persisted}
+
+
+async def _persist_research_if_requested(
+    payload: dict, topic: str, report: str, genre: str
+) -> dict | None:
+    """CR-001 (W5): when `persist` + user_id are supplied, save the report to research_reports_v2."""
+    from writer_engine.config import get_settings
+
+    if not payload.get("persist"):
+        return None
+    user_id = payload.get("user_id")
+    project_id = payload.get("project_id")
+    if not user_id:
+        return {"persisted": False, "reason": "persist requested but user_id missing"}
+    settings = get_settings()
+    if not (settings.supabase_url and settings.supabase_service_role_key):
+        return {"persisted": False, "reason": "supabase not configured"}
+    try:
+        from writer_engine.persist_helpers import persist_research
+        from writer_engine.supabase.client import get_supabase_admin
+
+        client = await get_supabase_admin()
+        labelled = f"[project {project_id}] {topic}" if project_id else topic
+        rid = await persist_research(
+            client, project_id=str(project_id) if project_id else None, user_id=str(user_id),
+            topic=labelled, content=report, genre_slug=genre,
+        )
+        return {"persisted": bool(rid), "research_id": rid}
+    except Exception as exc:
+        return {"persisted": False, "error": str(exc)[:200]}
 
 
 OPS = {"run": _op_run}
