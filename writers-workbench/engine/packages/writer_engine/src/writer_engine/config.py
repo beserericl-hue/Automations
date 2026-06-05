@@ -67,6 +67,13 @@ class EngineSettings(BaseSettings):
     # DEFAULT_LIMITS in writer_engine.rate_limit.anthropic_budget. Set to override per env/tier.
     anthropic_tier: str = Field(default="", alias="ANTHROPIC_TIER")
     anthropic_budget_overrides: str = Field(default="", alias="ANTHROPIC_BUDGET_OVERRIDES")
+    # Scaling (CR-003): per-INSTANCE cap on simultaneous in-flight LLM calls (sized so one engine
+    # instance handles ~10 concurrent users without oversubscribing). Horizontal scale = add
+    # instances; the Redis-shared AnthropicBudget keeps all instances under the account-wide limit.
+    max_concurrent_llm: int = Field(default=12, alias="MAX_CONCURRENT_LLM")
+    llm_budget_max_wait_s: float = Field(default=300.0, alias="LLM_BUDGET_MAX_WAIT_S")
+    # 429 backstop: how many times the Anthropic SDK retries with exponential backoff + retry-after.
+    anthropic_max_retries: int = Field(default=5, alias="ANTHROPIC_MAX_RETRIES")
 
     # Postal delivery defaults (F1-A prereq #1 — PostalClient cc/bcc/sender/reply_to/headers).
     postal_sender: str = Field(default="", alias="POSTAL_SENDER")

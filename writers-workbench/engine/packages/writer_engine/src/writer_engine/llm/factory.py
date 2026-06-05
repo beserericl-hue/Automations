@@ -10,12 +10,22 @@ _router: LLMRouter | None = None
 
 
 def get_router(service: str = "writer-engine") -> LLMRouter:
-    """Return a singleton router with every adapter we have an API key for. Missing keys → adapter skipped."""
+    """Return a singleton router with every adapter we have an API key for. Missing keys → adapter skipped.
+
+    Built with the Redis-shared Anthropic budget + a per-instance concurrency cap so multi-user /
+    multi-instance load stays under the account rate limit (CR-003 scaling).
+    """
     global _router
     if _router is not None:
         return _router
-    router = LLMRouter()
     settings = get_settings()
+    from writer_engine.rate_limit import AnthropicBudget
+
+    router = LLMRouter(
+        budget=AnthropicBudget(),  # no-op when REDIS_URL is unset (local / tests)
+        max_concurrent=settings.max_concurrent_llm,
+        budget_max_wait_s=settings.llm_budget_max_wait_s,
+    )
     if settings.anthropic_api_key:
         from .anthropic_client import AnthropicAdapter
 
