@@ -757,14 +757,20 @@ async def _persist_chapter_if_requested(
             metadata={"chapter_run_id": str(out.chapter_run_id), "word_count": out.word_count,
                       "sub_chapter_count": out.sub_chapter_count, "craft_qa": out.craft_qa},
         )
+    except Exception as exc:
+        return {"persisted": False, "error": str(exc)[:200]}
+    # Bible extraction/persist is a SEPARATE best-effort step — a failure here must NOT mask the
+    # chapter persist that already succeeded above.
+    bible_info: dict = {"bible_entries": 0}
+    try:
         bible = await _op_extract_bible({"content_text": out.content_text})
-        added = await persist_bible(
+        bible_info["bible_entries"] = await persist_bible(
             client, project_id=str(project_id), user_id=str(user_id),
             entries=bible.get("entries") or [], chapter_number=chapter_number,
         )
-        return {"persisted": True, "content_id": content_id, "bible_entries": added}
     except Exception as exc:
-        return {"persisted": False, "error": str(exc)[:200]}
+        bible_info["bible_error"] = str(exc)[:200]
+    return {"persisted": True, "content_id": content_id, **bible_info}
 
 
 _DIM_TO_SEEDS = {
