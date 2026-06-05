@@ -43,20 +43,37 @@ def _arc_block(arc: str) -> str:
     return f"STORY ARC: {arc}. Structure the chapter beats along this arc's points." if arc else ""
 
 
-def _build_story_system(genre: str, arc: str, title: str = "") -> str:
+def _build_story_system(
+    genre: str, arc: str, title: str = "", target_chapters: int = 0, locked_synopsis: str = ""
+) -> str:
     """Pure: outline system = prime directive + genre + arc + plot/character seeds + outline gate.
 
     Locks the working title (a benchmark project's title must never be renamed) and demands a single
-    coherent, explicitly-named story arc that every chapter is tagged against.
+    coherent, explicitly-named story arc that every chapter is tagged against. When a target chapter
+    count or locked synopsis is supplied (CR-002 anti-drift), the outline must match them so a project
+    doesn't drift in scale or premise from one generation to the next.
     """
     title_lock = (
         f'TITLE LOCK — the work is titled "{title}". Use this EXACT title in the `title` field. '
         "Do NOT invent, translate, or 'improve' the title.\n\n" if title else ""
     )
+    anchor = ""
+    if target_chapters:
+        anchor += (
+            f"CHAPTER-COUNT ANCHOR — this project is established at ~{target_chapters} chapters. "
+            f"Produce within ±3 of {target_chapters}. Do NOT drift the scale (no jumping to a much "
+            "smaller or larger count).\n"
+        )
+    if locked_synopsis:
+        anchor += (
+            f"LOCKED SYNOPSIS — preserve this premise; do not change the story's core:\n{locked_synopsis}\n"
+        )
+    if anchor:
+        anchor = "\n" + anchor + "\n"
     return compose_craft_system(
         seed_keys=_STORY_SEEDS, genre_block=_genre_block(genre), arc_block=_arc_block(arc)
     ) + (
-        "\n\n" + title_lock +
+        "\n\n" + title_lock + anchor +
         "Produce the novel outline as strict JSON matching StoryOutline (title, premise, themes, "
         "story_arc_name, dramatic_question, wow_factor, characters, chapters).\n\n"
         "SCALE — this is a full-length novel, not a short story (Follett-scale). Requirements:\n"
@@ -116,11 +133,41 @@ async def _persist_outline_if_requested(payload: dict, outline_dict: dict) -> di
         return {"persisted": False, "error": str(exc)[:200]}
 
 
+async def _load_project_anchor(payload: dict) -> tuple[int, str]:
+    """CR-002: the project canon to anchor a (re)generation — target chapter count + locked synopsis.
+    Explicit payload values win; otherwise read the project's chapter_count + outline.premise so a
+    re-brainstorm of an established project doesn't drift in scale or premise."""
+    target = int(payload.get("target_chapter_count") or 0)
+    synopsis = str(payload.get("locked_synopsis") or "")
+    project_id = payload.get("project_id")
+    if (target and synopsis) or not project_id:
+        return target, synopsis
+    settings = get_settings()
+    if not (settings.supabase_url and settings.supabase_service_role_key):
+        return target, synopsis
+    try:
+        from writer_engine.supabase.client import get_supabase_admin
+
+        client = await get_supabase_admin()
+        resp = await (
+            client.table("writing_projects_v2").select("chapter_count,outline")
+            .eq("id", str(project_id)).limit(1).execute()
+        )
+        rows = list(getattr(resp, "data", None) or [])
+        if rows:
+            target = target or int(rows[0].get("chapter_count") or 0)
+            synopsis = synopsis or str((rows[0].get("outline") or {}).get("premise") or "")
+    except Exception:
+        pass
+    return target, synopsis
+
+
 async def _op_story(payload: dict) -> dict:
     genre = str(payload.get("genre") or payload.get("genre_slug") or "")
     arc = str(payload.get("story_arc") or payload.get("story_arc_name") or "")
     title = str(payload.get("title") or "")
     requirements = str(payload.get("requirements") or payload.get("premise") or payload.get("title") or "")
+    target_chapters, locked_synopsis = await _load_project_anchor(payload)
     router = get_router(service=STEP_NAME)
     title_line = f'TITLE (use EXACTLY, do not rename): "{title}"\n\n' if title else ""
     try:
@@ -128,7 +175,7 @@ async def _op_story(payload: dict) -> dict:
             router,
             provider="anthropic",
             model=get_settings().model_default,
-            system=_build_story_system(genre, arc, title),
+            system=_build_story_system(genre, arc, title, target_chapters, locked_synopsis),
             prompt=f"{title_line}PROJECT REQUIREMENTS:\n{requirements}\n\nGenerate the full outline.",
             schema=StoryOutline,
             # A 50-70 chapter Follett-scale outline needs >16k tokens; STREAM it so it neither

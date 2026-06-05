@@ -59,6 +59,35 @@ async def persist_outline(
         .eq("id", project_id)
         .execute()
     )
+    await persist_canon(client, project_id=project_id, user_id=user_id, outline=outline)
+
+
+async def persist_canon(client: Any, *, project_id: str, user_id: str, outline: dict) -> None:
+    """CR-002: write/update the project's 'Series Bible' canon entry in story_bible_v2 — the synopsis,
+    target chapter count, and arc, alongside the character entries. Best-effort; a failure here never
+    blocks the outline persist."""
+    chapter_count = len(outline.get("chapters") or [])
+    desc = (
+        f"SYNOPSIS: {outline.get('premise') or ''}\n"
+        f"STORY ARC: {outline.get('story_arc_name') or ''}\n"
+        f"TARGET CHAPTER COUNT: {chapter_count}\n"
+        f"DRAMATIC QUESTION: {outline.get('dramatic_question') or ''}"
+    )
+    row = {"user_id": user_id, "project_id": project_id, "entry_type": "concept",
+           "name": "Series Bible", "description": desc}
+    try:
+        existing = await (
+            client.table("story_bible_v2").select("id")
+            .eq("project_id", project_id).eq("entry_type", "concept").eq("name", "Series Bible")
+            .limit(1).execute()
+        )
+        rows = await _rows(existing)
+        if rows:
+            await client.table("story_bible_v2").update(row).eq("id", rows[0]["id"]).execute()
+        else:
+            await client.table("story_bible_v2").insert(row).execute()
+    except Exception:
+        pass
 
 
 async def persist_chapter(

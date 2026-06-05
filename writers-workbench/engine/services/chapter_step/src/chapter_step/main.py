@@ -411,6 +411,17 @@ def _chapter_outline_beat(outline: dict[str, Any], chapter_number: int) -> str:
     return "(no matching outline entry — check against premise + arc)"
 
 
+def _outline_chapter_title(outline: dict[str, Any], chapter_number: int) -> str:
+    """The chapter's title from the outline (e.g. 'Prologue: What the Ground Keeps'), or '' if none."""
+    chapters = (outline or {}).get("chapters") or []
+    for ch in chapters:
+        if isinstance(ch, dict) and str(ch.get("chapter_number")) == str(chapter_number) and ch.get("title"):
+            return str(ch["title"])
+    if 0 <= chapter_number < len(chapters) and isinstance(chapters[chapter_number], dict):
+        return str(chapters[chapter_number].get("title") or "")
+    return ""
+
+
 def _arc_summary(outline: dict[str, Any]) -> str:
     o = outline or {}
     return " ".join(
@@ -744,8 +755,14 @@ async def _persist_chapter_if_requested(
     if not (settings.supabase_url and settings.supabase_service_role_key):
         return {"persisted": False, "reason": "supabase not configured"}
     chapter_number = int(payload.get("chapter_number") or 0)
-    title = str(payload.get("title") or ctx.get("title") or "Untitled")
+    project_title = str(payload.get("title") or ctx.get("title") or "Untitled")
     genre = str(ctx.get("genre_slug") or payload.get("genre_slug") or "")
+    # CR-002 W3: store the chapter under its OUTLINE title (e.g. "Prologue: What the Ground Keeps"),
+    # not a generic "Project — Chapter N", so the UI lists meaningful titles. Fall back to a numbered
+    # title only when the outline has no entry for this chapter.
+    chapter_title = _outline_chapter_title(ctx.get("outline") or {}, chapter_number) or (
+        f"{project_title} — Chapter {chapter_number}"
+    )
     try:
         from writer_engine.persist_helpers import persist_bible, persist_chapter
         from writer_engine.supabase.client import get_supabase_admin
@@ -753,7 +770,7 @@ async def _persist_chapter_if_requested(
         client = await get_supabase_admin()
         content_id = await persist_chapter(
             client, project_id=str(project_id), user_id=str(user_id), chapter_number=chapter_number,
-            title=f"{title} — Chapter {chapter_number}", content_text=out.content_text, genre_slug=genre,
+            title=chapter_title, content_text=out.content_text, genre_slug=genre,
             metadata={"chapter_run_id": str(out.chapter_run_id), "word_count": out.word_count,
                       "sub_chapter_count": out.sub_chapter_count, "craft_qa": out.craft_qa},
         )
