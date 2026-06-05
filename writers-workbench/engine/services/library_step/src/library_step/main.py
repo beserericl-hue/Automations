@@ -48,11 +48,21 @@ async def _op_retrieve(payload: dict) -> dict:
     client = await _supabase_or_none()
     if client is None:
         return {"items": [], "fixture": True}
-    q = client.table("published_content_v2").select("id,title,status,content_type,project_id,created_at")
+    q = client.table("published_content_v2").select(
+        "id,title,status,content_type,project_id,chapter_number,created_at"
+    )
+    # project_id scopes the query to one project (the UI's project view); content_type narrows it
+    # (e.g. just chapters). When a project_id is given, order by chapter so the UI lists them in order.
+    if payload.get("project_id"):
+        q = q.eq("project_id", payload["project_id"])
     if payload.get("user_id"):
         q = q.eq("user_id", payload["user_id"])
+    if payload.get("content_type"):
+        q = q.eq("content_type", payload["content_type"])
     if payload.get("status"):
         q = q.eq("status", payload["status"])
+    if payload.get("project_id"):
+        q = q.order("chapter_number", desc=False)
     resp = await q.limit(int(payload.get("limit") or 50)).execute()
     return {"items": getattr(resp, "data", None) or []}
 
