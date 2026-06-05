@@ -58,3 +58,19 @@ def test_brainstorm_locks_title() -> None:
     assert "The Burial Mound" in s
     # no title -> no lock block
     assert "TITLE LOCK" not in _build_story_system("ancient-history", "")
+
+
+def test_qa_tolerates_null_outline_follows_guide() -> None:
+    # the EXACT live failure: model returned outline_follows_guide=null -> used to discard the whole QA
+    from writer_engine.schemas.chapter import ChapterCraftQa
+
+    qa = ChapterCraftQa.model_validate({
+        "character_follows_guide": 0.82, "outline_follows_guide": None, "dialogue_follows_guide": 0.81,
+        "prose_transparent": 0.78, "story_turn_density": 0.72, "no_boring_paragraphs": 0.71,
+        "period_language_ok": 0.88, "character_consistency": 0.85,
+    })
+    assert qa.outline_follows_guide == 1.0  # null -> default, not a validation failure
+    assert qa.character_consistency == 0.85  # the real scores survive
+    # missing dim + "N/A" string also default instead of failing
+    qa2 = ChapterCraftQa.model_validate({"dialogue_follows_guide": "N/A"})
+    assert qa2.dialogue_follows_guide == 1.0

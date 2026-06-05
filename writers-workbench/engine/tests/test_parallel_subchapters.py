@@ -42,7 +42,7 @@ def test_write_subchapter_plan_context_path_reaches_llm() -> None:
             prior_tail="", chapter_number=1, model="claude-sonnet-4-6",
             plan_context="CHAPTER PLAN ...",
         ))
-        assert isinstance(res, str)  # a provider IS configured -> returned prose
+        assert isinstance(res, tuple) and isinstance(res[0], str)  # (prose, cache_read, cache_write)
     except ProviderNotRegistered:
         pass  # no provider -> reached the LLM call via the plan-context branch (expected)
 

@@ -41,6 +41,9 @@ class WriteChapterResponse(BaseModel):
     research_gaps_filled: list[str] = Field(default_factory=list)  # research topics grounded at write-time
     research_facts: str = ""  # the period facts / local color woven into the chapter as written
     sub_chapter_briefs: list[dict[str, object]] = Field(default_factory=list)  # the chapter's sub-beats
+    # Prompt-cache effectiveness across the sub-chapter calls (high cache_read vs input = caching works).
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
 
 
 class SubChapterBrief(BaseModel):
@@ -154,15 +157,18 @@ class ChapterCraftQa(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    character_follows_guide: float = Field(ge=0.0, le=1.0)
-    outline_follows_guide: float = Field(ge=0.0, le=1.0)
-    dialogue_follows_guide: float = Field(ge=0.0, le=1.0)
-    prose_transparent: float = Field(ge=0.0, le=1.0)
-    story_turn_density: float = Field(ge=0.0, le=1.0)
-    no_boring_paragraphs: float = Field(ge=0.0, le=1.0)
-    period_language_ok: float = Field(ge=0.0, le=1.0)
-    # Do the characters stay consistent with the established roster/bible (names, traits, relationships,
-    # voice)? Defaults present so a model that omits it doesn't fail the whole QA.
+    # Every dimension defaults to 1.0 ("not flagged"): the model intermittently returns `null` for a
+    # dimension it can't assess (e.g. outline_follows_guide when the QA prompt has no outline to
+    # compare against). A single null used to fail the WHOLE QA (required float, None disallowed) ->
+    # _score_chapter swallowed it -> craft_qa: null. The validator now coerces null/missing/non-numeric
+    # to the default so one un-assessable dimension never discards the rest of the scores.
+    character_follows_guide: float = Field(default=1.0, ge=0.0, le=1.0)
+    outline_follows_guide: float = Field(default=1.0, ge=0.0, le=1.0)
+    dialogue_follows_guide: float = Field(default=1.0, ge=0.0, le=1.0)
+    prose_transparent: float = Field(default=1.0, ge=0.0, le=1.0)
+    story_turn_density: float = Field(default=1.0, ge=0.0, le=1.0)
+    no_boring_paragraphs: float = Field(default=1.0, ge=0.0, le=1.0)
+    period_language_ok: float = Field(default=1.0, ge=0.0, le=1.0)
     character_consistency: float = Field(default=1.0, ge=0.0, le=1.0)
     # Places the chapter asserts a historical/period fact that should be researched/verified, or where
     # a researched detail would deepen the scene. Each: a short phrase. Drives "add research if needed".
@@ -203,8 +209,13 @@ class ChapterCraftQa(BaseModel):
                 out.setdefault(k, v)
         for dim in dims:
             v = out.get(dim)
-            if isinstance(v, (int, float)) and v > 1:
-                out[dim] = round(v / 100.0, 3)
+            if isinstance(v, bool) or not isinstance(v, (int, float)):
+                # null / "N/A" / missing / a bool: the model couldn't (or wouldn't) score this
+                # dimension — drop it so the field's default (1.0 = not flagged) applies instead of
+                # failing the whole QA.
+                out.pop(dim, None)
+            elif v > 1:
+                out[dim] = round(v / 100.0, 3)  # 0-100 scale -> 0-1
         return out
 
 
