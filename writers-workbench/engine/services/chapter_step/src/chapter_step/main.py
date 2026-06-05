@@ -1076,12 +1076,40 @@ async def _op_extract_bible(payload: dict) -> dict:
             schema=BibleExtract, max_tokens=4096,
         )
         entries = [e.model_dump(mode="json") for e in extract.entries]
-        return {"entries": entries, "added": len(entries)}
+        persisted = await _persist_bible_if_requested(payload, entries)
+        return {"entries": entries, "added": len(entries), "persist": persisted}
     except ProviderNotRegistered:
         entries = [BibleEntry(entry_type="character", name="(fixture)", description="no LLM provider").model_dump(mode="json")]
         return {"entries": entries, "added": len(entries)}
     except ValueError:
         return {"entries": [], "added": 0, "note": "extract-bible JSON could not be parsed"}
+
+
+async def _persist_bible_if_requested(payload: dict, entries: list[dict]) -> dict | None:
+    """CR-001 (W4): when `persist` + project_id + user_id are supplied, save extracted bible entries
+    to story_bible_v2. Lets extract-bible double as a bible backfill for already-written chapters."""
+    from writer_engine.config import get_settings
+
+    if not payload.get("persist"):
+        return None
+    project_id, user_id = payload.get("project_id"), payload.get("user_id")
+    if not (project_id and user_id):
+        return {"persisted": False, "reason": "persist requested but project_id/user_id missing"}
+    settings = get_settings()
+    if not (settings.supabase_url and settings.supabase_service_role_key):
+        return {"persisted": False, "reason": "supabase not configured"}
+    try:
+        from writer_engine.persist_helpers import persist_bible
+        from writer_engine.supabase.client import get_supabase_admin
+
+        client = await get_supabase_admin()
+        added = await persist_bible(
+            client, project_id=str(project_id), user_id=str(user_id), entries=entries,
+            chapter_number=payload.get("chapter_number"),
+        )
+        return {"persisted": True, "bible_entries": added}
+    except Exception as exc:
+        return {"persisted": False, "error": str(exc)[:200]}
 
 
 async def _op_format_kindle(payload: dict) -> dict:
