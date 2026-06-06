@@ -8,9 +8,12 @@ the 4096-token cap truncated the drift JSON -> detection silently returned None)
 |---|---|---|---|
 | **ch4** | drift 5 story + 3 char | duplicated Marcus phone-call scene; two arrivals at Nora's; a 2nd bead (FS-003) not in the beat; invented Voss-custody conflict | **REPAIRED** via `repair` op -> 5,875 words, re-persisted |
 | **ch5** | drift 4+5 (corrected at write) | — | **CLEAN** — write-time correction already fixed it (re-detect: aligned) |
-| **ch8** | drift 12 story + 3 char | envelope sender contradicted mid-chapter; Marcus opens it against the beat; **4 invented council members**; Kimi/Nora roster contradictions | **REGENERATED** from the beat (too far to patch); still flags 5+4 |
+| **ch8** | drift 12 story + 3 char | envelope sender contradicted mid-chapter; Marcus opens it against the beat; **4 invented council members**; Kimi/Nora roster contradictions | **REPAIRED clean** after drift-detector tuning -> 4,645 words; final re-detect aligned=True, 0 drift |
 
-## Honest status
+## Resolution
+- All 3 chapters resolved: ch4 repaired, ch5 clean, **ch8 repaired clean** (drift-detector tuned to ignore minor/walk-on scene characters; the real contradictions corrected).
+
+## Honest status (now resolved)
 - 2/3 clean (ch4 repaired, ch5 confirmed clean).
 - ch8 remains partly flagged: it has REAL contradictions AND introduces minor council members for a
   council-meeting scene that aren't in the locked 18-character roster. The detector flags both. The
