@@ -38,9 +38,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from writer_engine.redis_client import client as _redis_module
+from writer_engine.telemetry.logging import get_logger
 
 if TYPE_CHECKING:
     import redis.asyncio as redis
+
+logger = get_logger("rate_limit.anthropic_budget")
 
 
 class BudgetExhausted(RuntimeError):
@@ -76,7 +79,7 @@ class AnthropicBudget:
     def __init__(
         self,
         *,
-        redis_client: "redis.Redis | None" = None,
+        redis_client: redis.Redis | None = None,
         limits: dict[str, ModelLimits] | None = None,
         key_prefix: str = "engine:llm-budget:anthropic",
     ) -> None:
@@ -87,7 +90,7 @@ class AnthropicBudget:
     def limits_for(self, model: str) -> ModelLimits:
         return self._limits.get(model, _DEFAULT_UNKNOWN)
 
-    async def _client(self) -> "redis.Redis | None":
+    async def _client(self) -> redis.Redis | None:
         if self._redis is not None:
             return self._redis
         try:
@@ -98,7 +101,7 @@ class AnthropicBudget:
     def _key(self, model: str, kind: str) -> str:
         return f"{self._prefix}:{model}:{kind}"
 
-    async def _current(self, client: "redis.Redis", model: str, kind: str) -> int:
+    async def _current(self, client: redis.Redis, model: str, kind: str) -> int:
         key = self._key(model, kind)
         now = time.time()
         cutoff = now - _WINDOW_S
@@ -129,7 +132,9 @@ class AnthropicBudget:
         if client is None:
             return
         limits = self.limits_for(model)
-        deadline = time.time() + max_wait_s
+        start = time.time()
+        deadline = start + max_wait_s
+        stalled = False
         while True:
             in_used = await self._current(client, model, "input")
             out_used = await self._current(client, model, "output")
@@ -139,8 +144,25 @@ class AnthropicBudget:
                 and out_used + output_tokens <= limits.output_tpm
                 and req_used + 1 <= limits.rpm
             ):
+                if stalled:
+                    # We queued for TPM/RPM headroom and then got it — this is "queued", not "hung".
+                    logger.info("budget.capacity_granted", model=model,
+                                waited_s=round(time.time() - start, 1),
+                                in_used=in_used, out_used=out_used, req_used=req_used)
                 return
+            if not stalled:
+                # First time we couldn't proceed: log WHICH limit is the bottleneck under load.
+                stalled = True
+                logger.info(
+                    "budget.stall", model=model,
+                    in_used=in_used, in_limit=limits.input_tpm,
+                    out_used=out_used, out_limit=limits.output_tpm,
+                    req_used=req_used, req_limit=limits.rpm,
+                    want_in=input_tokens, want_out=output_tokens, max_wait_s=max_wait_s,
+                )
             if time.time() >= deadline:
+                logger.warning("budget.exhausted", model=model, waited_s=round(time.time() - start, 1),
+                               in_used=in_used, out_used=out_used, req_used=req_used)
                 raise BudgetExhausted(
                     f"Anthropic budget exhausted for {model} after {max_wait_s:.1f}s "
                     f"(in={in_used}/{limits.input_tpm}, out={out_used}/{limits.output_tpm}, "

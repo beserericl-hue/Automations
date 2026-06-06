@@ -30,8 +30,10 @@ from writer_engine.schemas.chapter import (
     WriteChapterResponse,
 )
 from writer_engine.step_service import build_step_app
+from writer_engine.telemetry.logging import get_logger
 
 STEP_NAME = "chapter"
+logger = get_logger(STEP_NAME)
 seed_default_prompts()
 
 # Craft seeds composed into a chapter WRITE (the load-bearing scene/prose/character guidance).
@@ -544,12 +546,18 @@ async def _chapter_research(beat: str, *, period: str, title: str) -> tuple[str,
             provider="perplexity", model="sonar-pro", system=None, prompt=shape, max_tokens=2048,
         )
     except ProviderNotRegistered:
+        logger.warning("chapter.research.no_provider", reason="perplexity not registered")
         return "", []
-    except Exception:
+    except Exception as exc:
+        # The Piscataway-blindness path: if grounding fails the chapter still writes, but UNRESEARCHED.
+        # Must be visible, not a silent empty-string.
+        logger.warning("chapter.research.failed", error=str(exc)[:200], beat=str(beat)[:120])
         return "", []
     facts = resp.text.strip()
     if resp.citations:
         facts += "\n\nSOURCES: " + "; ".join(resp.citations[:8])
+    logger.info("chapter.research.ok", topics=len(_facts_topics(facts)), chars=len(facts),
+                citations=len(resp.citations or []))
     return facts, _facts_topics(facts)
 
 
@@ -775,27 +783,31 @@ async def _op_write(payload: dict) -> dict:
     except ProviderNotRegistered:
         out = _fixture_chapter(req)
     result = out.model_dump(mode="json")
-    result["persist"] = await _persist_chapter_if_requested(payload, ctx, out)
+    result["persist"] = await _persist_chapter_if_requested(payload, ctx, out, model=model)
     return result
 
 
 async def _persist_chapter_if_requested(
-    payload: dict, ctx: dict[str, Any], out: WriteChapterResponse
+    payload: dict, ctx: dict[str, Any], out: WriteChapterResponse, model: str = ""
 ) -> dict | None:
-    """CR-001 (W3+W4): when `persist` + project_id + user_id are supplied, save the chapter to
-    published_content_v2 (+ a content_versions_v2 snapshot, idempotent on project+chapter_number) and
-    extract + upsert its story-bible entries. Best-effort — never breaks generation."""
+    """CR-001 (W3+W4) + CR-005: when `persist` + project_id + user_id are supplied, save the chapter to
+    published_content_v2 (+ content_versions_v2 snapshot, idempotent on project+chapter_number), extract
+    + upsert its story-bible entries, persist write-time research to research_reports_v2 + the story
+    bible, and write a per-run telemetry row to chapter_qa_v2 (drift + QA + research/bible usage).
+    Best-effort — never breaks generation, and every swallowed failure is logged (no silent OK)."""
     from writer_engine.config import get_settings
 
     if not payload.get("persist"):
         return None
     project_id, user_id = payload.get("project_id"), payload.get("user_id")
+    chapter_number = int(payload.get("chapter_number") or 0)
     if not (project_id and user_id):
+        logger.warning("chapter.persist.skip", reason="missing project_id/user_id", chapter=chapter_number)
         return {"persisted": False, "reason": "persist requested but project_id/user_id missing"}
     settings = get_settings()
     if not (settings.supabase_url and settings.supabase_service_role_key):
+        logger.warning("chapter.persist.skip", reason="supabase not configured", chapter=chapter_number)
         return {"persisted": False, "reason": "supabase not configured"}
-    chapter_number = int(payload.get("chapter_number") or 0)
     project_title = str(payload.get("title") or ctx.get("title") or "Untitled")
     genre = str(ctx.get("genre_slug") or payload.get("genre_slug") or "")
     # CR-002 W3: store the chapter under its OUTLINE title (e.g. "Prologue: What the Ground Keeps"),
@@ -805,7 +817,7 @@ async def _persist_chapter_if_requested(
         f"{project_title} — Chapter {chapter_number}"
     )
     try:
-        from writer_engine.persist_helpers import persist_bible, persist_chapter
+        from writer_engine.persist_helpers import persist_chapter
         from writer_engine.supabase.client import get_supabase_admin
 
         client = await get_supabase_admin()
@@ -813,21 +825,86 @@ async def _persist_chapter_if_requested(
             client, project_id=str(project_id), user_id=str(user_id), chapter_number=chapter_number,
             title=chapter_title, content_text=out.content_text, genre_slug=genre,
             metadata={"chapter_run_id": str(out.chapter_run_id), "word_count": out.word_count,
-                      "sub_chapter_count": out.sub_chapter_count, "craft_qa": out.craft_qa},
+                      "sub_chapter_count": out.sub_chapter_count, "craft_qa": out.craft_qa,
+                      "drift_report": out.drift_report},
         )
     except Exception as exc:
+        logger.exception("chapter.persist.failed", chapter=chapter_number, project=str(project_id))
         return {"persisted": False, "error": str(exc)[:200]}
     # Bible extraction/persist is a SEPARATE best-effort step — a failure here must NOT mask the
     # chapter persist that already succeeded above.
     bible_info: dict = {"bible_entries": 0}
     try:
+        from writer_engine.persist_helpers import persist_bible
+
         bible = await _op_extract_bible({"content_text": out.content_text})
         bible_info["bible_entries"] = await persist_bible(
             client, project_id=str(project_id), user_id=str(user_id),
             entries=bible.get("entries") or [], chapter_number=chapter_number,
         )
     except Exception as exc:
+        logger.warning("chapter.bible.failed", chapter=chapter_number, error=str(exc)[:200])
         bible_info["bible_error"] = str(exc)[:200]
+
+    # CR-005: write-time research closure — persist the facts woven into this chapter to the research
+    # report AND the story bible, so "any research is in the research report and the story bible".
+    research_used = out.research_facts or ""
+    if research_used:
+        try:
+            from writer_engine.persist_helpers import persist_bible, persist_research
+
+            await persist_research(
+                client, project_id=str(project_id), user_id=str(user_id),
+                topic=f"{project_title} — Chapter {chapter_number} research", content=research_used,
+                genre_slug=genre,
+            )
+            topics = _facts_topics(research_used)
+            if topics:
+                await persist_bible(
+                    client, project_id=str(project_id), user_id=str(user_id),
+                    entries=[{"entry_type": "research", "name": t, "description": research_used[:500]}
+                             for t in topics[:12]],
+                    chapter_number=chapter_number,
+                )
+            bible_info["research_persisted"] = True
+        except Exception as exc:
+            logger.warning("chapter.research.persist_failed", chapter=chapter_number, error=str(exc)[:200])
+            bible_info["research_error"] = str(exc)[:200]
+
+    # CR-005: per-run telemetry row (drift + QA + research/bible usage) for the project view.
+    bible_loaded = [r.get("name") for r in (ctx.get("roster") or []) if isinstance(r, dict) and r.get("name")]
+    try:
+        from writer_engine.persist_helpers import persist_chapter_qa
+
+        await persist_chapter_qa(
+            client, project_id=str(project_id), user_id=str(user_id), chapter_number=chapter_number,
+            telemetry={
+                "chapter_run_id": str(out.chapter_run_id),
+                "aligned": (out.drift_report or {}).get("aligned") if out.drift_report else None,
+                "drift_report": out.drift_report,
+                "craft_qa": out.craft_qa,
+                "research_used": _facts_topics(research_used) if research_used else [],
+                "bible_entries_loaded": bible_loaded,
+                "word_count": out.word_count,
+                "sub_chapter_count": out.sub_chapter_count,
+                "craft_passes": out.craft_passes,
+                "cache_read_tokens": out.cache_read_tokens,
+                "cache_write_tokens": out.cache_write_tokens,
+                "model": model,
+                "status": "ok",
+            },
+        )
+        bible_info["telemetry"] = True
+    except Exception as exc:
+        logger.warning("chapter.telemetry.failed", chapter=chapter_number, error=str(exc)[:200])
+        bible_info["telemetry_error"] = str(exc)[:200]
+
+    logger.info(
+        "chapter.persisted", chapter=chapter_number, project=str(project_id),
+        word_count=out.word_count, aligned=(out.drift_report or {}).get("aligned") if out.drift_report else None,
+        bible_loaded=len(bible_loaded), bible_written=bible_info["bible_entries"],
+        research=bool(research_used),
+    )
     return {"persisted": True, "content_id": content_id, **bible_info}
 
 
@@ -1136,9 +1213,10 @@ async def _op_repair(payload: dict) -> dict:
     if passes and payload.get("persist"):
         out = WriteChapterResponse(
             chapter_id=uuid4(), chapter_run_id=req.chapter_run_id, content_text=new_text,
-            word_count=len(new_text.split()), sub_chapter_count=0,
+            word_count=len(new_text.split()), sub_chapter_count=0, craft_passes=passes,
+            drift_report=drift.model_dump(mode="json") if drift else None,
         )
-        persist_result = await _persist_chapter_if_requested(payload, ctx, out)
+        persist_result = await _persist_chapter_if_requested(payload, ctx, out, model=model)
     d = drift.model_dump(mode="json") if drift else None
     return {
         "repaired": bool(passes), "content_text": new_text, "word_count": len(new_text.split()),

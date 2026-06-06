@@ -11,6 +11,7 @@ Run with::
 
 from __future__ import annotations
 
+import time
 from typing import Any, ClassVar
 from uuid import UUID, uuid4
 
@@ -19,9 +20,12 @@ from arq.connections import RedisSettings
 from writer_engine.config import get_settings
 from writer_engine.state_machine.durable import RedisSagaRepo
 from writer_engine.state_machine.saga import StepRef, run_step_via_http
+from writer_engine.telemetry.logging import get_logger
 
 from .newsletter_saga import NewsletterSagaDriver
 from .write_tools import WORKER_STEP_TIMEOUT_S, resolve_step_url
+
+logger = get_logger("orchestrator.worker")
 
 
 async def advance_newsletter_saga(_ctx: dict[str, Any], execution_id: str) -> dict[str, str]:
@@ -39,11 +43,29 @@ async def run_write_tool_job(_ctx: dict[str, Any], tool: str, body: dict[str, An
     """
     url = resolve_step_url(tool, get_settings())
     if url is None:
+        logger.error("worker.write_tool.unknown", tool=tool)
         return {"status": "error", "error": {"code": "UNKNOWN_TOOL", "message": tool}}
-    out = await run_step_via_http(
-        StepRef(name=tool, url=url), execution_id=uuid4(), payload=body, timeout_s=WORKER_STEP_TIMEOUT_S
-    )
-    return out.model_dump(mode="json")
+    chapter = body.get("chapter_number")
+    op = body.get("op")
+    logger.info("worker.write_tool.start", tool=tool, op=op, chapter=chapter,
+                project=body.get("project_id") or body.get("project_title"), user_id=body.get("user_id"))
+    started = time.monotonic()
+    try:
+        out = await run_step_via_http(
+            StepRef(name=tool, url=url), execution_id=uuid4(), payload=body,
+            timeout_s=WORKER_STEP_TIMEOUT_S,
+        )
+    except Exception:
+        # arq will retry per max_tries; log so a timeout/crash is attributable to the chapter.
+        logger.exception("worker.write_tool.crashed", tool=tool, op=op, chapter=chapter,
+                         duration_s=round(time.monotonic() - started, 1))
+        raise
+    dumped = out.model_dump(mode="json")
+    status = dumped.get("status")
+    logger.info("worker.write_tool.finish", tool=tool, op=op, chapter=chapter, status=status,
+                duration_s=round(time.monotonic() - started, 1),
+                error=(dumped.get("error") or {}).get("message") if status == "ERROR" else None)
+    return dumped
 
 
 def build_redis_settings() -> RedisSettings:
