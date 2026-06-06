@@ -136,3 +136,11 @@ def test_response_carries_two_cycle_telemetry() -> None:
     assert dumped["drift_report"]["story_drift"] == ["s"]
     assert dumped["research_gaps_filled"] == ["g"]
     assert dumped["sub_chapter_briefs"][0]["pov_character"] == "Tayak"
+
+
+def test_drift_system_allows_minor_scene_characters() -> None:
+    s = _build_drift_system()
+    # the tuning: new minor / walk-on characters are NOT drift
+    assert "minor / walk-on" in s or "walk-on" in s
+    assert "council members at a council meeting" in s
+    assert "NOT drift" in s
