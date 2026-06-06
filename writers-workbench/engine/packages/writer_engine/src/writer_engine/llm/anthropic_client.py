@@ -5,9 +5,12 @@ from __future__ import annotations
 from anthropic import AsyncAnthropic
 
 from writer_engine.config import get_settings
+from writer_engine.telemetry.logging import get_logger
 from writer_engine.telemetry.metrics import LLM_CALLS, LLM_TOKENS
 
 from .router import LLMResponse
+
+logger = get_logger("llm.anthropic")
 
 
 class AnthropicAdapter:
@@ -61,13 +64,23 @@ class AnthropicAdapter:
                     msg = await s.get_final_message()
             else:
                 msg = await self._client.messages.create(**kwargs)  # type: ignore[call-overload]
-        except Exception:
+        except Exception as exc:
             LLM_CALLS.labels(service=self._service, provider=self.provider, model=model, status="error").inc()
+            # 429 / overloaded / network — the root cause of "silent" generation failures. The SDK
+            # already retried max_retries times before this fires, so reaching here is terminal.
+            logger.warning("llm.call_failed", model=model, error_type=type(exc).__name__,
+                           error=str(exc)[:200], stream=stream)
             raise
 
         text = "".join(
             getattr(block, "text", "") for block in msg.content if getattr(block, "type", "") == "text"
         )
+        # finish_reason="max_tokens" means the output was TRUNCATED (root cause of the #142/#144
+        # mid-JSON cutoffs). Surface it so a short/garbled chapter or unparseable JSON is attributable.
+        stop_reason = getattr(msg, "stop_reason", None)
+        if stop_reason == "max_tokens":
+            logger.warning("llm.truncated", model=model, max_tokens=max_tokens, chars=len(text),
+                           stream=stream)
         usage = getattr(msg, "usage", None)
         input_tokens = int(getattr(usage, "input_tokens", 0) or 0)
         output_tokens = int(getattr(usage, "output_tokens", 0) or 0)

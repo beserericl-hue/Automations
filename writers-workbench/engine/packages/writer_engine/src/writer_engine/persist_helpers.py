@@ -178,3 +178,33 @@ async def persist_research(
     )
     rows = await _rows(resp)
     return str(rows[0]["id"]) if rows else ""
+
+
+async def persist_chapter_qa(
+    client: Any, *, project_id: str, user_id: str, chapter_number: int, telemetry: dict
+) -> str:
+    """CR-005 — insert one per-run telemetry row into ``chapter_qa_v2`` (drift report, craft QA,
+    research used, bible entries loaded, generation stats). History model: one row per run, newest
+    by created_at wins in the project view. Best-effort; the caller logs failures."""
+    row = {
+        "user_id": user_id,
+        "project_id": project_id,
+        "chapter_number": chapter_number,
+        "chapter_run_id": telemetry.get("chapter_run_id"),
+        "aligned": telemetry.get("aligned"),
+        "drift_report": telemetry.get("drift_report"),
+        "craft_qa": telemetry.get("craft_qa"),
+        "research_used": telemetry.get("research_used"),
+        "bible_entries_loaded": telemetry.get("bible_entries_loaded"),
+        "word_count": telemetry.get("word_count"),
+        "sub_chapter_count": telemetry.get("sub_chapter_count"),
+        "craft_passes": telemetry.get("craft_passes"),
+        "cache_read_tokens": telemetry.get("cache_read_tokens"),
+        "cache_write_tokens": telemetry.get("cache_write_tokens"),
+        "model": telemetry.get("model"),
+        "status": telemetry.get("status") or "ok",
+        "error": telemetry.get("error"),
+    }
+    resp = await client.table("chapter_qa_v2").insert(row).execute()
+    rows = await _rows(resp)
+    return str(rows[0]["id"]) if rows else ""
