@@ -655,7 +655,15 @@ async def _drift_correct_pass(
         revised = max((revised, retry), key=lambda t: len(t.split()))
     if len(revised.split()) < floor:
         return text, drift, 0  # correction collapsed below the floor — keep the original
-    return revised, drift, 1
+    # Re-scan the CORRECTED text so the reported drift reflects the FINAL state, not the pre-correction
+    # detection. Without this, every chapter that had ANY cycle-1 drift is stored aligned=False even
+    # though cycle 2 fixed it — making the telemetry / project view read ~90% "drifted" when most are
+    # actually clean. The post-correction report is what truly tells us which chapters still need repair.
+    final_drift = await _detect_drift(
+        revised, outline=ctx["outline"], chapter_number=req.chapter_number,
+        roster_text=roster_text, period=period, model=model,
+    )
+    return revised, (final_drift or drift), 1
 
 
 async def _op_write(payload: dict) -> dict:
