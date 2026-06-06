@@ -70,3 +70,78 @@ def test_internal_forwards_to_orchestrator(monkeypatch: pytest.MonkeyPatch) -> N
     body = r.json()
     assert body["status"] == "ok"
     assert body["items"] == [{"id": "x"}]
+
+
+# --------------------------------------------------------------------------- CR-004 hub
+
+def test_hub_requires_service_secret() -> None:
+    client = TestClient(app)
+    r = client.post("/internal/hub", json={"message": "hi"})
+    assert r.status_code == 401
+
+
+def test_hub_conversation_does_not_call_orchestrator() -> None:
+    """Chit-chat routes to a reply with no downstream call (router degrades to heuristic in tests)."""
+    client = TestClient(app)
+    r = client.post(
+        "/internal/hub",
+        json={"message": "hello there", "user_id": "u1"},
+        headers={"x-service-secret": "test-secret"},
+    )
+    assert r.status_code == 200
+    assert r.json()["kind"] == "reply"
+
+
+def _patch_orch(monkeypatch: pytest.MonkeyPatch, capture: dict[str, Any], response_json: dict) -> None:
+    class _Fake:
+        def __init__(self, *a: object, **k: object) -> None:
+            pass
+
+        async def __aenter__(self) -> "_Fake":
+            return self
+
+        async def __aexit__(self, *a: object) -> None:
+            return None
+
+        async def request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
+            capture["url"] = url
+            capture["body"] = kwargs.get("json")
+            return httpx.Response(200, json=response_json)
+
+    monkeypatch.setattr("gateway.routes.internal.httpx.AsyncClient", _Fake)
+
+
+def test_hub_task_enqueues_async_with_persist(monkeypatch: pytest.MonkeyPatch) -> None:
+    cap: dict[str, Any] = {}
+    _patch_orch(monkeypatch, cap, {"job_id": "job-123", "status": "queued", "tool": "chapter"})
+    client = TestClient(app)
+    r = client.post(
+        "/internal/hub",
+        json={"message": "write chapter 5", "user_id": "u1"},
+        headers={"x-service-secret": "test-secret"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["kind"] == "queued" and body["job_id"] == "job-123"
+    assert body["tool"] == "chapter" and body["op"] == "write"
+    # forwarded to the uniform write route, async + persist set
+    assert "/pipelines/write/chapter/run" in cap["url"]
+    assert cap["body"]["async"] is True and cap["body"]["persist"] is True
+    assert cap["body"]["op"] == "write"
+
+
+def test_hub_info_runs_sync_and_returns_data(monkeypatch: pytest.MonkeyPatch) -> None:
+    cap: dict[str, Any] = {}
+    _patch_orch(monkeypatch, cap, {"op": "list-outlines", "result": {"outlines": [{"title": "A"}]}})
+    client = TestClient(app)
+    r = client.post(
+        "/internal/hub",
+        json={"message": "list all my outlines", "user_id": "u1"},
+        headers={"x-service-secret": "test-secret"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["kind"] == "data"
+    assert body["data"]["result"]["outlines"] == [{"title": "A"}]
+    assert "/pipelines/write/library/run" in cap["url"]
+    assert cap["body"]["async"] is False

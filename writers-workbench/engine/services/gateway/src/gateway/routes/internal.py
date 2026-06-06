@@ -9,8 +9,56 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from writer_engine.auth import require_service_secret
 from writer_engine.config import get_settings
+from writer_engine.hub import (
+    HubRequest,
+    HubResponse,
+    build_dispatch_plan,
+    route_message,
+)
 
 router = APIRouter(dependencies=[Depends(require_service_secret)])
+
+
+@router.post("/hub")
+async def hub(body: dict[str, Any]) -> dict[str, Any]:
+    """CR-004 Path B — the engine hub. The UI chat (via the Workbench server) and the Eve voice
+    webhook POST a message here; a Gemini router picks the tool, info ops run synchronously and return
+    data, load-bearing ops are queued (arq, CR-003) and return ``{job_id, status:"queued"}``.
+
+    Accepts both the native ``{message,...}`` shape and the legacy n8n ``{user_message_request, user_id}``
+    shape so the server can forward verbatim (zero front-end change at cutover)."""
+    req = HubRequest(
+        message=body.get("message") or body.get("user_message_request") or "",
+        user_id=body.get("user_id"),
+        conversation_id=body.get("conversation_id"),
+        source=body.get("source") or "chat",
+        context=body.get("context") or {},
+    )
+    decision = await route_message(req)
+    plan = build_dispatch_plan(decision, req)
+
+    if plan.action == "reply":
+        return HubResponse(
+            kind="reply", assistant_message=plan.assistant_message,
+        ).model_dump(mode="json")
+
+    settings = get_settings()
+    url = f"{settings.orchestrator_url}/pipelines/write/{plan.tool}/run"
+
+    if plan.action == "call_sync":
+        data = await _forward("POST", url, json=plan.body, timeout_s=120.0)
+        return HubResponse(
+            kind="data", assistant_message=plan.assistant_message,
+            tool=plan.tool, op=plan.op, data=data,
+        ).model_dump(mode="json")
+
+    # enqueue — heavy generation; orchestrator returns {job_id, status, tool}
+    enq = await _forward("POST", url, json=plan.body, timeout_s=30.0)
+    return HubResponse(
+        kind="queued", assistant_message=plan.assistant_message,
+        tool=plan.tool, op=plan.op,
+        job_id=enq.get("job_id"), status=enq.get("status", "queued"),
+    ).model_dump(mode="json")
 
 
 @router.post("/library/retrieve")

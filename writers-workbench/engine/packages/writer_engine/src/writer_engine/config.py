@@ -57,6 +57,10 @@ class EngineSettings(BaseSettings):
     # Picker model (decision #2)
     picker_model: str = Field(default="gemini-2.5-pro", alias="PICKER_MODEL")
 
+    # Hub router model (CR-004) — fast/cheap Gemini for intent + tool selection, mirroring the n8n
+    # hub's gemini-2.5-flash. Routing is a short structured call, so flash is the right tier.
+    hub_router_model: str = Field(default="gemini-2.5-flash", alias="HUB_ROUTER_MODEL")
+
     # Anthropic model pins (F1-A — see [[f1a-decisions]] § model lineup). Strategy slots resolve to
     # these concrete ids; overridable per-env without code change.
     model_default: str = Field(default="claude-sonnet-4-6", alias="MODEL_DEFAULT")
