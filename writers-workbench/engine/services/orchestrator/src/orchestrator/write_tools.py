@@ -25,8 +25,11 @@ WRITE_TOOL_URLS: dict[str, Callable[[Any], str]] = {
 # Tools whose generation routinely exceeds the synchronous edge limit — default to async.
 ASYNC_DEFAULT_TOOLS = frozenset({"chapter", "brainstorm", "research"})
 
-# Generous per-step timeout for the worker→step call (fan-out chapters can run many minutes).
-WORKER_STEP_TIMEOUT_S = 1800.0
+# Per-step timeout for the worker→step HTTP call. Must be >= the arq job_timeout (5400s) so the HTTP
+# read doesn't die before arq's own ceiling — under 10-concurrent a single chapter's wall-time runs
+# well past 30 min because the batch shares one account's output-TPM. Slightly above job_timeout so
+# arq is the authoritative ceiling, not a mid-flight httpx ReadTimeout.
+WORKER_STEP_TIMEOUT_S = 5460.0
 
 
 def resolve_step_url(tool: str, settings: Any) -> str | None:

@@ -77,11 +77,14 @@ class WorkerSettings:
     functions: ClassVar[list[Any]] = [advance_newsletter_saga, run_write_tool_job]
     queue_name = "newsletter"
     max_jobs = 16
-    # Keep job results long enough for the UI/hub to poll a multi-minute generation.
-    keep_result = 3600
-    # arq's default job_timeout is 300s — too short for a full-novel outline or a 5-sub-chapter
-    # fan-out (10-15 min). Without this, arq kills the job at 300s and retries it forever
-    # (perpetual in_progress -> error). Give heavy write jobs 30 min, and don't re-run expensive
-    # LLM work on a flake more than once.
-    job_timeout = 1800
+    # Keep job results long enough for the UI/hub to poll a long generation (must outlive job_timeout).
+    keep_result = 7200
+    # job_timeout must cover the WORST case, not the solo case. A solo chapter is ~12 min, but under
+    # 10-concurrent the shared Anthropic account output-TPM (90k Sonnet) + the per-process LLM
+    # semaphore serialize ~90 sub-chapter calls across the batch, so a single chapter's wall-time
+    # balloons well past 30 min. At 1800s arq was killing every job at exactly 30 min and retrying
+    # (perpetual timeout->retry, 0 completions). Give heavy write jobs 90 min. MUST stay <= the
+    # worker->step HTTP read timeout (WORKER_STEP_TIMEOUT_S) or the HTTP call dies first.
+    job_timeout = 5400
+    # Don't re-run expensive LLM work on a flake more than once (a real timeout shouldn't loop).
     max_tries = 2

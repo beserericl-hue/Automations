@@ -46,8 +46,8 @@ USER_ID = os.environ.get("USER_ID", "+14105914612")  # eric@agileadtesting.com
 REPO = Path(__file__).resolve().parent.parent
 VAULT = REPO / "knowledgebase" / "Writers Workbench Wiki" / "Workbench-Test-Output-7"
 
-POLL_INTERVAL_S = 15
-JOB_TIMEOUT_S = 2400  # 40 min ceiling per chapter
+POLL_INTERVAL_S = 20
+JOB_TIMEOUT_S = 6300  # poll ceiling per chapter — must exceed the engine job_timeout (5400s)
 
 
 def _req(url: str, *, method: str = "GET", headers: dict | None = None, body: dict | None = None,
