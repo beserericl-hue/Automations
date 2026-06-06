@@ -1,503 +1,495 @@
 # Chapter 8: The Council Meeting [Present — 2024]
 
-*7,747 words · aligned=False · drift=1+5 · craft_passes=0 · cache_read=45096 tokens · persisted to DB (chapter_number 8).*
+*7,130 words · REGENERATED from the outline beat (the original drifted too far to patch). Still flags some drift — partly the council-meeting introducing minor members not in the locked roster. · current in the database.*
 
 ---
 
-The coffeepot had been running since six-thirty, and by seven the small kitchen off the council hall smelled the way Marcus liked it — burnt at the edges, strong enough to taste from the doorway. He poured a mug, didn't drink it, and carried it into the chamber.
+The coffee had been sitting too long. Marcus could smell it from the doorway — that scorched, back-of-the-throat smell that meant the pot had been on the burner since before anyone arrived, which meant someone on the custodial staff had started it as a courtesy and no one had thought to thank them. He crossed the room and turned the burner off.
 
-The room held eight chairs around a horseshoe table, a projection screen at the open end, and photographs of every council chair going back to 1978 arranged along the south wall in matching black frames. Marcus had hung most of those frames himself. He knew the faces the way he knew the faces of his own family — which was to say, with love and with a clear accounting of their failures.
+The community center smelled, underneath the coffee, of institutional carpet and the cedar smoke that clung to everything after last month's winter gathering. The carpet was a blue-grey that had been chosen to hide stains and had succeeded only in making the room look permanently overcast. Marcus set his bag on the presenter's table — a folding six-footer pushed against the east wall, beneath the projector screen — and looked at the room.
 
-He set his mug at the head position and began moving chairs.
+Twelve chairs around the horseshoe table. He counted them, which was unnecessary. He had set them up himself, forty minutes ago, pulling them from the stack against the wall one by one while the fluorescent panels above him flickered to life. He counted them anyway. Twelve chairs, plus his own at the open end. The tribal flag stood to the left of the screen, its colors — the green and white he had grown up with, the design his grandmother had helped choose in 1978 — hanging straight in the still air. The U.S. flag stood to the right. He had always thought it a strange pairing, those two flags in every room, like a photograph of two people who had once been in a fight and were now required to stand together at every family occasion.
 
-The custodian had left them pushed in at odd angles, the way people leave chairs when they don't expect anyone to care. Marcus cared. He squared each one to the table, checked that the microphone cables weren't tangled, straightened the notepad and pen at each seat. It was the kind of work his law professors would have called beneath him. He found it useful. It gave his hands something to do while his mind ran the meeting he hadn't yet called to order.
+He unzipped his bag and took out Tayak's report.
 
-Seven members. Four he could read. Three he couldn't — not today, not on this.
+It was forty-three pages, spiral-bound, printed on paper that still smelled faintly of the toner she'd run through her department's copier at — he checked the timestamp on the cover sheet — eleven forty-seven last night. The cover read *Preliminary Field Assessment, Phase I Cultural Resource Survey, Stratum One: Findings and Recommendations.* Below that, in smaller type: *Dr. Tayak Moyaone, Principal Investigator.* Below that, a site number he had already memorized.
 
-He pulled his own notepad from his jacket pocket and unfolded the page he'd written last night. At the top, underlined twice: *Trade bead. Blue. Venetian. Stratum One. Tayak says pre-1700.*
+He set it on the table in front of his chair. Then he picked it up and set it at the center of the horseshoe instead, where everyone could see it, where it would be the first thing they looked at when they walked in. Then he moved it back in front of his chair, because presenting it as a centerpiece felt like theater, and he was already doing enough theater this evening without the props.
 
-Tayak had called from the site at quarter to five, still in the field, her voice carrying the particular flatness she used when she was trying not to sound excited. *It's small*, she'd said. *Cobalt blue, faceted, about eight millimeters. The kind the Dutch were moving through the Chesapeake in the 1680s and 90s.* A pause. *Marcus, it's in context. Sealed stratum, no disturbance. This isn't someone dropping a bead in the dirt two hundred years later. This is someone putting it there.*
+His hands were not steady.
 
-He had asked her what she needed from the council.
+He noticed this the way you notice something you have been trying not to notice — all at once, with a kind of resignation. He pressed his palms flat on the table surface, felt the cool laminate, and held them there. Outside, a car turned into the parking lot, headlights sweeping briefly across the high windows. Too early for council members. Probably Raymond, who was always early and who would want coffee and would be disappointed about the burner.
 
-*Time*, she said. *Just time.*
+Marcus straightened up and poured himself a cup anyway, from what was left. It was thick and bitter and he drank half of it standing at the side table, looking at the room, thinking about what Tayak had said on the phone.
 
-He wrote that word now at the bottom of his notes. Then he drew a line under it and wrote, in smaller letters: *Delia.*
+*Marcus, it's a bead. A glass trade bead, Dutch manufacture, probably 1680 to 1710.* Her voice had been steady in the way voices get when the person speaking is working hard to keep them that way. *In situ. Stratum One, Unit Three. Wren documented the context. It's clean.*
 
-Elder Delia Swann had been on the council longer than Marcus had been chair. She was seventy-one, soft-spoken in the way that made younger members lean forward to hear her and then regret it, because what she said once said was not soft at all. She had buried her mother, her aunt, and her oldest brother without ceremony — their graves disturbed, their belongings scattered across three different museum collections — and she had spent forty years saying the same thing in council chambers and hearing rooms and BIA waiting rooms: *You do not fix a wound by opening it wider.*
+He had asked the question he always asked. *What does it mean?*
 
-Marcus respected her absolutely. He was also fairly certain she was going to try to shut Tayak down.
+*It means someone was here. Someone we know was here, in that stratum, in that period. It corroborates the oral record.* A pause. *It's the first physical evidence, Marcus.*
 
-He pulled out the second chair from the right — Delia's chair, the one she'd sat in for twenty years — and straightened it with particular care.
+He had sat with that for a moment. Then he had said he would call a special session, and she had said good, and they had hung up, and he had sat at his kitchen table for another twenty minutes before he started making calls.
 
-The projection screen at the far end of the room caught the morning light through the high window and glowed a flat, institutional white. He'd asked Kimi, Tayak's cousin, to send him three images from the site: the bead in situ, the bead cleaned and measured, and a map of the excavation unit showing the stratum depth. Kimi had sent them at eleven the previous night with a message that said *also I posted a teaser on the account and we got 4,000 likes in an hour, just so you know.* Marcus had not replied to that part.
+The trade bead was not in the room. Tayak had kept it at the site, properly logged, photographed, catalogued. What was in the room was forty-three pages of documentation that described it — its dimensions, its color (a deep cobalt, she had written, with a slight surface iridescence from two centuries of soil contact), its provenance, its implications. Marcus had read the report three times on the drive over, which was illegal and which he had done anyway, holding it against the steering wheel at red lights while the wipers dealt with the light rain.
 
-He went to the laptop on the side table, opened Kimi's images, and arranged them in order. The bead in the first photograph was barely visible — a blue point in dark soil, the measuring tape beside it reading 47 centimeters from the datum. In the second photograph, cleaned and held in a gloved palm, it was the color of deep water. Cobalt, Tayak had said. The Dutch had moved that color up every river in the Chesapeake, trading it for furs and goodwill and access, and somewhere in the 1690s a woman had held one just like it and decided it was worth keeping.
+He knew what the elders would say. He knew because he had been in this room for twenty-two years of council meetings and he had watched Eleanor Runningwater's face every time someone mentioned the mound, that particular stillness that was not peace but its opposite — a stillness that was holding something very large very carefully. Eleanor would say the site needed to be closed. She would say it with complete calm and absolute authority, and she would be speaking from a place he respected and could not argue with directly, which was the problem.
 
-Marcus stared at the image for a moment.
+He also knew what the younger members would say. Darius had texted him at six this morning: *this is it right? this is what we've been waiting for?* Three words and a question mark, the entire weight of the recognition petition compressed into a text message. Darius was twenty-nine and had spent four years building the legal framework for the petition and he was not wrong that this was what they had been waiting for. He was also not wrong in a way that would help Marcus tonight.
 
-He thought: *this is the thing that either saves us or splits us in half.*
+The door opened. Raymond came in, shaking rain off his jacket, and looked immediately at the coffee station.
 
-He went back to his office — a narrow room behind the chamber, a metal desk with a computer, two filing cabinets, and a framed map of the Piscataway ancestral territory that his daughter had given him for his fiftieth birthday. The map was old, a reproduction of a 1670 colonial survey, and it showed the land in the way colonial surveyors had seen it: empty, waiting, available. His daughter had framed it anyway because she understood that it was evidence.
+"Burner's off," Marcus said.
 
-He sat down, opened the center drawer, and looked at the envelope inside.
+Raymond looked at the pot, then at Marcus. "How long's it been sitting?"
 
-It had been there for three weeks. Maryland State Historic Preservation Office, return address. His name in the window, no title, which meant it had not gone through the council's general mail but had been sent directly to him. He had not opened it. He had not told anyone it existed.
+"Long enough."
 
-He knew what it probably was. He had been in this work long enough to know what a letter from Slade's office looked like when it arrived before the formal process was finished — when someone wanted a conversation before the conversation became a record.
+Raymond poured himself a cup, looked at it, and drank it anyway. He was sixty-seven years old and had been on the council for nineteen years and he had the particular stubbornness of a man who had decided that the world would not tell him what was drinkable.
 
-He looked at it for four seconds. Then he closed the drawer.
+"You look like you haven't slept," Raymond said.
 
-The copier in the hall started up — someone had arrived. He heard the outer door, then voices, then the particular sound of Elder Delia Swann's cane on the linoleum, three sharp taps and then a pause, the rhythm he'd known for twenty years.
+"I slept."
 
-Marcus picked up his mug, found the coffee cold, and went to meet her.
+"How much?"
 
-He held the door for her. She came in without looking at him, which was how she always came in — not rudeness, just economy. She had things to think about and the doorway was not one of them.
+Marcus picked up the report and straightened the pages that didn't need straightening. "Tayak found a trade bead."
 
-"Delia."
+Raymond set his cup down. He looked at Marcus for a moment with an expression that Marcus couldn't read — or could read too well, which was the same problem.
 
-"Marcus." She took her chair, set her cane against the table's edge, and looked at the projection screen. "That's new."
+"Dutch?" Raymond said.
 
-"Laptop. Kimi sent images from the site."
+"Dutch."
 
-"Kimi." She said the name the way she said most things: flat, precise, withholding judgment until she had more information. "Tayak's cousin."
+Raymond was quiet. The projector fan hummed. Somewhere in the building, a door latched — the security guard making his round, or the custodian coming back for the cart he'd left in the hallway.
 
-"Yes."
-
-"The one with the social media."
-
-"Yes."
-
-Delia looked at the screen a moment longer. Then she opened her folder and began reading, and Marcus went to check on the coffee.
-
----
-
-By nine-fifteen the room had seven people in it. Marcus stood at the front, his notepad on the table beside the laptop, and waited while the Tribal Secretary, a young man named Joel, finished the roll call and read the land acknowledgment in English and then in the few phrases of the Piscataway language that had been recovered and verified — *Piscataway yeh, Tayac yeh* — the words landing in the room the way they always did, like something set down carefully after a long carry.
-
-Marcus had written the acknowledgment himself, three years ago, with help from a linguist at the University of Maryland. He still felt the gap in it — the places where the language should have been and wasn't, replaced by English because the words hadn't survived. He said it anyway. The gap was part of the record too.
-
-Joel finished. Marcus picked up the remote.
-
-"I'm going to keep this short," he said. "The council has the briefing packet. Page two, the stratigraphic summary. Page four, the artifact description. I want to walk you through what Dr. Moyaone found, what it means for the recognition petition, and what she's asking us to authorize."
-
-He clicked to the first image.
-
-The photograph filled the screen: dark soil, the pale tape measure, and the bead — a blue point barely distinguishable from the surrounding matrix, the kind of thing you would walk past a thousand times and never see. Marcus had stared at it long enough that he could now see it immediately, the way you learn to find a hidden figure in a puzzle.
-
-"This is the trade bead. Cobalt blue, faceted, approximately eight millimeters in diameter. Found at forty-seven centimeters below the datum in Stratum One of the mound excavation unit." He paused. "For reference, Stratum One is the uppermost cultural layer. Dr. Moyaone's preliminary assessment puts it at pre-1700. She's sent samples for thermoluminescence dating, but the stratigraphic context is already strong."
-
-"How strong?" That was Raymond Birch, third seat on the left, who ran a construction company and thought in terms of load-bearing capacity.
-
-"Sealed stratum. No sign of disturbance from above. The bead was not dropped there recently. It was placed there, and the stratigraphy closed over it." Marcus clicked to the second image.
-
-The bead in a gloved palm. The color of deep water, as he'd thought the night before — or the color of the sky just before a storm comes in off the bay, that particular blue that doesn't look like it belongs to anything ordinary.
-
-"This type of bead," Marcus said, "is consistent with Dutch trade goods moving through the Chesapeake watershed in the 1680s and 1690s. The Dutch were trading these up every river in the region — glass from Venice, mostly, moving through Amsterdam to the coast." He kept his voice even, informational, the way he'd learned to speak in courtrooms when the facts were good enough to carry themselves. "Lenape traders were the primary distributors in this corridor. A bead like this, in this stratum, in this location, suggests contact between a Piscataway community and Lenape trading partners in the late seventeenth century."
-
-"Suggests," said Delia.
-
-Marcus looked at her. "Yes. Suggests. Dr. Moyaone is careful with her language. So am I."
-
-Delia had her hands flat on the folder, not open, just resting. "Was the ground disturbed to find it?"
-
-"A controlled excavation unit. Two meters by two meters. Documented to professional standards — photographs, field notes, provenience recorded for every item. The unit is open but stable."
-
-"That's not what I asked." Delia's voice had not changed in volume or temperature. "Was the ground disturbed."
-
-The room was quiet. Raymond had stopped writing. The two younger members — Cassie Threatt and her cousin Dev, both in their thirties, both of whom Marcus privately thought of as the future of the council — had gone still in the way people go still when they understand a question has two answers and only one of them is honest.
-
-"Yes," Marcus said. "The ground was disturbed."
-
-Delia nodded once, as if confirming something she already knew. She did not say anything else. She didn't need to. The nod was the argument.
-
-Marcus clicked to the third image: the excavation map, the unit marked in red, the stratum depths labeled in Wren's precise handwriting. He had looked at this image for a long time the night before. It was, in its way, a beautiful document — the land rendered as a column of time, each layer a century, the whole thing standing as evidence that people had been here, continuously, for longer than the colonial record admitted.
-
-"Page four of your packet," he said. "The artifact description includes Dr. Moyaone's preliminary assessment of cultural affiliation. She uses the term *probable Piscataway origin* for the stratum context, and she notes that the bead's presence suggests the mound was a place of intentional deposition — not a random scatter, not a midden. Someone brought this here and left it."
-
-"Someone who didn't agree to be dug up," Delia said.
-
-Marcus set the remote down. He had known this was coming. He had written *Delia* at the bottom of his notes precisely because he had known this was coming, and he had spent the drive over deciding whether to argue with her or to let her finish.
-
-He let her finish.
-
-"I've been sitting in rooms like this one," she said, "for forty years. BIA hearings, state preservation meetings, university panels. And every time someone finds something in the ground, the first question is always what it proves and the second question is always what we can do with it." She looked at the image on the screen — the red square on the map, the numbered strata. "My mother's brother's grave goods are in a storage facility in Baltimore. Have been since 1974. I have the accession number. I have written four letters requesting return under NAGPRA and received three acknowledgments and one request for additional documentation proving cultural affiliation." She paused. "We are not short of evidence that our ancestors were here. We are short of people who are willing to act on it."
-
-The room held that for a moment.
-
-Cassie Threatt leaned forward. She was thirty-four, wore her hair in two braids, and had a master's degree in public policy from Georgetown that she deployed with the precision of a surgical instrument. "Elder Swann, with respect — this is different. This is a sealed stratum. This is documented provenience. This is exactly the kind of material evidence the OFA requires for the recognition petition. We have a window here."
-
-"We always have a window," Delia said. "The window is always closing. That's how they keep us moving."
-
-"The petition deadline is real."
-
-"So is the ancestor in that ground."
-
-Marcus picked up the remote again. Not to click to a new image — just to have something in his hand. "Both things are true," he said. "Elder Swann is right that the ground was disturbed and that our ancestors didn't consent to excavation. Cassie is right that this evidence is material to the petition." He looked around the room, the horseshoe of faces, the microphones at each seat catching the hum of the air conditioning. "I'm not asking the council to choose between those two things today. I'm asking for authorization to continue the excavation under a protocol that Dr. Moyaone and I have drafted together — documentation to OFA standards, consultation with the council at each new stratum, and a binding commitment that any human remains or funerary objects found will be subject to immediate council review before any further action."
-
-Raymond looked up from his notes. "What's the timeline?"
-
-"Tayak estimates six to eight weeks for the current excavation phase, depending on what they find."
-
-"And if Slade's office moves to halt it?"
-
-"That's a legal question. Our attorney is on standby." Marcus kept his voice steady. "The site is on land the tribe has a recorded cultural interest in. We have standing."
-
-Dev, who had been quiet until now, raised his hand — a habit left over from school that he'd never quite lost. "Can we use the images? Publicly? Kimi's already —"
-
-"Kimi's social media activity is not authorized by this council," Marcus said. Faster than he'd intended. He saw Dev pull back slightly. "That's not a criticism of Kimi. It's a process point. Any public communication about the excavation needs to go through the council's communications protocol. That's in the packet, page six."
-
-"People are already talking about it," Cassie said. "Four thousand likes, Marcus."
+"Eleanor's going to want to close the site," Raymond said.
 
 "I know."
 
-"That's not nothing."
+"Darius is going to want to put it on the petition."
 
-"I know it's not nothing." He set the remote down again. "It's also not a strategy. A strategy is what we're building here."
+"I know that too."
 
-Delia had been looking at her hands during this exchange. Now she looked up. Her eyes, which were dark and had seen a great deal, moved to the image on the screen — the bead, blue and small in its gloved palm — and stayed there for a moment.
+Raymond picked up his cup again. "What are you going to do?"
 
-"I want it on the record," she said, "that the council acknowledges the ancestors present in that ground. Not as evidence. As people."
+Marcus looked at the report on the table in front of him. Forty-three pages. The first physical evidence. A cobalt bead with a slight surface iridescence, sitting in a labeled evidence bag in a locked field kit in Charles County while he stood here in a room that smelled of burnt coffee and cedar, trying to figure out how to give two groups of people what they needed without breaking the thing they were both trying to protect.
 
-"Seconded," said Raymond, without looking up from his notes.
+"I'm going to tell them the truth," he said. "And then I'm going to promise them both what they want."
 
-Joel typed. The audio recorder's red light held steady.
+Raymond looked at him over the rim of the cup. "Can you keep that promise?"
 
-"So moved," Marcus said. "It will be in the minutes." He looked at Delia. She had gone back to her folder. He couldn't tell if he'd satisfied her or simply deferred her — and he suspected she couldn't tell either, which was perhaps the most honest thing about the moment.
+Marcus didn't answer. He pulled out his chair and sat down, and opened the report to the first page, and read the first line again — *The following preliminary assessment documents the recovery of a single glass trade bead from Stratum One of the mound feature designated Site 18CH-447* — as if the words might tell him something different than they had the last three times.
 
-He clicked the screen dark.
+Outside, another car turned into the lot. Then another. The room was about to fill.
 
-"I'll need a motion to authorize the excavation continuation under the protocol on page three."
+The first person through the door after Raymond was Dorothy Swann.
 
-Cassie moved it. Dev seconded. Raymond asked two more questions about site security and liability coverage. The vote, when it came, was five to two — Delia and an older member named Harold voting no, their reasons already stated and now entered into the permanent record of the tribe.
+Marcus had expected Eleanor Runningwater — Eleanor always arrived early, always took the seat nearest the tribal flag, always arranged her papers with a precision that was itself a statement. But Eleanor's hip had been bad this week; Raymond had mentioned it in the parking lot. Dorothy came instead, and Dorothy was a different kind of problem.
 
-Five to two. Marcus had needed five. He had it.
+She was seventy-nine and moved like someone who had decided long ago that hurrying was a form of lying. She wore a dark blue cardigan over a white blouse, and her silver hair was pinned back in a way that her granddaughter had probably done for her, tight and careful. She carried a canvas tote that clinked faintly — her thermos, Marcus knew, and the small cedar bundle she kept wrapped in cloth at the bottom, which she would not take out unless the meeting required it, and whose presence in the room she considered sufficient.
 
-He thanked the council. He waited while they gathered their folders and their coffee cups and their separate silences, while Delia retrieved her cane from the table's edge and stood with the particular deliberateness of someone whose joints had opinions, while Joel saved the audio file and shut down his laptop.
+She looked at the projector screen, which showed the title slide — *Site 18CH-447: Preliminary Assessment, Phase I — Cultural Resources Survey* — and then she looked at Marcus.
 
-When the room was empty, Marcus stood at the front for a moment, looking at the dark screen.
+"You called a special session," she said. Not a question.
 
-He had what he needed. He had promised both things — protection and documentation, the ancestors acknowledged and the evidence preserved — and he had no clear idea yet how to honor both promises at once when the stratigraphy went deeper and the findings got harder and Delia came back with her cane and her forty years and her mother's brother's accession number.
+"I did."
 
-He gathered his notes. He turned off the projector light. He went back to his office, sat down at the metal desk, and opened the center drawer.
+"For one bead."
 
-The envelope was still there. Maryland State Historic Preservation Office. His name in the window.
+"For what the bead means."
 
-He picked it up. Turned it over. Set it down again, this time face-down, as if that made a difference.
+She set her tote on the table and sat down, two seats to his left, and folded her hands. She did not look at the screen again.
 
-He had five votes. He had a protocol. He had six to eight weeks before the ground told them something that might make the vote irrelevant.
+The others came in over the next ten minutes. Darius arrived with his laptop already open, a yellow legal pad tucked under his arm, and a look on his face that Marcus recognized from lacrosse practice — the look of a young man who had already decided how the game was going to go and was impatient to begin. He was twenty-nine and wore his ambition like a clean shirt, which Marcus found both admirable and exhausting. He sat across from Dorothy without appearing to see her.
 
-He left the envelope where it was, closed the drawer, and reached for his phone to call Tayak.
+Loretta Greenfield came in, then Paul Swiftwind, then the secretary, Angie, who set up her laptop at the corner and plugged in the small digital recorder that sat at the center of the table like a squat gray referee. Council members drifted to their seats along the horseshoe. Marcus counted heads. Seven of nine present. Quorum.
 
-Elder Swann was still in the hallway.
+He called the meeting to order at six fifty-three.
 
-Marcus heard him before he reached the door — the slow, deliberate tap of his walking stick on the linoleum, the low murmur of two voices. He stopped with his hand on the door frame.
+Angie read the prior minutes. Someone moved to approve. Someone seconded. Marcus moved through the procedural items the way you moved through them when everyone in the room knew they were waiting for the real thing — quickly, without apology, not quite rushing.
 
-Swann was talking to Harold. Harold still had his folder under his arm, unopened, the way he'd carried it through the whole meeting. Both men stood with their backs to the council room, looking out the narrow window at the end of the hall — the parking lot, the tree line, the last of the afternoon light lying flat across the grass.
+"Item four," he said. "Special presentation. Site 18CH-447." He clicked to the next slide. "Tayak called me yesterday afternoon from the field."
 
-"He promised both," Harold said.
+He told them what she had found. He kept it simple: one glass trade bead, cobalt, recovered in situ from Stratum One, Unit Three, at a depth consistent with late seventeenth-century deposition. He put up the photograph — a close shot, good light, the bead resting on a white scale card, its color exactly as Tayak had described it, a deep blue with a faint iridescence along one side where the soil had worked on the glass for three hundred years.
 
-"Men who promise both," Swann said, "are men who haven't decided yet."
+The room was quiet in a way that rooms are quiet when people are deciding what to feel.
 
-Marcus stepped back into the room before they heard him.
+"The bead is Dutch manufacture," Marcus said. "That's the preliminary assessment. Lab confirmation is pending, but the morphology is consistent — drawn-glass construction, the cobalt compound, the size. Dutch trade beads were circulating in the Chesapeake watershed from roughly 1630 onward." He paused. "Tayak's report places it in the same stratum as the oral record's earliest documented presence at the site. It corroborates the timeline."
 
-He stood there a moment in the empty chamber. The fluorescent lights buzzed at their single, tireless pitch. Joel's chair was still pushed at an angle from the table, his notepad left behind — three pages of minutes in a handwriting so small it looked like a different alphabet. The coffee urn on the side table had stopped steaming. Someone had left a paper cup beside it, lipstick on the rim, Cassie's red, already cold.
+He clicked to the next slide. Stratigraphy. A clean profile drawing, Wren's work, the layers labeled in her small careful hand.
 
-He pulled Joel's chair straight. An old habit — he'd been straightening chairs in this room for eleven years.
+Darius leaned forward. "So this is direct physical evidence. Not circumstantial."
 
-He was almost to the door again when he heard the voices coming back.
+"It's the first physical evidence," Marcus said. "The documentation is clean. Chain of custody, context sheets, GIS coordinates, photographs. It meets the evidentiary standard."
 
-Not Swann and Harold. Different voices. Younger, faster, the consonants sharper.
+"For the petition."
 
-Jonah Twobirds, and Cassie.
+"For any proceeding that requires material evidence of presence."
 
-"—can't just table it. We tabled it in 2019 and we tabled it in 2021 and here we are in 2024 still explaining to the BIA why we exist—"
+Darius sat back and wrote something on his legal pad, and Marcus could see from the angle that it was underlined.
 
-"The vote passed, Jonah."
+Dorothy had not moved. Her hands were still folded. She was looking at the photograph on the screen with an expression that Marcus had seen on her face once before, at a funeral — not grief exactly, but something adjacent to it, something that knew grief was nearby and was not surprised.
 
-"Five to two. Harold and Delia. You know what that means next session."
+"Marcus," she said.
 
-They came through the door still talking, and stopped when they saw Marcus.
+"Dorothy."
 
-Jonah was twenty-nine. He wore his hair short on the sides and carried himself the way young men did who had learned early that rooms didn't automatically make space for them — a slight forward lean, chin up, ready. He had a law school application on his kitchen table that he hadn't submitted yet. Marcus knew this because Jonah had told him, in the parking lot after last month's meeting, in the way young men told you things they weren't ready to say directly: sideways, while looking at something else.
+"Who else has seen this report?"
 
-"Marcus." Jonah looked at Cassie, then back. "We were just—"
+"The council. Tayak's field team. Her department chair has been notified of the find, not the full documentation."
 
-"I heard," Marcus said. He wasn't angry. He was tired in a way that had nothing to do with the hour. "Come in. Close the door."
+"The state?"
 
-Jonah closed it. The hallway sounds — Swann's walking stick, a phone ringing somewhere in the administrative wing, the printer cycling through something — cut off.
+"Not yet. We have a window before the Section 106 consultation clock starts."
 
-Marcus sat on the edge of the table. Not in his chair. He wanted the three of them to be the same height.
+She nodded, slowly, as if the nodding cost something. "And the bead. Where is it now?"
 
-"Say what you need to say," he told Jonah.
+"Locked field kit. Tayak's custody. The site."
 
-Jonah looked at the dark screen, then at Marcus. "Swann is going to come back. You know that. Harold will second him. And the next time there's a finding — a real finding, human remains, a funerary object — they'll have the votes to halt it."
+"Still in the ground?"
 
-"Maybe."
+"No. Recovered, logged, bagged. But on site."
 
-"Not maybe. Delia's already talking to the Reservation Housing Committee about the site access road. She wants it rerouted."
+Dorothy unfolded her hands and placed them flat on the table. Her knuckles were large, the joints thickened with years of something — arthritis, work, time. "Then it needs to go back," she said.
 
-Marcus hadn't known that. He kept his face still. "When did she say that?"
+The room shifted. Not dramatically — no one spoke, no one moved — but Marcus felt it, the way you feel a current change direction in water you're standing in.
 
-"Last week. At the women's committee meeting." Jonah spread his hands. "Marcus, the bead is the first physical object we've had with a documented provenience in that stratum. Tayak can tie it to a specific cultural period. The OFA requires continuous community existence — that's the criterion we've been failing on for eleven years. Eleven years." He said it the way you said a number that had stopped feeling like a number. "We have never had a material culture item from that site with a chain of custody we can put in front of a federal examiner and say: *here*. This is what here looks like."
+"Dorothy—"
 
-"I know what the criteria are," Marcus said.
+"I'm not finished." Her voice was the same temperature it had been since she walked in. Not raised. Not sharp. Just very, very steady. "That bead came out of the ground where our people put it. It was not put there for us to find. It was put there because it belonged to someone, and that someone is resting there, and the ones resting there have not asked to be disturbed."
 
-"Then you know what stopping now costs."
+"We don't know there are burials in Stratum One," Darius said.
 
-"I know what not stopping costs too."
+Dorothy looked at him. It was not an unkind look. It was the look of a woman who had decided to be patient with a person who did not yet know what he did not know. "We know there is a mound," she said. "We know what mounds are for."
 
-Jonah opened his mouth.
+"We know what some mounds are for. This site may be—"
 
-"Sit down," Marcus said. Not harshly. Jonah sat.
+"Darius." Marcus kept his voice level. "Let her finish."
 
-Marcus looked at Cassie. She was watching him with the particular expression she used in budget meetings — not hostile, not warm, just precise. Cassie had been on the council for six years and had never once, in Marcus's memory, said anything she didn't mean.
+Darius pressed his lips together and looked at his legal pad.
 
-"The elders aren't wrong," Marcus said.
+Dorothy turned back to Marcus. "The site needs to be closed. The bead needs to be returned. We document what was found, we record the location, and we seal the unit. That is what we owe them."
 
-"I didn't say they were wrong—"
+"If we close it now," Darius said — he couldn't help himself, Marcus could see that, the words had been building since the moment Marcus put the photograph on the screen — "we lose the evidence window. The state is going to move on this property. Slade has been circling it for two years. If we don't document and submit, we hand them the grounds to argue we abandoned the site."
 
-"You said they were choosing silence over survival. In this room. With Harold two seats down."
+"We are not abandoning anything," Dorothy said. "We are protecting it."
 
-Jonah's jaw tightened. "I said what I believe."
+"With respect, Dorothy, there's a difference between protection and—"
 
-"I know you did. And Swann said you were choosing ambition over respect. And you both meant it, and you were both right about each other, and that's exactly the problem." Marcus stood up from the table. "You want to use the evidence. He wants to protect the ground. Those aren't the same thing, and they're not always compatible, and a five-to-two vote doesn't make them compatible — it just means we move forward today."
+"There is no difference." Still calm. Still flat. "You protect what is yours by not letting strangers cut it open."
 
-"That's enough," Cassie said quietly.
+"Tayak is not a stranger."
 
-"It's not enough," Jonah said. "It's not enough because in six weeks Tayak is going to find something in a deeper stratum and we're going to have this same fight again, except by then Slade's office will have filed a motion and we'll be having it under a thirty-day clock." He leaned forward. "I've read the petition drafts. I've read all eleven years of them. We keep failing the continuous existence criterion because we have no material record. We have oral history—"
+"Tayak is family." A pause. "That does not make a shovel a ceremony."
 
-"Oral history is evidence," Marcus said.
+The silence after that was longer. The projector fan hummed. Someone's phone buzzed against the table and was quickly silenced. Angie's fingers had stopped moving on her keyboard.
 
-"Not to the OFA it isn't. Not without corroboration." Jonah's voice was flat now, the heat gone out of it, which was worse. "You know what they wrote in the 2019 denial? 'Insufficient documentary evidence of an organized community with political authority during the period 1790 to 1900.' A hundred and ten years. We have stories. We have Nora Moyaone's quilts. We have a grandmother who's eighty-two years old and losing words." He stopped. Looked at his hands. "I'm not disrespecting the stories. I'm saying the stories need the ground to back them up. And the ground is right there."
+Marcus looked at the photograph on the screen. The bead. Cobalt, iridescent at one edge, sitting on a white card in a field kit in Charles County while this room decided what it meant. Tayak's voice from yesterday: *It's the first physical evidence, Marcus.* The weight in it. The twenty years of work compressed into that sentence.
 
-The room was quiet.
+He also heard Dorothy. He heard her completely. He had sat in this room for twenty-two years and he knew the difference between an elder performing tradition and an elder speaking from it, and Dorothy was speaking from it, and she was not wrong.
 
-The fluorescent light buzzed.
+The problem was that Darius was also not wrong.
 
-Marcus thought about Swann in the hallway: *men who promise both are men who haven't decided yet.*
+Marcus stood up.
 
-He thought about Delia looking at the image of the bead — blue, small, held in a gloved palm — and saying *as people*, not *as evidence*, and the way she'd gone back to her folder afterward as if she'd said the only thing that mattered and was done.
+It was not something he did often in meetings — he ran them from his chair, kept the energy horizontal. Standing was a signal, and he used it sparingly, and he used it now.
 
-He thought about the envelope in his desk drawer.
+"Here is what I'm going to ask the council to authorize," he said. "One: the excavation continues, with a cultural monitor present at all times — someone from this council, rotating, with authority to stop work at any point. Two: all recovered cultural items are documented to federal evidentiary standard and held in tribal custody, not university custody. Three: we commission a Traditional Cultural Property assessment for the full site boundary, which gives us a legal protection layer that does not depend on what Tayak finds next. Four: nothing — no finding, no report, no image — goes to the state or to any federal body without full council review and a majority vote."
 
-"Go home," he said.
+He looked at Dorothy. "The ancestors are not going to the state. They are not going to a university lab. They are not going anywhere without this council's say."
 
-Jonah looked up.
+He looked at Darius. "And the evidence we have is going into the petition file, properly documented, properly attributed, where it will be ready when we need it."
 
-"Both of you. Go home. The vote passed. The protocol is in the record." Marcus picked up Joel's notepad from the table and held it out. "Take this to Joel on your way out. He forgot it."
+Dorothy was watching him. Her expression had not changed, but something in it had — some small adjustment, the way a door settles differently in its frame depending on the weather.
 
-Cassie took the notepad. She touched Jonah's arm — not a command, just a signal — and they went.
+"You're promising us both what we want," she said.
 
-Marcus stood at the window after they left. The parking lot was half-empty now. Swann's truck — a dark green Ford that had been old when Marcus first joined the council — was gone. Harold's too. The tree line held the last of the light, the leaves still and heavy in the August heat, and beyond them, though you couldn't see it from here, the ground sloped down toward the creek and the mound and whatever the next stratum held.
+"I'm promising you what I can deliver."
 
-He had promised both things.
+"Those are not the same thing."
 
-Jonah was right that the promise was unstable. Swann was right that it was untested. Delia was right that it was, at bottom, a deferral.
+"No," Marcus said. "They're not."
 
-What none of them knew — what he had not said in the meeting, had not said to anyone — was that the envelope in his desk drawer had arrived three weeks ago, and that he had not opened it, and that the return address was not Slade's office but a name he recognized from a different context entirely: a private land survey firm that worked, as a matter of public record, for the development consortium that had been quietly acquiring parcels along the Route 6 corridor for the past two years.
+The vote, when it came, was six to one. Darius voted yes. Dorothy voted no, cleanly, without comment, and then she sat with her hands folded again and looked at the wall behind Marcus's head while Angie recorded the resolution number and the time.
 
-He didn't know what was in it.
+Paul Swiftwind leaned over to Dorothy afterward and said something quiet in Piscataway — *kehe*, the old word for grandmother, and then something Marcus couldn't catch — and Dorothy nodded once without looking at him.
 
-He had told himself, for three weeks, that not knowing was a form of caution. That opening it would require him to act on it, and that acting on it would change the shape of everything he was trying to hold together.
+The meeting broke up in the way council meetings break up: gradually, in clusters, people stopping to talk in the doorway or by the coffee station, the formal thing dissolving into the informal thing that was often where the real decisions got made. Darius came to Marcus with three questions about the TCP assessment timeline. Loretta asked about the monitor rotation schedule. Marcus answered them both, made notes, shook hands, said the things that needed saying.
 
-He was beginning to understand that not opening it was its own kind of action.
+Dorothy left without speaking to him again. He watched her go — the slow, deliberate walk, the canvas tote, the slight weight she carried on her left side from the hip that had been bothering her since winter. At the door she paused, just for a moment, and looked back at the projector screen, which still showed the photograph of the bead.
 
-He turned off the lights and went back to his office.
+Then she left, and the door swung shut behind her, and the screen went dark when the projector timed out.
 
-He sat at his desk for a moment in the dark, not reaching for the lamp. The building had gone quiet around him — the copier silent, the front desk empty, the hum of the air conditioning the only sound. Through the window, the parking lot lights had come on, casting the asphalt in a yellow that made everything look slightly wrong.
+Marcus was the last one in the room. He straightened the chairs along the horseshoe, a habit from years of coaching, the instinct to leave a space the way you found it. He collected the printed agendas that people had left behind and stacked them for recycling. He shut down the projector.
 
-He had not gone home.
+The room smelled of coffee and cedar and the faint chemical bite of the dry-erase marker someone had uncapped and recapped without using.
 
-He had told Cassie and Jonah to go home and then walked back down the hall to his own office and sat down, and now he was looking at the desk drawer.
+He sat back down in his chair.
 
-He opened it.
+The resolution was passed. The monitor rotation would start tomorrow. The TCP assessment would take six weeks, maybe eight. The evidence was in tribal custody, properly documented, legally defensible. He had done what he came to do.
 
-The envelope was where he'd left it — under a copy of the 2019 OFA denial, which he kept there the way some people kept a photograph, not for comfort but for accuracy. The envelope was standard business size, white, with a printed address label. The return address read *Meridian Land Survey Group, LLC, Waldorf, MD.* He'd looked them up the day it arrived. They had a website with a stock photo of a surveyor and a list of services that included boundary surveys, title research, and what they called *development feasibility assessment.* Their client list was not public. Their connection to the Route 6 consortium was not on the website. He'd found it in a county planning board filing from fourteen months ago, a single line in an appendix.
+*You're promising us both what we want.*
 
-He turned the envelope over. Still sealed. The flap had a slight warp to it from three weeks in the drawer.
+*I'm promising you what I can deliver.*
 
-He put it back. Closed the drawer.
+He opened his briefcase and put the report inside — all forty-three pages, the photograph of the cobalt bead, the stratigraphy drawing in Wren's careful hand. Then he reached past the report, past the agenda packets and the legal pad, to the back of the briefcase where a manila envelope sat against the lining.
 
-Then he opened the drawer again, took the envelope out, and set it on the desk in front of him.
+He did not take it out. He had not taken it out in three weeks, not since it had arrived in his office mail with a return address he recognized and a postmark from Annapolis.
 
-The room was quiet enough that he could hear, faintly, the sound of a truck on the road outside — the shift of gears as it slowed for the turn, then the fade. He thought about what Jonah had said. *In six weeks Tayak is going to find something in a deeper stratum and we're going to have this same fight again, except by then Slade's office will have filed a motion and we'll be having it under a thirty-day clock.*
+He knew what was in it. He had read it once, standing at his desk, and then he had put it in the envelope and put the envelope in the briefcase and he had not read it again.
 
-He thought about the vote. Five to two. Swann's voice: *men who promise both are men who haven't decided yet.*
+He closed the briefcase.
 
-He thought about the moment, forty minutes ago, when he had stood up from the table and the room had still been fracturing — Jonah forward in his chair, Swann's faction gone rigid, Cassie watching with that budget-meeting precision — and he had understood that the vote had settled nothing, that five to two was a number and not a resolution, and that if he let them leave with the number and nothing else, the council would reconvene in six weeks and the fracture would be wider.
+The HVAC clicked off and the room was very quiet — just the distant sound of the security guard's footsteps in the hallway, and the faint hum of the refrigerator in the break room, and somewhere outside, the rain still coming down on the parking lot, on the cars, on the road that ran south toward Charles County and the mound and the bead that was no longer in the ground.
 
-He had not planned what he said next. He was not sure, afterward, whether that was a strength or a failure.
+He sat there for another minute.
+
+Then he picked up his phone and called Tayak.
+
+Raymond Deer had been quiet for most of the meeting.
+
+Marcus had noticed it the way he noticed everything in a council room — peripherally, without looking directly, the way you watch a fire to see which way the smoke is leaning. Raymond sat at the far end of the horseshoe, third from the left, with his printed agenda folded in half and his pen tapping a slow rhythm against the table edge. He was thirty-four, the youngest voting member on the council, and he had a lawyer's habit of waiting until everyone else had committed before he spoke.
+
+He waited until Dorothy finished.
+
+"With respect," Raymond said.
+
+He did not say it the way people say it when they mean the opposite. He said it the way he always said it to Dorothy — carefully, like a man carrying something fragile across a room he knows has a loose board somewhere.
+
+"With respect, Grandmother, we have been protecting the mound for eleven years. We have been protecting it with ceremony and with silence and with the understanding that the ancestors deserve peace. And in eleven years, the state has moved the boundary twice, the county has approved two new subdivision permits within a half mile of the site, and our recognition petition is sitting in a federal office in Washington with a status of *under review* that has not changed since 2019."
+
+Dorothy did not move.
+
+"The bead changes that," Raymond said.
+
+"The bead is one item," Dorothy said.
+
+"It's the first item. It's the first physical evidence of continuous presence that meets federal evidentiary standard." He looked at Marcus. "Tell me I'm wrong."
+
+Marcus kept his face still. "You're not wrong."
+
+"Then we document it. We photograph it, we carbon-date it, we put it in the petition file with a full chain of custody and we send it to the Office of Federal Acknowledgment with a cover letter that says: here is what your *under review* has been sitting on top of." Raymond's pen stopped tapping. "We have been waiting for the ground to speak. The ground is speaking."
+
+"The ground is not speaking." Dorothy's voice was level. "A young woman with a trowel is digging."
+
+"Tayak is one of us."
+
+"Tayak works for a university."
+
+"Tayak *is* Piscataway."
+
+"Those are not the same thing," Dorothy said, and the echo of what she had said to Marcus twenty minutes ago was not lost on anyone in the room. Marcus saw Loretta glance at him. He kept his face still.
+
+Raymond leaned forward. "I have a daughter who is seven years old. When she is seventeen, I want her to be able to tell her class what she is. Not what she *was*. Not what her great-great-grandmother *was*. What she *is*, right now, with a legal status that the federal government is required to respect." His voice had not risen, but something in it had tightened, the way a bowstring tightens — not louder, just more loaded. "The petition needs this evidence. And we have it. We have it right now, in tribal custody, properly documented. What are we waiting for?"
+
+"We are waiting," Dorothy said, "because the moment that evidence becomes a legal instrument, it becomes contested. The state will send someone to verify it. The university will want access. Federal reviewers will want the site assessed. And every one of those processes is another door that opens onto the mound." She paused. "Once you open a door, Raymond, you cannot choose who walks through it."
+
+"We can't choose who walks through it if the county approves the next subdivision either."
+
+"That is a different—"
+
+"It is the same thing." Raymond's voice cracked upward, just slightly, the first time Marcus had heard it do that in two years on the council. "It is exactly the same thing. We lose the land either way. The only question is whether we lose it with evidence on record or without."
+
+Angie's laptop keys had gone silent. Paul Swiftwind had set down his coffee cup. Darius was watching Raymond with an expression Marcus recognized — the look of a man who agrees with someone and is waiting to see if it's safe to say so.
+
+Marcus let it run.
+
+He knew he should intervene. He could feel the room fracturing along the line Raymond had just drawn — not a new line, but an old one, the one that ran between the people who had grown up watching the recognition petition stall and the people who had grown up watching the land shrink. Both things were true. Both griefs were real. The room needed to feel that before it would accept anything he said next.
+
+He let it run one more beat.
+
+Dorothy said, "You are twenty years younger than I am, Raymond. You have not watched what happens to a community when its sacred places become evidence. When the ancestors become exhibits. When the story becomes a legal brief."
+
+"With respect, Grandmother." Raymond's voice was quiet again, quieter than before. "You have not watched what happens to a community when the evidence disappears and the brief is never filed."
+
+The room went still.
+
+Marcus put both hands flat on the table.
+
+"All right," he said.
+
+The word landed the way he meant it to — not as a dismissal, not as a verdict, but as a door closing on a conversation that had said what it needed to say. He looked at Raymond first, then at Dorothy, then at the room.
+
+"You're both right," he said. "That is not a diplomatic answer. It is the actual answer. The evidence needs to be documented and it needs to be protected and those two things are going to be in tension for as long as this process runs. That tension doesn't go away because we vote. It goes away when the petition is decided."
+
+Raymond sat back. Not satisfied, but listening.
+
+"The four conditions I outlined hold," Marcus said. "The monitor rotation, the tribal custody, the TCP assessment, the council review before anything goes to the state or to federal reviewers. Within those conditions, the documentation proceeds. Raymond — the petition file gets updated. Dorothy — the ancestors do not leave tribal custody and the site does not become a public record until this council says so."
+
+He looked at Raymond. "Is that enough for you to vote yes?"
+
+Raymond was quiet for a moment. Then: "Yes."
+
+Marcus looked at Dorothy.
+
+She looked back at him. The adjustment he had seen in her face earlier was gone now — she had closed it, the way you close a window when the weather turns.
+
+"No," she said. "It is not enough for me. But I understand that I am one vote."
+
+"You are," Marcus said. "And your vote is recorded and your reasons are recorded and when this goes to the federal reviewers, they will see that this council took the protection question seriously. That matters too."
+
+Dorothy said nothing. She looked at the wall behind his head — the same spot she had looked at when she voted no — and Marcus understood that she was not being dismissive. She was looking at something she could see that he could not.
+
+Paul Swiftwind leaned over to her and said, quietly, in Piscataway — *kehe*, the old word, and then something else Marcus couldn't catch — and Dorothy nodded once.
+
+The vote came. Six to one.
+
+Marcus had said *the documentation proceeds* and meant it. He had said *the ancestors do not leave tribal custody* and meant that too. The problem was that both statements assumed a protocol that did not yet exist — a written, enforceable, legally defensible protocol that would satisfy a federal reviewer, hold up under state scrutiny, and still honor what Dorothy had seen in that wall behind his head.
+
+He had forty-eight hours to build it.
+
+He kept his face level while Angie read the resolution language back into the record, her voice flat and careful, each clause landing like a stone set in mortar. *Resolved, that excavation at the Charles County site designated TR-2024-07 shall continue under the following conditions.* The four conditions. His conditions. He listened to them as if hearing them for the first time and felt the gap between what they promised and what they required.
+
+Raymond was already on his phone, thumbing something — a text, probably, to someone outside this room who had been waiting for a number. Darius had uncrossed his arms. Paul Swiftwind was capping his pen with the slow satisfaction of a man who had expected worse. Dorothy sat with her hands folded on the table and her agenda packet closed, and she did not look at Marcus, and he did not blame her.
+
+"Before we adjourn," Marcus said.
+
+Angie looked up.
+
+"I want to add one item to the record. Not a condition — a commitment from this chair." He paused. "Before any cultural item from TR-2024-07 is transferred to any external institution, reviewed by any federal agency, or entered into any public database, this council will have in hand a written reburial plan. Not a draft. A plan. With a timeline, a responsible party, and a cultural protocol reviewed by our elders." He looked at Dorothy. "That commitment is mine, not the council's. I am putting it in the record because I want it there."
+
+Dorothy looked at him then. Her expression did not change, but she looked at him.
+
+"Noted," Angie said, and typed.
+
+Raymond said nothing. He had what he needed. The rest was Marcus's problem.
 
 ---
 
-He had looked at Jonah first, because Jonah was the one still leaning forward, still with something to prove.
+The room cleared in the way rooms do after a hard vote — not quickly, not slowly, but with the particular deliberateness of people who are not sure what they feel and are not ready to find out in public. Darius stopped to shake Marcus's hand, a firm two-pump grip, and said, "Good meeting," which meant *that was harder than it should have been.* Paul Swiftwind helped Dorothy with her coat — a heavy wool thing, charcoal gray, with buttons that had been replaced at least twice, the new ones slightly too large for the holes. She let him help her without looking at Marcus again, and Marcus let her leave without calling after her.
 
-"The protocol doesn't exist yet," he said.
+Raymond was the last to go. He paused at the door, one hand on the frame, and said, "The reburial plan — you know she'll hold you to that."
 
-Jonah blinked. "What?"
+"I know."
 
-"The excavation protocol. The one in the vote. It doesn't exist as a written document. I'm going to draft it."
+"Do you have someone who can write it?"
 
-"You're going to—" Cassie started.
+"I'm working on it."
 
-"Personally. Not the cultural resources committee. Not a subcommittee. Me." He looked at Swann's empty chair, then at Harold, who was watching him with an expression that was not quite trust and not quite its opposite. "And it will contain two things. First: every ancestor disturbed in the course of the excavation will be documented fully — photographs, measurements, provenience, the works — and then reinterred with ceremony, on a schedule approved by the elders. Not by the university. Not by Tayak's department. By us."
-
-Harold's hands, which had been flat on the table, shifted slightly.
-
-"Second," Marcus said. "The findings — all material evidence recovered, all documentation — will be submitted to the federal petition before the OFA's review window closes." He paused. "Before the state's deadline. Not after."
-
-"What's the date?" Cassie asked.
-
-"November fourteenth." He said it before he'd finished calculating whether it was possible. "The petition supplement goes to the OFA by November fourteenth."
-
-Jonah sat back slowly. Something in his face changed — not relief, not quite, but a settling, the way a person looks when they've been braced for a blow that lands differently than expected. "That's eleven weeks."
-
-"Yes."
-
-"The excavation is ongoing. We don't know what's in the lower strata."
-
-"No."
-
-"You're promising evidence we haven't found yet."
-
-"I'm promising a framework for using what we do find." Marcus looked at him steadily. "That's different."
-
-Jonah was quiet for a moment. Then: "What does Swann get?"
-
-"Ceremony. Real ceremony, not a paragraph in a report. Every ancestor. And the protocol will specify that if the excavation produces human remains, work stops until the elders have been consulted. Full stop."
-
-"Swann's already left."
-
-"I know. I'll call him tonight."
-
-Harold spoke for the first time since before the vote. His voice was careful, the way it always was when he was choosing between two things he believed. "You're saying the ground gets respected and the petition gets fed."
-
-"Yes."
-
-"At the same time."
-
-"Yes."
-
-Harold looked at the table. "Those aren't always the same direction."
-
-"I know," Marcus said. "I'm asking you to trust that I'll hold both."
-
-A long pause. The fluorescent light buzzed. Cassie was writing something on her notepad — not looking up, just writing, the way she did when she was deciding.
-
-"November fourteenth," Harold said finally.
-
-"November fourteenth."
-
-Harold nodded once. Not warm. Not a gift. Just a nod, the kind that meant *I am watching you.*
-
-Jonah said, "Conditionally."
-
-Marcus looked at him.
-
-"I accept conditionally," Jonah said. "You draft the protocol, you share it with the full council before you share it with the university, and the November fourteenth date is firm. If the date slips, we revisit."
-
-"Agreed."
-
-Cassie looked up from her notepad. "I'll second the conditions."
-
-"Then we're done," Marcus said.
+Raymond nodded. He didn't believe it, or he half-believed it, which was the same thing. He left.
 
 ---
 
-He sat at his desk now with the envelope in front of him and thought about the word *conditionally.* Jonah had used it the way lawyers used it — not as a softening but as a boundary, a line he was drawing in the record. Marcus had agreed to the conditions because they were reasonable and because he'd had no choice and because he believed, in the way he believed most things he committed to in that room, that he could make them real by the force of deciding to.
+The building went quiet in stages. First the voices, then the footsteps, then the particular mechanical sigh of the front door catching on its pneumatic closer. The HVAC hummed on. From somewhere down the hall, the break room refrigerator cycled — a low, grinding shudder, then silence, then the hum again. The projector fan on the ceiling ticked as it cooled.
 
-He was less certain of that now than he had been forty minutes ago.
+Marcus sat at the council table for a while. He had not turned the projector off and the screen still showed Tayak's last slide — the context sheet for the trade bead, her handwriting in the unit designation box, the photograph of the bead itself against the white scale card, blue and white, smaller than a thumbnail, sitting in the dark Charles County clay as if it had been waiting.
 
-The protocol did not exist. He had eleven weeks to draft a document that would satisfy Harold's grief and Jonah's legal strategy and Tayak's excavation schedule and the OFA's evidentiary standards, and he had drafted enough policy documents in his career to know that satisfying two of those four simultaneously was work. Satisfying all four was the kind of promise you made when the room needed you to make it, and then you went home and looked at the ceiling and tried to figure out if you were a man who kept that kind of promise or a man who had just learned, in his fifty-second year, that he was not.
+He looked at it for longer than he should have.
 
-He picked up the envelope.
+Then he gathered his papers, stacked them against the table edge, and walked to his office.
 
-The return address looked the same as it had for three weeks. *Meridian Land Survey Group, LLC.* The flap's warp had softened slightly in his hand.
+---
 
-He thought about Jonah's voice: *the ground is right there.* He thought about Delia going back to her folder. He thought about Tayak on the phone from the site that morning, her voice tight with something that wasn't quite excitement and wasn't quite fear — the particular tone she used when she'd found something she hadn't expected and was already calculating what it meant.
+The office was small enough that the desk took up most of it — a laminate-topped thing, practical and graceless, with a dual-monitor setup he'd been meaning to reconfigure for two years and a ceramic mug on a coaster that had left a ring through the coaster and onto the desk itself. His security badge hung from the handle of the top drawer. The overhead fluorescent had a flicker he'd reported in March and again in July and it was still flickering.
 
-He slid his thumb under the envelope's flap.
+He sat down. He did not turn on the monitors.
 
-The paper inside was a single folded sheet. A letter, two paragraphs, on Meridian's letterhead. He read it once, quickly, and then read it again more slowly, and when he was done he set it face-down on the desk and sat very still.
+The reburial plan commitment was real. He had put it in the record because he'd meant it and because Dorothy deserved to have it there. But a reburial plan required a protocol, and a protocol required a cultural consultant, and a cultural consultant required a budget line that was not in this fiscal year's allocation, and the budget committee met in six weeks, and the federal reviewers would want the TCP assessment before the budget committee met, which meant the documentation timeline Tayak was working from would need to compress, which meant she would be asked to move faster than the science allowed, which meant the findings would be thinner than the petition needed, which meant—
 
-He had been wrong about one thing. He had told himself, for three weeks, that not knowing was a form of caution. That opening it would require him to act on it.
+He stopped himself.
 
-He had been right about that part.
+One problem at a time.
 
-What he had been wrong about was thinking the action could wait until after November fourteenth.
+He opened the top drawer and took out the security badge — he had a habit of doing this when he was thinking, turning it over in his hands, the laminate worn at the corners from two years of the same habit — and set it on the desk.
 
-He turned the letter face-up again and read the second paragraph a third time. Then he picked up his phone and found Tayak's number, and looked at it for a long moment without calling, and set the phone back down.
+Then he reached past it, to the back of the drawer, where a manila envelope sat behind a rubber-banded stack of budget printouts. He had put it there four months ago. He had not opened it since.
 
-Not tonight. He needed to think. He needed to understand exactly what he was holding before he handed it to anyone else, because once he did, the shape of everything — the protocol, the deadline, the vote, the promise he had made in that room with Harold watching — would change in ways he could not yet see clearly enough to manage.
+The envelope was letter-sized, unsealed, with his name written on the front in a hand he recognized — his predecessor's, the previous council chair, a man named George Swann who had retired to Calvert County and sent Marcus this envelope three days after the election with a note that said only: *You'll know when you need it.*
 
-He locked the letter in the drawer. Put the key in his jacket pocket, where he would feel it.
+Marcus had thought he'd known when he needed it twice. Both times he had put it back.
 
-Then he sat in the dark office with the parking lot light coming through the window and thought about what it meant that a private survey firm working for a development consortium had written to him — not to the council, not to the tribal government office, but to him, Marcus Redcloud, personally — three weeks before Tayak Moyaone put a trowel in the ground.
+He held it now. The paper had gone slightly soft at the corners from the drawer's humidity, and the ink of his name had faded just enough to look older than four months. Whatever was inside was folded — he could feel the ridge through the envelope — and thin. Not a report. Not a legal brief. Something shorter.
 
-The last council member's footstep had faded down the hallway before Marcus moved.
+He thought about Tayak on the phone three hours ago, her voice careful and controlled the way it got when she was trying not to sound excited, saying *we have something, Marcus, we have something real,* and the trade bead sitting in the clay on that slide, blue and white, two hundred and fifty years in the ground.
 
-He sat at the head of the empty horseshoe, still in his chair, hands flat on the table. The fluorescent panels above him ran on a motion sensor; they were already beginning to cycle down, the room dimming at the edges. He didn't move to trigger them. The parking lot light came through the narrow window above the filing cabinet and laid a pale rectangle across the carpet, and that was enough.
+He thought about what he had promised Dorothy and what he had promised Raymond and the distance between those two promises, which was not a distance that closed by itself.
 
-The coffee urn on the side table had been there since six o'clock. He could smell it from where he sat — burnt, the bottom scorched — the smell of every meeting that ran long. He'd been drinking bad coffee in rooms like this one for twenty years, and the smell no longer bothered him. It was the smell of work that mattered.
+He set the envelope back in the drawer.
 
-He stood, finally, and the motion sensor caught him and the lights came back up hard and white, and he blinked against them and walked to his office at the back of the hall.
+Not yet. Whatever George Swann had known, it would keep one more day.
 
-The door was unlocked. It was always unlocked when council was in session; he kept it that way so staff could come in for files without interrupting him. He closed it behind him now and did not turn on the overhead light. The desk lamp was enough. He sat down in the chair that had held his weight for eleven years — the seat cushion had compressed to the exact shape of him, a fact he found both comforting and faintly embarrassing — and he looked at the desk drawer.
+He closed the drawer, picked up his phone, and called Tayak.
 
-It was the bottom left. Metal, with a small lock he'd had installed three years ago when the council had started handling NAGPRA consultation documents that the university's lawyers had flagged as sensitive. The key lived on his keychain, which lived in his jacket pocket, which he'd draped over the back of the chair.
+The call rang four times before she picked up. He could hear wind on her end, and the particular late-afternoon stillness of a field site going quiet.
 
-He reached into the jacket. Found the key. Set it on the desk without using it.
+"How'd it go," she said. Not a question.
 
-The tribal flag stood in the corner behind him, its staff resting in a cast-iron base that Delia had found at a surplus sale in Waldorf and repainted by hand. The eagle feather tied at the top moved slightly in the air from the vent overhead. He had given the land acknowledgment in front of that flag four hours ago, his voice steady, the words he'd said a hundred times, and they had still meant what they always meant — *we are here, we have always been here, the ground under this building is not metaphor* — and now he sat in the dark with a key on his desk and thought about what it meant to be the man who said those words and then locked a drawer.
+"We got the vote."
 
-He picked up the key. Unlocked the drawer. Pulled it open.
+A pause. "But."
 
-The envelope was there, under a manila folder and a legal pad. He'd put the folder on top of it six weeks ago, when it arrived, and he'd told himself the folder was there for organizational reasons. The folder contained a draft budget amendment that had been superseded two weeks later. He'd kept it there anyway.
+"No but. We got it."
 
-He took the envelope out and set it on the desk under the lamp.
+"Marcus."
 
-*Maryland State Archives. 350 Rowe Boulevard, Annapolis, MD 21401.*
+He turned the security badge over in his hand. "Dorothy wants a reburial plan in writing before the next meeting. Raymond wants the TCP assessment moving. The younger members want a press release by Friday."
 
-The envelope was standard business size, white, with a window in the upper left for the return address. His name and the tribal government's P.O. box were typed on a label, not handwritten. The postmark was six weeks ago, a Tuesday. He'd been in Annapolis himself that week for a BIA consultation and had come back to find it in the stack on his desk, and he'd known from the return address alone what it probably contained, and he'd put it in the drawer.
+"Friday."
 
-He hadn't opened it then. He hadn't opened it in the three weeks since, not even after Tayak called from the site with the trade bead in her hand and her voice doing that thing it did.
+"Kimi drafted something. I told her to hold it."
 
-He turned the envelope over. The flap was sealed with the standard moisture adhesive, undisturbed. He set his thumb against it.
+"Good." He heard her exhale. "How bad was Dorothy?"
 
-Then he set the envelope back down.
+"She wasn't bad. She was right."
 
-He sat with his elbows on the desk and his hands loose in front of him and looked at it. The paper had yellowed slightly at the edges — not age, just the particular fluorescence of archival correspondence, the slight off-white of institutional stationery. It was a small, ordinary object. It weighed almost nothing. He had held documents that changed things before — the original recognition petition, the NAGPRA consultation agreement with the Smithsonian, the letter from the OFA that said *insufficient evidence at this time* — and he knew what they felt like in the hand. They felt like this. Ordinary. Slightly too light for what they contained.
+Another pause, longer. "I'll call her."
 
-Harold's voice came back to him: *I am watching you.*
+"Don't call her tonight."
 
-Not a threat. Harold didn't do threats. It was something more precise than a threat — it was a record, a notation, the kind of thing an elder did when he was deciding whether a man was still the right man. Marcus had been watched by Harold Swann for twenty years and had, on balance, passed the test. He was less certain of that tonight than he had been at any point in those twenty years.
+"I wasn't going to call her tonight."
 
-He thought about Tayak. The way she'd said *it's a trade bead, Marcus, Venetian glass, late seventeenth century, it's exactly where it should be* — the words tumbling out faster than she usually let them, the field discipline cracking just slightly at the edges because she was standing in a trench on her family's ground and she had found something real. He had felt, listening to her, the particular pride he always felt around Tayak, the pride that was also a kind of guilt because she had worked harder than anyone he knew to get to that trench and some of the obstacles in her path had been ones he had failed to remove.
+He almost believed her. "The bead," he said. "The photograph you sent. Is it still in situ?"
 
-He looked at the envelope.
+"Wren documented everything. It's bagged and labeled. It's fine."
 
-The Maryland State Archives sent correspondence for several reasons. Survey records. Deed abstracts. Land grant transcriptions. Chain-of-title documentation going back to the colonial patents. He had requested nothing from them recently. He had not written to them or called them or submitted a records request in over a year. Which meant someone else had initiated this correspondence. Someone had asked the Archives to send him something, or the Archives had found something in the course of their own work that they believed the tribal council chair should know about, and they had addressed it to him personally, not to the tribal government's THPO, not to the council's legal counsel, not to the OFA liaison.
+"I mean — is it—" He stopped. He wasn't sure what he was asking.
 
-To him.
+"It's safe," Tayak said. Her voice had shifted, gone quieter. "It's been in the ground for two hundred and fifty years. Another night won't hurt it."
 
-He picked the envelope up a second time. Turned it over. Set it back down.
+He nodded, though she couldn't see him. The fluorescent overhead ticked once, twice, and held.
 
-The parking lot light shifted — a car pulling out, headlights sweeping across the window — and for a moment the shadow of the envelope stretched long across the desk, and then the car was gone and the shadow contracted back to its ordinary size.
+"Get some sleep," he said.
 
-He thought about the protocol he had promised Harold. The document that did not yet exist, that had to satisfy four constituencies simultaneously, that he had eleven weeks to write. He thought about Jonah's word: *conditionally.* He thought about the way Cassie had looked up from her notepad at the end, the look that meant she had made a decision and would not revisit it unless he gave her a reason to.
+"You too."
 
-He thought about the fact that a survey firm's letter to him personally, three weeks before Tayak broke ground, was now in a locked drawer in the same building where the tribal flag stood and the coffee urn had burned dry and Harold Swann had told him, with a single nod, that he was still, for now, the man in the chair.
+He set the phone down.
 
-He did not open the envelope.
+The overhead light steadied for a moment — the flicker gone, just clean white light — and then started again. He watched it. Three years he had been in this chair, and he still sometimes sat in this office at the end of a meeting and felt the specific weight of the thing: not the title, not the budget fights, not the federal correspondence stacked in his inbox, but the older weight underneath all of it, the one that had no official name in Robert's Rules.
 
-He put it back in the drawer, under the folder, and locked it, and held the key in his closed fist for a moment before he put it back in his jacket pocket.
+He pulled open the bottom drawer.
 
-Then he sat in the quiet office with the lamp burning and the parking lot light coming through the window and thought about what it meant that he had just made a promise to fourteen people in the next room — *I will hold both* — and that he was already holding a third thing they didn't know about, a thing sealed in a white envelope under a budget amendment no one needed anymore, a thing he had been carrying for six weeks in the way you carried a stone in your shoe when you were too far from home to stop and take it out.
+The envelope was there. It had always been there. He had moved it twice — once from the filing cabinet to the desk drawer, once from the top drawer to the bottom — and each time the move had felt like a decision, though it wasn't. It was the same non-decision, repeated.
 
-He would think about it tonight. He would think about it clearly, without the room and the vote and Harold's eyes on him, and in the morning he would know what to do.
+The return address was the Office of the Attorney General of Maryland. The postmark was three weeks ago, the ink slightly smeared on the right edge where the postal machine had caught it at an angle. His name on the front was typed, not handwritten — this was not George Swann's envelope, this was something else entirely, something that had arrived in the regular mail on a Tuesday morning and that he had held for thirty seconds over the recycling bin before putting it in the drawer instead.
 
-He turned off the desk lamp.
+He had not told Tayak.
 
-In the dark, the envelope was just a shape in a locked drawer. He knew where it was. He knew exactly where it was.
+He told himself it was because he hadn't read it yet, and you didn't pass on information you hadn't confirmed. That was a principle. That was sound practice. He had a law degree; he knew what it meant to act on unverified correspondence.
 
-He put on his jacket, felt the key in his pocket, and walked out into the empty hall, where the fluorescent lights had cycled down again and the burnt-coffee smell was already beginning to cool.
+He picked the envelope up. The seal was intact — a strip of self-adhesive flap, still holding. He ran his thumb along the edge. The paper was heavier than standard office stock, the kind the AG's office used for formal communications, and through it he could feel the shape of what was inside: two or three pages, folded in thirds, a staple in the upper left corner he could feel as a small hard ridge.
+
+The projector fan in the council room had gone silent. The refrigerator down the hall cycled again — that grinding shudder, the hum, the silence.
+
+He thought about the vote tonight. Fourteen to three, with two abstentions. He had worked for that margin for six weeks, made eleven phone calls, driven to Waldorf on a Sunday to sit in Councilmember Reyes's kitchen and drink bad coffee and explain, slowly, why the excavation was protection and not desecration. Fourteen to three. It was enough.
+
+He thought about what the envelope might say.
+
+The AG's office did not write to tribal council chairs to congratulate them. They wrote when there was a jurisdictional question, a competing claim, a timeline the state wanted to establish before the tribe could establish its own. They wrote when they were getting ready to do something and wanted the record to show they had given notice.
+
+Three weeks ago. He had received it three weeks ago, and the excavation had been underway for — he counted — four weeks now, which meant the state had known about the site before Tayak found the bead, before the vote tonight, before any of it had become real enough to fight over.
+
+Which meant someone had told them.
+
+He set the envelope back in the drawer.
+
+He was not ready for what it said. That was the truth, stripped of the principle about unverified correspondence, stripped of the sound legal practice. He was not ready, because once he read it he would have to decide what to do with it, and what to do with it included telling Tayak, and telling Tayak meant watching the careful controlled excitement in her voice turn into something harder and more frightened, and he had heard enough fear in that building tonight to last him.
+
+One more day.
+
+He closed the drawer. He straightened the security badge on the desk, aligned it with the edge of the coaster, and then recognized what he was doing and stopped.
+
+The fluorescent light flickered once more and went still.
+
+He sat for a moment in the steadier light, his hands flat on the laminate, and thought about Tayak's voice on the phone — *we have something real* — and the trade bead in the clay, blue and white, patient as anything, and the fourteen votes he had earned one kitchen at a time, and the reburial plan he had promised Dorothy and didn't yet know how to write.
+
+Then he picked up his phone again and opened his email and began drafting a message to the cultural consultant he'd been putting off calling for two months, because the reburial plan was real, and the budget committee met in six weeks, and the drawer would still be there tomorrow.
