@@ -91,3 +91,33 @@ def test_persist_helpers_exposes_chapter_qa() -> None:
     from writer_engine import persist_helpers
 
     assert hasattr(persist_helpers, "persist_chapter_qa")
+
+
+# --------------------------------------------------------------------------- CR-006 research link
+
+def test_persist_research_links_to_project() -> None:
+    from writer_engine.persist_helpers import persist_research
+
+    client = _FakeClient()
+    rid = asyncio.run(persist_research(
+        client, project_id="62cc734f-c861-4210-bc12-e9ea002fcf66", user_id="u1",
+        topic="The Burial Mound — Chapter 9 research", content="copper traded south",
+    ))
+    assert rid == "qa-row-1"
+    # report written AND a project link row written
+    assert client.sink["research_reports_v2"][0]["topic"].startswith("The Burial Mound")
+    link = client.sink["research_report_projects_v2"][0]
+    assert link["report_id"] == "qa-row-1"
+    assert link["project_id"] == "62cc734f-c861-4210-bc12-e9ea002fcf66"
+    assert link["user_id"] == "u1"
+
+
+def test_persist_research_no_link_without_project() -> None:
+    from writer_engine.persist_helpers import persist_research
+
+    client = _FakeClient()
+    asyncio.run(persist_research(
+        client, project_id=None, user_id="u1", topic="general research", content="x",
+    ))
+    assert "research_reports_v2" in client.sink
+    assert "research_report_projects_v2" not in client.sink  # no project -> no link

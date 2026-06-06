@@ -10,6 +10,7 @@ right account in the UI. No base-table schema changes — only inserts/updates.
 
 from __future__ import annotations
 
+import contextlib
 from typing import Any
 from uuid import uuid4
 
@@ -168,8 +169,10 @@ async def persist_bible(
 async def persist_research(
     client: Any, *, project_id: str | None, user_id: str, topic: str, content: str, genre_slug: str = ""
 ) -> str:
-    """Insert a research report (W5). research_reports_v2 has no project_id column, so the link is
-    recorded in the topic prefix for traceability."""
+    """Insert a research report (W5) and, when a project is given, link it to that project via the
+    research_report_projects_v2 meta table (CR-006) so the UI research tab can filter by project.
+    research_reports_v2 itself is a base table with no project_id column, so the link lives in the
+    meta table (the topic prefix is kept too, for human-readable traceability)."""
     resp = await (
         client.table("research_reports_v2")
         .insert({"user_id": user_id, "topic": topic, "genre_slug": genre_slug,
@@ -177,7 +180,16 @@ async def persist_research(
         .execute()
     )
     rows = await _rows(resp)
-    return str(rows[0]["id"]) if rows else ""
+    report_id = str(rows[0]["id"]) if rows else ""
+    if report_id and project_id:
+        # Best-effort link — a missing meta table (pre-migration-026) must not fail the report write.
+        with contextlib.suppress(Exception):
+            await (
+                client.table("research_report_projects_v2")
+                .insert({"report_id": report_id, "project_id": str(project_id), "user_id": user_id})
+                .execute()
+            )
+    return report_id
 
 
 async def persist_chapter_qa(
