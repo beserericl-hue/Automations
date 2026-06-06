@@ -21,9 +21,12 @@ from writer_engine.config import get_settings
 from writer_engine.llm.factory import get_router
 from writer_engine.llm.router import LLMRouter, ProviderNotRegistered
 from writer_engine.llm.structured import complete_structured
+from writer_engine.telemetry.logging import get_logger
 
 from .catalog import ToolSpec, lookup, render_catalog_prompt
 from .schemas import HubDecision, HubRequest
+
+logger = get_logger("hub.router")
 
 # --------------------------------------------------------------------------- heuristics
 #
@@ -366,11 +369,22 @@ async def route_message(
     router = llm_router or get_router(service="hub")
     settings = get_settings()
     try:
-        return await _gemini_route(req, router, model or settings.hub_router_model)
+        decision = await _gemini_route(req, router, model or settings.hub_router_model)
+        logger.info(
+            "hub.route.gemini", source=req.source, kind=decision.kind,
+            tool=decision.tool, op=decision.op, confidence=decision.confidence,
+            msg_preview=req.message[:120],
+        )
+        return decision
     except ProviderNotRegistered:
-        pass  # no Gemini key (e.g. tests / degraded) — use deterministic rules
-    except Exception:
-        pass
+        logger.warning("hub.route.no_gemini", msg_preview=req.message[:120])
+    except Exception as exc:  # the failure the stress test must be able to see
+        logger.warning("hub.route.gemini_failed", error=str(exc)[:300], msg_preview=req.message[:120])
 
     # 3. deterministic regex fallback
-    return _heuristic_route(req.message)
+    fallback = _heuristic_route(req.message)
+    logger.info(
+        "hub.route.heuristic", source=req.source, kind=fallback.kind,
+        tool=fallback.tool, op=fallback.op, msg_preview=req.message[:120],
+    )
+    return fallback

@@ -15,8 +15,10 @@ from writer_engine.hub import (
     build_dispatch_plan,
     route_message,
 )
+from writer_engine.telemetry.logging import get_logger
 
 router = APIRouter(dependencies=[Depends(require_service_secret)])
+logger = get_logger("hub.gateway")
 
 
 @router.post("/hub")
@@ -34,8 +36,13 @@ async def hub(body: dict[str, Any]) -> dict[str, Any]:
         source=body.get("source") or "chat",
         context=body.get("context") or {},
     )
+    logger.info("hub.request", source=req.source, user_id=req.user_id, msg_preview=req.message[:160])
     decision = await route_message(req)
     plan = build_dispatch_plan(decision, req)
+    logger.info(
+        "hub.dispatch", action=plan.action, tool=plan.tool, op=plan.op,
+        params=list(plan.body.keys()), user_id=req.user_id,
+    )
 
     if plan.action == "reply":
         return HubResponse(
@@ -45,20 +52,33 @@ async def hub(body: dict[str, Any]) -> dict[str, Any]:
     settings = get_settings()
     url = f"{settings.orchestrator_url}/pipelines/write/{plan.tool}/run"
 
-    if plan.action == "call_sync":
-        data = await _forward("POST", url, json=plan.body, timeout_s=120.0)
-        return HubResponse(
-            kind="data", assistant_message=plan.assistant_message,
-            tool=plan.tool, op=plan.op, data=data,
-        ).model_dump(mode="json")
+    try:
+        if plan.action == "call_sync":
+            data = await _forward("POST", url, json=plan.body, timeout_s=120.0)
+            logger.info("hub.sync_ok", tool=plan.tool, op=plan.op, user_id=req.user_id)
+            return HubResponse(
+                kind="data", assistant_message=plan.assistant_message,
+                tool=plan.tool, op=plan.op, data=data,
+            ).model_dump(mode="json")
 
-    # enqueue — heavy generation; orchestrator returns {job_id, status, tool}
-    enq = await _forward("POST", url, json=plan.body, timeout_s=30.0)
-    return HubResponse(
-        kind="queued", assistant_message=plan.assistant_message,
-        tool=plan.tool, op=plan.op,
-        job_id=enq.get("job_id"), status=enq.get("status", "queued"),
-    ).model_dump(mode="json")
+        # enqueue — heavy generation; orchestrator returns {job_id, status, tool}
+        enq = await _forward("POST", url, json=plan.body, timeout_s=30.0)
+        logger.info(
+            "hub.enqueued", tool=plan.tool, op=plan.op, job_id=enq.get("job_id"),
+            user_id=req.user_id, chapter=plan.body.get("chapter_number"),
+            project=plan.body.get("project_id") or plan.body.get("project_title"),
+        )
+        return HubResponse(
+            kind="queued", assistant_message=plan.assistant_message,
+            tool=plan.tool, op=plan.op,
+            job_id=enq.get("job_id"), status=enq.get("status", "queued"),
+        ).model_dump(mode="json")
+    except HTTPException as exc:
+        logger.error(
+            "hub.dispatch_failed", action=plan.action, tool=plan.tool, op=plan.op,
+            status_code=exc.status_code, detail=str(exc.detail)[:300], user_id=req.user_id,
+        )
+        raise
 
 
 @router.post("/library/retrieve")
