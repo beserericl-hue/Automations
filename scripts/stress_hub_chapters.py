@@ -271,6 +271,7 @@ def main() -> int:
     ap.add_argument("--range", nargs=2, type=int, metavar=("START", "END"))
     ap.add_argument("--repair-drifted", action="store_true",
                     help="re-scan + fix every chapter whose latest telemetry is aligned=false (via hub)")
+    ap.add_argument("--repair", type=str, help="repair a specific comma-separated chapter list, e.g. 12,30,50")
     ap.add_argument("--concurrency", type=int, default=10)
     args = ap.parse_args()
 
@@ -300,6 +301,24 @@ def main() -> int:
             snapshot_bible()
         print(json.dumps({k: v for k, v in rec.items() if k != "content_text"}, indent=2, default=str))
         return 0 if rec.get("status") == "ok" else 1
+
+    if getattr(args, "repair", None):
+        chapters = [int(x) for x in args.repair.split(",") if x.strip()]
+        print(f"[repair-list] {chapters}", flush=True)
+        results = []
+        with ThreadPoolExecutor(max_workers=args.concurrency) as ex:
+            futs = {ex.submit(run_repair, n): n for n in chapters}
+            for fut in as_completed(futs):
+                rec = fut.result()
+                results.append(rec)
+                if rec.get("chapter_row"):
+                    mirror_to_vault(rec)
+                print(f"  ch {rec['chapter']}: {rec.get('status')} job={rec.get('job_status','-')} "
+                      f"{rec.get('duration_s','-')}s aligned={rec.get('aligned','-')} "
+                      f"words={rec.get('word_count','-')}", flush=True)
+        still = sorted(r["chapter"] for r in results if r.get("aligned") is False)
+        print(f"\n[repair-list done] still drifted: {len(still)} {still}")
+        return 0
 
     if getattr(args, "repair_drifted", False):
         chapters = drifted_chapters()
