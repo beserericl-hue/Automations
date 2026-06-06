@@ -1,6 +1,6 @@
 # Chapter 4: Stratum One: The Glass Bead [Present — 2024]
 
-*8,020 words · aligned=None · drift=0+0 · craft_passes=0 · cache_read=45452 tokens · persisted to DB (chapter_number 4).*
+*5,875 words · REPAIRED via the chapter `repair` op (drift fixed: removed duplicated scene + extra bead + invented Voss conflict). 8,020 -> 5,875 words. · current in the database.*
 
 ---
 
@@ -96,13 +96,15 @@ Wren held out the polyethylene bag, the paper tag already written: *18CH-441, Un
 
 Then she set it in the finds tray and picked up the trowel and went back to work, because there was more ground to read and the day was getting on, and she did not trust herself yet to think about what she was going to say when she called Marcus.
 
+---
+
 The morning wore on. Tayak worked the unit in silence, her strokes mechanical now, controlled, the trowel moving in the short flat arcs she'd taught herself in her first field season twenty years ago — shave, sweep, feel, shave again. The dark band held. More charcoal flecks. A fragment of animal bone, too small to identify in the field, bagged as FS-002. A scatter of grit that might be fired clay or might be nothing.
 
-Wren was in the adjacent unit, three meters north, doing the same work. The scrape of her trowel was the only sound besides the cicadas and, twice, a truck on the county road.
+Wren was in the adjacent unit, three meters north — N10/E13 on the grid — doing the same work. The scrape of her trowel was the only sound besides the cicadas and, twice, a truck on the county road.
 
 At eleven-fifteen Tayak sat up straight, pressed her fists into the small of her back, and looked at the finds tray. The bag with FS-001 sat at the near edge, the bead visible through the plastic — a blue point against the white of the paper tag. She looked at it for three seconds, then looked away.
 
-She picked up her phone.
+She picked up her phone and walked to the field road, where the signal was better and the ground was flat enough to stand still without thinking about her footing.
 
 Marcus answered on the second ring. "Tell me something good."
 
@@ -132,7 +134,7 @@ Another pause. When he spoke again his voice had changed — quieter, the lawyer
 
 "Tayak."
 
-"I know. I'll bring it in tonight." She looked at the bead again. "Marcus — this is the anchor. The petition has been arguing occupation in the abstract. This puts us on the ground. This specific ground."
+"I know. I'll bring it in tonight." She looked back toward the unit — Wren's bent back visible in the northern square, the afternoon light going flat across the grass. "Marcus — this is the anchor. The petition has been arguing occupation in the abstract. This puts us on the ground. This specific ground."
 
 "I know what it means."
 
@@ -172,7 +174,7 @@ Tayak straightened up and went back for the camera. Her hands were not steady th
 
 The bead was larger than the first — perhaps eight millimeters across, the exposed face showing three distinct color layers, the innermost a dark cobalt, then white, then a red-orange that had faded to something closer to brick. The grinding at the end was deliberate, skilled. Someone in Venice or Amsterdam, three hundred and fifty years ago, had made this object with care. Someone had carried it across the Atlantic in the hold of a ship. Someone had traded it up the Potomac. And someone had worn it, or kept it, or lost it here in this dark soil above the mound.
 
-She took the photographs. She worked the pedestal. She assigned FS-003 — FS-002 was the bone fragment — and wrote the tag in Wren's notebook because her own handwriting was unreliable at the moment and she knew it.
+She took the photographs. She worked the pedestal. She assigned FS-003 — FS-002 was the bone fragment — and wrote the tag in Wren's notebook because her own handwriting was unreliable at the moment and she knew it: *18CH-441, Unit N10/E13, Level 2, FS-003, 1 glass trade bead, chevron construction, multilayer cobalt/white/red-orange, approx. 8mm.*
 
 When the bead was free she did not hold it up to the light. She set it directly in the bag, sealed it, and placed it in the finds tray beside FS-001.
 
@@ -198,7 +200,7 @@ Wren looked briefly uncomfortable, the way she always did when praised directly.
 
 Wren nodded and wrote something in the notebook, and Tayak suspected it was not field data.
 
-She stood up and looked at the sky. The light was going amber, the shadows of the tree line stretching across the field. Four o'clock, maybe four-thirty. She had three hours of driving and paperwork ahead of her, and after that she had to go to La Plata.
+She stood up and looked at the sky. The light was going amber, the shadows of the tree line stretching across the field. Four o'clock, maybe four-thirty. She had paperwork ahead of her, and after that she had to go to La Plata.
 
 She had to go to Nora.
 
@@ -234,13 +236,15 @@ She drove south on Route 6 with the window down, the warm evening air carrying c
 
 She did not look at the sign. She looked at the wall.
 
+---
+
 Nora's house was on Billingsley Road, a white wood-frame house with a covered porch and a kitchen garden that had been producing the same varieties of tomatoes and pole beans for as long as Tayak could remember. The porch light was on. It was always on after dark; Nora had kept it on for thirty years, first for Tayak's parents and then, after, for Tayak herself.
 
 She sat in the truck for a moment after she turned off the engine. Through the kitchen window she could see Nora at the table — the shape of her, the white of her hair, the lamp on the table beside her casting a warm circle of light across whatever she was working on. Probably the quilt. The new one, the one she'd been piecing since spring, the pattern she said she'd never tried before and wouldn't explain further.
 
 Tayak got out of the truck and went up the porch steps and knocked twice — she always knocked, even now, even after thirty years of this being the house she came home to — and heard Nora's voice: "It's open."
 
-The kitchen smelled of coffee and something savory that had been on the stove earlier, the ghost of it still warm in the air. Nora was at the table with the quilt spread across her lap, her reading glasses pushed up on her forehead, her hands still in the way they went still when she was waiting for something.
+The kitchen smelled of coffee and something savory that had been on the stove earlier, the ghost of it still warm in the air — onion and the iron-dark smell of the cast skillet Nora had used for forty years. Nora was at the table with the quilt spread across her lap, her reading glasses pushed up on her forehead, her hands still in the way they went still when she was waiting for something.
 
 "Sit down," Nora said, before Tayak had spoken.
 
@@ -288,160 +292,6 @@ Tayak sat back in the chair. The phone was still on the table between them, the 
 
 Nora looked at the photograph one more time. Then she looked at Tayak, and her expression was something Tayak had no name for — grief and relief together, the face of someone who has been carrying a thing for a long time and has finally found the right hands to put it in.
 
-"Her name was Saya," Nora said.
-
-The call to Marcus came from the field road, where the signal was better and the ground was flat enough to stand still without thinking about your footing.
-
-Tayak had her phone out before she reached the tree line. The excavation unit was forty yards behind her, Wren still at work in the afternoon light, the scrape of the trowel audible even at this distance. The air smelled of cut grass and warm soil and the faint diesel drift from the county road, and the cicadas were going in the oaks above her head like a second thought she couldn't stop having.
-
-Marcus picked up on the second ring.
-
-"Tell me something good," he said.
-
-"We have a bead."
-
-A pause. Not long — two seconds, maybe three. But she knew Marcus well enough to know what he did in two seconds of silence, which was to sit very still and not let himself feel anything yet.
-
-"What kind."
-
-"Glass. Opaque cobalt, cylindrical, drawn construction. Four millimeters. There's a second one — larger, multilayered chevron, blue and white with what looks like a red core. The kind that moved up the Potomac in the 1680s."
-
-"In situ."
-
-"Fifteen centimeters down. Dark organic band with charcoal flecks and bone fragments. Undisturbed. Wren documented everything before I touched it — scale, north arrow, unit label, full provenience. Chain of custody starts clean."
-
-This silence was longer.
-
-"Marcus."
-
-"I'm here." His voice had changed — still careful, but underneath the care there was something that sounded like a man setting down a weight he had been carrying uphill for a long time. "Contact-period. Colonial contact."
-
-"1680s at the earliest, based on bead type. Probably no later than 1700. The chevron is consistent with Dutch manufacture — those were circulating through the mid-Atlantic trade networks in exactly that window. If the lab confirms the stratigraphy and we get compositional analysis, we can argue documented Indigenous occupation of this specific site in the colonial-contact period."
-
-"Which is what the petition needs."
-
-"Which is what the petition needs."
-
-He said nothing for a moment. She could hear him breathing. She had known Marcus Redcloud since she was seventeen years old, had watched him argue in front of state committees and federal panels and a room full of lawyers who had all been paid more than him, and she had never once heard him lose his composure in public. Right now, on a county road in Charles County with the cicadas going and the smell of warm earth still on her hands, she could hear him not losing it.
-
-"Okay," he said. "Okay. How many people know?"
-
-"Wren. You. That's it."
-
-"Keep it that way for now. Don't post anything, don't tell Kimi—"
-
-"I know."
-
-"—and don't let Voss take custody of the artifact."
-
-She had been expecting this. She had been expecting it since the moment she picked up her phone, which was why she had walked to the field road instead of calling from the unit.
-
-"He's going to want to date it independently," she said.
-
-"Of course he is. His name is on the departmental excavation permit. He'll argue that gives him authority over artifact disposition pending analysis."
-
-"Does it?"
-
-"His permit, his authority — that's how he'll read it. That's how the university will read it if he pushes." A pause. "Does it give him that authority?"
-
-"The permit covers excavation access. Artifact custody under NAGPRA and the state historic preservation framework is a separate question."
-
-"Which he will not see it as."
-
-"No." She looked back toward the unit. Wren had stopped troweling; she was bent over her field notebook, writing. The afternoon light was long and flat across the grass, and the shadows of the oak trees stretched toward the mound like fingers. "He's going to say the bead needs to go to the university lab for thermoluminescence dating and compositional analysis. He's going to say it in a way that sounds completely reasonable."
-
-"And if it goes into the university system—"
-
-"It becomes a university artifact. Catalogued under their accession numbers. Chain of custody runs through their conservation lab, their storage facility." She stopped. "It stops being ours."
-
-"Right." Marcus's voice was flat now — not angry, just precise, the way it got when he was thinking through a legal problem. "So here's what you do. You maintain field custody. You document everything — photographs, field notes, the bag, the tag, all of it — and you keep the physical artifact under your direct control. Not the department's. Yours. And you call the tribal historic preservation coordinator tomorrow morning before Voss finds out the bead exists."
-
-"He's going to find out."
-
-"Yes. But there's a difference between him finding out after we've established our own chain of custody and him finding out when the artifact is still sitting in an unsecured field kit."
-
-She turned that over. "He's going to say I'm being obstructionist."
-
-"He's going to say a lot of things." A pause. "Tayak. This is the first physical anchor. Everything after this — every layer, every artifact, every piece of oral history Nora has been carrying — it all hangs on whether this bead stays in the right hands. Don't let the first piece of evidence walk out of the field in someone else's bag."
-
-The cicadas had gone quiet for a moment, the way they did sometimes, all at once, as if something had moved through the trees. Then they started again.
-
-"I won't," she said.
-
-"Call me when you're back in the truck. And Tayak—" His voice shifted, just slightly. "Good work."
-
-She stood on the field road for a moment after he hung up. The artifact bag was in her vest pocket — the small polyethylene square, sealed, the waterproof tag inside with Wren's handwriting on it: *FS-001. Unit N12E4. Level 2. 15 cm bd. 1 glass trade bead, opaque cobalt, cylindrical, 4mm. WC/TM. 14 June 2024.* The bead inside it was the size of a pea, and it weighed almost nothing, and it was the oldest physical proof she had ever held that her people had stood on this ground.
-
-She put her hand over her vest pocket and walked back toward the unit.
-
-The drive took twelve minutes. She knew because she had made it a hundred times — from the dig site on Route 6 down through the county roads to La Plata, past the Dollar General and the volunteer fire station and the church with the marquee sign that always had a different Bible verse on Fridays. Tonight it said *THE HARVEST IS PLENTIFUL.* She did not find this funny.
-
-The field kit sat on the passenger seat. The artifact bag was inside it, zipped into the small interior pocket where she kept her phone charger and her spare trowel. She had not moved it there for any scientific reason. She had moved it there because she wanted it close to her.
-
-She had been rehearsing the conversation since she pulled out of the field road. She would be calm. She would use the right words — *contact-period*, *colonial-contact horizon*, *approximately 1680 to 1700 based on bead typology*. She would explain the chevron pattern, the Dutch manufacture, the trade networks running up the Potomac. She would say: *This is the anchor for the petition, Nora. This is what we needed.* She would say it the way she said things in front of committees.
-
-She turned onto Nora's street and the rehearsal fell apart.
-
-The house was a white wood-frame on a corner lot, narrow-porched, with a fieldstone foundation that had been there longer than anything else on the block. Nora had lived in it for fifty-one years. The lights were on in the kitchen. They were always on in the kitchen.
-
-Tayak sat in the truck for a moment with the engine off. Through the window screen she could see the shape of her grandmother moving — the slow, deliberate movement of a woman who had learned to carry arthritis the way you carry a heavy coat, not by pretending it wasn't there but by adjusting your posture around it. Nora was at the stove. There was a smell coming through the window screen that Tayak could not name precisely but that meant *home* in the oldest part of her brain: something with onion, something with the cast-iron smell of the skillet Nora had used for forty years.
-
-She picked up the field kit and went inside.
-
----
-
-"You're dirty," Nora said, without turning around.
-
-"I know."
-
-"Wash your hands before you sit at my table."
-
-She washed her hands at the kitchen sink, the water running brown for a moment before it cleared. The narrow plank floor creaked under her boots the way it always had — a specific creak, third board from the door, that she had known since she was four years old. The kitchen had a new dishwasher that Kimi had bought Nora for Christmas and that Nora used as a drying rack. The radiator under the window was cold now, summer, but she could see the rust-orange stain on the plaster above it from decades of heat and steam.
-
-She dried her hands and sat down.
-
-Nora brought two cups of coffee and set them on the table — the heavy ceramic mugs, not the good china — and then she looked at Tayak's face and sat down across from her without going back for the food.
-
-"What did you find?"
-
-Tayak opened the field kit. She took out the artifact bag and set it on the table between them.
-
-The bead was visible through the polyethylene. Small, cobalt blue, the size of a pea. In the kitchen light it had a depth to it that it hadn't had in the afternoon field light — the color went down into itself, layer under layer, the white star-points at each end catching the overhead bulb and throwing it back.
-
-She had meant to say *contact-period*. She had meant to say *colonial-contact horizon*.
-
-What she said was: "It's small. Blue. Perfect. We pulled it out of the dark."
-
-Nora did not move. She was looking at the bag on the table, and her hands, which had been flat on the wood, had gone still in a way that was different from ordinary stillness.
-
-"The stratigraphy puts it in the 1680s," Tayak said. "The bead type is consistent with Dutch manufacture — chevron construction, multilayered glass, the star pattern at the ends. They were circulating through the Potomac trade networks in exactly that window. Lab analysis will confirm it, but I've seen enough to know what it is." She stopped. "It's the anchor, Nora. For the petition. It's the first physical proof."
-
-Nora reached out and touched the artifact bag with one finger. Not picking it up — just touching it, the tip of her finger against the polyethylene, as if she were checking whether it was real.
-
-Her finger was bent at the last joint, the arthritis having pulled it slightly sideways over the years, and the gesture had a quality to it that Tayak could not look away from. Like a woman touching something she had been waiting a long time to touch.
-
-"Which unit?" Nora said.
-
-"N12E4. About fifteen centimeters below the surface. Wren found it — she's good, she's very good, she stopped the moment she heard the tap."
-
-"Which part of the field?"
-
-Tayak told her. The northeast quadrant, the slight rise where the soil had gone darker and richer, the organic layer over lighter subsoil. She watched her grandmother's face as she said it.
-
-Nora's face did not change expression exactly. It did something more specific than that. It went the way a face goes when something you have known in your bones for a long time is finally confirmed out loud.
-
-"Nora." Tayak put both hands flat on the table. "Do you know something about this site that you haven't told me?"
-
-A pause. The refrigerator hummed. Outside, the tree frogs had started — the high, thin sound they made on summer nights, layered and continuous, like the sound of the county breathing.
-
-"I know whose that was," Nora said.
-
-Tayak felt something move through her chest — not quite fear, not quite hope, something that had the weight of both.
-
-"Sit down," Nora said, and then seemed to realize Tayak was already sitting, and almost smiled. "I need to tell you something about your great-great-grandmother's grandmother."
-
-She reached past the artifact bag and picked up her coffee cup. Her hands were steady. She had the look she got before she began a story she had been carrying for a long time — not the look of someone about to tell you something new, but the look of someone about to set down something heavy they have been holding upright for years, carefully, so it would not break.
-
 "Her name was Saya," Nora said. "And that bead was the only thing she kept from her mother."
 
 The kitchen went very quiet.
@@ -454,7 +304,7 @@ Nora set her coffee cup down. She did not answer immediately, and the not-answer
 
 "How long have you known what was in that mound?" Tayak said.
 
-Still nothing. Nora's hands were folded around the mug, the bent finger curved inward, and she was looking at the artifact bag on the table between them. Not at Tayak.
+Still nothing. Nora's hands were folded around the mug, the bent finger curved inward, and she was looking at the photograph on the phone screen between them. Not at Tayak.
 
 "Nora."
 
@@ -470,7 +320,7 @@ Tayak knew the name. Nora's grandmother. Schoolteacher. Dead sixty years.
 
 "Ida told you there was a bead in that mound."
 
-"Ida told me a story about Saya. About what Saya buried, and where, and why." Nora's thumb moved once across the side of the mug. "She told me in 1962. I was twenty years old. She sat me down at a table not much different from this one and she said: *I need to tell you something before I lose the words for it.* And she told me."
+"Ida told me a story about Saya. About what Saya left behind, and where, and why." Nora's thumb moved once across the side of the mug. "She told me in 1962. I was twenty years old. She sat me down at a table not much different from this one and she said: *I need to tell you something before I lose the words for it.* And she told me."
 
 The refrigerator hummed. Tayak did not move.
 
@@ -482,7 +332,7 @@ The refrigerator hummed. Tayak did not move.
 
 "I know how old you are." Not sharp — just level. "You weren't ready until you had a trowel in your hand and a permit in your pocket and something real to anchor it to. A story without an anchor is just a story. You needed the bead first."
 
-Tayak looked at the artifact bag on the table. The bead sat in its polyethylene window, cobalt blue, the star-points catching the kitchen light. Small and hard and patient, the way old things are patient — not because they wait, but because they simply endure while everything around them moves.
+Tayak looked at the phone on the table. The bead in its photograph — cobalt blue, the star-points catching the morning light. Small and hard and patient, the way old things are patient — not because they wait, but because they simply endure while everything around them moves.
 
 She had spent six years building the case for this excavation. She had written the permit application in three drafts. She had argued with Voss, negotiated with Marcus, driven out to this field in the dark to check the survey stakes before the crew arrived. She had done all of it believing she was the one who had found this.
 
@@ -496,39 +346,35 @@ Outside, a car passed on the road, its headlights sweeping briefly across the ki
 
 "Tell me about Saya," Tayak said finally.
 
-Nora nodded. She picked up the artifact bag and held it in both palms, the bead sitting in the center of the polyethylene like something cradled, and she looked at it for a moment with an expression Tayak could not name — recognition, maybe, or something older than recognition, something that did not have a word in English.
+Nora nodded. She looked at the photograph on the phone screen for a moment with an expression Tayak could not name — recognition, maybe, or something older than recognition, something that did not have a word in English.
 
-"Her mother was from the north," Nora said. "Lenape, or near enough. She came south along the Potomac with a trading party when Saya was very small, and she stayed. The bead came with her — it was a trader's gift, or a diplomat's gift, something given in that register where trade and ceremony are the same thing. Her mother wore it. When her mother died, Saya kept it. That was all she kept."
+"Her mother was from the north," Nora said. "Lenape, or near enough. She came south along the Potomac with a trading party when Saya was very small, and she stayed. The bead came with her — a trader's gift, or a diplomat's gift, something given in that register where trade and ceremony are the same thing. Her mother wore it. When her mother died, Saya kept it. That was all she kept."
 
 Tayak was watching her grandmother's face. Nora's voice had shifted — not into performance, not into the cadence of a formal telling, but into something quieter and more precise, the voice of a woman reciting something she has gone over so many times in her own mind that it has worn smooth.
 
-"The bead is in the mound," Tayak said, "because Saya buried it there."
+"How did the bead end up in the ground?" Tayak said.
 
-"Because Saya buried herself there, in a manner of speaking." Nora set the bag back on the table, gently, and folded her hands. "Not her body. Her claim. There was a document — she had written something, a petition of some kind, an argument for the land. When the petition failed, she buried it. She put the bead with it. Ida said she understood it as a kind of — a statement. *We were here. This is proof. Someone will find it.*"
+"Saya put it there." Nora's hands tightened slightly around the mug. "She was making a claim. An argument for the land — she had put it in writing, Ida said, a petition of some kind. When the petition failed, she buried it. She put the bead with it." A pause. "Ida understood it as a kind of statement. *We were here. This is proof. Someone will find it.*"
 
-The word *petition* landed in Tayak's chest like a stone dropped into still water.
+Tayak felt the word *petition* land in her chest. She did not ask the next question immediately. She held it for a moment, feeling its weight.
 
-"There's a document in the mound."
+"And the bead survived," she said. "Three hundred and fifty years."
 
-Nora said nothing.
+"Glass keeps," Nora said simply.
 
-"Nora. Is there a document in that mound?"
+Tayak looked at her grandmother's face — the deep lines around her eyes, the white hair, the bent finger curved around the mug. Sixty-two years of carrying this. Sixty-two years of watching the land, attending the council meetings, making the quilts, waiting.
 
-"Ida said there was." A pause. "Ida said Saya's husband wrapped it in oilskin and buried it deep. Whether it survived—" She lifted one hand and let it fall. "Three hundred years of Maryland ground. I don't know."
-
-Tayak sat very still. She was doing the arithmetic without meaning to — the stratigraphy, the depth, what oilskin does in anaerobic soil, what paper does, what ink does, what three centuries of wet and dry and freeze and thaw do to a thing a man wrapped carefully and put in the earth because he had run out of other options.
-
-"How did Ida know?" she said. "About the bead. About the document. How did the story get to her?"
+"How did Ida know?" she said. "How did the story get to her?"
 
 "The same way it got to me." Nora looked at her steadily. "Someone sat someone down at a table and said: *I need to tell you something before I lose the words for it.* Generation after generation. All the way back to Saya herself." She paused. "Ida was the one before me. Before Ida, her own grandmother. Before that—" She shook her head. "I don't know all the names in the chain. But the story is the same story. It hasn't changed."
 
 The overhead light buzzed faintly. Tayak had not noticed it before.
 
-She thought about Nora at twenty years old, sitting at a table like this one, listening to an old woman with a bent finger set down something heavy she had been carrying upright for years. She thought about all the women before Nora — the chain of them, each one holding the story in her hands, each one waiting for the right moment, the right person, the right anchor. She thought about Saya burying a bead in the dark and a man wrapping a document in oilskin and both of them understanding, somehow, that the proof had to outlast the moment. That someone would come.
+She thought about Nora at twenty years old, sitting at a table like this one, listening to an old woman set down something heavy she had been carrying upright for years. She thought about all the women before Nora — the chain of them, each one holding the story in her hands, each one waiting for the right moment, the right person, the right anchor. She thought about Saya burying a bead in the dark and understanding, somehow, that the proof had to outlast the moment. That someone would come.
 
 That someone was her.
 
-The vertiginous feeling was not dizziness exactly. It was more like the feeling of stepping back from a painting and suddenly seeing the whole composition — the thing you had been standing too close to understand.
+The feeling was not dizziness exactly. It was more like the feeling of stepping back from a painting and suddenly seeing the whole composition — the thing you had been standing too close to understand.
 
 She had thought she was excavating a site. She had been excavating her own family's ground. She had thought she was building a case. The case had been building toward her.
 
@@ -538,4 +384,10 @@ Nora looked at her with those steady dark eyes.
 
 "Sixty-two years," she said. "I've been waiting sixty-two years for someone to go and look."
 
-The tree frogs pulsed outside. The bead sat between them on the table, cobalt blue, older than anyone in the room by three centuries, carrying in its layered glass the whole weight of what Nora had just said — and the new, cold question that Tayak could not yet bring herself to ask: if the document was down there, and if Slade found out it existed before she could get to it, what would he do to stop her from reaching it first?
+The tree frogs pulsed outside. The phone lay between them on the table, the photograph still on the screen — the bead in its dark earth, blue and small and very old, carrying in its layered glass the whole weight of what Nora had just said.
+
+And underneath that weight, pressing up through it like the mineral sharpness Tayak had smelled when the trowel first broke ground, a new question she could not yet bring herself to ask: Saya had buried a petition. The ground had kept the bead. Whether it had kept anything else — whether there was more down there, deeper, waiting — that was a question for another layer. Another day. Another cut of the trowel.
+
+She was not ready for it yet.
+
+But she would be.
