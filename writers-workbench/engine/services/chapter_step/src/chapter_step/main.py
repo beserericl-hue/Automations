@@ -1218,7 +1218,12 @@ async def _op_repair(payload: dict) -> dict:
         min_length_ratio=min_ratio,
     )
     persist_result = None
-    if passes and payload.get("persist"):
+    # Persist whenever persist is requested — NOT only when a correction happened. A repair that
+    # re-scans and finds the chapter already clean must still record the verified aligned=True state,
+    # otherwise the stale pre-correction telemetry (aligned=False) lingers and the project view keeps
+    # showing drift that was already fixed. `drift` here is the POST-correction re-scan (see
+    # _drift_correct_pass), so the stored aligned reflects the true final state either way.
+    if payload.get("persist"):
         out = WriteChapterResponse(
             chapter_id=uuid4(), chapter_run_id=req.chapter_run_id, content_text=new_text,
             word_count=len(new_text.split()), sub_chapter_count=0, craft_passes=passes,

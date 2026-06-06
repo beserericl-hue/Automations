@@ -104,11 +104,14 @@ def _sb(path: str) -> list:
 
 # ----------------------------------------------------------------- one chapter
 
-def run_chapter(n: int) -> dict:
-    """Submit chapter n through the hub, poll to completion, return a result record."""
+def run_chapter(n: int, message: str | None = None) -> dict:
+    """Submit chapter n through the hub, poll to completion, return a result record.
+
+    Default message is a write; pass a 'fix …' message to drive the repair op instead (same entry,
+    the Gemini router picks chapter.repair)."""
     rec: dict = {"chapter": n, "started": time.time()}
     try:
-        resp = _hub(f"write chapter {n} of {PROJECT_TITLE}",
+        resp = _hub(message or f"write chapter {n} of {PROJECT_TITLE}",
                     {"project_id": PROJECT_ID, "project_title": PROJECT_TITLE})
     except Exception as exc:
         rec.update(status="submit_failed", error=str(exc)[:300])
@@ -141,6 +144,23 @@ def run_chapter(n: int) -> dict:
     rec.update(_verify_db(n))
     rec["status"] = "ok" if rec.get("chapter_row") and rec.get("telemetry_row") else "incomplete_persist"
     return rec
+
+
+def run_repair(n: int) -> dict:
+    """Drive the repair op through the hub ('fix …' routes to chapter.repair)."""
+    return run_chapter(n, message=f"fix the drift in chapter {n} of {PROJECT_TITLE}")
+
+
+def drifted_chapters(lo: int = 11, hi: int = 95) -> list[int]:
+    """Chapters whose LATEST telemetry row says aligned is false (the genuinely-flagged ones)."""
+    rows = _sb(f"chapter_qa_v2?select=chapter_number,aligned,created_at&project_id=eq.{PROJECT_ID}"
+               f"&chapter_number=gte.{lo}&chapter_number=lte.{hi}&order=created_at.desc")
+    latest: dict[int, bool] = {}
+    for r in rows:  # rows are newest-first; first seen per chapter is the latest
+        ch = r["chapter_number"]
+        if ch not in latest:
+            latest[ch] = r.get("aligned")
+    return sorted(ch for ch, aligned in latest.items() if aligned is False)
 
 
 def _verify_db(n: int) -> dict:
@@ -249,6 +269,8 @@ def main() -> int:
     ap.add_argument("--gate", type=int, help="run a single chapter and report")
     ap.add_argument("--mirror", type=int, help="verify + vault-mirror an already-written chapter (no gen)")
     ap.add_argument("--range", nargs=2, type=int, metavar=("START", "END"))
+    ap.add_argument("--repair-drifted", action="store_true",
+                    help="re-scan + fix every chapter whose latest telemetry is aligned=false (via hub)")
     ap.add_argument("--concurrency", type=int, default=10)
     args = ap.parse_args()
 
@@ -278,6 +300,26 @@ def main() -> int:
             snapshot_bible()
         print(json.dumps({k: v for k, v in rec.items() if k != "content_text"}, indent=2, default=str))
         return 0 if rec.get("status") == "ok" else 1
+
+    if getattr(args, "repair_drifted", False):
+        chapters = drifted_chapters()
+        cfg = {"range": f"repair-drifted ({len(chapters)})", "concurrency": args.concurrency}
+        print(f"[repair] {len(chapters)} drifted chapters: {chapters}", flush=True)
+        results: list[dict] = []
+        with ThreadPoolExecutor(max_workers=args.concurrency) as ex:
+            futs = {ex.submit(run_repair, n): n for n in chapters}
+            for fut in as_completed(futs):
+                rec = fut.result()
+                results.append(rec)
+                if rec.get("chapter_row"):
+                    mirror_to_vault(rec)
+                print(f"  ch {rec['chapter']}: {rec.get('status')} job={rec.get('job_status','-')} "
+                      f"{rec.get('duration_s','-')}s aligned={rec.get('aligned','-')} "
+                      f"words={rec.get('word_count','-')}", flush=True)
+        snapshot_bible()
+        still = [r["chapter"] for r in results if r.get("aligned") is False]
+        print(f"\n[repair done] {len(results)} repaired; still drifted: {len(still)} {sorted(still)}")
+        return 0
 
     if args.range:
         start, end = args.range
