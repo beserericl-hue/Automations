@@ -132,19 +132,29 @@ async def _load_context(project_id: str, payload: dict[str, Any] | None = None) 
     )
     proj_rows = getattr(proj_resp, "data", None) or [{}]
     proj = proj_rows[0]
-    bible_resp = await (
-        client.table("story_bible_v2")
-        .select("name,description,entry_type")
-        .eq("project_id", project_id)
-        .eq("entry_type", "character")
-        .execute()
-    )
-    roster = list(getattr(bible_resp, "data", None) or [])
+    outline = proj.get("outline") or {}
+    # Roster source of truth = the OUTLINE's curated character cast, NOT story_bible_v2. The bible
+    # accumulates a new row for every name variant each chapter extraction emits ("Marcus", "Marcus
+    # Fenn", "Marcus Redcloud"; 8 "Tayak" variants; possessives like "Kimi's boyfriend"; "The ..."
+    # fragments) — exact-name dedup never merges them, so over a 96-chapter novel it grows to ~300
+    # self-contradictory "characters". Feeding that to the writer AND the drift detector guarantees
+    # unfixable factual drift (the roster contradicts itself). The outline cast is the consistent,
+    # complete (~19 chars, with ages/roles) canon. Fall back to the bible only when the outline has none.
+    roster = _roster_from_outline(outline)
+    if not roster:
+        bible_resp = await (
+            client.table("story_bible_v2")
+            .select("name,description,entry_type")
+            .eq("project_id", project_id)
+            .eq("entry_type", "character")
+            .execute()
+        )
+        roster = list(getattr(bible_resp, "data", None) or [])
     return _apply_ctx_overrides(
         {
             "genre_slug": proj.get("genre_slug") or "",
             "title": proj.get("title") or "Untitled",
-            "outline": proj.get("outline") or {},
+            "outline": outline,
             "roster": roster,
         },
         payload,
