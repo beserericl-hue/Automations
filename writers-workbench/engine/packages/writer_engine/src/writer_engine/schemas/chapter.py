@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -15,7 +15,9 @@ class WriteChapterRequest(BaseModel):
 
     project_id: UUID
     chapter_number: int
-    chapter_run_id: UUID
+    # A unique id for THIS write run. The n8n path always supplied it; the engine hub (Path B, CR-004)
+    # and Eve do not, so it defaults — a missing run id must not 500 the whole chapter write.
+    chapter_run_id: UUID = Field(default_factory=uuid4)
     llm_strategy: Literal["sonnet", "haiku", "hybrid-draft-polish", "hybrid-smart", "tier-default"] = (
         "tier-default"
     )
