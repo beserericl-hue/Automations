@@ -1,4 +1,4 @@
-"""CR-007 — per-call token + cost accounting (token_usage_v2) and research topic-focus."""
+"""CR-007 \u2014 per-call token + cost accounting (token_usage_v2) and research topic-focus."""
 
 from __future__ import annotations
 
@@ -119,6 +119,38 @@ def test_repair_weaves_research() -> None:
     # repair op turns it on
     rep = inspect.getsource(main._op_repair)
     assert "weave_research=True" in rep
+
+
+def test_strip_em_dashes_removes_all_dash_variants() -> None:
+    from chapter_step.main import _strip_em_dashes
+
+    src = "gratitude \u2014 it was patience"          # em-dash
+    assert "\u2014" not in _strip_em_dashes(src) and _strip_em_dashes(src) == "gratitude, it was patience"
+    assert "\u2014" not in _strip_em_dashes("a beam \u2014 something there")
+    assert "--" not in _strip_em_dashes("a post -- a beam")
+    assert "\u2013" not in _strip_em_dashes("1840\u20131850 as a dash here")  # en-dash used as dash
+    # clean prose untouched
+    assert _strip_em_dashes("She knelt. The copper caught the light.") == "She knelt. The copper caught the light."
+
+
+def test_line_edit_rules_target_flagged_patterns() -> None:
+    from chapter_step.main import LINE_EDIT_RULES as r
+
+    assert "em-dash" in r.lower()
+    assert "run-on" in r.lower() or "clause-chain" in r.lower()
+    assert "not yet" in r  # the trailing-fragment AI tic from the user's example
+    assert "preserve meaning" in r.lower() or "preserve meaning AND length" in r
+
+
+def test_repair_runs_line_edit_on_every_chapter() -> None:
+    import inspect
+
+    from chapter_step import main
+    dc = inspect.getsource(main._drift_correct_pass)
+    assert "line_edit" in dc and "revises EVERY chapter" in dc
+    assert "line_edit=True" in inspect.getsource(main._op_repair)
+    # correction applies the em-dash backstop to its output
+    assert "_strip_em_dashes" in inspect.getsource(main._correct_drift)
 
 
 def test_research_prompt_has_topic_constraint() -> None:

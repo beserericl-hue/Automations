@@ -331,6 +331,38 @@ _SCAFFOLD_PREFIX = re.compile(
 )
 
 
+# Dash characters the writing directive bans (AI tells). Defined via escapes so the source carries no
+# ambiguous unicode: _EM = em-dash (U+2014), _EN = en-dash (U+2013).
+_EM, _EN = "\u2014", "\u2013"
+
+# Line-edit directive (repair): strengthen every sentence without changing meaning. Targets the
+# AI-prose signatures the user flagged: em-dashes, escalating clause-chains, trailing fragments.
+LINE_EDIT_RULES = (
+    "\n\nLINE EDIT: apply to EVERY sentence; preserve meaning AND length (this is sentence-level "
+    "strengthening, NOT condensing; do not cut scenes, content, or detail):\n"
+    f"1. Remove ALL em-dashes ({_EM}), en-dashes used as dashes ({_EN}), and double-hyphens (--). "
+    "Rewrite the sentence with a period or comma so it reads naturally; do not merely delete the dash.\n"
+    "2. Break run-on sentences and escalating clause-chains into clear, separate sentences. Example of "
+    f"what to fix: 'thank you was not the same as gratitude {_EM} it was a form of patience, and "
+    "patience was a kind of power, and she needed every kind she had.' Keep every idea, but unchain it "
+    "into plain sentences.\n"
+    "3. Cut AI stylistic tics: trailing fragments ('..., not yet', '..., or not'), piled-up "
+    "'the way you [verb]' similes, and abstract escalation ('a kind of X ... a kind of Y'). Prefer "
+    "concrete, strong, declarative prose.\n"
+    "4. Vary sentence length. Keep the author's voice and all story content intact.\n"
+)
+
+# Deterministic backstop applied after the LLM line-edit so no banned dash survives.
+_EM_DASH_RE = re.compile(f"\\s*(?:{_EM}|{_EN}|--)\\s*")
+
+
+def _strip_em_dashes(text: str) -> str:
+    """Last-resort guarantee that no em-dash / en-dash-as-dash / double-hyphen survives (the LLM
+    line-edit does the real rewriting; this catches stragglers). Replaces the dash with a comma +
+    space, which keeps the sentence grammatical without re-introducing the banned character."""
+    return _EM_DASH_RE.sub(", ", text)
+
+
 def _strip_scaffolding(text: str) -> str:
     """Drop leading meta/scaffolding paragraphs so the chapter starts on real story prose — not a
     'Confirmed cast' block, a 'POV CHARACTER: …' preamble, or a '## Chapter N — Revised Draft'
@@ -641,11 +673,12 @@ def _build_correct_system(genre_slug: str) -> str:
 async def _correct_drift(
     text: str, *, drift: DriftReport, roster_text: str, genre_slug: str, model: str,
     insist_length: bool = False, research_facts: str = "",
+    line_edit: bool = False,
 ) -> str:
     """QA cycle 2: streamed full-chapter revision that corrects story/character drift and, when
     ``research_facts`` is supplied (the repair path), WEAVES those researched facts into the prose to
-    fill the chapter's research gaps. Research that is fetched but not woven is wasted — so repair
-    passes the facts here and instructs the model to integrate them as concrete sensory/material detail."""
+    fill the chapter's research gaps. When ``line_edit`` is set, ALSO strengthens every sentence:
+    removes em-dashes, breaks run-on clause-chains, cuts AI tics — meaning and length preserved."""
     router = get_router(service=STEP_NAME)
     sd = "\n".join(f"- {x}" for x in drift.story_drift) or "(none)"
     cd = "\n".join(f"- {x}" for x in drift.character_drift) or "(none)"
@@ -665,26 +698,29 @@ async def _correct_drift(
         f"CHARACTER ROSTER (consistency reference):\n{roster_text}\n\n"
         f"STORY DRIFT TO CORRECT:\n{sd}\n\n"
         f"CHARACTER DRIFT TO CORRECT:\n{cd}\n"
-        f"{research_block}\n"
+        f"{research_block}"
+        f"{LINE_EDIT_RULES if line_edit else ''}\n"
         f"CHAPTER TO REVISE:\n{text}{insist}"
     )
     resp = await router.complete(
         provider="anthropic", model=model, system=_build_correct_system(genre_slug),
         prompt=user, max_tokens=32768, stream=True,
     )
-    return _strip_scaffolding(resp.text.strip())
+    return _strip_em_dashes(_strip_scaffolding(resp.text.strip()))
 
 
 async def _drift_correct_pass(
     text: str, *, ctx: dict[str, Any], req: WriteChapterRequest, roster_text: str, period: str,
-    model: str, min_length_ratio: float = 0.85, weave_research: bool = False,
+    model: str, min_length_ratio: float = 0.85, weave_research: bool = False, line_edit: bool = False,
 ) -> tuple[str, DriftReport | None, int]:
     """QA cycle 1 (detect drift vs outline/arc/roster + research gaps) -> QA cycle 2 (correct it).
 
     When ``weave_research`` is set (the REPAIR path), this also fetches focused research for the
     chapter's beat and WEAVES it into the correction — so a repair that surfaces research gaps actually
-    fills them in the prose, instead of researching for nothing. Returns (possibly-revised text, the
-    post-correction drift report, passes).
+    fills them in the prose. When ``line_edit`` is set (also REPAIR), EVERY chapter is revised for
+    sentence quality (em-dash removal, run-on/clause-chain simplification, AI-tic removal) even if it
+    has no drift — so all sentences in all chapters get strengthened. Returns (possibly-revised text,
+    the post-correction drift report, passes).
 
     ``min_length_ratio`` is the floor below which a (shrinking) correction is rejected. At WRITE time
     it is 0.85; the REPAIR op uses a higher floor now that the roster is clean (less to cut)."""
@@ -693,7 +729,7 @@ async def _drift_correct_pass(
         roster_text=roster_text, period=period, model=model,
     )
     if drift is None:
-        return text, None, 0
+        drift = DriftReport(aligned=True)  # line-edit still runs even when drift can't be scored
     # Fetch focused research when repairing — so research gaps can actually be filled in the prose.
     research_facts = ""
     if weave_research and (drift.research_gaps or drift.story_drift or drift.character_drift):
@@ -703,18 +739,19 @@ async def _drift_correct_pass(
         )
     has_drift = bool(drift.story_drift or drift.character_drift)
     has_research_to_weave = bool(weave_research and research_facts and drift.research_gaps)
-    if not (has_drift or has_research_to_weave):
-        return text, drift, 0  # aligned and nothing to weave
+    # line_edit revises EVERY chapter (sentence strengthening), even a clean one.
+    if not (has_drift or has_research_to_weave or line_edit):
+        return text, drift, 0  # aligned, nothing to weave, no line-edit requested
     draft_words = len(text.split())
     floor = min_length_ratio * draft_words
     revised = await _correct_drift(
         text, drift=drift, roster_text=roster_text, genre_slug=ctx["genre_slug"], model=model,
-        research_facts=research_facts,
+        research_facts=research_facts, line_edit=line_edit,
     )
     if len(revised.split()) < floor:
         retry = await _correct_drift(
             text, drift=drift, roster_text=roster_text, genre_slug=ctx["genre_slug"], model=model,
-            insist_length=True, research_facts=research_facts,
+            insist_length=True, research_facts=research_facts, line_edit=line_edit,
         )
         revised = max((revised, retry), key=lambda t: len(t.split()))
     if len(revised.split()) < floor:
@@ -837,6 +874,7 @@ async def _op_write(payload: dict) -> dict:
             {k: v for k, v in final_qa.model_dump(mode="json").items() if k in QA_DIMS}
             if final_qa else None
         )
+        text = _strip_em_dashes(text)  # writing directive: no em-dashes in output (write path too)
         out = WriteChapterResponse(
             chapter_id=uuid4(),
             chapter_run_id=req.chapter_run_id,
@@ -1281,7 +1319,7 @@ async def _op_repair(payload: dict) -> dict:
     min_ratio = float(payload.get("min_length_ratio") or 0.8)
     new_text, drift, passes = await _drift_correct_pass(
         text, ctx=ctx, req=req, roster_text=roster_text, period=period, model=model,
-        min_length_ratio=min_ratio, weave_research=True,
+        min_length_ratio=min_ratio, weave_research=True, line_edit=True,
     )
     persist_result = None
     # Persist whenever persist is requested — NOT only when a correction happened. A repair that
