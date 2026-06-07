@@ -144,3 +144,9 @@ def test_drift_system_allows_minor_scene_characters() -> None:
     assert "minor / walk-on" in s or "walk-on" in s
     assert "council members at a council meeting" in s
     assert "NOT drift" in s
+
+
+def test_drift_system_allows_additive_characterization() -> None:
+    s = _build_drift_system()
+    assert "ADDITIVE detail is NOT drift" in s
+    assert "CONTRADICTS an explicit roster fact" in s
