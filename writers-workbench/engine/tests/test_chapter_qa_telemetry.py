@@ -93,6 +93,21 @@ def test_persist_helpers_exposes_chapter_qa() -> None:
     assert hasattr(persist_helpers, "persist_chapter_qa")
 
 
+def test_bible_junk_filter_rejects_pollution() -> None:
+    # the variants/fragments that polluted the bible to ~1000 rows and broke the writer's roster
+    from writer_engine.persist_helpers import _is_junk_bible_name as j
+
+    assert j("Tayak's grandmother", "character") is True
+    assert j("Kimi's boyfriend", "character") is True
+    assert j("The clerk", "character") is True
+    assert j("commission chair", "character") is True  # generic lowercase role, no proper name
+    assert j("", "character") is True
+    # canonical cast + real concepts must pass
+    assert j("Marcus Redcloud", "character") is False
+    assert j("Nora Moyaone", "character") is False
+    assert j("cord-marked pottery", "concept") is False
+
+
 # --------------------------------------------------------------------------- CR-006 research link
 
 def test_persist_research_links_to_project() -> None:

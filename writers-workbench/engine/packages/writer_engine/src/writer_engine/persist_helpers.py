@@ -130,6 +130,26 @@ async def persist_chapter(
     return content_id
 
 
+def _is_junk_bible_name(name: str, entry_type: str) -> bool:
+    """Reject the entries that polluted the bible to ~1000 rows (CR-005/006 finding): possessives
+    ('Tayak's grandmother', "Kimi's boyfriend"), 'The ...' fragments, bare generic roles, and
+    one-word descriptors — for CHARACTER entries especially. These created dozens of fake/variant
+    'characters' that contradicted the canonical cast and broke the writer's roster."""
+    n = (name or "").strip()
+    if len(n) < 2:
+        return True
+    low = n.lower()
+    if "'s " in low or low.endswith("'s"):  # possessive -> a relation, not a character
+        return True
+    if entry_type == "character":
+        if low.startswith(("the ", "a ", "an ")):  # "The clerk", "A delegate"
+            return True
+        # generic role with no proper name (all lowercase, e.g. "commission chair", "constable")
+        if n == low and not any(ch.isupper() for ch in n):
+            return True
+    return False
+
+
 async def persist_bible(
     client: Any, *, project_id: str, user_id: str, entries: list[dict], chapter_number: int | None = None
 ) -> int:
@@ -138,6 +158,9 @@ async def persist_bible(
     Done as select-then-update/insert rather than a DB upsert: DEV's ``story_bible_v2`` has no UNIQUE
     constraint on (project_id, entry_type, name), so ``on_conflict`` raises 42P10. Each entry is
     independently best-effort so one bad row can't abort the rest (or mask the chapter persist).
+
+    Junk/variant names are filtered (see _is_junk_bible_name) so the bible stays a clean canonical
+    cast rather than accreting possessives/fragments that poison the writer's roster.
     """
     count = 0
     for e in entries:
@@ -145,6 +168,8 @@ async def persist_bible(
         if not name:
             continue
         entry_type = e.get("entry_type") or "concept"
+        if _is_junk_bible_name(str(name), entry_type):
+            continue
         row = {
             "user_id": user_id, "project_id": project_id, "entry_type": entry_type, "name": name,
             "description": e.get("description") or "", "last_chapter_seen": chapter_number,

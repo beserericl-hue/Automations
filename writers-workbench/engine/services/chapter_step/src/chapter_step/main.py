@@ -1220,9 +1220,11 @@ async def _op_repair(payload: dict) -> dict:
         "project_id": project_id or "00000000-0000-0000-0000-000000000000",
         "chapter_number": chapter_number, "chapter_run_id": payload.get("chapter_run_id") or str(uuid4()),
     })
-    # Repair accepts a shorter result (default floor 0.6): fixing heavy drift — cutting invented
-    # characters, duplicate scenes, contradictions — legitimately shortens the chapter; the fix wins.
-    min_ratio = float(payload.get("min_length_ratio") or 0.6)
+    # Repair accepts a shorter result while fixing drift, but not a gutted one. Floor raised 0.6 -> 0.8
+    # after the stress test: with the polluted roster, repairs over-cut (ch30 fell 7k -> 2.8k words to
+    # "align" against a self-contradictory cast). Now the roster is the clean outline cast, so there is
+    # far less to remove — keep at least 80% of the draft so a fix can't gut the chapter.
+    min_ratio = float(payload.get("min_length_ratio") or 0.8)
     new_text, drift, passes = await _drift_correct_pass(
         text, ctx=ctx, req=req, roster_text=roster_text, period=period, model=model,
         min_length_ratio=min_ratio,
