@@ -64,7 +64,16 @@ async def run_write_tool_job(_ctx: dict[str, Any], tool: str, body: dict[str, An
     status = dumped.get("status")
     logger.info("worker.write_tool.finish", tool=tool, op=op, chapter=chapter, status=status,
                 duration_s=round(time.monotonic() - started, 1),
-                error=(dumped.get("error") or {}).get("message") if status == "ERROR" else None)
+                error=(dumped.get("error") or {}).get("message") if str(status).lower() == "error" else None)
+    # CR-009: email the result + metadata on success (n8n parity). Best-effort — never affects the job.
+    if str(status).lower() == "ok":
+        try:
+            from writer_engine.notifications.task_email import send_task_completion_email
+
+            result = (dumped.get("payload") or {}).get("result") or {}
+            await send_task_completion_email(tool, body, result)
+        except Exception as exc:
+            logger.warning("worker.task_email.error", tool=tool, error=str(exc)[:200])
     return dumped
 
 
