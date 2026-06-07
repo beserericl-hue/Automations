@@ -1,227 +1,441 @@
 # Chapter 78: Voss Reads the Report [Present — 2024]
 
-> **drift aligned:** True  |  **QA avg:** None  |  **words:** 3649  |  **job:** None  (Nones)
+> **drift aligned:** False  |  **QA avg:** None  |  **words:** 5801  |  **job:** None  (Nones)
 >
 > **research topics used:** (none)
 >
 > **bible entries loaded into prompt:** Dr. Tayak Moyaone, Nora Moyaone, Garrett Slade, Marcus Redcloud, Dr. Elliot Voss, Kimi Moyaone, Wren Calvert, Siosaia (called Saya), Okwi, Matta, Tessa (Tessahki), Ahanu, Sokan, Waya, Kessik, Pell, Yanu, Ranu, Ida Moyaone
 >
-> **drift report:** `{"aligned": true, "story_drift": [], "research_gaps": ["Marshalltown trowel brand-name anachronism check \u2014 confirm Marshalltown Company trowels were in archaeological field use by early 2000s and would be the expected tool in 2024", "Mattawoman Creek tidal/brackish character at this inland Charles County location \u2014 verify salinity intrusion reaches this far upstream in late summer", "NSF proposal misconduct referenced obliquely \u2014 confirm whether the outline specifies this backstory for Voss or whether it is being introduced here without a prior scene establishing it", "Section 106 and NAGPRA named as procedural context \u2014 verify both apply to this site's legal situation as described in the arc (Section 106 requires federal nexus; confirm one exists)", "Loblolly pine as dominant eastern ridge species in Charles County \u2014 period-correct and ecologically accurate for this drainage, worth a quick verify", "Sumac and scrub willow at field edge \u2014 confirm both are plausible riparian-edge species for Mattawoman Creek corridor", "Great blue heron behavior \u2014 southward movement along creek in late summer is plausible; no flag, but worth confirming seasonal direction for this latitude"], "character_drift": []}`
+> **drift report:** `{"aligned": false, "story_drift": ["The chapter contains two structurally separate phone calls with Voss rather than the single call specified in the outline beat; the second call largely repeats the first call's content (offer to remove disclosure, Tayak's refusal, Voss's pledge of support), diluting the scene's dramatic economy.", "The outline beat specifies the call ends with Tayak thanking Voss and hanging up \u2014 a clean, final beat; the chapter instead has Voss call back forty minutes later and re-litigate the same ground, then a third coda section after that, fragmenting what should be a single climactic exchange.", "The outline beat does not include Voss disclosing that the university provost's office already has a copy and has likely flagged the disclosure; this is a significant new plot development (days-maybe-less deadline) not sanctioned by the planned beat.", "The outline specifies Voss tells Tayak the report is the most important Chesapeake archaeology in fifty years \u2014 the chapter renders this correctly \u2014 but also has him volunteer that the accelerated radiocarbon protocol results arrive in eight days and discuss commission timing, which is new expository plot information beyond the beat's scope.", "The outline beat ends on the hang-up; the chapter continues for several hundred words of interior reflection and a final trench-side coda after the call is over, shifting the chapter's emotional endpoint away from the phone call itself."], "research_gaps": ["SharePoint as the institutional file-sharing platform \u2014 verify UMD archaeology department used SharePoint for confidential report submission in 2024 rather than a discipline-specific repository such as tDAR or an IRB portal", "Maryland Historical Trust / SHPO submission protocol \u2014 confirm whether a PI's personal disclosure of descendant status is standard in Section 106 reports or unusual enough to warrant the reaction described", "Phragmites australis as dominant reed at a Charles County Potomac-adjacent site \u2014 ecologically accurate but worth confirming against site-specific vegetation surveys given ongoing Phragmites eradication efforts in the watershed", "Munsell 10YR 4/2 grayish-brown as B-horizon color for Charles County alluvial terrace soils \u2014 verify against USDA Web Soil Survey for the specific soil series likely at this site", "Accelerated AMS radiocarbon protocol turnaround \u2014 eight days is plausible for Beta Analytic rush service; confirm current 2024 pricing and turnaround for institutional accounts"], "character_drift": ["Voss's monograph is described as placing the regional trade-network center forty miles north of the mound; the roster does not specify this geographic detail, but more critically the chapter has Voss explicitly acknowledge his monograph may require retraction \u2014 this is a significant characterization choice not established in the roster and risks flattening his complexity prematurely.", "The chapter has Tayak address Voss as 'Elliot' and the narration treats this as a first \u2014 consistent with roster \u2014 but the second call has her use 'Elliot' again without the same weight, diluting the moment's singularity."]}`
 
 ---
 
-The trench was two feet deep at the south end and three at the north, and Tayak had been working the north face since six-thirty, when the light was still gray enough that she'd needed her headlamp. Now it was past nine and the lamp hung around her neck unused, and the sun had cleared the loblolly pines on the eastern ridge and was hitting the exposed profile in a way that made the color changes readable. She could see the boundary between stratum six and stratum seven — a line so faint it looked like a shadow until you understood it wasn't.
+The trench smelled of clay and old water, the particular cold sweetness of earth that hasn't seen sun in a thousand years. Tayak was on her knees at the eastern wall, a soft brush in her right hand and a hand trowel in her left, working a seam where the seventh stratum met the compacted subsoil below it, the floor of the world, as far as this site was concerned. Her knees ached. Her back ached. She hadn't eaten since six in the morning and it was now past two, and she didn't care about any of it because the wall in front of her was perfect. Undisturbed. Every layer as clean and legible as a sentence.
 
-She was on her knees with the Marshalltown, working a horizontal pass across the face, when the phone buzzed in her breast pocket.
+She had submitted the report at 11:47 that morning. She knew the exact time because she had watched the upload bar on her phone crawl across the screen, the SharePoint link going out to Voss's institutional address with the subject line she had rewritten four times. The final version read: *Final Report, 18CH-441, Moyaone et al., CONFIDENTIAL.* Nothing else. She had put her phone face-down in the dirt beside the trench and gone back to work, because there was nothing left to do but wait, and she couldn't wait without her hands moving.
 
-She didn't reach for it. She finished the pass, set the trowel on the edge of the trench, and pulled off her right glove before she looked at the screen.
+Wren was at the north end of the trench, photographing the post-mold pattern they'd exposed two days ago. The camera's shutter clicked in a slow, steady rhythm. Neither of them had spoken in almost an hour.
 
-University of Maryland, College Park. The main anthropology extension.
+The phone buzzed.
 
-She stared at it through two more buzzes. Then she climbed out.
+Tayak felt it before she heard it, the vibration through the packed earth, up through her knees. She looked down. The screen had lit against the dirt, Voss's name bright in the afternoon shadow of the trench wall.
 
-The field was still wet from last night's rain — the kind of late-summer rain that doesn't cool anything, just adds weight to the air. Her boots left prints in the soft grass as she walked to the field's edge, away from the trench, away from where Wren was working the west transect. She could hear Wren's trowel, a small patient sound, and then she couldn't.
+She didn't pick it up.
 
-"Moyaone."
+The first ring. She set the brush down on the edge of the trowel's blade, very carefully, the way she set things down when her hands weren't steady.
 
-"Dr. Moyaone." Voss's voice was careful. Not the voice he used in faculty meetings, where he projected toward the back wall. This was the voice he used when he had read something that changed his thinking and was not yet ready to admit how much. "I've been with your report since seven o'clock this morning."
+The second ring. Wren had stopped taking photographs. Tayak could feel her student watching from the north end without looking up to confirm it.
 
-She said nothing. The field edge was a line of sumac and scrub willow, leaves already going yellow at the tips, and beyond it the ground dropped toward Mattawoman Creek. She could smell the creek — brackish, warm, faintly rotten in the way of late-summer tidal flats. She had grown up with that smell. It meant home and it meant complicated.
+The third ring. She thought about what the call could be. She had been thinking about it since 11:47, turning the possibilities in her mind the way you turn a stone to find its flaws. Voss could be calling to tell her the report was extraordinary. He could be calling to tell her the personal disclosure, the section she had written about her grandmother, about the chain of stories, about her own family's connection to this ground, had made the report unacceptable. He could be calling to tell her both things at once, which was the outcome she feared most, because it would mean the work was real and the work would still be taken from her.
 
-"I want to be precise," Voss said. "The stratigraphic sequence in section four. The calibrated dates on the cord-marked ceramic against the pendant's context layer. The boundary description cross-referenced with the 1687 Calvert patent." A pause. "Tayak. This is the most significant piece of Chesapeake archaeology I've seen in fifty years of reading reports."
+She picked up on the fourth ring.
 
-She had hoped for this. She had also spent the last three days convincing herself not to hope for it, because hope had a way of making the other thing worse when it came. And the other thing always came.
+"Dr. Moyaone." His voice had the careful, slightly elevated tone he used when he was containing something. She had heard it twice before, once when she got the field grant, once when the university denied her tenure extension.
 
-"I'm glad you think so," she said.
+"Dr. Voss."
 
-"The disclosure." He said it the way you say the name of a weather system that has already made landfall. "The personal affiliation section. The statement about your connection to the Piscataway recognition petition and to the oral chain documented in appendix C."
+"I've been reading since noon." A pause. She heard the faint hum of his office HVAC, the soft chime of something on his computer. "I haven't stopped."
 
-There it was.
+She said nothing. The trench wall was six inches from her face. She could see the distinct color change between Stratum Six and Seven, the darker band of the sixth, rich with charcoal and organic material, and below it the paler, denser clay of the seventh, where the pendant had been. Where Yanu had been, two thousand years ago, pressing copper into the earth with her own hands.
 
-She turned so the sun was at her back. Across the field she could see the trench — a long dark rectangle in the grass, precise and deliberate, the way she had learned to make them. Eleven months of work. The north face with its color-change boundary. Stratum seven below that, the deepest layer, where the ground had given her what she had come for.
+"The stratigraphic context," Voss said. "The radiocarbon assays on the organic material from the seventh stratum. The post-mold pattern in relation to the feature complex." He stopped. She heard him exhale. "Tayak. This is the most intact burial feature I have seen documented in the Chesapeake in fifty years of reading this literature."
 
-"The personal disclosure," he said. "Your family connection to the site, the affidavit, the chain of names. It will be used against you. Not against the methodology. The methodology is clean and they know it. Against you. Opposing counsel, if this goes to the commission. The state's heritage office. Possibly the university."
+She closed her eyes.
 
-"I know what they'll do with it," she said.
+"The unplowed context alone," he said. "The fact that you have seven continuous cultural horizons with diagnostic artifacts in situ, the GIS overlays, the LiDAR mapping, this is not a site. This is a record. This is the kind of site people write monographs about."
 
-"Then you understand the exposure."
+She opened her eyes. The trench wall was still there. The color change between the strata was still there, exact and patient, indifferent to what any of them said about it.
 
-"I understand it."
-
-"The report is extraordinary. The methodology is clean, the documentation is thorough, the radiocarbon calibration is sound. None of that is in question." He stopped. She heard him exhale — not a sigh, just a breath that carried weight. "But the disclosure hands them a lever. Anyone who wants to argue conflict of interest now has language to work with. Descendant-community affiliation. Personal stake in the recognition outcome. They will call the interpretation tendentious. They will say the researcher cannot be objective about her own ancestors."
-
-The word *ancestors* in his mouth. She noticed how he used it — carefully, without irony, as if he had practiced it.
-
-"They'll say that regardless," she said. "The disclosure just gives them a sentence to quote."
-
-"Yes." He seemed to agree with this more readily than she expected. "But there is a difference between an argument and a citation."
-
-A great blue heron lifted off from somewhere below the field edge, its wings making a slow, heavy sound as it cleared the willows. She watched it go — long neck folded, legs trailing, moving south along the creek line the way they always did, unhurried, as if they owned the airspace.
-
-"Dr. Voss," she said. "Are you calling to tell me to remove it?"
-
-The pause was long enough that she counted it. Four seconds. Five.
-
-"I'm calling," he said, "to ask if you want my help to remove it."
-
-She watched the heron until it was gone behind the tree line.
-
-"No," she said.
-
-Another pause. Shorter this time.
-
-"All right." He didn't push it. She had expected him to push it. "Walk me through your thinking."
-
-"The affiliation is material to the research design. The oral chain in appendix C is primary evidence. If I strip the disclosure, I'm representing the chain as an external source with no connection to the investigator. That's not accurate."
-
-"It would be defensible."
-
-"It would be a lie."
-
-He said nothing. She heard, faintly, the sound of pages — actual paper, which surprised her. She had assumed he would be reading on a screen.
-
-"The cord-marked ceramic," he said. "The rim sherd from the west transect. Your dating puts it at Late Woodland, pre-Contact, consistent with the calibrated range on the pendant context layer."
-
-"The ceramic calibration is independent. Wren logged it. The provenience is clean."
-
-"I know." He wasn't questioning it. He was thinking out loud, which was a thing he did when he was building a position. She had watched him do it in departmental meetings — assembling the argument in front of the room, letting people see the architecture go up. "The pendant's context layer. The 100 BC calibration on the organic material from stratum seven. That's the anchor."
+"There's a section," Voss said, and his voice changed, not colder, but more careful. "Pages forty-one through forty-seven. The personal disclosure."
 
 "Yes."
 
-"And the Calvert boundary description."
-
-"Cross-referenced in section six. The 1687 patent uses the mound as a survey marker. The colonial government knew it was a Piscataway burial site when the grant was issued. That's in the record. I didn't make it."
-
-"No." He paused. "You found it."
-
-She didn't answer. The sun was fully up now, hitting the exposed profile at the angle she'd been waiting for since six o'clock. She needed to be back in the trench. She needed to finish the horizontal pass before the light shifted. She was standing at the field's edge talking to a man who had spent the last two and a half months as her institutional problem, and she was aware, in the way she was always aware of time on a site, that the light would not hold.
-
-"The 100 BC dating," Voss said. "In combination with the Calvert reference and the oral chain documentation. Tayak." He stopped. When he started again his voice had changed — the calculated quality gone, something more direct underneath it. "I've been in this field since 1978. I read the St. Mary's City reports when they came out. I was at the Jamestown symposium in 2001. I have seen a great deal of very good work."
-
-She waited.
-
-"This is different," he said. "This is not incremental. This moves the pre-Contact occupation date for this drainage system by three centuries and ties it, documentarily, to a living community's land claim. That does not happen. That is not a thing that happens."
-
-She had known this. She had known it since the morning she'd read the calibration results on her laptop in the field trailer, the fan running hot, the numbers on the screen not changing no matter how many times she looked away and looked back. She had sat with it for four days before she told anyone. She had not cried. She had gone back to the trench and done another horizontal pass and logged it in the field book in her ordinary handwriting, because that was what the work required.
-
-She did not say any of this to Voss.
-
-"The methodology holds," she said.
-
-"The methodology is impeccable." He said it flatly, as a fact, the way you state a measurement. "Which is why the disclosure is the only available target. It's the one place where someone who wants to discredit the findings can plant a flag. And there are people who will want to."
-
-"I know who they are."
-
-"Some of them," he said, "are closer than you think."
-
-She turned that over. She did not ask him to name them. She had her own list and she was not ready to compare it with his.
-
-"The report stands as filed," she said.
-
-A long breath. "Yes. All right." And then, unexpectedly: "The copper pendant. Stratum five. The context description in section four, paragraph three." She heard the pages again. He had printed the whole thing — forty-three pages plus appendices, and he had printed it. "The way you describe the placement. Face-up. Deliberate. The absence of disturbance in the surrounding matrix suggesting a single depositional event." He paused. "That's not an accident of preservation. Someone put it there."
+"Your grandmother. The oral tradition. Your family's connection to the site."
 
 "Yes."
 
-"Someone who knew what they were doing."
+A pause long enough that she heard him shift in his chair. "You know what they'll do with it."
 
-She looked at the trench. From here she could see the north face — the color change between stratum six and seven, the line that looked like a shadow until you understood it wasn't. Below that line was where the pendant had come from. Below that line was where the woman had knelt, two thousand years ago, and pressed her hands flat and said a name.
+"I know."
 
-"Yes," Tayak said. "Someone who knew exactly what they were doing."
+"They'll call it advocacy. They'll say you can't be objective. The SHPO, Slade's office, they'll use it to question the report's standing. They may try to refer it to the ethics committee."
 
-He was quiet for a moment. Not the silence of a man with nothing to say. The silence of a man sitting with something he hadn't expected to feel.
+"I know," she said again.
 
-"The disclosure stays," he said finally. Not a question.
+Wren had set the camera down. She was sitting on the trench's edge now, her legs dangling, watching Tayak with the expression she wore when she was trying not to look worried and failing.
 
-"The disclosure stays."
+"I can help you remove it," Voss said. "The disclosure section. We could reframe the oral tradition material as secondary source consultation, cite it as community knowledge, keep your name out of the personal connection. It would still be in the report. It would just be, "
 
-"Then I will support it. Formally. In writing, on university letterhead, to the commission and to whoever else needs to receive it. I will put my name to the findings and to the disclosure both. I want that understood."
+"Buried," Tayak said.
 
-She looked at the trench. Below the stratum-six line, below the dark boundary that had taken her four months to reach, was where the pendant had come from. A woman had knelt in that earth — not a hypothesis, not a cultural horizon, a woman — and pressed her palms flat against the ground and said a name over her daughter. The pendant had been face-up, copper gone green with age, the cord long since dissolved, the gesture still legible in the placement. You could read the care in it. Tayak had read it, and documented it, and written forty-three pages in the careful qualified language of the discipline, and then she had written one paragraph that said: *the oral tradition preserved by the descendant community constitutes independent corroboration of the stratigraphic sequence, and the author discloses a direct familial connection to that community.*
+Silence.
+
+"That's not what I meant."
+
+"I know it isn't." She shifted her weight off her left knee, which had gone numb against the clay. Above her, the afternoon light was cutting hard across the top of the trench, and the shadow line was moving. Another hour and she'd lose the light. "The answer is no, Elliot."
+
+She had never called him by his first name before. She wasn't sure why she did it now. It felt like the right size for what she was saying.
+
+"The disclosure stays," she said. "My grandmother's words stay. The chain of transmission stays. All of it."
+
+Another silence, shorter this time. "All right."
+
+"All right?"
+
+"I said all right." She heard something that might have been the creak of his chair, or might have been him setting the report down on his desk, the printed version, she realized, which meant he had printed two hundred and fourteen pages, which meant he had been serious about reading it from the beginning. "I'm going to support the report as submitted. I want you to know that before anything else happens."
+
+The cold sweetness of the trench was all around her. She pressed her free hand flat against the clay wall, feeling the slight give of it, the damp.
 
 "Thank you," she said.
 
-She had not said it to him before. Not once in four years of shared institutional space, not after the hearing, not after the withdrawal letter. She heard the word land between them and she did not take it back.
+She had never said that to him either. Not like this, not without the professional padding around it, the *thank you for your time* and *I appreciate your consideration.* Just the two words, plain and direct, the way you said them when you meant them.
 
-A brief pause. As if he too were noting it.
+"Don't thank me yet," Voss said. "The university received a copy at the same time I did. Someone in the provost's office will have flagged the disclosure section by now. Possibly already."
 
-"I'll have the letter to you by end of day," he said. "The commission deadline—"
+Her hand stayed flat against the wall. She felt the cold move up through her palm.
 
-"Twenty-two days."
+"How long do I have?"
 
-"Twenty-two days. All right." Another pause, shorter. "Go back to your trench, Tayak."
+"Before they act on it?" He paused. "Days. Maybe less."
 
-She ended the call.
+The line went dead.
 
----
+Tayak kept her hand against the clay. The cold moved up through her wrist, into her forearm, and she let it. Above her the shadow line had shifted another inch across the trench floor while she'd been on the phone. The light was going.
 
-Wren was working the west transect, forty feet south. The sound of her trowel was steady and unhurried — the particular rhythm of someone who had learned to let the ground tell her when to stop. Tayak had not told Wren about the call yet. She would, but not now.
+She had known this was coming. She had known it since she typed the first sentence of page forty-one, since she wrote *my grandmother told me this story when I was nine years old, sitting on the back steps of our house in La Plata, and she told it the way her grandmother told it to her, and I have never had reason to doubt it, and I will not pretend otherwise in a scientific document.* She had known it and she had written it anyway, and now the knowing had a shape and a timeline and the timeline was days.
 
-Now she needed a few minutes with the light and the stratum boundary and the fact that Voss had said *formally, in writing, on university letterhead*, and she needed to decide what she thought of a man who would do the right thing without being able to say why the wrong thing had been wrong.
+Days. Maybe less.
 
-She had thanked him anyway.
+She pulled her hand from the wall.
 
-She was still working out what that meant.
+"Tayak." Wren's voice, from above. Not a question. Just her name, the way Wren said it when she wanted to know if Tayak was still in her body.
 
-The trench was exactly as she had left it — the north face catching the light at the low morning angle, the stratum boundary sharp and dark between six and seven. She had been staring at that line for four months. It looked like a shadow until you had spent enough time with it to understand it was a record: compaction, organic content, the slow chemistry of two thousand years of burial. The line did not care whether the institution supported the report. The line did not care what Voss wrote on his letterhead. It had been there since before the colonial boundary descriptions, before the county court orders, before the land patents and the quiet title inquiries and the thirty-day clocks. It would be there after all of them.
+"I'm here." She looked up. Wren was still on the trench edge, legs dangling, the afternoon light behind her making her face hard to read. "Pack up the camera. We're losing the light."
 
-She crouched at the trench edge and looked down.
+"What did he say?"
 
-Below stratum six, below the dark line, was where the pendant had come from. A woman had knelt in that earth and pressed her palms flat against the ground and said a name over her daughter. The pendant had been face-up, copper gone green with age, the cord long since dissolved, the gesture still legible in the placement. You could read the care in it. Tayak had read it, and documented it, and written forty-three pages in the careful qualified language of the discipline, and then she had written one paragraph of truth.
+Tayak climbed the ladder. Her left knee complained on the third rung. She came up into the full weight of the afternoon, the smell of the Potomac somewhere behind the tree line, brackish and faintly diesel, the way it always smelled when the wind came off the water, and stood for a moment with her hands on her hips, looking back down into the trench.
 
-They would come at her with the one paragraph. Voss had said so and he was right. The commission, the university's risk office, anyone whose interest lay in the land rather than in what the land held. They would say *conflict of interest* and *compromised objectivity* and *the researcher's personal position* and they would mean: *we would prefer the record not to contain this.* They would mean: *the connection between the living people and the ground is inconvenient.* They would mean what the colonial boundary descriptions had meant when they buried the Piscataway settlement in a subordinate clause and called it a survey marker.
+From up here, the color change between strata six and seven was less visible. You had to be inside it to see it. You had to press your face close to the wall and let your eyes adjust.
 
-She had spent eleven months excavating against that logic. She was not going to practice it in the final report.
+That was the thing about evidence. It didn't announce itself. It waited for someone willing to get down into the dark with it.
 
-Voss had not apologized.
+"He said it's the most significant Chesapeake report in fifty years," she said.
 
-She had noticed it the way you notice a gap in stratigraphy — not by what is there but by what isn't. The NSF proposal. Her coordinates, her site numbers, her six months of field assessment stripped to a clean data layer and slotted into a grant that had his name on it and not hers. The hearing panel had called it administrative error. Voss had withdrawn the proposal. He had called her this morning and offered his name on a letter that would cost him something professionally, or might, and he had not once said *I was wrong* or *I am sorry* or anything that would require him to look directly at what he had done.
+Wren was quiet for a moment. Then: "He actually said that?"
 
-She had thanked him anyway.
+"He named sections." Tayak crouched and began folding the tarp they'd laid over the trench edge. "The radiocarbon assays. The post-mold pattern. The GIS overlays." She smoothed a crease. "He said the unplowed context alone."
 
-She thought: it is enough. It has to be enough. Twenty-two days.
+Wren set the camera in its case and clicked the latches. "He read all of it."
 
-She thought: Nora is eighty-two years old and has been carrying a name in her mouth for sixty-two years and she did not wait for an apology from the institutions that made the carrying necessary. She just kept the name.
+"He read all of it."
 
-Tayak picked up her Marshalltown from the edge of the spoil tray. The handle was worn smooth at the grip from eleven months of use — she had carried it since Marant's field season on the Patuxent lowlands, and before that Marant had carried it herself for six years, and the wood held both histories in the grain without distinguishing between them.
+The tarp was stiff with dried clay along one edge, a rust-colored line that matched the third stratum exactly, the color of the world in Matta's time. Tayak folded it anyway, crease by crease, the way her grandmother had taught her to fold quilts. You started from the corners. You kept the edges true.
 
-She climbed down into the trench.
+"And the disclosure section?" Wren said.
 
-The letter would come by end of day. Voss would send it to the commission and to whoever else needed to receive it, and his name on the university's letterhead would do work that her name alone could not do in this particular room at this particular moment, and she knew that and he knew that and neither of them had said it aloud because there was no version of saying it aloud that wasn't its own kind of indictment. That was the architecture of the thing. That was what she had thanked him for — not the decency of it, which was real, but the utility of it, which was also real, and the fact that she could not fully separate the two was the thing she could not name.
+"He offered to help me remove it."
 
-She set the trowel against the stratum-seven face and began to work.
+Wren's hands went still on the camera case. "What did you say?"
 
-The light was still good.
+"I said no."
 
----
+A pause. The HVAC of Voss's office was gone now, replaced by the sound of wind moving through the Phragmites at the field's edge, a dry, papery sound, like someone turning pages very fast. Somewhere on the water a workboat engine turned over and settled into its low diesel grumble.
 
-The air was warming — late morning now, the angle of the light shifting so the north face of the trench caught it differently, the stratum boundary less sharp in the new angle, the dark line softening at its upper edge. In two hours it would be direct overhead and she would lose the reading entirely until late afternoon. She had learned the light here the way she had learned the stratigraphy — by being present for it, day after day, until the patterns were in her body rather than just in her field log.
+"He's going to support the report anyway," Tayak said. "As submitted."
 
-She paused her trowel and looked at the face.
+Wren let out a breath. "Okay. That's, okay. That's something."
 
-Below stratum seven was where the chain began. Not the chain of reports and permits and Section 106 consultations and NAGPRA filings — the other chain. The one Nora held. The one that ran from this ground through every woman who had carried the name forward, through Ida and Ida's grandmother and the keeper before her, all the way back to a woman kneeling in earth that was not yet a mound, pressing her palms flat, saying the name of her daughter into ground that would hold it for two thousand years.
+"The university already has a copy."
 
-Tayak had excavated down to the edge of that chain. She had documented it in forty-three pages of careful qualified language. She had disclosed the connection in one paragraph, and she would not take the paragraph back, and Voss would stand behind it in writing, and in twenty-two days she would walk into a commission room and put all of it on a table and let the room decide what it was worth.
+The breath stopped.
 
-And Nora would come. And Nora would say the name.
+"Someone in the provost's office," Tayak said. "He thinks they'll have flagged the disclosure section by now. He said days. Maybe less."
 
-For the first time since the permit suspension, she felt something that was not urgency and not dread. She could not name it exactly. Something like: *the ground is real, and I have read it correctly, and the people who made it are real, and the name is real, and I am going to say so in a room that would prefer I didn't.*
+Wren picked up the camera case and stood. She was twenty-eight years old and she had the particular stillness of someone who had grown up being told that careful, quiet work was its own reward, and who had recently begun to suspect that this was not always true. She stood with the camera case in both hands and looked at Tayak with an expression that was not quite fear and not quite anger and was exactly the thing that lived between them.
 
-The fight ahead.
+"What do we do?" she said.
 
-She let herself look at it plainly. The commission would receive the report and Voss's letter and Nora's affidavit and sixty-two years of carried knowledge, and someone across a table would use the word *objectivity* to mean its opposite, and someone else would use the word *process* to mean *delay*, and the thirty-day clock would keep running, and Garrett Slade's bulldozers were still scheduled, and somewhere in a Columbia office park a man named Pruitt was watching the same clock from the other side. She had known all of this before the call. The call had not changed the shape of the fight. It had changed one thing: Voss's support was now on record. And so was everything she had refused to hide.
+Tayak looked back down into the trench. The shadow line had reached the seventh stratum now. In another twenty minutes the whole trench floor would be in shade, and the color change between the strata would disappear into the general dark, and you wouldn't be able to see it at all unless you knew exactly where to look.
 
-Both things on record. That was the architecture of it.
+"We document," she said. "Everything we haven't documented yet. We photograph every section of that wall before the light goes. We finish the artifact table for the seventh stratum tonight." She picked up the folded tarp. "And tomorrow morning I call Marcus."
 
-Wren's trowel was still moving, forty feet south — the steady unhurried rhythm of someone who had learned to let the ground set the pace. The sound was grounding. Tayak had worked beside that sound for four months without fully registering how much she relied on it.
+She started toward the equipment tent. Behind her she heard Wren follow, the camera case knocking softly against her hip with each step.
 
-She thought of Nora.
+Days. Maybe less.
 
-Eighty-two years old. The name had been in her mouth for sixty-two years — held there through her daughter's leaving, through Tayak's childhood, through every season the mound had sat unexcavated and the institutions that might have protected it had looked the other way. Nora had not waited for anyone's letter. She had simply kept the name the way you keep a fire in bad weather: not because you are certain the fire matters, but because you are certain the cold does.
+She had two hundred and fourteen pages of evidence and a grandmother whose words were on page forty-three and a trench that went down seven strata and two thousand years, and somewhere in the provost's office a person she had never met was reading a section heading that said *Personal Disclosure and Relationship to Site* and reaching for a phone.
 
-*I will tell you when you are standing in the right place.*
+She kept walking. The Phragmites rattled in the wind. The workboat engine faded out across the water and was gone.
 
-The hearing was in twenty-two days.
+The call came back forty minutes after she'd hung up on him.
 
-She thought: the right place might be a commission room in Annapolis with fluorescent lights and a folding table and a state official reading from a legal brief. She thought: Nora would come anyway. She thought: Nora had been coming to rooms like that her whole life, carrying things that rooms like that were designed not to receive.
+She was at the equipment tent, artifact table open on her laptop, when the phone lit up with his name again. She stepped away from the table, away from Wren, who was photographing the last section of the eastern wall with a headlamp strapped to her forehead, and answered.
 
-She set the trowel's edge against the pale subsoil and began to work again, and the sound of it joined Wren's sound forty feet south, and the morning light held, and the ground gave back exactly what it had always given: the record, patient and specific and older than any court that would be asked to read it.
+"I want to say something else," Voss said.
+
+"All right."
+
+She walked to the edge of the field. The Phragmites were chest-high here, and in the failing light they had gone from gold to grey. She could hear the Potomac in them, not the river itself but the smell of it, brackish and faintly rotten in the good way that tidal water was rotten, the way that meant life breaking down and becoming something else.
+
+"The disclosure section," Voss said. "Page forty-three."
+
+"I know which page it's on."
+
+"They'll use it." His voice had changed. Not the department chair's voice now, the voice he used in faculty meetings, careful and lateral, never quite saying the thing directly. This was something else. Quieter. "The commission's legal team. Slade's office. Whoever the provost sends. They will use it to argue that you lacked scientific objectivity. That the report is advocacy, not science. That your personal relationship to the site constitutes a conflict of interest that invalidates the findings."
+
+The Phragmites moved. A reed knocked against her arm.
+
+"I know," she said.
+
+"I want to be clear that I am not telling you to remove it." A pause. She could hear his office behind him, the low hum of the HVAC, the soft percussion of a building settling into evening. "I am asking if you would like help removing it. Before the commission sees the full submission. There is still time. I have the SharePoint access. I could have a revised version uploaded by morning."
+
+She said nothing.
+
+"Tayak."
+
+"I heard you."
+
+She turned so her back was to the trench. From here she could see Wren's headlamp moving along the eastern wall, a small white circle of light on two thousand years of compressed earth. The circle stopped. Wren was photographing the boundary between strata six and seven, the line where Kessik's world ended and the founding era began. You couldn't see the color change from here. You had to be inside it.
+
+"If we remove it," Tayak said, "the report says: *an intact burial feature was identified in the seventh stratum, associated with diagnostic artifacts consistent with the Hopewell interaction sphere, radiocarbon-dated to approximately 100 BC.* It says the site has national significance. It says the state should halt the development permit."
+
+"Yes."
+
+"And it says nothing about who is buried there."
+
+"The scientific findings stand without it."
+
+"The scientific findings stand without it," she said. "And the people in that ground are evidence."
+
+Voss was quiet.
+
+"They are features," she said. "They are a *feature complex.* They have a *stratigraphic context.* They have a *cultural horizon.* And nobody reading that report will know that the woman who buried the copper pendant was named Yanu, and that she buried it with her daughter, and that her name has been spoken aloud in my family every generation for two thousand years because someone decided that was how you kept a person from disappearing."
+
+The HVAC hummed. Somewhere in the building a door opened and closed.
+
+"That's why it's in the report," Tayak said. "Not because I forgot to be objective. Because objectivity that erases the name is not neutral. It's just a cleaner kind of erasure."
+
+"I know," Voss said.
+
+"Do you?"
+
+A long pause. She heard him shift in his chair, the particular creak of the old wooden desk chair she had sat across from for six years, the one he'd had since his Harvard postdoc and refused to replace.
+
+"I think I'm beginning to," he said.
+
+She pressed the phone harder against her ear. The Phragmites rattled. The smell of the river was stronger now, low tide somewhere downstream, the mud exposed, the whole tidal system breathing out.
+
+"Elliot," she said. It was the first time she had used his first name. She heard him register it, a small silence, the kind that meant he was paying attention. "I knew they would use it before I wrote it."
+
+"I thought you might have."
+
+"I wrote it anyway."
+
+"I know."
+
+"Because if I take it out, I am the one who erases her. Not the state. Not the commission. Me." She let that sit. "I've spent my whole career digging up evidence that my people were here. I am not going to write a document that proves it and then take out the part that says *I am one of them.*"
+
+The silence that followed was not the silence of someone formulating a response. It was the silence of someone who had understood something and was sitting with the weight of it.
+
+"All right," Voss said.
+
+"All right."
+
+"Then I'll support it as submitted." His voice was steady. "I want you to know that. Whatever the provost's office does. Whatever the commission's lawyers say. My name is on the cover letter and it stays there."
+
+She had not expected to feel anything when he said it. She had been braced for the conversation to cost her something, had been braced for it since the phone lit up with his name, and instead it had given her something, and she was not sure what to do with that.
+
+"Thank you," she said.
+
+A beat.
+
+"That's the first time you've thanked me for anything," he said. Not unkindly.
+
+"You've mostly given me things I didn't ask for."
+
+"Fair." She could hear the almost-smile in it. "Get some sleep, Tayak."
+
+"After we finish the artifact table."
+
+"Of course." The creak of the chair again. "The radiocarbon assays on the seventh stratum, the lab is running the accelerated protocol?"
+
+"Results in eight days."
+
+"Good. We'll need them before the commission convenes." A pause. "Eight days is tight."
+
+"Everything is tight."
+
+"Yes." He exhaled. "Yes, it is. Good night."
+
+She hung up.
+
+The headlamp was still moving along the eastern wall. Wren had reached the northern corner now, the place where the wall turned and the post-mold pattern was clearest, four dark circles in the clay, the ghosts of posts that had held something upright a very long time ago. A structure. A shelter. A place where someone had stood out of the rain.
+
+Tayak walked back across the field toward the light.
+
+"Voss?" Wren said, without turning.
+
+"He's going to hold the line."
+
+Wren photographed the post-molds. The shutter clicked four times, once for each ghost.
+
+"And the disclosure?"
+
+"Stays."
+
+Wren lowered the camera. She turned and looked at Tayak in the way she had, direct, without performing anything, and nodded once.
+
+"Okay," she said. "Then we finish the table."
+
+They went back to the tent. The artifact table was open on the screen, the seventh stratum's inventory half-complete. Tayak sat down and pulled the laptop toward her. The cursor blinked in the description field for artifact 7-14: the copper pendant, now in the lab in College Park, now in a sealed acid-free bag with a printed tag that read *18CH-441, Feature 7, Stratum VII, Locus 4.* The tag did not say Yanu. The tag did not say Taya. The tag said what tags always said: the county code, the site number, the feature, the stratum, the locus.
+
+She typed: *Copper pendant, worked. Great Lakes origin probable. Associated with Feature 7 burial context. See Section 6.4 and Personal Disclosure, p. 43.*
+
+She hit save.
+
+Eight days until the radiocarbon results. The commission convening after that. And somewhere in the provost's office, a copy of the report already sitting on a screen, a cursor hovering over page forty-three.
+
+She opened the next row in the table and kept working.
+
+The call had been over for four minutes when Tayak realized she had not moved.
+
+She was still standing at the edge of the tent, one hand resting on the aluminum pole, the phone dark in her other hand. The field stretched out behind her. The river smell was stronger now, the particular low-tide smell of the Patuxent watershed, not clean water but the whole tidal system laid open, mud and marsh grass and something older underneath, the smell that had been here long before anyone built a road or a university or a state historic preservation office.
+
+Wren's headlamp was still moving. Tayak watched it without seeing it.
+
+*My name is on the cover letter and it stays there.*
+
+She had not let herself want that. She had been so careful not to want it, had written the disclosure knowing she would have to defend it alone, had steeled herself for the conversation with Voss the way you steeled yourself for a procedure: get through it, don't flinch, walk out the other side. She had not left room for the possibility that he would say what he had said.
+
+She put the phone in her jacket pocket and went back inside.
+
+The artifact table was still open on the screen. Artifact 7-14. The cursor blinked.
+
+She sat down and did not type anything.
+
+What Voss had said, she was turning it over, trying to find the cost in it, because there was a cost and she knew it. His monograph on Chesapeake pre-contact trade networks had been the field's standard reference for eleven years. She had read it in her second year of graduate school, had cited it in her dissertation, had argued with it in three of her own papers. The monograph placed the center of the regional trade network forty miles north of the mound. Her report placed it here. Her report placed it here with radiocarbon assays, with GIS-mapped post-mold patterns, with a copper pendant whose isotope signature pointed to the Great Lakes, with a stratigraphic sequence that was intact because the ground above it had never been plowed, *unplowed context*, the phrase that made every archaeologist sit up straight, the phrase that meant the record was clean.
+
+If her report held, his monograph needed a revision at minimum. A retraction of its central argument at worst.
+
+He knew that. He had read the report in a day and a half, which meant he had read it the way you read something that is reorganizing what you know, the way you read something you cannot put down because each page is dismantling a thing you built.
+
+And he had called her. And he had said: *my name is on the cover letter and it stays there.*
+
+She thought about what it cost a sixty-two-year-old man with a Harvard PhD and a famous monograph to say that. She thought about the provost's office. She thought about the donors whose names were on the building where Voss's office was, donors who had shoreline estates and development interests and lawyers who read archaeological reports the way other lawyers read zoning applications. She thought about the board of regents. She thought about the letter that was probably already being drafted somewhere, the letter that would call the personal disclosure a conflict of interest, that would use the word *advocacy* the way people used it to mean *you have forgotten your place.*
+
+Voss would get that letter. He would get it with his name on the cover letter of her report.
+
+He had said it anyway.
+
+She typed: *Copper pendant, worked. Great Lakes origin probable. Associated with Feature 7 burial context. See Section 6.4 and Personal Disclosure, p. 43.*
+
+She hit save.
+
+Outside, the headlamp moved. She heard Wren's boots in the grass, the soft creak of the tent flap, and then Wren was inside, setting the camera down on the field table, pulling off one glove with her teeth.
+
+"Post-molds are fully documented," Wren said. "All four. I got them at three angles."
+
+"Good."
+
+Wren looked at her. Not the camera-check look, not the field-notes look. The other one.
+
+"You've been sitting there since you came back in," Wren said.
+
+"I know."
+
+"The table won't finish itself."
+
+"I know that too."
+
+Wren sat down across from her and opened her own laptop. She pulled up the photographic log and began entering file names. She did not push. That was one of the things about Wren, she knew when to wait.
+
+After a moment Tayak said, "He's going to write a formal endorsement letter. To the commission. His name on it."
+
+Wren's fingers paused on the keys.
+
+"He told you that."
+
+"Just now."
+
+"Knowing what it costs him."
+
+"Yes."
+
+Wren was quiet for a moment. Then she said, "What did you say?"
+
+"I thanked him."
+
+Wren looked up.
+
+"He said it was the first time."
+
+"Was he right?"
+
+Tayak thought about six years of conversations in that office, the creak of that chair, the things she had taken from him and the things she had refused and the things she had argued with in print. The monograph she had been quietly dismantling for three years without ever saying so to his face.
+
+"Yes," she said.
+
+Wren nodded slowly, the way she nodded when something had landed and she was letting it settle. Then she went back to the file names.
+
+Tayak scrolled to the next row in the artifact table. Artifact 7-15: the antler fragment from the eastern wall of Feature 7, burned at one end, the burn pattern consistent with ritual rather than accident. She began to type.
+
+The HVAC hummed. Outside, the marsh grass moved in a wind she couldn't feel from here. The river was still breathing out, the mud still exposed, the whole tidal system doing what it had done for ten thousand years regardless of what any report said or any commission ruled.
+
+She thought about Voss sitting in his office in that chair he'd had since his Harvard postdoc, the one he refused to replace, reading her report on his dual monitors with the GIS shapefiles open in the background. She thought about the moment he had reached page forty-three. She thought about what it meant to read something that reorganizes what you know and then call the person who wrote it and say: *I'm beginning to understand.*
+
+It was not forgiveness. She was not in the business of forgiving institutions for what they had taken, and Voss was an institution whether he liked it or not. But it was something. It was a man who had spent forty years building a version of Chesapeake history sitting in his chair and deciding that her version was more true than his, and saying so with his name attached.
+
+She would take that. She would take it and use it.
+
+Artifact 7-16. The ceramic sherd from the southern quadrant of Feature 7, tempered with crushed shell, the exterior surface showing a cord-marked finish that the typology placed in the late Woodland period. She typed the description. She cross-referenced Section 4.2. She saved.
+
+Eight days until the radiocarbon results. The commission after that.
+
+And Voss's letter, whenever he sent it, his name on it, his institutional address, his Harvard PhD and his eleven-year monograph and his famous standing in Chesapeake archaeology, all of it attached to her report, to her disclosure, to the name on page forty-three that had been spoken in her family every generation for two thousand years.
+
+She kept working. Wren kept working. The headlamp lay on the field table between them, its beam pointed at the tent ceiling, filling the space with a flat white light that made everything look exact.
+
+She hung up and held the phone against her thigh for a moment, not moving.
+
+The trench was quiet. The walls held the cold the way earthen walls always did, not the cold of air but the cold of depth, of ground that hadn't seen sun in centuries. She could smell it: damp clay, iron-rich subsoil, the faint organic sweetness of decomposed matter that she had learned to read the way a doctor reads a chart. The deepest layer was below her, already re-covered. She had laid the tarp back herself, pressed the edges down with her palms, weighted the corners with the same stones she'd used before. It looked like nothing from above. That was the point.
+
+She put the phone in her jacket pocket.
+
+The personal disclosure was on page forty-three. It would stay there. The state would find it, Slade or one of his people, whoever read these things first, and they would use the word *advocacy* and mean something uglier than that, something closer to *you have forgotten what you are to us.* There would be a letter. There would be a committee. There might be a hearing of a different kind than the one she was preparing for, one with her name on the wrong side of the table.
+
+She had known all of this when she typed the disclosure. She had known it when she hit save.
+
+She looked down at the tarp.
+
+Beneath it: Feature 7. The burial context. The copper pendant in its acid-free bag, now in the site safe at the truck. The post-mold pattern that placed a structure here in a period when no published account of this watershed put anyone here at all. The radiocarbon samples at the lab in College Park, eight days from now returning numbers that would either confirm what the stratigraphy already told her or, and she had been a scientist long enough to hold this possibility without flinching, complicate it in ways she hadn't anticipated.
+
+Beneath all of that: Yanu.
+
+Not a name in a report. Not *Individual 1, Feature 7, Stratum 7.* A name her grandmother had spoken, that Ida had spoken before her, that had passed from mouth to mouth across two thousand years of burning houses and colonial documents and deliberate silence and quilts stitched with patterns no one was supposed to remember. A name that had survived because someone always decided it was worth the risk of saying it out loud.
+
+She had decided the same thing. She had put it on page forty-three, in a section titled *Personal Disclosure and Researcher Positionality,* in the flat institutional language the format required, and what it said in that language was: *I am not a neutral observer of this ground. I am its descendant.* What it said underneath that language, in the language she had grown up speaking with Nora in the kitchen on cold mornings, was something she had never said in a published document before and would not unsay now.
+
+The mud on the tarp had dried at the edges. She crouched and pressed one corner down where it had lifted slightly in the wind, smoothing it flat with the heel of her hand. The ground was cold through her glove. She held her palm there for a moment, not a ceremony, not a prayer, just a hand on the earth.
+
+She stood.
+
+The thing she had traded was clean neutrality. The thing she had traded it for had no professional name. It was not objectivity and it was not advocacy and it was not the word the letter would use. It was closer to what Nora had done every time she sat down with a piece of fabric and made a pattern that had no business surviving, made it anyway, gave it to someone who would make it again, trusted the chain. It was closer to what Okwi had done when he wrapped the petition in oilskin and pressed it into the earth of this mound, knowing the petition had failed, knowing the mound would be the only record.
+
+She did not have a name for it yet. She thought she might not need one.
+
+She reached up and gripped the edge of the trench. The soil crumbled slightly under her fingers, Munsell 10YR 4/2, grayish brown, the B-horizon she'd been working through for three weeks, and she pulled herself up, one boot finding the wooden step Wren had hammered in during the second week when the walls got deep enough to matter. She came up out of the trench and stood on the surface.
+
+The marsh stretched south toward the river. The Phragmites were silver-gray in the early light, the seed heads gone to floss, and beyond them the Potomac was a flat pewter line that looked still from here but was not. The tide was still going out. She could smell the exposed mud, brackish, alive, the smell of the Chesapeake's particular kind of decay that was also a kind of abundance.
+
+She pulled off her gloves and put them in her pocket next to the phone.
+
+Behind her, the tent. Inside the tent, Wren, entering file names into the photographic log with the careful patience that was her particular form of loyalty. The artifact table open on Tayak's laptop, half finished, waiting. The HVAC hum she couldn't hear from out here but could picture, the flat institutional sound of a space that had been made to hold work and was holding it.
+
+She stood at the edge of the trench and looked at the covered ground.
+
+Eight days for the radiocarbon results. Then the commission. Then whatever came after the commission, the letter, the committee, the hearing, the donors, the board of regents, the long institutional machinery that ground slowly and left marks. All of it still ahead. All of it real.
+
+She had climbed out of the trench. That was the thing. She had put her hands on the earth and pulled herself up and now she was standing on the surface in the cold morning air and the disclosure was still in the report and Voss's letter was coming and the ground beneath her feet held what it held, had always held it, would hold it past whatever the commission ruled.
+
+She turned and walked back toward the tent.

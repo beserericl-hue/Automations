@@ -1,20 +1,20 @@
 # Chapter 26: NAGPRA [Present — 2024]
 
-> **drift aligned:** False  |  **QA avg:** None  |  **words:** 5688  |  **job:** complete  (303.8s)
+> **drift aligned:** True  |  **QA avg:** None  |  **words:** 5593  |  **job:** None  (Nones)
 >
 > **research topics used:** (none)
 >
 > **bible entries loaded into prompt:** Dr. Tayak Moyaone, Nora Moyaone, Garrett Slade, Marcus Redcloud, Dr. Elliot Voss, Kimi Moyaone, Wren Calvert, Siosaia (called Saya), Okwi, Matta, Tessa (Tessahki), Ahanu, Sokan, Waya, Kessik, Pell, Yanu, Ranu, Ida Moyaone
 >
-> **drift report:** `{"aligned": false, "story_drift": ["Outline beat specifies Tayak calls Marcus in a fury; in the chapter she is controlled and flat throughout the call \u2014 the fury is absent, which changes the emotional register of the scene.", "Outline beat specifies Marcus explains the NAGPRA paradox calmly; this is present, but the beat also implies the explanation is the scene's pivot \u2014 in the chapter the call is the first third, and the scene's actual pivot is Nora's affidavit revelation, which is not in the planned beat.", "Outline beat specifies Tayak goes to Nora's house and sits in the kitchen and does not speak for twenty minutes \u2014 this is rendered, but the beat ends there; the chapter continues into a substantial new plot development (Nora's list, the affidavit, the chain of names) that is not planned for this chapter, constituting a beat that belongs to a later chapter being fired early."], "research_gaps": ["Maryland Historical Trust permit suspension procedure and realistic timeline for reinstatement worth verifying for accuracy", "2024 NAGPRA regulatory changes (43 CFR Part 10) \u2014 confirm whether the burden-shift language applies only to federal agencies and museums or could touch state-permitted excavations", "Piscataway Maryland state recognition history \u2014 confirm 2012 date and the specific language of the proclamation for period-correct grounding", "Billingsley Road / Zekiah Swamp local geography \u2014 confirm cedar scrub is ecologically accurate for this corridor in November", "Elderberry tea preparation as a period-correct domestic detail \u2014 confirm it is consistent with Piscataway domestic practice rather than generic Appalachian folk medicine"], "character_drift": ["Nora reveals a notarized affidavit she has held for six years and a written genealogical list \u2014 neither is established in the roster, and this disclosure is a major plot action inconsistent with Nora's established private worry (racing to pass on oral knowledge before she loses words), which implies the transmission has not yet happened in full."]}`
+> **drift report:** `{"aligned": true, "story_drift": [], "research_gaps": ["Confirm 2024 NAGPRA regulatory revision language precisely \u2014 the 'burden shift' framing Marcus uses should match actual 43 CFR Part 10 amendment wording", "Verify Maryland Historic Sites Act Section 9(c) citation and permit-suspension procedure against actual statute", "Confirm BIA federal acknowledgment petition history for Piscataway Nation \u2014 specific petition dates and denial grounds would sharpen Marcus's line about thirty years of failed petitions", "Elderberry tea preparation detail is plausible but verify it as a documented Piscataway/Chesapeake Algonquian practice rather than generic Native American association", "College-ruled paper sold at Waldorf Walmart is a fine grounding detail \u2014 confirm a Walmart exists in Waldorf, Maryland (it does, but worth a quick check for the specific road)", "Pamunkey and Chickahominy federal recognition dates \u2014 Pamunkey recognized 2015, Chickahominy 2018 \u2014 confirm both were federally recognized by 2024 so Marcus's implied suggestion holds", "Notarization procedure for a private affidavit in Maryland \u2014 confirm a lay person can have a personal genealogical affidavit notarized without attorney involvement, which Nora's six-year-old document implies"], "character_drift": []}`
 
 ---
 
-The notice was two pages, printed on Maryland Historical Trust letterhead, and Tayak had already read it once before she understood it.
+The notice was two pages, printed on Maryland Historical Trust letterhead. Tayak had read it once before she understood it.
 
 She read it again.
 
-The trench was four feet deep at the south profile, and the November light came in at a low angle that made the clay walls look almost warm — a burnt-sienna color that she knew, in direct light, was just grey-brown Maryland subsoil. She had her back to the east face. The notice was in her left hand. Her right hand still held the trowel she'd been using when Wren brought it down from the truck, and the trowel was leaving a small smear of subsoil on her jacket where she'd forgotten to lower it.
+The trench was four feet deep at the south profile, and the November light came in at a low angle that made the clay walls look almost warm. Burnt sienna. She knew, in direct light, it was just grey-brown Maryland subsoil. She had her back to the east face. The notice was in her left hand. Her right hand still held the trowel she'd been using when Wren brought it down from the truck, and the trowel was leaving a smear of subsoil on her jacket where she'd forgotten to lower it.
 
 She lowered it now.
 
@@ -34,11 +34,11 @@ She knew what NAGPRA said. She had known it since graduate school, since the sem
 
 The Piscataway were not.
 
-She turned the notice over, as if there might be something on the back. There wasn't. Just the Trust's address in Crownsville, a fax number that probably still worked, and Garrett Slade's signature — neat, unhurried, the signature of a man who had written it many times and expected it to be taken seriously.
+She turned the notice over, as if there might be something on the back. There wasn't. Just the Trust's address in Crownsville, a fax number that probably still worked, and Garrett Slade's signature. Neat, unhurried. The signature of a man who had written it many times and expected it to be taken seriously.
 
 Forty-eight hours.
 
-She looked up at the south wall of the trench. At this depth — just past one meter — the soil had shifted from the dark, root-threaded topsoil of the upper stratum to a compacted clay that held the cold like a stone floor. She could smell it: that particular underground smell, iron and old wet and something faintly organic she had never been able to name precisely, that she associated with every significant find she had ever made. Cecile used to call it *the smell of patience.* The ground had been here longer than the law. The law had forty-eight hours.
+She looked up at the south wall of the trench. At this depth, just past one meter, the soil had shifted from the dark, root-threaded topsoil of the upper stratum to a compacted clay that held the cold like a stone floor. She could smell it: iron and old wet and something faintly organic she had never been able to name precisely, the smell she associated with every significant find she had ever made. Cecile used to call it *the smell of patience.* The ground had been here longer than the law. The law had forty-eight hours.
 
 Tayak set the trowel on the lip of the trench and read the bolded phrase one more time.
 
@@ -48,11 +48,11 @@ She knew what Slade was doing. He wasn't saying the Piscataway had no claim. He 
 
 She couldn't.
 
-She had known that, somewhere, since the moment she'd first read the permit's oversight clause and seen Marcus Redcloud's signature at the bottom. She had filed the permit anyway because the alternative was letting Garrett Slade's bulldozers come through in thirty-eight days without a record. She had made a calculation and now the calculation was collecting its cost.
+She had known that somewhere since the moment she'd first read the permit's oversight clause and seen Marcus Redcloud's signature at the bottom. She had filed the permit anyway because the alternative was letting Garrett Slade's bulldozers come through in thirty-eight days without a record. She had made a calculation. Now the calculation was collecting its cost.
 
-The cold was working through her jacket at the shoulders. She had been standing still long enough for it to find the gaps. Above her, at the trench lip, she could hear the wind moving through the field grass — a low, continuous sound, like something breathing that had no intention of stopping.
+The cold was working through her jacket at the shoulders. She had been standing still long enough for it to find the gaps. Above her, at the trench lip, she could hear the wind moving through the field grass. A low, continuous sound. Something breathing that had no intention of stopping.
 
-She folded the notice along its original crease. She put it in her jacket pocket. She picked up the trowel.
+She folded the notice along its original crease and put it in her jacket pocket. She picked up the trowel.
 
 Then she put the trowel down again, took the notice back out, and read the deadline one more time, because she was a scientist and scientists checked their readings.
 
@@ -60,11 +60,9 @@ Then she put the trowel down again, took the notice back out, and read the deadl
 
 The date on the notice was yesterday.
 
-She was already dialing before she climbed out of the trench.
+She was already dialing before she climbed out of the trench., -
 
----
-
-Marcus picked up on the second ring. She could hear road noise behind him — he was in a car, moving — and then the soft click of a window going up and the noise cutting off.
+Marcus picked up on the second ring. She could hear road noise behind him and then the soft click of a window going up and the noise cutting off.
 
 "I got Slade's notice," she said. "He copied you."
 
@@ -72,7 +70,7 @@ Marcus picked up on the second ring. She could hear road noise behind him — he
 
 She stopped walking. The grass was stiff with cold and crackled under her boots. "Walk me through NAGPRA," she said. "The part that matters right now."
 
-"Tayak—"
+"Tayak, "
 
 "Walk me through it." Her voice came out harder than she intended. She did not soften it.
 
@@ -84,7 +82,7 @@ She heard him exhale. Not impatience. Something more careful than that.
 
 "Maryland recognizes you. The federal government doesn't."
 
-She reached the folding table at the site edge where her thermos sat and put one hand on it without picking it up. "So the law that exists to protect our ancestors' graves—"
+She reached the folding table at the site edge where her thermos sat and put one hand on it without picking it up. "So the law that exists to protect our ancestors' graves, "
 
 "Cannot be invoked by you. Not as a tribe. Not directly." His voice was level, the way it got when he was being precise about something he found painful. "You could try a lineal descent claim. If you can demonstrate direct ancestry to specific individuals in the ground, you have standing as a descendant rather than as a tribe. But that's a different process. Slower. Harder to prove for ancient burials."
 
@@ -114,7 +112,7 @@ Silence. Long enough that she pulled the phone from her ear to check the connect
 
 "What do I say?"
 
-"That's not something I can tell you." He said it carefully, without apology. "I'm on the permit. Whatever you write goes into a record I'm part of. I can't advise you on the content of a response to a notice I received a copy of."
+"That's not something I can tell you." He said it without apology. "I'm on the permit. Whatever you write goes into a record I'm part of. I can't advise you on the content of a response to a notice I received a copy of."
 
 She understood. She didn't like it.
 
@@ -122,7 +120,7 @@ She understood. She didn't like it.
 
 Another pause. She could hear him deciding.
 
-"The statute requires consultation with all Indian Tribes having a reasonable claim of cultural affiliation. The 2024 regulatory changes shifted the burden — institutions now have to justify retention, not tribes have to prove affiliation. But that shift applies to museums and federal agencies holding collections. You're a permit holder on a state-permitted excavation. The older framework still governs your situation." He stopped. "There are federally recognized tribes in the region. The Pamunkey. The Chickahominy. Slade's notice doesn't name them, but the statute doesn't require him to. It requires you to demonstrate you've consulted with whoever qualifies."
+"The statute requires consultation with all Indian Tribes having a reasonable claim of cultural affiliation. The 2024 regulatory changes shifted the burden. Institutions now have to justify retention rather than forcing tribes to prove affiliation. But that shift applies to museums and federal agencies holding collections. You're a permit holder on a state-permitted excavation. The older framework still governs your situation." He stopped. "There are federally recognized tribes in the region. The Pamunkey. The Chickahominy. Slade's notice doesn't name them, but the statute doesn't require him to. It requires you to demonstrate you've consulted with whoever qualifies."
 
 She heard what he was not saying.
 
@@ -138,7 +136,7 @@ She picked up the thermos. The coffee inside had been cold for two hours. She dr
 
 "For repatriation claims by federally recognized tribes, yes. The rule change strengthened their position. It didn't create a new category of eligible claimant." His voice was quieter now. "Tayak. The law is better than it was in 1990. It is still not built for you."
 
-She set the thermos down on the folding table. The metal rang against the plastic surface, a small, flat sound that the wind took immediately.
+She set the thermos down on the folding table. The metal rang against the plastic surface, a small flat sound that the wind took immediately.
 
 "So I have forty-eight hours," she said, "to respond to a notice that requires me to consult with tribes that aren't my people, or to invoke a lineal descent process that would take months and requires documentation I don't have in hand, or to let the permit suspend and give Slade everything he's been positioning himself for since the day he left that statute page on my folding table."
 
@@ -148,7 +146,7 @@ She set the thermos down on the folding table. The metal rang against the plasti
 
 "No."
 
-She looked out across the field. The mound's low profile was barely visible from here — just a slight rise in the ground, a thickening of the grass where the soil had been accumulating since before the law existed, before the state existed, before the word *consultation* had been written into any document by any hand.
+She looked out across the field. The mound's low profile was barely visible from here. Just a slight rise in the ground, a thickening of the grass where the soil had been accumulating since before the law existed, before the state existed, before the word *consultation* had been written into any document by any hand.
 
 "All right," she said.
 
@@ -158,21 +156,19 @@ She looked out across the field. The mound's low profile was barely visible from
 
 "What are you going to do?"
 
-She thought about Cecile Marant making her read the full text of the law in a single sitting and then asking who it left out. She thought about writing the answer in capital letters. She thought about how she had known, then, and had gone into this field anyway, and had found things that needed finding, and was now standing in a Maryland field in November holding a cold thermos and a notice with yesterday's date on it.
+She thought about Cecile Marant making her read the full text of the law in a single sitting and then asking who it left out. She thought about writing the answer in capital letters. She thought about how she had known then, and had gone into this field anyway, and had found things that needed finding, and was now standing in a Maryland field in November holding a cold thermos and a notice with yesterday's date on it.
 
 "I'm going to see Nora," she said.
 
 He didn't say anything to that. She wasn't sure what there was to say.
 
-She ended the call and stood for a moment with the phone in her hand, looking at the mound. The grass on its low crest moved in the wind, all in one direction, the way grass does when the wind has decided where it's going and isn't asking.
-
----
+She ended the call and stood for a moment with the phone in her hand, looking at the mound. The grass on its low crest moved in the wind, all in one direction, the way grass moves when the wind has decided where it's going and isn't asking., -
 
 She drove the forty minutes to Billingsley Road without music, without the radio, without anything except the sound of the truck on the blacktop and the occasional rattle of the field kit in the bed. She did not rehearse what she would say to Nora. There was nothing to rehearse. She had no plan. She had a notice in her jacket pocket and forty-seven hours left on a clock she had not started.
 
-Billingsley Road ran between old fields gone to cedar and scrub, the kind of land that had been farmed out and left alone long enough to forget it had ever been cleared. The maples along the shoulder held their last leaves, brown and curled, a few still clinging with the particular stubbornness of things that know they're already finished. Tayak drove slowly. She was not ready to arrive, but she was going anyway.
+Route 301 gave way to the county roads, and the county roads gave way to Billingsley, which ran between old fields gone to cedar and scrub. Land that had been farmed out and left alone long enough to forget it had ever been cleared. The maples along the shoulder held their last leaves, brown and curled, a few still clinging with the particular stubbornness of things that know they're already finished. Tayak drove slowly. She was not ready to arrive, but she was going anyway.
 
-Nora's house sat back from the road behind a gravel drive that needed raking. The porch light was on, though it was not yet dark — Nora kept it on from October through March as a matter of principle, against the early dark, against the cold, against whatever the season brought. The house itself was small and white with green shutters, and the garden along the foundation had been put to bed for winter, the perennials cut back to stubs, the beds mulched with straw the color of old paper. A hummingbird feeder still hung from the porch eave, empty and rinsed, waiting for May.
+Nora's house sat back from the road behind a gravel drive that needed raking. The porch light was on, though it was not yet dark. Nora kept it on from October through March as a matter of principle, against the early dark, against the cold, against whatever the season brought. The house itself was small and white with green shutters, and the garden along the foundation had been put to bed for winter, the perennials cut back to stubs, the beds mulched with straw the color of old paper. A hummingbird feeder still hung from the porch eave, empty and rinsed, waiting for May.
 
 Tayak sat in the truck with the engine off.
 
@@ -182,29 +178,27 @@ Tayak got out.
 
 The gravel was loud under her boots. The air smelled of woodsmoke and the cold mineral smell of ground that had recently frozen and thawed and was considering freezing again. She went up the porch steps, and the door opened before she knocked.
 
-Nora stood in the doorway in a dark cardigan over a housedress, her white hair pinned up in the way she wore it when she had been home all day and not expecting anyone. She looked at Tayak's face and said nothing. She stepped back and held the door.
+Nora stood in the doorway in a dark cardigan over a housedress, her white hair pinned up in the way she wore it when she had been home all day and not expecting anyone. She looked at Tayak's face and said nothing. She stepped back and held the door., -
 
----
-
-The kitchen was warm. It smelled of the tea Nora had been drinking before Tayak arrived — something with dried mint, the smell sharp and green against the woodsmoke — and of the cast-iron pan hanging on the wall that held decades of seasoning in its surface, a smell like old heat. A powwow T-shirt from the 2019 Piscataway gathering hung over the back of a chair. A coffee mug on the counter read *Piscataway Nation* in the tribe's colors, the handle repaired with a stripe of clear epoxy where it had broken and been mended. On the refrigerator, held by a magnet shaped like a turtle, was a flyer for the Maryland state recognition ceremony from 2012, the paper gone soft at the edges from twelve years on the door.
+The kitchen was warm. It smelled of the tea Nora had been drinking before Tayak arrived. Dried elderberry, the way Nora's grandmother had made it, the smell dark and faintly sweet beneath the woodsmoke. A powwow T-shirt from the 2019 Piscataway gathering hung over the back of a chair. A coffee mug on the counter read *Piscataway Nation* in the tribe's colors, the handle repaired with a stripe of clear epoxy where it had broken and been mended. On the refrigerator, held by a magnet shaped like a turtle, was a flyer for the Maryland state recognition ceremony from 2012, the paper gone soft at the edges from twelve years on the door.
 
 Tayak sat down at the kitchen table.
 
-The table was old oak, the surface worn pale where hands had rested for decades. Four chairs, two of them pushed in tight, two of them pulled slightly out — Nora's usual place and the place where guests sat, as though Nora had been expecting someone for years and kept the chair ready. Tayak put her hands flat on the table. The wood was smooth and cool under her palms.
+The table was old oak, the surface worn pale where hands had rested for decades. Four chairs, two of them pushed in tight, two of them pulled slightly out. Nora's usual place and the place where guests sat, as though Nora had been expecting someone for years and kept the chair ready. Tayak put her hands flat on the table. The wood was smooth and cool under her palms.
 
-Nora did not ask what had happened. She turned to the counter and took down two mugs — heavy ceramic, handmade, glazed in a dark blue-green the color of the Potomac in November — and set them on the table. She went back to the kettle. The kettle began to sound, not yet boiling, the low hiss of water approaching.
+Nora did not ask what had happened. She turned to the counter and took down two mugs, heavy ceramic, handmade, glazed in a dark blue-green the color of the Potomac in November, and set them on the table. She went back to the kettle. The kettle began to sound, not yet boiling, the low hiss of water approaching its pitch.
 
-The notice was in Tayak's jacket pocket, folded in thirds. She could feel its weight, though paper had no weight — it was the weight of what was written on it, which was not the same as the paper's weight but was heavier.
+The notice was in Tayak's jacket pocket, folded in thirds. She could feel its weight, though paper had no weight. The weight was what was written on it, and that was heavier than paper.
 
 The kettle reached its pitch and Nora lifted it.
 
-The sound of water pouring into a mug. The smell of mint rising, sharp and clean. Nora set one mug in front of Tayak and took her own to the chair across the table and sat down.
+The sound of water pouring into a mug. The smell of elderberry rising, dark and sweet. Nora set one mug in front of Tayak and took her own to the chair across the table and sat down.
 
-Tayak looked at the mug. The tea was pale gold, the mint sprig floating, one end curling against the ceramic rim.
+Tayak looked at the mug. The tea was deep red, the dried berry floating, one end curling against the ceramic rim.
 
 She did not speak.
 
-Nora wrapped both hands around her own mug and looked at Tayak with the particular quality of attention that had nothing demanding in it — the attention of someone who has learned, over eighty-two years, that waiting is not passive. Nora's hands on the mug were the hands of a woman who had quilted and gardened and held other people's grief and her own, and they were still now, completely still, the way hands are still when the person they belong to has decided that stillness is the right work for this moment.
+Nora wrapped both hands around her own mug and looked at Tayak with the particular quality of attention that had nothing demanding in it. The attention of someone who has learned, over eighty-two years, that waiting is not passive. Nora's hands on the mug were the hands of a woman who had quilted and gardened and held other people's grief and her own. They were still now, completely still, the way hands are still when the person they belong to has decided that stillness is the right work for this moment.
 
 Outside, a car passed on Billingsley Road. Its headlights swept briefly across the kitchen window and were gone.
 
@@ -218,25 +212,25 @@ Nora drank her tea and set the mug down and did not speak.
 
 The clock ticked.
 
-At some point — Tayak did not check her phone, did not count the minutes, but it was long enough that the tea had gone from steaming to warm — she said: "They built the law so it wouldn't reach us."
+At some point, she did not check her phone and did not count the minutes, but it was long enough that the tea had gone from steaming to warm, she said: "They built the law so it wouldn't reach us."
 
-Her voice came out flat. Not angry. She had moved past the register of anger somewhere on Route 301, somewhere between the site and the Billingsley Road turnoff, and what was left was something quieter and more durable. The kind of thing that does not need to raise its voice because it has been true for a long time.
+Her voice came out flat. Not angry. She had moved past anger somewhere on Route 301, somewhere between the site and the Billingsley Road turnoff, and what was left was something quieter and more durable. The kind of thing that does not need to raise its voice because it has been true for a long time.
 
 Nora reached across the table and set the mug of tea closer to Tayak's hands. Not pushing it into them. Just closer.
 
 "They always do," she said.
 
-Her voice was the same as it always was — unhurried, dry, the voice of a woman who has said true things for a long time and has stopped being surprised by them. Not bitter. Bitterness requires the expectation of something different. Nora had no such expectation. She had something else, something that had no clean name — a knowledge of the pattern that had not become resignation, that had stayed, over eighty-two years, on the near side of despair.
+Her voice was the same as it always was. Unhurried, dry, the voice of a woman who has said true things for a long time and has stopped being surprised by them. Not bitter. Bitterness requires the expectation of something different. Nora had no such expectation. She had something else, something that had no clean name. A knowledge of the pattern that had not become resignation. Over eighty-two years it had stayed, just barely, on the near side of despair.
 
 Tayak picked up the mug.
 
-The ceramic was warm against her palms. The tea smelled of mint and something else underneath it, something darker — dried elderberry, the way Nora's grandmother had made it, the way Nora had made it for as long as Tayak could remember. She did not drink it yet. She just held it.
+The ceramic was warm against her palms. The tea smelled of elderberry, dark and faintly sweet, the way Nora had made it for as long as Tayak could remember. She did not drink it yet. She just held it.
 
 Neither of them cried.
 
 The clock ticked. The porch light made a small rectangle of yellow on the kitchen floor through the window in the door. Outside, the cedar scrub along Billingsley Road held the dark and said nothing, the way land does when it has been holding its answer for two thousand years and has learned that the question will come back around.
 
-Tayak held the mug and thought about forty-eight hours, and about a document in a conservation suite with a handprint at the bottom, and about the chain of names Nora carried — the names that ran back through Ida, through Ida's grandmother, through Matta and Tessa and Saya and further back than that, back to ground that was under Tayak's boots this morning and would be under a road in forty-eight hours if she could not find a way to stop it.
+Tayak held the mug and thought about forty-eight hours, and about a document in a conservation suite with a handprint at the bottom, and about the chain of names Nora carried. The names ran back through Ida, through Ida's grandmother, through Matta and Tessa and Saya and further back than that, back to ground that was under Tayak's boots this morning and would be under a road in forty-eight hours if she could not find a way to stop it.
 
 She thought: *The chain is the only thing that was never subject to their law.*
 
@@ -246,53 +240,51 @@ Then Nora said, without preamble: "I need to tell you something about the petiti
 
 Tayak looked up.
 
-"Not the 1697 one," Nora said. "The other one. The one I've been keeping."
+"Not the 1697 one," Nora said. "The other one. The one I've been keeping.", -
 
----
-
-The silence after Nora's words was the kind that has shape.
+The silence after Nora's words had shape.
 
 Tayak set the mug down. The ceramic made a small sound against the table, and then there was nothing but the clock and the cedar dark outside and Nora already pushing back her chair.
 
-She moved without hurry. She crossed to the low cabinet beside the refrigerator that Tayak had always assumed held dish towels or spare batteries or the ordinary debris of a long life in a small house. Nora opened it and reached past whatever was in front and came back with something folded — paper, not a document, not a folder, just paper folded in thirds the way you fold a letter when you intend to carry it in a pocket or a coat.
+She moved without hurry. She crossed to the low cabinet beside the refrigerator that Tayak had always assumed held dish towels or spare batteries or the ordinary debris of a long life in a small house. Nora opened it and reached past whatever was in front and came back with something folded. Paper, not a document, not a folder, just paper folded in thirds the way you fold a letter when you intend to carry it in a pocket or a coat.
 
 She set it on the table between them and remained standing, one hand on the back of her chair, watching Tayak the way a person watches when they have been waiting a long time to see how someone receives a thing.
 
-The paper was not old. That was the first thing Tayak registered. It was not the yellow-brown of the oilskin document in the conservation suite, not the fragile artifact that Adaeze had humidified open with gloved hands under a fume hood. It was ordinary paper — college-ruled, the kind sold in packs of two hundred at the Waldorf Walmart — and it had been folded and unfolded enough times that the creases had gone soft and slightly gray at the edges. Someone had handled this paper the way you handle something you return to. Not for ceremony. For use.
+The paper was not old. That was the first thing Tayak registered. It was not the yellow-brown of the oilskin document in the conservation suite, not the fragile artifact that Adaeze had humidified open with gloved hands under a fume hood. It was ordinary paper. College-ruled, the kind sold in packs of two hundred at the Waldorf Walmart. It had been folded and unfolded enough times that the creases had gone soft and slightly gray at the edges. Someone had handled this paper the way you handle something you return to. Not for ceremony. For use.
 
 Tayak did not pick it up.
 
-She looked at it. The handwriting was Nora's — she knew Nora's handwriting from birthday cards and from the label on the elderberry tea in the cabinet above the stove and from the note Nora had pressed into her hand at the 2012 recognition ceremony, which Tayak had kept in the breast pocket of her field jacket for two weeks before she understood she was keeping it. The writing was small and vertical, the letters formed with the slight leftward lean of someone who had learned to write when the nuns still taught penmanship.
+She looked at it. The handwriting was Nora's. She knew Nora's handwriting from birthday cards and from the label on the elderberry tea in the cabinet above the stove and from the note Nora had pressed into her hand at the 2012 recognition ceremony, which Tayak had kept in the breast pocket of her field jacket for two weeks before she understood she was keeping it. The writing was small and vertical, the letters formed with the slight leftward lean of someone who had learned to write when the nuns still taught penmanship.
 
 It was a list.
 
-Names, in a column on the left side of the page. Beside each name, a place. Beside each place, a year. The years ran backward down the page, the way a genealogy runs when someone begins at the present and goes toward the root. The top entry was in fresher ink — darker, the pen pressed more firmly, as if Nora had added it recently and had wanted it to hold.
+Names, in a column on the left side of the page. Beside each name, a place. Beside each place, a year. The years ran backward down the page, the way a genealogy runs when someone begins at the present and goes toward the root. The top entry was in fresher ink, darker, the pen pressed more firmly, as if Nora had added it recently and had wanted it to hold.
 
-*Nora Moyaone. Billingsley Road, Charles County. 1942–*
+*Nora Moyaone. Billingsley Road, Charles County. 1942, *
 
 Below it, in slightly older ink:
 
-*Ida Moyaone. Bryantown Road. 1881–1963.*
+*Ida Moyaone. Bryantown Road. 1881, 1963.*
 
 Then:
 
-*Ida's grandmother — Clara. Port Tobacco. 1849–1921.*
+*Ida's grandmother, Clara. Port Tobacco. 1849, 1921.*
 
-Then names Tayak did not know. A woman named Bette, listed at a place that was only a direction — *east fork, Zekiah*. A man named Thomas, listed at *Friendship tract boundary, 1778*. Then a woman named Tessa, and beside her name the place was simply *the high ground*, and the year was 1743.
+Then names Tayak did not know. A woman named Bette, listed at a place that was only a direction: *east fork, Zekiah.* A man named Thomas, listed at *Friendship tract boundary, 1778.* Then a woman named Tessa, and beside her name the place was simply *the high ground,* and the year was 1743.
 
-Then Matta. Then a name Tayak could not read — the ink had faded or the pen had faltered — and beside it, the year 1697 and the single word *petition*.
+Then Matta. Then a name Tayak could not read, the ink faded or the pen faltered, and beside it the year 1697 and the single word *petition.*
 
 Then Saya.
 
 Tayak's eyes stopped on Saya's name the way her trowel had stopped on the oilskin packet in the trench. The same quality of arrest. The same understanding that she was touching something that had been waiting.
 
-Below Saya's name, two more entries. The ink was different — older, or copied from something older, the letters formed with slightly more effort, as if Nora had been transcribing from memory rather than from a source document. A woman named Kessa. A woman named Waya. And then the list ended, not with a final name but with a line in smaller letters, set apart from the column:
+Below Saya's name, two more entries. The ink was different, older or copied from something older, the letters formed with slightly more effort, as if Nora had been transcribing from memory rather than from a source document. A woman named Kessa. A woman named Waya. Then the list ended, not with a final name but with a line in smaller letters, set apart from the column:
 
 *Further names not held. The chain holds from here.*
 
 Nora sat back down. She wrapped both hands around her mug and looked at the paper and then at Tayak.
 
-"My grandmother Ida gave me that list in 1962," she said. "The night before her surgery. She was eighty-one and she had a heart condition and she was not certain she would come back from the anesthesia. She sat at this table" — Nora touched the table's edge with two fingers — "in this kitchen, and she told me the names. I wrote them down while she talked. The ones at the bottom, Kessa and Waya — those she said she had received from her own grandmother, who had received them from Matta's granddaughter. She said the chain was longer once, but some of the earlier names had thinned out over the years. What she could give me, she gave me."
+"My grandmother Ida gave me that list in 1962," she said. "The night before her surgery. She was eighty-one and she had a heart condition and she was not certain she would come back from the anesthesia. She sat at this table", Nora touched the table's edge with two fingers, "in this kitchen, and she told me the names. I wrote them down while she talked. The ones at the bottom, Kessa and Waya, those she said she had received from her own grandmother, who had received them from Matta's granddaughter. She said the chain was longer once, but some of the earlier names had thinned out over the years. What she could give me, she gave me."
 
 Tayak looked at the list. She did not touch it.
 
@@ -308,11 +300,11 @@ The clock ticked. Somewhere on Billingsley Road a truck downshifted, the sound c
 
 "And what I know. What I can say. What I can put my name to."
 
-Tayak looked at the paper. She thought about the NAGPRA regulations she had read three times standing in the trench before Marcus had explained what they meant. *Indian Tribes and Native Hawaiian organizations.* The definitions section. The definitions section that did not include them. She thought about the 2024 changes — the new rules that said oral tradition alone could establish cultural affiliation, that a single line of evidence was sufficient, that institutions now had to prove the right to hold rather than forcing tribes to prove the right to claim. Good rules. Rules that would have meant something, would have reached them, if the word *tribe* in the statute meant what it meant in plain English rather than what it meant in federal administrative law.
+Tayak looked at the paper. She thought about the NAGPRA regulations she had read three times standing in the trench before Marcus had explained what they meant. *Indian Tribes and Native Hawaiian organizations.* The definitions section. The definitions section that did not include them. She thought about the 2024 changes. The new rules said oral tradition alone could establish cultural affiliation, that a single line of evidence was sufficient, that institutions now had to prove the right to hold rather than forcing tribes to prove the right to claim. Good rules. Rules that would have meant something, would have reached them, if the word *tribe* in the statute meant what it meant in plain English rather than what it meant in federal administrative law.
 
-The law had moved toward them and stopped just short. Like a hand extended and then withdrawn.
+The law had moved toward them and stopped just short. A hand extended and then withdrawn.
 
-"If I file this as supporting documentation," Tayak said, "and Slade's office gets access to the record — which they will, because the permit process is public — then everything on that list becomes subject to challenge. Every name. Every place. Every year." She looked up. "They'll say it's hearsay. They'll say it's unverifiable. They'll say the chain is broken because we can't produce primary sources for Kessa and Waya, because the names at the bottom are oral tradition and oral tradition isn't evidence under the statute."
+"If I file this as supporting documentation," Tayak said, "and Slade's office gets access to the record, which they will because the permit process is public, then everything on that list becomes subject to challenge. Every name. Every place. Every year." She looked up. "They'll say it's hearsay. They'll say it's unverifiable. They'll say the chain is broken because we can't produce primary sources for Kessa and Waya, because the names at the bottom are oral tradition and oral tradition isn't evidence under the statute."
 
 "Under their statute," Nora said.
 
@@ -330,27 +322,27 @@ Tayak waited.
 
 "I told you about the oral history," Nora said. "The chain. Saya and Matta and Tessa and the ones before them. I've been carrying it since 1962." She set her mug down. "But I haven't told you everything I've been carrying."
 
-The clock. The refrigerator. The cedar dark outside pressing gently against the glass.
+The clock. The refrigerator. The cedar dark outside pressing against the glass.
 
-"I have an affidavit," Nora said. "Drafted. Notarized. I've had it for six years, waiting for the moment when it would be needed and not wasted." Her voice did not change register. She said it the way she said everything — as if the fact had been true for a long time and she was simply introducing it to the room. "It names every place on that list. It names the mound by its coordinates. It attests to the chain of transmission — who told whom, when, under what circumstances. It includes a statement from Ida's physician in Waldorf, from 1962, confirming the date of the surgery. It includes a copy of Ida's death certificate, which lists her birthplace as Bryantown Road, Charles County." She paused. "It's not proof under their definitions. But it is a record. And records have a way of mattering when the other records run out."
+"I have an affidavit," Nora said. "Drafted. Notarized. I've had it for six years, waiting for the moment when it would be needed and not wasted." Her voice did not change register. She said it the way she said everything, as if the fact had been true for a long time and she was simply introducing it to the room. "It names every place on that list. It names the mound by its coordinates. It attests to the chain of transmission. Who told whom, when, under what circumstances. It includes a statement from Ida's physician in Waldorf, from 1962, confirming the date of the surgery. It includes a copy of Ida's death certificate, which lists her birthplace as Bryantown Road, Charles County." She paused. "It's not proof under their definitions. But it is a record. And records have a way of mattering when the other records run out."
 
 Tayak looked at the list on the table. The soft crease lines. The name *Saya* in Nora's vertical hand. The two names below it, the ones that had thinned, the ones that held what could be held.
 
-She thought about what Marcus had said on the phone. *The law designed to help you can't reach you.* She thought about the 2024 rules, the new language about oral tradition as a single sufficient line of evidence — language that applied to federally recognized tribes, that stopped at the same wall everything stopped at.
+She thought about what Marcus had said on the phone. *The law designed to help you can't reach you.* She thought about the 2024 rules, the new language about oral tradition as a single sufficient line of evidence. Language that applied to federally recognized tribes. Language that stopped at the same wall everything stopped at.
 
-She thought about what the affidavit could do and what it couldn't. It couldn't invoke NAGPRA. It couldn't compel the state to halt the permit review. It couldn't substitute for federal recognition in the definitions section of the statute. But it could go into the record. It could be the thing that made the record complicated. It could be the thing that made a future court — not this process, not the forty-eight-hour clock, but a future court — look at the chain and say: *this was here, this was attested, this was offered and the machinery chose not to see it.*
+She thought about what the affidavit could do and what it couldn't. It couldn't invoke NAGPRA. It couldn't compel the state to halt the permit review. It couldn't substitute for federal recognition in the definitions section of the statute. But it could go into the record. It could be the thing that made the record complicated. It could be the thing that made a future court, not this process, not the forty-eight-hour clock, but a future court, look at the chain and say: *this was here, this was attested, this was offered and the machinery chose not to see it.*
 
 Records have a way of mattering when the other records run out.
 
-She thought about the 1697 petition in the conservation suite, wrapped in oilskin for three hundred and twenty-seven years. Someone had put it in the ground because they understood that the ground keeps what the law discards. Someone had understood that the chain of evidence runs in two directions — forward through the courts and backward through the earth — and that the earth's version is slower but does not expire.
+She thought about the 1697 petition in the conservation suite, wrapped in oilskin for three hundred and twenty-seven years. Someone had put it in the ground because they understood that the ground keeps what the law discards. Someone had understood that the chain of evidence runs in two directions. Forward through the courts and backward through the earth. The earth's version is slower but does not expire.
 
 She thought about Saya's handprint at the bottom of the petition. The ink pressed hard into the paper. *I was here. I held this.*
 
 Tayak looked at her own hands, flat on the table on either side of the list.
 
-The list lay between them in the warm kitchen light, names and places and years going back to ground that was under her boots this morning. Not a legal document. Not evidence under the statute. Something older than the statute, and more durable, and entirely outside the reach of the law that could not reach them — which meant it was also outside the reach of the law that was closing around the site.
+The list lay between them in the warm kitchen light, names and places and years going back to ground that was under her boots this morning. Not a legal document. Not evidence under the statute. Something older than the statute, and more durable, and entirely outside the reach of the law that could not reach them. Which meant it was also outside the reach of the law that was closing around the site.
 
-That was the question. That was what Nora had put on the table without saying it, the way Nora put everything on the table — without explanation, without instruction, trusting Tayak to see what was there.
+That was the question. That was what Nora had put on the table without saying it, the way Nora put everything on the table. Without explanation, without instruction, trusting Tayak to see what was there.
 
 If the affidavit went into the record, it was inside the machinery. The machinery would process it. Slade's office would request access. The chain that had survived three hundred years outside the law's reach would be inside it, subject to it, exposed to challenge and counter-filing and the particular violence of administrative procedure.
 
@@ -358,6 +350,6 @@ If the affidavit stayed out of the record, the forty-eight hours would run, and 
 
 The clock ticked.
 
-Tayak's hands were flat on the table. She did not pick up the list. She did not reach for her phone. She sat in Nora's kitchen in the yellow porch light with the mint tea gone cool and the cedar dark outside and the list in front of her, and she understood that what Nora had just placed between them was not a document.
+Tayak's hands were flat on the table. She did not pick up the list. She did not reach for her phone. She sat in Nora's kitchen in the yellow porch light with the elderberry tea gone cool and the cedar dark outside and the list in front of her, and she understood that what Nora had placed between them was not a document.
 
 It was a question about what kind of proof survives.
