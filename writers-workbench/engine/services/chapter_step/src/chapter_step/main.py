@@ -1456,6 +1456,168 @@ async def _op_format_kindle(payload: dict) -> dict:
     return {"docx_storage_path": f"kindle/{payload.get('chapter_id', 'unknown')}.docx"}
 
 
+# --- blog + short-story write tools (n8n parity; CR-009 Part 2) ---------------------------------
+
+# The "Writing Prime Directive" carried verbatim from the n8n blog/short-story workflows.
+_PRIME_DIRECTIVE = (
+    "Write like a human, not a machine. Use clear, everyday language and short sentences. Cut cliches: "
+    "no 'revolutionize', 'game-changing', 'unleash', or 'delve'. Get to the point, remove filler. No "
+    "hype, just substance. Show, don't tell, with concrete detail. One idea per paragraph; keep them "
+    "short. Respect the reader. Skip unnecessary adjectives and adverbs. After drafting, cut anything "
+    "confusing or off-topic."
+)
+
+
+async def _load_genre_guidelines(genre_slug: str) -> tuple[str, str]:
+    """(genre_name, writing_guidelines) from genre_config_v2; (slug, '') if unavailable."""
+    from writer_engine.config import get_settings
+
+    settings = get_settings()
+    if not (settings.supabase_url and settings.supabase_service_role_key and genre_slug):
+        return (genre_slug or "Science Fiction", "")
+    try:
+        from writer_engine.supabase.client import get_supabase_admin
+
+        client = await get_supabase_admin()
+        r = await (
+            client.table("genre_config_v2").select("genre_name,writing_guidelines")
+            .eq("genre_slug", genre_slug).limit(1).execute()
+        )
+        row = (getattr(r, "data", None) or [{}])[0]
+        return (row.get("genre_name") or genre_slug, row.get("writing_guidelines") or "")
+    except Exception:
+        return (genre_slug, "")
+
+
+async def _persist_simple(payload: dict, *, title: str, content_type: str, content_text: str,
+                          genre_slug: str, metadata: dict | None = None) -> dict | None:
+    """Persist a standalone piece (blog/short story) to published_content_v2 when persist is requested."""
+    from writer_engine.config import get_settings
+
+    if not payload.get("persist"):
+        return None
+    user_id = payload.get("user_id")
+    settings = get_settings()
+    if not (user_id and settings.supabase_url and settings.supabase_service_role_key):
+        logger.warning("compose.persist.skip", reason="missing user_id / supabase", content_type=content_type)
+        return {"persisted": False}
+    try:
+        from writer_engine.persist_helpers import persist_content
+        from writer_engine.supabase.client import get_supabase_admin
+
+        client = await get_supabase_admin()
+        cid = await persist_content(
+            client, user_id=str(user_id), title=title, content_type=content_type,
+            content_text=_strip_em_dashes(content_text), genre_slug=genre_slug,
+            project_id=payload.get("project_id"), metadata=metadata or {},
+        )
+        logger.info("compose.persisted", content_type=content_type, content_id=cid, words=len(content_text.split()))
+        return {"persisted": True, "content_id": cid}
+    except Exception as exc:
+        logger.warning("compose.persist.failed", content_type=content_type, error=str(exc)[:200])
+        return {"persisted": False, "error": str(exc)[:200]}
+
+
+async def _op_blog(payload: dict) -> dict:
+    """One-shot blog post (n8n write_blog_post parity): genre-aware, researched, SEO-structured."""
+    from writer_engine.config import get_settings
+
+    settings = get_settings()
+    topic = str(payload.get("topic") or payload.get("message") or "").strip()
+    genre_slug = str(payload.get("genre_slug") or "")
+    keywords = payload.get("keywords") or ""
+    target = int(payload.get("target_length") or 1500)
+    genre_name, guidelines = await _load_genre_guidelines(genre_slug)
+    research, _ = await _chapter_research(
+        topic, period="contemporary", title=topic, focus=f"Genre: {genre_slug}. Blog topic: {topic}"
+    ) if topic else ("", [])
+    model = {"haiku": settings.model_cheap, "sonnet": settings.model_default}.get(
+        str(payload.get("llm_strategy") or ""), settings.model_default)
+    system = (
+        f"You are a world-class blogger specializing in {genre_name}.\n\n## Genre Guidelines\n{guidelines}\n\n"
+        f"## Writing Prime Directive\n{_PRIME_DIRECTIVE}\n\n## Requirements\n- Attention-grabbing headline\n"
+        "- Hook opening paragraph\n- 3-5 subheadings for scannability\n- Relevant book/film recommendations\n"
+        "- End with a discussion prompt\n- SEO-optimized without keyword stuffing\n\n"
+        "Return strict JSON: {title, meta_description, body_markdown, tags}."
+    )
+    prompt = (f"Write a blog post about: {topic}\nTarget length: {target} words\nSEO keywords: {keywords}\n\n"
+              f"## Research Context\n{research}")
+    try:
+        resp = await get_router(service=STEP_NAME).complete(
+            provider="anthropic", model=model, system=system, prompt=prompt, max_tokens=8192)
+    except ProviderNotRegistered:
+        return {"written": False, "reason": "no provider"}
+    import json as _json
+    title, body, meta = (topic[:80] or "Untitled Blog Post"), resp.text.strip(), {}
+    try:
+        from writer_engine.llm.json_extractor import extract_json
+
+        data = _json.loads(extract_json(resp.text))
+        title = data.get("title") or title
+        body = data.get("body_markdown") or body
+        meta = {"meta_description": data.get("meta_description"), "tags": data.get("tags")}
+    except Exception:
+        pass
+    body = _strip_em_dashes(body)
+    persist = await _persist_simple(payload, title=title, content_type="blog_post",
+                                    content_text=body, genre_slug=genre_slug, metadata=meta)
+    return {"written": True, "title": title, "content_text": body, "word_count": len(body.split()),
+            "persist": persist}
+
+
+async def _op_short_story(payload: dict) -> dict:
+    """One-shot short story (n8n write_short_story parity): genre + story arc, written from a premise
+    or a brainstormed 3-beat outline, researched, with scene breaks."""
+    from writer_engine.config import get_settings
+
+    settings = get_settings()
+    # Prefer a stored/brainstormed outline (premise + 3-beat structure); fall back to a raw premise.
+    ctx = await _load_context(str(payload.get("project_id") or "00000000-0000-0000-0000-000000000000"), payload) \
+        if payload.get("project_id") else _apply_ctx_overrides(
+            {"genre_slug": payload.get("genre_slug") or "", "title": "", "outline": {}, "roster": []}, payload)
+    outline = ctx.get("outline") or {}
+    premise = str(payload.get("premise") or outline.get("premise") or payload.get("message") or "").strip()
+    genre_slug = str(ctx.get("genre_slug") or payload.get("genre_slug") or "")
+    genre_name, guidelines = await _load_genre_guidelines(genre_slug)
+    title = str(outline.get("title") or payload.get("title") or (premise.split(".")[0][:60] if premise else "Untitled"))
+    length = int(payload.get("length") or 3000)
+    arc = _arc_summary(outline) if outline.get("chapters") or outline.get("story_arc_name") else ""
+    research, _ = await _chapter_research(
+        premise, period=str(payload.get("period") or "contemporary"), title=title,
+        focus=_research_focus(ctx) or f"Genre: {genre_slug}. Premise: {premise}",
+    ) if premise else ("", [])
+    structure = ""
+    if outline.get("chapters"):
+        structure = "## Story Outline (follow exactly)\n" + "\n".join(
+            f"Beat {c.get('chapter_number') or c.get('number') or i}: {c.get('title','')} — "
+            f"{c.get('beat') or c.get('brief','')}" for i, c in enumerate(outline["chapters"], 1))
+    model = {"haiku": settings.model_cheap, "sonnet": settings.model_default}.get(
+        str(payload.get("llm_strategy") or ""), settings.model_default)
+    system = (
+        f"You are a world-class {genre_name} author.\n\n## Genre Guidelines\n{guidelines}\n\n"
+        f"## Writing Prime Directive\n{_PRIME_DIRECTIVE}\n\n"
+        + (f"## Story Arc\n{arc}\n\n" if arc else "")
+        + "## Structure\nWrite a complete short story with natural scene breaks (use --- between scenes): "
+        "(1) Opening — establish the world and protagonist; (2) Rising action — develop conflict and "
+        "character; (3) Climax and resolution. Write the story text directly: no JSON, no metadata, "
+        "no scene labels."
+    )
+    prompt = (f"Write a complete short story titled \"{title}\" of approximately {length} words.\n\n"
+              f"Premise: {premise}\nTone: {payload.get('tone') or 'fitting the genre'}\n"
+              f"{structure}\n\n## Research\n{research}")
+    try:
+        resp = await get_router(service=STEP_NAME).complete(
+            provider="anthropic", model=model, system=system, prompt=prompt, max_tokens=16384, stream=True)
+    except ProviderNotRegistered:
+        return {"written": False, "reason": "no provider"}
+    body = _strip_em_dashes(_strip_scaffolding(resp.text.strip()))
+    persist = await _persist_simple(payload, title=title, content_type="short_story",
+                                    content_text=body, genre_slug=genre_slug,
+                                    metadata={"premise": premise})
+    return {"written": True, "title": title, "content_text": body, "word_count": len(body.split()),
+            "persist": persist}
+
+
 OPS = {
     "write": _op_write,
     "plan": _op_plan,
@@ -1466,6 +1628,8 @@ OPS = {
     "evaluate-genre": _op_evaluate_genre,
     "extract-bible": _op_extract_bible,
     "format-kindle": _op_format_kindle,
+    "blog": _op_blog,
+    "short-story": _op_short_story,
 }
 
 

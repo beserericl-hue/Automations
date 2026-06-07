@@ -120,6 +120,24 @@ CATALOG: tuple[ToolSpec, ...] = (
         aliases=("brainstorm_story", "outline_story"),
     ),
     ToolSpec(
+        "brainstorm", "short-story", "task",
+        intent="brainstorm / outline a SHORT STORY from a premise (develops a 3-beat structure)",
+        params=("premise", "genre", "story_arc", "title"),
+        aliases=("brainstorm_short_story", "short_story_outline"),
+    ),
+    ToolSpec(
+        "chapter", "blog", "task",
+        intent="write a blog post about a topic",
+        params=("topic", "genre", "keywords", "target_length"),
+        aliases=("write_blog", "write_blog_post", "blog_post"),
+    ),
+    ToolSpec(
+        "chapter", "short-story", "task",
+        intent="write a SHORT STORY from a premise or a brainstormed 3-beat outline",
+        params=("premise", "genre", "story_arc", "title", "length"),
+        aliases=("write_short_story", "short_story"),
+    ),
+    ToolSpec(
         "brainstorm", "revise-outline", "task",
         intent="revise / regenerate the whole outline of an existing project",
         params=("project_id", "project_title", "directive"),

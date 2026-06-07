@@ -217,6 +217,32 @@ async def persist_research(
     return report_id
 
 
+async def persist_content(
+    client: Any, *, user_id: str, title: str, content_type: str, content_text: str,
+    genre_slug: str = "", project_id: str | None = None, metadata: dict | None = None,
+) -> str:
+    """Insert a standalone piece (blog_post / short_story / etc.) into published_content_v2 + a
+    content_versions_v2 snapshot. For non-chapter content (no chapter_number)."""
+    ins = await (
+        client.table("published_content_v2")
+        .insert({
+            "user_id": user_id, "title": title, "content_type": content_type,
+            "genre_slug": genre_slug, "content_text": content_text, "status": "draft",
+            "project_id": project_id, "metadata": metadata or {},
+        })
+        .execute()
+    )
+    content_id = str((await _rows(ins) or [{"id": str(uuid4())}])[0]["id"])
+    await (
+        client.table("content_versions_v2")
+        .insert({"user_id": user_id, "content_id": content_id, "version_number": 1,
+                 "content_text": content_text, "changed_by": "engine",
+                 "change_note": f"{content_type} (engine write)"})
+        .execute()
+    )
+    return content_id
+
+
 async def persist_token_usage(
     client: Any, *, user_id: str, workflow: str, calls: list[dict], metadata: dict | None = None
 ) -> int:

@@ -190,6 +190,46 @@ async def _op_story(payload: dict) -> dict:
     return {"outline": outline_dict, "persist": persisted}
 
 
+def _build_short_story_system(genre: str, arc: str, title: str) -> str:
+    """Short-story brainstorm: develop a premise into a 3-beat structure (genre + story arc), the way a
+    chapter outline anchors a chapter. NOT the 60-72 chapter Follett scale — a short story is 3 beats."""
+    title_lock = f'\n\nTITLE LOCK: use EXACTLY "{title}" as the title; do not rename.' if title else ""
+    arc_line = f"\n\nSTORY ARC: {arc}. Map the three beats onto this arc." if arc else ""
+    return (
+        f"You are brainstorming a SHORT STORY in the {genre or 'science fiction'} genre. From the "
+        "premise, develop a tight THREE-BEAT structure (this is a short story, not a novel):\n"
+        "  Beat 1 — Opening: establish the world and introduce the protagonist.\n"
+        "  Beat 2 — Rising action: develop the central conflict and deepen character.\n"
+        "  Beat 3 — Climax & resolution: turn and land the ending.\n"
+        "Produce: a title, a one-paragraph premise, 2-4 themes, the full character roster (name, role, "
+        "a one-line arc each), and EXACTLY 3 chapters — one per beat (chapter_number 1/2/3, a title, "
+        "and a one-sentence beat). Keep it consistent and concrete." + arc_line + title_lock +
+        "\n\nReturn strict JSON matching the outline schema."
+    )
+
+
+async def _op_short_story(payload: dict) -> dict:
+    """Premise -> 3-beat short-story outline (genre + arc). Persisted like any outline."""
+    genre = str(payload.get("genre") or payload.get("genre_slug") or "")
+    arc = str(payload.get("story_arc") or payload.get("story_arc_name") or "")
+    title = str(payload.get("title") or "")
+    premise = str(payload.get("premise") or payload.get("requirements") or payload.get("message") or "")
+    router = get_router(service=STEP_NAME)
+    try:
+        outline, _resp = await complete_structured(
+            router, provider="anthropic", model=get_settings().model_default,
+            system=_build_short_story_system(genre, arc, title),
+            prompt=f"PREMISE:\n{premise}\n\nDevelop the 3-beat short-story outline.",
+            schema=StoryOutline, max_tokens=8192,
+        )
+    except ProviderNotRegistered:
+        outline = _fixture_outline(payload)
+    outline_dict = outline.model_dump(mode="json")
+    outline_dict["form"] = "short_story"  # tag so the writer/UI knows it's a 3-beat short story
+    persisted = await _persist_outline_if_requested(payload, outline_dict)
+    return {"outline": outline_dict, "persist": persisted}
+
+
 async def _op_chapter(payload: dict) -> dict:
     return {"chapter_outline": {"chapter_number": payload.get("chapter_number", 1), "beats": []}}
 
@@ -345,6 +385,7 @@ async def _op_create_project(payload: dict) -> dict:
 
 OPS = {
     "story": _op_story,
+    "short-story": _op_short_story,
     "chapter": _op_chapter,
     "edit-outline": _op_edit_outline,
     "revise-outline": _op_revise_outline,

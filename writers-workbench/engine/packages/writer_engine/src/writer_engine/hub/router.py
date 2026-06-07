@@ -206,6 +206,15 @@ def _heuristic_route(message: str) -> HubDecision:
             params["project_title"] = m.group(3).strip()
         return _decide("library", "lifecycle", params, 0.8)
 
+    # 1b. blog / short-story (n8n parity) — specific, BEFORE the generic brainstorm/write flags.
+    if re.search(r"\bblog\b", low) and _IS_WRITE.search(low):
+        return _decide("chapter", "blog", {"topic": msg}, 0.7)
+    if re.search(r"\bshort\s+stor", low):
+        if re.search(r"\b(brainstorm|outline|plan)\b", low):
+            return _decide("brainstorm", "short-story", {"premise": msg}, 0.7)
+        if _IS_WRITE.search(low):
+            return _decide("chapter", "short-story", {"premise": msg}, 0.7)
+
     # 2. mutually-excluding flags (computed once, resolved in priority order)
     has_lib_action = bool(_HAS_LIBRARY_ACTION.search(low))
     is_retrieve = (not has_lib_action) and bool(_RETRIEVE.search(low))
