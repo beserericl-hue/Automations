@@ -95,6 +95,27 @@ export interface OutlineChapter {
   // - an object with sub_chapters array (from brainstorm_chapter workflow)
   // - an array of SubChapter (legacy format)
   chapter_outline?: ChapterOutline | SubChapter[];
+  // Engine (Path B) outline schema uses different field names than the n8n schema above;
+  // normalizeOutlineChapter() maps these onto number/brief/arc_notes. (CR-008 B)
+  chapter_number?: number | string;
+  beat?: string;
+  arc_point?: string;
+  act?: string;
+  pov_character?: string;
+  bridge_from_prior?: string;
+}
+
+/** Reconcile an outline chapter from either the n8n or the engine schema to a single shape. */
+export function normalizeOutlineChapter(ch: OutlineChapter): OutlineChapter {
+  const rawNum = ch.number ?? ch.chapter_number;
+  const number =
+    typeof rawNum === 'string' && /^\d+$/.test(rawNum.trim()) ? parseInt(rawNum, 10) : rawNum;
+  return {
+    ...ch,
+    number: number as number | string,
+    brief: ch.brief || ch.beat || '',
+    arc_notes: ch.arc_notes || ch.arc_point,
+  };
 }
 
 export interface ChapterOutline {

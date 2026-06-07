@@ -14,6 +14,7 @@ import { sendWebhookCommand } from '../../lib/webhook';
 import CommandDialog from '../shared/CommandDialog';
 import RewriteWithResearchModal from '../content/RewriteWithResearchModal';
 import type { WritingProject, PublishedContent, StoryBibleEntry, ResearchReport, GenreConfig, StoryArc, OutlineCharacter, OutlineChapter, ChapterOutline, SubChapter } from '../../types/database';
+import { normalizeOutlineChapter } from '../../types/database';
 
 const TABS = ['overview', 'outline', 'chapters', 'bible', 'art', 'social', 'research', 'cost', 'export'] as const;
 type Tab = typeof TABS[number];
@@ -608,6 +609,9 @@ function OutlineTab({ outline, storyArc, projectTitle, userId, writtenChapterNum
     return <EmptyState message="No outline yet. Use the chat or Eve to brainstorm one." />;
   }
 
+  // Reconcile engine vs n8n outline field names (chapter_number/beat/arc_point -> number/brief/arc_notes).
+  const chapters = outline.chapters.map(normalizeOutlineChapter);
+
   const toggleChapter = (num: number | string) => {
     setExpandedChapters(prev => {
       const next = new Set(prev);
@@ -618,7 +622,7 @@ function OutlineTab({ outline, storyArc, projectTitle, userId, writtenChapterNum
   };
 
   const expandAll = () => {
-    setExpandedChapters(new Set(outline.chapters!.map(ch => ch.number)));
+    setExpandedChapters(new Set(chapters.map(ch => ch.number)));
   };
 
   const collapseAll = () => {
@@ -714,7 +718,7 @@ function OutlineTab({ outline, storyArc, projectTitle, userId, writtenChapterNum
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-            Chapters ({outline.chapters.length})
+            Chapters ({chapters.length})
           </h3>
           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[10px] text-gray-400">
             <span>Outline updated: {new Date(projectUpdatedAt).toLocaleString()}</span>
@@ -739,7 +743,7 @@ function OutlineTab({ outline, storyArc, projectTitle, userId, writtenChapterNum
         </div>
       </div>
 
-      {outline.chapters.map((ch: OutlineChapter, i: number) => {
+      {chapters.map((ch: OutlineChapter, i: number) => {
         const isExpanded = expandedChapters.has(ch.number);
         // chapter_outline can be an object with sub_chapters or a legacy array
         const subChapters = getSubChapters(ch.chapter_outline);
