@@ -1096,12 +1096,46 @@ function ChaptersTab({
   );
 }
 
+// CR-008 B4: the bible accreted dup/variant names ("Marcus"/"Marcus Redcloud", possessives,
+// "The ..." fragments). Until the DB is deduped, collapse for display: drop junk names, and keep one
+// entry per canonical name (latest updated). Mirrors the engine's _is_junk_bible_name filter.
+function isJunkBibleName(name: string, entryType: string): boolean {
+  const n = (name || '').trim();
+  if (n.length < 2) return true;
+  const low = n.toLowerCase();
+  if (low.includes("'s ") || low.endsWith("'s")) return true; // possessive = a relation, not an entry
+  if (entryType === 'character') {
+    if (/^(the|a|an)\s/.test(low)) return true;               // "The clerk", "A delegate"
+    if (n === low && !/[A-Z]/.test(n)) return true;           // bare lowercase role, no proper name
+  }
+  return false;
+}
+function canonicalKey(name: string): string {
+  return (name || '').trim().toLowerCase().replace(/^the\s+/, '').replace(/['’]s\b.*$/, '').trim();
+}
+function dedupeBibleEntries(entries: StoryBibleEntry[]): StoryBibleEntry[] {
+  const byKey = new Map<string, StoryBibleEntry>();
+  for (const e of entries) {
+    if (isJunkBibleName(e.name, e.entry_type)) continue;
+    const key = `${e.entry_type}:${canonicalKey(e.name)}`;
+    const prev = byKey.get(key);
+    // keep the longest-described, then most-recently-updated, as the canonical row
+    if (!prev
+        || (e.description?.length ?? 0) > (prev.description?.length ?? 0)
+        || (e.updated_at ?? '') > (prev.updated_at ?? '')) {
+      byKey.set(key, e);
+    }
+  }
+  return [...byKey.values()];
+}
+
 function BibleTab({ entries }: { entries: StoryBibleEntry[] | undefined; projectId: string }) {
   if (!entries?.length) {
     return <EmptyState message="No story bible entries yet. They are created automatically when you write chapters." />;
   }
 
-  const grouped = entries.reduce((acc, entry) => {
+  const cleaned = dedupeBibleEntries(entries);
+  const grouped = cleaned.reduce((acc, entry) => {
     if (!acc[entry.entry_type]) acc[entry.entry_type] = [];
     acc[entry.entry_type].push(entry);
     return acc;
