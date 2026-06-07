@@ -217,6 +217,36 @@ async def persist_research(
     return report_id
 
 
+async def persist_token_usage(
+    client: Any, *, user_id: str, workflow: str, calls: list[dict], metadata: dict | None = None
+) -> int:
+    """CR-007 — write one ``token_usage_v2`` row per LLM call (billing parity with the n8n workflows).
+    Each row: model, input/output/total tokens, cost_usd, and metadata (project_id/chapter_number +
+    cache tokens). Best-effort bulk insert; returns the number of rows written."""
+    rows = []
+    for c in calls:
+        inp = int(c.get("input_tokens") or 0)
+        out = int(c.get("output_tokens") or 0)
+        cr = int(c.get("cache_read_tokens") or 0)
+        cw = int(c.get("cache_write_tokens") or 0)
+        rows.append({
+            "user_id": user_id,
+            "workflow_name": workflow,
+            "model": c.get("model"),
+            "input_tokens": inp,
+            "output_tokens": out,
+            # total includes cache tokens so cost analytics reflect the full billable footprint
+            "total_tokens": inp + out + cr + cw,
+            "cost_usd": c.get("cost_usd") or 0,
+            "metadata": {**(metadata or {}), "provider": c.get("provider"),
+                         "cache_read_tokens": cr, "cache_write_tokens": cw},
+        })
+    if not rows:
+        return 0
+    await client.table("token_usage_v2").insert(rows).execute()
+    return len(rows)
+
+
 async def persist_chapter_qa(
     client: Any, *, project_id: str, user_id: str, chapter_number: int, telemetry: dict
 ) -> str:

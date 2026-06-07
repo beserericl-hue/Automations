@@ -30,6 +30,7 @@ from writer_engine.schemas.chapter import (
     WriteChapterResponse,
 )
 from writer_engine.step_service import build_step_app
+from writer_engine.telemetry import token_accounting
 from writer_engine.telemetry.logging import get_logger
 
 STEP_NAME = "chapter"
@@ -536,16 +537,48 @@ def _facts_topics(facts: str, limit: int = 14) -> list[str]:
     return topics
 
 
-async def _chapter_research(beat: str, *, period: str, title: str) -> tuple[str, list[str]]:
+def _research_focus(ctx: dict[str, Any]) -> str:
+    """The story's binding research subject — its specific people / place / culture / period — built
+    from the outline so Perplexity stays ON TOPIC. Without this anchor a beat like 'a burial rite'
+    set in '100 BC' returns generic Old-World facts (Britain/Norway/Stonehenge) instead of THIS book's
+    subject (e.g. Piscataway/Algonquian peoples of the Maryland-Chesapeake tidewater)."""
+    o = ctx.get("outline") or {}
+    parts: list[str] = []
+    for key in ("setting", "premise"):
+        v = o.get(key)
+        if v:
+            parts.append(f"{key.capitalize()}: {str(v)[:500]}")
+    if ctx.get("genre_slug"):
+        parts.append(f"Genre: {ctx['genre_slug']}")
+    # the cast's cultural anchor — first roster line often names the people/place
+    roster = ctx.get("roster") or []
+    if roster and isinstance(roster[0], dict) and roster[0].get("description"):
+        parts.append(f"Lead character: {roster[0].get('name')} — {str(roster[0]['description'])[:160]}")
+    return "\n".join(parts)
+
+
+async def _chapter_research(
+    beat: str, *, period: str, title: str, focus: str = ""
+) -> tuple[str, list[str]]:
     """Pre-write research grounding (Perplexity): given the chapter's planned beat, fetch SPECIFIC
     period facts / local color / material culture / real events to weave into the scene as it is
-    written. Returns (facts_text, topic_labels). Empty on no provider / error — writing still proceeds.
+    written. ``focus`` binds the query to THIS story's specific people/place/culture so the research
+    can't drift to unrelated cultures. Returns (facts_text, topic_labels). Empty on no provider / error.
     """
     if not str(beat).strip():
         return "", []
     router = get_router(service=STEP_NAME)
+    focus_block = (
+        f"\n\nSTORY SUBJECT (all facts MUST pertain to THIS specific people, place, and period):\n{focus}\n\n"
+        "HARD CONSTRAINT: research only the culture/region/period described in STORY SUBJECT above. Do "
+        "NOT return facts about other cultures or regions — no European / Old-World / Stonehenge-style "
+        "analogues unless STORY SUBJECT is itself European. If unsure, prefer facts specific to the named "
+        "people and place over generic period facts."
+        if focus else ""
+    )
     shape = (
-        f'For a chapter of the historical novel "{title}", set in {period}, where: {beat}\n\n'
+        f'For a chapter of the historical novel "{title}", set in {period}, where: {beat}'
+        f"{focus_block}\n\n"
         "Give SPECIFIC, period-accurate factual detail a novelist can weave into the scene — material "
         "culture, local color, geography, real events, terminology, sensory specifics, daily life. "
         "Use labeled bullets (one topic per bullet, the topic in bold, then 1-3 factual sentences). "
@@ -607,22 +640,32 @@ def _build_correct_system(genre_slug: str) -> str:
 
 async def _correct_drift(
     text: str, *, drift: DriftReport, roster_text: str, genre_slug: str, model: str,
-    insist_length: bool = False,
+    insist_length: bool = False, research_facts: str = "",
 ) -> str:
-    """QA cycle 2: streamed full-chapter revision that corrects story/character drift (research is
-    already woven at write-time, so this pass only fixes drift and must not shorten)."""
+    """QA cycle 2: streamed full-chapter revision that corrects story/character drift and, when
+    ``research_facts`` is supplied (the repair path), WEAVES those researched facts into the prose to
+    fill the chapter's research gaps. Research that is fetched but not woven is wasted — so repair
+    passes the facts here and instructs the model to integrate them as concrete sensory/material detail."""
     router = get_router(service=STEP_NAME)
     sd = "\n".join(f"- {x}" for x in drift.story_drift) or "(none)"
     cd = "\n".join(f"- {x}" for x in drift.character_drift) or "(none)"
+    gaps = "\n".join(f"- {x}" for x in (drift.research_gaps or [])) or "(none)"
     insist = (
         "\n\nYOUR PREVIOUS REVISION WAS TOO SHORT. Return the FULL chapter — every scene, at least as "
         "long as the original. Fix ONLY the drift listed; keep all other prose intact. Do not condense."
         if insist_length else ""
     )
+    research_block = (
+        f"\n\nRESEARCH GAPS to fill:\n{gaps}\n\n"
+        f"RESEARCHED FACTS — weave these into the prose where they fit, as concrete sensory / material /"
+        f" period detail (do NOT dump them as exposition, do NOT invent beyond them):\n{research_facts}\n"
+        if research_facts.strip() else ""
+    )
     user = (
         f"CHARACTER ROSTER (consistency reference):\n{roster_text}\n\n"
         f"STORY DRIFT TO CORRECT:\n{sd}\n\n"
-        f"CHARACTER DRIFT TO CORRECT:\n{cd}\n\n"
+        f"CHARACTER DRIFT TO CORRECT:\n{cd}\n"
+        f"{research_block}\n"
         f"CHAPTER TO REVISE:\n{text}{insist}"
     )
     resp = await router.complete(
@@ -634,33 +677,44 @@ async def _correct_drift(
 
 async def _drift_correct_pass(
     text: str, *, ctx: dict[str, Any], req: WriteChapterRequest, roster_text: str, period: str,
-    model: str, min_length_ratio: float = 0.85,
+    model: str, min_length_ratio: float = 0.85, weave_research: bool = False,
 ) -> tuple[str, DriftReport | None, int]:
-    """QA cycle 1 (detect drift vs outline/arc/roster) -> QA cycle 2 (correct it, only when there is
-    real story/character drift). Research is woven at WRITE-time, not here. Returns
-    (possibly-revised text, the pre-correction drift report, passes).
+    """QA cycle 1 (detect drift vs outline/arc/roster + research gaps) -> QA cycle 2 (correct it).
+
+    When ``weave_research`` is set (the REPAIR path), this also fetches focused research for the
+    chapter's beat and WEAVES it into the correction — so a repair that surfaces research gaps actually
+    fills them in the prose, instead of researching for nothing. Returns (possibly-revised text, the
+    post-correction drift report, passes).
 
     ``min_length_ratio`` is the floor below which a (shrinking) correction is rejected. At WRITE time
-    it is 0.85 (a correction shouldn't trim a fresh chapter much). For the REPAIR op it is lower:
-    fixing heavy drift — removing invented characters, deleting duplicated scenes, cutting
-    contradictions — legitimately shortens the chapter, and there the fix is the priority."""
+    it is 0.85; the REPAIR op uses a higher floor now that the roster is clean (less to cut)."""
     drift = await _detect_drift(
         text, outline=ctx["outline"], chapter_number=req.chapter_number,
         roster_text=roster_text, period=period, model=model,
     )
     if drift is None:
         return text, None, 0
-    if not (drift.story_drift or drift.character_drift):
-        return text, drift, 0  # aligned — nothing to correct
+    # Fetch focused research when repairing — so research gaps can actually be filled in the prose.
+    research_facts = ""
+    if weave_research and (drift.research_gaps or drift.story_drift or drift.character_drift):
+        beat = _chapter_outline_beat(ctx.get("outline") or {}, req.chapter_number)
+        research_facts, _ = await _chapter_research(
+            beat, period=period, title=str(ctx.get("title") or ""), focus=_research_focus(ctx),
+        )
+    has_drift = bool(drift.story_drift or drift.character_drift)
+    has_research_to_weave = bool(weave_research and research_facts and drift.research_gaps)
+    if not (has_drift or has_research_to_weave):
+        return text, drift, 0  # aligned and nothing to weave
     draft_words = len(text.split())
     floor = min_length_ratio * draft_words
     revised = await _correct_drift(
         text, drift=drift, roster_text=roster_text, genre_slug=ctx["genre_slug"], model=model,
+        research_facts=research_facts,
     )
     if len(revised.split()) < floor:
         retry = await _correct_drift(
             text, drift=drift, roster_text=roster_text, genre_slug=ctx["genre_slug"], model=model,
-            insist_length=True,
+            insist_length=True, research_facts=research_facts,
         )
         revised = max((revised, retry), key=lambda t: len(t.split()))
     if len(revised.split()) < floor:
@@ -707,7 +761,7 @@ async def _op_write(payload: dict) -> dict:
             # bolted on by a post-hoc rewrite that tends to shorten it.
             beat = _chapter_outline_beat(ctx["outline"], req.chapter_number)
             research_facts, research_gaps_filled = await _chapter_research(
-                beat, period=period, title=ctx["title"]
+                beat, period=period, title=ctx["title"], focus=_research_focus(ctx)
             )
             # Use a pre-made chapter outline if the caller supplied one (the explicit
             # outline -> chapter-outline -> narrative flow); otherwise plan it now.
@@ -1227,7 +1281,7 @@ async def _op_repair(payload: dict) -> dict:
     min_ratio = float(payload.get("min_length_ratio") or 0.8)
     new_text, drift, passes = await _drift_correct_pass(
         text, ctx=ctx, req=req, roster_text=roster_text, period=period, model=model,
-        min_length_ratio=min_ratio,
+        min_length_ratio=min_ratio, weave_research=True,
     )
     persist_result = None
     # Persist whenever persist is requested — NOT only when a correction happened. A repair that
@@ -1376,7 +1430,20 @@ async def handler(inp: StepInput) -> StepOutput:
             status=StepStatus.ERROR,
             error={"code": "UNKNOWN_OP", "message": f"unknown op '{op}'"},  # type: ignore[arg-type]
         )
-    result = await OPS[op](inp.payload)
+    # CR-007: account every LLM call this op makes (sub-chapters, research, drift, QA, correction) and
+    # write per-call token + cost rows to token_usage_v2 for billing.
+    token_accounting.begin(
+        user_id=inp.payload.get("user_id"),
+        project_id=inp.payload.get("project_id"),
+        chapter_number=inp.payload.get("chapter_number"),
+        workflow=f"chapter.{op}",
+    )
+    try:
+        result = await OPS[op](inp.payload)
+    finally:
+        usage = await token_accounting.flush()
+    if isinstance(result, dict):
+        result.setdefault("token_usage", usage)
     return StepOutput(
         execution_id=inp.execution_id,
         step_name=STEP_NAME,

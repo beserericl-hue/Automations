@@ -113,5 +113,18 @@ class LLMRouter:
         )
         if self._sem is not None:
             async with self._sem:
-                return await self._dispatch(**kwargs)
-        return await self._dispatch(**kwargs)
+                resp = await self._dispatch(**kwargs)
+        else:
+            resp = await self._dispatch(**kwargs)
+        # CR-007: record token usage for billing (best-effort; no-op when no accounting context set).
+        try:
+            from writer_engine.telemetry import token_accounting
+
+            token_accounting.record(
+                provider=provider, model=resp.model or model,
+                input_tokens=resp.input_tokens, output_tokens=resp.output_tokens,
+                cache_read=resp.cache_read_tokens, cache_write=resp.cache_write_tokens,
+            )
+        except Exception:  # accounting must never break a generation
+            pass
+        return resp
