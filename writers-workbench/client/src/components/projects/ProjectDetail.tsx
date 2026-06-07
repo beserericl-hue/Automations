@@ -105,6 +105,30 @@ export default function ProjectDetail() {
     enabled: !!id && !!userId,
   });
 
+  // Per-chapter QA telemetry (CR-005): latest aligned + craft-QA per chapter, for the QA column.
+  const { data: qaByChapter } = useQuery({
+    queryKey: ['project-chapter-qa', id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('chapter_qa_v2')
+        .select('chapter_number, aligned, craft_qa, created_at')
+        .eq('project_id', id!)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      const map: Record<number, { aligned: boolean | null; qaAvg: number | null }> = {};
+      for (const row of (data ?? []) as Array<{ chapter_number: number; aligned: boolean | null; craft_qa: Record<string, number> | null }>) {
+        if (row.chapter_number in map) continue; // ordered newest-first -> first seen is the latest run
+        const vals = Object.values(row.craft_qa || {}).filter((v): v is number => typeof v === 'number');
+        map[row.chapter_number] = {
+          aligned: row.aligned,
+          qaAvg: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null,
+        };
+      }
+      return map;
+    },
+    enabled: !!id && !!userId && !isImpersonating && activeTab === 'chapters',
+  });
+
   // Story Bible entries
   const { data: bibleEntries } = useQuery({
     queryKey: ['project-bible', id, isImpersonating],
@@ -127,24 +151,35 @@ export default function ProjectDetail() {
     enabled: !!id && !!userId && (activeTab === 'bible' || activeTab === 'overview'),
   });
 
-  // Research reports — show all user research, not filtered by genre
-  // Genre filter was too strict (research for a project may be tagged with a different genre)
+  // Research reports — scoped to THIS project via the research_report_projects_v2 link table (CR-006).
+  // Previously this showed ALL of the user's research regardless of project; now each project's
+  // Research tab shows only its own reports (unassigned reports live in no project's tab).
   const { data: researchReports } = useQuery({
     queryKey: ['project-research', id, isImpersonating],
     queryFn: async () => {
       if (isImpersonating) {
-        const res = await apiFetch<ApiEnvelope<ResearchReport[]>>('/api/impersonate/data/research?limit=30');
+        const res = await apiFetch<ApiEnvelope<ResearchReport[]>>(
+          `/api/impersonate/data/research?project_id=${encodeURIComponent(id!)}&limit=50`,
+        );
         return res.data ?? [];
       }
       const { data, error } = await supabase
-        .from('research_reports_v2')
-        .select('*')
-        .eq('user_id', userId!)
-        .is('deleted_at', null)
-        .order('updated_at', { ascending: false })
-        .limit(30);
+        .from('research_report_projects_v2')
+        .select('research_reports_v2(*)')
+        .eq('project_id', id!)
+        .eq('user_id', userId!);
       if (error) throw error;
-      return data as ResearchReport[];
+      // PostgREST embeds the many-to-one report as an object, but supabase-js types it as an array;
+      // handle both shapes (cast through unknown).
+      const linked = (data ?? [])
+        .map((row) => {
+          const v = (row as unknown as { research_reports_v2: ResearchReport | ResearchReport[] | null })
+            .research_reports_v2;
+          return Array.isArray(v) ? v[0] : v;
+        })
+        .filter((r): r is ResearchReport => !!r && !r.deleted_at)
+        .sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''));
+      return linked;
     },
     enabled: !!id && !!userId && activeTab === 'research',
   });
@@ -383,7 +418,7 @@ export default function ProjectDetail() {
           />
         )}
         {activeTab === 'outline' && <OutlineTab outline={outline} storyArc={storyArc ?? null} projectTitle={project.title} userId={userId!} writtenChapterNumbers={new Set((chapters || []).map(c => c.chapter_number).filter((n): n is number => n != null))} projectUpdatedAt={project.updated_at} outlineVersionInfo={outlineVersionInfo ?? null} />}
-        {activeTab === 'chapters' && <ChaptersTab chapters={chapters} projectTitle={project.title} projectType={project.project_type} userId={userId!} />}
+        {activeTab === 'chapters' && <ChaptersTab chapters={chapters} qaByChapter={qaByChapter} projectTitle={project.title} projectType={project.project_type} userId={userId!} />}
         {activeTab === 'bible' && <BibleTab entries={bibleEntries} projectId={id!} />}
         {activeTab === 'art' && <ArtTab projectId={id!} />}
         {activeTab === 'social' && <SocialTab projectId={id!} />}
@@ -884,13 +919,36 @@ function OutlineTab({ outline, storyArc, projectTitle, userId, writtenChapterNum
   );
 }
 
+// CR-005 per-chapter drift/QA badge: aligned-to-outline indicator + craft-QA score.
+function ChapterQaBadge({ qa }: { qa?: { aligned: boolean | null; qaAvg: number | null } }) {
+  if (!qa) return <span className="text-xs text-gray-300 dark:text-gray-600">—</span>;
+  const score = qa.qaAvg != null ? qa.qaAvg.toFixed(2) : null;
+  if (qa.aligned === false) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" title="Drifts from the outline/roster (latest QA run)">
+        drift{score ? ` · ${score}` : ''}
+      </span>
+    );
+  }
+  if (qa.aligned === true) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300" title="Aligned to the outline/roster (latest QA run)">
+        ✓{score ? ` ${score}` : ''}
+      </span>
+    );
+  }
+  return <span className="text-xs text-gray-500">{score ?? '—'}</span>;
+}
+
 function ChaptersTab({
   chapters,
+  qaByChapter,
   projectTitle,
   projectType,
   userId,
 }: {
   chapters: (Pick<PublishedContent, 'id' | 'title' | 'chapter_number' | 'status' | 'updated_at'> & { content_text: string | null })[] | undefined;
+  qaByChapter?: Record<number, { aligned: boolean | null; qaAvg: number | null }>;
   projectTitle: string;
   projectType: string | null | undefined;
   userId: string;
@@ -915,6 +973,7 @@ function ChaptersTab({
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 w-16">#</th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Title</th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Words</th>
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400" title="Drift QA (CR-005): aligned to the outline/roster + craft-QA score">QA</th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Status</th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Updated</th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 w-56">Actions</th>
@@ -948,6 +1007,7 @@ function ChaptersTab({
                   </div>
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500">{wordCount.toLocaleString()}</td>
+                <td className="px-4 py-3"><ChapterQaBadge qa={ch.chapter_number != null ? qaByChapter?.[ch.chapter_number] : undefined} /></td>
                 <td className="px-4 py-3">
                   <StatusBadge status={ch.status} />
                 </td>
