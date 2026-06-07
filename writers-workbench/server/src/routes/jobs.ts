@@ -4,8 +4,25 @@ import { logger } from '../lib/logger.js';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import { getNamedQueue } from '../lib/queue.js';
 import { ALL_QUEUE_NAMES, type QueueName } from '../lib/jobs/types.js';
+import { getEngineJob } from '../lib/engine-hub.js';
 
 export const jobsRouter = Router();
+
+/**
+ * CR-008 C: poll an ENGINE arq job (Path B). When HUB_BACKEND=engine, chat returns
+ * `{ engineJob: true, jobId }`; the client polls here, which proxies the engine gateway's
+ * /internal/write/jobs/{id}. Status ∈ queued | in_progress | complete | error | not_found.
+ */
+jobsRouter.get('/engine/:id/status', requireAuth, async (req: Request, res: Response) => {
+  const jobId = String(req.params.id);
+  try {
+    const job = await getEngineJob(jobId);
+    res.json({ jobId, engineJob: true, status: job.status, result: job.result, error: job.error });
+  } catch (err) {
+    logger.error({ err, jobId }, 'jobs: engine poll failed');
+    res.status(502).json({ error: 'Failed to reach engine job' });
+  }
+});
 
 const TERMINAL_STATUSES = new Set(['completed', 'failed']);
 const CANCELLABLE_STATUSES = new Set(['waiting', 'delayed']);

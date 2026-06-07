@@ -10,6 +10,7 @@ import { addTrackedJob } from '../lib/jobs/job-tracker.js';
 import type { N8nWebhookJob } from '../lib/jobs/types.js';
 import { getCreditCost } from '../services/credit-costs.js';
 import { deductCredits } from '../services/credits.js';
+import { hubBackend, callEngineHub } from '../lib/engine-hub.js';
 
 export const chatRouter = Router();
 
@@ -65,7 +66,8 @@ function setCreditsHeader(res: Response, remaining: number): void {
 chatRouter.post('/proxy', requireAuth, validateBody(ChatProxySchema), async (req, res) => {
   const webhookUrl = resolveWebhookUrl();
 
-  if (!webhookUrl) {
+  // The n8n webhook is only required when n8n is the backend; the engine-hub path doesn't use it.
+  if (hubBackend() !== 'engine' && !webhookUrl) {
     res.status(500).json({ error: 'N8N webhook URL not configured' });
     return;
   }
@@ -94,6 +96,51 @@ chatRouter.post('/proxy', requireAuth, validateBody(ChatProxySchema), async (req
     return;
   }
   const shouldDeduct = !bypassCredits(req) && cost > 0 && hasSubscription;
+
+  // CR-008 Workstream C: Path B cutover. When HUB_BACKEND=engine, route to the engine hub instead of
+  // n8n — its Gemini router picks the tool, info ops return data synchronously, load-bearing ops are
+  // queued (returning an engine job_id the client polls via /api/jobs/engine/:id). Default is n8n.
+  if (hubBackend() === 'engine') {
+    try {
+      const hub = await callEngineHub({
+        message,
+        userId,
+        context: {
+          ...(req.body.project_id ? { project_id: req.body.project_id } : {}),
+          ...(req.body.project_title ? { project_title: req.body.project_title } : {}),
+        },
+      });
+      let balance = req.creditsRemaining ?? 0;
+      if (shouldDeduct) {
+        const result = await deductCredits(userId, cost, `chat.engine:${classification.jobType}`);
+        if (result.ok) balance = result.balance_after;
+      }
+      setCreditsHeader(res, balance);
+      const classBlock = {
+        tier: classification.tier,
+        queue: classification.queue,
+        jobType: classification.jobType,
+      };
+      if (hub.kind === 'queued' && hub.job_id) {
+        res.json({
+          mode: 'async', jobId: hub.job_id, engineJob: true, status: hub.status ?? 'queued',
+          assistantMessage: hub.assistant_message, classification: classBlock,
+          creditsCharged: bypassCredits(req) ? 0 : cost, creditsRemaining: balance,
+        });
+      } else {
+        res.json({
+          mode: 'sync', classification: classBlock,
+          creditsCharged: bypassCredits(req) ? 0 : cost, creditsRemaining: balance,
+          assistantMessage: hub.assistant_message,
+          data: hub.kind === 'data' ? hub.data : { reply: hub.assistant_message },
+        });
+      }
+    } catch (error) {
+      logger.error({ err: error, userId }, 'chat: engine hub failed');
+      res.status(502).json({ error: 'Failed to reach engine hub' });
+    }
+    return;
+  }
 
   // Sync tier: keep the low-latency direct call so the client gets an
   // immediate response (list/retrieve/approve and friends).
