@@ -66,6 +66,29 @@ export async function callEngineHub(args: {
   return (await resp.json()) as HubResponse;
 }
 
+/**
+ * Call an engine write tool directly (bypasses the hub router). Used for explicit UI actions like
+ * "Fix drift" (chapter.repair) that target a specific tool/op regardless of HUB_BACKEND. Heavy tools
+ * return `{ job_id, status }`; the client polls /api/jobs/engine/:id.
+ */
+export async function callEngineWriteTool(
+  tool: string,
+  body: Record<string, unknown>,
+): Promise<{ job_id?: string; status?: string; [k: string]: unknown }> {
+  const url = `${engineGatewayUrl()}/internal/write/${encodeURIComponent(tool)}`;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-service-secret': serviceSecret() },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    logger.error({ status: resp.status, tool, body: text.slice(0, 300) }, 'engine-hub: write tool failed');
+    throw new Error(`engine write ${tool} ${resp.status}`);
+  }
+  return (await resp.json()) as { job_id?: string; status?: string };
+}
+
 /** Poll an engine async job (queued load-bearing op). */
 export async function getEngineJob(jobId: string): Promise<{ status: string; result?: unknown; error?: string }> {
   const url = `${engineGatewayUrl()}/internal/write/jobs/${encodeURIComponent(jobId)}`;

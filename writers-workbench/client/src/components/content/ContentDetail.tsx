@@ -468,7 +468,7 @@ export default function ContentDetail() {
       )}
 
       {/* Engine QA/drift (CR-005): the engine stores drift + craft-QA in the chapter metadata. */}
-      {item.content_type === 'chapter' && <EngineQaPanel metadata={item.metadata} />}
+      {item.content_type === 'chapter' && <EngineQaPanel metadata={item.metadata} contentId={id!} />}
 
       {/* Q/A Report (for chapters) */}
       {item.content_type === 'chapter' && (
@@ -534,7 +534,10 @@ export default function ContentDetail() {
 
 // CR-008 B: surface the engine's per-chapter QA + drift (stored in published_content_v2.metadata by
 // CR-005) on the chapter detail page — the old QAReportPanel only reads the n8n last_qa_report field.
-function EngineQaPanel({ metadata }: { metadata: Record<string, unknown> | null | undefined }) {
+// CR-008/009: a "Fix drift" action runs the engine repair op (drift-correct + research + line-edit).
+function EngineQaPanel({ metadata, contentId }: { metadata: Record<string, unknown> | null | undefined; contentId: string }) {
+  const queryClient = useQueryClient();
+  const [repairState, setRepairState] = useState<'idle' | 'running' | 'error'>('idle');
   const m = (metadata || {}) as Record<string, unknown>;
   const qa = m.craft_qa as Record<string, number> | null | undefined;
   const drift = m.drift_report as
@@ -546,6 +549,32 @@ function EngineQaPanel({ metadata }: { metadata: Record<string, unknown> | null 
   const qaAvg = qaEntries.length ? qaEntries.reduce((a, [, v]) => a + v, 0) / qaEntries.length : null;
   const story = drift?.story_drift ?? [];
   const chars = drift?.character_drift ?? [];
+
+  async function fixDrift() {
+    setRepairState('running');
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      const token = s?.session?.access_token;
+      const headers = { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+      const r = await fetch(`/api/content/${contentId}/repair`, { method: 'POST', headers });
+      const j = (await r.json()) as { jobId?: string };
+      if (!r.ok || !j.jobId) throw new Error('repair failed to queue');
+      // Poll the engine job until terminal, then refetch so the drift badge reflects the new scan.
+      const deadline = Date.now() + 30 * 60 * 1000;
+      while (Date.now() < deadline) {
+        await new Promise((res) => setTimeout(res, 15000));
+        const pr = await fetch(`/api/jobs/engine/${j.jobId}/status`, { headers });
+        const pj = (await pr.json()) as { status?: string };
+        if (pj.status === 'complete') break;
+        if (pj.status === 'error' || pj.status === 'not_found') throw new Error('repair job failed');
+      }
+      await queryClient.invalidateQueries({ queryKey: ['content-detail', contentId] });
+      setRepairState('idle');
+    } catch {
+      setRepairState('error');
+    }
+  }
+
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
       <div className="flex items-center gap-3">
@@ -558,6 +587,16 @@ function EngineQaPanel({ metadata }: { metadata: Record<string, unknown> | null 
           </span>
         )}
         {qaAvg != null && <span className="text-xs text-gray-500">Craft QA {qaAvg.toFixed(2)}</span>}
+        {drift?.aligned === false && (
+          <button
+            onClick={fixDrift}
+            disabled={repairState === 'running'}
+            title="Run the engine repair op: correct the drift against the outline/roster, weave research, line-edit"
+            className="ml-auto rounded border border-amber-400 px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50 dark:border-amber-600 dark:text-amber-300 dark:hover:bg-amber-950"
+          >
+            {repairState === 'running' ? 'Fixing drift…' : repairState === 'error' ? 'Retry fix' : 'Fix drift'}
+          </button>
+        )}
       </div>
       {qaEntries.length > 0 && (
         <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-3">

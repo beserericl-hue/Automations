@@ -17,6 +17,7 @@ import { z } from 'zod';
 import { validateBody } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
+import { callEngineWriteTool } from '../lib/engine-hub.js';
 import { logger } from '../lib/logger.js';
 import { getNamedQueue } from '../lib/queue.js';
 import { addTrackedJob } from '../lib/jobs/job-tracker.js';
@@ -643,3 +644,52 @@ contentActionsRouter.post(
     }
   },
 );
+
+/**
+ * POST /api/content/:id/repair — CR-008/009: run the ENGINE drift-correction (chapter.repair) on a
+ * chapter. Repair re-detects drift vs the outline/roster, corrects it (+ weaves focused research +
+ * line-edits), then re-scans so the "Drift detected" badge clears. Engine-only (not gated on
+ * HUB_BACKEND). Returns an engine job_id the client polls via /api/jobs/engine/:id.
+ */
+contentActionsRouter.post('/:id/repair', async (req: Request, res: Response) => {
+  const userId = req.userId;
+  if (!userId) {
+    res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED' } });
+    return;
+  }
+  const id = String(req.params.id);
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data: chapter, error } = await supabase
+      .from('published_content_v2')
+      .select('id, user_id, chapter_number, content_type, project_id')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (error || !chapter) {
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Chapter not found' } });
+      return;
+    }
+    if (chapter.content_type !== 'chapter') {
+      res.status(400).json({ success: false, error: { code: 'NOT_A_CHAPTER', message: 'Repair targets chapters' } });
+      return;
+    }
+    const job = await callEngineWriteTool('chapter', {
+      op: 'repair',
+      project_id: chapter.project_id,
+      chapter_number: chapter.chapter_number,
+      user_id: userId,
+      persist: true,
+      async: true,
+    });
+    logger.info({ userId, contentId: id, jobId: job.job_id }, 'content-actions: engine repair queued');
+    res.status(202).json({ success: true, jobId: job.job_id, engineJob: true, status: job.status ?? 'queued' });
+  } catch (err) {
+    logger.error({ err, userId, contentId: id }, 'content-actions: repair failed');
+    res.status(502).json({
+      success: false,
+      error: { code: 'ENGINE_UNREACHABLE', message: err instanceof Error ? err.message : 'Engine error' },
+    });
+  }
+});
