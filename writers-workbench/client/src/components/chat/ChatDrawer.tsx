@@ -19,6 +19,8 @@ interface Message {
   jobStatus?: JobStatus;
   /** Short tag describing what the job does (e.g. "write_chapter"). */
   jobType?: string;
+  /** CR-008 C: this job runs on the engine (Path B) — poll /api/jobs/engine/:id instead of SSE. */
+  engineJob?: boolean;
 }
 
 interface ChatDrawerProps {
@@ -182,6 +184,47 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
     return () => window.removeEventListener('chat-job-status', handleJobStatus);
   }, []);
 
+  // CR-008 C: engine jobs (Path B) have no SSE callback — poll their status until terminal.
+  const engineJobKey = messages
+    .filter((m) => m.engineJob && m.jobId && (m.jobStatus === 'queued' || m.jobStatus === 'active'))
+    .map((m) => m.jobId)
+    .join(',');
+  useEffect(() => {
+    if (!engineJobKey) return;
+    const ids = engineJobKey.split(',');
+    const statusMap: Record<string, JobStatus> = {
+      queued: 'queued', deferred: 'queued', in_progress: 'active',
+      complete: 'completed', error: 'failed', not_found: 'failed',
+    };
+    let stopped = false;
+    const poll = async () => {
+      const { data: s } = await supabase.auth.getSession();
+      const token = s?.session?.access_token;
+      for (const jobId of ids) {
+        try {
+          const r = await fetch(`/api/jobs/engine/${jobId}/status`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          });
+          if (!r.ok) continue;
+          const j = (await r.json()) as { status: string; error?: string };
+          const st = statusMap[j.status] ?? 'active';
+          if (stopped) return;
+          setMessages((prev) => prev.map((m) => (m.jobId === jobId ? {
+            ...m, jobStatus: st,
+            content: st === 'completed'
+              ? 'Done — results are in your Content Library (and emailed to you).'
+              : st === 'failed' ? `Job failed: ${j.error || 'unknown error'}` : m.content,
+          } : m)));
+        } catch {
+          // transient — keep polling
+        }
+      }
+    };
+    const timer = setInterval(poll, 20000);
+    void poll();
+    return () => { stopped = true; clearInterval(timer); };
+  }, [engineJobKey]);
+
   const handleResizeStart = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
@@ -271,6 +314,7 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
           jobId: data.jobId,
           jobStatus: 'queued',
           jobType: data?.classification?.jobType,
+          engineJob: !!data.engineJob,
         });
       } else {
         const payload = data?.data ?? data;
