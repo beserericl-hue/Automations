@@ -467,6 +467,9 @@ export default function ContentDetail() {
         </div>
       )}
 
+      {/* Engine QA/drift (CR-005): the engine stores drift + craft-QA in the chapter metadata. */}
+      {item.content_type === 'chapter' && <EngineQaPanel metadata={item.metadata} />}
+
       {/* Q/A Report (for chapters) */}
       {item.content_type === 'chapter' && (
         <QAReportPanel
@@ -525,6 +528,55 @@ export default function ContentDetail() {
         variant="danger"
         loading={deleteMutation.isPending}
       />
+    </div>
+  );
+}
+
+// CR-008 B: surface the engine's per-chapter QA + drift (stored in published_content_v2.metadata by
+// CR-005) on the chapter detail page — the old QAReportPanel only reads the n8n last_qa_report field.
+function EngineQaPanel({ metadata }: { metadata: Record<string, unknown> | null | undefined }) {
+  const m = (metadata || {}) as Record<string, unknown>;
+  const qa = m.craft_qa as Record<string, number> | null | undefined;
+  const drift = m.drift_report as
+    | { aligned?: boolean; story_drift?: string[]; character_drift?: string[]; research_gaps?: string[] }
+    | null
+    | undefined;
+  if (!qa && !drift) return null;
+  const qaEntries = qa ? Object.entries(qa).filter(([, v]) => typeof v === 'number') : [];
+  const qaAvg = qaEntries.length ? qaEntries.reduce((a, [, v]) => a + v, 0) / qaEntries.length : null;
+  const story = drift?.story_drift ?? [];
+  const chars = drift?.character_drift ?? [];
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+      <div className="flex items-center gap-3">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Engine QA</h3>
+        {drift?.aligned != null && (
+          <span className={`rounded px-2 py-0.5 text-xs ${drift.aligned
+            ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+            : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'}`}>
+            {drift.aligned ? 'Aligned to outline ✓' : 'Drift detected'}
+          </span>
+        )}
+        {qaAvg != null && <span className="text-xs text-gray-500">Craft QA {qaAvg.toFixed(2)}</span>}
+      </div>
+      {qaEntries.length > 0 && (
+        <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-3">
+          {qaEntries.map(([k, v]) => (
+            <div key={k} className="flex justify-between text-xs">
+              <span className="text-gray-500">{k.replace(/_/g, ' ')}</span>
+              <span className="text-gray-900 dark:text-gray-200">{v.toFixed(2)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {(story.length > 0 || chars.length > 0) && (
+        <div className="mt-3 border-t border-gray-100 pt-2 dark:border-gray-800">
+          <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Outstanding drift</p>
+          <ul className="mt-1 list-disc pl-4 text-xs text-gray-600 dark:text-gray-400">
+            {[...story, ...chars].slice(0, 8).map((d, i) => <li key={i}>{d}</li>)}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
