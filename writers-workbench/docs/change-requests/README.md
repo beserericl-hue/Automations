@@ -13,4 +13,5 @@ tier (DEV/PROD). PROD-affecting CRs are gated on the acceptance test + explicit 
 | [CR-005](CR-005-generation-telemetry-and-qa-persistence.md) | Generation telemetry & QA persistence (chapter_qa_v2) + operational logging | Done | DEV |
 | [CR-006](CR-006-research-project-link.md) | Link research reports to projects (project-scoped research tab) | Engine done; UI in CR-008 | DEV |
 | [CR-007](CR-007-token-cost-accounting.md) | Token & cost accounting (token_usage_v2) — billing parity | Engine done; UI in CR-008 | DEV |
-| [CR-008](CR-008-ui-engine-reconciliation.md) | Reconcile the Workbench UI with the engine (Path B) | Proposed | DEV/PROD |
+| [CR-008](CR-008-ui-engine-reconciliation.md) | Reconcile the Workbench UI with the engine (Path B) | In progress (A+B) | DEV/PROD |
+| [CR-009](CR-009-engine-task-emails-and-remaining-parity.md) | Engine task-completion emails + remaining n8n→engine parity | Proposed | DEV/PROD |
