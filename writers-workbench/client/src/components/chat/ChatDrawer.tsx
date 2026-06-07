@@ -130,7 +130,7 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
         .from('writing_projects_v2')
         .select('title, chapter_count')
         .eq('id', params.id!)
-        .single();
+        .maybeSingle();
       return data as { title: string; chapter_count: number } | null;
     },
     enabled: !!isOnProject,

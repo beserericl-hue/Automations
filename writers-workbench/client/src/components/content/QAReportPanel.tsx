@@ -20,7 +20,7 @@ async function triggerQA(userId: string, contentTitle: string, chapterNumber: nu
       .from('writing_projects_v2')
       .select('title')
       .eq('id', projectId)
-      .single();
+      .maybeSingle();
     projectTitle = data?.title || '';
   }
 
