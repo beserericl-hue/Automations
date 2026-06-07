@@ -47,9 +47,9 @@ export default function ImageDetail() {
         .select('*')
         .eq('id', id!)
         .eq('user_id', userId!)
-        .single();
+        .maybeSingle();  // missing/deleted id -> null -> not-found state (no coerce crash)
       if (error) throw error;
-      return data as GeneratedImage;
+      return (data as GeneratedImage) ?? null;
     },
     enabled: !!id && !!userId,
   });

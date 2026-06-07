@@ -110,7 +110,7 @@ export default function TopBar({ onMenuClick, onChatToggle }: TopBarProps) {
           .select('title')
           .eq('id', entityId.id)
           .eq('user_id', userId)
-          .single();
+          .maybeSingle();
         return data?.title || null;
       }
       if (entityId.type === 'project') {
@@ -119,7 +119,7 @@ export default function TopBar({ onMenuClick, onChatToggle }: TopBarProps) {
           .select('title')
           .eq('id', entityId.id)
           .eq('user_id', userId)
-          .single();
+          .maybeSingle();
         return data?.title || null;
       }
       return null;

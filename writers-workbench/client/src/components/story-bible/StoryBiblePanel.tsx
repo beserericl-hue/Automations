@@ -51,9 +51,9 @@ export default function StoryBiblePanel() {
         .select('id, title')
         .eq('id', id!)
         .eq('user_id', userId!)
-        .single();
+        .maybeSingle();  // missing/deleted id -> null (no coerce crash)
       if (error) throw error;
-      return data as Pick<WritingProject, 'id' | 'title'>;
+      return (data as Pick<WritingProject, 'id' | 'title'>) ?? null;
     },
     enabled: !!id && !!userId,
   });

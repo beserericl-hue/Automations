@@ -32,9 +32,9 @@ export default function ResearchDetail() {
         .eq('id', id!)
         .eq('user_id', userId!)
         .is('deleted_at', null)
-        .single();
+        .maybeSingle();  // missing/deleted id -> null -> not-found state (no coerce crash)
       if (error) throw error;
-      return data as ResearchReport;
+      return (data as ResearchReport) ?? null;
     },
     enabled: !!id && !!userId,
   });

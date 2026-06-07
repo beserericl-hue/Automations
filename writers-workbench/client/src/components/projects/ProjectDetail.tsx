@@ -56,15 +56,17 @@ export default function ProjectDetail() {
         if (!res.data) throw new Error('Project not found');
         return res.data;
       }
+      // maybeSingle (not single): a missing/deleted/stale project id returns null instead of throwing
+      // "Cannot coerce the result to a single JSON object" — so it lands on the not-found state below.
       const { data, error } = await supabase
         .from('writing_projects_v2')
         .select('*')
         .eq('id', id!)
         .eq('user_id', userId!)
         .is('deleted_at', null)
-        .single();
+        .maybeSingle();
       if (error) throw error;
-      return data as WritingProject;
+      return (data as WritingProject) ?? null;
     },
     enabled: !!id && !!userId,
   });
