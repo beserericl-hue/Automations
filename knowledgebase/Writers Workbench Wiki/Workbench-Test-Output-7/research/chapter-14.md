@@ -1,0 +1,23 @@
+# Chapter 14 — write-time research
+
+- **Paper and oilskin**: In the late seventeenth century, petitions and legal memorials in the Chesapeake were commonly written on *laid rag paper* made from linen or hemp rags, not wood-pulp paper. Oilskin or oiled cloth was used to protect papers from damp during transport through humid coastal environments like the Chesapeake Bay watershed.  
+
+- **Colonial Maryland assembly**: Maryland’s provincial government in 1697 met in the colonial capital at *St. Mary’s City* until the capital moved to Annapolis in 1695, so a 1697 petition to the assembly would belong to the early Annapolis era. The assembly was the *General Assembly of Maryland*, with petitions typically presented in the formal language of supplication and grievance common in colonial legal culture.  
+
+- **Piscataway identity**: The Piscataway were a Native polity centered along the *Potomac River* and its tributaries in what is now southern Maryland and the Washington, D.C. region. By the late seventeenth century, Piscataway communities had been displaced by warfare, land pressure, disease, and colonial expansion, with some people moving inland or seeking protection near Catholic and proprietary settlements.  
+
+- **Handprint as mark**: In colonial Anglo-American legal practice, people who could not or did not sign with handwriting often used a *mark* beside their name, and a handprint would visually emphasize that the person had physically attested to the petition. Such marks appear in early modern documents as a practical substitute for a written signature and can carry legal weight when witnessed or recorded by clerks.  
+
+- **Ink and fading**: Seventeenth-century scribes in Maryland commonly used *iron gall ink*, which darkened initially but can brown, fade, or eat into paper over time, especially in damp storage conditions. Under ultraviolet or raking light, iron gall ink and erasures can become more legible because the fibers and ink absorb light differently than the surrounding paper.  
+
+- **Legal style and wording**: A 1690s petition would likely use formulas such as *“humble petition,” “your petitioner,”* and *“most respectfully sheweth”* in the formal idiom of the period. Colonial petitions often listed specific injuries, land disputes, debts, boundary issues, violence, or requests for recognition, and they were addressed to authority as matters of redress rather than private correspondence.  
+
+- **University conservation lab**: In a modern university lab, manuscript examination commonly uses *UV illumination*, magnification, and high-resolution digital photography to recover faded writing, identify ink behavior, and document water damage or folds. Conservation staff would also note fold lines, edge losses, tide-like staining, mold spotting, and brittleness as clues to storage history.  
+
+- **Chesapeake geography**: Southern Maryland in 1697 was a riverine landscape of *tides, marshes, pine woods, tobacco fields, and plantation landings*; travel often followed waterways rather than roads. The Patuxent, Potomac, and Wicomico systems formed the practical corridors for people, goods, and colonial authority.  
+
+- **Everyday sensory world**: A document from this period would have been handled in a world of *smoke, tallow candles, salt air, wet wool, horse sweat, and river mud*. The colony’s legal and domestic spaces were noisy with quills scratching, paper rustling, and the smell of beeswax, ink, and unwashed clothing.  
+
+- **Colonial documentary habits**: Important papers were often folded for storage, docketed on the outside, and carried in parcels rather than bound in neat folders. The survival of a single fragment with a clear mark or signature is consistent with the fragmentary preservation of provincial records, especially those exposed to humidity, handling, fire, or later dispersal.
+
+SOURCES: https://dutchculture.nl/en/grant/nwo-open-call-research-collections-colonial-context; https://www.nwo.nl/en/researchprogrammes/dutch-research-agenda-nwa/thematic-programming/research-into-collections-with-a-colonial-context; https://qso365.co.uk/2024/09/i-built-a-stratum-1-ntp-time-server/; https://www.colonialcollections.nl/en/news/; https://committee.kolonialecollecties.nl/site/binaries/site-content/collections/documents/2025/02/19/recommendation-nigeria/ng-2024-1b-en.pdf; https://english.cultureelerfgoed.nl/documents/2025/01/01/provenance-research-into-collections-from-a-colonial-context---a-guide; https://www.niod.nl/en/projects/pilotproject-provenance-research-objects-colonial-era-pproce; https://nl.galsys.co.uk/news/ntp-stratum-levels-explained/

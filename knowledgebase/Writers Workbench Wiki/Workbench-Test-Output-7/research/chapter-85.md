@@ -1,0 +1,15 @@
+# Chapter 85 — write-time research
+
+- **Commission building exterior**: A contemporary government or quasi-government commission office in Canada would likely have *energy-efficient glazing, aluminum framing, and barrier-free entrances* by 2024, with automatic doors, tactile signage, and accessible ramps or flush thresholds. In urban Canadian public architecture, these features are standard under modern accessibility and building-code practice.  
+
+- **Phone call details**: By 2024, a first-ring pickup is entirely plausible because most people carry a mobile phone on their person; caller ID, voicemail, and speakerphone use are routine. The physical act of calling would likely be through a smartphone with a glass touchscreen, haptic vibration, and wireless earbuds or an in-hand device rather than a landline.  
+
+- **Smoking language and gesture**: “It takes her the length of a cigarette” is period-accurate contemporary idiom because cigarette duration is still commonly used as a rough unit of time, even by nonsmokers. A cigarette typically takes about 5–7 minutes to smoke, depending on pace and brand.  
+
+- **2024 researcher identity and terminology**: In contemporary academic and public-history settings, terms such as *positionality*, *community-based research*, *oral history*, and *Indigenous data sovereignty* are widely used for a descendant-researcher whose testimony is part of the record. A statement that she has ceased to be “objective” reflects current scholarly critique that objectivity is not neutral in work involving family, ancestry, and colonial archives.  
+
+- **Archive and testimony setting**: If the scene involves an official hearing or commission, a 2024 Canadian record would often include *transcripts, digital recordings, exhibit numbering, and sworn testimony* rather than only handwritten notes. Proceedings commonly use formal language such as “for the record,” “evidence,” “submission,” and “statement,” especially in quasi-judicial or inquiry settings.  
+
+- **Temporal setting markers**: A present-day Canadian scene in 2024 can include *winter grit, slush piles, reflective road salt residue, and bundled pedestrians* if set in colder months, or bright late-afternoon light and dust from construction if set in warmer seasons. Urban public buildings often sit among *glass towers, surface parking, buses, and construction hoarding* that signal a contemporary downtown core.
+
+SOURCES: https://historicalnovelsociety.org/forthcoming-historical-novels-for-2024/; https://www.youtube.com/watch?v=vyt_ZzMVFUs; https://austenprose.com/2024/09/22/the-best-new-historical-novels-fall-2024/; https://fivebooks.com/category/fiction/historical-fiction/new-historical-fiction/; https://crimereads.com/the-best-historical-fiction-of-2024-so-far/; https://ulleseit.com/top-historical-fiction-picks-february-2024/; https://www.beyondthebookends.com/best-new-historical-fiction-books-2024/; https://tertulia.com/editorial-list/the-best-historical-fiction-books-2024

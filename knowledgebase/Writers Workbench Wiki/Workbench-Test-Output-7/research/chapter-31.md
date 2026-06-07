@@ -1,0 +1,23 @@
+# Chapter 31 — write-time research
+
+- **Written petition**: In the 1830s, Native political memorials to the U.S. government were commonly formal petitions or protests signed by leaders and citizens, often framed in the language of loyalty, rights, and federal obligation.[1][2] The Cherokee protest against the Treaty of New Echota was an official petition in 1836 signed by Principal Chief John Ross, council members, and 2,174 citizens.[2]
+
+- **Federal-removal context**: The Indian Removal Act was signed in 1830 and created the legal framework for forcing southeastern tribes to cede homelands and move west of the Mississippi River.[2] By the mid-1830s, Cherokee leaders were already using petitions as one of the last legal and diplomatic tools available to resist removal.[1][2]
+
+- **Council legitimacy**: Cherokee resistance centered on the distinction between the legally recognized national leadership and the unauthorized signers of the Treaty of New Echota.[2] That makes the act of submitting a petition without first informing the tribal council historically resonant with the politics of legitimacy and internal authority in this period.[2]
+
+- **Pressure and exhaustion**: Contemporary accounts of Cherokee resistance describe leaders exhausting “all options” as encroachment intensified and the outlook turned bleak.[2] A scene of private fatigue after a formal filing is consistent with the historical mood of the removal crisis, when political maneuvers were carrying heavy emotional cost.[2]
+
+- **Roads and travel**: Travel in Cherokee country in the 1830s was often by wagon road, horseback, or on foot, with rough connections between settlements and federal offices. If a character drives in a modern setting, the landscape can still echo older route patterns where ridges, creek bottoms, and river crossings shaped movement and settlement.
+
+- **The mound landscape**: Mississippian-era mound sites in the Southeast are typically earthworks built from layered soil and clay, with flattened tops or broad platforms and surrounding plaza space. A standing figure at the edge of a trench would be looking at stratified soil cuts that can reveal dark topsoil, lighter fill, and compacted layers, depending on the excavation.
+
+- **Soil and vegetation**: In the southeastern Piedmont and river-valley regions, exposed cuts often show reddish clay subsoil beneath darker loam, with pine, oak, hickory, or mixed hardwood vegetation nearby depending on the exact site. Heat, humidity, insects, and the smell of wet earth after rain are characteristic sensory details for open excavation areas in this region.
+
+- **Petition document materiality**: Nineteenth-century petitions were typically handwritten on paper and folded or docketed for delivery, then handled as legal objects rather than private letters.[1][2] That material seriousness can be echoed in the physical weight of paper, ink, and signatures as the document leaves a character’s hands.
+
+- **Chiefs, citizens, and signatures**: The Cherokee protest petition of 1836 is notable for its formal list of signers, combining council authority with citizen support.[2] For a novelist, the act of signing or submitting such a document can be grounded in the period practice of collective assent, countersignature, and recordkeeping rather than a solitary gesture.
+
+- **Language of protest**: Petitioning was a recognized American political tactic, and Native leaders used it in direct response to federal policy.[1][2] A scene built around a petition can therefore carry the historical texture of legal argument, written protest, and reluctant appeal to distant authority rather than open confrontation.
+
+SOURCES: https://www.americanyawp.com/reader/manifest-destiny/cherokee-petition-protesting-removal-1836/; https://americanindian.si.edu/nk360/removal-cherokee/resisting-removal.html; https://cbsaustin.com/news/nation-world/native-american-group-calls-for-washington-commanders-to-reinstate-redskins-name-washington-dc-native-american-guardians-association-racism-name-petition-warriors-braves-on-the-warpath; https://www.wisconsinhistory.org/record/multi/W019PLP/petition-for-removing-native-americans-from-washin; https://nativenewsonline.net/currents/native-leaders-chime-in-on-washington-commanders-name-change-conversations/; https://www.fox29.com/sports/native-american-group-sues-washington-commanders-over-erasure-of-redskins-identity; https://www.readex.com/blog/we-petition-you-remove-them-amongst-us-highlights-native-american-tribal-histories; https://digitalcommons.law.ou.edu/indianserialset/3277/
