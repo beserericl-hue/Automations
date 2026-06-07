@@ -931,9 +931,13 @@ async def _persist_chapter_if_requested(
         from writer_engine.supabase.client import get_supabase_admin
 
         client = await get_supabase_admin()
+        # Universal em-dash backstop at the persist chokepoint: covers EVERY path, including the
+        # repair floor-failure that keeps the original (un-line-edited) text — so no persisted chapter
+        # carries a banned dash regardless of whether the LLM correction was accepted.
+        clean_text = _strip_em_dashes(out.content_text)
         content_id = await persist_chapter(
             client, project_id=str(project_id), user_id=str(user_id), chapter_number=chapter_number,
-            title=chapter_title, content_text=out.content_text, genre_slug=genre,
+            title=chapter_title, content_text=clean_text, genre_slug=genre,
             metadata={"chapter_run_id": str(out.chapter_run_id), "word_count": out.word_count,
                       "sub_chapter_count": out.sub_chapter_count, "craft_qa": out.craft_qa,
                       "drift_report": out.drift_report},
