@@ -110,6 +110,11 @@ async def persist_chapter(
     }
     if rows:
         content_id = str(rows[0]["id"])
+        # Stamp updated_at on re-writes (repair/rewrite) — there is no DB trigger, so without this the
+        # row's updated_at stays frozen at first-write time and the UI sorts/refreshes stale.
+        from datetime import UTC, datetime
+
+        row["updated_at"] = datetime.now(UTC).isoformat()
         await client.table("published_content_v2").update(row).eq("id", content_id).execute()
     else:
         ins = await client.table("published_content_v2").insert(row).execute()

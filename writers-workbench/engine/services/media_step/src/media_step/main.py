@@ -100,10 +100,14 @@ async def _dalle_cover(prompt: str, *, key: str) -> bytes | None:
             return None
 
 
-async def _upload_cover(image: bytes, *, user_id: str, title: str, settings) -> str | None:
-    """Persist the cover to Supabase Storage (cover-images bucket); return its public URL."""
+async def _upload_cover(image: bytes, *, user_id: str, title: str, settings) -> tuple[str | None, str | None]:
+    """Persist the cover to Supabase Storage (cover-images bucket).
+
+    Returns ``(public_url, storage_path)`` — the storage_path (relative to the bucket) is what the
+    ``generated_images_v2`` row stores, matching the n8n save_to_storage convention.
+    """
     if not settings.supabase_url or not settings.supabase_service_role_key:
-        return None
+        return None, None
     from datetime import datetime
 
     ts = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
@@ -119,9 +123,47 @@ async def _upload_cover(image: bytes, *, user_id: str, title: str, settings) -> 
                 content=image,
             )
             r.raise_for_status()
-            return f"{base}/storage/v1/object/public/cover-images/{path}"
+            return f"{base}/storage/v1/object/public/cover-images/{path}", path
         except Exception:
-            return None
+            return None, None
+
+
+async def _record_generated_image(
+    *, storage_path: str, user_id: str, project_id: str | None, prompt: str,
+    genre_slug: str | None, provider: str, title: str, settings,
+) -> bool:
+    """Insert a generated_images_v2 row so the cover shows in the UI gallery / as the project cover.
+
+    Mirrors the n8n save_to_storage node (workflow 02). Best-effort: a DB failure must not fail the
+    generation itself (the image is already in Storage), so this returns a bool and never raises.
+    """
+    if not settings.supabase_url or not settings.supabase_service_role_key:
+        return False
+    base = settings.supabase_url.rstrip("/")
+    key = settings.supabase_service_role_key
+    body = {
+        "user_id": user_id or "anon",
+        "project_id": project_id or None,
+        "image_type": "cover_art",
+        "storage_path": storage_path,
+        "original_prompt": prompt[:10000],
+        "genre_slug": genre_slug or None,
+        "image_format": "png",
+        "generation_model": "nano-banana-pro" if provider == "kieai" else (provider or "unknown"),
+        "metadata": {"story_title": title, "content_type": "cover_art", "provider": provider},
+    }
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            r = await client.post(
+                f"{base}/rest/v1/generated_images_v2",
+                headers={"apikey": key, "Authorization": f"Bearer {key}",
+                         "Content-Type": "application/json", "Prefer": "return=minimal"},
+                json=body,
+            )
+            r.raise_for_status()
+            return True
+        except Exception:
+            return False
 
 
 async def _op_cover_art(payload: dict) -> dict:
@@ -143,9 +185,18 @@ async def _op_cover_art(payload: dict) -> dict:
         return {"image_url": f"https://placehold.co/1600x2400?text={_slug(title)}",
                 "provider": "stub", "prompt": prompt}
 
-    public_url = await _upload_cover(image, user_id=user_id, title=title, settings=settings)
+    public_url, storage_path = await _upload_cover(image, user_id=user_id, title=title, settings=settings)
+    recorded = False
+    if storage_path:
+        recorded = await _record_generated_image(
+            storage_path=storage_path, user_id=user_id,
+            project_id=(str(payload["project_id"]) if payload.get("project_id") else None),
+            prompt=prompt, genre_slug=(payload.get("genre_slug") or payload.get("genre")),
+            provider=provider, title=title, settings=settings,
+        )
     return {"image_url": public_url or "(generated, not persisted — storage unconfigured)",
-            "provider": provider, "persisted": bool(public_url), "prompt": prompt}
+            "storage_path": storage_path, "provider": provider,
+            "persisted": bool(public_url), "db_recorded": recorded, "prompt": prompt}
 
 
 def _social_system() -> str:
