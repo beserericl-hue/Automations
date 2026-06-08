@@ -419,7 +419,7 @@ export default function ProjectDetail() {
           />
         )}
         {activeTab === 'outline' && <OutlineTab outline={outline} storyArc={storyArc ?? null} projectTitle={project.title} userId={userId!} writtenChapterNumbers={new Set((chapters || []).map(c => c.chapter_number).filter((n): n is number => n != null))} projectUpdatedAt={project.updated_at} outlineVersionInfo={outlineVersionInfo ?? null} />}
-        {activeTab === 'chapters' && <ChaptersTab chapters={chapters} qaByChapter={qaByChapter} projectTitle={project.title} projectType={project.project_type} userId={userId!} />}
+        {activeTab === 'chapters' && <ChaptersTab chapters={chapters} qaByChapter={qaByChapter} projectId={id!} projectTitle={project.title} projectType={project.project_type} userId={userId!} />}
         {activeTab === 'bible' && <BibleTab entries={bibleEntries} projectId={id!} />}
         {activeTab === 'art' && <ArtTab projectId={id!} />}
         {activeTab === 'social' && <SocialTab projectId={id!} />}
@@ -944,15 +944,61 @@ function ChapterQaBadge({ qa }: { qa?: { aligned: boolean | null; qaAvg: number 
   return <span className="text-xs text-gray-500">{score ?? '—'}</span>;
 }
 
+// CR-008/009: per-row "Fix Drift" — runs the engine repair op (drift-correct vs outline/roster + weave
+// research + line-edit), polls the engine job, then refetches so the QA badge reflects the new scan.
+// Same action the ContentDetail EngineQaPanel exposes, surfaced in the chapters list action set.
+function ChapterFixDriftButton({ contentId, projectId }: { contentId: string; projectId: string }) {
+  const queryClient = useQueryClient();
+  const [state, setState] = useState<'idle' | 'running' | 'error'>('idle');
+
+  async function fixDrift() {
+    setState('running');
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      const token = s?.session?.access_token;
+      const headers = { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+      const r = await fetch(`/api/content/${contentId}/repair`, { method: 'POST', headers });
+      const j = (await r.json()) as { jobId?: string };
+      if (!r.ok || !j.jobId) throw new Error('repair failed to queue');
+      const deadline = Date.now() + 30 * 60 * 1000;
+      while (Date.now() < deadline) {
+        await new Promise((res) => setTimeout(res, 15000));
+        const pr = await fetch(`/api/jobs/engine/${j.jobId}/status`, { headers });
+        const pj = (await pr.json()) as { status?: string };
+        if (pj.status === 'complete') break;
+        if (pj.status === 'error' || pj.status === 'not_found') throw new Error('repair job failed');
+      }
+      await queryClient.invalidateQueries({ queryKey: ['project-chapter-qa', projectId] });
+      await queryClient.invalidateQueries({ queryKey: ['project-chapters', projectId] });
+      setState('idle');
+    } catch {
+      setState('error');
+    }
+  }
+
+  return (
+    <button
+      disabled={state === 'running'}
+      onClick={fixDrift}
+      title="Run the engine repair op: correct the drift against the outline/roster, weave research, line-edit"
+      className="rounded-lg px-3 py-1.5 text-xs font-medium border border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950 disabled:opacity-50 whitespace-nowrap"
+    >
+      {state === 'running' ? 'Fixing drift…' : state === 'error' ? 'Retry fix' : 'Fix Drift'}
+    </button>
+  );
+}
+
 function ChaptersTab({
   chapters,
   qaByChapter,
+  projectId,
   projectTitle,
   projectType,
   userId,
 }: {
   chapters: (Pick<PublishedContent, 'id' | 'title' | 'chapter_number' | 'status' | 'updated_at'> & { content_text: string | null })[] | undefined;
   qaByChapter?: Record<number, { aligned: boolean | null; qaAvg: number | null }>;
+  projectId: string;
   projectTitle: string;
   projectType: string | null | undefined;
   userId: string;
@@ -980,7 +1026,7 @@ function ChaptersTab({
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400" title="Drift QA (CR-005): aligned to the outline/roster + craft-QA score">QA</th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Status</th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Updated</th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 w-56">Actions</th>
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 w-72">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -996,6 +1042,7 @@ function ChaptersTab({
               : ch.chapter_number != null ? String(ch.chapter_number) : '\u2014';
             const actionKey = ch.id;
             const isPending = pendingAction === actionKey;
+            const hasDrift = ch.chapter_number != null && qaByChapter?.[ch.chapter_number]?.aligned === false;
             return (
               <tr key={ch.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                 <td className="px-4 py-3 text-sm text-gray-500">
@@ -1018,6 +1065,7 @@ function ChaptersTab({
                 <td className="px-4 py-3 text-sm text-gray-400">{new Date(ch.updated_at).toLocaleDateString()}</td>
                 <td className="px-4 py-3">
                   <div className="flex gap-1.5">
+                    {hasDrift && <ChapterFixDriftButton contentId={ch.id} projectId={projectId} />}
                     <button
                       disabled={isPending}
                       onClick={() => {
