@@ -21,6 +21,52 @@ router = APIRouter(dependencies=[Depends(require_service_secret)])
 logger = get_logger("hub.gateway")
 
 
+async def _execute_hub(req: HubRequest) -> HubResponse:
+    """Route + dispatch one hub request. Shared by the chat (``/hub``) and voice (``/hub/voice``)
+    surfaces so both go through the identical Gemini-router → sync/async-dispatch path."""
+    logger.info("hub.request", source=req.source, user_id=req.user_id, msg_preview=req.message[:160])
+    decision = await route_message(req)
+    plan = build_dispatch_plan(decision, req)
+    logger.info(
+        "hub.dispatch", action=plan.action, tool=plan.tool, op=plan.op,
+        params=list(plan.body.keys()), user_id=req.user_id,
+    )
+
+    if plan.action == "reply":
+        return HubResponse(kind="reply", assistant_message=plan.assistant_message)
+
+    settings = get_settings()
+    url = f"{settings.orchestrator_url}/pipelines/write/{plan.tool}/run"
+
+    try:
+        if plan.action == "call_sync":
+            data = await _forward("POST", url, json=plan.body, timeout_s=120.0)
+            logger.info("hub.sync_ok", tool=plan.tool, op=plan.op, user_id=req.user_id)
+            return HubResponse(
+                kind="data", assistant_message=plan.assistant_message,
+                tool=plan.tool, op=plan.op, data=data,
+            )
+
+        # enqueue — heavy generation; orchestrator returns {job_id, status, tool}
+        enq = await _forward("POST", url, json=plan.body, timeout_s=30.0)
+        logger.info(
+            "hub.enqueued", tool=plan.tool, op=plan.op, job_id=enq.get("job_id"),
+            user_id=req.user_id, chapter=plan.body.get("chapter_number"),
+            project=plan.body.get("project_id") or plan.body.get("project_title"),
+        )
+        return HubResponse(
+            kind="queued", assistant_message=plan.assistant_message,
+            tool=plan.tool, op=plan.op,
+            job_id=enq.get("job_id"), status=enq.get("status", "queued"),
+        )
+    except HTTPException as exc:
+        logger.error(
+            "hub.dispatch_failed", action=plan.action, tool=plan.tool, op=plan.op,
+            status_code=exc.status_code, detail=str(exc.detail)[:300], user_id=req.user_id,
+        )
+        raise
+
+
 @router.post("/hub")
 async def hub(body: dict[str, Any]) -> dict[str, Any]:
     """CR-004 Path B — the engine hub. The UI chat (via the Workbench server) and the Eve voice
@@ -36,49 +82,47 @@ async def hub(body: dict[str, Any]) -> dict[str, Any]:
         source=body.get("source") or "chat",
         context=body.get("context") or {},
     )
-    logger.info("hub.request", source=req.source, user_id=req.user_id, msg_preview=req.message[:160])
-    decision = await route_message(req)
-    plan = build_dispatch_plan(decision, req)
-    logger.info(
-        "hub.dispatch", action=plan.action, tool=plan.tool, op=plan.op,
-        params=list(plan.body.keys()), user_id=req.user_id,
+    return (await _execute_hub(req)).model_dump(mode="json")
+
+
+@router.post("/hub/voice")
+async def hub_voice(body: dict[str, Any]) -> dict[str, Any]:
+    """Eve voice webhook (CR-004 Path B voice surface). The ElevenLabs agent's server-tool posts here.
+
+    Differs from ``/hub`` only at the edges: it accepts the ElevenLabs caller fields
+    (``system__caller_id`` / ``caller_id`` → ``user_id``; ``user_message_request`` → message) and
+    returns a FLAT, voice-friendly shape — ``{response, job_id?, status?, tool?, op?}`` — where
+    ``response`` is the single line Eve should speak. The agent holds the conversation turns itself,
+    so this stays stateless per turn (``conversation_id`` is threaded through for correlation only)."""
+    user_id = (
+        body.get("user_id")
+        or body.get("system__caller_id")
+        or body.get("caller_id")
+        or body.get("phone_number")
     )
-
-    if plan.action == "reply":
-        return HubResponse(
-            kind="reply", assistant_message=plan.assistant_message,
-        ).model_dump(mode="json")
-
-    settings = get_settings()
-    url = f"{settings.orchestrator_url}/pipelines/write/{plan.tool}/run"
-
-    try:
-        if plan.action == "call_sync":
-            data = await _forward("POST", url, json=plan.body, timeout_s=120.0)
-            logger.info("hub.sync_ok", tool=plan.tool, op=plan.op, user_id=req.user_id)
-            return HubResponse(
-                kind="data", assistant_message=plan.assistant_message,
-                tool=plan.tool, op=plan.op, data=data,
-            ).model_dump(mode="json")
-
-        # enqueue — heavy generation; orchestrator returns {job_id, status, tool}
-        enq = await _forward("POST", url, json=plan.body, timeout_s=30.0)
-        logger.info(
-            "hub.enqueued", tool=plan.tool, op=plan.op, job_id=enq.get("job_id"),
-            user_id=req.user_id, chapter=plan.body.get("chapter_number"),
-            project=plan.body.get("project_id") or plan.body.get("project_title"),
-        )
-        return HubResponse(
-            kind="queued", assistant_message=plan.assistant_message,
-            tool=plan.tool, op=plan.op,
-            job_id=enq.get("job_id"), status=enq.get("status", "queued"),
-        ).model_dump(mode="json")
-    except HTTPException as exc:
-        logger.error(
-            "hub.dispatch_failed", action=plan.action, tool=plan.tool, op=plan.op,
-            status_code=exc.status_code, detail=str(exc.detail)[:300], user_id=req.user_id,
-        )
-        raise
+    req = HubRequest(
+        message=body.get("message") or body.get("user_message_request") or "",
+        user_id=str(user_id) if user_id else None,
+        conversation_id=body.get("conversation_id") or body.get("system__conversation_id"),
+        source="voice",
+        context=body.get("context") or {},
+    )
+    resp = await _execute_hub(req)
+    # Flat shape ElevenLabs reads without nested-field config. For an info op with data, hand back a
+    # short spoken line plus the data so the agent can summarise it aloud.
+    spoken = resp.assistant_message or (
+        "Here's what I found." if resp.kind == "data" else "Okay."
+    )
+    out: dict[str, Any] = {"response": spoken, "kind": resp.kind}
+    if resp.tool:
+        out["tool"] = resp.tool
+        out["op"] = resp.op
+    if resp.job_id:
+        out["job_id"] = resp.job_id
+        out["status"] = resp.status
+    if resp.kind == "data" and resp.data is not None:
+        out["data"] = resp.data
+    return out
 
 
 @router.post("/library/retrieve")

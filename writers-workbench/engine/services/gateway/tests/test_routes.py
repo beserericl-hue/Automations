@@ -145,3 +145,28 @@ def test_hub_info_runs_sync_and_returns_data(monkeypatch: pytest.MonkeyPatch) ->
     assert body["data"]["result"]["outlines"] == [{"title": "A"}]
     assert "/pipelines/write/library/run" in cap["url"]
     assert cap["body"]["async"] is False
+
+
+def test_hub_voice_maps_caller_id_and_returns_flat(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Eve voice surface: system__caller_id -> user_id, and a flat {response, job_id} the agent speaks."""
+    cap: dict[str, Any] = {}
+    _patch_orch(monkeypatch, cap, {"job_id": "job-9", "status": "queued", "tool": "chapter"})
+    client = TestClient(app)
+    r = client.post(
+        "/internal/hub/voice",
+        json={"user_message_request": "write chapter 5", "system__caller_id": "+14105914612"},
+        headers={"x-service-secret": "test-secret"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    # flat voice shape: a spoken line + the queued job, no nested HubResponse envelope
+    assert isinstance(body["response"], str) and body["response"]
+    assert body["kind"] == "queued" and body["job_id"] == "job-9"
+    # caller id became the user_id forwarded to the orchestrator
+    assert cap["body"]["user_id"] == "+14105914612"
+
+
+def test_hub_voice_requires_service_secret() -> None:
+    client = TestClient(app)
+    r = client.post("/internal/hub/voice", json={"user_message_request": "hi"})
+    assert r.status_code == 401

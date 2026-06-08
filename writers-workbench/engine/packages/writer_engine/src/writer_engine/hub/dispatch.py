@@ -58,7 +58,13 @@ def build_dispatch_plan(decision: HubDecision, req: HubRequest) -> DispatchPlan:
     # task — load-bearing generation: persist results (CR-001) and force the async queue path.
     body["persist"] = True
     body["async"] = True
+    # Voice (and chat) need something to say the instant a task is queued — the work runs for minutes
+    # on the arq queue. If the router didn't supply an ack, synthesise a generic one so Eve never goes
+    # silent after kicking off a chapter/brainstorm/research/cover-art job.
+    ack = decision.assistant_message or (
+        "Got it — I've started on that. It runs in the background and I'll let you know when it's ready."
+    )
     return DispatchPlan(
-        action="enqueue", assistant_message=decision.assistant_message,
+        action="enqueue", assistant_message=ack,
         tool=decision.tool, op=decision.op, body=body,
     )
