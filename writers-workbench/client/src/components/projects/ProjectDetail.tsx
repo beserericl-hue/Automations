@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
@@ -945,14 +945,53 @@ function ChapterQaBadge({ qa }: { qa?: { aligned: boolean | null; qaAvg: number 
 }
 
 // CR-008/009: per-row "Fix Drift" — runs the engine repair op (drift-correct vs outline/roster + weave
-// research + line-edit), polls the engine job, then refetches so the QA badge reflects the new scan.
-// Same action the ContentDetail EngineQaPanel exposes, surfaced in the chapters list action set.
+// research + line-edit). NON-BLOCKING: the click only QUEUES the job (returns immediately as "Queued"),
+// so the user can fan out fix-drift jobs across many chapters at once. A background poller watches the
+// engine job and, when it finishes, refetches project-chapter-qa + project-chapters so this row's QA
+// badge flips to ✓ on its own. Same engine action the ContentDetail EngineQaPanel exposes.
 function ChapterFixDriftButton({ contentId, projectId }: { contentId: string; projectId: string }) {
   const queryClient = useQueryClient();
-  const [state, setState] = useState<'idle' | 'running' | 'error'>('idle');
+  const [state, setState] = useState<'idle' | 'queued' | 'error'>('idle');
+  const [jobId, setJobId] = useState<string | null>(null);
 
-  async function fixDrift() {
-    setState('running');
+  // Background poll — runs only while a job is in flight; never blocks the click handler.
+  useEffect(() => {
+    if (!jobId) return;
+    let cancelled = false;
+    const deadline = Date.now() + 40 * 60 * 1000;
+    async function poll() {
+      while (!cancelled && Date.now() < deadline) {
+        await new Promise((res) => setTimeout(res, 15000));
+        if (cancelled) return;
+        try {
+          const { data: s } = await supabase.auth.getSession();
+          const token = s?.session?.access_token;
+          const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+          const pr = await fetch(`/api/jobs/engine/${jobId}/status`, { headers });
+          const pj = (await pr.json()) as { status?: string };
+          if (pj.status === 'complete') {
+            if (cancelled) return;
+            await queryClient.invalidateQueries({ queryKey: ['project-chapter-qa', projectId] });
+            await queryClient.invalidateQueries({ queryKey: ['project-chapters', projectId] });
+            setJobId(null);
+            setState('idle');
+            return;
+          }
+          if (pj.status === 'error' || pj.status === 'not_found') {
+            if (!cancelled) { setState('error'); setJobId(null); }
+            return;
+          }
+        } catch {
+          // transient poll error — keep trying until the deadline
+        }
+      }
+    }
+    void poll();
+    return () => { cancelled = true; };
+  }, [jobId, projectId, queryClient]);
+
+  async function queueFixDrift() {
+    setState('queued');
     try {
       const { data: s } = await supabase.auth.getSession();
       const token = s?.session?.access_token;
@@ -960,17 +999,7 @@ function ChapterFixDriftButton({ contentId, projectId }: { contentId: string; pr
       const r = await fetch(`/api/content/${contentId}/repair`, { method: 'POST', headers });
       const j = (await r.json()) as { jobId?: string };
       if (!r.ok || !j.jobId) throw new Error('repair failed to queue');
-      const deadline = Date.now() + 30 * 60 * 1000;
-      while (Date.now() < deadline) {
-        await new Promise((res) => setTimeout(res, 15000));
-        const pr = await fetch(`/api/jobs/engine/${j.jobId}/status`, { headers });
-        const pj = (await pr.json()) as { status?: string };
-        if (pj.status === 'complete') break;
-        if (pj.status === 'error' || pj.status === 'not_found') throw new Error('repair job failed');
-      }
-      await queryClient.invalidateQueries({ queryKey: ['project-chapter-qa', projectId] });
-      await queryClient.invalidateQueries({ queryKey: ['project-chapters', projectId] });
-      setState('idle');
+      setJobId(j.jobId); // hands off to the background poller; the click is already done
     } catch {
       setState('error');
     }
@@ -978,12 +1007,12 @@ function ChapterFixDriftButton({ contentId, projectId }: { contentId: string; pr
 
   return (
     <button
-      disabled={state === 'running'}
-      onClick={fixDrift}
-      title="Run the engine repair op: correct the drift against the outline/roster, weave research, line-edit"
-      className="rounded-lg px-3 py-1.5 text-xs font-medium border border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950 disabled:opacity-50 whitespace-nowrap"
+      disabled={state === 'queued'}
+      onClick={queueFixDrift}
+      title="Queue the engine repair op (correct drift vs outline/roster, weave research, line-edit). Runs in the background — you can queue more chapters while it works."
+      className="rounded-lg px-3 py-1.5 text-xs font-medium border border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950 disabled:opacity-60 whitespace-nowrap"
     >
-      {state === 'running' ? 'Fixing drift…' : state === 'error' ? 'Retry fix' : 'Fix Drift'}
+      {state === 'queued' ? 'Queued — fixing…' : state === 'error' ? 'Retry fix' : 'Fix Drift'}
     </button>
   );
 }
