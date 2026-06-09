@@ -15,3 +15,4 @@ tier (DEV/PROD). PROD-affecting CRs are gated on the acceptance test + explicit 
 | [CR-007](CR-007-token-cost-accounting.md) | Token & cost accounting (token_usage_v2) — billing parity | Engine done; UI in CR-008 | DEV |
 | [CR-008](CR-008-ui-engine-reconciliation.md) | Reconcile the Workbench UI with the engine (Path B) | In progress (A+B) | DEV/PROD |
 | [CR-009](CR-009-engine-task-emails-and-remaining-parity.md) | Engine task-completion emails + remaining n8n→engine parity | Proposed | DEV/PROD |
+| [CR-010](CR-010-engine-parity-completion-ui-wiring-and-multi-engine-scale.md) | Full n8n→engine parity audit (remaining gaps), UI wiring, multi-engine load balancing | Proposed | DEV/PROD |
