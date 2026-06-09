@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
-import { sendWebhookCommand } from '../../lib/webhook';
+import { useEngineJobQueue } from '../../hooks/useEngineJobQueue';
 import type { QAReport, QACheck } from '../../types/database';
 
 interface QAReportPanelProps {
@@ -13,7 +12,7 @@ interface QAReportPanelProps {
   userId: string;
 }
 
-async function triggerQA(userId: string, contentTitle: string, chapterNumber: number | null, projectId: string | null) {
+async function buildQAMessage(contentTitle: string, chapterNumber: number | null, projectId: string | null) {
   let projectTitle = '';
   if (projectId) {
     const { data } = await supabase
@@ -25,31 +24,25 @@ async function triggerQA(userId: string, contentTitle: string, chapterNumber: nu
   }
 
   const chapterLabel = chapterNumber != null ? `chapter ${chapterNumber}` : contentTitle;
-  const message = projectTitle
-    ? `q/a ${chapterLabel} of ${projectTitle}`
-    : `q/a ${chapterLabel}`;
-
-  return sendWebhookCommand(userId, message);
+  return projectTitle ? `q/a ${chapterLabel} of ${projectTitle}` : `q/a ${chapterLabel}`;
 }
 
 export default function QAReportPanel({ metadata, contentId, contentTitle, chapterNumber, projectId, userId }: QAReportPanelProps) {
   const [expanded, setExpanded] = useState(false);
-  const queryClient = useQueryClient();
   const report = metadata?.qa_report as QAReport | undefined;
 
-  const runQA = useMutation({
-    mutationFn: () => triggerQA(userId, contentTitle, chapterNumber, projectId),
-    onSuccess: () => {
-      // The Q/A workflow is async — it will update metadata.qa_report in the DB.
-      // Poll for the result after a delay.
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['content-detail', contentId] });
-      }, 15_000);
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['content-detail', contentId] });
-      }, 45_000);
-    },
-  });
+  // Queue the Q/A op so the click returns immediately; the content refetches when the engine job
+  // completes (and the panel shows the new report). The hook also handles a sync engine response.
+  const jobQueue = useEngineJobQueue(userId);
+  const qaState = jobQueue.stateOf('qa');
+  const qaRunning = qaState === 'queued';
+  const qaError = qaState === 'error';
+
+  async function runQACheck() {
+    if (qaRunning) return;
+    const message = await buildQAMessage(contentTitle, chapterNumber, projectId);
+    await jobQueue.enqueue('qa', message, [['content-detail', contentId]]);
+  }
 
   if (!report || !report.checks?.length) {
     return (
@@ -62,19 +55,19 @@ export default function QAReportPanel({ metadata, contentId, contentTitle, chapt
             No consistency report available
           </div>
           <button
-            onClick={() => runQA.mutate()}
-            disabled={runQA.isPending}
+            onClick={() => void runQACheck()}
+            disabled={qaRunning}
             className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50"
           >
-            {runQA.isPending ? 'Running...' : 'Run Q/A Check'}
+            {qaRunning ? 'Running...' : qaError ? 'Retry Q/A Check' : 'Run Q/A Check'}
           </button>
         </div>
-        {runQA.isSuccess && (
+        {qaRunning && (
           <p className="mt-2 text-xs text-green-600 dark:text-green-400">
-            Q/A check started — results will appear here shortly.
+            Q/A check queued — results will appear here when it finishes.
           </p>
         )}
-        {runQA.isError && (
+        {qaError && (
           <p className="mt-2 text-xs text-red-500">
             Failed to start Q/A check. Try again.
           </p>
@@ -109,11 +102,11 @@ export default function QAReportPanel({ metadata, contentId, contentTitle, chapt
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={(e) => { e.stopPropagation(); runQA.mutate(); }}
-            disabled={runQA.isPending}
+            onClick={(e) => { e.stopPropagation(); void runQACheck(); }}
+            disabled={qaRunning}
             className="rounded px-2 py-1 text-[10px] font-medium border border-gray-300 text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800 disabled:opacity-50"
           >
-            {runQA.isPending ? 'Running...' : 'Re-run'}
+            {qaRunning ? 'Running...' : 'Re-run'}
           </button>
           <svg
             className={`h-4 w-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
@@ -124,9 +117,9 @@ export default function QAReportPanel({ metadata, contentId, contentTitle, chapt
         </div>
       </button>
 
-      {runQA.isSuccess && (
+      {qaRunning && (
         <div className="px-4 py-2 text-xs text-green-600 dark:text-green-400 border-t border-gray-200 dark:border-gray-700 bg-green-50 dark:bg-green-950/20">
-          Q/A re-check started — results will refresh shortly.
+          Q/A re-check queued — results will refresh when it finishes.
         </div>
       )}
 

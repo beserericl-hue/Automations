@@ -10,7 +10,7 @@ import ProjectEditForm from './ProjectEditForm';
 import ImageGallery from '../images/ImageGallery';
 import SocialMediaPanel from '../social/SocialMediaPanel';
 import CostDashboard from '../cost/CostDashboard';
-import { sendWebhookCommand } from '../../lib/webhook';
+import { useEngineJobQueue } from '../../hooks/useEngineJobQueue';
 import CommandDialog from '../shared/CommandDialog';
 import RewriteWithResearchModal from '../content/RewriteWithResearchModal';
 import type { WritingProject, PublishedContent, StoryBibleEntry, ResearchReport, GenreConfig, StoryArc, OutlineCharacter, OutlineChapter, ChapterOutline, SubChapter } from '../../types/database';
@@ -418,7 +418,7 @@ export default function ProjectDetail() {
             genreConfig={genreConfig ?? null}
           />
         )}
-        {activeTab === 'outline' && <OutlineTab outline={outline} storyArc={storyArc ?? null} projectTitle={project.title} userId={userId!} writtenChapterNumbers={new Set((chapters || []).map(c => c.chapter_number).filter((n): n is number => n != null))} projectUpdatedAt={project.updated_at} outlineVersionInfo={outlineVersionInfo ?? null} />}
+        {activeTab === 'outline' && <OutlineTab outline={outline} storyArc={storyArc ?? null} projectId={id!} projectTitle={project.title} userId={userId!} writtenChapterNumbers={new Set((chapters || []).map(c => c.chapter_number).filter((n): n is number => n != null))} projectUpdatedAt={project.updated_at} outlineVersionInfo={outlineVersionInfo ?? null} />}
         {activeTab === 'chapters' && <ChaptersTab chapters={chapters} qaByChapter={qaByChapter} projectId={id!} projectTitle={project.title} projectType={project.project_type} userId={userId!} />}
         {activeTab === 'bible' && <BibleTab entries={bibleEntries} projectId={id!} />}
         {activeTab === 'art' && <ArtTab projectId={id!} />}
@@ -598,12 +598,15 @@ function getChapterMeta(co: OutlineChapter['chapter_outline']): ChapterOutline |
   return null;
 }
 
-function OutlineTab({ outline, storyArc, projectTitle, userId, writtenChapterNumbers, projectUpdatedAt, outlineVersionInfo }: { outline: WritingProject['outline']; storyArc: StoryArc | null; projectTitle: string; userId: string; writtenChapterNumbers: Set<number>; projectUpdatedAt: string; outlineVersionInfo: { totalVersions: number; latestVersion: { version_number: number; created_at: string; revision_note: string | null } | null } | null }) {
+function OutlineTab({ outline, storyArc, projectId, projectTitle, userId, writtenChapterNumbers, projectUpdatedAt, outlineVersionInfo }: { outline: WritingProject['outline']; storyArc: StoryArc | null; projectId: string; projectTitle: string; userId: string; writtenChapterNumbers: Set<number>; projectUpdatedAt: string; outlineVersionInfo: { totalVersions: number; latestVersion: { version_number: number; created_at: string; revision_note: string | null } | null } | null }) {
   const [bookOverviewOpen, setBookOverviewOpen] = useState(true);
   const [expandedChapters, setExpandedChapters] = useState<Set<number | string>>(new Set());
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogConfig, setDialogConfig] = useState<{ title: string; description: string; sendLabel: string; buildCommand: (notes: string) => string } | null>(null);
+  const [dialogConfig, setDialogConfig] = useState<{ title: string; description: string; sendLabel: string; buildCommand: (notes: string) => string; invalidate: ReadonlyArray<readonly unknown[]> } | null>(null);
+  // Queue heavy generation (chapter outline / write / rewrite) so the click returns immediately and
+  // the UI is freed to fan out other jobs; results refetch when each engine job completes.
+  const jobQueue = useEngineJobQueue(userId);
 
   if (!outline?.chapters?.length) {
     return <EmptyState message="No outline yet. Use the chat or Eve to brainstorm one." />;
@@ -628,6 +631,10 @@ function OutlineTab({ outline, storyArc, projectTitle, userId, writtenChapterNum
   const collapseAll = () => {
     setExpandedChapters(new Set());
   };
+
+  const coverState = jobQueue.stateOf('cover-art');
+  const coverQueued = coverState != null;
+  const coverError = coverState === 'error';
 
   return (
     <div className="space-y-4">
@@ -672,6 +679,25 @@ function OutlineTab({ outline, storyArc, projectTitle, userId, writtenChapterNum
 
           {bookOverviewOpen && (
             <div className="mt-3 space-y-4">
+              {/* Generate Cover Art — queues a media.cover-art job built from the book premise. The result
+                  lands in the Art gallery; generate as many as you like and pick one when publishing. */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  disabled={coverQueued}
+                  onClick={() => {
+                    const premise = (outline.premise || '').trim();
+                    const cmd = `generate cover art for ${projectTitle}.`
+                      + (premise ? ` Design a book cover that captures this premise: ${premise}` : '');
+                    void jobQueue.enqueue('cover-art', cmd, [['generated-images']]);
+                  }}
+                  className="rounded-lg px-3 py-1.5 text-xs font-medium border border-fuchsia-300 text-fuchsia-700 hover:bg-fuchsia-50 dark:border-fuchsia-700 dark:text-fuchsia-400 dark:hover:bg-fuchsia-950 disabled:opacity-60 whitespace-nowrap"
+                  title="Generate book cover art from the premise. Runs in the background and is added to the Art gallery — generate as many as you like; select one when publishing."
+                >
+                  {coverQueued ? (coverError ? 'Retry cover art' : 'Queued — generating…') : 'Generate Cover Art'}
+                </button>
+                <span className="text-[11px] text-gray-400">Adds to the Art gallery — generate as many as you like; pick one when you publish.</span>
+              </div>
+
               {outline.premise && (
                 <div>
                   <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Premise</span>
@@ -757,7 +783,12 @@ function OutlineTab({ outline, storyArc, projectTitle, userId, writtenChapterNum
         const chapterNum = typeof ch.number === 'number' ? ch.number : null;
         const isWritten = chapterNum !== null && writtenChapterNumbers.has(chapterNum);
         const actionKey = `${ch.number}`;
-        const isActionPending = pendingAction?.startsWith(actionKey) ?? false;
+        const outlineState = jobQueue.stateOf(`${actionKey}:outline`);
+        const writeState = jobQueue.stateOf(`${actionKey}:write`);
+        const outlineQueued = outlineState != null;
+        const outlineError = outlineState === 'error';
+        const writeQueued = writeState != null;
+        const writeError = writeState === 'error';
 
 
         return (
@@ -793,41 +824,43 @@ function OutlineTab({ outline, storyArc, projectTitle, userId, writtenChapterNum
               <div className="flex gap-1.5 shrink-0">
                 {/* Outline button — always available: creates or rewrites the chapter outline */}
                 <button
-                  disabled={isActionPending}
+                  disabled={outlineQueued}
                   onClick={() => {
                     setDialogConfig({
                       title: hasOutline ? `Re-outline ${chapterLabel}` : `Create outline for ${chapterLabel}`,
                       description: `${hasOutline ? 'Rewrite' : 'Create'} a detailed sub-chapter outline for "${ch.title}" with scenes, arc beats, and character assignments.`,
                       sendLabel: hasOutline ? 'Re-outline' : 'Create Outline',
                       buildCommand: (notes) => `chapter outline for ${chapterLabel} of ${projectTitle}` + (notes ? `. ADDITIONAL INSTRUCTIONS: ${notes}` : ''),
+                      invalidate: [['project-detail', projectId], ['outline-versions-info', projectId]],
                     });
                     setPendingAction(`${actionKey}:outline`);
                     setDialogOpen(true);
                   }}
                   className="rounded border border-indigo-300 px-2 py-1 text-[10px] font-medium text-indigo-600 hover:bg-indigo-50 dark:border-indigo-700 dark:text-indigo-400 dark:hover:bg-indigo-950 disabled:opacity-50"
-                  title={hasOutline ? 'Rewrite the chapter outline (sub-chapters, scenes, arc beats)' : 'Create a detailed chapter outline with sub-chapters'}
+                  title={hasOutline ? 'Rewrite the chapter outline (sub-chapters, scenes, arc beats) — queues in the background' : 'Create a detailed chapter outline with sub-chapters — queues in the background'}
                 >
-                  {hasOutline ? 'Re-outline' : 'Outline'}
+                  {outlineQueued ? (outlineError ? 'Retry outline' : 'Queued…') : hasOutline ? 'Re-outline' : 'Outline'}
                 </button>
 
                 {/* Write/Rewrite button — only when outline exists */}
                 {hasOutline && (
                   <button
-                    disabled={isActionPending}
+                    disabled={writeQueued}
                     onClick={() => {
                       setDialogConfig({
                         title: isWritten ? `Rewrite ${chapterLabel}` : `Write ${chapterLabel}`,
                         description: `${isWritten ? 'Rewrite' : 'Write'} "${ch.title}" based on its chapter outline and the book outline.`,
                         sendLabel: isWritten ? 'Rewrite Chapter' : 'Write Chapter',
                         buildCommand: (notes) => `${isWritten ? 'rewrite' : 'write'} ${chapterLabel} of ${projectTitle}. IMPORTANT: Follow the chapter outline and book outline exactly — use the outlined sub-chapters, characters, arc beats, and scene briefs. Do not deviate from the outline structure.` + (notes ? ` ADDITIONAL INSTRUCTIONS: ${notes}` : ''),
+                        invalidate: [['project-chapters', projectId], ['project-chapter-qa', projectId], ['project-detail', projectId]],
                       });
                       setPendingAction(`${actionKey}:write`);
                       setDialogOpen(true);
                     }}
                     className="rounded border border-green-300 px-2 py-1 text-[10px] font-medium text-green-600 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-950 disabled:opacity-50"
-                    title={isWritten ? 'Rewrite this chapter (replaces existing content)' : 'Write this chapter based on its outline'}
+                    title={isWritten ? 'Rewrite this chapter (replaces existing content) — queues in the background' : 'Write this chapter based on its outline — queues in the background'}
                   >
-                    {isWritten ? 'Rewrite' : 'Write'}
+                    {writeQueued ? (writeError ? 'Retry' : 'Queued…') : isWritten ? 'Rewrite' : 'Write'}
                   </button>
                 )}
               </div>
@@ -911,8 +944,12 @@ function OutlineTab({ outline, storyArc, projectTitle, userId, writtenChapterNum
           onSend={(notes) => {
             setDialogOpen(false);
             const cmd = dialogConfig.buildCommand(notes);
-            sendWebhookCommand(userId, cmd)
-              .finally(() => setTimeout(() => setPendingAction(null), 3000));
+            const key = pendingAction;
+            const invalidate = dialogConfig.invalidate as unknown[][];
+            setPendingAction(null);
+            // Queue and return immediately — the job runs in the background, the row shows "Queued…",
+            // and the relevant queries refetch when the engine job completes.
+            if (key) void jobQueue.enqueue(key, cmd, invalidate);
           }}
           title={dialogConfig.title}
           description={dialogConfig.description}
@@ -1069,7 +1106,9 @@ function ChaptersTab({
 }) {
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogConfig, setDialogConfig] = useState<{ title: string; description: string; sendLabel: string; buildCommand: (notes: string) => string } | null>(null);
+  const [dialogConfig, setDialogConfig] = useState<{ title: string; description: string; sendLabel: string; buildCommand: (notes: string) => string; invalidate: ReadonlyArray<readonly unknown[]> } | null>(null);
+  // Queue chapter rewrites so the click returns immediately; results refetch when the job completes.
+  const jobQueue = useEngineJobQueue(userId);
   const [rewriteResearchTarget, setRewriteResearchTarget] = useState<{
     id: string;
     label: string;
@@ -1105,7 +1144,9 @@ function ChaptersTab({
               : ch.chapter_number === 999 ? 'Epilogue'
               : ch.chapter_number != null ? String(ch.chapter_number) : '\u2014';
             const actionKey = ch.id;
-            const isPending = pendingAction === actionKey;
+            const rewriteState = jobQueue.stateOf(actionKey);
+            const rewriteQueued = rewriteState != null;
+            const rewriteError = rewriteState === 'error';
             const hasDrift = ch.chapter_number != null && qaByChapter?.[ch.chapter_number]?.aligned === false;
             return (
               <tr key={ch.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
@@ -1131,24 +1172,25 @@ function ChaptersTab({
                   <div className="flex gap-1.5">
                     {hasDrift && <ChapterFixDriftButton contentId={ch.id} projectId={projectId} />}
                     <button
-                      disabled={isPending}
+                      disabled={rewriteQueued}
                       onClick={() => {
                         setDialogConfig({
                           title: `Rewrite ${chapterLabel}`,
                           description: `Rewrite "${ch.title}" based on the chapter outline and book outline.`,
                           sendLabel: 'Rewrite Chapter',
                           buildCommand: (notes) => `rewrite ${chapterLabel} of ${projectTitle}. IMPORTANT: Follow the chapter outline and book outline exactly — use the outlined sub-chapters, characters, arc beats, and scene briefs. Do not deviate from the outline structure.` + (notes ? ` ADDITIONAL INSTRUCTIONS: ${notes}` : ''),
+                          invalidate: [['project-chapters', projectId], ['project-chapter-qa', projectId], ['project-detail', projectId]],
                         });
                         setPendingAction(actionKey);
                         setDialogOpen(true);
                       }}
                       className="rounded-lg px-3 py-1.5 text-xs font-medium border border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-950 disabled:opacity-50 whitespace-nowrap"
-                      title="Rewrite this chapter from the outline"
+                      title="Rewrite this chapter from the outline — queues in the background"
                     >
-                      Rewrite
+                      {rewriteQueued ? (rewriteError ? 'Retry' : 'Queued…') : 'Rewrite'}
                     </button>
                     <button
-                      disabled={isPending}
+                      disabled={rewriteQueued}
                       onClick={() =>
                         setRewriteResearchTarget({
                           id: ch.id,
@@ -1183,8 +1225,12 @@ function ChaptersTab({
           onSend={(notes) => {
             setDialogOpen(false);
             const cmd = dialogConfig.buildCommand(notes);
-            sendWebhookCommand(userId, cmd)
-              .finally(() => setTimeout(() => setPendingAction(null), 3000));
+            const key = pendingAction;
+            const invalidate = dialogConfig.invalidate as unknown[][];
+            setPendingAction(null);
+            // Queue and return immediately — the job runs in the background, the row shows "Queued…",
+            // and the relevant queries refetch when the engine job completes.
+            if (key) void jobQueue.enqueue(key, cmd, invalidate);
           }}
           title={dialogConfig.title}
           description={dialogConfig.description}
