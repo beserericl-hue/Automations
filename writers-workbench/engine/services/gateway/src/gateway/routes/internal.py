@@ -162,6 +162,16 @@ async def write_job(job_id: str) -> dict[str, Any]:
     return await _forward("GET", f"{settings.orchestrator_url}/pipelines/write/jobs/{job_id}")
 
 
+@router.post("/write/jobs/{job_id}/abort")
+async def write_job_abort(job_id: str) -> dict[str, Any]:
+    """Cancel an async write-tool job (Fix Drift "Cancel" button) — returns {job_id, aborted}.
+
+    A still-queued job is dropped before it runs; a running job is cancelled at its next await. Idempotent:
+    a job that already finished returns aborted:false rather than erroring."""
+    settings = get_settings()
+    return await _forward("POST", f"{settings.orchestrator_url}/pipelines/write/jobs/{job_id}/abort")
+
+
 @router.get("/newsletter/executions/{execution_id}/review/{stage}")
 async def newsletter_review(execution_id: str, stage: str) -> dict[str, Any]:
     """UI calls here when the operator opens an approval gate — returns the review payload from saga state."""

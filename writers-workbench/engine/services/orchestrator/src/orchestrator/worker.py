@@ -97,3 +97,8 @@ class WorkerSettings:
     job_timeout = 5400
     # Don't re-run expensive LLM work on a flake more than once (a real timeout shouldn't loop).
     max_tries = 2
+    # Allow a queued/running write job to be cancelled from the UI (Fix Drift "Cancel"). arq checks for
+    # an abort flag at enqueue and between awaits, so a queued job is dropped immediately and a running
+    # job is cancelled at its next await (the next sub-chapter LLM call / HTTP hop). Aborted jobs are NOT
+    # retried. Repairs snapshot content_versions_v2, so a mid-flight cancel leaves the DB consistent.
+    allow_abort_jobs = True

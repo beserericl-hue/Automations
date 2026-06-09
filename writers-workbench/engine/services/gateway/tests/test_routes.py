@@ -170,3 +170,20 @@ def test_hub_voice_requires_service_secret() -> None:
     client = TestClient(app)
     r = client.post("/internal/hub/voice", json={"user_message_request": "hi"})
     assert r.status_code == 401
+
+
+def test_write_job_abort_forwards_to_orchestrator(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Cancel passthrough: POST /internal/write/jobs/{id}/abort forwards to the orchestrator and returns {aborted}."""
+    cap: dict[str, Any] = {}
+    _patch_orch(monkeypatch, cap, {"job_id": "job-7", "aborted": True})
+    client = TestClient(app)
+    r = client.post("/internal/write/jobs/job-7/abort", headers={"x-service-secret": "test-secret"})
+    assert r.status_code == 200
+    assert r.json() == {"job_id": "job-7", "aborted": True}
+    assert cap["url"].endswith("/pipelines/write/jobs/job-7/abort")
+
+
+def test_write_job_abort_requires_service_secret() -> None:
+    client = TestClient(app)
+    r = client.post("/internal/write/jobs/job-7/abort")
+    assert r.status_code == 401

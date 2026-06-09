@@ -953,6 +953,7 @@ function ChapterFixDriftButton({ contentId, projectId }: { contentId: string; pr
   const queryClient = useQueryClient();
   const [state, setState] = useState<'idle' | 'queued' | 'error'>('idle');
   const [jobId, setJobId] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   // Background poll — runs only while a job is in flight; never blocks the click handler.
   useEffect(() => {
@@ -1005,15 +1006,49 @@ function ChapterFixDriftButton({ contentId, projectId }: { contentId: string; pr
     }
   }
 
+  // Cancel the in-flight repair: aborts the engine arq job (queued → dropped, running → cancelled at its
+  // next await), then stops the poller and resets the row. Idempotent — safe even if it just finished.
+  async function cancelFixDrift() {
+    if (!jobId) return;
+    setCancelling(true);
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      const token = s?.session?.access_token;
+      const headers = { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+      await fetch(`/api/jobs/engine/${jobId}/abort`, { method: 'POST', headers });
+      // Refetch QA/chapters in case the job had already partially written before the abort landed.
+      await queryClient.invalidateQueries({ queryKey: ['project-chapter-qa', projectId] });
+      await queryClient.invalidateQueries({ queryKey: ['project-chapters', projectId] });
+    } catch {
+      // best-effort — the poller will still reconcile state on its own
+    } finally {
+      setJobId(null); // stops the background poller via its cleanup
+      setState('idle');
+      setCancelling(false);
+    }
+  }
+
   return (
-    <button
-      disabled={state === 'queued'}
-      onClick={queueFixDrift}
-      title="Queue the engine repair op (correct drift vs outline/roster, weave research, line-edit). Runs in the background — you can queue more chapters while it works."
-      className="rounded-lg px-3 py-1.5 text-xs font-medium border border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950 disabled:opacity-60 whitespace-nowrap"
-    >
-      {state === 'queued' ? 'Queued — fixing…' : state === 'error' ? 'Retry fix' : 'Fix Drift'}
-    </button>
+    <span className="inline-flex items-center gap-1">
+      <button
+        disabled={state === 'queued'}
+        onClick={queueFixDrift}
+        title="Queue the engine repair op (correct drift vs outline/roster, weave research, line-edit). Runs in the background — you can queue more chapters while it works."
+        className="rounded-lg px-3 py-1.5 text-xs font-medium border border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950 disabled:opacity-60 whitespace-nowrap"
+      >
+        {state === 'queued' ? 'Queued — fixing…' : state === 'error' ? 'Retry fix' : 'Fix Drift'}
+      </button>
+      {state === 'queued' && jobId && (
+        <button
+          disabled={cancelling}
+          onClick={cancelFixDrift}
+          title="Cancel this repair job. A queued job is dropped before it runs; a running job stops at its next step. The chapter's saved versions are unchanged."
+          className="rounded-lg px-2 py-1.5 text-xs font-medium border border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-700 dark:text-rose-400 dark:hover:bg-rose-950 disabled:opacity-60 whitespace-nowrap"
+        >
+          {cancelling ? 'Cancelling…' : 'Cancel'}
+        </button>
+      )}
+    </span>
   );
 }
 

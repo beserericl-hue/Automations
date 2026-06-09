@@ -98,3 +98,21 @@ export async function getEngineJob(jobId: string): Promise<{ status: string; res
   }
   return (await resp.json()) as { status: string; result?: unknown; error?: string };
 }
+
+/**
+ * Cancel an async engine write-tool job (Fix Drift "Cancel"). Proxies the gateway's
+ * POST /internal/write/jobs/{id}/abort, which sets arq's abort flag — a queued job is dropped before it
+ * runs, a running job is cancelled at its next await. Idempotent: a finished job returns aborted:false.
+ */
+export async function abortEngineJob(jobId: string): Promise<{ aborted: boolean; error?: string }> {
+  const url = `${engineGatewayUrl()}/internal/write/jobs/${encodeURIComponent(jobId)}/abort`;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-service-secret': serviceSecret() },
+  });
+  if (!resp.ok) {
+    return { aborted: false, error: `engine job abort ${resp.status}` };
+  }
+  const body = (await resp.json()) as { aborted?: boolean };
+  return { aborted: Boolean(body.aborted) };
+}

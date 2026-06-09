@@ -4,7 +4,7 @@ import { logger } from '../lib/logger.js';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import { getNamedQueue } from '../lib/queue.js';
 import { ALL_QUEUE_NAMES, type QueueName } from '../lib/jobs/types.js';
-import { getEngineJob } from '../lib/engine-hub.js';
+import { getEngineJob, abortEngineJob } from '../lib/engine-hub.js';
 
 export const jobsRouter = Router();
 
@@ -20,6 +20,25 @@ jobsRouter.get('/engine/:id/status', requireAuth, async (req: Request, res: Resp
     res.json({ jobId, engineJob: true, status: job.status, result: job.result, error: job.error });
   } catch (err) {
     logger.error({ err, jobId }, 'jobs: engine poll failed');
+    res.status(502).json({ error: 'Failed to reach engine job' });
+  }
+});
+
+/**
+ * Cancel an ENGINE arq job (Path B) — the Fix Drift "Cancel" button. Proxies the engine gateway's
+ * POST /internal/write/jobs/{id}/abort. Idempotent: a job that already finished returns aborted:false.
+ */
+jobsRouter.post('/engine/:id/abort', requireAuth, async (req: Request, res: Response) => {
+  const jobId = String(req.params.id);
+  try {
+    const { aborted, error } = await abortEngineJob(jobId);
+    if (error) {
+      res.status(502).json({ error });
+      return;
+    }
+    res.json({ jobId, engineJob: true, aborted });
+  } catch (err) {
+    logger.error({ err, jobId }, 'jobs: engine abort failed');
     res.status(502).json({ error: 'Failed to reach engine job' });
   }
 });

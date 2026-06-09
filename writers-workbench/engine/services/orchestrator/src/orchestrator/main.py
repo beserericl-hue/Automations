@@ -34,6 +34,7 @@ from .write_tools import is_async, resolve_step_url
 _arq_pool = None
 
 SERVICE = "orchestrator"
+logger = get_logger(SERVICE)
 
 
 @asynccontextmanager
@@ -152,6 +153,27 @@ def build_app() -> FastAPI:
                 out["status"] = "error"
                 out["error"] = str(exc)[:300]
         return out
+
+    @app.post("/pipelines/write/jobs/{job_id}/abort", dependencies=[Depends(require_service_secret)])
+    async def abort_write_job(job_id: str) -> dict[str, Any]:
+        """Cancel an async write-tool job (Fix Drift "Cancel"). Sets arq's abort flag: a still-queued job is
+        dropped before it starts; a running job is cancelled at its next await. Aborted jobs are not retried.
+
+        Returns ``{job_id, aborted}`` where ``aborted`` is arq's confirmation. A job that already completed
+        (or never existed) returns ``aborted: false`` rather than erroring — cancel is idempotent/safe to spam.
+        """
+        from arq.jobs import Job
+
+        if app.state.arq_pool is None:
+            raise HTTPException(http_status.HTTP_503_SERVICE_UNAVAILABLE, detail="async queue unavailable")
+        job = Job(job_id, redis=app.state.arq_pool, _queue_name="newsletter")
+        try:
+            aborted = await job.abort(timeout=2)
+        except Exception as exc:  # already finished / result expired — nothing to abort
+            logger.info("write_job.abort.noop", job_id=job_id, error=str(exc)[:200])
+            aborted = False
+        logger.info("write_job.abort", job_id=job_id, aborted=aborted)
+        return {"job_id": job_id, "aborted": aborted}
 
     @app.get("/pipelines/{pipeline}/state/{execution_id}", dependencies=[Depends(require_service_secret)])
     async def get_state(pipeline: str, execution_id: str) -> dict[str, Any]:
