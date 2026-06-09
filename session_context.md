@@ -57,6 +57,17 @@ _Last updated: 2026-06-08. Branch: `develop` (all work committed + pushed)._
 - Checks: engine ruff clean, gateway pytest 15 green, client + server `tsc --noEmit` clean, orchestrator app builds with the `/abort` route registered.
 - Deploy: engine is repo-connected → orchestrator+gateway auto-redeploy from develop; the worker restart on deploy is what activates `allow_abort_jobs`. NOT yet smoke-tested against the live gateway post-deploy (do this next session: enqueue a repair, hit `POST /api/jobs/engine/:id/abort`, confirm `aborted:true`).
 
+## NON-BLOCKING ACTION BUTTONS + COVER ART (commit `e7561d7`, on develop)
+User: every heavy action button hung the UI until done; make them queue + free the UI; ensure the engine handles each; add a Generate Cover Art button.
+- Root cause: Outline/Re-outline, Write/Rewrite, Run Q/A used `sendWebhookCommand` → posts to the n8n webhook **synchronously** (pending for the whole op) and, post-cutover, bypassed the engine entirely.
+- `client/src/lib/webhook.ts`: new `enqueueHubCommand()` → always POSTs `/api/chat/proxy` (engine-aware) → heavy op enqueues, returns `job_id` instantly.
+- `client/src/hooks/useEngineJobQueue.ts` (new): tracks many jobs by action key, background-polls `/api/jobs/engine/:id/status`, invalidates React Query keys on complete so results auto-appear. Click never awaits generation → fan out freely.
+- `ProjectDetail.tsx`: Outline/Re-outline + Write/Rewrite (Outline tab) and Rewrite (Chapters tab) queue + show "Queued…"; **new Generate Cover Art button** in Book Overview builds a `media.cover-art` job from the premise → Art gallery (generate many, pick at publish), invalidates `['generated-images']`.
+- `QAReportPanel.tsx`: Run Q/A / Re-run queue + poll (no block).
+- **RewriteWithResearchModal was already non-blocking** (BullMQ enqueue → jobId) — untouched.
+- Verified routing offline via `_heuristic_route` (non-destructive, no jobs run): every command → a queued **task** op: `chapter.plan` (outline), `chapter.write` (write/rewrite), `chapter.qa` (q/a), `media.cover-art` (cover). Catalog in `engine/.../hub/catalog.py` confirms all routes exist; Gemini is the live primary router (cleaner param extraction).
+- Caveats: in the deterministic FALLBACK, "rewrite" maps to `chapter.write` (still produces a new draft) and project_title extraction is messy with the "IMPORTANT:…" suffix — Gemini (primary) extracts cleanly; command strings are unchanged from the proven n8n format. Client `tsc --noEmit` clean. NOT yet clicked in a live browser / no live job run this round.
+
 ## Pending / next tasks
 1. ~~Resolve the running-job question~~ — DONE (job completed on its own).
 2. ~~Build job Cancel~~ — DONE this session (commit `dae99d7`). Remaining: live post-deploy smoke test of the abort path.
