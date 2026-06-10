@@ -1,4 +1,4 @@
-"""chapter-step — write / qa / scan-drift / evaluate-genre / extract-bible / format-kindle.
+"""chapter-step — write / qa / scan-drift / evaluate-genre / extract-bible / blog / short-story.
 
 Operations dispatch via ``payload["op"]``. The ``write`` and ``qa`` ops compose the Follett
 writing-craft layer (``follett_seeds.*``) on top of genre + story arc; the remaining ops are F1-2
@@ -1458,10 +1458,6 @@ async def _persist_bible_if_requested(payload: dict, entries: list[dict]) -> dic
         return {"persisted": False, "error": str(exc)[:200]}
 
 
-async def _op_format_kindle(payload: dict) -> dict:
-    return {"docx_storage_path": f"kindle/{payload.get('chapter_id', 'unknown')}.docx"}
-
-
 # --- blog + short-story write tools (n8n parity; CR-009 Part 2) ---------------------------------
 
 # The "Writing Prime Directive" carried verbatim from the n8n blog/short-story workflows.
@@ -1633,7 +1629,6 @@ OPS = {
     "scan-drift": _op_scan_drift,
     "evaluate-genre": _op_evaluate_genre,
     "extract-bible": _op_extract_bible,
-    "format-kindle": _op_format_kindle,
     "blog": _op_blog,
     "short-story": _op_short_story,
 }

@@ -107,12 +107,9 @@ CATALOG: tuple[ToolSpec, ...] = (
         params=("project_id", "project_title", "chapter_number"),
         aliases=("qa_chapter", "quality_check"),
     ),
-    ToolSpec(
-        "chapter", "format-kindle", "task",
-        intent="format a book / chapters for Kindle / ebook export",
-        params=("project_id", "project_title"),
-        aliases=("format_kindle", "kindle"),
-    ),
+    # NOTE: Kindle/.docx export is NOT an engine op. The Workbench Export tab builds the manuscript
+    # server-side (POST /api/export/docx, the `docx` lib) and never calls the engine. The old engine
+    # `chapter.format-kindle` op was a stub that returned a fake path, so it was removed (CR-010 A1).
     ToolSpec(
         "brainstorm", "story", "task",
         intent="brainstorm / outline a new story, book, or novel from a premise",

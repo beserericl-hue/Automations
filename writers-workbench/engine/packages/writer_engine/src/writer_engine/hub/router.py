@@ -33,7 +33,7 @@ logger = get_logger("hub.router")
 # This is NOT a thin keyword table. It is a faithful port of the n8n hub's ``preprocess_message`` —
 # ~100 lines of routing precedence and EXCLUSIONS that were each added to fix a specific misroute in
 # production (the "revert outline → brainstorm" trap, "write the outline" wrongly hitting chapter-write,
-# small edits regenerating the whole outline, approve-by-number, the format-kindle/chapter-outline
+# small edits regenerating the whole outline, approve-by-number, the chapter-outline
 # shortcuts). Gemini is the primary router; this is the deterministic fallback AND the regression net
 # that keeps those fixed bugs fixed. Order and the `not X` guards are load-bearing — do not reorder
 # without re-checking the misroute each rule defends against. Cross-ref: server/src/lib/jobs/classifier.ts
@@ -82,8 +82,6 @@ _LIBRARY = re.compile(
     r"send\s+(me\s+)?(the\s+|my\s+|this\s+)?(outline|research|chapter|story|blog|newsletter|report|draft)|"
     r"list\s+(all|draft|published|scheduled|approved|rejected|deleted)|show\s+(deleted|trash)|content\s+librar|"
     r"version\s+histor|list\s+version|get\s+version)", re.I)
-_FORMAT_KINDLE = re.compile(r"\b(format|kindle|manuscript|docx|generate\s+kdp)", re.I)
-_FORMAT_KINDLE_OBJ = re.compile(r"\b(book|project|novel)\b", re.I)
 _WRITING = re.compile(r"\b(re)?(write|draft|compose)\b[\w\s]{0,30}\b(chapter|prologue|epilogue)\b", re.I)
 _WRITING_OUTLINE_EXCLUDE = re.compile(r"\b(write|draft|compose).{0,30}outline", re.I)
 _CHAPTER_OUTLINE = re.compile(
@@ -94,7 +92,6 @@ _BULK_APPROVE = re.compile(r"\b(approve|publish)\s+(all|every)\s+(chapters?|draf
 _APPROVE_BY_NUM = re.compile(
     r"^(approve|publish|reject|delete|schedule)\s+(?:(?:chapter|ch)\s*)?#?(\d{1,2})(?:\s+(?:of|for|from|in)\s+(.+))?\s*$",
     re.I)
-_PAGE_SIZE = re.compile(r"(\d+\.?\d*\s*x\s*\d+\.?\d*)", re.I)
 _PROJECT_TAIL = re.compile(r"(?:of|for|from|in)\s+(?:the\s+)?(.+?)\s*$", re.I)
 
 _ORDINALS = {
@@ -223,21 +220,15 @@ def _heuristic_route(message: str) -> HubDecision:
                and bool(_EDIT_OUTLINE.search(low)) and not _EDIT_OUTLINE_EXCLUDE.search(low))
     is_brainstorm = (not is_retrieve and not is_edit and bool(_BRAINSTORM.search(low)))
     is_project = bool(_PROJECT_LIST.search(low))
-    is_format_kindle = bool(_FORMAT_KINDLE.search(low) and _FORMAT_KINDLE_OBJ.search(low))
     is_library = bool(_LIBRARY.search(low))
     is_writing = (not is_qa and bool(_WRITING.search(low)) and not _WRITING_OUTLINE_EXCLUDE.search(low))
     is_chapter_outline = (not is_retrieve and not is_writing and bool(_CHAPTER_OUTLINE.search(low)))
     is_bulk_approve = bool(_BULK_APPROVE.search(low))
 
     # priority order mirrors preprocess_message's sequence of early returns
-    if is_format_kindle:
-        params = {}
-        title = _extract_project_title(msg)
-        if title:
-            params["project_title"] = title
-        ps = _PAGE_SIZE.search(msg)
-        params["page_size"] = ps.group(1) if ps else "6x9"
-        return _decide("chapter", "format-kindle", params, 0.7)
+    # NOTE: Kindle/.docx export is not an engine op — it's a server-side download via the Workbench
+    # Export tab (POST /api/export/docx). A chat "format for kindle" intentionally has no route here
+    # and degrades to conversation so the agent can point the user at the Export tab (CR-010 A1).
     if is_retrieve:
         # revert/restore want the item itself; list/version/history want the listing
         if re.search(r"\b(revert|restore)\b", low):

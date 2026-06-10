@@ -163,14 +163,15 @@ def test_outline_prologue_is_chapter_plan() -> None:
     assert d.tool == "chapter" and d.op == "plan"
 
 
-def test_format_kindle_extracts_page_size() -> None:
-    d = _route("format the book for kindle at 5x8")
-    assert d.tool == "chapter" and d.op == "format-kindle"
-    assert d.params["page_size"] == "5x8"
-
-
-def test_format_kindle_defaults_page_size() -> None:
-    assert _route("format my novel for kindle").params["page_size"] == "6x9"
+def test_format_kindle_is_not_an_engine_op() -> None:
+    # CR-010 A1: Kindle/.docx export is a server-side download (Workbench Export tab → POST
+    # /api/export/docx), not an engine op. The old `chapter.format-kindle` stub returned a fake path
+    # and was removed; a "format for kindle" chat message degrades to conversation so the agent can
+    # point the user at the Export tab.
+    for msg in ("format the book for kindle at 5x8", "format my novel for kindle"):
+        d = _route(msg)
+        assert d.kind == "conversation"
+        assert d.tool is None and d.op is None
 
 
 def test_list_projects_routes_to_list() -> None:
