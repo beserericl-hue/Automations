@@ -1,6 +1,36 @@
 # Session Context — Writer's Workbench Engine (Path B) parity + cutover
 
-_Last updated: 2026-06-08. Branch: `develop` (all work committed + pushed)._
+_Last updated: 2026-06-10. Branch: `develop` (all work committed + pushed)._
+
+## LATEST SESSION (2026-06-09 → 06-10) — newest first, all on DEV, pushed to `develop`
+
+### Z. Removed dead `format-kindle` engine op (commit `6c74d08`)
+- Audited Export-to-Word end to end: the Workbench **Export tab** (`client/.../export/ExportDialog.tsx`) → `POST /api/export/docx` → `server/src/routes/export.ts` builds the KDP `.docx` **fully server-side** via the `docx` lib from `published_content_v2` (status approved/published only, Prologue→Ch1-N→Epilogue). It **never calls the engine**.
+- Engine `chapter.format-kindle` was a stub returning a fake path, reachable only via a chat "format kindle" command. Removed: catalog entry, `_op_format_kindle`+OPS, router heuristic branch + `_FORMAT_KINDLE*`/`_PAGE_SIZE` regexes. "format for kindle" now degrades to conversation. Hub-router tests updated (35 pass), ruff clean. CR-010 A1 marked resolved.
+- Note: user's Export tab showed "0 of 96" because Burial Mound chapters are all `draft` — export only includes approved/published. Working as designed.
+
+### Y. CR-010 — full n8n→engine→UI parity audit, ONE consolidated CR (commit `c55684e`)
+- File: `writers-workbench/docs/change-requests/CR-010-engine-parity-completion-ui-wiring-and-multi-engine-scale.md` (indexed in change-requests/README.md).
+- Method: mapped all 24 n8n V2 workflows (`workflows/01..24`) vs engine `hub/catalog.py` (21 ops) + each `services/*/main.py` OPS vs UI buttons→server routes. Spot-verified top gaps in source.
+- Key gaps captured: engine STUBS (format-kindle [now removed], eve-callback/reset placeholders in notify_step); PARTIALS (embeddings off+untriggered = lost canon-grounding in chapter.write; token accounting chapter-only; library versions/revert not hub-routable; story_bible.update not routable; no "email me X" op); MISSING pipeline (content ingestion/scraping cron has no engine producer); UI still on n8n even with HUB_BACKEND=engine (rewrite-with-research, brainstorm submit); blocking/orphaned UI (ContentDetail Fix-Drift while-loop, approve/publish via UI skips snapshot+email, dead `sendWebhookCommand`, no buttons for research/social/image/bible); multi-engine LB remaining (extends CR-003): gateway replicas+LB, per-provider shared budgets (OpenAI/Perplexity/Gemini), heavy/light queue split, HA Redis + alerting (the 9-day outage gap), autoscaling.
+- **Recommendation flagged to user**: for format-kindle, route hub op to server `/api/export/docx` rather than reimplement — but user chose to REMOVE it (done, item Z).
+
+### X. Non-blocking action buttons + Generate Cover Art (commit `e7561d7`)
+- Root cause: Outline/Re-outline, Write/Rewrite, Run Q/A used `sendWebhookCommand` → posts n8n webhook SYNCHRONOUSLY (hangs UI for the whole op) and post-cutover bypassed the engine.
+- `client/src/lib/webhook.ts`: new `enqueueHubCommand()` → always POSTs `/api/chat/proxy` (engine-aware) → returns `job_id` instantly.
+- `client/src/hooks/useEngineJobQueue.ts` (NEW): tracks many jobs by action key, background-polls `/api/jobs/engine/:id/status`, invalidates React Query keys on complete. Click never awaits generation → fan out freely.
+- Wired in `ProjectDetail.tsx`: Outline/Re-outline + Write/Rewrite (Outline tab), Rewrite (Chapters tab) → queue + "Queued…". `QAReportPanel.tsx`: Run Q/A/Re-run → queue+poll. New **Generate Cover Art** button in Book Overview → `media.cover-art` from premise → Art gallery (generate many, pick at publish), invalidates `['generated-images']`.
+- RewriteWithResearchModal was ALREADY non-blocking (BullMQ→jobId) — untouched.
+- Verified offline via `_heuristic_route` (no jobs run): every command → queued TASK op (chapter.plan / chapter.write / chapter.qa / media.cover-art). Client tsc clean. NOT yet clicked in a live browser / no live job run.
+
+### W. Graceful per-job Cancel for Fix Drift (commit `dae99d7`)
+- orchestrator `WorkerSettings.allow_abort_jobs=True` + `POST /pipelines/write/jobs/{id}/abort` (arq abort: queued→dropped, running→cancelled at next await, not retried). Module-level logger added.
+- gateway passthrough `POST /internal/write/jobs/{id}/abort` (+2 tests, 15 gateway tests pass).
+- server `abortEngineJob()` + `POST /api/jobs/engine/:id/abort`. client Cancel button on Chapters Fix Drift (shows once "Queued — fixing…").
+- Engine repo-connected → auto-redeploys; worker restart on deploy activates allow_abort_jobs. NOT yet smoke-tested live post-deploy.
+
+---
+
 
 ## What this session did (all on DEV, all pushed to `develop`)
 
