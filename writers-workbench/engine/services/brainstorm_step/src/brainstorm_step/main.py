@@ -44,7 +44,8 @@ def _arc_block(arc: str) -> str:
 
 
 def _build_story_system(
-    genre: str, arc: str, title: str = "", target_chapters: int = 0, locked_synopsis: str = ""
+    genre: str, arc: str, title: str = "", target_chapters: int = 0, locked_synopsis: str = "",
+    arc_text: str = "",
 ) -> str:
     """Pure: outline system = prime directive + genre + arc + plot/character seeds + outline gate.
 
@@ -70,17 +71,22 @@ def _build_story_system(
         )
     if anchor:
         anchor = "\n" + anchor + "\n"
+    # E2E-4: inject the arc's actual beats (from story_arcs_v2.prompt_text) so the outline honours the
+    # named arc's structure and can tag each chapter's arc_notes to a real stage.
+    arc_beats = f"\n\nSTORY ARC BEATS — structure the chapters along THESE stages:\n{arc_text}\n" if arc_text else ""
     return compose_craft_system(
         seed_keys=_STORY_SEEDS, genre_block=_genre_block(genre), arc_block=_arc_block(arc)
-    ) + (
+    ) + arc_beats + (
         "\n\n" + title_lock + anchor +
         "Produce the novel outline as strict JSON matching StoryOutline (title, premise, themes, "
         "story_arc_name, dramatic_question, wow_factor, characters, chapters).\n\n"
         "SCALE — this is a full-length novel, not a short story (Follett-scale). Requirements:\n"
         "1. CHAPTERS: 60-72 chapters PLUS a Prologue (chapter_number 0) and an Epilogue "
         "(chapter_number = last+1). Each chapter entry is COMPACT — {chapter_number, title, act, "
-        "arc_point, pov_character, bridge_from_prior, beat} where `beat` is 1-2 sentences on what "
-        "happens (a dramatic movement with a story turn). Keep entries compact so the whole arc fits.\n"
+        "arc_point, pov_character, bridge_from_prior, beat, arc_notes} where `beat` is 1-2 sentences on "
+        "what happens (a dramatic movement with a story turn) and `arc_notes` names WHICH stage of the "
+        "named story arc this chapter fulfils (e.g. a Hero's Journey chapter: 'Crossing the Threshold'). "
+        "Keep entries compact so the whole arc fits.\n"
         "2. STORY ARC — name ONE coherent arc in `story_arc_name` and make it a single unbroken "
         "through-line: setup, escalating complications, a midpoint reversal, a crisis, a climax, and a "
         "resolution. Tag every chapter's `act` and `arc_point` to its position on that arc. The arc "
@@ -168,6 +174,15 @@ async def _op_story(payload: dict) -> dict:
     title = str(payload.get("title") or "")
     requirements = str(payload.get("requirements") or payload.get("premise") or payload.get("title") or "")
     target_chapters, locked_synopsis = await _load_project_anchor(payload)
+    # E2E-4: load the named arc's beats from story_arcs_v2 so the outline honours its real structure.
+    arc_text = ""
+    if arc:
+        settings = get_settings()
+        if settings.supabase_url and settings.supabase_service_role_key:
+            from writer_engine.story_arcs import load_story_arc
+            from writer_engine.supabase.client import get_supabase_admin
+
+            arc, arc_text = await load_story_arc(await get_supabase_admin(), arc)
     router = get_router(service=STEP_NAME)
     title_line = f'TITLE (use EXACTLY, do not rename): "{title}"\n\n' if title else ""
     try:
@@ -175,7 +190,7 @@ async def _op_story(payload: dict) -> dict:
             router,
             provider="anthropic",
             model=get_settings().model_default,
-            system=_build_story_system(genre, arc, title, target_chapters, locked_synopsis),
+            system=_build_story_system(genre, arc, title, target_chapters, locked_synopsis, arc_text),
             prompt=f"{title_line}PROJECT REQUIREMENTS:\n{requirements}\n\nGenerate the full outline.",
             schema=StoryOutline,
             # A 50-70 chapter Follett-scale outline needs >16k tokens; STREAM it so it neither

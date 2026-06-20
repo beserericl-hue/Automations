@@ -128,11 +128,24 @@ R07/R16/R44/V05 flipped to built; V31 stays pending (needs E2E-5 callback + mult
 
 ---
 
-## Sprint E2E-4 — `chapter.plan` dual-arc depth + arc fidelity
+## Sprint E2E-4 — `chapter.plan` dual-arc depth + arc fidelity ✅ SHIPPED (2026-06-20)
 
-**Gap:** `chapter.plan` and `brainstorm.story` exist, but the suite asserts deep arc behavior the current
-implementation may not fully cover. **Start by auditing the current `chapter.plan` / brainstorm arc handling against
-these assertions; build only what's missing.**
+**Status:** structural foundation built on `develop`. Audit found the linchpin gap: **nothing loaded
+`story_arcs_v2.prompt_text`** — arcs were referenced by NAME only, so outlines/plans couldn't honour the
+real beats. Built: a shared `story_arcs.load_story_arc` loader; an expanded `SubChapterBrief` schema
+(number/title/brief/arc_beat/characters/setting/emotional_tone/connects_to_book_arc, brief↔beat alias);
+`chapter.plan` dual-arc — loads the book arc (outline.story_arc_name) + an optional per-chapter override
+("using <arc>"), injects both (no cross-contamination), injects prev/next chapter context, emits the rich
+sub_chapters, and persists them into `outline.chapters[N].chapter_outline` (snapshotting the prior outline);
+`brainstorm.story` loads the arc beats + emits per-chapter `arc_notes`; `chapter.write` auto-loads the saved
+chapter outline + an opt-in auto-plan guard (`require_chapter_outline` → plan-first, no prose, R116);
+routing extracts `chapter_story_arc`/`story_arc`/title/chapter-count. 9 offline tests (loader, schema,
+dual-arc plan w/ persist, auto-plan guard, 4 routing). Flipped R110–R116/R118/R120/R121 to built (E2E-4).
+**Caveat:** the arc-beat *wording* fidelity (R54–R69) and the R119 character-name cross-check are LLM/prompt
+behavior validated live, not offline; R119 left pending (no new cross-check op). The auto-plan guard is
+opt-in so the proven Burial Mound auto-fan-out write path is unchanged.
+
+**Gap:** `chapter.plan` / `brainstorm.story` existed but didn't load arc definitions or carry dual-arc depth.
 
 **Build / extend:**
 - `brainstorm.story` honors a `story_arc` param and emits per-chapter `arc_notes` that name the chosen arc's beats

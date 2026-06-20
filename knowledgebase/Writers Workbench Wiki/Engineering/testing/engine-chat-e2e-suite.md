@@ -1520,7 +1520,7 @@ Voice tests POST the **simulated** spoken input to `POST /internal/hub/voice` `{
 End-to-end test of the 3-step process: brainstorm book outline (with arc) → brainstorm chapter outline (sub-chapters) → write chapter. Tests arc integration, dual-arc support, sub-chapter structure, prev/next context, and consistency. **Prereqs:** story arcs loaded in `story_arcs_v2`; DEV user `+14105914612`.
 
 ### R110 — Brainstorm Book Outline with Story Arc
-- **Engine route:** `brainstorm.story` (task) · impl: pending CR-010 (story_arc param + per-chapter arc_notes)
+- **Engine route:** `brainstorm.story` (task) · impl: built (E2E-4)
 - **Prerequisite:** "The Hero's Journey" arc in `story_arcs_v2`
 - **Command:**
   ```
@@ -1539,7 +1539,7 @@ End-to-end test of the 3-step process: brainstorm book outline (with arc) → br
   - [ ] CR-009 email with outline; no 5xx
 
 ### R111 — Brainstorm Chapter Outline for Prologue (Same Arc)
-- **Engine route:** `chapter.plan` (task) · impl: pending CR-010 (dual-arc, sub_chapters schema)
+- **Engine route:** `chapter.plan` (task) · impl: built (E2E-4)
 - **Prerequisite:** R110
 - **Command:**
   ```
@@ -1552,7 +1552,7 @@ End-to-end test of the 3-step process: brainstorm book outline (with arc) → br
   - [ ] CR-009 email; no chapter prose written
 
 ### R112 — Brainstorm Chapter Outline for Chapter 1 (Same Arc)
-- **Engine route:** `chapter.plan` (task) · impl: pending CR-010 (prev/next context injection)
+- **Engine route:** `chapter.plan` (task) · impl: built (E2E-4)
 - **Prerequisite:** R110, R111
 - **Command:**
   ```
@@ -1563,7 +1563,7 @@ End-to-end test of the 3-step process: brainstorm book outline (with arc) → br
   - [ ] briefs reflect book Ch1 brief (no drift); Prologue context injected (acknowledges prior events); Ch2 context injected (sets up hook); names match book outline; saved to outline; CR-009 email
 
 ### R113 — Brainstorm Chapter Outline with Different Story Arc
-- **Engine route:** `chapter.plan` (task) · impl: pending CR-010 (per-chapter arc override, dual-arc fields)
+- **Engine route:** `chapter.plan` (task) · impl: built (E2E-4)
 - **Prerequisite:** R110; "Fichtean Curve" in `story_arcs_v2`
 - **Command:**
   ```
@@ -1574,7 +1574,7 @@ End-to-end test of the 3-step process: brainstorm book outline (with arc) → br
   - [ ] chapter_story_arc distinct from book's Hero's Journey; arc_beat = Fichtean stages; connects_to_book_arc still references Hero's Journey Ch2 stage; both arc prompt_texts loaded; no cross-contamination; CR-009 email
 
 ### R114 — Write Prologue (After Chapter Outline Exists)
-- **Engine route:** `chapter.write` (task) · impl: pending CR-010 (auto-load sub_chapters, scene-break injection, dual-arc prompt)
+- **Engine route:** `chapter.write` (task) · impl: built (E2E-4)
 - **Prerequisite:** R111
 - **Command:**
   ```
@@ -1586,7 +1586,7 @@ End-to-end test of the 3-step process: brainstorm book outline (with arc) → br
   - [ ] `published_content_v2` row (content_type=chapter, "Prologue — The Signal Beneath"); `content_versions_v2` snapshot; 1500-3000 words; CR-009 email
 
 ### R115 — Write Chapter 1 (After Chapter Outline Exists)
-- **Engine route:** `chapter.write` (task) · impl: pending CR-010 (numbered chapter, story bible cross-check)
+- **Engine route:** `chapter.write` (task) · impl: built (E2E-4)
 - **Prerequisite:** R110, R111, R112, R114
 - **Command:**
   ```
@@ -1598,7 +1598,7 @@ End-to-end test of the 3-step process: brainstorm book outline (with arc) → br
   - [ ] `published_content_v2` row; `content_versions_v2` snapshot; 3000-5000 words; ends on hook into Ch2; CR-009 email
 
 ### R116 — Write Chapter Without Chapter Outline (Should Trigger Brainstorm First)
-- **Engine route:** `chapter.plan` (task) · impl: pending CR-010 (missing-chapter-outline guard, auto-plan-before-write)
+- **Engine route:** `chapter.plan` (task) · impl: built (E2E-4)
 - **Prerequisite:** R110; no chapter outline for Ch3
 - **Command:**
   ```
@@ -1620,7 +1620,7 @@ End-to-end test of the 3-step process: brainstorm book outline (with arc) → br
   - [ ] message: no book outline exists; suggests brainstorm.story first; chapter.write/plan NOT called; no `published_content_v2` row; no crash/5xx
 
 ### R118 — Revise Chapter Outline
-- **Engine route:** `brainstorm.revise-outline` or `chapter.plan` re-run (task) · impl: pending CR-010 (chapter outline snapshot before overwrite)
+- **Engine route:** `brainstorm.revise-outline` or `chapter.plan` re-run (task) · impl: built (E2E-4)
 - **Prerequisite:** R112
 - **Command:**
   ```
@@ -1646,7 +1646,7 @@ End-to-end test of the 3-step process: brainstorm book outline (with arc) → br
   - [ ] every name verified against the roster; no invented names; roles consistent; no renamed characters (e.g. "Maya"≠"Maria"); QA report inline or via CR-009 email listing discrepancies/confirming consistency
 
 ### R120 — Kishōtenketsu Chapter Arc (No Conflict Structure)
-- **Engine route:** `chapter.plan` (task) · impl: pending CR-010 (non-conflict arc support, Ki/Shō/Ten/Ketsu)
+- **Engine route:** `chapter.plan` (task) · impl: built (E2E-4)
 - **Prerequisite:** R110; "Kishōtenketsu" in `story_arcs_v2`; no outline for Ch4
 - **Command:**
   ```
@@ -1660,7 +1660,7 @@ End-to-end test of the 3-step process: brainstorm book outline (with arc) → br
   - [ ] arc_beat values = Ki/Shō/Ten/Ketsu; no forced conflict beats; Ten = contrast/revelation (not combat); connects_to_book_arc still references Hero's Journey Ch4 stage; Kishōtenketsu prompt loaded; CR-009 email
 
 ### R121 — Full Pipeline: Outline → Chapter Outline → Write → Verify
-- **Engine route:** `library.retrieve` → `chapter.plan` → `chapter.write` · impl: pending CR-010 (multi-step pipeline)
+- **Engine route:** `library.retrieve` → `chapter.plan` → `chapter.write` · impl: built (E2E-4)
 - **Prerequisite:** R110; "Dan Harmon's Story Circle" in `story_arcs_v2`; no outline for Ch5
 - **Command (Step 1):**
   ```

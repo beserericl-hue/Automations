@@ -49,13 +49,36 @@ class WriteChapterResponse(BaseModel):
 
 
 class SubChapterBrief(BaseModel):
-    """One sub-chapter beat in a chapter's fan-out plan."""
+    """One sub-chapter beat in a chapter's fan-out plan (E2E-4 rich schema).
+
+    ``beat`` is the legacy field the writer consumes; ``brief`` is its alias in the chapter-outline
+    contract. The arc fields carry the dual-arc grounding: ``arc_beat`` names THIS chapter's arc stage
+    (the chapter-level arc, which may override the book arc) and ``connects_to_book_arc`` ties the
+    sub-chapter back to the book-level arc stage so the two never cross-contaminate."""
 
     model_config = ConfigDict(extra="ignore")
 
+    number: int | None = None
     title: str = ""
     beat: str = ""
     pov_character: str = ""
+    # E2E-4 chapter-outline fields
+    brief: str = ""
+    arc_beat: str = ""
+    characters: list[str] = Field(default_factory=list)
+    setting: str = ""
+    emotional_tone: str = ""
+    connects_to_book_arc: str = ""
+
+    @model_validator(mode="after")
+    def _sync_brief_beat(self) -> SubChapterBrief:
+        # brief and beat are aliases — keep both populated so the writer (reads beat) and the
+        # chapter-outline contract (reads brief) agree regardless of which the model emitted.
+        if self.brief and not self.beat:
+            self.beat = self.brief
+        elif self.beat and not self.brief:
+            self.brief = self.beat
+        return self
 
 
 class SubChapterPlan(BaseModel):

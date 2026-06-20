@@ -230,34 +230,87 @@ def _chapter_header(ctx: dict[str, Any], roster: list, req: WriteChapterRequest)
     return "\n".join(lines)
 
 
-def _plan_system(genre_slug: str, outline: dict[str, Any]) -> str:
-    """System prompt for splitting a chapter into sub-chapter beats (scene-list + escalation seeds)."""
+def _plan_system(
+    genre_slug: str, outline: dict[str, Any], *,
+    book_arc_block: str = "", chapter_arc_block: str = "",
+) -> str:
+    """System prompt for splitting a chapter into sub-chapter beats (E2E-4 dual-arc).
+
+    ``book_arc_block`` is the whole-novel arc (e.g. Hero's Journey) and ``chapter_arc_block`` is an
+    optional CHAPTER-level arc that overrides it for this chapter only (e.g. Kishōtenketsu). Each
+    sub-chapter's ``arc_beat`` uses the chapter arc (or the book arc when none); ``connects_to_book_arc``
+    always ties back to the book arc so a non-conflict chapter arc never overwrites the book structure."""
+    arc_section = ""
+    if book_arc_block:
+        arc_section += f"\n\nBOOK-LEVEL STORY ARC (the whole novel follows this):\n{book_arc_block}"
+    if chapter_arc_block:
+        arc_section += (
+            "\n\nCHAPTER-LEVEL STORY ARC for THIS chapter — use these beats for each sub-chapter's "
+            "arc_beat. It MAY differ from the book arc (e.g. a quiet Kishōtenketsu chapter inside a "
+            f"Hero's Journey novel); do NOT mix the two:\n{chapter_arc_block}"
+        )
     return compose_craft_system(
         seed_keys=["follett_seeds.scene.event_list", "follett_seeds.scene.escalating_turn",
                    "follett_seeds.scene.bme_check"],
         genre_block=_genre_block(genre_slug),
         arc_block=_arc_block(outline),
-    ) + (
-        "\n\nReturn strict JSON matching SubChapterPlan: a list of sub-chapters, each with a title, a "
-        "concrete beat (what happens — a discrete movement of the chapter, NOT a summary), and the POV "
-        "character. The sub-chapters together must cover the whole chapter with a beginning/middle/end "
-        "and at least one story turn each."
+    ) + arc_section + (
+        "\n\nReturn strict JSON matching SubChapterPlan: 3-7 sub-chapters. Each sub-chapter MUST carry: "
+        "number (1-based), title, brief (a concrete beat — a discrete movement, NOT a summary), "
+        "arc_beat (the CHAPTER-level arc stage it fulfils — use the chapter arc above if given, else the "
+        "book arc), characters (names taken EXACTLY from the CHARACTER ROSTER — never invent), setting, "
+        "emotional_tone, and connects_to_book_arc (how it advances the BOOK-level arc stage for this "
+        "chapter). Together the sub-chapters cover the chapter beginning/middle/end with at least one "
+        "story turn each. If the chapter arc is a non-conflict structure (Kishōtenketsu, Story Circle), "
+        "do NOT force combat/confrontation beats — honour that arc's shape."
     )
 
 
+def _adjacent_chapter_context(outline: dict[str, Any], chapter_number: int) -> str:
+    """Prev/next chapter briefs (E2E-4 R112): so a chapter outline acknowledges what came before and
+    sets up the hook into what follows, without drifting from the book outline."""
+    chapters = (outline or {}).get("chapters") or []
+    def _find(target: Any) -> dict | None:
+        for ch in chapters:
+            if isinstance(ch, dict) and str(ch.get("chapter_number")) == str(target):
+                return ch
+        return None
+    lines: list[str] = []
+    nums = [c.get("chapter_number") for c in chapters if isinstance(c, dict)]
+    try:
+        ordered = sorted(n for n in nums if str(n).lstrip("-").isdigit())
+        idx = ordered.index(int(chapter_number)) if str(chapter_number).lstrip("-").isdigit() else -1
+    except (ValueError, TypeError):
+        idx, ordered = -1, []
+    prev_n = ordered[idx - 1] if idx > 0 else None
+    next_n = ordered[idx + 1] if 0 <= idx < len(ordered) - 1 else None
+    prev = _find(prev_n) if prev_n is not None else None
+    nxt = _find(next_n) if next_n is not None else None
+    if prev:
+        lines.append(f"PREVIOUS CHAPTER ({prev.get('chapter_number')} — {prev.get('title','')}): "
+                     f"{prev.get('beat', prev.get('summary',''))} — acknowledge where this left off.")
+    if nxt:
+        lines.append(f"NEXT CHAPTER ({nxt.get('chapter_number')} — {nxt.get('title','')}): "
+                     f"{nxt.get('beat', nxt.get('summary',''))} — end on a hook that sets this up.")
+    return "\n".join(lines)
+
+
 async def _plan_subchapters(
-    ctx: dict[str, Any], req: WriteChapterRequest, n: int, model: str
+    ctx: dict[str, Any], req: WriteChapterRequest, n: int, model: str, *,
+    book_arc_block: str = "", chapter_arc_block: str = "", adjacent: str = "",
 ) -> list[SubChapterBrief]:
-    """Plan up to n sub-chapters for the chapter. Fixture briefs when no provider."""
+    """Plan up to n sub-chapters for the chapter (E2E-4: dual-arc + prev/next). Fixture on no provider."""
     router = get_router(service=STEP_NAME)
+    adj = f"\n\nADJACENT CHAPTER CONTEXT:\n{adjacent}" if adjacent else ""
     try:
         plan, _ = await complete_structured(
             router,
             provider="anthropic",
             model=model,
-            system=_plan_system(ctx["genre_slug"], ctx["outline"]),
+            system=_plan_system(ctx["genre_slug"], ctx["outline"],
+                                book_arc_block=book_arc_block, chapter_arc_block=chapter_arc_block),
             prompt=(
-                f"{_chapter_header(ctx, ctx['roster'], req)}\n\n"
+                f"{_chapter_header(ctx, ctx['roster'], req)}{adj}\n\n"
                 f"Split chapter {req.chapter_number} into {n} sub-chapters."
             ),
             schema=SubChapterPlan,
@@ -267,6 +320,60 @@ async def _plan_subchapters(
         return briefs or [SubChapterBrief(beat=f"Part {i + 1} of chapter {req.chapter_number}") for i in range(n)]
     except ProviderNotRegistered:
         return [SubChapterBrief(beat=f"Part {i + 1}") for i in range(n)]
+
+
+async def _persist_chapter_outline(
+    project_id: str, chapter_number: int, sub_chapters: list[dict],
+    chapter_story_arc: str, book_arc_name: str,
+) -> dict | None:
+    """Save the chapter outline into ``writing_projects_v2.outline.chapters[N].chapter_outline`` (E2E-4
+    R111/R118). Snapshots the prior outline to outline_versions_v2 first when one exists, so a re-plan
+    is reversible. Best-effort."""
+    from writer_engine.config import get_settings
+
+    settings = get_settings()
+    if not (settings.supabase_url and settings.supabase_service_role_key):
+        return None
+    try:
+        from writer_engine.supabase.client import get_supabase_admin
+
+        client = await get_supabase_admin()
+        cur = await client.table("writing_projects_v2").select("outline,user_id").eq("id", project_id).limit(1).execute()
+        rows = getattr(cur, "data", None) or []
+        if not rows:
+            return {"persisted": False, "reason": "project not found"}
+        outline = dict(rows[0].get("outline") or {})
+        user_id = rows[0].get("user_id")
+        chapters = list(outline.get("chapters") or [])
+        # Snapshot the prior outline (R118: chapter-outline revision keeps history).
+        try:
+            v = await client.table("outline_versions_v2").select("version_number").eq(
+                "project_id", project_id).order("version_number", desc=True).limit(1).execute()
+            vn = int(((getattr(v, "data", None) or [{}])[0].get("version_number")) or 0) + 1
+            await client.table("outline_versions_v2").insert({
+                "user_id": user_id, "project_id": project_id, "version_number": vn,
+                "outline": outline, "revision_note": f"pre chapter-outline snapshot (ch {chapter_number})",
+            }).execute()
+        except Exception as exc:
+            logger.warning("plan.snapshot_failed", error=str(exc)[:160])
+        found = False
+        for ch in chapters:
+            if isinstance(ch, dict) and str(ch.get("chapter_number")) == str(chapter_number):
+                ch["chapter_outline"] = {
+                    "sub_chapters": sub_chapters,
+                    "chapter_story_arc": chapter_story_arc,
+                    "book_arc_name": book_arc_name,
+                }
+                found = True
+                break
+        if not found:
+            return {"persisted": False, "reason": f"chapter {chapter_number} not in outline"}
+        outline["chapters"] = chapters
+        await client.table("writing_projects_v2").update({"outline": outline}).eq("id", project_id).execute()
+        return {"persisted": True, "chapter_number": chapter_number}
+    except Exception as exc:
+        logger.warning("plan.persist_failed", error=str(exc)[:200])
+        return {"persisted": False, "error": str(exc)[:200]}
 
 
 def _briefs_from_payload(payload: dict[str, Any]) -> list[SubChapterBrief]:
@@ -304,12 +411,52 @@ async def _op_plan(payload: dict) -> dict:
     model = {"haiku": settings.model_cheap, "sonnet": settings.model_default}.get(
         str(payload.get("llm_strategy") or ""), settings.model_default
     )
-    n_sub = max(1, min(int(req.sub_chapter_count_override or 5), 6))
-    briefs = await _plan_subchapters(ctx, req, n_sub, model)
+    n_sub = max(3, min(int(req.sub_chapter_count_override or 5), 7))
+
+    # Dual-arc (E2E-4): the book arc grounds connects_to_book_arc; an optional per-chapter arc override
+    # (chapter_story_arc / "using <arc>") grounds each sub-chapter's arc_beat. Both definitions are
+    # loaded from story_arcs_v2 so the model honours the real beats (Hero's Journey, Kishōtenketsu, …).
+    from writer_engine.story_arcs import arc_prompt_block, load_story_arc
+
+    outline = ctx.get("outline") or {}
+    book_arc_name = str(outline.get("story_arc_name") or outline.get("story_arc") or "")
+    chapter_arc_name = str(payload.get("chapter_story_arc") or payload.get("story_arc") or "")
+    client = None
+    if settings.supabase_url and settings.supabase_service_role_key:
+        from writer_engine.supabase.client import get_supabase_admin
+
+        client = await get_supabase_admin()
+    book_arc_name, book_arc_text = await load_story_arc(client, book_arc_name)
+    book_arc_block = arc_prompt_block("Book arc", book_arc_name, book_arc_text)
+    chapter_arc_block = ""
+    if chapter_arc_name and chapter_arc_name.strip().lower() != book_arc_name.strip().lower():
+        chapter_arc_name, chapter_arc_text = await load_story_arc(client, chapter_arc_name)
+        chapter_arc_block = arc_prompt_block("Chapter arc", chapter_arc_name, chapter_arc_text)
+    else:
+        chapter_arc_name = book_arc_name  # inherit the book arc when no override given
+
+    adjacent = _adjacent_chapter_context(outline, chapter_number)
+    briefs = await _plan_subchapters(
+        ctx, req, n_sub, model,
+        book_arc_block=book_arc_block, chapter_arc_block=chapter_arc_block, adjacent=adjacent,
+    )
+    for i, b in enumerate(briefs, start=1):
+        if b.number is None:
+            b.number = i
+    sub_dicts = [b.model_dump(mode="json") for b in briefs]
+
+    persist = None
+    if payload.get("persist") and payload.get("project_id"):
+        persist = await _persist_chapter_outline(
+            str(payload["project_id"]), chapter_number, sub_dicts, chapter_arc_name, book_arc_name)
+
     return {
         "chapter_number": chapter_number,
-        "sub_chapter_briefs": [b.model_dump(mode="json") for b in briefs],
+        "chapter_story_arc": chapter_arc_name,
+        "book_arc": book_arc_name,
+        "sub_chapter_briefs": sub_dicts,
         "count": len(briefs),
+        "persist": persist,
     }
 
 
@@ -810,11 +957,34 @@ async def _drift_correct_pass(
     return revised, (final_drift or drift), 1
 
 
+def _saved_sub_chapters(outline: dict[str, Any], chapter_number: Any) -> list:
+    """The reviewed chapter outline saved by chapter.plan, if any (E2E-4 R116 auto-plan guard)."""
+    for ch in (outline or {}).get("chapters") or []:
+        if isinstance(ch, dict) and str(ch.get("chapter_number")) == str(chapter_number):
+            return ((ch.get("chapter_outline") or {}).get("sub_chapters")) or []
+    return []
+
+
 async def _op_write(payload: dict) -> dict:
     from writer_engine.config import get_settings
 
     req = WriteChapterRequest.model_validate(payload)
     ctx = await _load_context(str(req.project_id), payload)
+
+    # Auto-plan guard (E2E-4 R116, opt-in via require_chapter_outline): "write chapter N" with no
+    # reviewed chapter outline → create the outline first and STOP, so the author reviews it before any
+    # prose is written. Opt-in so the proven auto-fan-out write path (Burial Mound) is unchanged.
+    if (payload.get("require_chapter_outline")
+            and not _briefs_from_payload(payload)
+            and not _saved_sub_chapters(ctx.get("outline") or {}, req.chapter_number)):
+        plan_result = await _op_plan({**payload, "persist": True})
+        return {
+            "planned": True, "wrote": False, "chapter_number": req.chapter_number,
+            "message": "No chapter outline existed — I created one and emailed it. Review it, then ask "
+                       "me to write the chapter.",
+            "plan": plan_result,
+        }
+
     roster = ctx["roster"]
     revision = bool(payload.get("revision") or req.use_qa_report_as_input)
     system = _build_write_system(genre_slug=ctx["genre_slug"], outline=ctx["outline"], revision=revision)
@@ -843,9 +1013,13 @@ async def _op_write(payload: dict) -> dict:
             research_facts, research_gaps_filled = await _chapter_research(
                 beat, period=period, title=ctx["title"], focus=_research_focus(ctx)
             )
-            # Use a pre-made chapter outline if the caller supplied one (the explicit
-            # outline -> chapter-outline -> narrative flow); otherwise plan it now.
+            # Use a pre-made chapter outline if the caller supplied one (the explicit outline ->
+            # chapter-outline -> narrative flow); else auto-load the chapter outline saved by
+            # chapter.plan (E2E-4 R114/R115); else plan it now.
             provided = _briefs_from_payload(payload)
+            if not provided:
+                saved = _saved_sub_chapters(ctx.get("outline") or {}, req.chapter_number)
+                provided = [SubChapterBrief.model_validate(s) for s in saved] if saved else []
             briefs = provided or await _plan_subchapters(ctx, req, n_sub, model)
             sub_briefs = briefs
             # Prompt caching: the craft system + chapter context + research grounding are identical

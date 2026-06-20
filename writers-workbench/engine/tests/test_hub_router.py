@@ -202,6 +202,36 @@ def test_email_newsletter_is_not_write_newsletter() -> None:
     assert _route("Email me the newsletter about revolutions").op == "email-content"
 
 
+# --------------------------------------------------------------------------- chapter.plan dual-arc (E2E-4)
+
+def test_brainstorm_with_arc_extracts_arc_title_chapters() -> None:
+    d = _route('Brainstorm a book using the Hero\'s Journey called "The Signal Beneath." '
+               "Genre: post-apocalyptic. 8 chapters.")
+    assert d.tool == "brainstorm" and d.op == "story"
+    assert d.params["story_arc"] == "Hero's Journey"
+    assert d.params["title"] == "The Signal Beneath"
+    assert d.params["target_chapter_count"] == 8
+
+
+def test_chapter_plan_arc_override() -> None:
+    d = _route('Create a chapter outline for Chapter 2 of "The Signal Beneath" using the Fichtean Curve')
+    assert d.tool == "chapter" and d.op == "plan"
+    assert d.params["chapter_number"] == 2
+    assert d.params["chapter_story_arc"] == "Fichtean Curve"
+    assert d.params["project_title"] == "The Signal Beneath"
+
+
+def test_chapter_plan_nonconflict_arc_and_prologue() -> None:
+    d = _route('Create a chapter outline for Chapter 4 of "The Signal Beneath" using Kishōtenketsu. '
+               "This should be a quieter chapter.")
+    assert d.op == "plan" and d.params["chapter_story_arc"] == "Kishōtenketsu"
+    assert d.params["project_title"] == "The Signal Beneath"
+
+    d = _route('Create a chapter outline for the Prologue of "The Signal Beneath"')
+    assert d.op == "plan" and d.params["chapter_number"] == "Prologue"
+    assert d.params["project_title"] == "The Signal Beneath"
+
+
 def test_research_and_cover_and_social() -> None:
     assert _route("research Late Woodland burial mounds").op == "run"
     assert _route("generate cover art").op == "cover-art"

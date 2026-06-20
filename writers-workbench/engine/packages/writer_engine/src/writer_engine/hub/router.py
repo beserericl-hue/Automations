@@ -151,6 +151,48 @@ def _chapter_params(message: str) -> dict[str, Any]:
     return params
 
 
+_USING_ARC = re.compile(r"\busing\s+(?:the\s+)?(.+?)(?=\s+(?:called|genre|for\b)|[.,\n]|$)", re.I)
+_CALLED_TITLE = re.compile(r'\b(?:called|titled|named)\s+["“]?(.+?)["”]?(?=[.,\n]|\s+genre|$)', re.I)
+_NUM_CHAPTERS = re.compile(r"\b(\d{1,3})\s+chapters?\b", re.I)
+
+
+def _extract_using_arc(message: str) -> str | None:
+    m = _USING_ARC.search(message)
+    if not m:
+        return None
+    arc = m.group(1).strip(" \"“”")
+    return arc or None
+
+
+def _plan_params(message: str) -> dict[str, Any]:
+    """chapter.plan params: chapter + project_title (+ a per-chapter arc override from 'using <arc>')."""
+    params = _chapter_params(message)
+    arc = _extract_using_arc(message)
+    if arc:
+        params["chapter_story_arc"] = arc
+    if params.get("project_title"):
+        t = re.sub(r"\s+using\s+.*$", "", params["project_title"], flags=re.I)
+        t = re.sub(r"^(?:chapter\s+\d+|prologue|epilogue)\s+of\s+", "", t, flags=re.I)
+        t = re.sub(r"^of\s+", "", t, flags=re.I)
+        params["project_title"] = t.strip(" \"“”")
+    return params
+
+
+def _story_params(message: str) -> dict[str, Any]:
+    """brainstorm.story params from the deterministic path: story_arc / title / target_chapter_count."""
+    params: dict[str, Any] = {}
+    arc = _extract_using_arc(message)
+    if arc:
+        params["story_arc"] = arc
+    tm = _CALLED_TITLE.search(message)
+    if tm:
+        params["title"] = tm.group(1).strip(" \"“”")
+    cm = _NUM_CHAPTERS.search(message)
+    if cm:
+        params["target_chapter_count"] = int(cm.group(1))
+    return params
+
+
 def _email_params(message: str) -> dict[str, Any]:
     """Extract params for library.email-content from an 'email me …' message: inline content + subject
     + recipient (R03/R05 style), or content_type + title/search_term + chapter_number (R100-R105)."""
@@ -373,7 +415,7 @@ def _heuristic_route(message: str) -> HubDecision:
     is_write = bool(_IS_WRITE.search(low))
     is_outline_kw = ("chapter outline" in low) or ("outline" in low and ("prologue" in low or "epilogue" in low))
     if not is_list and not is_write and is_outline_kw:
-        return _decide("chapter", "plan", _chapter_params(msg), 0.7)
+        return _decide("chapter", "plan", _plan_params(msg), 0.7)
 
     # 1. APPROVE/PUBLISH/REJECT BY NUMBER — "approve 3", "publish chapter 5 of X" (preprocess line 21)
     m = _APPROVE_BY_NUM.match(msg)
@@ -429,7 +471,7 @@ def _heuristic_route(message: str) -> HubDecision:
         return _decide("brainstorm", "edit-outline", params, 0.7)
     if is_brainstorm:
         op = "revise-outline" if _BRAINSTORM_REVISE.search(low) else "story"
-        params = {"directive": msg} if op == "revise-outline" else {}
+        params = {"directive": msg} if op == "revise-outline" else _story_params(msg)
         title = _extract_project_title(msg)
         if title and op == "revise-outline":
             params["project_title"] = title
@@ -454,7 +496,7 @@ def _heuristic_route(message: str) -> HubDecision:
     if is_writing:
         return _decide("chapter", "write", _chapter_params(msg), 0.7)
     if is_chapter_outline:
-        return _decide("chapter", "plan", _chapter_params(msg), 0.7)
+        return _decide("chapter", "plan", _plan_params(msg), 0.7)
 
     # remaining single-keyword tasks not covered above
     if re.search(r"\bresearch\b", low):
@@ -491,7 +533,10 @@ def _router_system() -> str:
         "project = brainstorm.revise-outline; a brand-new story from a premise = brainstorm.story.\n"
         "- CHAPTER FIXES: 'qa'/'quality check' a chapter = chapter.qa; 'fix/clean up/dedup/repair' a "
         "chapter = chapter.repair.\n"
-        "- 'chapter outline' / 'plan the chapter' / 'outline the prologue' = chapter.plan.\n"
+        "- 'chapter outline' / 'plan the chapter' / 'outline the prologue' = chapter.plan. If the "
+        "message says 'using <arc>' (e.g. 'using the Fichtean Curve' / 'using Kishōtenketsu'), put that "
+        "in chapter_story_arc (a per-chapter arc override). For 'brainstorm a book using <arc> called "
+        "<title>' put the arc in story_arc, the title in title, and any 'N chapters' in target_chapter_count.\n"
         "- 'write a newsletter [for the <genre> genre] [about/topic …] [date …]' = chapter.newsletter "
         "(put topic + genre_slug + date in params). 'email me the newsletter …' is NOT this — that is "
         "library.email-content.\n"
