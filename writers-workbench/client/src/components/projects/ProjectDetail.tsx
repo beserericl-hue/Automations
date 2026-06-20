@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
@@ -11,6 +11,7 @@ import ImageGallery from '../images/ImageGallery';
 import SocialMediaPanel from '../social/SocialMediaPanel';
 import CostDashboard from '../cost/CostDashboard';
 import { useEngineJobQueue } from '../../hooks/useEngineJobQueue';
+import { useChapterRepair } from '../../hooks/useChapterRepair';
 import CommandDialog from '../shared/CommandDialog';
 import RewriteWithResearchModal from '../content/RewriteWithResearchModal';
 import type { WritingProject, PublishedContent, StoryBibleEntry, ResearchReport, GenreConfig, StoryArc, OutlineCharacter, OutlineChapter, ChapterOutline, SubChapter } from '../../types/database';
@@ -987,89 +988,17 @@ function ChapterQaBadge({ qa }: { qa?: { aligned: boolean | null; qaAvg: number 
 // engine job and, when it finishes, refetches project-chapter-qa + project-chapters so this row's QA
 // badge flips to ✓ on its own. Same engine action the ContentDetail EngineQaPanel exposes.
 function ChapterFixDriftButton({ contentId, projectId }: { contentId: string; projectId: string }) {
-  const queryClient = useQueryClient();
-  const [state, setState] = useState<'idle' | 'queued' | 'error'>('idle');
-  const [jobId, setJobId] = useState<string | null>(null);
-  const [cancelling, setCancelling] = useState(false);
-
-  // Background poll — runs only while a job is in flight; never blocks the click handler.
-  useEffect(() => {
-    if (!jobId) return;
-    let cancelled = false;
-    const deadline = Date.now() + 40 * 60 * 1000;
-    async function poll() {
-      while (!cancelled && Date.now() < deadline) {
-        await new Promise((res) => setTimeout(res, 15000));
-        if (cancelled) return;
-        try {
-          const { data: s } = await supabase.auth.getSession();
-          const token = s?.session?.access_token;
-          const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-          const pr = await fetch(`/api/jobs/engine/${jobId}/status`, { headers });
-          const pj = (await pr.json()) as { status?: string };
-          if (pj.status === 'complete') {
-            if (cancelled) return;
-            await queryClient.invalidateQueries({ queryKey: ['project-chapter-qa', projectId] });
-            await queryClient.invalidateQueries({ queryKey: ['project-chapters', projectId] });
-            setJobId(null);
-            setState('idle');
-            return;
-          }
-          if (pj.status === 'error' || pj.status === 'not_found') {
-            if (!cancelled) { setState('error'); setJobId(null); }
-            return;
-          }
-        } catch {
-          // transient poll error — keep trying until the deadline
-        }
-      }
-    }
-    void poll();
-    return () => { cancelled = true; };
-  }, [jobId, projectId, queryClient]);
-
-  async function queueFixDrift() {
-    setState('queued');
-    try {
-      const { data: s } = await supabase.auth.getSession();
-      const token = s?.session?.access_token;
-      const headers = { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
-      const r = await fetch(`/api/content/${contentId}/repair`, { method: 'POST', headers });
-      const j = (await r.json()) as { jobId?: string };
-      if (!r.ok || !j.jobId) throw new Error('repair failed to queue');
-      setJobId(j.jobId); // hands off to the background poller; the click is already done
-    } catch {
-      setState('error');
-    }
-  }
-
-  // Cancel the in-flight repair: aborts the engine arq job (queued → dropped, running → cancelled at its
-  // next await), then stops the poller and resets the row. Idempotent — safe even if it just finished.
-  async function cancelFixDrift() {
-    if (!jobId) return;
-    setCancelling(true);
-    try {
-      const { data: s } = await supabase.auth.getSession();
-      const token = s?.session?.access_token;
-      const headers = { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
-      await fetch(`/api/jobs/engine/${jobId}/abort`, { method: 'POST', headers });
-      // Refetch QA/chapters in case the job had already partially written before the abort landed.
-      await queryClient.invalidateQueries({ queryKey: ['project-chapter-qa', projectId] });
-      await queryClient.invalidateQueries({ queryKey: ['project-chapters', projectId] });
-    } catch {
-      // best-effort — the poller will still reconcile state on its own
-    } finally {
-      setJobId(null); // stops the background poller via its cleanup
-      setState('idle');
-      setCancelling(false);
-    }
-  }
+  // Non-blocking engine repair + Cancel, shared with the ContentDetail Engine-QA panel (CR-010 B2).
+  const { state, jobId, queue, cancel, cancelling } = useChapterRepair(contentId, [
+    ['project-chapter-qa', projectId],
+    ['project-chapters', projectId],
+  ]);
 
   return (
     <span className="inline-flex items-center gap-1">
       <button
         disabled={state === 'queued'}
-        onClick={queueFixDrift}
+        onClick={queue}
         title="Queue the engine repair op (correct drift vs outline/roster, weave research, line-edit). Runs in the background — you can queue more chapters while it works."
         className="rounded-lg px-3 py-1.5 text-xs font-medium border border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950 disabled:opacity-60 whitespace-nowrap"
       >
@@ -1078,7 +1007,7 @@ function ChapterFixDriftButton({ contentId, projectId }: { contentId: string; pr
       {state === 'queued' && jobId && (
         <button
           disabled={cancelling}
-          onClick={cancelFixDrift}
+          onClick={cancel}
           title="Cancel this repair job. A queued job is dropped before it runs; a running job stops at its next step. The chapter's saved versions are unchanged."
           className="rounded-lg px-2 py-1.5 text-xs font-medium border border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-700 dark:text-rose-400 dark:hover:bg-rose-950 disabled:opacity-60 whitespace-nowrap"
         >

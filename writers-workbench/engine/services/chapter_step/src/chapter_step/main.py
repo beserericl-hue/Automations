@@ -685,12 +685,16 @@ def _build_correct_system(genre_slug: str) -> str:
 async def _correct_drift(
     text: str, *, drift: DriftReport, roster_text: str, genre_slug: str, model: str,
     insist_length: bool = False, research_facts: str = "",
-    line_edit: bool = False,
+    line_edit: bool = False, style_directives: str = "", citation_mode: str = "",
 ) -> str:
     """QA cycle 2: streamed full-chapter revision that corrects story/character drift and, when
     ``research_facts`` is supplied (the repair path), WEAVES those researched facts into the prose to
     fill the chapter's research gaps. When ``line_edit`` is set, ALSO strengthens every sentence:
-    removes em-dashes, breaks run-on clause-chains, cuts AI tics — meaning and length preserved."""
+    removes em-dashes, breaks run-on clause-chains, cuts AI tics — meaning and length preserved.
+
+    ``style_directives`` (author-supplied, the rewrite-with-research path) is applied as a hard
+    revision instruction. ``citation_mode`` controls whether the woven research is invisible (fiction
+    default) or carried as inline markdown footnotes (``inline`` — non-fiction)."""
     router = get_router(service=STEP_NAME)
     sd = "\n".join(f"- {x}" for x in drift.story_drift) or "(none)"
     cd = "\n".join(f"- {x}" for x in drift.character_drift) or "(none)"
@@ -700,17 +704,30 @@ async def _correct_drift(
         "long as the original. Fix ONLY the drift listed; keep all other prose intact. Do not condense."
         if insist_length else ""
     )
+    citation_clause = (
+        " Carry each researched fact with an inline markdown footnote citation (e.g. [^1]) and list the "
+        "sources at the end — this is a non-fiction work."
+        if citation_mode == "inline"
+        else " Ground the prose in these facts WITHOUT footnotes, source labels, or citations in the "
+        "narrative — this is fiction; the research must read as the author's own knowledge."
+    )
     research_block = (
         f"\n\nRESEARCH GAPS to fill:\n{gaps}\n\n"
         f"RESEARCHED FACTS — weave these into the prose where they fit, as concrete sensory / material /"
-        f" period detail (do NOT dump them as exposition, do NOT invent beyond them):\n{research_facts}\n"
+        f" period detail (do NOT dump them as exposition, do NOT invent beyond them).{citation_clause}\n"
+        f"{research_facts}\n"
         if research_facts.strip() else ""
+    )
+    style_block = (
+        f"\n\nAUTHOR STYLE DIRECTIVES (apply all of these to the revised prose):\n{style_directives}\n"
+        if style_directives.strip() else ""
     )
     user = (
         f"CHARACTER ROSTER (consistency reference):\n{roster_text}\n\n"
         f"STORY DRIFT TO CORRECT:\n{sd}\n\n"
         f"CHARACTER DRIFT TO CORRECT:\n{cd}\n"
         f"{research_block}"
+        f"{style_block}"
         f"{LINE_EDIT_RULES if line_edit else ''}\n"
         f"CHAPTER TO REVISE:\n{text}{insist}"
     )
@@ -724,6 +741,7 @@ async def _correct_drift(
 async def _drift_correct_pass(
     text: str, *, ctx: dict[str, Any], req: WriteChapterRequest, roster_text: str, period: str,
     model: str, min_length_ratio: float = 0.85, weave_research: bool = False, line_edit: bool = False,
+    research_focus: str = "", style_directives: str = "", citation_mode: str = "",
 ) -> tuple[str, DriftReport | None, int]:
     """QA cycle 1 (detect drift vs outline/arc/roster + research gaps) -> QA cycle 2 (correct it).
 
@@ -743,27 +761,40 @@ async def _drift_correct_pass(
     if drift is None:
         drift = DriftReport(aligned=True)  # line-edit still runs even when drift can't be scored
     # Fetch focused research when repairing — so research gaps can actually be filled in the prose.
+    # An author-supplied ``research_focus`` (the rewrite-with-research path) ALWAYS triggers a fetch
+    # and binds the Perplexity query to that focus, even when QA found no gaps — the user explicitly
+    # asked to ground this chapter in that subject.
     research_facts = ""
-    if weave_research and (drift.research_gaps or drift.story_drift or drift.character_drift):
+    want_research = weave_research and (
+        bool(research_focus.strip()) or drift.research_gaps or drift.story_drift or drift.character_drift
+    )
+    if want_research:
         beat = _chapter_outline_beat(ctx.get("outline") or {}, req.chapter_number)
+        if research_focus.strip():
+            beat = f"{beat}\n\nAUTHOR RESEARCH FOCUS (prioritise this): {research_focus.strip()}"
         research_facts, _ = await _chapter_research(
             beat, period=period, title=str(ctx.get("title") or ""), focus=_research_focus(ctx),
         )
     has_drift = bool(drift.story_drift or drift.character_drift)
-    has_research_to_weave = bool(weave_research and research_facts and drift.research_gaps)
+    # Weave whenever we fetched facts — for an explicit research_focus there may be no QA gap to match,
+    # but the author still wants those facts in the prose.
+    has_research_to_weave = bool(weave_research and research_facts and (drift.research_gaps or research_focus.strip()))
+    has_author_directive = bool(research_focus.strip() or style_directives.strip())
     # line_edit revises EVERY chapter (sentence strengthening), even a clean one.
-    if not (has_drift or has_research_to_weave or line_edit):
-        return text, drift, 0  # aligned, nothing to weave, no line-edit requested
+    if not (has_drift or has_research_to_weave or line_edit or has_author_directive):
+        return text, drift, 0  # aligned, nothing to weave, no line-edit / author directive requested
     draft_words = len(text.split())
     floor = min_length_ratio * draft_words
     revised = await _correct_drift(
         text, drift=drift, roster_text=roster_text, genre_slug=ctx["genre_slug"], model=model,
         research_facts=research_facts, line_edit=line_edit,
+        style_directives=style_directives, citation_mode=citation_mode,
     )
     if len(revised.split()) < floor:
         retry = await _correct_drift(
             text, drift=drift, roster_text=roster_text, genre_slug=ctx["genre_slug"], model=model,
             insist_length=True, research_facts=research_facts, line_edit=line_edit,
+            style_directives=style_directives, citation_mode=citation_mode,
         )
         revised = max((revised, retry), key=lambda t: len(t.split()))
     if len(revised.split()) < floor:
@@ -1333,9 +1364,16 @@ async def _op_repair(payload: dict) -> dict:
     # "align" against a self-contradictory cast). Now the roster is the clean outline cast, so there is
     # far less to remove — keep at least 80% of the draft so a fix can't gut the chapter.
     min_ratio = float(payload.get("min_length_ratio") or 0.8)
+    # Author-supplied params (rewrite-with-research path, B1): a research focus to ground the chapter
+    # in, free-text style directives, and the citation mode (invisible for fiction / inline footnotes
+    # for non-fiction). 'auto' is resolved to invisible|inline by the caller before it reaches here.
+    research_focus = str(payload.get("research_focus") or "")
+    style_directives = str(payload.get("style_directives") or "")
+    citation_mode = str(payload.get("citation_mode") or "")
     new_text, drift, passes = await _drift_correct_pass(
         text, ctx=ctx, req=req, roster_text=roster_text, period=period, model=model,
         min_length_ratio=min_ratio, weave_research=True, line_edit=True,
+        research_focus=research_focus, style_directives=style_directives, citation_mode=citation_mode,
     )
     persist_result = None
     # Persist whenever persist is requested — NOT only when a correction happened. A repair that

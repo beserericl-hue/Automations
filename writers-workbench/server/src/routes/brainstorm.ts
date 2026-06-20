@@ -5,6 +5,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { requireAuth } from '../middleware/auth.js';
 import { BrainstormSubmitSchema } from '../schemas.js';
 import { logger } from '../lib/logger.js';
+import { hubBackend, callEngineWriteTool } from '../lib/engine-hub.js';
 
 export const brainstormRouter = Router();
 
@@ -201,6 +202,50 @@ brainstormRouter.post(
       }
 
       const { title, genre_slug, story_arc, target_chapter_count } = parsed.data;
+      const userId = (req as { userId?: string }).userId || '';
+
+      // B1 (CR-010): when HUB_BACKEND=engine, generate the outline via the engine's brainstorm.story
+      // op instead of the n8n brainstorm webhook. brainstorm.story only persists into an EXISTING
+      // project, so we first create the project (engine create-project, synchronous) — mirroring n8n's
+      // "create project → brainstorm → save outline" — then queue the generation with persist:true.
+      // Returns an engine job_id; the outline lands in writing_projects_v2.outline and is emailed.
+      if (hubBackend() === 'engine') {
+        const themes = parsed.data.themes ? `\n\nThemes: ${parsed.data.themes}` : '';
+        const created = (await callEngineWriteTool('brainstorm', {
+          op: 'create-project',
+          user_id: userId,
+          title,
+          genre_slug,
+          async: false,
+        })) as { payload?: { result?: { project_id?: string } } };
+        const projectId = created.payload?.result?.project_id;
+        if (!projectId) {
+          logger.error({ created }, 'brainstorm: engine create-project returned no project_id');
+          res.status(502).json({ error: 'Failed to create project in engine' });
+          return;
+        }
+        const job = await callEngineWriteTool('brainstorm', {
+          op: 'story',
+          project_id: projectId,
+          user_id: userId,
+          title,
+          genre_slug,
+          story_arc,
+          requirements: contentText + themes,
+          target_chapter_count: String(target_chapter_count || '15'),
+          persist: true,
+          async: true,
+        });
+        res.json({
+          status: 'accepted',
+          engineJob: true,
+          jobId: job.job_id,
+          projectId,
+          message:
+            'Brainstorm submitted. Your outline will appear in Projects and be emailed to you.',
+        });
+        return;
+      }
 
       const webhookUrl = process.env.N8N_BRAINSTORM_WEBHOOK_URL
         || (process.env.N8N_API_URL ? `${process.env.N8N_API_URL}/webhook/brainstorm_story_v2` : '');

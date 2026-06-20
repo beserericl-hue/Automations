@@ -17,7 +17,7 @@ import { z } from 'zod';
 import { validateBody } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
-import { callEngineWriteTool } from '../lib/engine-hub.js';
+import { callEngineWriteTool, hubBackend } from '../lib/engine-hub.js';
 import { logger } from '../lib/logger.js';
 import { getNamedQueue } from '../lib/queue.js';
 import { addTrackedJob } from '../lib/jobs/job-tracker.js';
@@ -522,15 +522,6 @@ contentActionsRouter.post(
       return;
     }
 
-    const webhookUrl = resolveHubWebhookUrl();
-    if (!webhookUrl) {
-      res.status(503).json({
-        success: false,
-        error: { code: 'NOT_CONFIGURED', message: 'N8N_HUB_WEBHOOK_URL not set' },
-      });
-      return;
-    }
-
     const { id } = req.params;
     const body = req.body as z.infer<typeof RewriteWithResearchSchema>;
 
@@ -570,6 +561,55 @@ contentActionsRouter.post(
         res.status(400).json({
           success: false,
           error: { code: 'PROJECT_NOT_FOUND', message: 'Parent project missing' },
+        });
+        return;
+      }
+
+      // Resolve citation_mode 'auto' from the project type (fiction → invisible grounding,
+      // non-fiction → inline footnotes) — both the engine and n8n paths honour the resolved value.
+      const isNonFiction = ['non_fiction', 'nonfiction'].includes(
+        String(project.project_type || 'fiction').toLowerCase(),
+      );
+      const resolvedCitationMode =
+        body.citation_mode === 'auto' ? (isNonFiction ? 'inline' : 'invisible') : body.citation_mode;
+
+      // B1 (CR-010): when HUB_BACKEND=engine, route to the engine's chapter.repair op — its research-
+      // weave path re-detects drift, fetches focused research bound to the author's research_focus,
+      // weaves it in (invisible for fiction / inline footnotes for non-fiction), applies the style
+      // directives, line-edits, and re-persists. Returns an engine job_id the existing
+      // useEngineJobQueue poller (/api/jobs/engine/:id) already understands. No n8n webhook involved.
+      if (hubBackend() === 'engine') {
+        const job = await callEngineWriteTool('chapter', {
+          op: 'repair',
+          project_id: chapter.project_id,
+          chapter_number: chapter.chapter_number,
+          user_id: userId,
+          research_focus: body.research_focus,
+          style_directives: body.style_directives || '',
+          citation_mode: resolvedCitationMode,
+          use_qa_report: body.use_qa_report,
+          persist: true,
+          async: true,
+        });
+        logger.info(
+          { userId, contentId: id, jobId: job.job_id },
+          'content-actions: rewrite-with-research queued via engine',
+        );
+        res.status(202).json({
+          success: true,
+          jobId: job.job_id,
+          engineJob: true,
+          status: job.status ?? 'queued',
+        });
+        return;
+      }
+
+      // n8n path: the hub webhook must be configured.
+      const webhookUrl = resolveHubWebhookUrl();
+      if (!webhookUrl) {
+        res.status(503).json({
+          success: false,
+          error: { code: 'NOT_CONFIGURED', message: 'N8N_HUB_WEBHOOK_URL not set' },
         });
         return;
       }
@@ -690,6 +730,134 @@ contentActionsRouter.post('/:id/repair', async (req: Request, res: Response) => 
     res.status(502).json({
       success: false,
       error: { code: 'ENGINE_UNREACHABLE', message: err instanceof Error ? err.message : 'Engine error' },
+    });
+  }
+});
+
+const LifecycleSchema = z.object({
+  action: z.enum(['approve', 'publish', 'reject', 'schedule', 'unschedule', 'draft']),
+  schedule_date: z.string().optional(),
+});
+
+const LIFECYCLE_STATUS: Record<string, string> = {
+  approve: 'approved',
+  publish: 'published',
+  reject: 'rejected',
+  schedule: 'scheduled',
+  unschedule: 'draft',
+  draft: 'draft',
+};
+
+/**
+ * Server-side lifecycle fallback when the engine is the n8n backend or the engine gateway is
+ * unreachable. Replicates the snapshot + status change (the email is the only engine-only extra it
+ * skips — logged) so a core approve/publish never hard-fails on engine downtime. `row` is the
+ * pre-update content row.
+ */
+async function serverSideLifecycle(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  id: string,
+  userId: string,
+  action: string,
+  scheduleDate: string | undefined,
+  row: { content_text?: string | null; metadata?: Record<string, unknown> | null },
+): Promise<string> {
+  const newStatus = LIFECYCLE_STATUS[action] ?? 'draft';
+  // Snapshot before approve/publish — the auto-version the n8n manage_library workflow took.
+  if ((action === 'approve' || action === 'publish') && row.content_text) {
+    const { data: last } = await supabase
+      .from('content_versions_v2')
+      .select('version_number')
+      .eq('content_id', id)
+      .order('version_number', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const nextVersion = ((last?.version_number as number | undefined) ?? 0) + 1;
+    await supabase.from('content_versions_v2').insert({
+      content_id: id,
+      user_id: userId,
+      version_number: nextVersion,
+      content_text: row.content_text,
+      changed_by: `lifecycle_${action}`,
+      change_note: `auto-snapshot before ${action}`,
+    });
+  }
+  const updates: Record<string, unknown> = { status: newStatus, updated_at: new Date().toISOString() };
+  const meta = { ...(row.metadata || {}) };
+  if (action === 'publish') updates.published_at = new Date().toISOString();
+  if (action === 'schedule' && scheduleDate) {
+    meta.schedule_date = scheduleDate;
+    updates.metadata = meta;
+  }
+  if (action === 'unschedule' && 'schedule_date' in meta) {
+    delete meta.schedule_date;
+    updates.metadata = meta;
+  }
+  await supabase.from('published_content_v2').update(updates).eq('id', id).eq('user_id', userId);
+  logger.warn({ contentId: id, action }, 'content-actions: lifecycle via server fallback (no email)');
+  return newStatus;
+}
+
+/**
+ * POST /api/content/:id/lifecycle — CR-010 B2: change a piece of content's lifecycle state
+ * (approve / publish / reject / schedule / unschedule / back-to-draft) through the ENGINE's
+ * library.lifecycle op rather than a direct Supabase status write. The engine snapshots the current
+ * text into content_versions_v2 on approve/publish and emails the user (approve/publish/reject/
+ * schedule) — the auto-version + notification that the n8n manage_library workflow performed and that
+ * the old direct-Supabase UI write silently skipped. Synchronous (lifecycle is a fast info op).
+ * Falls back to an equivalent server-side write (snapshot + status, no email) if the engine is the
+ * n8n backend or the gateway is unreachable, so a core lifecycle action never hard-fails.
+ */
+contentActionsRouter.post('/:id/lifecycle', validateBody(LifecycleSchema), async (req: Request, res: Response) => {
+  const userId = req.userId;
+  if (!userId) {
+    res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED' } });
+    return;
+  }
+  const id = String(req.params.id);
+  const { action, schedule_date } = req.body as z.infer<typeof LifecycleSchema>;
+  try {
+    // Verify the content belongs to the requesting user; load the row for the fallback snapshot.
+    const supabase = getSupabaseAdmin();
+    const { data: content, error } = await supabase
+      .from('published_content_v2')
+      .select('id, content_text, metadata, status')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (error || !content) {
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Content not found' } });
+      return;
+    }
+
+    if (hubBackend() === 'engine') {
+      try {
+        const out = (await callEngineWriteTool('library', {
+          op: 'lifecycle',
+          content_id: id,
+          user_id: userId,
+          action,
+          ...(schedule_date ? { schedule_date } : {}),
+          async: false,
+        })) as { payload?: { result?: Record<string, unknown> } };
+        const result = out.payload?.result ?? {};
+        if (result.error) throw new Error(String(result.error));
+        logger.info({ userId, contentId: id, action, status: result.status }, 'content-actions: lifecycle via engine');
+        res.json({ success: true, status: result.status, result, via: 'engine' });
+        return;
+      } catch (engineErr) {
+        logger.warn({ err: engineErr, contentId: id, action }, 'content-actions: engine lifecycle failed, falling back');
+      }
+    }
+
+    const status = await serverSideLifecycle(supabase, id, userId, action, schedule_date, content);
+    res.json({ success: true, status, via: 'server' });
+  } catch (err) {
+    logger.error({ err, userId, contentId: id, action }, 'content-actions: lifecycle failed');
+    res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL', message: err instanceof Error ? err.message : 'Internal error' },
     });
   }
 });

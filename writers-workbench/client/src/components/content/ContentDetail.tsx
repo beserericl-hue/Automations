@@ -13,6 +13,7 @@ import QAReportPanel from './QAReportPanel';
 import AnnotationsPanel from './AnnotationsPanel';
 import ProvenancePanel from './ProvenancePanel';
 import RewriteWithResearchModal from './RewriteWithResearchModal';
+import { useChapterRepair } from '../../hooks/useChapterRepair';
 import type { PublishedContent, GeneratedImage } from '../../types/database';
 
 export default function ContentDetail() {
@@ -135,12 +136,20 @@ export default function ContentDetail() {
         });
         return;
       }
-      const { error } = await supabase
-        .from('published_content_v2')
-        .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq('id', id!)
-        .eq('user_id', userId!);
-      if (error) throw error;
+      // CR-010 B2: route lifecycle through the engine (library.lifecycle) so the auto-version
+      // snapshot + approve/publish/reject/schedule notification email happen — the old direct
+      // Supabase status write silently skipped both. Map the target status to a lifecycle action.
+      const action =
+        newStatus === 'approved' ? 'approve'
+        : newStatus === 'published' ? 'publish'
+        : newStatus === 'rejected' ? 'reject'
+        : newStatus === 'scheduled' ? 'schedule'
+        : newStatus === 'draft' && item?.status === 'scheduled' ? 'unschedule'
+        : 'draft';
+      await apiFetch(`/api/content/${id}/lifecycle`, {
+        method: 'POST',
+        body: JSON.stringify({ action }),
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['content-detail', id] });
@@ -161,16 +170,12 @@ export default function ContentDetail() {
         });
         return;
       }
-      const { error } = await supabase
-        .from('published_content_v2')
-        .update({
-          status: 'scheduled',
-          metadata: meta,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id!)
-        .eq('user_id', userId!);
-      if (error) throw error;
+      // CR-010 B2: schedule through the engine lifecycle op (snapshot is skipped for schedule, but it
+      // sends the "scheduled" notification email and records schedule_date) instead of a direct write.
+      await apiFetch(`/api/content/${id}/lifecycle`, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'schedule', schedule_date: dateStr }),
+      });
     },
     onSuccess: () => {
       setShowSchedulePicker(false);
@@ -536,8 +541,10 @@ export default function ContentDetail() {
 // CR-005) on the chapter detail page — the old QAReportPanel only reads the n8n last_qa_report field.
 // CR-008/009: a "Fix drift" action runs the engine repair op (drift-correct + research + line-edit).
 function EngineQaPanel({ metadata, contentId }: { metadata: Record<string, unknown> | null | undefined; contentId: string }) {
-  const queryClient = useQueryClient();
-  const [repairState, setRepairState] = useState<'idle' | 'running' | 'error'>('idle');
+  // CR-010 B2: non-blocking Fix Drift + Cancel, shared with the Chapters-table button via the hook —
+  // the click queues the engine repair and returns immediately; a background poller refreshes this
+  // panel when the new drift scan lands. (Was a blocking while/setTimeout loop.)
+  const { state, jobId, queue, cancel, cancelling } = useChapterRepair(contentId, [['content-detail', contentId]]);
   const m = (metadata || {}) as Record<string, unknown>;
   const qa = m.craft_qa as Record<string, number> | null | undefined;
   const drift = m.drift_report as
@@ -549,31 +556,6 @@ function EngineQaPanel({ metadata, contentId }: { metadata: Record<string, unkno
   const qaAvg = qaEntries.length ? qaEntries.reduce((a, [, v]) => a + v, 0) / qaEntries.length : null;
   const story = drift?.story_drift ?? [];
   const chars = drift?.character_drift ?? [];
-
-  async function fixDrift() {
-    setRepairState('running');
-    try {
-      const { data: s } = await supabase.auth.getSession();
-      const token = s?.session?.access_token;
-      const headers = { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
-      const r = await fetch(`/api/content/${contentId}/repair`, { method: 'POST', headers });
-      const j = (await r.json()) as { jobId?: string };
-      if (!r.ok || !j.jobId) throw new Error('repair failed to queue');
-      // Poll the engine job until terminal, then refetch so the drift badge reflects the new scan.
-      const deadline = Date.now() + 30 * 60 * 1000;
-      while (Date.now() < deadline) {
-        await new Promise((res) => setTimeout(res, 15000));
-        const pr = await fetch(`/api/jobs/engine/${j.jobId}/status`, { headers });
-        const pj = (await pr.json()) as { status?: string };
-        if (pj.status === 'complete') break;
-        if (pj.status === 'error' || pj.status === 'not_found') throw new Error('repair job failed');
-      }
-      await queryClient.invalidateQueries({ queryKey: ['content-detail', contentId] });
-      setRepairState('idle');
-    } catch {
-      setRepairState('error');
-    }
-  }
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
@@ -588,14 +570,26 @@ function EngineQaPanel({ metadata, contentId }: { metadata: Record<string, unkno
         )}
         {qaAvg != null && <span className="text-xs text-gray-500">Craft QA {qaAvg.toFixed(2)}</span>}
         {drift?.aligned === false && (
-          <button
-            onClick={fixDrift}
-            disabled={repairState === 'running'}
-            title="Run the engine repair op: correct the drift against the outline/roster, weave research, line-edit"
-            className="ml-auto rounded border border-amber-400 px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50 dark:border-amber-600 dark:text-amber-300 dark:hover:bg-amber-950"
-          >
-            {repairState === 'running' ? 'Fixing drift…' : repairState === 'error' ? 'Retry fix' : 'Fix drift'}
-          </button>
+          <span className="ml-auto inline-flex items-center gap-1">
+            <button
+              onClick={queue}
+              disabled={state === 'queued'}
+              title="Queue the engine repair op (correct drift vs outline/roster, weave research, line-edit). Runs in the background — the panel refreshes when it's done."
+              className="rounded border border-amber-400 px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50 dark:border-amber-600 dark:text-amber-300 dark:hover:bg-amber-950"
+            >
+              {state === 'queued' ? 'Queued — fixing…' : state === 'error' ? 'Retry fix' : 'Fix drift'}
+            </button>
+            {state === 'queued' && jobId && (
+              <button
+                onClick={cancel}
+                disabled={cancelling}
+                title="Cancel this repair job. A queued job is dropped before it runs; a running job stops at its next step. Saved versions are unchanged."
+                className="rounded border border-rose-300 px-2 py-0.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50 dark:border-rose-700 dark:text-rose-300 dark:hover:bg-rose-950"
+              >
+                {cancelling ? 'Cancelling…' : 'Cancel'}
+              </button>
+            )}
+          </span>
         )}
       </div>
       {qaEntries.length > 0 && (

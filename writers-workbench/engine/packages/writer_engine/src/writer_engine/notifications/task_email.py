@@ -97,6 +97,48 @@ def build_task_email(tool: str, body: dict, result: dict) -> tuple[str, str]:
     return subject, html
 
 
+_LIFECYCLE_VERB = {
+    "approved": "approved", "published": "published", "rejected": "rejected", "scheduled": "scheduled",
+}
+
+
+async def send_lifecycle_email(client: Any, user_id: str | None, content: dict, new_status: str) -> bool:
+    """Notify the user that a piece of content changed lifecycle state (approve/publish/reject/schedule).
+
+    Mirrors n8n manage_library's approve/publish/reject/schedule Gmail node. Best-effort: a mail
+    failure must never affect the lifecycle DB write. ``content`` is the post-update row."""
+    verb = _LIFECYCLE_VERB.get(new_status)
+    if verb is None:  # draft / unschedule — no notification, matching n8n
+        return False
+    try:
+        settings = get_settings()
+        rec = await _load_recipients(client, user_id)
+        if not rec.to:
+            logger.info("lifecycle_email.no_recipient", status=new_status)
+            return False
+        title = escape(str(content.get("title") or "Untitled"))
+        ctype = escape(str(content.get("content_type") or "content"))
+        when = content.get("metadata", {})
+        sched = ""
+        if new_status == "scheduled" and isinstance(when, dict) and when.get("schedule_date"):
+            sched = f" for {escape(str(when['schedule_date']))}"
+        subject = f"[Writer's Workbench] \"{content.get('title') or 'Untitled'}\" {verb}"
+        html = (
+            f"<p>Your {ctype} <strong>{title}</strong> has been <strong>{verb}</strong>{sched}.</p>"
+            f"<p>Status: {escape(new_status)}</p>"
+        )
+        res = await send_email(
+            to=[rec.to], from_addr=settings.newsletter_from_address, subject=subject, html=html,
+            bcc=[rec.bcc] if rec.bcc else None,
+        )
+        logger.info("lifecycle_email.sent", to=rec.to, status=new_status,
+                    message_id=getattr(res, "message_id", None))
+        return True
+    except Exception as exc:  # never let a mail failure touch the DB write
+        logger.warning("lifecycle_email.failed", status=new_status, error=str(exc)[:200])
+        return False
+
+
 async def send_task_completion_email(tool: str, body: dict, result: dict | None) -> bool:
     """Email the configured recipient that ``tool`` finished. Returns True if a mail was sent.
     Best-effort and opt-out-able (``body['notify'] is False``)."""
