@@ -108,6 +108,7 @@ The catalog. One line per page. When answering a question, scan this first to fi
 ## Sprints
 
 - [[sprints/_index]]
+- [[engine-e2e-parity-sprints]] — minimal sprints (E2E-1..E2E-5) to make the full [[engine-chat-e2e-suite]] runnable.
 - [[completed-sprints]] — Sprint 0-12 + newsletter cluster summary.
 - [[sprint-8-rbac]] — RBAC + tiers + credits + impersonation deep dive.
 - [[sprint-10a-tier-separation]] — V1/DEV/PROD tier rollout.

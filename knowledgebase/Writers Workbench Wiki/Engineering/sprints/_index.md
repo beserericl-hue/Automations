@@ -2,7 +2,7 @@
 name: Sprints index
 description: Catalog of sprint pages — completed, planned, releases, hotfixes.
 type: index
-last_reviewed: 2026-05-09
+last_reviewed: 2026-06-20
 ---
 
 # Sprints
@@ -27,6 +27,7 @@ Two source-of-truth conventions:
 - [[microservice-alternative]] — (SUPERSEDED) chapter-writer-only Python microservice proposal. Now subsumed by full-backend rewrite.
 - [[python-migration-roadmap]] — full Python backend rewrite + B2B productization. Sprints 16-26. See [[architecture/python-backend/_index]] for design pages.
 - [[engine-framework-sprints]] — **CURRENT — task breakdown**: F0 foundation (done) + F1-A/F1-B write-workshop (queue, no new Docker images) + F2 newsletter (in flight) per-step services. Operationalizes [[engine-framework]] + [[newsletter-microservices]].
+- [[engine-e2e-parity-sprints]] — **exit-gate plan for the full [[engine-chat-e2e-suite]]**: the minimal 5 sprints (E2E-1..E2E-5) implementing ONLY the engine ops the suite is still blocked on — `library.email-content`, `library.versions`+`library.revert`, newsletter-as-hub-op, `chapter.plan` dual-arc depth, `notify.eve-callback`. When all ship, all 161 tests run.
 - [[chapter-optimization-sprint]] — **F2.5** chapter algorithm optimization (~25 pts, ~2-3 weeks). Lands between F2 and F1-B: pass-merging, streaming continuity, tier-down models, two-pass draft/edit, speculative decoding. Gated on Sprint-15 quality rubric + F1-A clean Python baseline. No new Docker images.
 - [[releases-and-tags]] — v1.0.0 (2026-04-17), v1.1.0 (2026-04-28), v1.1.1, v1.1.2.
 - [[hotfixes]] — story-bible extraction (2026-04-29), auth Site URL, admin-create user, etc.
