@@ -129,6 +129,7 @@ The catalog. One line per page. When answering a question, scan this first to fi
 - [[testing/_index]]
 - [[unit-tests]] — Vitest + RTL test inventory.
 - [[e2e-tests]] — Playwright projects + spec files + CI gotchas.
+- [[engine-chat-e2e-suite]] — functional E2E through the engine chat interface (catalog ops + genres/arcs + gaps).
 - [[newsletter-test-plan]] — 114-test manual QA plan.
 - [[ci-pipeline]] — GitHub Actions jobs + required status checks + paths filter.
 - [[regression-tests]] — sticky bug categories + R-tests R70-R81.
