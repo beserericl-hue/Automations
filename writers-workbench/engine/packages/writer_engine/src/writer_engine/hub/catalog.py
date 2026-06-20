@@ -137,6 +137,12 @@ CATALOG: tuple[ToolSpec, ...] = (
         aliases=("write_blog", "write_blog_post", "blog_post"),
     ),
     ToolSpec(
+        "chapter", "newsletter", "task",
+        intent="write a newsletter about a topic for a genre (subject line, intro, sections, outro)",
+        params=("topic", "genre", "genre_slug", "date"),
+        aliases=("write_newsletter", "newsletter"),
+    ),
+    ToolSpec(
         "chapter", "short-story", "task",
         intent="write a SHORT STORY from a premise or a brainstormed 3-beat outline",
         params=("premise", "genre", "story_arc", "title", "length"),

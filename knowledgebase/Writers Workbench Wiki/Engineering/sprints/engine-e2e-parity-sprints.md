@@ -99,10 +99,20 @@ the hub.
 
 ---
 
-## Sprint E2E-3 — Newsletter as a hub op
+## Sprint E2E-3 — Newsletter as a hub op ✅ SHIPPED (2026-06-20)
 
-**Gap (CR-010):** the engine has a durable newsletter saga (`/newsletter/generate`) but "write a newsletter" is not
-routable from the chat/voice hub, so it can't be driven the way the suite drives everything else.
+**Status:** built on `develop`. **Design note / deviation:** the suite's R07/R16/R44 assertions describe a
+TOPIC newsletter saved to `published_content_v2` (subject_line/pre_header/intro/sections/outro) — i.e. the
+n8n `write_newsletter`, NOT the F2 curated multi-story saga (which needs ingested content and writes
+`newsletter_sends`). So rather than bridge the saga (which couldn't satisfy those assertions), I added
+`chapter.newsletter` — a topic newsletter op mirroring `chapter.blog` (Perplexity research with citations
+preserved → genre-toned structured compose → persist `published_content_v2` content_type=newsletter →
+CR-009 email, since it's under the `chapter` tool already in `_EMAIL_TOOLS`). Catalog entry + heuristic
+branch + Gemini rule + `_newsletter_params` (topic/genre_slug/date). Also fixed a latent `extract_json`
+import bug shared with `_op_blog` (it silently fell back to raw text). 4 tests (3 routing + 1 op).
+R07/R16/R44/V05 flipped to built; V31 stays pending (needs E2E-5 callback + multi-task split).
+
+**Gap (CR-010):** "write a newsletter" was not routable from the chat/voice hub.
 
 **Build:**
 - A hub catalog entry that maps "write a newsletter …" to the newsletter pipeline and returns a pollable `job_id`

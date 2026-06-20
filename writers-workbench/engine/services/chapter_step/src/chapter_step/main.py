@@ -1590,9 +1590,8 @@ async def _op_blog(payload: dict) -> dict:
     import json as _json
     title, body, meta = (topic[:80] or "Untitled Blog Post"), resp.text.strip(), {}
     try:
-        from writer_engine.llm.json_extractor import extract_json
-
-        data = _json.loads(extract_json(resp.text))
+        m = re.search(r"\{.*\}", resp.text, re.S)
+        data = _json.loads(m.group(0)) if m else {}
         title = data.get("title") or title
         body = data.get("body_markdown") or body
         meta = {"meta_description": data.get("meta_description"), "tags": data.get("tags")}
@@ -1603,6 +1602,74 @@ async def _op_blog(payload: dict) -> dict:
                                     content_text=body, genre_slug=genre_slug, metadata=meta)
     return {"written": True, "title": title, "content_text": body, "word_count": len(body.split()),
             "persist": persist}
+
+
+async def _op_newsletter(payload: dict) -> dict:
+    """One-shot topic newsletter (n8n write_newsletter parity): genre-aware, Perplexity-researched
+    (citation URLs preserved), structured as subject_line / pre_header / intro / sections / outro, and
+    persisted to published_content_v2 (content_type=newsletter). This is the topic newsletter the suite
+    drives (R07/R16/R44) — distinct from the F2 curated multi-story saga (newsletter_sends)."""
+    import json as _json
+
+    from writer_engine.config import get_settings
+
+    settings = get_settings()
+    topic = str(payload.get("topic") or payload.get("message") or "").strip()
+    genre_slug = str(payload.get("genre_slug") or payload.get("genre") or "")
+    send_date = str(payload.get("date") or payload.get("send_date") or "")
+    genre_name, guidelines = await _load_genre_guidelines(genre_slug)
+    research, _ = await _chapter_research(
+        topic, period="contemporary", title=topic,
+        focus=f"Genre: {genre_slug}. Newsletter topic: {topic}",
+    ) if topic else ("", [])
+    model = {"haiku": settings.model_cheap, "sonnet": settings.model_default}.get(
+        str(payload.get("llm_strategy") or ""), settings.model_default)
+    system = (
+        f"You are an expert newsletter writer specializing in {genre_name}.\n\n## Genre Guidelines\n"
+        f"{guidelines}\n\n## Writing Prime Directive\n{_PRIME_DIRECTIVE}\n\n## Requirements\n"
+        "- A compelling subject_line and a short pre_header teaser\n"
+        "- An intro that hooks the reader\n"
+        "- 3-5 sections, each {heading, body}, each covering a distinct facet of the topic\n"
+        "- Preserve any source URLs from the research as inline references where relevant\n"
+        "- An outro with a call to action or discussion prompt\n\n"
+        "Return strict JSON: {subject_line, pre_header, intro, sections:[{heading, body}], outro, title}."
+    )
+    prompt = (
+        f"Write a newsletter about: {topic}\nGenre: {genre_name}\n\n"
+        f"## Research Context (preserve citation URLs)\n{research}"
+    )
+    try:
+        resp = await get_router(service=STEP_NAME).complete(
+            provider="anthropic", model=model, system=system, prompt=prompt, max_tokens=8192)
+    except ProviderNotRegistered:
+        return {"written": False, "reason": "no provider"}
+    data: dict = {}
+    try:
+        m = re.search(r"\{.*\}", resp.text, re.S)
+        data = _json.loads(m.group(0)) if m else {}
+    except Exception:
+        data = {}
+    subject_line = str(data.get("subject_line") or (topic[:80] or "Newsletter"))
+    title = str(data.get("title") or subject_line)
+    sections = [s for s in (data.get("sections") or []) if isinstance(s, dict)]
+    parts: list[str] = []
+    if data.get("pre_header"):
+        parts.append(f"_{data['pre_header']}_")
+    if data.get("intro"):
+        parts.append(str(data["intro"]))
+    for sec in sections:
+        parts.append(f"## {sec.get('heading', '')}\n\n{sec.get('body', '')}")
+    if data.get("outro"):
+        parts.append(str(data["outro"]))
+    body = _strip_em_dashes("\n\n".join(p for p in parts if p).strip() or resp.text.strip())
+    meta = {
+        "subject_line": subject_line, "pre_header": data.get("pre_header"),
+        "send_date": send_date, "section_count": len(sections),
+    }
+    persist = await _persist_simple(payload, title=title, content_type="newsletter",
+                                    content_text=body, genre_slug=genre_slug, metadata=meta)
+    return {"written": True, "title": title, "subject_line": subject_line, "content_text": body,
+            "word_count": len(body.split()), "section_count": len(sections), "persist": persist}
 
 
 async def _op_short_story(payload: dict) -> dict:
@@ -1668,6 +1735,7 @@ OPS = {
     "evaluate-genre": _op_evaluate_genre,
     "extract-bible": _op_extract_bible,
     "blog": _op_blog,
+    "newsletter": _op_newsletter,
     "short-story": _op_short_story,
 }
 

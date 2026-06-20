@@ -156,7 +156,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] CR-009 task-completion email received
 
 ### R07: Write Newsletter (political-scifi)
-- **Engine route:** `newsletter` durable saga (task) · impl: pending CR-010 (not yet a hub op)
+- **Engine route:** `chapter.newsletter` (task) · impl: built (E2E-3)
 - **Command:**
   ```
   Write a newsletter for the political-scifi genre. Topic: "Power Structures in Space: How Sci-Fi Predicts Real-World Politics". Genre slug: political-scifi. Date: 2026-03-10.
@@ -278,7 +278,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] Email arrives with story + cover image; Draft row in `published_content_v2`; CR-009 email received
 
 ### R16: Write Newsletter (political-history)
-- **Engine route:** `newsletter` durable saga (task) · impl: pending CR-010 (not yet a hub op)
+- **Engine route:** `chapter.newsletter` (task) · impl: built (E2E-3)
 - **Command:**
   ```
   Write a newsletter for the political-history genre. Topic: "This Month in Political History: Revolutions That Changed the Map". Genre slug: political-history. Date: 2026-03-10.
@@ -591,7 +591,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] Short paragraphs (2-4 sentences); concrete examples; human voice; no hype; CR-009 email received
 
 ### R44: Prime Directive — Newsletter
-- **Engine route:** `newsletter` durable saga (task) · impl: pending CR-010
+- **Engine route:** `chapter.newsletter` (task) · impl: built (E2E-3)
 - **Command:**
   ```
   Write a newsletter for the ancient-history genre. Topic: "New Archaeological Discoveries Reshaping Our Understanding of Ancient Egypt". Genre slug: ancient-history. Date: 2026-03-10.
@@ -1320,7 +1320,7 @@ Voice tests POST the **simulated** spoken input to `POST /internal/hub/voice` `{
 
 ### V05: Voice — Write Newsletter
 - **Voice webhook:** `{user_message_request:"Write me a newsletter for the political history genre about revolutions that changed the world date today", system__caller_id:"+14105914612"}`
-- **Engine route:** newsletter saga (task) · impl: pending CR-010 (not yet a hub op)
+- **Engine route:** `chapter.newsletter` (task) · impl: built (E2E-3)
 - **Expected:** flat `{response, kind="queued"}`; routes newsletter saga; job_id; complete; `genre_slug=political-history`; date→today; `published_content_v2` draft; CR-009 email
 
 ### V06: Voice — Write Short Story

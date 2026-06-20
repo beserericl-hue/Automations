@@ -262,6 +262,31 @@ def _trash_params(message: str, action: str) -> dict[str, Any]:
     return params
 
 
+def _newsletter_params(message: str) -> dict[str, Any]:
+    """Params for chapter.newsletter: topic + genre_slug + date from a 'write a newsletter …' message."""
+    params: dict[str, Any] = {}
+    low = message.lower()
+    tm = (
+        re.search(r'topic:\s*["“]?(.+?)["”]?(?:\.\s|\.$|$|\s+genre\s+slug)', message, re.I)
+        or re.search(r"\babout\s+(.+?)(?:\s+for\s+the\b|\s+date\b|\.\s|\.$|$)", message, re.I)
+    )
+    if tm:
+        params["topic"] = tm.group(1).strip(" \"“”")
+    gm = re.search(r"genre\s+slug:\s*([a-z][a-z-]+)", message, re.I)
+    if gm:
+        params["genre_slug"] = gm.group(1).strip().lower()
+    else:
+        gm2 = re.search(r"for\s+the\s+([a-z][a-z\- ]+?)\s+genre", low)
+        if gm2:
+            params["genre_slug"] = gm2.group(1).strip().replace(" ", "-")
+    dm = re.search(r"date:?\s*(\d{4}-\d{2}-\d{2})", message, re.I)
+    if dm:
+        params["date"] = dm.group(1)
+    elif re.search(r"\b(today|date\s+today)\b", low):
+        params["date"] = "today"
+    return params
+
+
 def _decide(tool: str, op: str, params: dict[str, Any], conf: float = 0.6) -> HubDecision:
     spec = lookup(tool, op)
     return HubDecision(
@@ -358,9 +383,11 @@ def _heuristic_route(message: str) -> HubDecision:
             params["project_title"] = m.group(3).strip()
         return _decide("library", "lifecycle", params, 0.8)
 
-    # 1b. blog / short-story (n8n parity) — specific, BEFORE the generic brainstorm/write flags.
+    # 1b. blog / newsletter / short-story (n8n parity) — specific, BEFORE the generic brainstorm/write.
     if re.search(r"\bblog\b", low) and _IS_WRITE.search(low):
         return _decide("chapter", "blog", {"topic": msg}, 0.7)
+    if re.search(r"\bnewsletter\b", low) and (_IS_WRITE.search(low) or "newsletter for" in low):
+        return _decide("chapter", "newsletter", _newsletter_params(msg), 0.7)
     if re.search(r"\bshort\s+stor", low):
         if re.search(r"\b(brainstorm|outline|plan)\b", low):
             return _decide("brainstorm", "short-story", {"premise": msg}, 0.7)
@@ -465,6 +492,9 @@ def _router_system() -> str:
         "- CHAPTER FIXES: 'qa'/'quality check' a chapter = chapter.qa; 'fix/clean up/dedup/repair' a "
         "chapter = chapter.repair.\n"
         "- 'chapter outline' / 'plan the chapter' / 'outline the prologue' = chapter.plan.\n"
+        "- 'write a newsletter [for the <genre> genre] [about/topic …] [date …]' = chapter.newsletter "
+        "(put topic + genre_slug + date in params). 'email me the newsletter …' is NOT this — that is "
+        "library.email-content.\n"
         "- 'approve/publish/reject/schedule [#N] [of <title>]' = library.lifecycle (put action + "
         "chapter_number + project_title in params).\n"
         "- EMAIL ME: 'email me / send me an email of [an outline/short story/chapter/research report/"

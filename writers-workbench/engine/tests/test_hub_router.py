@@ -179,6 +179,29 @@ def test_trash_actions_route_and_dispatch_kind() -> None:
     assert _route("Show me my trash").params["action"] == "list_deleted"
 
 
+# --------------------------------------------------------------------------- newsletter (E2E-3)
+
+def test_newsletter_is_task_with_topic_genre_date() -> None:
+    d = _route('Write a newsletter for the political-scifi genre. Topic: "Power Structures in Space". '
+               'Genre slug: political-scifi. Date: 2026-03-10.')
+    assert d.tool == "chapter" and d.op == "newsletter" and d.kind == "task"
+    assert d.params["genre_slug"] == "political-scifi"
+    assert d.params["topic"] == "Power Structures in Space"
+    assert d.params["date"] == "2026-03-10"
+
+
+def test_newsletter_voice_phrasing_and_today() -> None:
+    d = _route("Write me a newsletter for the political history genre about revolutions that "
+               "changed the world date today")
+    assert d.op == "newsletter" and d.params["genre_slug"] == "political-history"
+    assert d.params["date"] == "today"
+
+
+def test_email_newsletter_is_not_write_newsletter() -> None:
+    # "email me the newsletter" must stay library.email-content, never chapter.newsletter.
+    assert _route("Email me the newsletter about revolutions").op == "email-content"
+
+
 def test_research_and_cover_and_social() -> None:
     assert _route("research Late Woodland burial mounds").op == "run"
     assert _route("generate cover art").op == "cover-art"
