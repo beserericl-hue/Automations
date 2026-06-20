@@ -1433,29 +1433,29 @@ Voice tests POST the **simulated** spoken input to `POST /internal/hub/voice` `{
 
 ### V26: Voice — Retrieve & Callback — Review Mode
 - **Voice webhook:** `{user_message_request:"Pull up my draft blog post about aqueducts and call me back so we can revise it", system__caller_id:"+14105914612"}`
-- **Engine route:** `notify.eve-callback` (task) · impl: pending CR-010 A1
+- **Engine route:** `notify.eve-callback` (task) · impl: built (E2E-5, gated dry-run)
 - **Expected:** flat `{response, kind="queued"}`; routes `notify.eve-callback`; job_id; complete; hub detects "call me back"; sub-steps: retrieve aqueducts post → remove stale "Eve Session:" KB docs → upload content_text as KB doc → set `review` first_message → outbound call to +14105914612 → schedule greeting reset; assert op payload `{content_type:"blog", content_title, content_text, callback_mode:"review", phone:"+14105914612"}`
 
 ### V27: Voice — Retrieve & Callback — Brainstorm Mode
 - **Voice webhook:** `{user_message_request:"Load the research report on post apocalyptic trends and call me back let's brainstorm a new story outline from it", system__caller_id:"+14105914612"}`
-- **Engine route:** `notify.eve-callback` (task) · impl: pending CR-010 A1
+- **Engine route:** `notify.eve-callback` (task) · impl: built (E2E-5, gated dry-run)
 - **Expected:** flat `{response, kind="queued"}`; routes `notify.eve-callback`; complete; retrieve report → KB cleanup → upload → `brainstorm` first_message → outbound call → reset; assert payload `{content_type:"research_report", callback_mode:"brainstorm", phone:"+14105914612"}`; Eve references report data points (KB upload verified)
 
 ### V28: Voice — Callback Review with Editorial Feedback
 - **Voice webhook:** `{user_message_request:"Get my short story about the Roman soldier under the Colosseum and help me improve it", system__caller_id:"+14105914612"}`
-- **Engine route:** `notify.eve-callback` (task) · impl: pending CR-010 A1
+- **Engine route:** `notify.eve-callback` (task) · impl: built (E2E-5, gated dry-run)
 - **Prerequisite:** V06
 - **Expected:** flat `{response, kind="queued"}`; routes `notify.eve-callback`; complete; "help me improve" = review intent; retrieve → KB cleanup → upload → `review` first_message → outbound call; assert payload `{callback_mode:"review", content_type:"short_story", phone:"+14105914612"}`; Eve can give specific editorial feedback (KB upload verified)
 
 ### V29: Voice — KB Cleanup (Back-to-Back Retrievals)
 - **Voice webhook (1):** `{user_message_request:"Pull up my research report about post apocalyptic trends and call me back to review it", system__caller_id:"+14105914612"}`
 - **Voice webhook (2):** `{user_message_request:"Now pull up my draft blog post about aqueducts and call me back to revise that instead", system__caller_id:"+14105914612"}`
-- **Engine route:** `notify.eve-callback` (task) · impl: pending CR-010 A1
+- **Engine route:** `notify.eve-callback` (task) · impl: built (E2E-5, gated dry-run)
 - **Expected:** both flat queued; both complete; call 1 cleans prior KB then uploads report; call 2 cleans report KB then uploads blog; after call 2 KB has exactly ONE "Eve Session:" doc (the blog); Eve references blog content not the report (cleanup verified); assert 2nd payload content_type="blog"
 
 ### V30: Voice — Content Not Found
 - **Voice webhook:** `{user_message_request:"Pull up my draft story about alien wizards on Neptune and call me back", system__caller_id:"+14105914612"}`
-- **Engine route:** `notify.eve-callback` (task) · impl: pending CR-010 A1
+- **Engine route:** `notify.eve-callback` (task) · impl: built (E2E-5, gated dry-run)
 - **Expected:** flat `{response, kind="data"}` with error (no job_id, no callback); retrieve returns found=false; `notify.eve-callback` NOT invoked; no outbound call; no KB op; response = not-found message; assert callback op not called when retrieve found=false
 
 ### V31: Voice — Parallel Tasks + Callback

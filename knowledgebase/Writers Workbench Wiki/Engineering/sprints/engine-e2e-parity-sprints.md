@@ -167,10 +167,23 @@ opt-in so the proven Burial Mound auto-fan-out write path is unchanged.
 
 ---
 
-## Sprint E2E-5 — `notify.eve-callback` (voice KB + outbound call)
+## Sprint E2E-5 — `notify.eve-callback` (voice KB + outbound call) ✅ SHIPPED (2026-06-20, gated)
 
-**Gap (CR-010 A1):** `notify.eve-callback` / `eve-reset-greeting` are placeholders — no ElevenLabs KB injection, no
-outbound call.
+**Status:** built on `develop` as a GATED dry-run. New `writer_engine.eve` runs the full n8n WF-16 flow
+(remove stale "Eve Session:" KB docs → upload content → attach → set review/brainstorm first_message →
+outbound call → reset). **Baseline protection:** every real ElevenLabs call is gated behind
+ELEVENLABS_API_KEY + ELEVENLABS_AGENT_ID, which are NOT set — so DEV/tests run a dry run that returns the
+planned `{content_type, content_title, content_text, callback_mode, phone}` and touch NOTHING. Pointing
+the PROD Eve agent at it remains a separate, explicitly-authorized step. `notify._op_eve_callback` resolves
+the content (published_content_v2 / research_reports_v2), and on not-found does NOT place the callback (V30).
+Routing: "pull up X and call me back [to brainstorm]" + the V28 "get my X and help me improve" variant →
+notify.eve-callback (catalog + Gemini rule + heuristic). 6 offline tests (routing, payload dry-run, brainstorm
+mode, not-found-no-callback, WF-16 KB-cleanup ordering via a mock client). Flipped V26–V30 to built (E2E-5).
+**Caveat:** V30's strict "kind=data / no job_id" isn't met (the op is a queued task that returns
+invoked=false rather than a pre-dispatch skip — the callback action is still not performed); V31 (two
+parallel tasks from one message) stays pending — the single-op hub doesn't split multi-task messages.
+
+**Gap (CR-010 A1):** `notify.eve-callback` / `eve-reset-greeting` were placeholders — no KB injection, no call.
 
 **Build:**
 - Implement the n8n WF-16 flow in `notify_step`: retrieve the target content, remove stale "Eve Session:" KB docs,

@@ -185,6 +185,13 @@ CATALOG: tuple[ToolSpec, ...] = (
         aliases=("repurpose_social", "social"),
     ),
     ToolSpec(
+        "notify", "eve-callback", "task",
+        intent="pull up a piece of content and CALL ME BACK by phone to review or brainstorm it "
+        "('pull up my X and call me back', '… and call me back to brainstorm')",
+        params=("content_type", "search_term", "callback_mode"),
+        aliases=("eve_callback", "callback", "call_me_back"),
+    ),
+    ToolSpec(
         "library", "revert", "task",
         intent="revert / roll back an outline or a chapter to a previous saved version "
         "('revert the outline for X to version N', 'revert chapter 3 of Y to version 2')",

@@ -304,6 +304,24 @@ def _trash_params(message: str, action: str) -> dict[str, Any]:
     return params
 
 
+def _callback_params(message: str) -> dict[str, Any]:
+    """notify.eve-callback params: callback_mode (brainstorm vs review) + content_type + search_term."""
+    low = message.lower()
+    mode = "brainstorm" if "brainstorm" in low else "review"
+    params: dict[str, Any] = {"callback_mode": mode, "search_term": message}
+    if "research" in low:
+        params["content_type"] = "research_report"
+    elif "blog" in low:
+        params["content_type"] = "blog"
+    elif re.search(r"\bshort\s+stor", low):
+        params["content_type"] = "short_story"
+    elif "newsletter" in low:
+        params["content_type"] = "newsletter"
+    elif "chapter" in low:
+        params["content_type"] = "chapter"
+    return params
+
+
 def _newsletter_params(message: str) -> dict[str, Any]:
     """Params for chapter.newsletter: topic + genre_slug + date from a 'write a newsletter …' message."""
     params: dict[str, Any] = {}
@@ -388,6 +406,16 @@ def _heuristic_route(message: str) -> HubDecision:
     #     chapter/retrieve/research branches below, which the same words would otherwise trigger.
     if _EMAIL_INTENT.search(low):
         return _decide("library", "email-content", _email_params(msg), 0.8)
+
+    # 0a-2. CALL ME BACK — "pull up X and call me back [to review/brainstorm]" → notify.eve-callback
+    #       (E2E-5). Before retrieve, which the "pull up X" half would otherwise win. Also fires on
+    #       "get my X and help me improve it" (V28: retrieve verb + a help-me-improve/review intent),
+    #       gated on "get/pull up/load my" so a plain chat edit ("fix chapter 3") doesn't misroute.
+    if re.search(r"\bcall\s+me(\s+back)?\b", low) or (
+        re.search(r"\b(get|pull\s+up|load|grab)\s+my\b", low)
+        and re.search(r"\bhelp\s+me\s+(improve|revise|review|work\s+on)\b", low)
+    ):
+        return _decide("notify", "eve-callback", _callback_params(msg), 0.8)
 
     # 0b. REVERT an outline/chapter to a version → library.revert (task). Checked before the version
     #     branch so "revert … to version N" rolls back rather than reading history; before retrieve too
@@ -540,6 +568,9 @@ def _router_system() -> str:
         "- 'write a newsletter [for the <genre> genre] [about/topic …] [date …]' = chapter.newsletter "
         "(put topic + genre_slug + date in params). 'email me the newsletter …' is NOT this — that is "
         "library.email-content.\n"
+        "- 'pull up/get/load my <content> and CALL ME BACK [to review/brainstorm]' = notify.eve-callback "
+        "(put content_type + search_term + callback_mode=review|brainstorm). 'brainstorm' in the request "
+        "→ callback_mode=brainstorm, else review.\n"
         "- 'approve/publish/reject/schedule [#N] [of <title>]' = library.lifecycle (put action + "
         "chapter_number + project_title in params).\n"
         "- EMAIL ME: 'email me / send me an email of [an outline/short story/chapter/research report/"

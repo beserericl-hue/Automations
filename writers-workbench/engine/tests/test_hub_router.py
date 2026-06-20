@@ -232,6 +232,26 @@ def test_chapter_plan_nonconflict_arc_and_prologue() -> None:
     assert d.params["project_title"] == "The Signal Beneath"
 
 
+# --------------------------------------------------------------------------- eve-callback (E2E-5)
+
+def test_callback_routes_with_mode_and_type() -> None:
+    d = _route("Pull up my draft blog post about aqueducts and call me back so we can revise it")
+    assert d.tool == "notify" and d.op == "eve-callback" and d.kind == "task"
+    assert d.params["callback_mode"] == "review" and d.params["content_type"] == "blog"
+
+    d = _route("Load the research report on post apocalyptic trends and call me back let's brainstorm")
+    assert d.op == "eve-callback" and d.params["callback_mode"] == "brainstorm"
+    assert d.params["content_type"] == "research_report"
+
+
+def test_callback_help_me_improve_variant() -> None:
+    # V28: retrieve verb + "help me improve" (no literal "call me back") still routes to the callback.
+    d = _route("Get my short story about the Roman soldier under the Colosseum and help me improve it")
+    assert d.op == "eve-callback" and d.params["content_type"] == "short_story"
+    # a plain chat edit with no "get my" must NOT hijack to the callback
+    assert _route("fix chapter 3").op != "eve-callback"
+
+
 def test_research_and_cover_and_social() -> None:
     assert _route("research Late Woodland burial mounds").op == "run"
     assert _route("generate cover art").op == "cover-art"
