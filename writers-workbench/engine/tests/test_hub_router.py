@@ -97,6 +97,46 @@ def test_chapter_number_extracted() -> None:
     assert _route("write the epilogue").params["chapter_number"] == "Epilogue"
 
 
+# --------------------------------------------------------------------------- email-content (E2E-1)
+
+def test_email_content_is_task_and_in_catalog() -> None:
+    assert lookup("library", "email-content").name == "library.email-content"
+    assert lookup(None, "email_report").name == "library.email-content"  # alias
+    assert "library.email-content" in {s.name for s in CATALOG if s.kind == "task"}
+
+
+def test_email_inline_extracts_content_subject_recipient() -> None:
+    d = _route(
+        'Send me an email report with this content:\n\n# Trends\n\n- a\n\n'
+        'Send it to eric@agileadtesting.com with subject line "Regression Test: Email Report"'
+    )
+    assert d.tool == "library" and d.op == "email-content" and d.kind == "task"
+    assert d.params["content"].startswith("# Trends")
+    assert "Send it to" not in d.params["content"]  # trailing instruction stripped
+    assert d.params["subject"] == "Regression Test: Email Report"
+    assert d.params["recipient"] == "eric@agileadtesting.com"
+
+
+def test_email_resolve_modes() -> None:
+    d = _route('Email me the outline for "The Seed Vault"')
+    assert d.op == "email-content" and d.params["content_type"] == "outline"
+    assert d.params["title"] == "The Seed Vault"
+
+    d = _route('Email me chapter 1 of "The Seed Vault"')
+    assert d.op == "email-content" and d.params["content_type"] == "chapter"
+    assert d.params["chapter_number"] == 1 and d.params["title"] == "The Seed Vault"
+
+    d = _route("Email me the short story about the Roman soldier and the Colosseum")
+    assert d.op == "email-content" and d.params["content_type"] == "short_story"
+    assert "search_term" in d.params  # descriptive, no quoted title
+
+
+def test_email_beats_retrieve_and_chapter_write() -> None:
+    # "email me" must win over the retrieve/chapter branches the same words would otherwise hit.
+    assert _route("Email me the newsletter about revolutions").op == "email-content"
+    assert _route("Email me chapter 1 of The Seed Vault").op == "email-content"
+
+
 def test_research_and_cover_and_social() -> None:
     assert _route("research Late Woodland burial mounds").op == "run"
     assert _route("generate cover art").op == "cover-art"

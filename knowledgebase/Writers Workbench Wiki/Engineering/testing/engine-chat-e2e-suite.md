@@ -84,7 +84,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] Row exists in `research_reports_v2` with topic="Post-Apocalyptic Fiction Trends 2026", genre_slug=post-apocalyptic, user_id="+14105914612"
 
 ### R03: Email Report
-- **Engine route:** `library.email-content` (task) · impl: pending CR-010 A2
+- **Engine route:** `library.email-content` (task) · impl: built (E2E-1)
 - **Command:**
   ```
   Send me an email report with this content:
@@ -121,7 +121,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] Response correctly scoped to user_id "+14105914612"
 
 ### R05: Centralized Email Config (app_config)
-- **Engine route:** `library.email-content` (task) · impl: pending CR-010 A2
+- **Engine route:** `library.email-content` (task) · impl: built (E2E-1)
 - **Command:**
   ```
   Send me an email report with this content:
@@ -1229,7 +1229,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] routes to library listing (status=draft), kind=data; "The Forgotten Engineers of Rome" present with status=draft
 
 ### R100: Email Outline
-- **Engine route:** `library.email-content` (task) · impl: pending CR-010 A2
+- **Engine route:** `library.email-content` (task) · impl: built (E2E-1)
 - **Prerequisite:** R30
 - **Command:**
   ```
@@ -1240,7 +1240,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] reads outline JSONB from `writing_projects_v2`; renders structured HTML (characters + chapters, not raw JSON); email sent; subject references title + "outline"
 
 ### R101: Email Short Story
-- **Engine route:** `library.email-content` (task) · impl: pending CR-010 A2
+- **Engine route:** `library.email-content` (task) · impl: built (E2E-1)
 - **Command:**
   ```
   Email me the short story about the Roman soldier and the Colosseum
@@ -1250,7 +1250,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] searches `published_content_v2` by keywords; markdown→HTML; email sent; source = `published_content_v2`
 
 ### R102: Email Research Report
-- **Engine route:** `library.email-content` (task) · impl: pending CR-010 A2
+- **Engine route:** `library.email-content` (task) · impl: built (E2E-1)
 - **Prerequisite:** R02
 - **Command:**
   ```
@@ -1261,7 +1261,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] reads from `research_reports_v2` (ilike title); HTML; email sent; subject references report
 
 ### R103: Email Chapter
-- **Engine route:** `library.email-content` (task) · impl: pending CR-010 A2
+- **Engine route:** `library.email-content` (task) · impl: built (E2E-1)
 - **Prerequisite:** R31
 - **Command:**
   ```
@@ -1272,7 +1272,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] locates correct row in `published_content_v2`; markdown→HTML; email sent; subject "Chapter 1 — The Seed Vault"
 
 ### R104: Email Newsletter
-- **Engine route:** `library.email-content` (task) · impl: pending CR-010 A2
+- **Engine route:** `library.email-content` (task) · impl: built (E2E-1)
 - **Command:**
   ```
   Email me the newsletter about revolutions that changed the world
@@ -1282,7 +1282,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] searches `published_content_v2` by keywords; HTML; email sent
 
 ### R105: Email Content Not Found
-- **Engine route:** `library.email-content` (task) · impl: pending CR-010 A2
+- **Engine route:** `library.email-content` (task) · impl: built (E2E-1)
 - **Command:**
   ```
   Email me the short story titled "A Story That Definitely Does Not Exist"
@@ -1310,7 +1310,7 @@ Voice tests POST the **simulated** spoken input to `POST /internal/hub/voice` `{
 
 ### V03: Voice — Email Report
 - **Voice webhook:** `{user_message_request:"Send me an email with a summary of that research use the subject line voice test research report", system__caller_id:"+14105914612"}`
-- **Engine route:** `library.email-content` (task) · impl: pending CR-010 A2
+- **Engine route:** `library.email-content` (task) · impl: built (E2E-1)
 - **Expected:** flat `{response, kind="queued"}`; routes `library.email-content`; job_id; complete; email to `app_config.recipient_email`; subject "voice test research report"; body = summary of saved report; BCC if configured
 
 ### V04: Voice — Write Blog Post
@@ -1465,7 +1465,7 @@ Voice tests POST the **simulated** spoken input to `POST /internal/hub/voice` `{
 
 ### V32: Voice — Centralized Email Verification
 - **Voice webhook:** `{user_message_request:"Send me an email report with just the text centralized email voice test and subject line V32 Email Config Test", system__caller_id:"+14105914612"}`
-- **Engine route:** `library.email-content` (task) · impl: pending CR-010 A2
+- **Engine route:** `library.email-content` (task) · impl: built (E2E-1)
 - **Expected:** flat `{response, kind="queued"}`; routes `library.email-content`; complete; email to `app_config.recipient_email` (not hardcoded); subject "V32 Email Config Test"; body contains "centralized email voice test"; BCC if configured
 
 ## Section V-D: Voice — Delete, Undelete, List Deleted & Email Content (V33–V40)
@@ -1493,24 +1493,24 @@ Voice tests POST the **simulated** spoken input to `POST /internal/hub/voice` `{
 
 ### V37: Voice — Email Outline
 - **Voice webhook:** `{user_message_request:"Can you email me the outline for The Seed Vault I want to look at it on my phone", system__caller_id:"+14105914612"}`
-- **Engine route:** `library.email-content` (task) · impl: pending CR-010 A2
+- **Engine route:** `library.email-content` (task) · impl: built (E2E-1)
 - **Expected:** flat queued; content_type=outline; complete; reads outline from `writing_projects_v2`; HTML email to `app_config.recipient_email`; subject references title + "outline"; BCC if configured
 
 ### V38: Voice — Email Short Story
 - **Voice webhook:** `{user_message_request:"Send me the short story about the Roman soldier by email", system__caller_id:"+14105914612"}`
-- **Engine route:** `library.email-content` (task) · impl: pending CR-010 A2
+- **Engine route:** `library.email-content` (task) · impl: built (E2E-1)
 - **Prerequisite:** V06
 - **Expected:** flat queued; content_type=short_story; complete; reads from `published_content_v2` (user-scoped); HTML email; subject references title; BCC if configured
 
 ### V39: Voice — Email Research Report
 - **Voice webhook:** `{user_message_request:"Email me that research report on post apocalyptic fiction trends", system__caller_id:"+14105914612"}`
-- **Engine route:** `library.email-content` (task) · impl: pending CR-010 A2
+- **Engine route:** `library.email-content` (task) · impl: built (E2E-1)
 - **Prerequisite:** V02
 - **Expected:** flat queued; content_type=research; complete; resolves to report in `research_reports_v2`; HTML email; subject references report; BCC if configured
 
 ### V40: Voice — Email Chapter
 - **Voice webhook:** `{user_message_request:"Send me chapter one of The Seed Vault in an email", system__caller_id:"+14105914612"}`
-- **Engine route:** `library.email-content` (task) · impl: pending CR-010 A2
+- **Engine route:** `library.email-content` (task) · impl: built (E2E-1)
 - **Expected:** flat queued; content_type=chapter, chapter_number=1; complete; reads from `published_content_v2` (user-scoped); HTML email; subject "The Seed Vault — Chapter 1"; BCC if configured
 
 ---

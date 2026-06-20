@@ -170,6 +170,14 @@ CATALOG: tuple[ToolSpec, ...] = (
         params=("project_id", "project_title", "platform"),
         aliases=("repurpose_social", "social"),
     ),
+    ToolSpec(
+        "library", "email-content", "task",
+        intent="email me / send me an email of an EXISTING outline, short story, chapter, newsletter, "
+        "research report, or blog — OR email inline content the message provides "
+        "('send me an email with this content: …'). NOT for showing/opening content (that is retrieve)",
+        params=("content_type", "title", "search_term", "chapter_number", "subject", "recipient", "content"),
+        aliases=("email_content", "email_report", "send_email", "email_me", "email"),
+    ),
 )
 
 

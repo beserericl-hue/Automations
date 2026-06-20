@@ -42,7 +42,12 @@ every `impl: pending` test in the suite flips to runnable, and the whole suite e
 
 ---
 
-## Sprint E2E-1 — On-demand "email me X" (`library.email-content`)
+## Sprint E2E-1 — On-demand "email me X" (`library.email-content`) ✅ SHIPPED (2026-06-20, commit `<pending>`)
+
+**Status:** built on `develop`. `library.email-content` op (inline-content + DB-resolve + graceful not-found),
+catalog entry, Gemini rule + deterministic heuristic branch (`_email_params`), shared `markdown_to_html`
+helper. Tests: 4 routing + 4 op unit (all 8 E2E-1 chat prompts route correctly offline); the 14 suite tests'
+tags flipped to `built (E2E-1)`. Live DEV run still validates real Postal send + DB resolution.
 
 **Gap (CR-010 A2):** CR-009 emails fire on *generation*; there is no op to email an existing artifact on request.
 

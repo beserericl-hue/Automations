@@ -94,6 +94,18 @@ _APPROVE_BY_NUM = re.compile(
     re.I)
 _PROJECT_TAIL = re.compile(r"(?:of|for|from|in)\s+(?:the\s+)?(.+?)\s*$", re.I)
 
+# "email me …" / "send me an email …" — the on-demand email-content intent (E2E-1). Kept narrow so it
+# only fires on an explicit email verb, never on ordinary writing requests.
+_EMAIL_INTENT = re.compile(
+    r"\b(?:e-?mail\s+me\b|e-?mail\s+(?:the|this|that|my|chapter|a)\b|"
+    r"send\s+me\s+(?:an?\s+)?(?:e-?mail|report)\b|send\s+(?:an?\s+)?e-?mail\b)",
+    re.I,
+)
+_EMAIL_ADDR = re.compile(r"\b(?:send\s+it\s+to|to)\s+([\w.+-]+@[\w-]+\.[\w.-]+)", re.I)
+_EMAIL_SUBJECT = re.compile(r'subject(?:\s+line)?\s*[:=]?\s*["“]([^"”]+)["”]', re.I)
+_EMAIL_INLINE = re.compile(r"with\s+(?:this|the\s+following)\s+content:\s*(.+)", re.I | re.S)
+_EMAIL_INLINE_TAIL = re.compile(r"\n\s*(?:send\s+it\s+to|use\s+subject|with\s+subject)\b", re.I)
+
 _ORDINALS = {
     "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5,
     "sixth": 6, "seventh": 7, "eighth": 8, "ninth": 9, "tenth": 10, "last": -1,
@@ -130,6 +142,48 @@ def _chapter_params(message: str) -> dict[str, Any]:
     title = _extract_project_title(message)
     if title:
         params["project_title"] = title
+    return params
+
+
+def _email_params(message: str) -> dict[str, Any]:
+    """Extract params for library.email-content from an 'email me …' message: inline content + subject
+    + recipient (R03/R05 style), or content_type + title/search_term + chapter_number (R100-R105)."""
+    params: dict[str, Any] = {}
+    low = message.lower()
+
+    inline = _EMAIL_INLINE.search(message)
+    if inline:
+        body = _EMAIL_INLINE_TAIL.split(inline.group(1).strip())[0].strip()
+        if body:
+            params["content"] = body
+    sm = _EMAIL_SUBJECT.search(message)
+    if sm:
+        params["subject"] = sm.group(1).strip()
+    rm = _EMAIL_ADDR.search(message)
+    if rm:
+        params["recipient"] = rm.group(1)
+
+    if "content" not in params:  # resolve-from-DB mode
+        if "outline" in low:
+            params["content_type"] = "outline"
+        elif re.search(r"\bshort\s+stor", low):
+            params["content_type"] = "short_story"
+        elif "research" in low:
+            params["content_type"] = "research"
+        elif "newsletter" in low:
+            params["content_type"] = "newsletter"
+        elif "blog" in low:
+            params["content_type"] = "blog"
+        elif "chapter" in low:
+            params["content_type"] = "chapter"
+        ch = _extract_chapter_number(message)
+        if ch is not None:
+            params["chapter_number"] = ch
+        title = _extract_project_title(message)
+        if title:
+            params["title"] = title.strip(" \"“”")
+        else:
+            params["search_term"] = message
     return params
 
 
@@ -186,6 +240,12 @@ def _heuristic_route(message: str) -> HubDecision:
     message (e.g. 'fix the outline') lands on the op that production proved correct."""
     msg = (message or "").strip()
     low = msg.lower()
+
+    # 0a. EMAIL ME / SEND ME AN EMAIL — highest precedence (E2E-1). "email me the outline for X",
+    #     "email me chapter 1 of Y", "send me an email report with this content: …". Must win over the
+    #     chapter/retrieve/research branches below, which the same words would otherwise trigger.
+    if _EMAIL_INTENT.search(low):
+        return _decide("library", "email-content", _email_params(msg), 0.8)
 
     # 0. CHAPTER-OUTLINE shortcut — "outline ... prologue/epilogue" or "chapter outline", but NOT a
     #    list/retrieve and NOT a write. (preprocess line 1-11)
@@ -312,8 +372,14 @@ def _router_system() -> str:
         "- 'chapter outline' / 'plan the chapter' / 'outline the prologue' = chapter.plan.\n"
         "- 'approve/publish/reject/schedule [#N] [of <title>]' = library.lifecycle (put action + "
         "chapter_number + project_title in params).\n"
+        "- EMAIL ME: 'email me / send me an email of [an outline/short story/chapter/research report/"
+        "newsletter/blog]' = library.email-content (NEVER library.retrieve — retrieve is for showing on "
+        "screen). Put content_type + title (or search_term) + chapter_number in params. For an inline "
+        "'send me an email with this content: …' request, put the body in `content`, the subject in "
+        "`subject`, and any explicit 'send it to <addr>' in `recipient`.\n"
         "- Extract any params you can from the message into 'params' (project_title, chapter_number, "
-        "genre, story_arc, url, directive, action). Leave unknown params out — do not invent values.\n"
+        "genre, story_arc, url, directive, action, content_type, title, search_term, subject, recipient, "
+        "content). Leave unknown params out — do not invent values.\n"
         "- If the message is chit-chat, a greeting, or a question you can answer without a tool, set "
         "kind='conversation' and put the answer in assistant_message.\n"
         "- For a task, set assistant_message to a one-line acknowledgement (e.g. 'Queuing chapter 5 — "
