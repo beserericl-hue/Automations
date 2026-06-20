@@ -1,8 +1,33 @@
 # Session Context — Writer's Workbench Engine (Path B) parity + cutover
 
-_Last updated: 2026-06-10. Branch: `develop` (all work committed + pushed)._
+_Last updated: 2026-06-20. Branch: `develop` (all work committed + pushed)._
 
-## LATEST SESSION (2026-06-20) — CR-010 B1/B2: kill remaining n8n fallbacks (commit `bfe2c6b`, on `develop`)
+## LATEST SESSION (2026-06-20) — Full engine E2E test suite + parity sprint set (vault, commit `67de3fb`)
+
+Authored into the Obsidian vault (`knowledgebase/Writers Workbench Wiki/Engineering/`), all pushed to `develop`.
+
+- **Full E2E suite** `testing/engine-chat-e2e-suite.md` — a **complete 1:1 port** of the repo's
+  `regressiontest_prompts.md`: all **161 tests** (R01–R121 chat + V01–V40 voice), nothing consolidated/dropped.
+  Driven through the engine **chat interface** (`/api/chat/proxy` → hub) and **voice webhook**
+  (`/internal/hub/voice`, SIMULATED input — no live agent). Each test asserts the FULL behavior the
+  completed engine must satisfy (target state); ops not yet built carry an `impl: pending CR-010 <ref>` tag.
+  Pass criteria keyed to hub `kind` (reply/data/queued), job poll `GET /api/jobs/engine/:id`, V2 DB rows,
+  CR-009 emails. (Earlier mistake this session: I first consolidated 161→38 and dropped voice; user caught
+  it; re-ported in full via 5 parallel agents.)
+- **Sprint set** `sprints/engine-e2e-parity-sprints.md` — the MINIMAL sprints (E2E-1..E2E-5) implementing
+  ONLY the engine ops the suite is blocked on, each mapped to the exact tests it unblocks:
+  - **E2E-1** `library.email-content` (on-demand "email me X") → R03,R05,R100–R105,V03,V32,V37–V40
+  - **E2E-2** `library.versions`+`library.revert` (+verify lifecycle delete/undelete) → R28–R29,R84–R93
+  - **E2E-3** newsletter as a hub op → R07,R16,R44,V05,V31
+  - **E2E-4** `chapter.plan` dual-arc depth + arc fidelity (AUDIT then extend) → R54–R69,R110–R121
+  - **E2E-5** `notify.eve-callback` (real ElevenLabs KB + outbound call; baseline-protected) → V26–V31
+  - Out-of-scope-for-suite (noted, NOT gating): embeddings, token-accounting completeness, ingestion cron,
+    multi-engine scale (CR-010 A2/A3/C).
+  - DONE = all 5 ship → every `impl: pending` flips → full 161-test suite runs = engine parity gate before PROD.
+- Indexed in `testing/_index`, `sprints/_index`, `index.md`; `log.md` appended.
+- Provided the user a copy-paste **kickoff prompt** to hand E2E-1..E2E-5 to a fresh session.
+
+## PRIOR THIS SESSION (2026-06-20) — CR-010 B1/B2: kill remaining n8n fallbacks (commit `bfe2c6b`, on `develop`)
 
 All on DEV, pushed to `develop` (engine + server repo-connected → auto-redeploy). Closes the
 "no user action falls back to n8n with HUB_BACKEND=engine" acceptance bar except the ingestion cron.
