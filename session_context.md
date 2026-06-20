@@ -2,6 +2,39 @@
 
 _Last updated: 2026-06-10. Branch: `develop` (all work committed + pushed)._
 
+## LATEST SESSION (2026-06-20) — CR-010 B1/B2: kill remaining n8n fallbacks (commit `bfe2c6b`, on `develop`)
+
+All on DEV, pushed to `develop` (engine + server repo-connected → auto-redeploy). Closes the
+"no user action falls back to n8n with HUB_BACKEND=engine" acceptance bar except the ingestion cron.
+
+- **B1 rewrite-with-research** (`/api/content/:id/rewrite-with-research`) now branches on `hubBackend()`
+  → engine `chapter.repair` (returns an engine job_id the `useEngineJobQueue` poller already reads); n8n
+  path kept as fallback. Engine `_op_repair` now honours author params threaded through
+  `_drift_correct_pass` → `_correct_drift`: `research_focus` forces a Perplexity fetch even with no QA
+  gap and binds the query to it; `style_directives` applied; `citation_mode` → invisible (fiction) vs
+  inline footnotes (non-fiction). `use_qa_report` is passed but the engine re-detects QA fresh (cycle 1),
+  which supersedes the stored report (equivalent-or-better).
+- **B1 brainstorm submit** (`/api/brainstorm/submit`) branches on `hubBackend()` → engine
+  `create-project` (sync) then `brainstorm.story` (async, `persist:true`) — mirrors n8n create→brainstorm→save.
+- **B2b lifecycle** — engine `library.lifecycle` now snapshots into `content_versions_v2` on approve/publish
+  and emails on approve/publish/reject/schedule (new `send_lifecycle_email`), the auto-version + notify the
+  old direct-Supabase UI write skipped. New `POST /api/content/:id/lifecycle` (engine-first, server-side
+  snapshot+status **fallback** so approve/publish never hard-fails on engine downtime). ContentDetail
+  status + schedule mutations route through it (impersonation path unchanged).
+- **B2a** — ContentDetail Engine-QA "Fix drift" is now non-blocking + Cancel, via a new shared
+  `client/src/hooks/useChapterRepair.ts`; the Chapters-table button (`dae99d7`) refactored onto the same
+  hook (−~75 lines dup).
+- **B2c** — deleted dead `sendWebhookCommand`.
+- Verify: client+server tsc clean; server tests 12/12; engine ruff clean; gateway pytest 13/13.
+  **NOT yet exercised against the live engine** (no live job run / no browser click) — do post-deploy.
+
+### REMAINING CR-010 (next): A2 embeddings+token-accounting (quality parity), A2 versions/bible + A3
+email-content, B3 first-class buttons (research/social/image/bible), then Part C scale (queue split,
+per-provider budgets, replicas+LB, HA Redis). A1 Eve callback still gated on agent go-ahead. A3 ingestion
+cron decision (keep n8n vs port) is the only user-invisible n8n dependency left.
+
+---
+
 ## LATEST SESSION (2026-06-09 → 06-10) — newest first, all on DEV, pushed to `develop`
 
 ### Z. Removed dead `format-kindle` engine op (commit `6c74d08`)

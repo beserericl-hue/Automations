@@ -62,17 +62,17 @@ The chat drawer + the buttons we just queued (Outline/Re-outline, Write/Rewrite,
 
 | UI action | Server route | Today | Required work |
 |---|---|---|---|
-| **Rewrite with research** (ContentDetail + Chapters tab modal) | `POST /api/content/:id/rewrite-with-research` | always BullMQ→**n8n** hub webhook | Add an engine path (engine has `chapter.rewrite` + research-weave via `repair`). Switch on `HUB_BACKEND` like `/api/chat/proxy`, returning an engine `jobId` the existing `useEngineJobQueue` poller already understands. |
-| **Submit Brainstorm** (Brainstorm page) | `POST /api/brainstorm/submit` | always **n8n** (`N8N_BRAINSTORM_WEBHOOK_URL`) | Add engine path → `brainstorm.story` (engine op is complete). Switch on `HUB_BACKEND`. |
+| **Rewrite with research** (ContentDetail + Chapters tab modal) | `POST /api/content/:id/rewrite-with-research` | ✅ DONE (`bfe2c6b`) — engine `chapter.repair` when `HUB_BACKEND=engine`, n8n fallback | Branches on `hubBackend()`; threads `research_focus`/`style_directives`/`citation_mode` through `_op_repair` → returns an engine job_id the `useEngineJobQueue` poller reads. |
+| **Submit Brainstorm** (Brainstorm page) | `POST /api/brainstorm/submit` | ✅ DONE (`bfe2c6b`) — engine `create-project`+`brainstorm.story` when `HUB_BACKEND=engine`, n8n fallback | Branches on `hubBackend()`: creates the project (sync) then queues `brainstorm.story` with `persist`. |
 | **Analyze Content** (Brainstorm parse) | `POST /api/brainstorm/parse` | direct Anthropic SDK server-side | Acceptable (fast, non-hub). Leave, or move behind the engine for one code path. Low priority. |
 
 ### B2 — Blocking / inconsistent UX
 
 | UI action | Issue | Required work |
 |---|---|---|
-| **Fix Drift in the ContentDetail "Engine QA" panel** | uses an in-function `while`+`setTimeout` poll loop (`ContentDetail.tsx` `EngineQaPanel.fixDrift`) instead of the non-blocking `useEngineJobQueue` hook used everywhere else | Refactor onto `useEngineJobQueue` for consistency + a Cancel button (parity with the Chapters-table Fix Drift shipped in `dae99d7`). |
-| **Approve / Publish via ContentDetail** | direct Supabase `update({status})` — **skips** the auto-version-snapshot **and** the approve/publish notification email that n8n's `manage_library` performs | Route lifecycle actions through `library.lifecycle` (engine) so snapshot + email happen, or replicate snapshot+email in the server route. |
-| **`sendWebhookCommand`** in `client/src/lib/webhook.ts` | dead code (no component imports it post-cutover) | Delete it so nothing can accidentally hit the raw n8n webhook from the browser. |
+| **Fix Drift in the ContentDetail "Engine QA" panel** | ✅ DONE (`bfe2c6b`) — non-blocking + Cancel via new shared `useChapterRepair` hook (Chapters-table button refactored onto it too) | (was an in-function `while`+`setTimeout` loop) |
+| **Approve / Publish via ContentDetail** | ✅ DONE (`bfe2c6b`) — routes through new `POST /api/content/:id/lifecycle` → engine `library.lifecycle` (snapshot+email), with a server-side snapshot+status fallback | engine `library.lifecycle` now does the auto-version snapshot + approve/publish/reject/schedule email. |
+| **`sendWebhookCommand`** in `client/src/lib/webhook.ts` | ✅ DONE (`bfe2c6b`) — deleted | — |
 
 ### B3 — Functions with no UI entry point (chat-only / orphaned)
 
