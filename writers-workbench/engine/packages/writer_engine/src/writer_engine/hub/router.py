@@ -106,6 +106,12 @@ _EMAIL_SUBJECT = re.compile(r'subject(?:\s+line)?\s*[:=]?\s*["“]([^"”]+)["�
 _EMAIL_INLINE = re.compile(r"with\s+(?:this|the\s+following)\s+content:\s*(.+)", re.I | re.S)
 _EMAIL_INLINE_TAIL = re.compile(r"\n\s*(?:send\s+it\s+to|use\s+subject|with\s+subject)\b", re.I)
 
+# version history / revert / trash (E2E-2)
+_VERSION_NUM = re.compile(r"\bversion\s+(\d+)\b", re.I)
+_UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I)
+_TITLED = re.compile(r'(?:titled|called|named)\s+["“]?(.+?)["”]?\s*$', re.I)
+_TO_VERSION_TAIL = re.compile(r"\s*to\s+version\s+\d+.*$", re.I)
+
 _ORDINALS = {
     "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5,
     "sixth": 6, "seventh": 7, "eighth": 8, "ninth": 9, "tenth": 10, "last": -1,
@@ -187,6 +193,75 @@ def _email_params(message: str) -> dict[str, Any]:
     return params
 
 
+def _clean_title(t: str | None) -> str | None:
+    if not t:
+        return None
+    return _TO_VERSION_TAIL.sub("", t).strip(" \"“”") or None
+
+
+def _versions_params(message: str) -> dict[str, Any]:
+    """Params for library.versions: outline (by title) vs content (by id) history, or get version N."""
+    params: dict[str, Any] = {}
+    low = message.lower()
+    vm = _VERSION_NUM.search(message)
+    if "outline" in low:
+        params["scope"] = "outline"
+        title = _clean_title(_extract_project_title(message))
+        if title:
+            params["project_title"] = title
+    else:
+        params["scope"] = "content"
+        u = _UUID_RE.search(message)
+        if u:
+            params["content_id"] = u.group(0)
+    if re.search(r"\bget\b", low) and vm:
+        params["mode"] = "get"
+        params["version_number"] = int(vm.group(1))
+    else:
+        params["mode"] = "list"
+    return params
+
+
+def _revert_params(message: str) -> dict[str, Any]:
+    """Params for library.revert: scope (outline|chapter) + version_number + title/chapter_number."""
+    params: dict[str, Any] = {}
+    low = message.lower()
+    vm = _VERSION_NUM.search(message)
+    if vm:
+        params["version_number"] = int(vm.group(1))
+    ch = _extract_chapter_number(message)
+    if "chapter" in low and ch is not None:
+        params["scope"] = "chapter"
+        params["chapter_number"] = ch
+    else:
+        params["scope"] = "outline"
+    title = _clean_title(_extract_project_title(message))
+    if title:
+        params["project_title"] = title
+    return params
+
+
+def _trash_params(message: str, action: str) -> dict[str, Any]:
+    """Params for the lifecycle trash actions: delete / undelete (by name) / list_deleted (+ filter)."""
+    params: dict[str, Any] = {"action": action}
+    low = message.lower()
+    if action == "list_deleted":
+        if "blog" in low:
+            params["content_type_filter"] = "blog_post"
+        elif re.search(r"\bshort\s+stor", low):
+            params["content_type_filter"] = "short_story"
+        elif "newsletter" in low:
+            params["content_type_filter"] = "newsletter"
+        elif "chapter" in low:
+            params["content_type_filter"] = "chapter"
+        return params
+    tm = _TITLED.search(message)
+    if tm:
+        params["title"] = tm.group(1).strip(" \"“”")
+    params["search_term"] = message  # op keyword-matches the row when no clean title
+    return params
+
+
 def _decide(tool: str, op: str, params: dict[str, Any], conf: float = 0.6) -> HubDecision:
     spec = lookup(tool, op)
     return HubDecision(
@@ -246,6 +321,26 @@ def _heuristic_route(message: str) -> HubDecision:
     #     chapter/retrieve/research branches below, which the same words would otherwise trigger.
     if _EMAIL_INTENT.search(low):
         return _decide("library", "email-content", _email_params(msg), 0.8)
+
+    # 0b. REVERT an outline/chapter to a version → library.revert (task). Checked before the version
+    #     branch so "revert … to version N" rolls back rather than reading history; before retrieve too
+    #     (which mapped "revert outline" to a read) — a revert with a version mutates.
+    if re.search(r"\brevert\b", low):
+        return _decide("library", "revert", _revert_params(msg), 0.8)
+
+    # 0c. VERSION HISTORY / GET VERSION → library.versions (info). Tight trigger ("version history" or
+    #     an explicit get/show/list version) so "… to version N" in other messages doesn't match.
+    if re.search(r"\bversion\s+history\b|\b(get|show|list)\s+version\b", low):
+        return _decide("library", "versions", _versions_params(msg), 0.8)
+
+    # 0d. TRASH ops → library.lifecycle. undelete / list_deleted / delete (checked in that order so
+    #     "undelete" and "deleted" never fall into the bare-"delete" branch).
+    if re.search(r"\bundelete\b", low) or re.search(r"\bput\s+it\s+back\b", low) or re.search(r"\brestore\b.{0,20}draft", low):
+        return _decide("library", "lifecycle", _trash_params(msg, "undelete"), 0.8)
+    if re.search(r"\b(deleted|trash)\b", low) and re.search(r"\b(show|list|my|view)\b", low):
+        return _decide("library", "lifecycle", _trash_params(msg, "list_deleted"), 0.8)
+    if re.search(r"\bdelete\b", low):
+        return _decide("library", "lifecycle", _trash_params(msg, "delete"), 0.8)
 
     # 0. CHAPTER-OUTLINE shortcut — "outline ... prologue/epilogue" or "chapter outline", but NOT a
     #    list/retrieve and NOT a write. (preprocess line 1-11)
@@ -377,9 +472,14 @@ def _router_system() -> str:
         "screen). Put content_type + title (or search_term) + chapter_number in params. For an inline "
         "'send me an email with this content: …' request, put the body in `content`, the subject in "
         "`subject`, and any explicit 'send it to <addr>' in `recipient`.\n"
+        "- VERSIONS: 'show version history' / 'outline version history for X' / 'get version N of <id>' "
+        "= library.versions (info). REVERT: 'revert the outline for X to version N' / 'revert chapter 3 "
+        "of Y to version 2' = library.revert (put scope=outline|chapter + version_number + project_title "
+        "+ chapter_number). TRASH: 'delete the draft titled X' = library.lifecycle action=delete; "
+        "'undelete X' = action=undelete; 'show my deleted/trash' = action=list_deleted.\n"
         "- Extract any params you can from the message into 'params' (project_title, chapter_number, "
         "genre, story_arc, url, directive, action, content_type, title, search_term, subject, recipient, "
-        "content). Leave unknown params out — do not invent values.\n"
+        "content, scope, version_number, content_id, mode). Leave unknown params out — never invent.\n"
         "- If the message is chit-chat, a greeting, or a question you can answer without a tool, set "
         "kind='conversation' and put the answer in assistant_message.\n"
         "- For a task, set assistant_message to a one-line acknowledgement (e.g. 'Queuing chapter 5 — "

@@ -31,43 +31,78 @@ async def _op_insert_draft(payload: dict) -> dict:
     return (getattr(resp, "data", None) or [{}])[0]
 
 
-async def _op_lifecycle(payload: dict) -> dict:
-    """Approve / publish / reject / schedule / unschedule a piece of content.
+_LIFECYCLE_STATUS = {
+    "approve": "approved", "publish": "published", "reject": "rejected",
+    "unschedule": "draft", "draft": "draft", "delete": "deleted", "undelete": "draft",
+    "schedule": "scheduled",
+}
 
-    n8n parity (manage_library): on approve/publish snapshot the current text into
-    ``content_versions_v2`` first (so the state before the lifecycle change is reversible), then flip
-    the status, and email the user on approve/publish/reject/schedule. ``draft`` (back-to-draft) and
-    ``unschedule`` change status silently. Best-effort email — never blocks the DB write."""
+
+async def _op_lifecycle(payload: dict) -> dict:
+    """Approve / publish / reject / schedule / unschedule / delete / undelete a piece of content, or
+    list_deleted (the trash). n8n parity (manage_library): snapshot the current text into
+    ``content_versions_v2`` before approve/publish/delete, flip the status, and email the user on
+    approve/publish/reject/schedule/delete/undelete. ``draft`` / ``unschedule`` change status silently.
+    A published item cannot be deleted (unpublish first). The target is resolved by ``content_id`` or,
+    when absent, by ``title``/``search_term`` (delete/undelete by name). Best-effort email."""
     from datetime import datetime
 
-    action = str(payload.get("action") or "approve")
-    content_id = payload.get("content_id")
+    action = str(payload.get("action") or "approve").lower()
     user_id = payload.get("user_id")
-    valid = {"approve", "publish", "reject", "schedule", "unschedule", "draft"}
-    if action not in valid:
-        return {"error": f"unknown action {action}"}
-    new_status = {
-        "approve": "approved", "publish": "published", "reject": "rejected",
-        "unschedule": "draft", "draft": "draft",
-    }.get(action, "scheduled")
     client = await _supabase_or_none()
+
+    # list_deleted is a READ of the trash (no target row) — handle first.
+    if action == "list_deleted":
+        if client is None:
+            return {"items": [], "fixture": True}
+        q = client.table("published_content_v2").select(
+            "id,title,status,content_type,chapter_number,updated_at"
+        ).eq("status", "deleted")
+        if user_id:
+            q = q.eq("user_id", user_id)
+        ctf = _clean_str(payload.get("content_type_filter") or payload.get("content_type"))
+        if ctf:
+            q = q.eq("content_type", ctf)
+        rows = getattr(await q.limit(20).execute(), "data", None) or []
+        return {"items": rows, "count": len(rows)}
+
+    if action not in _LIFECYCLE_STATUS:
+        return {"error": f"unknown action {action}"}
+    new_status = _LIFECYCLE_STATUS[action]
+
+    content_id = payload.get("content_id")
     if client is None:
         return {"id": content_id, "status": new_status}
 
-    # Load the current row so we can snapshot it (approve/publish) and email with its title/type.
-    cur = await (
-        client.table("published_content_v2")
-        .select("id,user_id,title,content_type,content_text,status,project_id,chapter_number,metadata")
-        .eq("id", content_id).limit(1).execute()
-    )
-    rows = getattr(cur, "data", None) or []
-    if not rows:
+    cols = "id,user_id,title,content_type,content_text,status,project_id,chapter_number,metadata,deleted_at"
+    row = None
+    if content_id:
+        cur = await client.table("published_content_v2").select(cols).eq("id", content_id).limit(1).execute()
+        rows = getattr(cur, "data", None) or []
+        row = rows[0] if rows else None
+    else:
+        # Resolve by title/name (delete/undelete by name). Undelete searches the trash; others active rows.
+        q = client.table("published_content_v2").select(cols)
+        if user_id:
+            q = q.eq("user_id", user_id)
+        if action == "undelete":
+            q = q.eq("status", "deleted")
+        rows = getattr(await q.limit(200).execute(), "data", None) or []
+        row = _best_match(rows, _clean_str(payload.get("title") or payload.get("search_term")), ("title",))
+    if not row:
         return {"error": "content not found", "id": content_id}
-    row = rows[0]
+    content_id = row["id"]
     row_user = row.get("user_id") or user_id
 
-    # Snapshot before mutating on approve/publish — the auto-version n8n took at these gates.
-    if action in {"approve", "publish"} and row.get("content_text"):
+    # Published-delete guard (R95): a published item must be unpublished before it can be deleted.
+    if action == "delete" and row.get("status") == "published":
+        return {
+            "error": "Cannot delete published content — unpublish it first.",
+            "id": content_id, "status": "published",
+        }
+
+    # Snapshot before approve/publish/delete — the auto-version n8n took at these gates.
+    if action in {"approve", "publish", "delete"} and row.get("content_text"):
         try:
             last = await (
                 client.table("content_versions_v2").select("version_number")
@@ -75,10 +110,11 @@ async def _op_lifecycle(payload: dict) -> dict:
             )
             last_rows = getattr(last, "data", None) or []
             next_version = int((last_rows[0].get("version_number") if last_rows else 0) or 0) + 1
+            note = "Auto-snapshot before delete" if action == "delete" else f"auto-snapshot before {action}"
             await client.table("content_versions_v2").insert({
                 "content_id": content_id, "user_id": row_user, "version_number": next_version,
                 "content_text": row.get("content_text"), "changed_by": f"lifecycle_{action}",
-                "change_note": f"auto-snapshot before {action}",
+                "change_note": note,
             }).execute()
         except Exception as exc:  # snapshot is best-effort; never block the lifecycle change
             logger.warning("lifecycle.snapshot_failed", action=action, error=str(exc)[:200])
@@ -87,6 +123,10 @@ async def _op_lifecycle(payload: dict) -> dict:
     meta = dict(row.get("metadata") or {})
     if action == "publish":
         updates["published_at"] = datetime.now(UTC).isoformat()
+    if action == "delete":
+        updates["deleted_at"] = datetime.now(UTC).isoformat()
+    if action == "undelete":
+        updates["deleted_at"] = None
     if action == "schedule" and payload.get("schedule_date"):
         meta["schedule_date"] = payload["schedule_date"]
         updates["metadata"] = meta
@@ -99,11 +139,10 @@ async def _op_lifecycle(payload: dict) -> dict:
     )
     out = (getattr(resp, "data", None) or [{**row, **updates}])[0]
 
-    # Email the user (approve/publish/reject/schedule) — best-effort, mirrors n8n's Gmail node.
     try:
         from writer_engine.notifications.task_email import send_lifecycle_email
 
-        await send_lifecycle_email(client, row_user, {**row, **updates}, new_status)
+        await send_lifecycle_email(client, row_user, {**row, **updates}, new_status, action)
     except Exception as exc:
         logger.warning("lifecycle.email_failed", action=action, error=str(exc)[:200])
     return out
@@ -338,12 +377,194 @@ async def _op_email_content(payload: dict) -> dict:
     return {"emailed": True, "to": rec.to, "subject": subject, "content_type": label}
 
 
+# --------------------------------------------------------------------------- versions + revert (E2E-2)
+
+
+async def _op_versions(payload: dict) -> dict:
+    """List or get versions (E2E-2). scope=outline → outline_versions_v2 by project (resolved by title);
+    scope=content → content_versions_v2 by content_id. mode=get returns one version's full body."""
+    client = await _supabase_or_none()
+    if client is None:
+        return {"versions": [], "fixture": True}
+    scope = _clean_str(payload.get("scope")).lower()
+    mode = _clean_str(payload.get("mode")).lower() or "list"
+    version_number = payload.get("version_number")
+    user_id = payload.get("user_id")
+
+    # outline scope: explicit, or no content_id given and an outline/project reference is present.
+    if scope == "outline" or (not scope and not payload.get("content_id")):
+        project_id = payload.get("project_id")
+        if not project_id:
+            term = _clean_str(payload.get("project_title") or payload.get("title") or payload.get("search_term"))
+            pq = client.table("writing_projects_v2").select("id,title")
+            if user_id:
+                pq = pq.eq("user_id", user_id)
+            pm = _best_match(getattr(await pq.limit(200).execute(), "data", None) or [], term, ("title",))
+            if not pm:
+                return {"error": f"project '{term}' not found", "versions": []}
+            project_id = pm["id"]
+        vq = (
+            client.table("outline_versions_v2").select("version_number,outline,revision_note,created_at")
+            .eq("project_id", project_id).order("version_number", desc=False)
+        )
+        vrows = getattr(await vq.limit(100).execute(), "data", None) or []
+        if mode == "get" and version_number is not None:
+            sel = next((v for v in vrows if int(v.get("version_number") or 0) == int(version_number)), None)
+            if not sel:
+                return {"error": f"version {version_number} not found", "versions": []}
+            return {"version": sel}
+        entries = [{
+            "version_number": v.get("version_number"), "created_at": v.get("created_at"),
+            "revision_note": v.get("revision_note"),
+            "chapter_count": len((v.get("outline") or {}).get("chapters") or []),
+        } for v in vrows]
+        return {"scope": "outline", "project_id": project_id, "versions": entries, "count": len(entries)}
+
+    # content scope
+    content_id = payload.get("content_id")
+    if not content_id:
+        return {"error": "content_id required for content version history", "versions": []}
+    vq = (
+        client.table("content_versions_v2").select("version_number,changed_by,change_note,created_at,content_text")
+        .eq("content_id", content_id).order("version_number", desc=False)
+    )
+    vrows = getattr(await vq.limit(100).execute(), "data", None) or []
+    if mode == "get" and version_number is not None:
+        sel = next((v for v in vrows if int(v.get("version_number") or 0) == int(version_number)), None)
+        if not sel:
+            return {"error": f"version {version_number} not found", "versions": []}
+        return {"version": sel}
+    entries = [{
+        "version_number": v.get("version_number"), "changed_by": v.get("changed_by"),
+        "change_note": v.get("change_note"), "created_at": v.get("created_at"),
+    } for v in vrows]
+    return {"scope": "content", "content_id": content_id, "versions": entries, "count": len(entries)}
+
+
+async def _revert_chapter(client, payload: dict, version_number: int, user_id) -> dict:
+    from datetime import datetime
+
+    content_id = payload.get("content_id")
+    if content_id:
+        cur = getattr(
+            await client.table("published_content_v2").select("content_text").eq("id", content_id).limit(1).execute(),
+            "data", None,
+        ) or []
+        if not cur:
+            return {"reverted": False, "error_message": "content not found"}
+        current_text = cur[0].get("content_text")
+    else:
+        term = _clean_str(payload.get("project_title") or payload.get("title") or payload.get("search_term"))
+        q = client.table("published_content_v2").select("id,title,content_text,chapter_number,content_type")
+        if user_id:
+            q = q.eq("user_id", user_id)
+        q = q.eq("content_type", "chapter")
+        ch = payload.get("chapter_number")
+        if ch not in (None, ""):
+            import contextlib
+
+            with contextlib.suppress(TypeError, ValueError):
+                q = q.eq("chapter_number", int(ch))
+        match = _best_match(getattr(await q.limit(200).execute(), "data", None) or [], term, ("title",))
+        if not match:
+            return {"reverted": False, "error_message": "chapter not found"}
+        content_id, current_text = match["id"], match.get("content_text")
+
+    vrows = getattr(
+        await client.table("content_versions_v2").select("version_number,content_text").eq("content_id", content_id).execute(),
+        "data", None,
+    ) or []
+    target = next((v for v in vrows if int(v.get("version_number") or 0) == version_number), None)
+    if not target:
+        return {"reverted": False, "error_message": f"version {version_number} not found"}
+    try:
+        next_v = max((int(v.get("version_number") or 0) for v in vrows), default=0) + 1
+        await client.table("content_versions_v2").insert({
+            "content_id": content_id, "user_id": user_id, "version_number": next_v,
+            "content_text": current_text, "changed_by": "revert",
+            "change_note": f"pre-revert snapshot (to v{version_number})",
+        }).execute()
+    except Exception as exc:
+        logger.warning("revert.snapshot_failed", scope="chapter", error=str(exc)[:200])
+    await client.table("published_content_v2").update(
+        {"content_text": target.get("content_text"), "updated_at": datetime.now(UTC).isoformat()}
+    ).eq("id", content_id).execute()
+    return {"reverted": True, "scope": "chapter", "content_id": content_id, "version": version_number}
+
+
+async def _op_revert(payload: dict) -> dict:
+    """Revert an outline (writing_projects_v2.outline) or a chapter (published_content_v2.content_text)
+    to a prior version (E2E-2). Snapshots the CURRENT state before overwriting. A missing version or
+    project leaves everything unmodified and returns an informative error (R90/R91)."""
+    client = await _supabase_or_none()
+    if client is None:
+        return {"reverted": False, "error_message": "supabase not configured"}
+    version_number = payload.get("version_number")
+    if version_number in (None, ""):
+        return {"reverted": False, "error_message": "version_number required"}
+    version_number = int(version_number)
+    user_id = payload.get("user_id")
+    scope = _clean_str(payload.get("scope")).lower() or "outline"
+
+    if scope == "chapter":
+        return await _revert_chapter(client, payload, version_number, user_id)
+
+    # outline revert
+    project_id = payload.get("project_id")
+    if project_id:
+        cur = getattr(
+            await client.table("writing_projects_v2").select("title,outline").eq("id", project_id).limit(1).execute(),
+            "data", None,
+        ) or []
+        if not cur:
+            return {"reverted": False, "error_message": "project not found"}
+        current_outline, title = cur[0].get("outline") or {}, cur[0].get("title")
+    else:
+        term = _clean_str(payload.get("project_title") or payload.get("title") or payload.get("search_term"))
+        pq = client.table("writing_projects_v2").select("id,title,outline")
+        if user_id:
+            pq = pq.eq("user_id", user_id)
+        pm = _best_match(getattr(await pq.limit(200).execute(), "data", None) or [], term, ("title",))
+        if not pm:
+            return {"reverted": False, "error_message": f"project '{term}' not found"}
+        project_id, current_outline, title = pm["id"], pm.get("outline") or {}, pm.get("title")
+
+    vrows = getattr(
+        await client.table("outline_versions_v2").select("version_number,outline").eq("project_id", project_id).execute(),
+        "data", None,
+    ) or []
+    target = next((v for v in vrows if int(v.get("version_number") or 0) == version_number), None)
+    if not target:
+        return {"reverted": False, "error_message": f"version {version_number} not found for '{title}'"}
+    target_outline = target.get("outline") or {}
+
+    try:  # snapshot current outline BEFORE overwrite
+        next_v = max((int(v.get("version_number") or 0) for v in vrows), default=0) + 1
+        await client.table("outline_versions_v2").insert({
+            "user_id": user_id, "project_id": project_id, "version_number": next_v,
+            "outline": current_outline, "revision_note": f"pre-revert snapshot (to v{version_number})",
+        }).execute()
+    except Exception as exc:
+        logger.warning("revert.snapshot_failed", scope="outline", error=str(exc)[:200])
+
+    chapter_count = len(target_outline.get("chapters") or [])
+    await client.table("writing_projects_v2").update(
+        {"outline": target_outline, "chapter_count": chapter_count}
+    ).eq("id", project_id).execute()
+    return {
+        "reverted": True, "scope": "outline", "project_id": project_id, "title": title,
+        "version": version_number, "chapter_count": chapter_count,
+    }
+
+
 OPS = {
     "insert-draft": _op_insert_draft,
     "lifecycle": _op_lifecycle,
     "retrieve": _op_retrieve,
     "list-outlines": _op_list_outlines,
     "email-content": _op_email_content,
+    "versions": _op_versions,
+    "revert": _op_revert,
 }
 
 

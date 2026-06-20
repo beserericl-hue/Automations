@@ -48,7 +48,14 @@ def build_dispatch_plan(decision: HubDecision, req: HubRequest) -> DispatchPlan:
         if not body.get(key) and req.context.get(key):
             body[key] = req.context[key]
 
-    if decision.kind == "info":
+    # library.lifecycle is an info op, but delete/undelete MUTATE + email and the suite drives them as
+    # queued tasks (E2E-2 R94/R98); list_deleted + approve/publish/etc. stay synchronous reads/writes.
+    force_task = (
+        decision.tool == "library" and decision.op == "lifecycle"
+        and str(body.get("action", "")).lower() in {"delete", "undelete"}
+    )
+
+    if decision.kind == "info" and not force_task:
         body["async"] = False
         return DispatchPlan(
             action="call_sync", assistant_message=decision.assistant_message,

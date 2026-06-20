@@ -68,10 +68,12 @@ def test_retrieve_is_info() -> None:
 
 
 def test_revert_outline_does_not_brainstorm() -> None:
-    # the classic n8n bug: "revert" matched the brainstorm regex -> full regenerate
+    # the classic n8n bug: "revert" matched the brainstorm regex -> full regenerate. Now revert is its
+    # own library.revert op (task), not a regenerate — assert it never lands on brainstorm.story.
     d = _route("revert outline for The Burial Mound to version 2")
-    assert d.tool == "library" and d.kind == "info"
+    assert d.tool == "library" and d.op == "revert"
     assert d.op != "story"
+    assert d.params["version_number"] == 2 and d.params["scope"] == "outline"
 
 
 def test_revise_vs_edit_outline() -> None:
@@ -135,6 +137,46 @@ def test_email_beats_retrieve_and_chapter_write() -> None:
     # "email me" must win over the retrieve/chapter branches the same words would otherwise hit.
     assert _route("Email me the newsletter about revolutions").op == "email-content"
     assert _route("Email me chapter 1 of The Seed Vault").op == "email-content"
+
+
+# --------------------------------------------------------------------------- versions / revert / trash (E2E-2)
+
+def test_versions_outline_vs_content() -> None:
+    d = _route('Show outline version history for "The Accord"')
+    assert d.tool == "library" and d.op == "versions" and d.kind == "info"
+    assert d.params["scope"] == "outline" and d.params["project_title"] == "The Accord"
+
+    d = _route("Show version history for 11111111-2222-3333-4444-555555555555")
+    assert d.op == "versions" and d.params["scope"] == "content"
+    assert d.params["content_id"] == "11111111-2222-3333-4444-555555555555"
+
+    d = _route("Get version 1 of 11111111-2222-3333-4444-555555555555")
+    assert d.op == "versions" and d.params["mode"] == "get" and d.params["version_number"] == 1
+
+
+def test_revert_is_task_with_version() -> None:
+    d = _route('Revert the outline for "The Accord" to version 1')
+    assert d.tool == "library" and d.op == "revert" and d.kind == "task"
+    assert d.params["scope"] == "outline" and d.params["version_number"] == 1
+    assert d.params["project_title"] == "The Accord"
+
+
+def test_trash_actions_route_and_dispatch_kind() -> None:
+    # delete/undelete are forced async (queued) via build_dispatch_plan; list_deleted stays sync.
+    d = _route('Delete the draft titled "The Forgotten Engineers of Rome"')
+    assert d.op == "lifecycle" and d.params["action"] == "delete"
+    assert build_dispatch_plan(d, HubRequest(message="x", user_id="u1")).action == "enqueue"
+
+    d = _route("Undelete The Forgotten Engineers of Rome")
+    assert d.op == "lifecycle" and d.params["action"] == "undelete"
+    assert build_dispatch_plan(d, HubRequest(message="x", user_id="u1")).action == "enqueue"
+
+    d = _route("Show my deleted blog posts")
+    assert d.op == "lifecycle" and d.params["action"] == "list_deleted"
+    assert d.params["content_type_filter"] == "blog_post"
+    assert build_dispatch_plan(d, HubRequest(message="x", user_id="u1")).action == "call_sync"
+
+    assert _route("Show me my trash").params["action"] == "list_deleted"
 
 
 def test_research_and_cover_and_social() -> None:

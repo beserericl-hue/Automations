@@ -67,7 +67,16 @@ tags flipped to `built (E2E-1)`. Live DEV run still validates real Postal send +
 
 ---
 
-## Sprint E2E-2 — Version history + revert (`library.versions`, `library.revert`)
+## Sprint E2E-2 — Version history + revert (`library.versions`, `library.revert`) ✅ SHIPPED (2026-06-20)
+
+**Status:** built on `develop`. `library.versions` (outline-by-title + content-by-id list/get) and
+`library.revert` (outline + chapter, snapshot-before-overwrite, no-mutation-on-error). The lifecycle
+op was MISSING delete/undelete/list_deleted (the R94–R99/V33–V36 "built" tag was aspirational) — added
+them: soft-delete + content_versions snapshot ("Auto-snapshot before delete"), published-delete guard
+(unpublish first), undelete→draft, list_deleted (+content_type filter), and delete/undelete email verbs.
+delete/undelete are forced async (queued) via a `build_dispatch_plan` per-action override; approve/
+publish/schedule/list_deleted stay sync. 13 new tests (4 routing + 9 op) + the revert routing test
+updated; router suite + gateway + smoke all green.
 
 **Gap (CR-010 A2):** `content_versions_v2` / `outline_versions_v2` are written but cannot be listed or reverted via
 the hub.

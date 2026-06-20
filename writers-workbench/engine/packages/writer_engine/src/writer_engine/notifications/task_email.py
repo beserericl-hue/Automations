@@ -97,17 +97,21 @@ def build_task_email(tool: str, body: dict, result: dict) -> tuple[str, str]:
     return subject, html
 
 
+# Map a lifecycle ACTION (not status) to the past-tense verb used in the email. Actions that don't
+# notify (plain back-to-draft, unschedule) are absent → no email, matching n8n.
 _LIFECYCLE_VERB = {
-    "approved": "approved", "published": "published", "rejected": "rejected", "scheduled": "scheduled",
+    "approve": "approved", "publish": "published", "reject": "rejected", "schedule": "scheduled",
+    "delete": "deleted", "undelete": "restored to drafts",
 }
 
 
-async def send_lifecycle_email(client: Any, user_id: str | None, content: dict, new_status: str) -> bool:
-    """Notify the user that a piece of content changed lifecycle state (approve/publish/reject/schedule).
-
-    Mirrors n8n manage_library's approve/publish/reject/schedule Gmail node. Best-effort: a mail
-    failure must never affect the lifecycle DB write. ``content`` is the post-update row."""
-    verb = _LIFECYCLE_VERB.get(new_status)
+async def send_lifecycle_email(
+    client: Any, user_id: str | None, content: dict, new_status: str, action: str | None = None
+) -> bool:
+    """Notify the user that a piece of content changed lifecycle state (approve/publish/reject/schedule/
+    delete/undelete). Mirrors n8n manage_library's Gmail node. Best-effort: a mail failure must never
+    affect the lifecycle DB write. ``content`` is the post-update row; ``action`` selects the verb."""
+    verb = _LIFECYCLE_VERB.get((action or "").lower())
     if verb is None:  # draft / unschedule — no notification, matching n8n
         return False
     try:

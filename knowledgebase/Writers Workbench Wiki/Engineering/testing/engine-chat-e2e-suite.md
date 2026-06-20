@@ -411,7 +411,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
 ## Section E: Version History (Tests R28–R29)
 
 ### R28: Version History on Approve/Publish
-- **Engine route:** `library.versions` (info) · impl: pending CR-010 A2
+- **Engine route:** `library.versions` (info) · impl: built (E2E-2)
 - **Command:**
   ```
   Show version history for [content_id from R23]
@@ -422,7 +422,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] Each version shows version_number, changed_by, change_note, timestamp
 
 ### R29: Get Specific Version
-- **Engine route:** `library.versions` (info) · impl: pending CR-010 A2
+- **Engine route:** `library.versions` (info) · impl: built (E2E-2)
 - **Command:**
   ```
   Get version 1 of [content_id from R23]
@@ -1057,7 +1057,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] routes to `library.list-outlines`, kind=data; same result set as R82; stop words don't pollute the query
 
 ### R84: Outline Version History — The Accord
-- **Engine route:** `library.versions` (info: list) · impl: pending CR-010 A2
+- **Engine route:** `library.versions` (info: list) · impl: built (E2E-2)
 - **Prerequisite:** R71
 - **Command:**
   ```
@@ -1068,7 +1068,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] ≥1 version entry (R71 pre-revision snapshot); each entry: version_number, created_at, chapter count; chronological order
 
 ### R85: Outline Version History — The Correction
-- **Engine route:** `library.versions` (info: list) · impl: pending CR-010 A2
+- **Engine route:** `library.versions` (info: list) · impl: built (E2E-2)
 - **Prerequisite:** R75
 - **Command:**
   ```
@@ -1078,7 +1078,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] routes to `library.versions` (list, outline), kind=data; ilike match; ≥1 entry (pre-revision 10-ch, no prologue); chapter count accurate
 
 ### R86: Outline Version History — No Revisions
-- **Engine route:** `library.versions` (info: list) · impl: pending CR-010 A2
+- **Engine route:** `library.versions` (info: list) · impl: built (E2E-2)
 - **Prerequisite:** R58
 - **Command:**
   ```
@@ -1089,7 +1089,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] empty list or "No version history found"; no unhandled error / 500
 
 ### R87: Revert Outline — The Accord to Version 1
-- **Engine route:** `library.revert` (task/info: outline) · impl: pending CR-010 A2
+- **Engine route:** `library.revert` (task: outline) · impl: built (E2E-2)
 - **Prerequisite:** R84
 - **Command:**
   ```
@@ -1111,7 +1111,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] routes to `library.retrieve`, kind=data; returns v1 content (exactly 10 chapters; no ch0/ch11); Freytag intact; briefs match original (not R71)
 
 ### R89: Revert Outline — The Optimization to Pre-Epilogue Version
-- **Engine route:** `library.versions` (list) + `library.revert` (outline) · impl: pending CR-010 A2
+- **Engine route:** `library.versions` (list) + `library.revert` (outline) · impl: built (E2E-2)
 - **Prerequisite:** R78
 - **Command (Step 1):**
   ```
@@ -1126,7 +1126,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] Step 2 → `library.revert`, kind=queued; complete; current (with-epilogue) snapshotted; outline updated to v1 (8 chapters, no epilogue); confirmation names title + version
 
 ### R90: Revert Outline — Invalid Version Number
-- **Engine route:** `library.revert` (outline) · impl: pending CR-010 A2
+- **Engine route:** `library.revert` (outline) · impl: built (E2E-2)
 - **Prerequisite:** R84
 - **Command:**
   ```
@@ -1137,7 +1137,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] `writing_projects_v2.outline` NOT modified; no new snapshot; job status=failed (or inline error) with informative error_message
 
 ### R91: Revert Outline — Project Not Found
-- **Engine route:** `library.revert` (outline) · impl: pending CR-010 A2
+- **Engine route:** `library.revert` (outline) · impl: built (E2E-2)
 - **Command:**
   ```
   Revert the outline for "A Story That Does Not Exist" to version 1
@@ -1158,7 +1158,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] `writing_projects_v2.outline` updated; PRESERVE EXISTING CHARACTERS enforced; revised-outline email sent
 
 ### R93: Verify Version History After Multiple Revisions
-- **Engine route:** `library.versions` (info: list) · impl: pending CR-010 A2
+- **Engine route:** `library.versions` (info: list) · impl: built (E2E-2)
 - **Prerequisite:** R92
 - **Command:**
   ```

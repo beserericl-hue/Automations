@@ -60,8 +60,16 @@ CATALOG: tuple[ToolSpec, ...] = (
     ToolSpec(
         "library", "lifecycle", "info",
         intent="approve, publish, reject, or schedule a piece of content (no generation, a DB state change)",
-        params=("project_title", "action", "schedule_date"),
-        aliases=("content_action", "approve", "publish", "reject", "schedule"),
+        params=("project_title", "action", "schedule_date", "title", "content_type_filter"),
+        aliases=("content_action", "approve", "publish", "reject", "schedule",
+                 "delete", "undelete", "list_deleted", "trash"),
+    ),
+    ToolSpec(
+        "library", "versions", "info",
+        intent="show version history / list versions of a piece of content or an outline, or get one "
+        "specific version (outline version history, 'version history for <id>', 'get version N of <id>')",
+        params=("scope", "mode", "content_id", "project_title", "version_number"),
+        aliases=("version_history", "list_versions", "get_version", "outline_versions"),
     ),
     ToolSpec(
         "story_bible", "list", "info",
@@ -169,6 +177,13 @@ CATALOG: tuple[ToolSpec, ...] = (
         intent="repurpose content into social media posts",
         params=("project_id", "project_title", "platform"),
         aliases=("repurpose_social", "social"),
+    ),
+    ToolSpec(
+        "library", "revert", "task",
+        intent="revert / roll back an outline or a chapter to a previous saved version "
+        "('revert the outline for X to version N', 'revert chapter 3 of Y to version 2')",
+        params=("scope", "project_title", "chapter_number", "version_number"),
+        aliases=("revert_outline", "revert_chapter", "rollback"),
     ),
     ToolSpec(
         "library", "email-content", "task",
