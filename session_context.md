@@ -2,7 +2,39 @@
 
 _Last updated: 2026-06-20. Branch: `develop` (all work committed + pushed)._
 
-## LATEST SESSION (2026-06-20) — Full engine E2E test suite + parity sprint set (vault, commit `67de3fb`)
+## LATEST SESSION (2026-06-20) — Engine E2E parity sprints E2E-1..E2E-5 ALL SHIPPED (on `develop`)
+
+All five engine-E2E-parity sprints implemented, tested offline, committed + pushed to `develop`
+(engine repo-connected → auto-redeploys DEV). Each flips its suite tests from `impl: pending` → `built`
+in `knowledgebase/.../testing/engine-chat-e2e-suite.md`; sprint plan + vault log updated per sprint.
+
+- **E2E-1** `library.email-content` (`dafed31`) — on-demand "email me X": inline-content + DB-resolve
+  (outline/short_story/chapter/newsletter/research/blog) + graceful not-found; shared `markdown_to_html`.
+  R03/R05/R100–R105/V03/V32/V37–V40.
+- **E2E-2** `library.versions` + `library.revert` + lifecycle trash (`69dc7ed`) — version history/get
+  (outline+content), revert (snapshot-before-overwrite, no-mutation-on-error), and delete/undelete/
+  list_deleted + published-delete guard (lifecycle had none); delete/undelete forced async via a
+  build_dispatch_plan per-action override. R28/R29/R84–R99/V33–V36.
+- **E2E-3** `chapter.newsletter` (`650161c`) — topic newsletter mirroring chapter.blog (→
+  published_content_v2, CR-009 email); chose this over bridging the F2 curated saga because the
+  assertions describe the n8n topic newsletter. Fixed a latent extract_json bug in `_op_blog`. R07/R16/R44/V05.
+- **E2E-4** chapter.plan dual-arc (`5304875`) — **audit found the linchpin: nothing loaded
+  story_arcs_v2.prompt_text**. Added `story_arcs.load_story_arc`, rich SubChapterBrief schema, dual-arc
+  plan (book arc + per-chapter override, prev/next, persist chapter_outline + snapshot), brainstorm
+  arc_notes, write auto-load + opt-in auto-plan guard. R110–R116/R118/R120/R121. (Arc-beat wording +
+  R119 cross-check are live-validated.)
+- **E2E-5** `notify.eve-callback` (`3fa6057`) — n8n WF-16 flow (KB cleanup→upload→first_message→outbound
+  call→reset) in new `writer_engine.eve`, **GATED behind ELEVENLABS_API_KEY+AGENT_ID (unset → dry run,
+  PROD Eve agent NEVER touched)**; resolves content + skips callback on not-found. V26–V30.
+
+**Offline-only**: full engine suite **324 green**, ruff clean — but NONE exercised against the live
+engine (no live LLM jobs, no real Postal/ElevenLabs). The 161-test suite's live run is the remaining
+parity gate. **Still pending**: V31 (multi-task split — single-op hub doesn't split), R119 (character
+cross-check), R54–R69 arc-beat wording fidelity (live). PROD Eve agent cutover still requires explicit OK.
+
+---
+
+## PRIOR (2026-06-20) — Full engine E2E test suite + parity sprint set (vault, commit `67de3fb`)
 
 Authored into the Obsidian vault (`knowledgebase/Writers Workbench Wiki/Engineering/`), all pushed to `develop`.
 
