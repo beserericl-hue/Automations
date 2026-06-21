@@ -73,5 +73,8 @@ class HubResponse(BaseModel):
     # task
     job_id: str | None = None
     status: str | None = None
+    # multi-task (V31): one message that fans out to several ops — each {tool, op, job_id, status}.
+    # job_id above mirrors jobs[0].job_id for single-poll callers.
+    jobs: list[dict[str, Any]] | None = None
     # error / clarify
     error: str | None = None

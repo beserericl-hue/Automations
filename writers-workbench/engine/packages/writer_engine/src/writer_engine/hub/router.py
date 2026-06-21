@@ -59,6 +59,7 @@ _QA_CHAPTER = re.compile(
 _QA_CHAPTER2 = re.compile(
     r"\b(chapter|prologue|epilogue).{0,20}(q/?a|cleanup|clean\s*up|fix\s*(duplicate|name)|dedup)", re.I)
 _FIX_CHAPTER = re.compile(r"\bfix.{0,30}(chapter|prologue|epilogue)", re.I)
+_CONSISTENCY_CHECK = re.compile(r"\bcheck\b.{0,50}\b(consistency|character\s+names?)\b", re.I)
 _QA_FIXY = re.compile(r"\b(fix|repair|clean\s*up|dedup|duplicate|inconsist)", re.I)  # → repair vs qa split
 _EDIT_OUTLINE = re.compile(
     r"\b(make\s+\w+.{0,20}(years?\s+old|age\s+\d)|change.{0,20}(age|name|title|role|description)|"
@@ -118,6 +119,18 @@ _ORDINALS = {
 }
 
 
+_TASK_SPLIT = re.compile(r"\b(?:and\s+also|and\s+then|;\s*also|,\s*also|;\s*and)\b", re.I)
+
+
+def split_tasks(message: str) -> list[str]:
+    """Split a message into independent task clauses on an explicit multi-task conjunction (V31:
+    'write a newsletter … AND ALSO pull up my report … and call me back'). Conservative — only an
+    explicit 'and also' / 'and then' / '; also' splits, so ordinary single-task messages are untouched."""
+    parts = [p.strip(" ,;.") for p in _TASK_SPLIT.split(message or "")]
+    parts = [p for p in parts if p]
+    return parts if len(parts) > 1 else [message]
+
+
 def _extract_chapter_number(message: str) -> int | str | None:
     """Pull a chapter target from the message: prologue/epilogue (string) or an integer."""
     low = message.lower()
@@ -130,7 +143,11 @@ def _extract_chapter_number(message: str) -> int | str | None:
 
 
 def _extract_project_title(message: str) -> str | None:
-    """Best-effort project title from a trailing 'of/for/from/in <title>' clause."""
+    """Best-effort project title. A QUOTED title wins (unambiguous — used by most plan/qa/email
+    commands); otherwise fall back to a trailing 'of/for/from/in <title>' clause."""
+    qm = re.search(r'["“]([^"”]{2,})["”]', message)
+    if qm:
+        return qm.group(1).strip() or None
     m = _PROJECT_TAIL.search(message)
     if not m:
         return None
@@ -151,7 +168,7 @@ def _chapter_params(message: str) -> dict[str, Any]:
     return params
 
 
-_USING_ARC = re.compile(r"\busing\s+(?:the\s+)?(.+?)(?=\s+(?:called|genre|for\b)|[.,\n]|$)", re.I)
+_USING_ARC = re.compile(r"\busing\s+(?:the\s+)?(.+?)(?=\s+(?:called|genre|for\b|about\b|title\b)|[.,\n]|$)", re.I)
 _CALLED_TITLE = re.compile(r'\b(?:called|titled|named)\s+["“]?(.+?)["”]?(?=[.,\n]|\s+genre|$)', re.I)
 _NUM_CHAPTERS = re.compile(r"\b(\d{1,3})\s+chapters?\b", re.I)
 
@@ -178,18 +195,37 @@ def _plan_params(message: str) -> dict[str, Any]:
     return params
 
 
+_TITLE_LABEL = re.compile(r'\btitle:\s*["“]?(.+?)["”]?(?=[.,\n]|$)', re.I)
+_SECTIONS = re.compile(r"\bsections?:\s*(\d+)", re.I)
+
+
 def _story_params(message: str) -> dict[str, Any]:
     """brainstorm.story params from the deterministic path: story_arc / title / target_chapter_count."""
     params: dict[str, Any] = {}
     arc = _extract_using_arc(message)
     if arc:
         params["story_arc"] = arc
-    tm = _CALLED_TITLE.search(message)
+    tm = _CALLED_TITLE.search(message) or _TITLE_LABEL.search(message)
     if tm:
         params["title"] = tm.group(1).strip(" \"“”")
     cm = _NUM_CHAPTERS.search(message)
     if cm:
         params["target_chapter_count"] = int(cm.group(1))
+    return params
+
+
+def _short_story_params(message: str) -> dict[str, Any]:
+    """brainstorm.short-story params: premise + story_arc + title + section count (E2E-4 R54-R61)."""
+    params: dict[str, Any] = {"premise": message}
+    arc = _extract_using_arc(message)
+    if arc:
+        params["story_arc"] = arc
+    tm = _CALLED_TITLE.search(message) or _TITLE_LABEL.search(message)
+    if tm:
+        params["title"] = tm.group(1).strip(" \"“”")
+    sm = _SECTIONS.search(message)
+    if sm:
+        params["sections"] = int(sm.group(1))
     return params
 
 
@@ -460,14 +496,15 @@ def _heuristic_route(message: str) -> HubDecision:
         return _decide("chapter", "newsletter", _newsletter_params(msg), 0.7)
     if re.search(r"\bshort\s+stor", low):
         if re.search(r"\b(brainstorm|outline|plan)\b", low):
-            return _decide("brainstorm", "short-story", {"premise": msg}, 0.7)
+            return _decide("brainstorm", "short-story", _short_story_params(msg), 0.7)
         if _IS_WRITE.search(low):
             return _decide("chapter", "short-story", {"premise": msg}, 0.7)
 
     # 2. mutually-excluding flags (computed once, resolved in priority order)
     has_lib_action = bool(_HAS_LIBRARY_ACTION.search(low))
     is_retrieve = (not has_lib_action) and bool(_RETRIEVE.search(low))
-    is_qa = bool(_QA_CHAPTER.search(low) or _QA_CHAPTER2.search(low) or _FIX_CHAPTER.search(low))
+    is_qa = bool(_QA_CHAPTER.search(low) or _QA_CHAPTER2.search(low) or _FIX_CHAPTER.search(low)
+                 or _CONSISTENCY_CHECK.search(low))
     is_edit = (not is_retrieve and not is_qa
                and bool(_EDIT_OUTLINE.search(low)) and not _EDIT_OUTLINE_EXCLUDE.search(low))
     is_brainstorm = (not is_retrieve and not is_edit and bool(_BRAINSTORM.search(low)))

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 
-from writer_engine.hub import build_dispatch_plan, route_message
+from writer_engine.hub import build_dispatch_plan, route_message, split_tasks
 from writer_engine.hub.catalog import CATALOG, lookup, render_catalog_prompt, tool_names
 from writer_engine.hub.router import _heuristic_route, _normalise
 from writer_engine.hub.schemas import HubDecision, HubRequest
@@ -250,6 +250,32 @@ def test_callback_help_me_improve_variant() -> None:
     assert d.op == "eve-callback" and d.params["content_type"] == "short_story"
     # a plain chat edit with no "get my" must NOT hijack to the callback
     assert _route("fix chapter 3").op != "eve-callback"
+
+
+# --------------------------------------------------------------------------- short-story arc, R119, multi-task
+
+def test_brainstorm_short_story_arc_title_sections() -> None:
+    d = _route("Brainstorm a short story using Freytags Pyramid about a plague doctor in Manhattan. "
+               "Genre: post-apocalyptic. Title: The Inoculator. Sections: 5.")
+    assert d.tool == "brainstorm" and d.op == "short-story"
+    assert d.params["story_arc"] == "Freytags Pyramid"
+    assert d.params["title"] == "The Inoculator"
+    assert d.params["sections"] == 5
+
+
+def test_character_consistency_check_routes_to_qa() -> None:
+    d = _route('Check Chapter 1 of "The Signal Beneath" for character name consistency with the book outline')
+    assert d.tool == "chapter" and d.op == "qa"
+    assert d.params["chapter_number"] == 1 and d.params["project_title"] == "The Signal Beneath"
+
+
+def test_split_tasks_multi_and_single() -> None:
+    parts = split_tasks("Write a newsletter for the ancient history genre and also pull up my research "
+                        "report and call me back to brainstorm")
+    assert len(parts) == 2 and parts[0].startswith("Write a newsletter")
+    assert "call me back" in parts[1]
+    # a normal single-task message is never split
+    assert split_tasks("Write chapter 5 of The Burial Mound") == ["Write chapter 5 of The Burial Mound"]
 
 
 def test_research_and_cover_and_social() -> None:

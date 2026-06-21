@@ -83,6 +83,21 @@ def test_callback_brainstorm_research_report(monkeypatch):
     assert out["content_type"] == "research_report"
 
 
+def test_callback_resolve_only_returns_found_without_eve(monkeypatch):
+    # V30 sync pre-check: resolve_only returns the resolved content + found, never runs the ElevenLabs flow.
+    _patch(monkeypatch, {
+        "published_content_v2": [
+            {"title": "Roman Aqueducts", "content_text": "body", "content_type": "blog_post"},
+        ],
+    })
+    out = asyncio.run(nt._op_eve_callback({
+        "content_type": "blog", "search_term": "aqueducts", "callback_mode": "review",
+        "user_id": "+14105914612", "resolve_only": True,
+    }))
+    assert out["found"] is True and out["content_title"] == "Roman Aqueducts"
+    assert "eve" not in out  # no callback performed during a resolve-only pre-check
+
+
 def test_callback_not_found_does_not_invoke(monkeypatch):
     _patch(monkeypatch, {"published_content_v2": [
         {"title": "Something Unrelated", "content_text": "x", "content_type": "short_story"},

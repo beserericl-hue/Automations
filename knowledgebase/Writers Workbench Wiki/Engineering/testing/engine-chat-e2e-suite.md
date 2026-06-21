@@ -701,7 +701,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] does NOT invoke `brainstorm.story` or any task tool; returned inline
 
 ### R54: Brainstorm Short Story — Freytags Pyramid (Post-Apocalyptic)
-- **Engine route:** `brainstorm.story` (task) · impl: built · arc fidelity: pending CR-010 (chapter.plan/dual-arc sprint)
+- **Engine route:** `brainstorm.story`/`brainstorm.short-story` (task) · impl: built · arc fidelity: built (E2E-4)
 - **Command:**
   ```
   Brainstorm a short story using Freytags Pyramid about a plague doctor in the ruins of Manhattan who discovers that the disease wiping out survivors is man-made, and the cure lies in the hands of the people who created it. Genre: post-apocalyptic. Title: The Inoculator. Sections: 5. Themes: trust, complicity, the cost of survival.
@@ -715,7 +715,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] Characters have roles; arc_notes use Freytag terminology; CR-009 email subject contains "The Inoculator"
 
 ### R55: Brainstorm Book — Freytags Pyramid (Political Sci-Fi)
-- **Engine route:** `brainstorm.story` (task) · impl: built · arc fidelity: pending CR-010
+- **Engine route:** `brainstorm.story`/`brainstorm.short-story` (task) · impl: built · arc fidelity: built (E2E-4)
 - **Command:**
   ```
   Help me brainstorm a book using Freytags Pyramid about a diplomat who brokers peace between two warring colony planets, only to discover the peace treaty she negotiated will secretly enslave one side. Genre: political-scifi. Title: The Accord. 10 chapters. Themes: complicity, the machinery of power, moral compromise, the price of peace.
@@ -727,7 +727,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] arc_notes name specific Freytag beats; protagonist fatal flaw from Act 1; CR-009 email "The Accord"
 
 ### R56: Brainstorm Short Story — Freytags Pyramid (Ancient History)
-- **Engine route:** `brainstorm.story` (task) · impl: built · arc fidelity: pending CR-010
+- **Engine route:** `brainstorm.story`/`brainstorm.short-story` (task) · impl: built · arc fidelity: built (E2E-4)
 - **Command:**
   ```
   Brainstorm a short story using Freytags Pyramid about a Roman senator who poisons his rivals to secure the consulship, only for his own family to be destroyed by the same poison network he built. Genre: ancient-history. Title: The Consulship of Gaius Varro. 5 sections. Themes: ambition, legacy, self-destruction.
@@ -739,7 +739,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] Roman details researched; arc_notes use Freytag terminology; CR-009 email subject contains the title
 
 ### R57: Brainstorm Short Story — Freytags Pyramid (Historical Time Travel)
-- **Engine route:** `brainstorm.story` (task) · impl: built · arc fidelity: pending CR-010
+- **Engine route:** `brainstorm.story`/`brainstorm.short-story` (task) · impl: built · arc fidelity: built (E2E-4)
 - **Command:**
   ```
   Brainstorm a short story using Freytags Pyramid about a historian who travels to 1692 Salem to observe the witch trials, but accidentally provides testimony that condemns an innocent woman. Genre: historical-time-travel. Title: The Witness. 5 sections. Themes: guilt, the observer effect, whether the past can be repaired.
@@ -751,7 +751,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] Salem details; fatal flaw in Section 1; arc_notes Freytag terminology; CR-009 email "The Witness"
 
 ### R58: Brainstorm Short Story — Three-Act Structure (Post-Apocalyptic)
-- **Engine route:** `brainstorm.story` (task) · impl: built · arc fidelity: pending CR-010
+- **Engine route:** `brainstorm.story`/`brainstorm.short-story` (task) · impl: built · arc fidelity: built (E2E-4)
 - **Command:**
   ```
   Brainstorm a short story using the Three-Act Structure about a radio operator in a flooded world who picks up a signal from a city that was supposed to be underwater. Genre: post-apocalyptic. Title: Signal from the Deep. 5 sections. Themes: hope vs. delusion, isolation, the pull of the impossible.
@@ -763,7 +763,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] arc_notes Three-Act terminology; CR-009 email "Signal from the Deep"
 
 ### R59: Brainstorm Book — Three-Act Structure (AI Marketing)
-- **Engine route:** `brainstorm.story` (task) · impl: built · arc fidelity: pending CR-010
+- **Engine route:** `brainstorm.story`/`brainstorm.short-story` (task) · impl: built · arc fidelity: built (E2E-4)
 - **Command:**
   ```
   Help me brainstorm a book using the Three-Act Structure about an AI startup founder who discovers her company's flagship product is manipulating users' purchasing decisions in ways she didn't authorize. Genre: ai-marketing. Title: The Optimization. 8 chapters. Themes: ethics in tech, the line between persuasion and manipulation, corporate accountability.
@@ -775,7 +775,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] arc_notes Three-Act terminology; narrative goal Act1→Act3; CR-009 email "The Optimization"
 
 ### R60: Brainstorm Short Story — Three-Act Structure (Political History)
-- **Engine route:** `brainstorm.story` (task) · impl: built · arc fidelity: pending CR-010
+- **Engine route:** `brainstorm.story`/`brainstorm.short-story` (task) · impl: built · arc fidelity: built (E2E-4)
 - **Command:**
   ```
   Brainstorm a short story using the Three-Act Structure about a journalist in 1970s Chile who uncovers evidence of CIA involvement in the upcoming coup, but no one will publish her story. Genre: political-history. Title: The Unpublished. 5 sections. Themes: truth vs. power, the cost of speaking out, complicity of silence.
@@ -786,7 +786,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
   - [ ] 1970s Chile/Pinochet context; denouement addresses truth vs power; goal clear from Act1; CR-009 email "The Unpublished"
 
 ### R61: Brainstorm Book — Three-Act Structure (Historical Time Travel)
-- **Engine route:** `brainstorm.story` (task) · impl: built · arc fidelity: pending CR-010
+- **Engine route:** `brainstorm.story`/`brainstorm.short-story` (task) · impl: built · arc fidelity: built (E2E-4)
 - **Command:**
   ```
   Help me brainstorm a book using the Three-Act Structure about a grief-stricken physicist who invents a time machine to save her daughter from a car accident, but each trip changes the present in ways that make the world progressively worse. Genre: historical-time-travel. Title: The Correction. 10 chapters. Themes: grief, the tyranny of good intentions, accepting loss, the butterfly effect.
@@ -1294,7 +1294,7 @@ Every `impl: pending` tag below is one of these (the sprint set lists only what'
 
 # PART 2 — VOICE WEBHOOK TESTS (V01–V40)
 
-Voice tests POST the **simulated** spoken input to `POST /internal/hub/voice` `{user_message_request, system__caller_id:"+14105914612"}` (no live ElevenLabs agent). The webhook returns a FLAT `{response, kind, job_id?}`; routing is identical to chat. Callback tests (V24–V32) assert the `notify.eve-callback` op is invoked with the right payload (impl pending CR-010 A1).
+Voice tests POST the **simulated** spoken input to `POST /internal/hub/voice` `{user_message_request, system__caller_id:"+14105914612"}` (no live ElevenLabs agent). The webhook returns a FLAT `{response, kind, job_id?}`; routing is identical to chat. Callback tests (V24–V32) assert the `notify.eve-callback` op is invoked with the right payload (impl: built (E2E-5) — gated dry-run; real ElevenLabs calls fire only when an agent is configured, never the baseline-protected PROD agent).
 
 ## Section V-A: Core Voice Commands (V01–V18)
 
@@ -1433,34 +1433,34 @@ Voice tests POST the **simulated** spoken input to `POST /internal/hub/voice` `{
 
 ### V26: Voice — Retrieve & Callback — Review Mode
 - **Voice webhook:** `{user_message_request:"Pull up my draft blog post about aqueducts and call me back so we can revise it", system__caller_id:"+14105914612"}`
-- **Engine route:** `notify.eve-callback` (task) · impl: built (E2E-5, gated dry-run)
+- **Engine route:** `notify.eve-callback` (task) · impl: built (E2E-5)
 - **Expected:** flat `{response, kind="queued"}`; routes `notify.eve-callback`; job_id; complete; hub detects "call me back"; sub-steps: retrieve aqueducts post → remove stale "Eve Session:" KB docs → upload content_text as KB doc → set `review` first_message → outbound call to +14105914612 → schedule greeting reset; assert op payload `{content_type:"blog", content_title, content_text, callback_mode:"review", phone:"+14105914612"}`
 
 ### V27: Voice — Retrieve & Callback — Brainstorm Mode
 - **Voice webhook:** `{user_message_request:"Load the research report on post apocalyptic trends and call me back let's brainstorm a new story outline from it", system__caller_id:"+14105914612"}`
-- **Engine route:** `notify.eve-callback` (task) · impl: built (E2E-5, gated dry-run)
+- **Engine route:** `notify.eve-callback` (task) · impl: built (E2E-5)
 - **Expected:** flat `{response, kind="queued"}`; routes `notify.eve-callback`; complete; retrieve report → KB cleanup → upload → `brainstorm` first_message → outbound call → reset; assert payload `{content_type:"research_report", callback_mode:"brainstorm", phone:"+14105914612"}`; Eve references report data points (KB upload verified)
 
 ### V28: Voice — Callback Review with Editorial Feedback
 - **Voice webhook:** `{user_message_request:"Get my short story about the Roman soldier under the Colosseum and help me improve it", system__caller_id:"+14105914612"}`
-- **Engine route:** `notify.eve-callback` (task) · impl: built (E2E-5, gated dry-run)
+- **Engine route:** `notify.eve-callback` (task) · impl: built (E2E-5)
 - **Prerequisite:** V06
 - **Expected:** flat `{response, kind="queued"}`; routes `notify.eve-callback`; complete; "help me improve" = review intent; retrieve → KB cleanup → upload → `review` first_message → outbound call; assert payload `{callback_mode:"review", content_type:"short_story", phone:"+14105914612"}`; Eve can give specific editorial feedback (KB upload verified)
 
 ### V29: Voice — KB Cleanup (Back-to-Back Retrievals)
 - **Voice webhook (1):** `{user_message_request:"Pull up my research report about post apocalyptic trends and call me back to review it", system__caller_id:"+14105914612"}`
 - **Voice webhook (2):** `{user_message_request:"Now pull up my draft blog post about aqueducts and call me back to revise that instead", system__caller_id:"+14105914612"}`
-- **Engine route:** `notify.eve-callback` (task) · impl: built (E2E-5, gated dry-run)
+- **Engine route:** `notify.eve-callback` (task) · impl: built (E2E-5)
 - **Expected:** both flat queued; both complete; call 1 cleans prior KB then uploads report; call 2 cleans report KB then uploads blog; after call 2 KB has exactly ONE "Eve Session:" doc (the blog); Eve references blog content not the report (cleanup verified); assert 2nd payload content_type="blog"
 
 ### V30: Voice — Content Not Found
 - **Voice webhook:** `{user_message_request:"Pull up my draft story about alien wizards on Neptune and call me back", system__caller_id:"+14105914612"}`
-- **Engine route:** `notify.eve-callback` (task) · impl: built (E2E-5, gated dry-run)
+- **Engine route:** `notify.eve-callback` (task) · impl: built (E2E-5)
 - **Expected:** flat `{response, kind="data"}` with error (no job_id, no callback); retrieve returns found=false; `notify.eve-callback` NOT invoked; no outbound call; no KB op; response = not-found message; assert callback op not called when retrieve found=false
 
 ### V31: Voice — Parallel Tasks + Callback
 - **Voice webhook:** `{user_message_request:"Write a newsletter about ancient Roman festivals for the ancient history genre and also pull up my research report about post apocalyptic trends and call me back to brainstorm", system__caller_id:"+14105914612"}`
-- **Engine route:** newsletter saga (pending CR-010) + `notify.eve-callback` (pending CR-010 A1)
+- **Engine route:** `chapter.newsletter` + `notify.eve-callback` (multi-task fan-out) · impl: built (E2E-3/E2E-5)
 - **Expected:** hub detects 2 tasks; flat queued (one or two job_ids); task1 newsletter → complete → CR-009 email; task2 `notify.eve-callback` → complete → KB load + outbound call (callback_mode=brainstorm); both ops invoked
 
 ### V32: Voice — Centralized Email Verification
@@ -1635,7 +1635,7 @@ End-to-end test of the 3-step process: brainstorm book outline (with arc) → br
   - [ ] sub-chapter 2 emphasizes internal conflict; new sub-chapter for the journal scene; other sub-chapters preserved; names match book outline; saved to outline; CR-009 email
 
 ### R119 — Consistency Check: Character Names
-- **Engine route:** `chapter.qa` (task) · impl: pending CR-010 (character-name cross-reference)
+- **Engine route:** `chapter.qa` (task) · impl: built (E2E-4, deterministic name cross-check)
 - **Prerequisite:** R115
 - **Command:**
   ```

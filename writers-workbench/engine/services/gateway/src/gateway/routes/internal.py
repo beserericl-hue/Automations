@@ -14,6 +14,7 @@ from writer_engine.hub import (
     HubResponse,
     build_dispatch_plan,
     route_message,
+    split_tasks,
 )
 from writer_engine.telemetry.logging import get_logger
 
@@ -21,10 +22,75 @@ router = APIRouter(dependencies=[Depends(require_service_secret)])
 logger = get_logger("hub.gateway")
 
 
+def _write_url(tool: str) -> str:
+    return f"{get_settings().orchestrator_url}/pipelines/write/{tool}/run"
+
+
+async def _execute_eve_callback(req: HubRequest, plan: Any) -> HubResponse:
+    """V30: resolve the target content SYNCHRONOUSLY first; only queue the real callback when found, so
+    a not-found request returns kind=data with NO job_id and NO outbound call / KB op."""
+    url = _write_url("notify")
+    resolve = await _forward("POST", url, json={**plan.body, "resolve_only": True, "async": False}, timeout_s=60.0)
+    result = (resolve.get("payload") or {}).get("result") or {}
+    if not result.get("found"):
+        logger.info("hub.eve_callback.not_found", user_id=req.user_id)
+        return HubResponse(
+            kind="data", tool="notify", op="eve-callback", data=result,
+            assistant_message=result.get("message") or "I couldn't find that to call you back about.",
+        )
+    body = {**plan.body}
+    for k in ("content_type", "content_title", "content_text", "callback_mode", "phone"):
+        if result.get(k):
+            body[k] = result[k]
+    enq = await _forward("POST", url, json={**body, "async": True}, timeout_s=30.0)
+    logger.info("hub.eve_callback.queued", user_id=req.user_id, job_id=enq.get("job_id"))
+    return HubResponse(
+        kind="queued", tool="notify", op="eve-callback", assistant_message=plan.assistant_message,
+        job_id=enq.get("job_id"), status=enq.get("status", "queued"),
+    )
+
+
+async def _execute_multi(req: HubRequest, clauses: list[str]) -> HubResponse:
+    """V31: a message that fans out to several tasks. Route + enqueue each clause independently and
+    return one queued response carrying every job (job_id mirrors the first for single-poll callers)."""
+    jobs: list[dict[str, Any]] = []
+    msgs: list[str] = []
+    for clause in clauses:
+        creq = HubRequest(message=clause, user_id=req.user_id, context=req.context, source=req.source)
+        plan = build_dispatch_plan(await route_message(creq), creq)
+        if plan.action == "reply":
+            if plan.assistant_message:
+                msgs.append(plan.assistant_message)
+            continue
+        url = _write_url(plan.tool)
+        try:
+            if plan.action == "call_sync":
+                await _forward("POST", url, json=plan.body, timeout_s=120.0)
+            else:
+                enq = await _forward("POST", url, json={**plan.body, "async": True}, timeout_s=30.0)
+                jobs.append({"tool": plan.tool, "op": plan.op,
+                             "job_id": enq.get("job_id"), "status": enq.get("status", "queued")})
+            if plan.assistant_message:
+                msgs.append(plan.assistant_message)
+        except HTTPException as exc:
+            logger.error("hub.multi.failed", tool=plan.tool, op=plan.op, detail=str(exc.detail)[:200])
+    logger.info("hub.multi", user_id=req.user_id, tasks=len(clauses), jobs=len(jobs))
+    return HubResponse(
+        kind="queued", assistant_message=" ".join(msgs) or "Working on those — I'll let you know.",
+        job_id=(jobs[0]["job_id"] if jobs else None), jobs=jobs, status="queued",
+    )
+
+
 async def _execute_hub(req: HubRequest) -> HubResponse:
     """Route + dispatch one hub request. Shared by the chat (``/hub``) and voice (``/hub/voice``)
     surfaces so both go through the identical Gemini-router → sync/async-dispatch path."""
     logger.info("hub.request", source=req.source, user_id=req.user_id, msg_preview=req.message[:160])
+
+    # V31: fan a multi-task message ("… and also …") out to one job per task.
+    clauses = split_tasks(req.message)
+    if len(clauses) > 1:
+        return await _execute_multi(req, clauses)
+
     decision = await route_message(req)
     plan = build_dispatch_plan(decision, req)
     logger.info(
@@ -35,9 +101,16 @@ async def _execute_hub(req: HubRequest) -> HubResponse:
     if plan.action == "reply":
         return HubResponse(kind="reply", assistant_message=plan.assistant_message)
 
-    settings = get_settings()
-    url = f"{settings.orchestrator_url}/pipelines/write/{plan.tool}/run"
+    # V30: eve-callback resolves content existence synchronously before it queues anything.
+    if plan.tool == "notify" and plan.op == "eve-callback":
+        try:
+            return await _execute_eve_callback(req, plan)
+        except HTTPException as exc:
+            logger.error("hub.dispatch_failed", tool="notify", op="eve-callback",
+                         status_code=exc.status_code, detail=str(exc.detail)[:300])
+            raise
 
+    url = _write_url(plan.tool)
     try:
         if plan.action == "call_sync":
             data = await _forward("POST", url, json=plan.body, timeout_s=120.0)

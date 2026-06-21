@@ -110,7 +110,7 @@ preserved → genre-toned structured compose → persist `published_content_v2` 
 CR-009 email, since it's under the `chapter` tool already in `_EMAIL_TOOLS`). Catalog entry + heuristic
 branch + Gemini rule + `_newsletter_params` (topic/genre_slug/date). Also fixed a latent `extract_json`
 import bug shared with `_op_blog` (it silently fell back to raw text). 4 tests (3 routing + 1 op).
-R07/R16/R44/V05 flipped to built; V31 stays pending (needs E2E-5 callback + multi-task split).
+R07/R16/R44/V05 + V31 (multi-task fan-out) all built. **(2026-06-21 follow-up: V31 multi-task routing added — see E2E-5 note.)**
 
 **Gap (CR-010):** "write a newsletter" was not routable from the chat/voice hub.
 
@@ -140,10 +140,7 @@ sub_chapters, and persists them into `outline.chapters[N].chapter_outline` (snap
 `brainstorm.story` loads the arc beats + emits per-chapter `arc_notes`; `chapter.write` auto-loads the saved
 chapter outline + an opt-in auto-plan guard (`require_chapter_outline` → plan-first, no prose, R116);
 routing extracts `chapter_story_arc`/`story_arc`/title/chapter-count. 9 offline tests (loader, schema,
-dual-arc plan w/ persist, auto-plan guard, 4 routing). Flipped R110–R116/R118/R120/R121 to built (E2E-4).
-**Caveat:** the arc-beat *wording* fidelity (R54–R69) and the R119 character-name cross-check are LLM/prompt
-behavior validated live, not offline; R119 left pending (no new cross-check op). The auto-plan guard is
-opt-in so the proven Burial Mound auto-fan-out write path is unchanged.
+dual-arc plan w/ persist, auto-plan guard, 4 routing). Flipped R110–R116/R118/R120/R121 to built (E2E-4). **(2026-06-21 follow-up: closed the rest — `brainstorm.short-story` now loads the arc beats + honours the section count + emits arc_notes (R54–R61); `chapter.qa` now loads the chapter+roster and runs a deterministic character-name cross-check incl. rename detection Maya≠Maria (R119). Both flipped to built.)** The auto-plan guard is opt-in so the proven Burial Mound auto-fan-out write path is unchanged.
 
 **Gap:** `chapter.plan` / `brainstorm.story` existed but didn't load arc definitions or carry dual-arc depth.
 
@@ -178,10 +175,7 @@ the PROD Eve agent at it remains a separate, explicitly-authorized step. `notify
 the content (published_content_v2 / research_reports_v2), and on not-found does NOT place the callback (V30).
 Routing: "pull up X and call me back [to brainstorm]" + the V28 "get my X and help me improve" variant →
 notify.eve-callback (catalog + Gemini rule + heuristic). 6 offline tests (routing, payload dry-run, brainstorm
-mode, not-found-no-callback, WF-16 KB-cleanup ordering via a mock client). Flipped V26–V30 to built (E2E-5).
-**Caveat:** V30's strict "kind=data / no job_id" isn't met (the op is a queued task that returns
-invoked=false rather than a pre-dispatch skip — the callback action is still not performed); V31 (two
-parallel tasks from one message) stays pending — the single-op hub doesn't split multi-task messages.
+mode, not-found-no-callback, WF-16 KB-cleanup ordering via a mock client). Flipped V26–V30 to built (E2E-5). **(2026-06-21 follow-up: V30 now does a genuine SYNC resolve in the gateway — not-found returns kind=data with NO job_id and NO callback; and V31 multi-task fan-out is built — `split_tasks` + `_execute_multi` route one message to several jobs, each in HubResponse.jobs. Both flipped to built.)**
 
 **Gap (CR-010 A1):** `notify.eve-callback` / `eve-reset-greeting` were placeholders — no KB injection, no call.
 

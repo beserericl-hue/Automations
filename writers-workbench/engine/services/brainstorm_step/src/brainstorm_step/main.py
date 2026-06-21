@@ -205,36 +205,68 @@ async def _op_story(payload: dict) -> dict:
     return {"outline": outline_dict, "persist": persisted}
 
 
-def _build_short_story_system(genre: str, arc: str, title: str) -> str:
-    """Short-story brainstorm: develop a premise into a 3-beat structure (genre + story arc), the way a
-    chapter outline anchors a chapter. NOT the 60-72 chapter Follett scale — a short story is 3 beats."""
+def _build_short_story_system(
+    genre: str, arc: str, title: str, *, arc_text: str = "", sections: int = 0
+) -> str:
+    """Short-story brainstorm: develop a premise into a SECTION-beat structure (genre + story arc).
+
+    E2E-4: when an arc is named, the structure follows THAT arc's beats (Freytags Pyramid = 5 sections,
+    not a hardcoded 3) and each beat carries arc_notes naming its stage. ``arc_text`` is the arc's real
+    beats (from story_arcs_v2). ``sections`` is the requested section count (overrides the default)."""
     title_lock = f'\n\nTITLE LOCK: use EXACTLY "{title}" as the title; do not rename.' if title else ""
-    arc_line = f"\n\nSTORY ARC: {arc}. Map the three beats onto this arc." if arc else ""
-    return (
-        f"You are brainstorming a SHORT STORY in the {genre or 'science fiction'} genre. From the "
-        "premise, develop a tight THREE-BEAT structure (this is a short story, not a novel):\n"
+    n = sections if sections else (5 if arc and "freytag" in arc.lower() else 3)
+    arc_block = ""
+    if arc:
+        arc_block = f"\n\nSTORY ARC — {arc}. Map the beats onto THIS arc's stages exactly"
+        if arc_text:
+            arc_block += f", whose stages are:\n{arc_text}"
+        arc_block += (
+            f"\nProduce EXACTLY {n} beats, one per arc stage. Each chapter's `arc_notes` MUST name which "
+            "arc stage it is (e.g. for Freytags Pyramid: Exposition / Rising Action / Climax / Falling "
+            "Action / Catastrophe). For Freytags Pyramid the Climax is the MIDPOINT APEX (goal reached + "
+            "the first crack), NOT the final confrontation; the last beat is the catastrophe/"
+            "survival-with-consequence."
+        )
+    default_beats = (
         "  Beat 1 — Opening: establish the world and introduce the protagonist.\n"
         "  Beat 2 — Rising action: develop the central conflict and deepen character.\n"
         "  Beat 3 — Climax & resolution: turn and land the ending.\n"
-        "Produce: a title, a one-paragraph premise, 2-4 themes, the full character roster (name, role, "
-        "a one-line arc each), and EXACTLY 3 chapters — one per beat (chapter_number 1/2/3, a title, "
-        "and a one-sentence beat). Keep it consistent and concrete." + arc_line + title_lock +
+        if not arc else ""
+    )
+    return (
+        f"You are brainstorming a SHORT STORY in the {genre or 'science fiction'} genre. From the "
+        f"premise, develop a tight {n}-BEAT structure (this is a short story, not a novel):\n"
+        + default_beats +
+        f"Produce: a title, a one-paragraph premise, 2-4 themes, the full character roster (name, role, "
+        f"a one-line arc each), and EXACTLY {n} chapters — one per beat (chapter_number 1..{n}, a title, "
+        "a one-sentence beat, and `arc_notes` naming the arc stage). Keep it consistent and concrete."
+        + arc_block + title_lock +
         "\n\nReturn strict JSON matching the outline schema."
     )
 
 
 async def _op_short_story(payload: dict) -> dict:
-    """Premise -> 3-beat short-story outline (genre + arc). Persisted like any outline."""
+    """Premise -> arc-shaped short-story outline (genre + arc). Persisted like any outline (E2E-4)."""
     genre = str(payload.get("genre") or payload.get("genre_slug") or "")
     arc = str(payload.get("story_arc") or payload.get("story_arc_name") or "")
     title = str(payload.get("title") or "")
     premise = str(payload.get("premise") or payload.get("requirements") or payload.get("message") or "")
+    sections = int(payload.get("sections") or payload.get("target_chapter_count") or 0)
+    # E2E-4: load the named arc's actual beats so the short story honours its structure + arc_notes.
+    arc_text = ""
+    if arc:
+        s = get_settings()
+        if s.supabase_url and s.supabase_service_role_key:
+            from writer_engine.story_arcs import load_story_arc
+            from writer_engine.supabase.client import get_supabase_admin
+
+            arc, arc_text = await load_story_arc(await get_supabase_admin(), arc)
     router = get_router(service=STEP_NAME)
     try:
         outline, _resp = await complete_structured(
             router, provider="anthropic", model=get_settings().model_default,
-            system=_build_short_story_system(genre, arc, title),
-            prompt=f"PREMISE:\n{premise}\n\nDevelop the 3-beat short-story outline.",
+            system=_build_short_story_system(genre, arc, title, arc_text=arc_text, sections=sections),
+            prompt=f"PREMISE:\n{premise}\n\nDevelop the short-story outline.",
             schema=StoryOutline, max_tokens=8192,
         )
     except ProviderNotRegistered:

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from .catalog import CATALOG, ToolSpec, lookup, tool_names
 from .dispatch import DispatchPlan, build_dispatch_plan
-from .router import route_message
+from .router import route_message, split_tasks
 from .schemas import HubDecision, HubRequest, HubResponse
 
 __all__ = [
@@ -22,5 +22,6 @@ __all__ = [
     "build_dispatch_plan",
     "lookup",
     "route_message",
+    "split_tasks",
     "tool_names",
 ]

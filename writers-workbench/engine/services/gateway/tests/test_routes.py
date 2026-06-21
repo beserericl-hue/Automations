@@ -97,7 +97,7 @@ def _patch_orch(monkeypatch: pytest.MonkeyPatch, capture: dict[str, Any], respon
         def __init__(self, *a: object, **k: object) -> None:
             pass
 
-        async def __aenter__(self) -> "_Fake":
+        async def __aenter__(self) -> _Fake:
             return self
 
         async def __aexit__(self, *a: object) -> None:
@@ -170,6 +170,90 @@ def test_hub_voice_requires_service_secret() -> None:
     client = TestClient(app)
     r = client.post("/internal/hub/voice", json={"user_message_request": "hi"})
     assert r.status_code == 401
+
+
+def _patch_orch_recording(monkeypatch: pytest.MonkeyPatch, calls: list[dict], resolve_result: dict) -> None:
+    """A body-aware fake orchestrator: a resolve_only POST returns {payload:{result:resolve_result}};
+    any other POST returns an incrementing job. Records every forwarded body."""
+    n = {"i": 0}
+
+    class _Fake:
+        def __init__(self, *a: object, **k: object) -> None:
+            pass
+
+        async def __aenter__(self) -> _Fake:
+            return self
+
+        async def __aexit__(self, *a: object) -> None:
+            return None
+
+        async def request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
+            body = kwargs.get("json") or {}
+            calls.append({"url": url, "body": body})
+            if body.get("resolve_only"):
+                return httpx.Response(200, json={"payload": {"result": resolve_result}})
+            n["i"] += 1
+            return httpx.Response(200, json={"job_id": f"job-{n['i']}", "status": "queued", "tool": "x"})
+
+    monkeypatch.setattr("gateway.routes.internal.httpx.AsyncClient", _Fake)
+
+
+def test_hub_eve_callback_resolves_then_queues_when_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[dict] = []
+    _patch_orch_recording(monkeypatch, calls, {
+        "found": True, "content_type": "blog", "content_title": "Aqueducts",
+        "content_text": "How aqueducts carried water.", "callback_mode": "review", "phone": "+14105914612",
+    })
+    client = TestClient(app)
+    r = client.post(
+        "/internal/hub",
+        json={"message": "Pull up my draft blog post about aqueducts and call me back to revise it",
+              "user_id": "+14105914612"},
+        headers={"x-service-secret": "test-secret"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["kind"] == "queued" and body["op"] == "eve-callback" and body["job_id"] == "job-1"
+    # exactly two forwards: a sync resolve, then an async enqueue carrying the resolved content
+    assert len(calls) == 2
+    assert calls[0]["body"]["resolve_only"] is True and calls[0]["body"]["async"] is False
+    assert calls[1]["body"]["async"] is True and calls[1]["body"]["content_title"] == "Aqueducts"
+
+
+def test_hub_eve_callback_not_found_returns_data_no_job(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[dict] = []
+    _patch_orch_recording(monkeypatch, calls, {"found": False, "message": "Couldn't find that."})
+    client = TestClient(app)
+    r = client.post(
+        "/internal/hub",
+        json={"message": "Pull up my draft story about alien wizards on Neptune and call me back",
+              "user_id": "+14105914612"},
+        headers={"x-service-secret": "test-secret"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["kind"] == "data" and not body["job_id"]  # V30: no job, no callback
+    assert len(calls) == 1 and calls[0]["body"]["resolve_only"] is True  # only the resolve ran
+
+
+def test_hub_multi_task_fans_out_to_two_jobs(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[dict] = []
+    _patch_orch_recording(monkeypatch, calls, {"found": True})
+    client = TestClient(app)
+    r = client.post(
+        "/internal/hub",
+        json={"message": "Write a newsletter about ancient Roman festivals for the ancient history "
+                         "genre and also pull up my research report about post apocalyptic trends and "
+                         "call me back to brainstorm", "user_id": "+14105914612"},
+        headers={"x-service-secret": "test-secret"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["kind"] == "queued"
+    ops = {(j["tool"], j["op"]) for j in body["jobs"]}
+    assert ("chapter", "newsletter") in ops          # task 1: newsletter
+    assert ("notify", "eve-callback") in ops         # task 2: callback (brainstorm)
+    assert body["job_id"] == body["jobs"][0]["job_id"]
 
 
 def test_write_job_abort_forwards_to_orchestrator(monkeypatch: pytest.MonkeyPatch) -> None:

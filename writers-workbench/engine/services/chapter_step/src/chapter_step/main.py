@@ -1374,17 +1374,82 @@ def _low_dims(qa: ChapterCraftQa, threshold: float = CRAFT_THRESHOLD) -> list[st
     return [dim for dim in QA_DIMS if d.get(dim, 0.0) < threshold]
 
 
+_NAME_STOP = {
+    "the", "and", "but", "she", "her", "his", "him", "they", "them", "their", "you", "your", "this",
+    "that", "then", "there", "here", "when", "where", "what", "who", "why", "how", "chapter", "prologue",
+    "epilogue", "act", "scene", "part", "one", "two", "three", "four", "five", "six", "seven", "eight",
+    "nine", "ten", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+    "january", "february", "march", "april", "june", "july", "august", "september", "october",
+    "november", "december",
+}
+
+
+def _edit_distance(a: str, b: str) -> int:
+    if a == b:
+        return 0
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
+        prev = cur
+    return prev[-1]
+
+
+def _character_name_consistency(text: str, roster: list[dict]) -> dict:
+    """Deterministic character-name cross-check (R119): which roster names appear, and any capitalized
+    name in the prose that is a near-miss of a roster name (a likely rename, e.g. Maya→Maria)."""
+    roster_full = [str(c.get("name") or "").strip() for c in roster if str(c.get("name") or "").strip()]
+    roster_tokens = {t.lower() for n in roster_full for t in re.findall(r"[A-Za-z]{3,}", n)}
+    low = text.lower()
+    present = [n for n in roster_full if n and re.search(rf"\b{re.escape(n.split()[0].lower())}\b", low)]
+    missing = [n for n in roster_full if n not in present]
+    from collections import Counter
+
+    caps = Counter(re.findall(r"\b[A-Z][a-z]{2,}\b", text))
+    renames: list[dict] = []
+    for w, _c in caps.items():
+        wl = w.lower()
+        if wl in roster_tokens or wl in _NAME_STOP:
+            continue
+        for rt in roster_tokens:
+            if 0 < _edit_distance(wl, rt) <= 2 and abs(len(wl) - len(rt)) <= 2:
+                renames.append({"found": w, "closest_roster_name": rt})
+                break
+    return {
+        "consistent": not renames and not missing,
+        "roster": roster_full, "names_present": present, "names_missing": missing,
+        "possible_renames": renames,
+    }
+
+
 async def _op_qa(payload: dict) -> dict:
+    # Load the chapter prose + roster when only project_id+chapter_number are given (R119: the hub
+    # passes a reference, not the text), so a "check chapter N for name consistency" works end to end.
     chapter_text = str(payload.get("chapter_text") or payload.get("content_text") or "")
+    roster = payload.get("roster") or []
+    project_id = payload.get("project_id")
+    chapter_number = payload.get("chapter_number")
+    if (not chapter_text or not roster) and project_id and chapter_number not in (None, ""):
+        ctx = await _load_context(str(project_id), payload)
+        roster = roster or ctx.get("roster") or []
+        if not chapter_text:
+            try:
+                chapter_text = await _load_persisted_chapter(str(project_id), int(chapter_number))
+            except (TypeError, ValueError):
+                chapter_text = ""
     period = str(payload.get("period") or "contemporary")
-    roster_text = _roster_text(payload.get("roster") or []) if payload.get("roster") else ""
+    roster_text = _roster_text(roster) if roster else ""
+    name_check = _character_name_consistency(chapter_text, roster) if roster else None
     qa = await _score_chapter(chapter_text, period, roster_text)
     if qa is None:
         return {"chapter_id": payload.get("chapter_id"), "scores": None, "findings": [],
+                "character_consistency": name_check,
                 "note": "craft-QA JSON could not be parsed"}
     scores = qa.model_dump(mode="json")
     findings = scores.pop("findings", [])
-    return {"chapter_id": payload.get("chapter_id"), "scores": scores, "findings": findings}
+    return {"chapter_id": payload.get("chapter_id"), "scores": scores, "findings": findings,
+            "character_consistency": name_check}
 
 
 async def _op_scan_drift(payload: dict) -> dict:

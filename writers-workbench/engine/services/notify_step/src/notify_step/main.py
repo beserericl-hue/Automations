@@ -121,6 +121,12 @@ async def _op_eve_callback(payload: dict) -> dict:
         content_title = resolved["title"]
         content_text = resolved["content_text"]
 
+    # resolve_only (V30): the hub pre-checks existence synchronously and only queues the real callback
+    # when found — so a not-found request returns kind=data with NO job and NO ElevenLabs/outbound call.
+    if payload.get("resolve_only"):
+        return {"found": True, "callback_mode": callback_mode, "phone": phone,
+                "content_type": content_type, "content_title": content_title, "content_text": content_text}
+
     eve = await run_eve_callback(
         content_type=content_type, content_title=content_title, content_text=content_text,
         callback_mode=callback_mode, phone=phone,

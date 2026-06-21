@@ -123,6 +123,21 @@ def test_plan_loads_override_arc_emits_rich_subchapters_and_persists(monkeypatch
 
 # --------------------------------------------------------------------------- auto-plan guard
 
+def test_character_name_consistency_flags_rename():
+    roster = [{"name": "Mara Okonkwo"}, {"name": "The Warlord"}]
+    text = "Mara walked the shore. Later, Maria returned to the station. The Warlord watched from the cliff."
+    out = ch._character_name_consistency(text, roster)
+    assert out["consistent"] is False
+    assert "Mara Okonkwo" in out["names_present"] and "The Warlord" in out["names_present"]
+    assert any(r["found"] == "Maria" for r in out["possible_renames"])
+
+
+def test_character_name_consistency_clean_when_names_match():
+    roster = [{"name": "Mara Okonkwo"}]
+    out = ch._character_name_consistency("Mara walked the shore at dawn.", roster)
+    assert out["consistent"] is True and out["possible_renames"] == []
+
+
 def test_write_auto_plan_guard_plans_not_writes(monkeypatch):
     outline = {"story_arc_name": "X", "chapters": [{"chapter_number": 3, "title": "C", "beat": "c"}]}
 
