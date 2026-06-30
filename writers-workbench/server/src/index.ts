@@ -58,8 +58,38 @@ app.use((req, res, next) => {
   next();
 });
 
-// Security headers
-app.use(helmet());
+// Security headers.
+// IMPORTANT: helmet()'s default Content-Security-Policy sets `default-src 'self'` with NO
+// `connect-src`, so the browser blocks the SPA from connecting to anything but our own origin —
+// including Supabase Auth (login goes browser -> supabase.co directly). That silently broke sign-in
+// ("Failed to fetch" / "Refused to connect ... violates the document's Content Security Policy").
+// We must explicitly allow the external origins the client talks to:
+//   - Supabase   (auth + realtime + storage images)        — https + wss + https images
+//   - ElevenLabs ConvAI widget ("Talk to Eve")             — script from unpkg, connects to *.elevenlabs.io
+//   - Google Fonts (googleapis css + gstatic fonts)        — covered by style-src/font-src https:
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        'connect-src': [
+          "'self'",
+          'https://*.supabase.co',
+          'wss://*.supabase.co',
+          'https://*.elevenlabs.io',
+          'wss://*.elevenlabs.io',
+        ],
+        'img-src': ["'self'", 'data:', 'blob:', 'https:'],
+        'script-src': ["'self'", 'https://unpkg.com', 'https://*.elevenlabs.io'],
+        'media-src': ["'self'", 'blob:', 'data:', 'https://*.elevenlabs.io'],
+        'frame-src': ["'self'", 'https://*.elevenlabs.io'],
+        'worker-src': ["'self'", 'blob:'],
+        'font-src': ["'self'", 'https:', 'data:'],
+        'style-src': ["'self'", 'https:', "'unsafe-inline'"],
+      },
+    },
+  }),
+);
 
 // CORS with origin whitelist
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
