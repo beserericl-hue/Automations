@@ -31,6 +31,27 @@ async def load_story_arc(client: Any, name: str | None) -> tuple[str, str]:
     return (term, "")
 
 
+async def list_story_arcs(client: Any, user_id: str | None = None) -> list[dict]:
+    """List the available story arcs (G16). Returns ``[{name, description}]`` from ``story_arcs_v2``
+    (global + this user's), so 'list the story arcs' reads the real table (Freytags Pyramid, Three-Act)
+    instead of the model fabricating arcs from training data. Best-effort: ``[]`` on any failure."""
+    if not client:
+        return []
+    try:
+        resp = await (
+            client.table("story_arcs_v2").select("name,description,user_id").order("name").limit(100).execute()
+        )
+        rows = getattr(resp, "data", None) or []
+    except Exception:
+        return []
+    out: list[dict] = []
+    for r in rows:
+        if user_id and r.get("user_id") and str(r.get("user_id")) != str(user_id):
+            continue  # skip other users' private arcs; keep globals (null user_id) + own
+        out.append({"name": r.get("name"), "description": r.get("description")})
+    return out
+
+
 def arc_prompt_block(label: str, name: str, prompt_text: str) -> str:
     """Render an arc definition into a labelled prompt block (empty string when there's nothing)."""
     if not name and not prompt_text:

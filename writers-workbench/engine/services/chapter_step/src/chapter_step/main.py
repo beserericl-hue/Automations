@@ -37,6 +37,57 @@ STEP_NAME = "chapter"
 logger = get_logger(STEP_NAME)
 seed_default_prompts()
 
+
+def _coerce_int(value: Any, default: int) -> int:
+    """Tolerant int() for router-supplied params like ``"1500 words"`` / ``"2,500"`` / ``"ch 3"``.
+
+    G6: the Gemini router extracts a length/count verbatim from the message ("1500 words"), so a bare
+    ``int(value)`` raised ValueError and errored the whole write with nothing produced. Pull the first
+    run of digits; fall back to ``default`` when there is none."""
+    if isinstance(value, bool):
+        return default
+    if isinstance(value, (int, float)):
+        return int(value)
+    m = re.search(r"-?\d[\d,]*", str(value or ""))
+    return int(m.group(0).replace(",", "")) if m else default
+
+
+def _coerce_chapter_number(value: Any, default: int = 1) -> int:
+    """Map a chapter reference to the stored integer: Prologue → 0, Epilogue → 999 (the n8n / story-bible
+    convention), otherwise the first integer in the value. G19: ``int("Prologue")`` crashed chapter.plan."""
+    s = str(value if value is not None else "").strip().lower()
+    if "prologue" in s:
+        return 0
+    if "epilogue" in s:
+        return 999
+    return _coerce_int(value, default)
+
+
+async def _resolve_project_for_payload(payload: dict, *, create: bool) -> dict | None:
+    """G9: resolve (or create) ``project_id`` from ``project_title`` in place on the payload so the
+    chapter ops work from chat/voice, where only a title is ever supplied. Returns the resolved project
+    row (with its outline/genre) when a match/creation happened, else None. No-op without Supabase."""
+    from writer_engine.config import get_settings
+
+    if payload.get("project_id") or not payload.get("project_title"):
+        return None
+    settings = get_settings()
+    if not (settings.supabase_url and settings.supabase_service_role_key):
+        return None
+    from writer_engine.persist_helpers import resolve_or_create_project
+    from writer_engine.supabase.client import get_supabase_admin
+
+    client = await get_supabase_admin()
+    pid, row = await resolve_or_create_project(
+        client, user_id=str(payload.get("user_id") or ""), title=str(payload["project_title"]),
+        genre_slug=str(payload.get("genre_slug") or payload.get("genre") or ""), create=create,
+    )
+    if pid:
+        payload["project_id"] = pid
+        logger.info("chapter.project_resolved", project_id=pid, title=str(payload["project_title"])[:80],
+                    created=row is None)
+    return row
+
 # Craft seeds composed into a chapter WRITE (the load-bearing scene/prose/character guidance).
 _WRITE_SEEDS = [
     "follett_seeds.character.pov_selector",
@@ -399,8 +450,11 @@ async def _op_plan(payload: dict) -> dict:
     outline. The returned `sub_chapter_briefs` can be fed straight back into `write`."""
     from writer_engine.config import get_settings
 
+    # G9/G19: resolve project_id from title (no create — planning an as-yet-unwritten book is fine
+    # without a row) and accept Prologue/Epilogue as chapter references instead of crashing on int().
+    await _resolve_project_for_payload(payload, create=False)
     project_id = payload.get("project_id") or "00000000-0000-0000-0000-000000000000"
-    chapter_number = int(payload.get("chapter_number") or 1)
+    chapter_number = _coerce_chapter_number(payload.get("chapter_number"), 1)
     chapter_run_id = payload.get("chapter_run_id") or str(uuid4())
     req = WriteChapterRequest.model_validate(
         {"project_id": project_id, "chapter_number": chapter_number, "chapter_run_id": chapter_run_id,
@@ -968,6 +1022,11 @@ def _saved_sub_chapters(outline: dict[str, Any], chapter_number: Any) -> list:
 async def _op_write(payload: dict) -> dict:
     from writer_engine.config import get_settings
 
+    # G9: chat/voice only ever supply a project TITLE — resolve it to a project_id (creating a new
+    # project for a brand-new book) BEFORE validation, which requires the UUID. Without this every
+    # "write chapter N of X" failed with ValidationError: project_id required.
+    await _resolve_project_for_payload(payload, create=True)
+    payload["chapter_number"] = _coerce_chapter_number(payload.get("chapter_number"), 1)
     req = WriteChapterRequest.model_validate(payload)
     ctx = await _load_context(str(req.project_id), payload)
 
@@ -1127,7 +1186,7 @@ async def _persist_chapter_if_requested(
     if not payload.get("persist"):
         return None
     project_id, user_id = payload.get("project_id"), payload.get("user_id")
-    chapter_number = int(payload.get("chapter_number") or 0)
+    chapter_number = _coerce_chapter_number(payload.get("chapter_number"), 0)
     if not (project_id and user_id):
         logger.warning("chapter.persist.skip", reason="missing project_id/user_id", chapter=chapter_number)
         return {"persisted": False, "reason": "persist requested but project_id/user_id missing"}
@@ -1458,7 +1517,7 @@ async def _op_scan_drift(payload: dict) -> dict:
 
     text = str(payload.get("chapter_text") or payload.get("content_text") or "")
     outline = payload.get("outline") or {}
-    chapter_number = int(payload.get("chapter_number") or 0)
+    chapter_number = _coerce_chapter_number(payload.get("chapter_number"), 0)
     roster_text = _roster_text(payload.get("roster") or []) if payload.get("roster") else "(none)"
     period = str(payload.get("period") or "contemporary")
     drift = await _detect_drift(
@@ -1578,7 +1637,7 @@ async def _op_repair(payload: dict) -> dict:
     from writer_engine.config import get_settings
 
     project_id = payload.get("project_id")
-    chapter_number = int(payload.get("chapter_number") or 0)
+    chapter_number = _coerce_chapter_number(payload.get("chapter_number"), 0)
     text = str(payload.get("content_text") or "")
     if not text and project_id:
         text = await _load_persisted_chapter(str(project_id), chapter_number)
@@ -1805,7 +1864,7 @@ async def _op_blog(payload: dict) -> dict:
     topic = str(payload.get("topic") or payload.get("message") or "").strip()
     genre_slug = str(payload.get("genre_slug") or "")
     keywords = payload.get("keywords") or ""
-    target = int(payload.get("target_length") or 1500)
+    target = _coerce_int(payload.get("target_length"), 1500)  # G6: router may pass "1500 words"
     genre_name, guidelines = await _load_genre_guidelines(genre_slug)
     research, _ = await _chapter_research(
         topic, period="contemporary", title=topic, focus=f"Genre: {genre_slug}. Blog topic: {topic}"
@@ -1926,7 +1985,7 @@ async def _op_short_story(payload: dict) -> dict:
     genre_slug = str(ctx.get("genre_slug") or payload.get("genre_slug") or "")
     genre_name, guidelines = await _load_genre_guidelines(genre_slug)
     title = str(outline.get("title") or payload.get("title") or (premise.split(".")[0][:60] if premise else "Untitled"))
-    length = int(payload.get("length") or 3000)
+    length = _coerce_int(payload.get("length"), 3000)  # G6: router may pass "2500 words"
     arc = _arc_summary(outline) if outline.get("chapters") or outline.get("story_arc_name") else ""
     research, _ = await _chapter_research(
         premise, period=str(payload.get("period") or "contemporary"), title=title,

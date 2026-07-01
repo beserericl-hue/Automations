@@ -33,6 +33,60 @@ async def create_project(
     return str(rows[0]["id"]) if rows else ""
 
 
+async def resolve_project_id(
+    client: Any, *, user_id: str | None, title: str | None
+) -> tuple[str | None, dict | None]:
+    """Find the user's project whose title matches ``title`` (fuzzy — the n8n ilike behaviour).
+
+    Returns ``(project_id, row)`` for the best match, or ``(None, None)`` when nothing matches.
+    Used by the hub write paths (chapter.write / chapter.plan / brainstorm) to turn a spoken/typed
+    project TITLE into the ``project_id`` the step + persist layer require — the chat/voice surfaces
+    never carry a UUID (CR-004), so without this every 'write chapter N of <title>' fails validation.
+    """
+    from writer_engine.library_helpers.title_resolver import normalize_title, titles_match
+
+    if not title:
+        return None, None
+    q = client.table("writing_projects_v2").select("id,title,genre_slug,outline,user_id")
+    if user_id:
+        q = q.eq("user_id", user_id)
+    rows = await _rows(await q.limit(500).execute())
+    if not rows:
+        return None, None
+    # Exact normalized match wins; then the fuzzy (article-insensitive / substring) match.
+    want = normalize_title(title)
+    for row in rows:
+        if normalize_title(row.get("title")) == want:
+            return str(row["id"]), row
+    for row in rows:
+        if titles_match(row.get("title"), title):
+            return str(row["id"]), row
+    return None, None
+
+
+async def resolve_or_create_project(
+    client: Any, *, user_id: str, title: str | None, project_id: str | None = None,
+    genre_slug: str = "", project_type: str = "story", create: bool = True,
+) -> tuple[str | None, dict | None]:
+    """Resolve a project by id or title; create it (when ``create``) if the title matches nothing.
+
+    Central to G9/G12: 'write chapter 2 of "The Seed Vault"' resolves the existing project; 'write a
+    chapter of a new book called X' creates it. Returns ``(project_id, row_or_None)`` — the row is the
+    matched/created project so callers can reuse its outline/genre without a second query. When the
+    title matches nothing and ``create`` is False, returns ``(None, None)`` (the caller decides)."""
+    if project_id:
+        return str(project_id), None
+    pid, row = await resolve_project_id(client, user_id=user_id, title=title)
+    if pid:
+        return pid, row
+    if not (create and user_id and title):
+        return None, None
+    new_id = await create_project(
+        client, user_id=user_id, title=title, genre_slug=genre_slug, project_type=project_type
+    )
+    return (new_id or None), None
+
+
 async def persist_outline(
     client: Any, *, project_id: str, user_id: str, outline: dict, note: str = "engine brainstorm"
 ) -> None:

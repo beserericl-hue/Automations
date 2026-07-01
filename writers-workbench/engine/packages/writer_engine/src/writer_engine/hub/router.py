@@ -383,6 +383,84 @@ def _newsletter_params(message: str) -> dict[str, Any]:
     return params
 
 
+# --- content listing / research / social / story-bible detectors (G3/G4/G7/G10/G13/G16/G17) ---
+_STATUS_WORDS = {
+    "draft": "draft", "drafts": "draft", "published": "published", "scheduled": "scheduled",
+    "approved": "approved", "rejected": "rejected",
+}
+_TYPE_WORDS = [
+    (re.compile(r"\bblog(?:\s+post)?s?\b", re.I), "blog_post"),
+    (re.compile(r"\bnewsletters?\b", re.I), "newsletter"),
+    (re.compile(r"\bshort\s+stor(?:y|ies)\b", re.I), "short_story"),
+    (re.compile(r"\bchapters?\b", re.I), "chapter"),
+]
+_LIST_VERB = re.compile(r"\b(list|show|view|see|what(?:'s| are| is)?|display|browse)\b", re.I)
+_SOCIAL_PLATFORMS = {
+    "twitter": "twitter", "tweet": "twitter", "tweets": "twitter", "x": "twitter",
+    "linkedin": "linkedin", "facebook": "facebook", "instagram": "instagram", "insta": "instagram",
+    "threads": "threads", "tiktok": "tiktok",
+}
+_INLINE_CONTENT = re.compile(r":\s*(.+)$", re.S)
+
+
+def _list_content_params(message: str) -> dict[str, Any] | None:
+    """G10/G14: 'list my draft blog posts' / 'list my published content' / 'list scheduled newsletters'
+    → library.retrieve with a status + optional content_type filter. Returns None when the message
+    isn't a status-filtered content listing (so 'list all outlines' still routes to list-outlines)."""
+    low = message.lower()
+    if not _LIST_VERB.search(low):
+        return None
+    # 'deleted' / 'trash' listing is the lifecycle list_deleted op (a separate branch) — not a status
+    # filter on live content. Bail so it routes there.
+    if re.search(r"\b(deleted|trash)\b", low):
+        return None
+    status = None
+    for word, val in _STATUS_WORDS.items():
+        if re.search(rf"\b{word}\b", low):
+            status = val
+            break
+    ctype = None
+    for rx, val in _TYPE_WORDS:
+        if rx.search(message):
+            ctype = val
+            break
+    if not status and not ctype:
+        return None
+    # "outline(s)" listing is a different table (writing_projects) — leave it to list-outlines.
+    if "outline" in low and not ctype:
+        return None
+    params: dict[str, Any] = {}
+    if status:
+        params["status"] = status
+    if ctype:
+        params["content_type"] = ctype
+    return params
+
+
+def _research_params(message: str) -> dict[str, Any]:
+    """research.run params: topic (the message) + genre_slug (G4: 'genre slug X' was dropped)."""
+    params: dict[str, Any] = {"topic": message}
+    gm = re.search(r"genre\s+slug:?\s*([a-z][a-z-]+)", message, re.I) or re.search(
+        r"\bgenre:?\s*([a-z][a-z-]+)", message, re.I)
+    if gm:
+        params["genre_slug"] = gm.group(1).strip().lower()
+    return params
+
+
+def _social_params(message: str) -> dict[str, Any]:
+    """media.social-posts params (G7/G17): the platform(s) asked for + the inline content to repurpose.
+    'Repurpose this into LinkedIn posts: <text>' → platforms=[linkedin], summary=<text>."""
+    low = message.lower()
+    platforms = [v for k, v in _SOCIAL_PLATFORMS.items() if re.search(rf"\b{k}\b", low)]
+    # de-dup, preserve order
+    platforms = list(dict.fromkeys(platforms)) or ["twitter", "linkedin"]
+    params: dict[str, Any] = {"platforms": platforms}
+    im = _INLINE_CONTENT.search(message)
+    if im and len(im.group(1).strip()) > 20:
+        params["summary"] = im.group(1).strip()
+    return params
+
+
 def _decide(tool: str, op: str, params: dict[str, Any], conf: float = 0.6) -> HubDecision:
     spec = lookup(tool, op)
     return HubDecision(
@@ -428,6 +506,56 @@ def _numbered_selection(req: HubRequest) -> HubDecision | None:
     )
 
 
+def _deterministic_override(message: str) -> HubDecision | None:
+    """High-confidence intents that MUST route the same way every time, regardless of Gemini's mood.
+
+    The live suite showed Gemini (and the old heuristic) misrouting these to conversation or a
+    generative op: 'list my drafts' → chit-chat, 'repurpose into LinkedIn posts' → research/list,
+    'list the story arcs' → a fabricated answer, 'get the research report' → a NEW research run. Each
+    pattern here is unambiguous, so we resolve it deterministically before the model ever sees it
+    (G3/G7/G10/G13/G14/G16/G17). Returns None for anything not on this whitelist (→ normal routing)."""
+    msg = (message or "").strip()
+    low = msg.lower()
+    if _EMAIL_INTENT.search(low):  # 'email me …' keeps its own precedence
+        return None
+
+    # G7/G17 — repurpose into social posts (explicit inline content + platform).
+    if (re.search(r"\brepurpose\b", low)
+            or re.search(r"\bsocial\s+(media\s+)?posts?\b", low)
+            or (re.search(r"\b(twitter|tweet|linkedin|facebook|instagram|threads|tiktok)\b", low)
+                and re.search(r"\bposts?\b", low))):
+        return _decide("media", "social-posts", _social_params(msg), 0.85)
+
+    # G13 — list / get an EXISTING research report (not run a new one). "get/find/pull up/retrieve the
+    # research report" reads existing work; "run/do research on X" generates — keep those on research.run.
+    if ("research" in low
+            and re.search(r"\b(list|show|view|see|display|browse|get|fetch|find|pull\s+up|retrieve|open)\b", low)
+            and not _IS_WRITE.search(low)
+            and not re.search(r"\b(run|do|conduct|perform|start|new)\b[\w\s]{0,20}research", low)):
+        title = _extract_project_title(msg)
+        return _decide("library", "retrieve",
+                       {"content_type": "research", "search_term": title or msg}, 0.8)
+
+    # G3 — read the story bible (not write to it).
+    if "story bible" in low and not re.search(r"\b(write|create|add|update|generate|build)\b", low):
+        params: dict[str, Any] = {}
+        t = _extract_project_title(msg)
+        if t:
+            params["project_title"] = t
+        return _decide("story_bible", "list", params, 0.8)
+
+    # G16 — list the story arcs.
+    if re.search(r"\barcs?\b", low) and re.search(r"\b(list|show|what|which|available|see)\b", low):
+        return _decide("library", "retrieve", {"content_type": "story_arc"}, 0.85)
+
+    # G10/G14 — status/type-filtered content listing.
+    lp = _list_content_params(msg)
+    if lp is not None:
+        return _decide("library", "retrieve", lp, 0.8)
+
+    return None
+
+
 def _heuristic_route(message: str) -> HubDecision:
     """Deterministic precedence routing — Gemini's fallback and the offline regression net.
 
@@ -436,6 +564,13 @@ def _heuristic_route(message: str) -> HubDecision:
     message (e.g. 'fix the outline') lands on the op that production proved correct."""
     msg = (message or "").strip()
     low = msg.lower()
+
+    # High-confidence deterministic intents (social repurpose, status-filtered listings, story-bible
+    # read, list arcs, list/get research) resolve first — same as the pre-Gemini override — so the
+    # offline path and the tests agree with the live path (G3/G7/G10/G13/G14/G16/G17).
+    override = _deterministic_override(msg)
+    if override is not None:
+        return override
 
     # 0a. EMAIL ME / SEND ME AN EMAIL — highest precedence (E2E-1). "email me the outline for X",
     #     "email me chapter 1 of Y", "send me an email report with this content: …". Must win over the
@@ -556,6 +691,16 @@ def _heuristic_route(message: str) -> HubDecision:
             am = re.search(r"\b(approve|unschedule|unpublish|publish|reject|schedule|delete|undelete)\b", low)
             if am:
                 params["action"] = am.group(1)
+            # G11: thread the item's title/name into the op so it acts on the RIGHT content instead of
+            # falling back to the most-recent row. Prefer a quoted/`titled X` title, else the message
+            # (the op keyword-matches it, and refuses to mutate when nothing clearly matches).
+            title = _extract_project_title(msg)
+            if title:
+                params["project_title"] = title
+            params["search_term"] = msg
+            sd = re.search(r"\b(?:for|on|to)\s+(\d{4}-\d{2}-\d{2})", low)
+            if sd:
+                params["schedule_date"] = sd.group(1)
             return _decide("library", "lifecycle", params, 0.6)
         return _decide("library", "list-outlines", {}, 0.6)
     if is_writing:
@@ -565,7 +710,7 @@ def _heuristic_route(message: str) -> HubDecision:
 
     # remaining single-keyword tasks not covered above
     if re.search(r"\bresearch\b", low):
-        return _decide("research", "run", {"topic": msg}, 0.6)
+        return _decide("research", "run", _research_params(msg), 0.6)  # G4: keep genre_slug
     if re.search(r"\b(cover\s+art|generate\s+(a\s+)?cover|cover\s+image)\b", low):
         return _decide("media", "cover-art", {}, 0.6)
     if re.search(r"\b(repurpose|social\s+(media\s+)?posts?)\b", low):
@@ -673,6 +818,14 @@ async def route_message(
     sel = _numbered_selection(req)
     if sel is not None:
         return sel
+
+    # 1b. High-confidence deterministic intents win over Gemini (which the live suite showed
+    #     misrouting these): social repurpose, status listings, story-bible read, arcs, research get.
+    override = _deterministic_override(req.message)
+    if override is not None:
+        logger.info("hub.route.override", source=req.source, tool=override.tool, op=override.op,
+                    msg_preview=req.message[:120])
+        return override
 
     # 2. Gemini (primary) — falls through to heuristics if unavailable or it returns junk
     router = llm_router or get_router(service="hub")

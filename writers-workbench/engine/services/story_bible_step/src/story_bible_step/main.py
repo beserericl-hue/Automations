@@ -33,10 +33,22 @@ async def _op_list(payload: dict) -> dict:
     client = await _supabase_or_none()
     if client is None:
         return {"entries": []}
+    # G3: chat/voice supply a project TITLE ('get the story bible for X'), not an id — resolve it.
+    project_id = payload.get("project_id")
+    if not project_id and payload.get("project_title"):
+        from writer_engine.persist_helpers import resolve_project_id
+
+        project_id, _row = await resolve_project_id(
+            client, user_id=payload.get("user_id"), title=str(payload["project_title"])
+        )
+        if not project_id:
+            return {"entries": [], "found": False,
+                    "message": f"No project matching '{payload['project_title']}' found."}
     resp = await (
-        client.table("story_bible_v2").select("*").eq("project_id", payload.get("project_id")).execute()
+        client.table("story_bible_v2").select("*").eq("project_id", project_id).execute()
     )
-    return {"entries": getattr(resp, "data", None) or []}
+    rows = getattr(resp, "data", None) or []
+    return {"entries": rows, "count": len(rows), "found": bool(rows), "project_id": project_id}
 
 
 OPS = {"add": _op_add, "list": _op_list}

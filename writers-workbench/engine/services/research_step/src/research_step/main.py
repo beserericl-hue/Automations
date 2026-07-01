@@ -108,7 +108,7 @@ async def _synthesize(topic: str, qa: list[dict[str, str]], characters: str) -> 
 
 async def _op_run(payload: dict) -> dict:
     req = ResearchRequest.model_validate(payload)
-    genre = str(payload.get("genre") or "")
+    genre = str(payload.get("genre_slug") or payload.get("genre") or "")  # G4: keep the genre slug
     setting = str(payload.get("setting") or "")
     period = str(payload.get("period") or setting)
     place = str(payload.get("place") or "")

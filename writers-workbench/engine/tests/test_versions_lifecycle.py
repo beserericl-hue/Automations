@@ -172,7 +172,7 @@ def test_revert_project_not_found(monkeypatch):
 
 def test_delete_draft_snapshots_soft_deletes_and_emails(monkeypatch):
     store, sent = _patch(monkeypatch, {
-        "app_config": _APP_CONFIG,
+        "app_config_v2": _APP_CONFIG,
         "published_content_v2": [{
             "id": "c1", "user_id": "u1", "title": "The Forgotten Engineers of Rome",
             "status": "draft", "content_text": "body", "content_type": "blog_post", "metadata": {},
@@ -188,7 +188,7 @@ def test_delete_draft_snapshots_soft_deletes_and_emails(monkeypatch):
 
 def test_delete_published_is_rejected(monkeypatch):
     store, sent = _patch(monkeypatch, {
-        "app_config": _APP_CONFIG,
+        "app_config_v2": _APP_CONFIG,
         "published_content_v2": [{
             "id": "c2", "user_id": "u1", "title": "Why It Matters", "status": "published",
             "content_text": "body", "content_type": "blog_post", "metadata": {},
@@ -204,7 +204,7 @@ def test_delete_published_is_rejected(monkeypatch):
 
 def test_undelete_restores_to_draft(monkeypatch):
     _store, sent = _patch(monkeypatch, {
-        "app_config": _APP_CONFIG,
+        "app_config_v2": _APP_CONFIG,
         "published_content_v2": [{
             "id": "c3", "user_id": "u1", "title": "The Forgotten Engineers of Rome",
             "status": "deleted", "content_text": "body", "content_type": "blog_post", "metadata": {},

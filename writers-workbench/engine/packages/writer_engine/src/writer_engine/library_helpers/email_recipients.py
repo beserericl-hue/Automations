@@ -24,6 +24,29 @@ def _clean(v: str | None) -> str | None:
     return s or None
 
 
+async def load_app_config(client, keys, user_id=None) -> dict[str, str]:
+    """Load ``app_config_v2`` key→value for the given keys, scoped to ``user_id`` when supplied.
+
+    G2: the engine previously queried a table named ``app_config``; DEV/PROD Supabase actually have
+    ``app_config_v2``, and it is PER-USER (the ``recipient_email`` row differs per account). So the
+    lookup silently failed and every email fell back to ``users_v2.email``. This reads the correct,
+    user-scoped table: a user-scoped value wins over a global (null user_id) one for the same key."""
+    import contextlib
+
+    cfg: dict[str, str] = {}
+    global_cfg: dict[str, str] = {}
+    with contextlib.suppress(Exception):
+        rows = await client.table("app_config_v2").select("key,value,user_id").in_("key", list(keys)).execute()
+        for r in getattr(rows, "data", None) or []:
+            if not r.get("value"):
+                continue
+            if user_id and str(r.get("user_id")) == str(user_id):
+                cfg[r["key"]] = r["value"]
+            elif not r.get("user_id"):
+                global_cfg[r["key"]] = r["value"]
+    return {**global_cfg, **cfg}  # user-scoped overrides global
+
+
 def resolve_recipients(
     *,
     trigger_recipient: str | None = None,

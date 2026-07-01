@@ -81,16 +81,34 @@ async def _op_lifecycle(payload: dict) -> dict:
         rows = getattr(cur, "data", None) or []
         row = rows[0] if rows else None
     else:
-        # Resolve by title/name (delete/undelete by name). Undelete searches the trash; others active rows.
+        # G11: resolve by title/name (delete/undelete/publish/reject/schedule by name). This MUTATES, so
+        # it must never fall back to "the most recent row" on an empty/ambiguous term — that published /
+        # deleted arbitrary content. Require a real term, match it exactly-then-fuzzy, and refuse to act
+        # when nothing clearly matches. Undelete searches the trash; other actions the active rows.
+        term = _clean_str(
+            payload.get("project_title") or payload.get("title") or payload.get("search_term")
+        )
+        if not _keywords(term):
+            return {"error": "Please name the content to " + action + " (I won't guess which item).",
+                    "needs_title": True, "action": action}
         q = client.table("published_content_v2").select(cols)
         if user_id:
             q = q.eq("user_id", user_id)
         if action == "undelete":
             q = q.eq("status", "deleted")
+        ctf = _clean_str(payload.get("content_type_filter") or payload.get("content_type"))
+        if ctf:
+            q = q.eq("content_type", ctf)
+        chn = payload.get("chapter_number")
+        if chn not in (None, ""):
+            import contextlib as _cl
+            with _cl.suppress(TypeError, ValueError):
+                q = q.eq("chapter_number", int(chn))
         rows = getattr(await q.limit(200).execute(), "data", None) or []
-        row = _best_match(rows, _clean_str(payload.get("title") or payload.get("search_term")), ("title",))
+        row = _strict_best_match(rows, term, ("title",))
     if not row:
-        return {"error": "content not found", "id": content_id}
+        return {"error": f"No content matching '{_clean_str(payload.get('project_title') or payload.get('title') or payload.get('search_term'))}' found — nothing was changed.",
+                "id": content_id, "matched": False}
     content_id = row["id"]
     row_user = row.get("user_id") or user_id
 
@@ -148,10 +166,47 @@ async def _op_lifecycle(payload: dict) -> dict:
     return out
 
 
+_CONTENT_TYPE_ALIASES = {
+    "blog": "blog_post", "blogs": "blog_post", "blog_post": "blog_post", "blog_posts": "blog_post",
+    "short_story": "short_story", "short_stories": "short_story", "story": "short_story",
+    "newsletter": "newsletter", "newsletters": "newsletter",
+    "chapter": "chapter", "chapters": "chapter",
+}
+
+
 async def _op_retrieve(payload: dict) -> dict:
+    """Retrieve/list content from published_content_v2 with optional project/type/status filters AND a
+    free-text search term (G15). content_type=story_arc lists the story arcs (G16). Returns a ``found``
+    flag + ``count`` so a genuine no-match ('find my draft about quantum surfing') reports not-found
+    instead of dumping every row."""
     client = await _supabase_or_none()
     if client is None:
-        return {"items": [], "fixture": True}
+        return {"items": [], "fixture": True, "found": False, "count": 0}
+
+    raw_ct = _clean_str(payload.get("content_type")).lower().replace(" ", "_").replace("-", "_")
+    # G16: story arcs are their own table, not published content.
+    if raw_ct in {"story_arc", "story_arcs", "arc", "arcs"}:
+        from writer_engine.story_arcs import list_story_arcs
+
+        arcs = await list_story_arcs(client, payload.get("user_id"))
+        return {"items": arcs, "count": len(arcs), "found": bool(arcs), "content_type": "story_arc"}
+
+    # G13: research reports live in research_reports_v2, not published_content_v2.
+    if raw_ct in {"research", "research_report", "research_reports", "report", "reports"}:
+        rq = client.table("research_reports_v2").select("id,topic,genre_slug,status,created_at")
+        if payload.get("user_id"):
+            rq = rq.eq("user_id", payload["user_id"])
+        rq = rq.order("created_at", desc=True)
+        rrows = getattr(await rq.limit(200).execute(), "data", None) or []
+        term = _clean_str(payload.get("search_term") or payload.get("title"))
+        kws = _keywords(term)
+        if kws:
+            scored = [(sum(1 for kw in kws if kw in _clean_str(r.get("topic")).lower()), r) for r in rrows]
+            rrows = [r for s, r in sorted(scored, key=lambda t: t[0], reverse=True) if s]
+        limited = rrows[: int(payload.get("limit") or 50)]
+        return {"items": limited, "count": len(limited), "found": bool(limited),
+                "content_type": "research", "search_term": term or None}
+
     q = client.table("published_content_v2").select(
         "id,title,status,content_type,project_id,chapter_number,created_at"
     )
@@ -161,14 +216,34 @@ async def _op_retrieve(payload: dict) -> dict:
         q = q.eq("project_id", payload["project_id"])
     if payload.get("user_id"):
         q = q.eq("user_id", payload["user_id"])
-    if payload.get("content_type"):
-        q = q.eq("content_type", payload["content_type"])
+    ct = _CONTENT_TYPE_ALIASES.get(raw_ct, raw_ct)
+    if ct:
+        q = q.eq("content_type", ct)
     if payload.get("status"):
         q = q.eq("status", payload["status"])
     if payload.get("project_id"):
         q = q.order("chapter_number", desc=False)
-    resp = await q.limit(int(payload.get("limit") or 50)).execute()
-    return {"items": getattr(resp, "data", None) or []}
+    else:
+        q = q.order("created_at", desc=True)
+    resp = await q.limit(int(payload.get("limit") or 200)).execute()
+    items = getattr(resp, "data", None) or []
+
+    # G15: apply the free-text search term (title keyword match) so "find my draft about the Titanic"
+    # returns only the Titanic draft, and a non-existent subject returns found=false.
+    term = _clean_str(payload.get("search_term") or payload.get("title"))
+    kws = _keywords(term)
+    if kws:
+        scored = []
+        for it in items:
+            hay = _clean_str(it.get("title")).lower()
+            score = sum(1 for kw in kws if kw in hay)
+            if score:
+                scored.append((score, it))
+        scored.sort(key=lambda t: t[0], reverse=True)
+        items = [it for _s, it in scored]
+    limited = items[: int(payload.get("limit") or 50)]
+    return {"items": limited, "count": len(limited), "found": bool(limited),
+            "search_term": term or None}
 
 
 async def _op_list_outlines(payload: dict) -> dict:
@@ -218,30 +293,37 @@ def _best_match(rows: list[dict], term: str, fields: tuple[str, ...]) -> dict | 
     return best
 
 
+def _strict_best_match(rows: list[dict], term: str, fields: tuple[str, ...]) -> dict | None:
+    """Like :func:`_best_match` but NEVER falls back to rows[0]: an empty term or zero keyword overlap
+    returns None. Used for MUTATING lifecycle resolution (G11) where guessing = corrupting the wrong
+    content. Prefers an exact normalized-title match, then the best keyword-overlap match."""
+    from writer_engine.library_helpers.title_resolver import normalize_title, titles_match
+
+    kws = _keywords(term)
+    if not kws or not rows:
+        return None
+    want = normalize_title(term)
+    for row in rows:  # exact title first
+        if any(normalize_title(row.get(f)) == want for f in fields):
+            return row
+    for row in rows:  # then article-insensitive / substring (n8n ilike)
+        if any(titles_match(row.get(f), term) for f in fields):
+            return row
+    best, best_score = None, 0  # then keyword overlap (must be > 0)
+    for row in rows:
+        hay = " ".join(_clean_str(row.get(f)) for f in fields).lower()
+        score = sum(1 for kw in kws if kw in hay)
+        if score > best_score:
+            best, best_score = row, score
+    return best
+
+
 def _render_outline_md(outline: dict, title: str) -> str:
-    """Render an outline JSONB to readable markdown (premise + characters + chapters), not raw JSON."""
-    o = outline or {}
-    lines = [f"# {o.get('title') or title or 'Outline'}", ""]
-    if o.get("premise"):
-        lines += [str(o["premise"]), ""]
-    if o.get("story_arc_name"):
-        lines += [f"**Story arc:** {o['story_arc_name']}", ""]
-    chars = o.get("characters") or []
-    if chars:
-        lines += ["## Characters", ""]
-        for c in chars:
-            if isinstance(c, dict):
-                lines.append(f"- **{c.get('name', 'Unnamed')}** — {c.get('description', c.get('role', ''))}")
-        lines.append("")
-    chapters = o.get("chapters") or []
-    if chapters:
-        lines += ["## Chapters", ""]
-        for ch in chapters:
-            if isinstance(ch, dict):
-                num = ch.get("chapter_number", "")
-                lines.append(f"{num}. **{ch.get('title', '')}** — {ch.get('beat', ch.get('summary', ''))}")
-        lines.append("")
-    return "\n".join(lines)
+    """Render an outline JSONB to readable markdown (premise + characters + chapters), not raw JSON.
+    Delegates to the shared, key-tolerant renderer (G20) so chapter numbers/beats never come out blank."""
+    from writer_engine.library_helpers.outline_render import render_outline_markdown
+
+    return render_outline_markdown(outline, title)
 
 
 async def _email_recipients(client, explicit: str | None, user_id: str | None):
@@ -249,16 +331,9 @@ async def _email_recipients(client, explicit: str | None, user_id: str | None):
     > users_v2.email (last resort). BCC from app_config.bcc_email. Mirrors the centralized-email rule."""
     import contextlib
 
-    from writer_engine.library_helpers.email_recipients import resolve_recipients
+    from writer_engine.library_helpers.email_recipients import load_app_config, resolve_recipients
 
-    cfg: dict[str, str] = {}
-    with contextlib.suppress(Exception):
-        rows = await client.table("app_config").select("key,value").in_(
-            "key", ["recipient_email", "bcc_email"]
-        ).execute()
-        for r in getattr(rows, "data", None) or []:
-            if r.get("value"):
-                cfg[r["key"]] = r["value"]
+    cfg = await load_app_config(client, ["recipient_email", "bcc_email"], user_id)
     rec = resolve_recipients(trigger_recipient=_clean_str(explicit) or None, config=cfg)
     if not rec.to and user_id:
         with contextlib.suppress(Exception):
@@ -274,13 +349,19 @@ async def _email_recipients(client, explicit: str | None, user_id: str | None):
 async def _resolve_artifact(
     client, content_type: str, term: str, chapter_number, user_id: str | None
 ) -> tuple[str, str] | None:
-    """Resolve an existing artifact → (markdown_body, subject). None when nothing matches (not-found)."""
+    """Resolve an existing artifact → (markdown_body, subject). None when nothing matches (not-found).
+
+    G18: uses exact-then-fuzzy title matching (``_strict_best_match``) so a real title wins over a
+    keyword-overlap accident, and — critically for chapters — resolves the PROJECT by title first, then
+    filters that project's chapters by number. Previously 'chapter 1 of "The Seed Vault"' matched every
+    project's chapter 1 by keyword and emailed the wrong one; and a non-existent title returned a wrong
+    row instead of not-found."""
     if content_type == "outline":
         q = client.table("writing_projects_v2").select("title,outline").neq("outline", "{}")
         if user_id:
             q = q.eq("user_id", user_id)
         rows = getattr(await q.limit(200).execute(), "data", None) or []
-        match = _best_match(rows, term, ("title",))
+        match = _strict_best_match(rows, term, ("title",))
         if not match:
             return None
         return _render_outline_md(match.get("outline") or {}, match.get("title") or term), \
@@ -291,30 +372,50 @@ async def _resolve_artifact(
         if user_id:
             q = q.eq("user_id", user_id)
         rows = getattr(await q.limit(200).execute(), "data", None) or []
-        match = _best_match(rows, term, ("topic",))
+        # research rows have no `title`; match the topic (exact-then-fuzzy-then-keyword). No content-body
+        # fallback — that produced false-positive "matches" and emailed the wrong report (R105 class).
+        match = _strict_best_match(rows, term, ("topic",))
         if not match:
             return None
         return _clean_str(match.get("content")), f"Research Report — {match.get('topic') or term}"
 
-    # chapter / short_story / newsletter / blog → published_content_v2
+    # chapter → resolve the PROJECT by title, then that project's chapter by number (G18 R103).
+    if content_type == "chapter":
+        from writer_engine.persist_helpers import resolve_project_id
+
+        pid, _prow = await resolve_project_id(client, user_id=user_id, title=term)
+        q = client.table("published_content_v2").select(
+            "title,content_text,content_type,chapter_number,project_id"
+        ).eq("content_type", "chapter")
+        if user_id:
+            q = q.eq("user_id", user_id)
+        if pid:
+            q = q.eq("project_id", pid)
+        if chapter_number not in (None, ""):
+            import contextlib
+            with contextlib.suppress(TypeError, ValueError):
+                q = q.eq("chapter_number", int(chapter_number))
+        rows = getattr(await q.limit(200).execute(), "data", None) or []
+        # With a resolved project + chapter number the row is unambiguous; else fall back to title match.
+        match = rows[0] if (pid and rows) else _strict_best_match(rows, term, ("title", "content_text"))
+        if not match:
+            return None
+        subject = f"Chapter {match['chapter_number']} — {match.get('title') or term}" \
+            if match.get("chapter_number") not in (None, "") else (_clean_str(match.get("title")) or term)
+        return _clean_str(match.get("content_text")), subject
+
+    # short_story / newsletter / blog → published_content_v2 by title
     q = client.table("published_content_v2").select("title,content_text,content_type,chapter_number")
     if user_id:
         q = q.eq("user_id", user_id)
     if content_type:
         q = q.eq("content_type", content_type)
-    if content_type == "chapter" and chapter_number not in (None, ""):
-        import contextlib
-
-        with contextlib.suppress(TypeError, ValueError):
-            q = q.eq("chapter_number", int(chapter_number))
     rows = getattr(await q.limit(200).execute(), "data", None) or []
-    match = _best_match(rows, term, ("title", "content_text"))
+    # Title match only — a content-body keyword fallback emailed the wrong story for a non-existent title (R105).
+    match = _strict_best_match(rows, term, ("title",))
     if not match:
         return None
-    if match.get("content_type") == "chapter" and match.get("chapter_number") not in (None, ""):
-        subject = f"Chapter {match['chapter_number']} — {match.get('title') or term}"
-    else:
-        subject = _clean_str(match.get("title")) or term or "Your content"
+    subject = _clean_str(match.get("title")) or term or "Your content"
     return _clean_str(match.get("content_text")), subject
 
 

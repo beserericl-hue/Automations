@@ -16,7 +16,7 @@ _BOLD = re.compile(r"\*\*(.+?)\*\*")
 _ITALIC = re.compile(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)")
 _ORDERED = re.compile(r"^\s*\d+\.\s+(.*)$")
 _UNORDERED = re.compile(r"^\s*[-*]\s+(.*)$")
-_HEADING = re.compile(r"^(#{1,3})\s+(.*)$")
+_HEADING = re.compile(r"^\s*(#{1,3})\s+(.*)$")  # G5: tolerate leading whitespace before ## / ###
 
 
 def _inline(text: str) -> str:

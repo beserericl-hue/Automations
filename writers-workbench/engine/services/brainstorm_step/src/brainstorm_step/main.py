@@ -74,14 +74,26 @@ def _build_story_system(
     # E2E-4: inject the arc's actual beats (from story_arcs_v2.prompt_text) so the outline honours the
     # named arc's structure and can tag each chapter's arc_notes to a real stage.
     arc_beats = f"\n\nSTORY ARC BEATS — structure the chapters along THESE stages:\n{arc_text}\n" if arc_text else ""
+    # G12: when the author asks for a specific chapter count ("... 8 chapters"), HONOUR it instead of the
+    # default Follett 60-72 scale — otherwise the model split the difference (a "8 chapter" request came
+    # back as 39). The count anchor above still enforces the ±3 tolerance.
+    count_req = (
+        f"{target_chapters} chapters (±2)" if target_chapters
+        else "60-72 chapters"
+    )
+    scale_line = (
+        "SCALE — honour the requested chapter count exactly. Requirements:\n"
+        if target_chapters else
+        "SCALE — this is a full-length novel, not a short story (Follett-scale). Requirements:\n"
+    )
     return compose_craft_system(
         seed_keys=_STORY_SEEDS, genre_block=_genre_block(genre), arc_block=_arc_block(arc)
     ) + arc_beats + (
         "\n\n" + title_lock + anchor +
         "Produce the novel outline as strict JSON matching StoryOutline (title, premise, themes, "
         "story_arc_name, dramatic_question, wow_factor, characters, chapters).\n\n"
-        "SCALE — this is a full-length novel, not a short story (Follett-scale). Requirements:\n"
-        "1. CHAPTERS: 60-72 chapters PLUS a Prologue (chapter_number 0) and an Epilogue "
+        + scale_line +
+        f"1. CHAPTERS: {count_req} PLUS a Prologue (chapter_number 0) and an Epilogue "
         "(chapter_number = last+1). Each chapter entry is COMPACT — {chapter_number, title, act, "
         "arc_point, pov_character, bridge_from_prior, beat, arc_notes} where `beat` is 1-2 sentences on "
         "what happens (a dramatic movement with a story turn) and `arc_notes` names WHICH stage of the "
@@ -118,23 +130,40 @@ def _fixture_outline(payload: dict) -> StoryOutline:
 
 
 async def _persist_outline_if_requested(payload: dict, outline_dict: dict) -> dict | None:
-    """CR-001 (W2): when `persist` + project_id + user_id are supplied, save the outline to
-    writing_projects_v2.outline (+ a prior-version snapshot). Best-effort — never breaks generation."""
+    """CR-001 (W2): when `persist` + user_id are supplied, save the outline to
+    writing_projects_v2.outline (+ a prior-version snapshot). Best-effort — never breaks generation.
+
+    G12: a brainstorm from chat/voice carries a TITLE, never a project_id — so resolve-or-create the
+    project here (by title) before persisting. Without this the generated outline was discarded and the
+    'Outline is ready' email arrived empty, dead-ending the whole outline→chapter pipeline."""
     if not payload.get("persist"):
         return None
-    project_id, user_id = payload.get("project_id"), payload.get("user_id")
-    if not (project_id and user_id):
-        return {"persisted": False, "reason": "persist requested but project_id/user_id missing"}
+    user_id = payload.get("user_id")
+    if not user_id:
+        return {"persisted": False, "reason": "persist requested but user_id missing"}
     settings = get_settings()
     if not (settings.supabase_url and settings.supabase_service_role_key):
         return {"persisted": False, "reason": "supabase not configured"}
     try:
-        from writer_engine.persist_helpers import persist_outline
+        from writer_engine.persist_helpers import persist_outline, resolve_or_create_project
         from writer_engine.supabase.client import get_supabase_admin
 
         client = await get_supabase_admin()
+        project_id = payload.get("project_id")
+        created = False
+        if not project_id:
+            title = str(payload.get("title") or outline_dict.get("title") or "Untitled")
+            project_id, row = await resolve_or_create_project(
+                client, user_id=str(user_id), title=title,
+                genre_slug=str(payload.get("genre_slug") or payload.get("genre") or ""),
+                project_type="story", create=True,
+            )
+            created = row is None
+            payload["project_id"] = project_id  # thread it back so callers report the real id
+        if not project_id:
+            return {"persisted": False, "reason": "could not resolve or create a project"}
         await persist_outline(client, project_id=str(project_id), user_id=str(user_id), outline=outline_dict)
-        return {"persisted": True, "project_id": str(project_id)}
+        return {"persisted": True, "project_id": str(project_id), "created_project": created}
     except Exception as exc:
         return {"persisted": False, "error": str(exc)[:200]}
 
@@ -360,20 +389,52 @@ def _build_revise_system(title: str) -> str:
     )
 
 
+async def _load_project_outline(payload: dict) -> dict:
+    """G12: resolve the project by id/title and load its CURRENT outline from writing_projects_v2 so a
+    'revise the outline for X' from chat (which carries only a title) actually has an outline to revise
+    and can persist a snapshot. Sets payload['project_id'] when resolved. {} when nothing found."""
+    if payload.get("outline"):
+        return dict(payload["outline"])
+    settings = get_settings()
+    if not (settings.supabase_url and settings.supabase_service_role_key):
+        return {}
+    from writer_engine.persist_helpers import resolve_project_id
+    from writer_engine.supabase.client import get_supabase_admin
+
+    client = await get_supabase_admin()
+    pid = payload.get("project_id")
+    row = None
+    if not pid and payload.get("project_title"):
+        pid, row = await resolve_project_id(
+            client, user_id=payload.get("user_id"), title=str(payload["project_title"]))
+    if pid:
+        payload["project_id"] = pid
+    if row and row.get("outline"):
+        return dict(row["outline"])
+    if pid:
+        resp = await client.table("writing_projects_v2").select("outline").eq("id", pid).limit(1).execute()
+        rows = getattr(resp, "data", None) or []
+        if rows and rows[0].get("outline"):
+            return dict(rows[0]["outline"])
+    return {}
+
+
 async def _op_revise_outline(payload: dict) -> dict:
     """Directive-driven outline revision: apply a brainstorm idea to an existing outline.
 
-    Payload: {outline, directive (free text), title?}. Returns the complete revised outline.
+    Payload: {outline?|project_title|project_id, directive (free text), title?}. When no inline outline
+    is supplied, the project's current outline is loaded by title (G12). Returns the revised outline.
     """
-    outline = dict(payload.get("outline") or {})
+    outline = await _load_project_outline(payload)
     directive = str(
         payload.get("directive") or payload.get("idea") or payload.get("requirements") or ""
     ).strip()
-    title = str(payload.get("title") or outline.get("title") or "")
+    title = str(payload.get("title") or outline.get("title") or payload.get("project_title") or "")
     if not directive:
         return {"revised": False, "outline": outline}
     if not outline:
-        return {"revised": False, "outline": outline, "error": "no outline to revise"}
+        return {"revised": False, "outline": outline,
+                "error": "no outline to revise — I couldn't find a saved outline for that project"}
     router = get_router(service=STEP_NAME)
     try:
         revised, _resp = await complete_structured(

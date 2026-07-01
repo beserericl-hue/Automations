@@ -27,33 +27,101 @@ _BODY_SNIPPET_CHARS = 20000  # cap the inlined prose so the email isn't enormous
 
 
 async def _load_recipients(client: Any, user_id: str | None):
-    """Per-user email (users_v2) takes precedence, then app_config recipient_email/bcc_email."""
-    cfg: dict[str, str] = {}
-    with contextlib.suppress(Exception):
-        rows = await client.table("app_config").select("key,value").in_(
-            "key", ["recipient_email", "bcc_email"]
-        ).execute()
-        for r in getattr(rows, "data", None) or []:
-            if r.get("value"):
-                cfg[r["key"]] = r["value"]
-    user_email = None
-    if user_id:
+    """Recipient precedence: app_config_v2.recipient_email (user-scoped) > users_v2.email.
+
+    G2: reads ``app_config_v2`` (per-user), not the non-existent ``app_config``."""
+    from writer_engine.library_helpers.email_recipients import load_app_config
+
+    cfg = await load_app_config(client, ["recipient_email", "bcc_email"], user_id)
+    # app_config_v2.recipient_email (what the user configured) wins; users_v2.email is the fallback.
+    if not cfg.get("recipient_email") and user_id:
         with contextlib.suppress(Exception):
             ur = await client.table("users_v2").select("email,bcc_email").eq(
                 "user_id", user_id
             ).limit(1).execute()
             row = (getattr(ur, "data", None) or [{}])[0]
-            user_email = row.get("email")
+            if row.get("email"):
+                cfg["recipient_email"] = row["email"]
             if row.get("bcc_email"):
                 cfg.setdefault("bcc_email", row["bcc_email"])
-    return resolve_recipients(trigger_recipient=user_email, config=cfg)
+    return resolve_recipients(config=cfg)
+
+
+def _deliverable_html(tool: str, op: str, result: dict) -> str:
+    """G1: render the ACTUAL produced work as HTML for the completion email — not a bare 'ready' notice.
+
+    Each tool stores its deliverable in a different place, so a single ``result.content_text`` check
+    (the old behaviour) only ever caught chapter prose:
+      * research.run   → ``result.row.report_markdown`` (the full report + citations)
+      * brainstorm.*   → ``result.outline`` (premise + characters + chapters) — rendered from JSON
+      * media.cover-art→ ``result.image_url`` — embedded as an <img> so the art is IN the email
+      * media.social-posts → ``{platform: post}`` — each post rendered
+      * chapter.* / blog / newsletter / short-story → ``result.content_text``
+    """
+    from writer_engine.library_helpers.markdown_html import markdown_to_html
+
+    # research report
+    if tool == "research":
+        row = result.get("row") or {}
+        md = row.get("report_markdown") or result.get("report_markdown") or result.get("content") or ""
+        if md:
+            return "<hr>" + markdown_to_html(str(md))
+
+    # brainstormed outline
+    if tool == "brainstorm":
+        outline = result.get("outline")
+        if isinstance(outline, dict) and outline:
+            from writer_engine.library_helpers.outline_render import render_outline_markdown
+
+            return "<hr>" + markdown_to_html(render_outline_markdown(outline))
+
+    # media: cover art image / social posts
+    if tool == "media":
+        if op == "cover-art" or result.get("image_url"):
+            url = result.get("image_url") or ""
+            if url and url.startswith("http"):
+                return (
+                    "<hr><p style='font-family:system-ui,sans-serif'>Generated cover art:</p>"
+                    f"<p><img src='{escape(url)}' alt='cover art' "
+                    "style='max-width:480px;width:100%;border-radius:8px'/></p>"
+                    f"<p style='font-size:12px;color:#888'>{escape(url)}</p>"
+                )
+        # social-posts: result is a {platform: post} mapping
+        posts = {k: v for k, v in result.items()
+                 if isinstance(v, str) and k not in {"note", "provider", "prompt", "error"}}
+        if posts:
+            blocks = "".join(
+                f"<h3 style='font-family:system-ui,sans-serif;margin:12px 0 4px'>{escape(k.title())}</h3>"
+                f"<div style='font-family:system-ui,sans-serif;white-space:pre-wrap'>{escape(str(v))}</div>"
+                for k, v in posts.items()
+            )
+            return "<hr>" + blocks
+
+    # everything with inline prose (chapters, blog, newsletter, short story)
+    prose = result.get("content_text") or result.get("content") or ""
+    if prose:
+        snippet = str(prose)[:_BODY_SNIPPET_CHARS] + (
+            "\n\n… (truncated; open in the Workbench for the full text)"
+            if len(str(prose)) > _BODY_SNIPPET_CHARS else ""
+        )
+        return (
+            "<hr><div style='font-family:Georgia,serif;font-size:15px;line-height:1.6;"
+            f"white-space:pre-wrap'>{escape(snippet)}</div>"
+        )
+    return ""
 
 
 def build_task_email(tool: str, body: dict, result: dict) -> tuple[str, str]:
-    """Return (subject, html) for a completed task — result data + the metadata block."""
+    """Return (subject, html) for a completed task — the deliverable + a metadata block."""
     op = str(body.get("op") or "")
     chapter = body.get("chapter_number")
-    project = body.get("project_title") or body.get("project_id") or "your project"
+    # G8: thread the work's own title (research topic / outline title / content title) into the label.
+    result_title = (
+        (result.get("row") or {}).get("topic")
+        or (result.get("outline") or {}).get("title")
+        or result.get("title")
+    )
+    project = body.get("title") or body.get("project_title") or result_title or body.get("project_id") or "your project"
     label = _LABELS.get(tool, tool.title())
     what = f"{label} {chapter}".strip() if chapter is not None else label
     subject = f"[Writer's Workbench] {what} — {project} is ready"
@@ -86,14 +154,7 @@ def build_task_email(tool: str, body: dict, result: dict) -> tuple[str, str]:
         f"<h2 style='font-family:system-ui,sans-serif'>{escape(what)} is ready</h2>"
         f"<table style='font-family:system-ui,sans-serif;font-size:14px'>{rows_html}</table>"
     )
-    prose = result.get("content_text") or result.get("content") or ""
-    if prose:
-        snippet = prose[:_BODY_SNIPPET_CHARS] + ("\n\n… (truncated; open in the Workbench for the full text)"
-                                                 if len(prose) > _BODY_SNIPPET_CHARS else "")
-        html += (
-            "<hr><div style='font-family:Georgia,serif;font-size:15px;line-height:1.6;"
-            f"white-space:pre-wrap'>{escape(snippet)}</div>"
-        )
+    html += _deliverable_html(tool, op, result)  # G1: embed the actual produced work
     return subject, html
 
 

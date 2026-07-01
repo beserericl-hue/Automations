@@ -59,7 +59,7 @@ _APP_CONFIG = [{"key": "recipient_email", "value": "eric@agileadtesting.com"}]
 
 
 def test_inline_content_renders_and_sends(monkeypatch):
-    sent = _patch(monkeypatch, {"app_config": _APP_CONFIG})
+    sent = _patch(monkeypatch, {"app_config_v2": _APP_CONFIG})
     out = asyncio.run(lib._op_email_content({
         "user_id": "u1",
         "subject": "Regression Test: Email Report",
@@ -76,7 +76,7 @@ def test_inline_content_renders_and_sends(monkeypatch):
 
 
 def test_explicit_recipient_overrides_app_config(monkeypatch):
-    sent = _patch(monkeypatch, {"app_config": _APP_CONFIG})
+    sent = _patch(monkeypatch, {"app_config_v2": _APP_CONFIG})
     out = asyncio.run(lib._op_email_content({
         "user_id": "u1", "content": "hello", "recipient": "override@example.com",
     }))
@@ -87,7 +87,7 @@ def test_explicit_recipient_overrides_app_config(monkeypatch):
 
 def test_resolve_outline_renders_structure_not_json(monkeypatch):
     tables = {
-        "app_config": _APP_CONFIG,
+        "app_config_v2": _APP_CONFIG,
         "writing_projects_v2": [{
             "title": "The Seed Vault",
             "outline": {
@@ -111,7 +111,7 @@ def test_resolve_outline_renders_structure_not_json(monkeypatch):
 
 def test_not_found_sends_nothing(monkeypatch):
     tables = {
-        "app_config": _APP_CONFIG,
+        "app_config_v2": _APP_CONFIG,
         "published_content_v2": [{
             "title": "An Entirely Different Tale", "content_text": "irrelevant",
             "content_type": "short_story", "chapter_number": None,

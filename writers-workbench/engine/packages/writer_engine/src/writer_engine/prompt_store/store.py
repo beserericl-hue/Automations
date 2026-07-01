@@ -46,7 +46,7 @@ class PromptStore:
             return 0
         try:
             client = await get_supabase_admin()
-            resp = await client.table("app_config").select("key,value").like("key", "prompts.%").execute()
+            resp = await client.table("app_config_v2").select("key,value").like("key", "prompts.%").execute()
         except Exception:
             return 0
         rows = getattr(resp, "data", None) or []
