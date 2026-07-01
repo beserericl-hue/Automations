@@ -96,15 +96,15 @@ async def _op_lifecycle(payload: dict) -> dict:
             q = q.eq("user_id", user_id)
         if action == "undelete":
             q = q.eq("status", "deleted")
-        ctf = _clean_str(payload.get("content_type_filter") or payload.get("content_type"))
-        if ctf:
-            q = q.eq("content_type", ctf)
+        # NOTE: do NOT filter by content_type here. The router/Gemini often passes a noise content_type
+        # ("draft", "blog") that does not equal the stored value ("blog_post") and would exclude the real
+        # row → a false not-found (it regressed approve/publish/reject/delete). Title match is the gate.
         chn = payload.get("chapter_number")
         if chn not in (None, ""):
             import contextlib as _cl
             with _cl.suppress(TypeError, ValueError):
                 q = q.eq("chapter_number", int(chn))
-        rows = getattr(await q.limit(200).execute(), "data", None) or []
+        rows = getattr(await q.limit(300).execute(), "data", None) or []
         row = _strict_best_match(rows, term, ("title",))
     if not row:
         return {"error": f"No content matching '{_clean_str(payload.get('project_title') or payload.get('title') or payload.get('search_term'))}' found — nothing was changed.",
@@ -173,6 +173,14 @@ _CONTENT_TYPE_ALIASES = {
     "chapter": "chapter", "chapters": "chapter",
 }
 
+# Alias the router/Gemini content_type onto the keys _resolve_artifact / email-content branch on.
+_CT_ALIAS = {
+    "research_report": "research", "research_reports": "research", "report": "research", "reports": "research",
+    "blog_post": "blog", "blog_posts": "blog", "blogpost": "blog",
+    "short_story": "short_story", "shortstory": "short_story", "story": "short_story",
+    "book": "outline", "project": "outline", "novel": "outline",
+}
+
 
 async def _op_retrieve(payload: dict) -> dict:
     """Retrieve/list content from published_content_v2 with optional project/type/status filters AND a
@@ -190,6 +198,24 @@ async def _op_retrieve(payload: dict) -> dict:
 
         arcs = await list_story_arcs(client, payload.get("user_id"))
         return {"items": arcs, "count": len(arcs), "found": bool(arcs), "content_type": "story_arc"}
+
+    # Outlines/projects live in writing_projects_v2, not published_content_v2. 'Retrieve the outline
+    # for X' must read that table (with a title search) — else it returned 0 (R70/R74/R77/R88).
+    if raw_ct in {"outline", "outlines", "project", "projects", "book", "novel"}:
+        pq = client.table("writing_projects_v2").select("id,title,genre_slug,status,outline").neq("outline", "{}")
+        if payload.get("user_id"):
+            pq = pq.eq("user_id", payload["user_id"])
+        prows = getattr(await pq.limit(200).execute(), "data", None) or []
+        term = _clean_str(payload.get("search_term") or payload.get("title") or payload.get("project_title"))
+        kws = _keywords(term)
+        if kws:
+            match = _strict_best_match(prows, term, ("title",))
+            items = [match] if match else []
+        else:
+            items = [{k: v for k, v in p.items() if k != "outline"} for p in prows]
+        limited = items[: int(payload.get("limit") or 50)]
+        return {"items": limited, "count": len(limited), "found": bool(limited),
+                "content_type": "outline", "search_term": term or None}
 
     # G13: research reports live in research_reports_v2, not published_content_v2.
     if raw_ct in {"research", "research_report", "research_reports", "report", "reports"}:
@@ -267,6 +293,11 @@ _EMAIL_STOP = {
     "the", "a", "an", "of", "for", "about", "on", "in", "me", "my", "email", "e-mail", "please",
     "send", "with", "and", "to", "story", "short", "research", "report", "newsletter", "chapter",
     "outline", "titled", "title", "this", "that", "named",
+    # search/command verbs — these are how the user PHRASES the request, not part of the content they
+    # want. Without dropping them, "find my draft about X" keyword-matched polluted titles like
+    # "Find my draft ..." and a genuine not-found returned rows (G15 R37).
+    "find", "get", "show", "list", "retrieve", "pull", "fetch", "open", "view", "see", "all",
+    "draft", "drafts", "published", "content", "blog", "post", "posts", "up", "give",
 }
 
 
@@ -435,6 +466,9 @@ async def _op_email_content(payload: dict) -> dict:
     subject = _clean_str(payload.get("subject"))
     inline = _clean_str(payload.get("content") or payload.get("content_text"))
     content_type = _clean_str(payload.get("content_type")).lower().replace(" ", "_").replace("-", "_")
+    # Normalise the content_type the router/Gemini emits to the internal keys _resolve_artifact expects
+    # (research_report/report → research; blog_post → blog; short-story/story → short_story).
+    content_type = _CT_ALIAS.get(content_type, content_type)
     term = _clean_str(payload.get("title") or payload.get("search_term"))
     chapter_number = payload.get("chapter_number")
 

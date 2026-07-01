@@ -447,6 +447,52 @@ def _research_params(message: str) -> dict[str, Any]:
     return params
 
 
+_RETRIEVE_LEAD = re.compile(
+    r"^\s*(?:please\s+)?(find|show|pull\s+up|pull|retrieve|fetch|load|grab|open|get|see|list|display)\b", re.I)
+_GEN_VERB = re.compile(r"\b(write|compose|create|generate|brainstorm|repurpose|research)\b", re.I)
+_RET_NOUN = [
+    (re.compile(r"\boutlines?\b", re.I), "outline"),
+    (re.compile(r"\bshort\s+stor(?:y|ies)\b", re.I), "short_story"),
+    (re.compile(r"\bnewsletters?\b", re.I), "newsletter"),
+    (re.compile(r"\bblog(?:\s+post)?s?\b", re.I), "blog"),
+    (re.compile(r"\bchapters?\b", re.I), "chapter"),
+    (re.compile(r"\b(?:research\s+)?reports?\b|\bresearch\b", re.I), "research"),
+    (re.compile(r"\bstor(?:y|ies)\b", re.I), "short_story"),
+]
+_ABOUT_TITLE = re.compile(r'\b(?:about|on|for|titled|called|named)\s+"?(.+?)"?\s*$', re.I)
+
+
+def _retrieve_intent_params(message: str) -> dict[str, Any] | None:
+    """A RETRIEVE/SHOW/FIND request for existing work → library.retrieve params (content_type + search).
+    Guards against generation verbs so 'write a blog' / 'research X' never match. Returns None if the
+    message isn't a lead-verb retrieval of a known content noun (G15/G10: 'find my draft short story
+    about the Titanic', 'retrieve the outline for X', 'show me my outlines')."""
+    if not _RETRIEVE_LEAD.search(message) or _GEN_VERB.search(message):
+        return None
+    low = message.lower()
+    # Yield to more specific intents that share a retrieval lead verb: version history, trash listing,
+    # revert/restore, and 'call me back' (the callback flow) all handle 'show/pull up …' themselves.
+    if re.search(r"\bversion\b|\bhistory\b|\bdeleted\b|\btrash\b|\brevert\b|\brestore\b"
+                 r"|\bcall\s+me\b|\bcallback\b|help\s+me\s+(improve|revise|review)", low):
+        return None
+    ctype = None
+    for rx, val in _RET_NOUN:
+        if rx.search(message):
+            ctype = val
+            break
+    if not ctype:
+        return None
+    params: dict[str, Any] = {"content_type": ctype}
+    qm = re.search(r'"([^"]{2,})"', message)
+    am = _ABOUT_TITLE.search(message)
+    if qm:
+        params["search_term"] = qm.group(1).strip()
+    elif am:
+        params["search_term"] = am.group(1).strip()
+    # bare "show me my outlines" (no subject) → list them all (no search term)
+    return params
+
+
 def _social_params(message: str) -> dict[str, Any]:
     """media.social-posts params (G7/G17): the platform(s) asked for + the inline content to repurpose.
     'Repurpose this into LinkedIn posts: <text>' → platforms=[linkedin], summary=<text>."""
@@ -518,6 +564,10 @@ def _deterministic_override(message: str) -> HubDecision | None:
     low = msg.lower()
     if _EMAIL_INTENT.search(low):  # 'email me …' keeps its own precedence
         return None
+    # 'call me back' is the eve-callback flow — defer so it isn't stolen by the research/retrieve rules
+    # below (which share the 'pull up my …' lead). The callback branch in _heuristic_route / Gemini owns it.
+    if re.search(r"\bcall\s+me(\s+back)?\b", low):
+        return None
 
     # G7/G17 — repurpose into social posts (explicit inline content + platform).
     if (re.search(r"\brepurpose\b", low)
@@ -552,6 +602,15 @@ def _deterministic_override(message: str) -> HubDecision | None:
     lp = _list_content_params(msg)
     if lp is not None:
         return _decide("library", "retrieve", lp, 0.8)
+
+    # G15 — a lead-verb retrieval of existing work ('retrieve the outline for X', 'find my draft short
+    # story about Y', 'show me my outlines') must READ, never regenerate. Outlines route to list-outlines
+    # when no search term (a bare 'show me my outlines'), else to retrieve (which reads the right table).
+    rp = _retrieve_intent_params(msg)
+    if rp is not None:
+        if rp["content_type"] == "outline" and not rp.get("search_term"):
+            return _decide("library", "list-outlines", {}, 0.8)
+        return _decide("library", "retrieve", rp, 0.8)
 
     return None
 

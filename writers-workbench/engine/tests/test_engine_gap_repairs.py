@@ -201,3 +201,41 @@ def test_route_lifecycle_threads_title():  # G11
 def test_route_email_still_wins_over_research_listing():  # precedence guard
     d = _route("Email me the research report on Rome")
     assert (d.tool, d.op) == ("library", "email-content")
+
+
+# --------------------------------------------------------------------------- live-run regressions
+def test_route_retrieve_outline_by_title():  # R70 — outline retrieval, not generate
+    d = _route('Retrieve the outline for "The Accord"')
+    assert (d.tool, d.op) == ("library", "retrieve")
+    assert d.params.get("content_type") == "outline" and "Accord" in d.params.get("search_term", "")
+
+
+def test_route_show_my_outlines_lists():  # R83 — 'show me my outlines'
+    d = _route("Show me my outlines")
+    assert (d.tool, d.op) == ("library", "list-outlines")
+
+
+def test_route_find_draft_story_retrieves_not_generates():  # V25 — must not write a new story
+    d = _route("Find my draft short story about the Titanic")
+    assert (d.tool, d.op) == ("library", "retrieve")
+    assert d.params.get("content_type") == "short_story"
+
+
+def test_route_delete_not_stolen_by_retrieve():  # lifecycle delete still routes to lifecycle
+    d = _route('Delete the draft titled "The Forgotten Engineers of Rome"')
+    assert (d.tool, d.op) == ("library", "lifecycle") and d.params.get("action") == "delete"
+
+
+def test_route_callback_not_stolen_by_retrieve():  # 'pull up … and call me back' stays callback
+    d = _route("Pull up my research report about Rome and call me back to review it")
+    assert (d.tool, d.op) == ("notify", "eve-callback")
+
+
+def test_route_write_chapter_not_stolen_by_retrieve():  # generation still generates
+    d = _route('Write chapter 5 of "The Seed Vault"')
+    assert (d.tool, d.op) == ("chapter", "write")
+
+
+def test_ct_alias_research_report(monkeypatch):  # R102 — email-content research_report alias
+    assert lib._CT_ALIAS.get("research_report") == "research"
+    assert lib._CT_ALIAS.get("blog_post") == "blog"
