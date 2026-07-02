@@ -47,6 +47,7 @@ the suite (fixed ones are marked ✅).
 - [[library-and-reference]] — Content Library, Research, Brainstorm, Outlines, Story Arcs, Genres, Sources, Cost, Credits, Trash, Settings. Specs: `regression/library.spec.ts`, `reference.spec.ts`, `settings.spec.ts`.
 - [[story-bible-and-images]] — `/projects/:id/bible` StoryBiblePanel + EntryForm, `/images/:id` ImageDetail, ImageGallery. Spec: covered via `project-detail.spec.ts` (Art tab) + notes here.
 - [[newsletter-ui]] — all `/newsletter/*` routes. Spec: `regression/newsletter.spec.ts`.
+- [[eve-voice-widget]] — the ElevenLabs ConvAI voice widget in the Workbench + the DEV demo-agent→engine wiring (pinned to the demo account). Spec: `regression/eve-voice-widget.spec.ts`.
 - [[admin-superuser]] — `/admin/*`, `/superuser/*` (access-gated). Spec: `regression/nav-render.spec.ts` (guarded-route block) + notes here.
 
 ## Cross-cutting findings (worth fixing over time)

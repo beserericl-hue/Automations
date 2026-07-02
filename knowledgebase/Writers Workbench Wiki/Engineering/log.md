@@ -587,3 +587,15 @@ reference-form CRUD open/cancel, Settings theme+danger-zone, and the newsletter 
 a11y bug it surfaced (RewriteWithResearchModal missing role="dialog"/aria-modal) + test-robustness
 (async-load settle waits, correct editor-toolbar accessible names). Documented in [[ui-regression/_index]]
 (one page per feature area + findings). Commit 2aed98c on develop.
+
+## [2026-07-02] setup | Demo Eve (Writing Assistant Dev) repointed to the DEV engine, pinned to demo account
+
+Configured the DEV/demo ElevenLabs agent `Writing Assistant Dev` (agent_0001kpr667v6ffctex0a8dt4fk71,
+phone +14435012219 — the agent the DEV Workbench voice widget uses via VITE_ELEVENLABS_AGENT_ID) to route
+to the DEV engine hub (Path B) instead of the old n8n dev webhook. New webhook tool
+`forward_writing_request_engine_dev` → POST /internal/hub/voice with x-service-secret; body user_id pinned
+to the constant +14105914612 so the demo always acts as the demo account and never touches any other
+user's data. Prompt + LLM unchanged. PROD (agent_2801) and V1 (agent_6401) NOT touched; original n8n dev
+tool preserved for revert. Verified: widget mounts agent_0001 with the demo user in the Workbench UI
+(e2e/regression/eve-voice-widget.spec.ts, green), and the exact tool payload round-trips through the engine
+(list→data 23 outlines; write→queued blog job). Full details + revert in [[eve-voice-widget]].
