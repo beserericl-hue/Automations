@@ -6,7 +6,7 @@
  * /newsletter/execution/<id> on success.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch, ApiError } from '../../lib/api';
 import EditionBadge from './EditionBadge';
@@ -63,7 +63,10 @@ function formatLongDate(yyyyMmDd: string): string {
 
 export default function NewsletterGenerate() {
   const navigate = useNavigate();
-  const [editionId, setEditionId] = useState<string>('');
+  // The setup wizard deep-links here as `?edition=<id>` ("Generate now →"); honour it so the chosen
+  // edition is preselected instead of silently defaulting to editions[0].
+  const [searchParams] = useSearchParams();
+  const [editionId, setEditionId] = useState<string>(searchParams.get('edition') ?? '');
   const [templateId, setTemplateId] = useState<string>(''); // empty = use edition's default
   const [sendDate, setSendDate] = useState<string>(todayIso());
   const [previousContent, setPreviousContent] = useState<string>('');
@@ -88,9 +91,11 @@ export default function NewsletterGenerate() {
     [editions, editionId],
   );
 
-  // Default the select to the first edition once editions load.
+  // Default the select to the first edition once editions load. Also recover if a deep-linked
+  // ?edition id isn't among the loaded editions (stale/invalid) — fall back to the first.
   useEffect(() => {
-    if (!editionId && editions[0]) setEditionId(editions[0].id);
+    if (!editions.length) return;
+    if (!editionId || !editions.some((e) => e.id === editionId)) setEditionId(editions[0].id);
   }, [editionId, editions]);
 
   // Templates for the chosen edition. The dropdown shows them all; "" =

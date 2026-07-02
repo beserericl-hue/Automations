@@ -43,9 +43,10 @@ Spec: `writers-workbench/e2e/regression/newsletter.spec.ts`. Render of every new
 
 - **Generate template-override is a dead control** — `#template` value is never sent to
   `/api/newsletter/generate` (only edition_id/send_date/previous_content). Choosing a template has no effect.
-- **Setup → Generate `?edition=` is ignored** — NewsletterGenerate defaults to `editions[0]`; the wizard's
-  chosen edition isn't preselected. Same class: `EditionSetupWizard` passes `userName={null}` so the
-  subscriber name never prefills.
+- ✅ **Setup → Generate `?edition=` is ignored** — FIXED 2026-07-02: NewsletterGenerate now seeds
+  `editionId` from the `?edition` search param (with a fallback if the id is stale/invalid). Covered by
+  `newsletter.spec.ts` "Generate honours a deep-linked ?edition=". (Related, not yet fixed:
+  `EditionSetupWizard` passes `userName={null}` so the subscriber name never prefills.)
 - **HelpButton footer doc link** points at `/docs/newsletter-user-guide.html` (repo file is `.md`) — likely 404.
 - **ExecutionStatus `handleResolved(decision)` arity mismatch** — drops the `resumed` flag from
   `ApprovalResolveForm.onResolved(decision, resumed)`; a failed n8n resume isn't surfaced on that page.

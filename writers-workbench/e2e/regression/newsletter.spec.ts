@@ -26,6 +26,19 @@ test.describe('Newsletter — editions + generate + templates + help', () => {
     await expect(page.getByRole('combobox').first()).toBeVisible();
   });
 
+  test('Generate honours a deep-linked ?edition= (setup wizard preselect)', async ({ page }) => {
+    await page.goto('/newsletter/generate');
+    const editionSelect = page.locator('#edition');
+    await expect(editionSelect).toBeVisible({ timeout: 20_000 });
+    const values = await editionSelect.locator('option').evaluateAll((opts) =>
+      (opts as HTMLOptionElement[]).map((o) => o.value).filter(Boolean),
+    );
+    test.skip(values.length < 2, 'need ≥2 editions to prove preselect');
+    const target = values[values.length - 1]; // NOT the default (first) — proves the param is honoured
+    await page.goto(`/newsletter/generate?edition=${encodeURIComponent(target)}`);
+    await expect(page.locator('#edition')).toHaveValue(target, { timeout: 15_000 });
+  });
+
   test('Generate form: edition/send-date controls + submit present', async ({ page }) => {
     await page.goto('/newsletter/generate');
     await expect(page.getByText(/Generate|Edition|Send date|No enabled editions/i).first()).toBeVisible({ timeout: 20_000 });
