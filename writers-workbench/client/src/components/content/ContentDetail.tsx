@@ -434,7 +434,7 @@ export default function ContentDetail() {
                 </svg>
               </button>
             </div>
-            <ImageGallery projectId={item.project_id} onSelectImage={handleSelectCoverImage} />
+            <ImageGallery projectId={item.project_id ?? undefined} onSelectImage={handleSelectCoverImage} />
           </div>
         </div>
       )}
