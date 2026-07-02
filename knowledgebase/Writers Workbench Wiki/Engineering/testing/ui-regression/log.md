@@ -36,5 +36,11 @@ last_reviewed: 2026-07-02
 
 - `scripts/e2e_full_verify.py` + engine router: threaded voice/chat conversation context + demonstrative
   pronoun resolution ("blog about that", "email me that research"), isolated lifecycle-test data with
-  seeded disposable known-state rows, R79 verify-by-DB-row, R89 last-step route grading. The 6 previously
-  non-passing suite tests (R79, R89, R98, V36, V03, V22) now pass live on DEV. See [[engine-e2e-full-rerun-report]].
+  seeded disposable known-state rows, R79 verify-by-DB-row, R89 last-step route grading.
+- **Real engine bug fixed (surfaced by V22):** Gemini nondeterministically classified an explicit
+  "write a blog post about that …" as *conversation* (~half of calls, temperature-driven), so the 2nd
+  turn of the research→blog voice flow produced no blog. Added deterministic pre-Gemini overrides for
+  one-shot writes (blog / newsletter / short story). Verified live: routing went 6/6 `chapter.blog`
+  after deploy and V22 re-ran green (blog persisted, 1292 words).
+- **Result: all 6 previously non-passing suite tests now PASS live on DEV** — R79, R89, R98, V03, V22,
+  V36 → 6/6. See [[engine-e2e-full-rerun-report]].
