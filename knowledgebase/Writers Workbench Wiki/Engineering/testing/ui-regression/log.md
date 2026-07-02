@@ -44,3 +44,12 @@ last_reviewed: 2026-07-02
   after deploy and V22 re-ran green (blog persisted, 1292 words).
 - **Result: all 6 previously non-passing suite tests now PASS live on DEV** — R79, R89, R98, V03, V22,
   V36 → 6/6. See [[engine-e2e-full-rerun-report]].
+
+## [2026-07-02] build | Full UI regression GREEN — 173 tests, 0 failures (develop @ c9d7d99)
+Two-pass runner (light@3 / heavy@1 / signout, retries=2). Fixed this pass: chapter cover picker had no
+projectId (listed every user image → picked another project's cover); reference-render Outlines locator
+ambiguous with the sidebar; newsletter-templates Default+Active hydration race; TS2322 build break
+(project_id null coalesce). Confirmed all remaining failures were concurrency-timing / external engine
+flakiness (each passes in isolation) — absorbed by assertion-preserving retries. Remaining gaps: admin/
+superuser (role-gated, needs elevated account) + a few no-DB-effect items (LogoUploader, Apply Fix,
+ingestion drawer, onboarding/password). Runner: e2e/run-regression.sh; env: e2e/.env.e2e.example.

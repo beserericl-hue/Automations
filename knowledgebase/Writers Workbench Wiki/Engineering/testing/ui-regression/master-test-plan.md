@@ -1,132 +1,171 @@
 ---
 name: Master UI test plan — every page, button, PASS + FAIL criteria
-description: The authoritative run-after-every-sprint matrix. Every page/route, every interactive element, its expected result, explicit PASS criteria, explicit FAIL criteria, and the covering result-asserting test + status (GREEN / PENDING).
+description: The authoritative run-after-every-sprint matrix. Every page/route, every interactive element, its expected result, explicit PASS criteria, explicit FAIL criteria, and the covering result-asserting test + status (GREEN / PENDING / role-gated).
 type: reference
 last_reviewed: 2026-07-02
 ---
 
 # Master UI test plan
 
-Rule: every test asserts the **real produced result** (DOM output that is not a spinner/empty state **AND**
-the backing DB row/field changed; async actions poll to completion first), data-isolated (create → assert →
-hard-delete), pinned to demo user `+14105914612`. Harness: `e2e/pages/api.ts`. **Status legend:**
-🟢 GREEN = result-asserting test passing on DEV · 🟡 PENDING = test to build/finish · 🔴 BUG = open defect.
+Rule: every test asserts the **real produced result** — the DOM shows the real output (never a spinner /
+empty state / "no data") **AND** the backing DB row/field actually changed (queried via the DEV Supabase REST
+in [`e2e/pages/api.ts`](../../../../../writers-workbench/e2e/pages/api.ts)); async actions poll to completion
+first. Every test is data-isolated (seed disposable row → assert → hard-delete) and pinned to demo user
+`+14105914612`. **Status legend:** 🟢 GREEN = result-asserting test passing on DEV · 🟡 PENDING = no test
+yet · 🔒 ROLE-GATED = needs an elevated (admin/superuser) test account.
 
-Bugs found + fixed so far (result-asserting caught what click-only tests missed):
+## Authoritative run — 2026-07-02 (develop @ `c9d7d99`, DEV Railway)
+
+Runner: [`e2e/run-regression.sh`](../../../../../writers-workbench/e2e/run-regression.sh) (two-pass, `retries=2`).
+
+| Pass | Specs | Tests | Result |
+|---|---|---|---|
+| A — light (DB/render/fast API) @ workers=3 | 33 | 145 | **145 passed** (2 flaky → green on retry) |
+| B — heavy engine/LLM/image jobs @ workers=1 | 7 | 26 | **26 passed** |
+| C — sign-out (isolated session) | 1 | 2 | **2 passed** |
+| **Total** | **41** | **173** | **173 passed · 0 failed** |
+
+The 2 flaky = `topbar` search-nav + `newsletter` `?edition=` deep-link — both concurrency-timing races that
+pass on retry (each retry re-runs the *full* result-assert; no assertion is weakened). Heavy Pass B needed no
+retries. Reproduce: `set -a; source e2e/.env.e2e; set +a; bash e2e/run-regression.sh`.
+
+### App bugs the result-asserting bar caught + fixed (click-only tests missed all of these)
 `import-from-genre` 500 (broken upsert) · CSV subscriber import 500 (broken upsert) · new editions had no
-default template · **newsletter had no Preview button** · **per-chapter artwork missing + book cover never
-associated project_id → Art tab always empty**. All fixed; commits on `develop`.
+default template · newsletter had no **Preview** button · per-chapter **artwork missing** + book cover never
+set `project_id` → Art tab always empty · VersionHistory stale-cache after save · BrainstormForm auto-match
+race · **chapter cover picker listed every user image (no `projectId` scope)** — swapped in another project's
+cover. All fixed on `develop`.
 
 ---
 
-## 1. Newsletter Setup Wizard — `/newsletter/editions/:id/setup`  · spec `newsletter-wizard.spec.ts` 🟢
-| Element | Expected result | PASS criteria | FAIL criteria |
+## 1. Newsletter Setup Wizard — `/newsletter/editions/:id/setup` · `newsletter-wizard.spec.ts` 🟢
+| Element | Expected result | PASS | FAIL |
 |---|---|---|---|
-| Feeds: "Copy N feeds from `<genre>`" | imports genre feeds | "N feeds attached" count > 0 **AND** `newsletter_feed_sources_v2` rows exist for edition | count stays 0, no rows, or 500 |
-| Template step preview | renders default template | iframe `srcdoc` length > 100 **AND** default `newsletter_templates_v2` row exists | "No active default template" shown / blank iframe |
-| Subscriber "Add" | creates subscriber | `newsletter_subscribers_v2` row for edition+email exists; button → "Added ✓" | no row / error |
-| Done step | shows completion | "All set" + "Generate now →" + "Back to my newsletters" visible | missing buttons |
+| "Copy N feeds from `<genre>`" | imports genre feeds | "N feeds attached" > 0 AND `newsletter_feed_sources_v2` rows exist | count 0 / no rows / 500 |
+| Template step preview | renders default template | iframe `srcdoc` > 100 AND default `newsletter_templates_v2` row exists | blank / "no default template" |
+| Subscriber "Add" | creates subscriber | `newsletter_subscribers_v2` row for edition+email; "Added ✓" | no row |
+| Done step | completion | "All set" + "Generate now →" + "Back" visible | missing buttons |
 
-## 2. Newsletter editions list — `/newsletter/editions`  · `newsletter-wizard.spec.ts` (Preview) 🟢 / rest 🟡
-| Element | Expected result | PASS criteria | FAIL criteria |
-|---|---|---|---|
-| **Preview** (per row) | modal renders the default template | dialog "Preview of …" opens; iframe `srcdoc` > 100 chars | no dialog / blank iframe / "no template" |
-| New newsletter / EditionEditor Save | create edition | 🟢 `newsletter-crud.spec.ts`: newsletter_editions_v2 row with display_name+genre | missing row |
-| Feeds / Edit | navigate | correct URL + page renders | 🟡 |
-| Disable / Re-enable | toggles `enabled` | 🟢 `newsletter-crud`: `newsletter_editions_v2.enabled` flips false↔true in DB | no flip |
-| Show disabled | includes disabled rows | disabled editions appear when checked (verify server honours include_disabled) | 🟡 |
-
-## 3. EditionEditor — `/newsletter/editions/new` + `/:id`  🟡
-| Element | Expected result | PASS criteria | FAIL criteria |
-|---|---|---|---|
-| Save (create) | inserts edition | 201 + `newsletter_editions_v2` row with all field values; **+ default template seeded** | missing row/fields |
-| Save (edit) | updates edition | changed fields persisted in DB | stale values |
-| LogoUploader | uploads/removes logo | `stamp_url` set/cleared in DB | 🟡 |
-| Feeds add / SubscribersPanel | mutates rows | 🟢 `newsletter-crud`/`newsletter-wizard`: newsletter_feed_sources_v2 + newsletter_subscribers_v2 rows | no row |
-
-## 4. Newsletter Generate / Templates / Approvals / Sends / Ingestion  🟡
-| Element | Expected result | PASS criteria | FAIL criteria |
-|---|---|---|---|
-| Generate "Preview template" | modal renders HTML | iframe `srcdoc` > 100 | blank |
-| Generate submit | starts execution | navigates to `/newsletter/execution/:id`; execution row/state exists | no execution |
-| Generate `?edition=` deep-link | preselects edition | `#edition` value === param (fallback if stale) | ignored (fixed earlier) |
-| TemplateEditor Save + Render preview | persists + previews template | `newsletter_templates_v2` row updated; preview iframe HTML > 100 | 🟡 |
-| ApprovalDetail Approve/Reject/Revise | resolves the gate | approval status transitions server-side; rendered payload preview shows real HTML | 🟡 |
-| Sends detail | html preview | iframe `srcdoc` = stored html_body (> 0) | blank |
-| Ingestion drawer markdown/html | shows ingested content | pre/iframe non-empty for a real item | 🟡 |
-
-## 5. ProjectDetail — `/projects/:id` (9 tabs)  · Export 🟢, Cover/Chapter Art 🟢, rest 🟡
-| Element | Expected result | PASS criteria | FAIL criteria |
-|---|---|---|---|
-| **Export → Download .docx** | downloads KDP doc | download event fires; file > 2 KB; filename `.docx` | dialog opens but no download / tiny file |
-| **Generate Cover Art** (Outline) | book cover in gallery | `generated_images_v2` row (image_type cover_art, **project_id set**) + Art tab thumbnail | no row / project_id null / Art empty |
-| **Generate Art** (per chapter, Chapters tab) | chapter art in gallery | `generated_images_v2` row (image_type chapter_art, project_id) + Art thumbnail | no row / Art empty |
-| Outline / Re-outline, Write / Rewrite | queue engine job → artifact | job completes; `published_content_v2` chapter/outline updated with real content | queued forever / no DB change |
-| Fix Drift (+Cancel) | repair job flips QA | after job, `chapter_qa_v2`/metadata aligned=true | drift persists |
-| Social tab Copy | copies post text | clipboard has post text; posts render from `social_posts_v2` | empty |
-| Story Bible panel CRUD | add/delete entry | 🟢 `story-bible-crud.spec.ts`: story_bible_v2 row added then soft-deleted | no DB change |
-| Research / Cost tabs | list/analytics | real rows/values render | 🟡 |
-| Edit form Save | updates project | 🟢 `project-detail-crud.spec.ts`: writing_projects_v2.title persisted | stale |
-| Delete Project | soft-deletes | 🟢 `project-detail-crud`: writing_projects_v2.deleted_at set + nav to /projects | no delete |
-
-## 6. ContentDetail — `/content/:id`  · lifecycle 🟢, rest 🟡
-| Element | Expected result | PASS criteria | FAIL criteria |
-|---|---|---|---|
-| **Approve/Publish/Reject/Back-to-Draft/Schedule/Unpublish** | status transition | `published_content_v2.status` on the exact row → expected value; UI advances | wrong/no status change |
-| **Run Q/A** | consistency report | 🟢 `content-qa.spec.ts`: after the queued job, `metadata.qa_report.checks` exists AND report DISPLAYS | stays empty / no checks |
-| **AnnotationsPanel Apply Fix** | replaces target text | `content_text` changes to include the fix; annotation clears | text unchanged / annotation stays |
-| Rewrite with research | queues repair job | job completes; chapter `content_text` updated + research woven | no change |
-| VersionHistory Restore | restores a version | `content_text` == chosen version; new snapshot row added | unchanged |
-| Editor Save + Version History | persists + snapshots | 🟢 `content-editor.spec.ts`: content_text persisted + content_versions_v2 row; History lists versions | not saved |
-| Cover image picker | sets cover | `cover_image_path` set on row; banner shows image | unchanged |
-
-## 7. Dashboard / ProjectList  🟡
+## 2. Newsletter editions list — `/newsletter/editions` · `newsletter-wizard` + `newsletter-crud` + `newsletter` 🟢
 | Element | Expected | PASS | FAIL |
 |---|---|---|---|
-| StatCards | counts | 🟢 `dashboard.spec.ts`: Projects/Research counts == DB | wrong/blank |
-| Recent Activity row | navigate | opens the item's detail route | dead |
+| **Preview** (per row) | modal renders default template | dialog opens; iframe `srcdoc` > 100 | no dialog / blank |
+| New newsletter / EditionEditor Save | create edition | `newsletter_editions_v2` row w/ display_name+genre (+ default template seeded) | missing row |
+| Disable / Re-enable | toggle `enabled` | `newsletter_editions_v2.enabled` flips false↔true in DB | no flip |
+| Show disabled | include disabled | disabled editions appear when checked | not shown |
+
+## 3. EditionEditor — `/newsletter/editions/new` + `/:id` · `newsletter-crud` + `newsletter` 🟢 (LogoUploader 🟡)
+| Element | Expected | PASS | FAIL |
+|---|---|---|---|
+| Save (create/edit) | insert/update edition | row + all field values persisted in DB | missing/stale |
+| Feeds add / SubscribersPanel | mutate rows | `newsletter_feed_sources_v2` + `newsletter_subscribers_v2` rows | no row |
+| LogoUploader | upload/remove logo | `stamp_url` set/cleared | 🟡 no test |
+
+## 4. Newsletter Generate / Templates / Feeds / Approvals / Sends · `newsletter-generate` + `-templates` + `-feeds` 🟢
+| Element | Expected | PASS | FAIL |
+|---|---|---|---|
+| Generate "Preview template" | modal HTML | iframe `srcdoc` > 100 | blank |
+| Generate submit | start execution | navigates `/newsletter/execution/:id`; execution starts | no execution |
+| Generate `?edition=` deep-link | preselect edition | select value === param | ignored |
+| TemplateEditor Save (POST/PUT) + Render preview | persist + preview | `newsletter_templates_v2` row created/updated; preview iframe HTML > 100 | no row / blank |
+| TemplateEditor Import HTML / Default+Active | replace HTML / flags | source textarea replaced (script stripped); `active`/`is_default` persist | unchanged |
+| FeedEditor Pause/Resume / Edit / Delete | mutate feed | `active` flips; edit persists; delete removes row | no change |
+| ScheduledSends filters + detail | filter + HTML | list narrows; NewsletterDetail iframe = stored html; Markdown toggle reveals `<pre>` | blank |
+| Approvals Approve / Revise | resolve gate | seeded approval → Approve resolves in DB; Revise persists decision=revise (feedback required) | no transition |
+| HelpButtons (generate/sends/approvals/feeds/templates) | open/close | slide-over opens then closes | stuck |
+
+## 5. ProjectDetail — `/projects/:id` (tabs) · `project-detail*` + `project-tabs` + `project-export` + `project-art` + `project-plan-write` + `content-repair` 🟢
+| Element | Expected | PASS | FAIL |
+|---|---|---|---|
+| **Export → Download .docx** | KDP doc | download fires; file > 2 KB; `.docx` | no download / tiny |
+| **Generate Cover Art** (Outline) | book cover | `generated_images_v2` row (cover_art, project_id set) + Art thumbnail | no row / project_id null |
+| **Generate Art** (per chapter) | chapter art | `generated_images_v2` row (chapter_art, project_id) + Art thumbnail | no row / Art empty |
+| **Outline** (chapter.plan) | persist outline | `outline.chapters[N].chapter_outline` gains sub-chapters | queued forever / no change |
+| **Write / Rewrite** (chapter.write) | write chapter | `published_content_v2` chapter content_text > 200 words | no content |
+| **Fix Drift** (chapter.repair) | repair aligns QA | fresh `chapter_qa_v2` row `aligned=true` | drift persists |
+| **Rewrite with research** | repair job | `content_text` changes | no change |
+| Tabs: Overview/Outline/Bible/Social/Research/Cost | render + interact | each tab's content renders; expanders/filters/Copy work | tab blank |
+| Social Copy | copy post | clipboard has post text (from `social_posts_v2`) | empty |
+| Edit Save / Delete Project | update / soft-delete | title persisted / `deleted_at` set + nav to /projects | stale / no delete |
+
+## 6. ContentDetail — `/content/:id` · `content-detail*` + `content-editor` + `content-qa` + `content-lifecycle` 🟢
+| Element | Expected | PASS | FAIL |
+|---|---|---|---|
+| Approve/Publish/Reject/Back-to-Draft/Schedule/Unschedule/Unpublish | status transition | `published_content_v2.status` on the exact row → expected; UI advances | wrong/no change |
+| **Run Q/A** | consistency report | after job, `metadata.qa_report.checks` exists (incl. consistency/drift) AND report DISPLAYS | empty / no checks |
+| VersionHistory View/Restore/Compare | restore + diff | Restore sets `content_text` == chosen version + new snapshot; Compare gated <2 | unchanged |
+| Editor Save + Version History | persist + snapshot | `content_text` persisted + `content_versions_v2` row; History lists it | not saved |
+| **Cover image picker** | set/swap/remove cover | `cover_image_path` set to a **seeded project image**, then cleared | wrong image / unchanged |
+| Editor toolbar (Bold/Italic/Strike/H1-3/lists/quote/HR/Undo/Redo/Save) | format + persist | each wraps selection in the right tag AND persists content_text | no format / not saved |
+| Provenance / Sources toggle | expand | shows sources or the empty state | crash |
+| AnnotationsPanel Apply Fix | replace target text | `content_text` includes the fix; annotation clears | 🟡 no test |
+
+## 7. Dashboard / ProjectList · `dashboard.spec.ts` 🟢
+| Element | Expected | PASS | FAIL |
+|---|---|---|---|
+| StatCards | counts | Projects/Research counts == DB | wrong/blank |
 | Project row | open | `/projects/:id` renders | dead |
 
-## 8. Content Library — `/library`  🟡
+## 8. Content Library — `/library` · `library-full` + `library-bulk` + `library` 🟢
 | Element | Expected | PASS | FAIL |
 |---|---|---|---|
-| Type filter | filter + `?type=` | rows filter; URL param set | no effect |
-| Sort headers | reorder | row order changes by field | no change |
-| Bulk Approve | mutate selected | 🟢 `library-bulk.spec.ts`: both selected rows status=approved in DB | no change |
-| Row click | open detail | `/content/:id` | dead |
+| Type/Status/Genre/Project filters | narrow list (+`?type=`) | rows filter; URL param set | no effect |
+| Sort headers (Title/Type/Status/Updated) | reorder | sort indicator toggles | no change |
+| Clear filters / page-size select | reset / paginate | list resets; row count changes | no effect |
+| Bulk Approve / Publish / Delete | mutate selected | selected rows → approved/published/`deleted_at` in DB | no change |
+| Row click / select | open / bulk bar | `/content/:id` / toolbar appears | dead |
 
-## 9. Reference — story-arcs / genres / brainstorm / research / outlines / sources / cost  🟡
+## 9. Reference — story-arcs / genres / story-bible / brainstorm / research / outlines / sources / cost · `*-crud` + `reference-*` + `brainstorm-submit` 🟢
 | Element | Expected | PASS | FAIL |
 |---|---|---|---|
-| Story Arc create/delete | CRUD | 🟢 `story-arcs-crud.spec.ts`: `story_arcs_v2` row inserted then removed (DB-verified) | no DB change |
-| Genre create/delete | CRUD | 🟢 `genres-crud.spec.ts`: genre_config_v2 row inserted then removed (DB) | no change |
-| Brainstorm Analyze gating / Outlines list | gating + list | 🟢 `reference-render.spec.ts`: Analyze gated by content; outlined project appears in /outlines | broken |
-| Research open/delete | read + soft-delete | 🟢 `research-crud.spec.ts`: open detail + delete sets deleted_at | no change |
+| Story Arc / Genre / Story Bible create + edit + delete | CRUD | row inserted → updated → removed/soft-deleted (DB-verified) | no DB change |
+| Brainstorm Analyze → Submit | gate + create | Analyze gated by content; Submit creates `writing_projects_v2` row | broken |
+| Outlines list | list + link | outlined project appears in `/outlines` (main region) and links to it | missing |
+| Research open/delete | read + soft-delete | open detail; delete sets `deleted_at` | no change |
+| Sources / Cost | filters + analytics | type filters + range buttons render real content | crash |
 
-## 10. Account / Auth — settings / credits / onboarding / login/signup/forgot/reset  🟡
+## 10. Account / Auth — settings / credits · `settings-result` + `credits` 🟢 (onboarding/pwd 🟡)
 | Element | Expected | PASS | FAIL |
 |---|---|---|---|
-| Settings Save | persist email cfg | 🟢 `settings-result.spec.ts`: app_config_v2 recipient_email persisted (save/restore) | stale |
-| Theme toggle | flips theme | `<html>` `dark` class toggles | 🟢 (nav suite) |
-| Update Password | changes pwd | success toast; auth updated | error |
-| Credits balance / Purchase | balance | 🟢 `credits.spec.ts`: page balance == API; purchase (if offered) increases it | mismatch |
-| Onboarding profile+tier | creates user+sub | `users_v2` row + subscription | error |
-| Login/Signup/Forgot/Reset | auth flows | correct redirect/panel | 🟡 |
+| Settings Save | persist email cfg | `app_config_v2` recipient_email persisted (save/restore) | stale |
+| Theme toggle | flip theme | `<html>.dark` toggles both directions | stuck |
+| Phone + auth email | present, disabled | rendered read-only by design | editable |
+| Credits balance | == API | page balance == `/api/credits` | mismatch |
+| Onboarding / Update Password | create user / change pwd | user+subscription row / success | 🟡 no test (needs fresh user) |
 
-## 11. Images / Eve voice widget  · widget 🟢
+## 11. Images / Eve voice widget · `images-gallery` + `image-detail` + `eve-voice-widget` 🟢
 | Element | Expected | PASS | FAIL |
 |---|---|---|---|
-| Eve "Talk to Eve" widget | mounts ConvAI | `<elevenlabs-convai>` with agent-id + user dynamic-var | 🟢 |
-| ImageDetail Regenerate | new image | new `generated_images_v2` row; navigates to it | 🟡 |
-| ImageGallery Type filter | filter | 🟢 `images-gallery.spec.ts`: 2 seeded images → filter narrows to 1 | no filter |
+| Eve "Talk to Eve" widget | mount ConvAI | `<elevenlabs-convai>` with agent-id + user dynamic-var | not mounted |
+| ImageGallery Type filter | filter | 2 seeded images → filter narrows to 1 | no filter |
+| ImageDetail render / Download / Regenerate | show + download + gate | image + metadata render; download event fires; Regenerate gated on prompt | blank / no download |
+
+## 12. Global chrome — TopBar / Sidebar / ChatDrawer / Nav · `topbar` + `sidebar` + `chat-drawer` + `nav-render` + `topbar-signout` 🟢
+| Element | Expected | PASS | FAIL |
+|---|---|---|---|
+| TopBar Search / Cmd+K / result nav | open + navigate | panel opens; searching a seeded project navigates to `/projects/:id` | no nav |
+| TopBar Dark-mode / Chat / User menu / Breadcrumb | toggle + navigate | theme flips; ChatDrawer opens; Settings link → /settings; Home → / | dead |
+| Sidebar Collapse / section expanders / sub-link / EveOrb close | toggle + navigate | width changes; sections expand; project sub-link → `/projects/:id`; widget hides | stuck |
+| ChatDrawer send / Quick Commands / Clear / Close | send + manage | user bubble renders AND POST `/api/chat/proxy` fires; clear/close work | no send |
+| All routes render + self-guard | no crash | every route renders; guarded routes show in-page gate | crash / blank |
+| User menu → Sign out | logout | redirects to `/login`, session revoked | stays in |
+
+## 13. Trash — `/trash` · `trash.spec.ts` 🟢
+| Element | Expected | PASS | FAIL |
+|---|---|---|---|
+| Restore → confirm | un-delete | `deleted_at` cleared in DB; row leaves trash | still deleted |
+
+## 14. Admin / Superuser — `/admin`, `/superuser` 🔒 ROLE-GATED
+Demo user `+14105914612` is a normal user; the ~64 admin/superuser controls (user table, impersonation,
+role/status edits, global config, queue/exec dashboards) can only be **access-asserted** (denial) as demo.
+Result-asserting their effects needs an elevated DEV test account. **Awaiting user decision** — see
+[[admin-superuser]].
 
 ---
 
-### Green today (result-asserting, passing on DEV)
-`newsletter-wizard` (feeds+template+subscriber+**Preview**), `content-lifecycle` (status transitions),
-`project-export` (.docx download), `project-art` (chapter artwork → gallery), `story-arcs-crud` (create→DB→delete), `eve-voice-widget`, plus the
-`nav-render` render/guard smoke. See [[result-asserting-suite]].
+## Coverage gaps (only these remain outside the green suite)
+- 🟡 LogoUploader (stamp_url), AnnotationsPanel Apply Fix, newsletter ingestion drawer, onboarding + Update
+  Password (need a throwaway auth user), some login/signup/forgot/reset flows.
+- 🔒 Admin + Superuser panels — blocked on an elevated test account.
 
-### Pending (next, same methodology)
-Everything marked 🟡 above — being built module by module; each async action polls to completion and
-asserts the rendered result + DB row. This page is updated as each flips to 🟢 (or 🔴 when a new bug is found).
+Everything else on this page is 🟢 and re-runnable via `e2e/run-regression.sh`. See [[result-asserting-suite]].
