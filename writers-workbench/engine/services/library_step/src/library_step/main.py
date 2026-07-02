@@ -100,12 +100,22 @@ async def _op_lifecycle(payload: dict) -> dict:
         # ("draft", "blog") that does not equal the stored value ("blog_post") and would exclude the real
         # row → a false not-found (it regressed approve/publish/reject/delete). Title match is the gate.
         chn = payload.get("chapter_number")
+        pid = None
         if chn not in (None, ""):
             import contextlib as _cl
             with _cl.suppress(TypeError, ValueError):
                 q = q.eq("chapter_number", int(chn))
+            # 'approve/publish/... chapter N of <project>' — the term is the PROJECT title, but a chapter's
+            # own title (e.g. "The Carrier Wave") won't contain it. Resolve the project first so the
+            # chapter-number filter + project scope pick the right row (VP06/VP07 class).
+            from writer_engine.persist_helpers import resolve_project_id
+            pid, _prow = await resolve_project_id(client, user_id=user_id, title=term)
         rows = getattr(await q.limit(300).execute(), "data", None) or []
-        row = _strict_best_match(rows, term, ("title",))
+        if pid:
+            scoped = [r for r in rows if str(r.get("project_id")) == str(pid)]
+            row = scoped[0] if scoped else _strict_best_match(rows, term, ("title",))
+        else:
+            row = _strict_best_match(rows, term, ("title",))
     if not row:
         return {"error": f"No content matching '{_clean_str(payload.get('project_title') or payload.get('title') or payload.get('search_term'))}' found — nothing was changed.",
                 "id": content_id, "matched": False}
