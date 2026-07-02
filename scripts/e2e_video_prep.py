@@ -193,14 +193,68 @@ def main():
                     "verdict": "PASS" if ok else "FAIL", "evidence": drift_ev})
     print(f"\n=== VP10: inject drift\n    {'PASS' if ok else 'FAIL'} :: {drift_ev}", flush=True)
 
+    # VP11 — seed the demo newsletter "The Wasteland Wire" (marketing-copy §2). There is no chat/engine
+    # op to create a newsletter edition, so this replicates the UI Setup-Wizard against the DB: create the
+    # edition, add 5 subscribers, and copy the post-apocalyptic genre's feeds (import-from-genre parity).
+    ED = "wasteland-wire"
+    nl_ok, nl_ev = False, ""
+    try:
+        if not (isinstance(_supa("GET", "newsletter_editions_v2", f"id=eq.{ED}&select=id"), list)
+                and _supa("GET", "newsletter_editions_v2", f"id=eq.{ED}&select=id")):
+            _supa("POST", "newsletter_editions_v2", "", {
+                "id": ED, "display_name": "The Wasteland Wire", "newsletter_name": "The Wasteland Wire",
+                "subheader": "This week from the Rust Coast.", "genre": "post-apocalyptic",
+                "signature_name": "Maya Chen", "signature_role": "Signal scout",
+                "cadence": "weekly", "cadence_send_time": "09:00",
+                "primary_color": "#8a3b1e", "paper_color": "#fbf8f2", "enabled": True, "user_id": USER})
+        if not _supa("GET", "newsletter_subscribers_v2", f"edition_id=eq.{ED}&select=id"):
+            _supa("POST", "newsletter_subscribers_v2", "", [
+                {"user_id": USER, "edition_id": ED, "email": f"reader{i}@example.invalid",
+                 "display_name": f"Reader {i}", "status": "active", "source": "import"} for i in range(1, 6)])
+        if not _supa("GET", "newsletter_feed_sources_v2", f"edition_id=eq.{ED}&select=id"):
+            gl = _supa("GET", "genre_config_v2",
+                       "genre_slug=eq.post-apocalyptic&select=genre_name,rss_feed_urls,source_urls,subreddit_names")
+            g = gl[0] if isinstance(gl, list) and gl else {}
+            gn = g.get("genre_name") or "Post-Apocalyptic"
+            feed_rows, seen = [], set()
+
+            def _addfeed(name, url, ut, iv=240):
+                k = f"{ut}::{url.lower()}"
+                if k in seen:
+                    return
+                seen.add(k)
+                feed_rows.append({"user_id": USER, "edition_id": ED, "name": name, "url": url,
+                                  "url_type": ut, "fetch_interval_minutes": iv, "active": True})
+
+            for u in (g.get("rss_feed_urls") or []):
+                if isinstance(u, str) and u.strip():
+                    _addfeed(f"{gn} — RSS", u.strip(), "rss", 240)
+            for u in (g.get("source_urls") or []):
+                if isinstance(u, str) and u.strip():
+                    _addfeed(f"{gn} — source", u.strip(), "source", 240)
+            for s in (g.get("subreddit_names") or []):
+                if isinstance(s, str) and s.strip():
+                    c = s.strip().lstrip("r/").lstrip("R/")
+                    _addfeed(f"r/{c}", f"https://www.reddit.com/r/{c}/.json", "reddit", 180)
+            if feed_rows:
+                _supa("POST", "newsletter_feed_sources_v2", "", feed_rows)
+        sc = len(_supa("GET", "newsletter_subscribers_v2", f"edition_id=eq.{ED}&select=id") or [])
+        fc = len(_supa("GET", "newsletter_feed_sources_v2", f"edition_id=eq.{ED}&select=id") or [])
+        nl_ok, nl_ev = True, f"edition 'The Wasteland Wire' + {sc} subscribers + {fc} feeds"
+    except Exception as e:  # noqa: BLE001
+        nl_ev = f"newsletter seed error: {str(e)[:150]}"
+    results.append({"id": "VP11", "title": "Seed demo newsletter 'The Wasteland Wire' (DB, Setup-Wizard parity)",
+                    "verdict": "PASS" if nl_ok else "FAIL", "evidence": nl_ev})
+    print(f"\n=== VP11: seed newsletter\n    {'PASS' if nl_ok else 'FAIL'} :: {nl_ev}", flush=True)
+
     # summary
     json.dump(results, open(f"{OUT}/summary.json", "w"), indent=2)
     counts = {}
     for r in results:
         counts[r["verdict"]] = counts.get(r["verdict"], 0) + 1
     print(f"\n===== VIDEO PREP DONE :: {counts} =====")
-    print("NOTE: 'The Wasteland Wire' newsletter is a Setup-Wizard (UI) flow with no chat/engine op — "
-          "seed it manually per marketing-copy.md §2.")
+    print("NOTE: VP01-VP09 seed the project via chat; VP10 injects the ch3 drift; VP11 seeds the demo "
+          "newsletter directly in the DB (no chat/engine op exists to create a newsletter edition).")
 
 
 if __name__ == "__main__":

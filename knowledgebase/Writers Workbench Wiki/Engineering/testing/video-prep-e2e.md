@@ -41,9 +41,11 @@ python3 scripts/e2e_video_prep.py
 
 ## Out of scope for chat
 
-**The Wasteland Wire** newsletter edition (marketing-copy.md §2, "Demo newsletter to seed") is created
-through the Newsletter **Setup Wizard** (UI) — feed import, subscribers, cadence. There is no
-engine/chat op for creating a newsletter edition, so it must be seeded by hand in the DEV Workbench.
+**The Wasteland Wire** newsletter (marketing-copy.md §2) is seeded by **VP11** directly in the DB
+(there is no chat/engine op to create a newsletter edition): it inserts the `newsletter_editions_v2`
+row, 5 `newsletter_subscribers_v2` rows, and copies the post-apocalyptic genre's feeds into
+`newsletter_feed_sources_v2` — the same result as the UI Setup Wizard's "Copy feeds from genre"
+(`POST /api/newsletter/editions/:id/feeds/import-from-genre`). Idempotent (skips if the edition exists).
 
 ## Results (2026-07-02, DEV)
 
