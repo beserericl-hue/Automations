@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { supaGet, hardDeleteEdition, eqUser } from '../pages/api';
 
+test.describe.configure({ mode: 'serial' });
+
 /**
  * Newsletter CRUD via the UI — RESULT-asserting, data-isolated. Creates an edition through the
  * EditionEditor form (asserting the newsletter_editions_v2 row + fields), adds a feed via the Feeds

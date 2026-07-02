@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { apiClient, supaGet, hardDeleteEdition, eqUser } from '../pages/api';
 
+test.describe.configure({ mode: 'serial' });
+
 /**
  * Newsletter Setup Wizard — RESULT-asserting, data-isolated.
  *
