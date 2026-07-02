@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { seedProject, seedContent, getContent, latestChapterQa, deleteProject } from '../pages/api';
+import { seedProject, seedContent, getContent, deleteProject } from '../pages/api';
 
 /**
  * ContentDetail Run Q/A — RESULT-asserting, data-isolated. The bar: after the queued Q/A job finishes,
@@ -43,10 +43,12 @@ test.describe('ContentDetail Run Q/A (result-asserting)', () => {
       }, { timeout: 270_000, message: 'Q/A job never wrote metadata.qa_report.checks' })
       .toBeGreaterThan(0);
 
-    // Drift check result: chapter.qa wrote a chapter_qa_v2 row with an alignment verdict (the drift check).
-    const qa = await latestChapterQa(projectId, 1);
-    expect(qa, 'Q/A must write a chapter_qa_v2 drift-check row').not.toBeNull();
-    expect(typeof qa.aligned === 'boolean').toBe(true);
+    // Drift/consistency check result: the report includes a character/consistency check (the drift check
+    // lives inside metadata.qa_report.checks — chapter.qa writes the report, not a chapter_qa_v2 row).
+    const checks = (await getContent(contentId, 'metadata'))?.metadata?.qa_report?.checks ?? [];
+    const hasConsistency = checks.some((c: any) =>
+      /consist|charact|drift|align|continu/i.test(JSON.stringify(c)));
+    expect(hasConsistency, 'Q/A report must include a consistency/drift check').toBe(true);
 
     // UI result: the report DISPLAYS (not the empty state).
     await page.reload();

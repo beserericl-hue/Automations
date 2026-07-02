@@ -23,8 +23,9 @@ test.describe('ProjectDetail Outline + Write (result-asserting)', () => {
   test('Outline button runs chapter.plan → chapter_outline is persisted', async ({ page }) => {
     test.setTimeout(240_000);
     await page.goto(`/projects/${projectId}?tab=outline`);
-    // Chapter 1's Outline button (no sub-chapters yet → "Outline").
-    const outlineBtn = page.getByRole('button', { name: /^(Outline|Re-outline)$/ }).first();
+    // The per-chapter Outline button — targeted by its title so it isn't confused with the "Outline" TAB
+    // button (both are named "Outline").
+    const outlineBtn = page.locator('button[title*="chapter outline"]').first();
     await expect(outlineBtn).toBeVisible({ timeout: 20_000 });
     await outlineBtn.click();
     // CommandDialog → send without notes.
@@ -44,7 +45,8 @@ test.describe('ProjectDetail Outline + Write (result-asserting)', () => {
   test('Write button runs chapter.write → a chapter with real content is persisted', async ({ page }) => {
     test.setTimeout(600_000);
     await page.goto(`/projects/${projectId}?tab=outline`);
-    const writeBtn = page.getByRole('button', { name: /^(Write|Rewrite)$/ }).first();
+    // The per-chapter Write button — targeted by its title (only appears once a chapter outline exists).
+    const writeBtn = page.locator('button[title*="Write this chapter"], button[title*="Rewrite this chapter"]').first();
     await expect(writeBtn).toBeVisible({ timeout: 20_000 });
     await writeBtn.click();
     await page.getByRole('button', { name: /Send without notes|Write Chapter/i }).first().click();
