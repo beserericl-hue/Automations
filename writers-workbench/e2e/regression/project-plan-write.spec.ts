@@ -52,7 +52,8 @@ test.describe('ProjectDetail Outline + Write (result-asserting)', () => {
         ...OUTLINE,
         chapters: [{
           chapter_number: 1, title: 'The Signal', beat: 'Mara answers the transmission.',
-          chapter_outline: { sub_chapter_briefs: [{ number: 1, title: 'The Call',
+          // The client reads chapter_outline.sub_chapters (matches the engine plan op) → makes the Write button appear.
+          chapter_outline: { sub_chapters: [{ number: 1, title: 'The Call',
             brief: 'Mara hears the impossible signal at dusk and answers it; the drowned voice replies.',
             arc_beat: 'inciting incident', characters: ['Mara', 'Elias'] }] },
         }],
