@@ -475,3 +475,32 @@ def test_concrete_blog_topic_not_overwritten_by_context() -> None:
                last_research_title="the fall of the Roman Empire")
     assert d.tool == "chapter" and d.op == "blog"
     assert "quantum computing" in (d.params.get("topic") or "").lower()
+
+
+def test_explicit_blog_write_is_deterministic() -> None:
+    # V22: "write a blog post about that" must ALWAYS route to chapter.blog (Gemini flakes to conversation).
+    for msg in ["Now write a blog post about that for the ancient history genre about 1500 words",
+                "write me a blog post about the fall of Rome"]:
+        d = _route(msg)
+        assert d.tool == "chapter" and d.op == "blog", msg
+
+
+def test_explicit_newsletter_and_short_story_writes_are_deterministic() -> None:
+    assert (_route("write a newsletter for the ai-marketing genre").tool,
+            _route("write a newsletter for the ai-marketing genre").op) == ("chapter", "newsletter")
+    d = _route("write a short story about a lighthouse keeper")
+    assert d.tool == "chapter" and d.op == "short-story"
+
+
+def test_blog_write_with_context_binds_research_anchor() -> None:
+    # The override routes to blog; conversation-context then swaps "that" for the prior research topic.
+    d = _route("Now write a blog post about that for the ancient history genre",
+               last_research_title="the fall of the Roman Empire")
+    assert d.tool == "chapter" and d.op == "blog"
+    assert d.params.get("topic") == "the fall of the Roman Empire"
+
+
+def test_email_me_the_blog_is_not_a_blog_write() -> None:
+    # "email me the blog" must stay email-content, not get stolen by the blog-write override.
+    d = _route("email me the blog post about Rome")
+    assert d.tool == "library" and d.op == "email-content"

@@ -569,6 +569,17 @@ def _deterministic_override(message: str) -> HubDecision | None:
     if re.search(r"\bcall\s+me(\s+back)?\b", low):
         return None
 
+    # Explicit standalone-write intents that Gemini FLAKILY drops to 'conversation' (temperature makes
+    # "write a blog post about that", "write a newsletter", "write a short story about X" land on reply
+    # ~half the time — see V22). These one-shot writes are unambiguous, so pin them deterministically.
+    # Chapter writes stay OUT — they need chapter/project context the override can't safely infer.
+    if re.search(r"\bwrite\s+(?:me\s+)?an?\s+blog(\s+post)?\b", low):
+        return _decide("chapter", "blog", {"topic": msg}, 0.85)
+    if re.search(r"\bwrite\s+(?:me\s+)?an?\s+newsletter\b", low):
+        return _decide("chapter", "newsletter", _newsletter_params(msg), 0.85)
+    if re.search(r"\bwrite\s+(?:me\s+)?an?\s+short\s+stor(?:y|ies)\b", low):
+        return _decide("chapter", "short-story", {"topic": msg}, 0.85)
+
     # G7/G17 — repurpose into social posts (explicit inline content + platform).
     if (re.search(r"\brepurpose\b", low)
             or re.search(r"\bsocial\s+(media\s+)?posts?\b", low)
