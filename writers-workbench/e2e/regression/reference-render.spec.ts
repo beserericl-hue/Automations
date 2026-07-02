@@ -18,7 +18,9 @@ test.describe('Outlines (result-asserting)', () => {
 
   test('an outlined project appears in the Outlines list and links to it', async ({ page }) => {
     await page.goto('/outlines');
-    const link = page.getByRole('link', { name: new RegExp(TITLE) });
+    // Scope to the main content region — the same project title also appears as a link in the
+    // left "My Projects" sidebar, which makes a page-wide getByRole('link') ambiguous.
+    const link = page.getByRole('main').getByRole('link', { name: new RegExp(TITLE) });
     await expect(link).toBeVisible({ timeout: 20_000 });
     await link.click();
     await expect(page).toHaveURL(new RegExp(`/projects/${projectId}`), { timeout: 15_000 });

@@ -157,6 +157,10 @@ test.describe('Newsletter Templates (result-asserting)', () => {
     templateIdsToClean.push(tid);
 
     await page.goto(`/newsletter/templates/${tid}`);
+    // The editor initializes `active` to true and hydrates from the fetched row afterward. Wait for
+    // hydration to COMPLETE (seeded name populated) before toggling — otherwise an uncheck made during
+    // the load window is clobbered when the hydrate effect fires and re-checks Active.
+    await expect(page.getByLabel(/^Name$/i)).toHaveValue(`E2E Flags ${STAMP}`, { timeout: 20_000 });
     const activeBox = page.getByRole('checkbox', { name: /^Active$/i });
     await expect(activeBox).toBeVisible({ timeout: 20_000 });
     await expect(activeBox).toBeChecked();
