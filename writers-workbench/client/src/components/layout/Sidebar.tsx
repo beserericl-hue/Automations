@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
@@ -54,10 +54,19 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
   // matches both /newsletter/* and /newsletters, so be specific.
   const isNewsletterRoute = location.pathname === '/newsletter' || location.pathname.startsWith('/newsletter/');
 
-  // Auto-expand sections when navigating into them
-  if (isProjectRoute && !projectsExpanded) setProjectsExpanded(true);
-  if (isReferenceRoute && !referenceExpanded) setReferenceExpanded(true);
-  if (isNewsletterRoute && !newsletterExpanded) setNewsletterExpanded(true);
+  // Auto-expand a section only when NAVIGATING into its route (dependency false→true), NOT on every
+  // render. Previously these were bare `if (...) setState(true)` calls in the render body, so on a
+  // /projects route the effect re-fired every render and forced the accordion back open — you could
+  // never collapse it. A route-keyed effect expands on entry but lets a manual collapse stick.
+  useEffect(() => {
+    if (isProjectRoute) setProjectsExpanded(true);
+  }, [isProjectRoute]);
+  useEffect(() => {
+    if (isReferenceRoute) setReferenceExpanded(true);
+  }, [isReferenceRoute]);
+  useEffect(() => {
+    if (isNewsletterRoute) setNewsletterExpanded(true);
+  }, [isNewsletterRoute]);
 
   return (
     <aside
