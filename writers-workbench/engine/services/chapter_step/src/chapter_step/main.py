@@ -1457,26 +1457,38 @@ def _edit_distance(a: str, b: str) -> int:
 
 def _character_name_consistency(text: str, roster: list[dict]) -> dict:
     """Deterministic character-name cross-check (R119): which roster names appear, and any capitalized
-    name in the prose that is a near-miss of a roster name (a likely rename, e.g. Maya→Maria)."""
+    word in the prose that is a near-miss of a roster name (a likely rename, e.g. Mara→Meara).
+
+    HIGH PRECISION — a naive edit-distance match floods ordinary prose with false positives (it flagged
+    "Now"/"From"/"Make"/"Yes" as name drift). Guards:
+      * only fuzzy-match against roster tokens of length >= 4 (short tokens like "Tom" match far too many
+        common words within a 2-edit window),
+      * candidate words must be >= 4 letters,
+      * edit distance <= 1 for a roster token < 7 chars, <= 2 only for longer names, and the length
+        difference must be <= 1 (a rename is a typo of the SAME name, not a different-length word).
+    ``consistent`` reflects RENAMES only — a roster character simply not appearing in one chapter is not
+    an inconsistency (names_missing is still reported, for information)."""
     roster_full = [str(c.get("name") or "").strip() for c in roster if str(c.get("name") or "").strip()]
-    roster_tokens = {t.lower() for n in roster_full for t in re.findall(r"[A-Za-z]{3,}", n)}
+    roster_tokens = {t.lower() for n in roster_full for t in re.findall(r"[A-Za-z]{4,}", n)}
     low = text.lower()
     present = [n for n in roster_full if n and re.search(rf"\b{re.escape(n.split()[0].lower())}\b", low)]
     missing = [n for n in roster_full if n not in present]
     from collections import Counter
 
-    caps = Counter(re.findall(r"\b[A-Z][a-z]{2,}\b", text))
     renames: list[dict] = []
-    for w, _c in caps.items():
+    seen: set[str] = set()
+    for w in Counter(re.findall(r"\b[A-Z][a-z]{3,}\b", text)):  # >= 4-letter capitalised words only
         wl = w.lower()
-        if wl in roster_tokens or wl in _NAME_STOP:
+        if wl in seen or wl in roster_tokens or wl in _NAME_STOP:
             continue
         for rt in roster_tokens:
-            if 0 < _edit_distance(wl, rt) <= 2 and abs(len(wl) - len(rt)) <= 2:
+            maxd = 1 if len(rt) < 7 else 2
+            if 0 < _edit_distance(wl, rt) <= maxd and abs(len(wl) - len(rt)) <= 1:
                 renames.append({"found": w, "closest_roster_name": rt})
+                seen.add(wl)
                 break
     return {
-        "consistent": not renames and not missing,
+        "consistent": not renames,
         "roster": roster_full, "names_present": present, "names_missing": missing,
         "possible_renames": renames,
     }
