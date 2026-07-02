@@ -125,3 +125,39 @@ def test_not_found_sends_nothing(monkeypatch):
     assert out["emailed"] is False
     assert out.get("error_message")
     assert sent == []  # no email on not-found
+
+
+def test_allow_recent_research_falls_back_to_most_recent(monkeypatch):
+    # V03: "email me a summary of that research" with no concrete title → allow_recent picks the
+    # most-recent report (research_reports_v2 is queried created_at desc, so rows[0] is newest).
+    tables = {
+        "app_config_v2": _APP_CONFIG,
+        "research_reports_v2": [
+            {"topic": "The fall of the Roman Empire", "content": "Rome fell because…", "created_at": "2026-07-02T00:00:00Z"},
+            {"topic": "An older unrelated report", "content": "stale", "created_at": "2026-01-01T00:00:00Z"},
+        ],
+    }
+    sent = _patch(monkeypatch, tables)
+    out = asyncio.run(lib._op_email_content({
+        "user_id": "u1", "content_type": "research",
+        "subject": "voice test research report", "allow_recent": True,
+    }))
+    assert out["emailed"] is True
+    assert sent[0]["subject"] == "voice test research report"
+    assert "Rome fell because" in sent[0]["html"]
+
+
+def test_research_without_allow_recent_and_no_match_is_not_found(monkeypatch):
+    # A named-but-absent report must still be not-found (never email the wrong report).
+    tables = {
+        "app_config_v2": _APP_CONFIG,
+        "research_reports_v2": [
+            {"topic": "The fall of the Roman Empire", "content": "Rome fell…", "created_at": "2026-07-02T00:00:00Z"},
+        ],
+    }
+    sent = _patch(monkeypatch, tables)
+    out = asyncio.run(lib._op_email_content({
+        "user_id": "u1", "content_type": "research", "search_term": "Quantum Widgets of Neptune",
+    }))
+    assert out["emailed"] is False
+    assert sent == []

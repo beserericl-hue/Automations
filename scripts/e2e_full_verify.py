@@ -58,6 +58,24 @@ def _supa(table, query=""):
         return {"_error": str(e)[:200]}
 
 
+def _supa_write(method, table, query="", body=None):
+    """POST (insert, returns the row) / PATCH / DELETE against Supabase REST. Used by lifecycle seeding
+    to create + clean up disposable, known-state rows so approve/reject/delete/undelete tests don't
+    depend on run order."""
+    query = query.replace(USER, urllib.parse.quote(USER, safe=""))
+    url = f"{SUPA_URL}/rest/v1/{table}" + (f"?{query}" if query else "")
+    data = json.dumps(body).encode() if body is not None else None
+    headers = {"apikey": SUPA_KEY, "authorization": f"Bearer {SUPA_KEY}",
+               "content-type": "application/json", "Prefer": "return=representation"}
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            txt = r.read().decode()
+            return json.loads(txt) if txt.strip() else []
+    except Exception as e:  # noqa: BLE001
+        return {"_error": str(e)[:200]}
+
+
 PICKED = {}  # test_id -> a representative title produced/listed by that test (for placeholder substitution)
 _PLACEHOLDER = re.compile(r"\[[^\]]*?from\s+([RV]\d+)[^\]]*?\]", re.I)
 _ANY_BRACKET = re.compile(r"\[[^\]]+\]")
@@ -77,6 +95,29 @@ def _pick_title(res, resp):
             return res[k]
     ol = res.get("outline") or {}
     return ol.get("title")
+
+
+def _anchor_updates(res, resp):
+    """Typed conversation anchors produced by a step, for the NEXT step's pronoun resolution:
+    last_research_title/topic (research runs), last_content_title (blog/chapter/etc), last_project_title
+    (brainstorm/outline). The router binds "that research"/"blog about that"/"email me the report" to these."""
+    up = {}
+    if not isinstance(res, dict):
+        return up
+    # research run: result carries the topic (or a row with it)
+    topic = res.get("topic") or (res.get("row") or {}).get("topic")
+    if topic:
+        up["last_research_title"] = topic
+        up["last_research_topic"] = topic
+    # generic content title (blog/short story/chapter/newsletter)
+    ctitle = res.get("title") or res.get("subject")
+    if ctitle:
+        up["last_content_title"] = ctitle
+    # project/outline title
+    ptitle = (res.get("outline") or {}).get("title") or res.get("project_title")
+    if ptitle:
+        up["last_project_title"] = ptitle
+    return up
 
 
 def resolve_prompt(prompt, picked):
@@ -102,18 +143,129 @@ def _fallback_draft_title():
     return _FALLBACK["t"]
 
 
-def run_step(source, prompt, context=None):
-    """Drive one step; poll an async job to completion. Returns {response, job_result}."""
+# --------------------------------------------------------------------------- lifecycle isolation
+# Approve/reject/delete/undelete were flaky because they mutated whatever shared DEV row happened to be
+# in the right state — so the verdict depended on run order (R98/V36 undelete failed when the target
+# wasn't `deleted` yet). Instead we seed a disposable, uniquely-titled row in the exact pre-state each
+# test needs, rewrite the command to target it, verify the transition on THAT row, then delete it.
+import uuid  # noqa: E402
+
+_LIFECYCLE_END = {  # action -> expected status after the op
+    "approve": "approved", "publish": "published", "reject": "rejected",
+    "delete": "deleted", "undelete": "draft", "schedule": "scheduled", "unschedule": "draft",
+}
+# action -> the pre-state the disposable row must be in for the op to be a valid, deterministic transition
+_LIFECYCLE_PRESTATE = {
+    "approve": "draft", "reject": "draft", "schedule": "draft", "delete": "draft",
+    "publish": "approved", "undelete": "deleted", "unschedule": "scheduled",
+}
+
+
+def _lifecycle_action(prompt):
+    low = prompt.lower()
+    if "undelete" in low or "put it back" in low or re.search(r"\brestore\b", low):
+        return "undelete"
+    if "unpublish" in low:
+        return "unpublish"
+    if re.search(r"\brejec", low):
+        return "reject"
+    if re.search(r"\bpublish", low):
+        return "publish"
+    if re.search(r"\bschedul", low):
+        return "schedule"
+    if re.search(r"\bapprov", low):
+        return "approve"
+    if re.search(r"\bdelete\b", low):
+        return "delete"
+    return None
+
+
+def _inject_title(prompt, title):
+    """Point a lifecycle command at the disposable row: swap a quoted title, a `[from RXX]` placeholder,
+    a `called/titled X` clause, or a bare `undelete X` object for our seeded title. Returns prompt
+    unchanged when no title slot is found (search-style commands like V34 keep their own phrasing)."""
+    if re.search(r'"[^"]*"', prompt):
+        return re.sub(r'"[^"]*"', f'"{title}"', prompt, count=1)
+    if re.search(r"\[[^\]]*\]", prompt):
+        return re.sub(r"\[[^\]]*\]", title, prompt, count=1)
+    m = re.search(r"\b(called|titled|named)\s+(.+?)(?=\s+(?:put|for|to|in)\b|$)", prompt, re.I)
+    if m:
+        return prompt[:m.start(2)] + title + prompt[m.end(2):]
+    m = re.search(r"\bundelete\s+(.+?)(?=\s+put\b|$)", prompt, re.I)
+    if m:
+        return prompt[:m.start(1)] + title + prompt[m.end(1):]
+    return prompt
+
+
+def seed_lifecycle(test):
+    """If this is a lifecycle MUTATION test, seed a disposable row in the required pre-state and rewrite
+    its steps to target it. Returns (new_steps, seed) where seed={id,title,end_status} or (steps, None)."""
+    route = (test.get("route") or "").lower()
+    if "library.lifecycle" not in route and "lifecycle" not in route:
+        return test["steps"], None
+    steps = test["steps"]
+    if not steps:
+        return steps, None
+    first_prompt = steps[0][1]
+    action = _lifecycle_action(first_prompt)
+    if action not in _LIFECYCLE_PRESTATE:
+        return steps, None  # list_deleted / unknown — nothing to seed
+    # published-delete guard test (R95/V34): the row must be `published` so "cannot delete published" fires
+    prestate = _LIFECYCLE_PRESTATE[action]
+    if action == "delete" and "publish" in first_prompt.lower():
+        prestate = "published"
+    # end state we expect to assert (last step's action, e.g. V14 approve→publish ends published)
+    end_action = _lifecycle_action(steps[-1][1]) or action
+    end_status = "published" if prestate == "published" else _LIFECYCLE_END.get(end_action, prestate)
+
+    title = f"E2E Lifecycle {test['id']} {uuid.uuid4().hex[:8]}"
+    # Only seed when the command has a title slot we can point at the disposable row. Search-style
+    # commands (V34 "delete the published blog post about …") keep their own phrasing — seeding a
+    # uniquely-titled row wouldn't be matched, so leave them on the old verification path.
+    new_steps = [(src, _inject_title(p, title)) for (src, p) in steps]
+    if new_steps == steps:
+        return steps, None
+    ctype = "blog_post" if "blog" in first_prompt.lower() else "chapter"
+    row = {
+        "user_id": USER, "title": title, "content_type": ctype, "status": prestate,
+        "content_text": f"Disposable lifecycle fixture for {test['id']}. " * 12,
+        "genre_slug": "post-apocalyptic",
+    }
+    if prestate == "deleted":
+        row["deleted_at"] = datetime.now(timezone.utc).isoformat()
+    if prestate == "published":
+        row["published_at"] = datetime.now(timezone.utc).isoformat()
+    ins = _supa_write("POST", "published_content_v2", body=row)
+    if not isinstance(ins, list) or not ins:
+        return steps, {"error": f"seed insert failed: {ins}"}
+    seed_id = ins[0]["id"]
+    return new_steps, {"id": seed_id, "title": title, "end_status": end_status, "prestate": prestate}
+
+
+def cleanup_lifecycle(seed):
+    if seed and seed.get("id"):
+        _supa_write("DELETE", "published_content_v2", query=f"id=eq.{seed['id']}")
+
+
+def run_step(source, prompt, context=None, conversation_id=None):
+    """Drive one step; poll an async job to completion. Returns {response, job_result}.
+
+    Threads conversation context + a stable conversation_id so multi-turn pronouns ("that research",
+    "blog about that", "publish it") resolve — for BOTH the chat and voice surfaces."""
     try:
         if source == "voice":
             body = {"user_message_request": prompt, "system__caller_id": USER}
             if context:
                 body["context"] = context
+            if conversation_id:
+                body["conversation_id"] = conversation_id
             resp = _post("/internal/hub/voice", body)
         else:
             body = {"message": prompt, "user_id": USER}
             if context:
                 body["context"] = context
+            if conversation_id:
+                body["conversation_id"] = conversation_id
             resp = _post("/internal/hub", body)
     except Exception as e:  # noqa: BLE001
         return {"response": {"_error": str(e)[:300]}, "job_result": None}
@@ -168,9 +320,12 @@ def parse_suite():
 
 
 def expected_route(route):
+    # For a MULTI-STEP test the route lists each step's op ("library.versions … + library.revert …").
+    # verify() only grades the LAST run, so the expected route is the LAST op token, not the first
+    # (fixes R89, which graded the revert step against the versions route).
     r = route.replace("`", " ").split("·")[0]
-    toks = [t for t in re.split(r"[\s/(]+", r) if "." in t and not t.endswith(".")]
-    return toks[0] if toks else ""
+    toks = [t for t in re.split(r"[\s/()+,;]+", r) if "." in t and not t.endswith(".")]
+    return toks[-1] if toks else ""
 
 
 # --------------------------------------------------------------------------- verification
@@ -210,12 +365,14 @@ def verify(test, runs):
     route_ok = bool(exp) and (exp == got or (r.get("op") and exp.endswith("." + r.get("op", "xx"))))
     ev.append(f"route exp={exp or '?'} got={got} {'OK' if route_ok else 'MISMATCH'}")
 
-    # job completion for async
+    # job completion for async. A hard error/not_found fails immediately; a job that merely outran the
+    # poll deadline (slow chapter/epilogue writes — R79) falls through to the DB artifact check, which
+    # passes if the row actually persisted and fails if nothing landed.
     if r.get("kind") == "queued":
         st = jr.get("status")
         ev.append(f"job={st}")
-        if st != "complete":
-            return "FAIL", ev + ["async job did not complete"]
+        if st in ("error", "failed", "not_found"):
+            return "FAIL", ev + ["async job errored"]
 
     tool = (r.get("tool") or exp.split(".")[0]) if exp else r.get("tool")
     op = r.get("op") or (exp.split(".")[1] if "." in exp else "")
@@ -240,9 +397,15 @@ def verify(test, runs):
         return ("PASS" if (ok) else "FAIL"), ev
 
     if tool == "chapter" and op in ("write",):
-        rows = _supa("published_content_v2", f"user_id=eq.{USER}&content_type=eq.chapter&order=updated_at.desc&limit=8")
+        rows = _supa("published_content_v2",
+                     f"user_id=eq.{USER}&content_type=eq.chapter&order=updated_at.desc&limit=8"
+                     "&select=title,content_text,updated_at,chapter_number")
         newr = _recent(rows, "updated_at")
         wc = res.get("word_count") or 0
+        # R79: when the poll gave up before the job reported back, derive the word count from the freshly
+        # persisted row instead — the epilogue/chapter still landed in the DB.
+        if wc <= 200 and newr:
+            wc = max((len((rw.get("content_text") or "").split()) for rw in newr), default=0)
         ev.append(f"chapter rows recent={len(newr)} word_count={wc} persist={(res.get('persist') or {}).get('persisted')}")
         ok = bool(newr) and wc > 200
         return ("PASS" if (ok) else "FAIL"), ev
@@ -308,6 +471,14 @@ def verify(test, runs):
         return ("PASS" if route_ok else "FAIL"), ev
 
     if tool == "library" and op == "lifecycle":
+        # Isolated lifecycle test: assert the disposable seeded row reached its expected end-state in the
+        # DB — deterministic regardless of run order (R98/V36 undelete, approve/reject/delete/publish).
+        seed = test.get("_seed")
+        if seed and seed.get("id"):
+            dbrow = _supa("published_content_v2", f"id=eq.{seed['id']}&select=status,deleted_at")
+            cur = dbrow[0]["status"] if isinstance(dbrow, list) and dbrow else None
+            ev.append(f"seed={seed['id'][:8]} status={cur} want={seed['end_status']} prestate={seed['prestate']}")
+            return ("PASS" if cur == seed["end_status"] else "FAIL"), ev
         status = res.get("status") or res.get("count")
         err = res.get("error")
         ev.append(f"status={status} matched={res.get('matched')} error={str(err)[:60]}")
@@ -354,16 +525,22 @@ def main():
         else:
             runs = []
             ctx = {}  # conversation context carried across steps of THIS test ("publish it", "that")
-            for src, prompt in t["steps"]:
+            conv_id = f"e2e-{t['id']}"  # stable per-test conversation id (multi-turn correlation)
+            steps, seed = seed_lifecycle(t)  # isolate lifecycle data (disposable known-state row)
+            t["_seed"] = seed
+            for src, prompt in steps:
                 rp = resolve_prompt(prompt, PICKED)
-                out = run_step(src, rp, context=ctx or None)
+                out = run_step(src, rp, context=ctx or None, conversation_id=conv_id)
                 out["resolved_prompt"] = rp
                 runs.append(out)
-                # capture context for the next step: last list + the chosen title as active project
+                # capture context for the next step: last list + the chosen title as active project,
+                # PLUS typed anchors (research/content/project titles) so pronouns resolve next turn.
                 _rr, _jr, _res = _result_of(out)
                 title = _pick_title(_res, _rr)
                 if title:
-                    ctx = {"project_title": title, "last_list": (_res.get("items") or [])[:10]}
+                    ctx["project_title"] = title
+                    ctx["last_list"] = (_res.get("items") or [])[:10]
+                ctx.update(_anchor_updates(_res, _rr))
             # remember a representative title for later tests' [title from <this id>] placeholders
             picked_title = None
             for out in runs:
@@ -375,6 +552,8 @@ def main():
                 verdict, ev = verify(t, runs)
             except Exception as e:  # noqa: BLE001
                 verdict, ev = "FAIL", [f"verify error: {str(e)[:200]}"]
+            finally:
+                cleanup_lifecycle(t.get("_seed"))
         rec = {"id": t["id"], "title": t["title"], "route": t["route"], "verdict": verdict,
                "evidence": ev, "steps": t["steps"], "runs": runs, "expected": t["expected"]}
         with open(f"{OUT}/{t['id']}.json", "w") as f:

@@ -441,3 +441,37 @@ def test_dispatch_fills_project_anchor_from_context() -> None:
     plan = build_dispatch_plan(d, req)
     assert plan.body["project_id"] == "p1"
     assert plan.body["project_title"] == "The Burial Mound"
+
+
+# --------------------------------------------------------------------------- conversation-context pronouns
+
+def test_blog_about_that_binds_research_anchor() -> None:
+    # V22 msg2: "now write a blog post about that" resolves "that" to the prior research topic.
+    d = _route("Now write a blog post about that for the ancient history genre about fifteen hundred words",
+               last_research_title="the fall of the Roman Empire")
+    assert d.tool == "chapter" and d.op == "blog"
+    assert d.params.get("topic") == "the fall of the Roman Empire"
+
+
+def test_email_that_research_binds_anchor_when_threaded() -> None:
+    # V03 with conversation context: "summary of that research" → the report just discussed.
+    d = _route("Send me an email with a summary of that research use the subject line voice test research report",
+               last_research_title="the fall of the Roman Empire")
+    assert d.tool == "library" and d.op == "email-content"
+    assert d.params.get("title") == "the fall of the Roman Empire"
+
+
+def test_email_that_research_flags_allow_recent_without_context() -> None:
+    # V03 single-turn: no anchor → flag the op to fall back to the most-recent report.
+    d = _route("Send me an email with a summary of that research use the subject line voice test research report")
+    assert d.tool == "library" and d.op == "email-content"
+    assert d.params.get("allow_recent") is True
+    assert not d.params.get("title")
+
+
+def test_concrete_blog_topic_not_overwritten_by_context() -> None:
+    # A message that names its own topic must be left alone even with a stale anchor present.
+    d = _route("Write a blog post about quantum computing for the ai-marketing genre",
+               last_research_title="the fall of the Roman Empire")
+    assert d.tool == "chapter" and d.op == "blog"
+    assert "quantum computing" in (d.params.get("topic") or "").lower()

@@ -869,6 +869,53 @@ def _normalise(decision: HubDecision) -> HubDecision:
     )
 
 
+# A demonstrative reference to a just-produced artifact: "blog about THAT", "summary of THAT research",
+# "email me THE report", "write about IT". Only these bare pronouns count — a message that already names
+# a concrete topic/title is left alone.
+_DEMO_WORDS = {"that", "this", "it", "those", "these"}
+_ABOUT_DEMO = re.compile(r"\b(?:about|on|of|for|regarding)\s+(?:that|this|it|those|these)\b", re.I)
+_DEMO_RESEARCH = re.compile(r"\b(?:that|this|it|the)\s+(?:research|report|study|findings)\b", re.I)
+
+
+def _apply_conversation_context(req: HubRequest, decision: HubDecision) -> HubDecision:
+    """Resolve demonstrative pronouns ("that/this/it") against typed conversation anchors the caller
+    threads in ``context`` (``last_research_title``/``last_research_topic``, ``last_content_title``,
+    ``last_project_title``). Fixes multi-turn voice/chat flows where a follow-up refers to the artifact
+    the previous turn produced — e.g. V22 ("research X" → "now blog about THAT") and V03 ("email me a
+    summary of THAT research"). Leaves a message that already carries a concrete topic/title untouched."""
+    if decision.kind == "conversation" or not decision.tool:
+        return decision
+    ctx = req.context or {}
+    low = (req.message or "").lower()
+    p = decision.params
+    research_anchor = ctx.get("last_research_title") or ctx.get("last_research_topic")
+    generic_anchor = research_anchor or ctx.get("last_content_title") or ctx.get("last_project_title")
+
+    # "blog/newsletter/short story about THAT" → topic = the artifact just discussed (V22 msg2).
+    if decision.tool == "chapter" and decision.op in ("blog", "newsletter", "short-story"):
+        topic = str(p.get("topic") or "").strip()
+        if (not topic or topic.lower() in _DEMO_WORDS or _ABOUT_DEMO.search(low)) and generic_anchor:
+            p["topic"] = generic_anchor
+
+    # "email me a summary of THAT research" (V03) — research content_type, no concrete title. Bind the
+    # threaded anchor if present, else flag the op to fall back to the most-recent report.
+    if decision.tool == "library" and decision.op == "email-content":
+        ct = str(p.get("content_type") or "").lower().replace(" ", "_").replace("-", "_")
+        if ct in ("research", "research_report", "research_reports", "report", "reports"):
+            title = str(p.get("title") or "").strip()
+            # The title extractor grabs junk from a pronoun request ("that research use the subject …"),
+            # so treat a demonstrative-leading title as no title at all.
+            demo_title = bool(re.match(r"^(?:that|this|it|the)\b", title, re.I))
+            if (not title or demo_title) and _DEMO_RESEARCH.search(low):
+                if research_anchor:
+                    p["title"] = research_anchor
+                    p.pop("search_term", None)
+                else:
+                    p.pop("title", None)
+                    p["allow_recent"] = True
+    return decision
+
+
 async def route_message(
     req: HubRequest, *, llm_router: LLMRouter | None = None, model: str | None = None
 ) -> HubDecision:
@@ -884,7 +931,7 @@ async def route_message(
     if override is not None:
         logger.info("hub.route.override", source=req.source, tool=override.tool, op=override.op,
                     msg_preview=req.message[:120])
-        return override
+        return _apply_conversation_context(req, override)
 
     # 2. Gemini (primary) — falls through to heuristics if unavailable or it returns junk
     router = llm_router or get_router(service="hub")
@@ -896,7 +943,7 @@ async def route_message(
             tool=decision.tool, op=decision.op, confidence=decision.confidence,
             msg_preview=req.message[:120],
         )
-        return decision
+        return _apply_conversation_context(req, decision)
     except ProviderNotRegistered:
         logger.warning("hub.route.no_gemini", msg_preview=req.message[:120])
     except Exception as exc:  # the failure the stress test must be able to see
@@ -908,4 +955,4 @@ async def route_message(
         "hub.route.heuristic", source=req.source, kind=fallback.kind,
         tool=fallback.tool, op=fallback.op, msg_preview=req.message[:120],
     )
-    return fallback
+    return _apply_conversation_context(req, fallback)

@@ -388,7 +388,8 @@ async def _email_recipients(client, explicit: str | None, user_id: str | None):
 
 
 async def _resolve_artifact(
-    client, content_type: str, term: str, chapter_number, user_id: str | None
+    client, content_type: str, term: str, chapter_number, user_id: str | None,
+    allow_recent: bool = False,
 ) -> tuple[str, str] | None:
     """Resolve an existing artifact → (markdown_body, subject). None when nothing matches (not-found).
 
@@ -409,13 +410,18 @@ async def _resolve_artifact(
             f"{match.get('title') or term} — Outline"
 
     if content_type == "research":
-        q = client.table("research_reports_v2").select("topic,content")
+        q = client.table("research_reports_v2").select("topic,content,created_at")
         if user_id:
             q = q.eq("user_id", user_id)
-        rows = getattr(await q.limit(200).execute(), "data", None) or []
+        rows = getattr(await q.order("created_at", desc=True).limit(200).execute(), "data", None) or []
         # research rows have no `title`; match the topic (exact-then-fuzzy-then-keyword). No content-body
         # fallback — that produced false-positive "matches" and emailed the wrong report (R105 class).
         match = _strict_best_match(rows, term, ("topic",))
+        # V03: a demonstrative reference ("summary of THAT research", "email me the report") carries no
+        # concrete title. When the caller flagged allow_recent, resolve to the most-recent report (rows are
+        # ordered created_at desc) — the conversational "that" = the report we were just discussing.
+        if not match and allow_recent and rows:
+            match = rows[0]
         if not match:
             return None
         return _clean_str(match.get("content")), f"Research Report — {match.get('topic') or term}"
@@ -490,7 +496,10 @@ async def _op_email_content(payload: dict) -> dict:
         body_md, subject = inline, (subject or "Writer's Workbench — Email")
         label = "inline"
     else:
-        resolved = await _resolve_artifact(client, content_type, term, chapter_number, user_id)
+        resolved = await _resolve_artifact(
+            client, content_type, term, chapter_number, user_id,
+            allow_recent=bool(payload.get("allow_recent")),
+        )
         if not resolved:
             return {
                 "emailed": False,
