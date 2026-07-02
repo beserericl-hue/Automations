@@ -109,6 +109,21 @@ export async function deleteProject(id: string): Promise<void> {
   await supaDelete('writing_projects_v2', `id=eq.${id}`);
 }
 
+// --------------------------------------------------------------------------- disposable research
+export async function seedResearch(topic: string, genre = 'post-apocalyptic'): Promise<string> {
+  const res = await fetch(`${SUPA_URL}/rest/v1/research_reports_v2`, {
+    method: 'POST',
+    headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify({ user_id: DEMO_USER_ID, topic, genre_slug: genre, status: 'complete',
+      content: `# ${topic}\n\nDisposable regression research report. `.repeat(20) }),
+  });
+  if (!res.ok) throw new Error(`seedResearch ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return ((await res.json()) as Array<{ id: string }>)[0].id;
+}
+export async function deleteResearch(id: string): Promise<void> {
+  await supaDelete('research_reports_v2', `id=eq.${id}`);
+}
+
 // --------------------------------------------------------------------------- disposable content rows
 /** Insert a disposable published_content_v2 row (owned by the demo user) and return its id. */
 export async function seedContent(fields: {
