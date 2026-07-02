@@ -246,6 +246,11 @@ contentActionsRouter.get('/:id/annotations', async (req: Request, res: Response)
                 replacementText = `${surname}, ${firstName}`;
               }
             }
+            // General name-variant renames (e.g. engine QA: "Meara" → "Mara") carry an explicit
+            // `replacement` on the flag, so the panel offers a one-click Apply that swaps the span.
+            if (!replacementText && typeof f.replacement === 'string' && f.replacement) {
+              replacementText = f.replacement;
+            }
             annotations.push({
               id: aid,
               source: 'drift_scan',

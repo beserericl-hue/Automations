@@ -1482,7 +1482,141 @@ def _character_name_consistency(text: str, roster: list[dict]) -> dict:
     }
 
 
+_QA_DIM_LABELS = {
+    "character_follows_guide": "Character craft", "outline_follows_guide": "Follows the outline",
+    "dialogue_follows_guide": "Dialogue", "prose_transparent": "Prose clarity",
+    "story_turn_density": "Story turns / pacing", "no_boring_paragraphs": "No flat paragraphs",
+    "period_language_ok": "Period language", "character_consistency": "Character consistency",
+}
+
+
+def _build_qa_report(scores: dict, findings: list, name_check: dict | None) -> dict:
+    """Transform the engine QA result into the UI's ``metadata.qa_report`` shape
+    ``{generated_at, checks:[{name,status:PASS|NEEDS_REVIEW,details}]}`` (QAReportPanel reads this)."""
+    from datetime import UTC, datetime
+
+    find_by_dim: dict[str, str] = {}
+    for f in findings or []:
+        d = str(f.get("dimension") or "")
+        if d and d not in find_by_dim:
+            find_by_dim[d] = str(f.get("fix") or f.get("problem") or "")
+    checks = []
+    for dim, label in _QA_DIM_LABELS.items():
+        if dim == "character_consistency":
+            continue  # handled from name_check below (authoritative, deterministic)
+        v = scores.get(dim)
+        if not isinstance(v, (int, float)):
+            continue
+        ok = v >= CRAFT_THRESHOLD
+        checks.append({"name": label, "status": "PASS" if ok else "NEEDS_REVIEW",
+                       "details": (find_by_dim.get(dim) or f"score {v:.2f}") if not ok else f"score {v:.2f}"})
+    # deterministic character-name consistency (drives the drift demo)
+    if name_check is not None:
+        renames = name_check.get("possible_renames") or []
+        missing = name_check.get("names_missing") or []
+        consistent = bool(name_check.get("consistent"))
+        detail = "All roster names consistent." if consistent else (
+            "Possible renames: " + ", ".join(f"{r.get('found')}→{r.get('closest_roster_name')}" for r in renames)
+            + ("; missing: " + ", ".join(missing) if missing else "")
+        )
+        checks.append({"name": "Character consistency",
+                       "status": "PASS" if consistent else "NEEDS_REVIEW", "details": detail})
+    return {"generated_at": datetime.now(UTC).isoformat(), "checks": checks}
+
+
+def _drift_scan_from_namecheck(name_check: dict | None, chapter_text: str, chapter_number: int) -> dict | None:
+    """Build the ``outline._character_drift_scan`` structure the AnnotationsPanel reads, from the QA
+    name-consistency result. Each near-miss variant (e.g. 'Meara' vs roster 'Mara') becomes a drift
+    flag on this chapter with a ``replacement`` so the panel's one-click Apply can fix it."""
+    if not name_check:
+        return None
+    renames = name_check.get("possible_renames") or []
+    roster = name_check.get("roster") or []
+    if not renames:
+        return None
+    chars: list[dict] = []
+    for r in renames:
+        variant = str(r.get("found") or "")
+        token = str(r.get("closest_roster_name") or "")
+        if not variant or not token:
+            continue
+        canonical = next((n for n in roster if token in n.lower().split()), token.capitalize())
+        replacement = canonical.split()[0] if canonical else token.capitalize()
+        idx = chapter_text.find(variant)
+        context = chapter_text[max(0, idx - 30): idx + len(variant) + 30] if idx >= 0 else variant
+        chars.append({
+            "name": canonical, "name_format": canonical,
+            "drift_flags": [{
+                "chapter_number": chapter_number, "variant": variant, "context": context,
+                "type": "name_variant", "severity": "high", "replacement": replacement,
+            }],
+        })
+    return {"characters": chars, "generated_at": None} if chars else None
+
+
+async def _persist_qa_artifacts(payload: dict, scores: dict, findings: list, name_check: dict | None,
+                                chapter_text: str) -> dict | None:
+    """Persist the QA report to the chapter row's ``metadata.qa_report`` (so the QAReportPanel displays
+    it) and any character-name drift into the project's ``outline._character_drift_scan`` (so the
+    AnnotationsPanel surfaces it with a one-click fix). Best-effort; never breaks the QA op."""
+    from writer_engine.config import get_settings
+
+    project_id = payload.get("project_id")
+    chn = payload.get("chapter_number")
+    settings = get_settings()
+    if not (project_id and chn not in (None, "") and settings.supabase_url and settings.supabase_service_role_key):
+        return None
+    try:
+        cnum = _coerce_chapter_number(chn, 0)
+        from writer_engine.supabase.client import get_supabase_admin
+
+        client = await get_supabase_admin()
+        qa_report = _build_qa_report(scores or {}, findings or [], name_check)
+        # merge qa_report into the chapter row's metadata (keyed on project+chapter)
+        cur = await (client.table("published_content_v2").select("id,metadata")
+                     .eq("project_id", str(project_id)).eq("content_type", "chapter")
+                     .eq("chapter_number", cnum).limit(1).execute())
+        rows = getattr(cur, "data", None) or []
+        if rows:
+            meta = dict(rows[0].get("metadata") or {})
+            meta["qa_report"] = qa_report
+            from datetime import UTC, datetime
+            await (client.table("published_content_v2")
+                   .update({"metadata": meta, "updated_at": datetime.now(UTC).isoformat()})
+                   .eq("id", rows[0]["id"]).execute())
+        # merge character drift into the project outline: keep OTHER chapters' flags, refresh THIS
+        # chapter's (so re-running QA after a fix clears the stale flag, and other chapters aren't lost).
+        new_chars = (_drift_scan_from_namecheck(name_check, chapter_text, cnum) or {}).get("characters") or []
+        po = await (client.table("writing_projects_v2").select("outline")
+                    .eq("id", str(project_id)).limit(1).execute())
+        prows = getattr(po, "data", None) or []
+        if prows:
+            outline = dict(prows[0].get("outline") or {})
+            existing = (outline.get("_character_drift_scan") or {}).get("characters") or []
+            merged: dict[str, dict] = {}
+            for c in existing:
+                nm = str(c.get("name") or "")
+                flags = [f for f in (c.get("drift_flags") or []) if f.get("chapter_number") != cnum]
+                if flags:
+                    merged[nm] = {"name": nm, "name_format": c.get("name_format", nm), "drift_flags": flags}
+            for c in new_chars:
+                nm = c["name"]
+                merged.setdefault(nm, {"name": nm, "name_format": c.get("name_format", nm), "drift_flags": []})
+                merged[nm]["drift_flags"].extend(c["drift_flags"])
+            outline["_character_drift_scan"] = {"characters": list(merged.values())}
+            await (client.table("writing_projects_v2").update({"outline": outline})
+                   .eq("id", str(project_id)).execute())
+        return {"qa_report_checks": len(qa_report["checks"]), "drift_characters": len(new_chars)}
+    except Exception as exc:
+        logger.warning("qa.persist_failed", error=str(exc)[:200])
+        return {"persisted": False, "error": str(exc)[:200]}
+
+
 async def _op_qa(payload: dict) -> dict:
+    # Resolve project_id from the title (the hub passes project_title, not a UUID) so we load the REAL
+    # chapter prose + roster and can persist the report. Without this, QA scored empty text and never
+    # surfaced in the UI.
+    await _resolve_project_for_payload(payload, create=False)
     # Load the chapter prose + roster when only project_id+chapter_number are given (R119: the hub
     # passes a reference, not the text), so a "check chapter N for name consistency" works end to end.
     chapter_text = str(payload.get("chapter_text") or payload.get("content_text") or "")
@@ -1507,8 +1641,11 @@ async def _op_qa(payload: dict) -> dict:
                 "note": "craft-QA JSON could not be parsed"}
     scores = qa.model_dump(mode="json")
     findings = scores.pop("findings", [])
+    # Persist qa_report (→ QAReportPanel) + character drift (→ AnnotationsPanel) so the UI shows results.
+    persisted = await _persist_qa_artifacts(payload, scores, findings, name_check, chapter_text)
     return {"chapter_id": payload.get("chapter_id"), "scores": scores, "findings": findings,
-            "character_consistency": name_check}
+            "character_consistency": name_check, "qa_report": _build_qa_report(scores, findings, name_check),
+            "persist": persisted}
 
 
 async def _op_scan_drift(payload: dict) -> dict:

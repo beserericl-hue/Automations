@@ -238,9 +238,19 @@ def main():
                     _addfeed(f"r/{c}", f"https://www.reddit.com/r/{c}/.json", "reddit", 180)
             if feed_rows:
                 _supa("POST", "newsletter_feed_sources_v2", "", feed_rows)
+        # Default template — the newsletter preview + generation need an active default template for the
+        # edition; clone an existing default template (e.g. ai-news) retargeted to this edition.
+        if not _supa("GET", "newsletter_templates_v2", f"edition_id=eq.{ED}&is_default=eq.true&select=id"):
+            src = _supa("GET", "newsletter_templates_v2", "is_default=eq.true&active=eq.true&limit=1&select=*")
+            if isinstance(src, list) and src:
+                tpl = {k: v for k, v in src[0].items() if k not in ("id", "created_at", "updated_at")}
+                tpl.update({"edition_id": ED, "name": "The Wasteland Wire (default)",
+                            "is_default": True, "active": True, "user_id": USER})
+                _supa("POST", "newsletter_templates_v2", "", tpl)
         sc = len(_supa("GET", "newsletter_subscribers_v2", f"edition_id=eq.{ED}&select=id") or [])
         fc = len(_supa("GET", "newsletter_feed_sources_v2", f"edition_id=eq.{ED}&select=id") or [])
-        nl_ok, nl_ev = True, f"edition 'The Wasteland Wire' + {sc} subscribers + {fc} feeds"
+        tc = len(_supa("GET", "newsletter_templates_v2", f"edition_id=eq.{ED}&select=id") or [])
+        nl_ok, nl_ev = True, f"edition 'The Wasteland Wire' + {sc} subscribers + {fc} feeds + {tc} template(s)"
     except Exception as e:  # noqa: BLE001
         nl_ev = f"newsletter seed error: {str(e)[:150]}"
     results.append({"id": "VP11", "title": "Seed demo newsletter 'The Wasteland Wire' (DB, Setup-Wizard parity)",
