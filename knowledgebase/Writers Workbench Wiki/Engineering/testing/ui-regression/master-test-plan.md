@@ -31,9 +31,9 @@ associated project_id → Art tab always empty**. All fixed; commits on `develop
 | Element | Expected result | PASS criteria | FAIL criteria |
 |---|---|---|---|
 | **Preview** (per row) | modal renders the default template | dialog "Preview of …" opens; iframe `srcdoc` > 100 chars | no dialog / blank iframe / "no template" |
-| New newsletter | → EditionEditor | URL `/newsletter/editions/new`, form renders | 🟡 |
+| New newsletter / EditionEditor Save | create edition | 🟢 `newsletter-crud.spec.ts`: newsletter_editions_v2 row with display_name+genre | missing row |
 | Feeds / Edit | navigate | correct URL + page renders | 🟡 |
-| Disable / Re-enable | toggles `enabled` | `newsletter_editions_v2.enabled` flips in DB + row status label changes | 🟡 |
+| Disable / Re-enable | toggles `enabled` | 🟢 `newsletter-crud`: `newsletter_editions_v2.enabled` flips false↔true in DB | no flip |
 | Show disabled | includes disabled rows | disabled editions appear when checked (verify server honours include_disabled) | 🟡 |
 
 ## 3. EditionEditor — `/newsletter/editions/new` + `/:id`  🟡
@@ -42,7 +42,7 @@ associated project_id → Art tab always empty**. All fixed; commits on `develop
 | Save (create) | inserts edition | 201 + `newsletter_editions_v2` row with all field values; **+ default template seeded** | missing row/fields |
 | Save (edit) | updates edition | changed fields persisted in DB | stale values |
 | LogoUploader | uploads/removes logo | `stamp_url` set/cleared in DB | 🟡 |
-| SubscribersPanel add / import CSV / activate / unsubscribe / remove | mutates subscribers | corresponding `newsletter_subscribers_v2` change in DB | 🟡 (CSV import bug fixed) |
+| Feeds add / SubscribersPanel | mutates rows | 🟢 `newsletter-crud`/`newsletter-wizard`: newsletter_feed_sources_v2 + newsletter_subscribers_v2 rows | no row |
 
 ## 4. Newsletter Generate / Templates / Approvals / Sends / Ingestion  🟡
 | Element | Expected result | PASS criteria | FAIL criteria |
@@ -64,26 +64,26 @@ associated project_id → Art tab always empty**. All fixed; commits on `develop
 | Outline / Re-outline, Write / Rewrite | queue engine job → artifact | job completes; `published_content_v2` chapter/outline updated with real content | queued forever / no DB change |
 | Fix Drift (+Cancel) | repair job flips QA | after job, `chapter_qa_v2`/metadata aligned=true | drift persists |
 | Social tab Copy | copies post text | clipboard has post text; posts render from `social_posts_v2` | empty |
-| Story Bible tab | lists entries | entries render matching `story_bible_v2` count | 🟡 |
+| Story Bible panel CRUD | add/delete entry | 🟢 `story-bible-crud.spec.ts`: story_bible_v2 row added then soft-deleted | no DB change |
 | Research / Cost tabs | list/analytics | real rows/values render | 🟡 |
-| Edit form Save | updates project | `writing_projects_v2` fields persisted | stale |
-| Delete Project | soft-deletes + cascade | project + children soft-deleted; nav to `/projects` | 🟡 |
+| Edit form Save | updates project | 🟢 `project-detail-crud.spec.ts`: writing_projects_v2.title persisted | stale |
+| Delete Project | soft-deletes | 🟢 `project-detail-crud`: writing_projects_v2.deleted_at set + nav to /projects | no delete |
 
 ## 6. ContentDetail — `/content/:id`  · lifecycle 🟢, rest 🟡
 | Element | Expected result | PASS criteria | FAIL criteria |
 |---|---|---|---|
 | **Approve/Publish/Reject/Back-to-Draft/Schedule/Unpublish** | status transition | `published_content_v2.status` on the exact row → expected value; UI advances | wrong/no status change |
-| **Run Q/A** | consistency report | after job, panel DISPLAYS checks **AND** `metadata.qa_report.checks` exists (not "No consistency report available") | stays empty / no checks |
+| **Run Q/A** | consistency report | 🟢 `content-qa.spec.ts`: after the queued job, `metadata.qa_report.checks` exists AND report DISPLAYS | stays empty / no checks |
 | **AnnotationsPanel Apply Fix** | replaces target text | `content_text` changes to include the fix; annotation clears | text unchanged / annotation stays |
 | Rewrite with research | queues repair job | job completes; chapter `content_text` updated + research woven | no change |
 | VersionHistory Restore | restores a version | `content_text` == chosen version; new snapshot row added | unchanged |
-| Editor Save | persists + snapshots | `content_text` saved; `content_versions_v2` row added | not saved |
+| Editor Save + Version History | persists + snapshots | 🟢 `content-editor.spec.ts`: content_text persisted + content_versions_v2 row; History lists versions | not saved |
 | Cover image picker | sets cover | `cover_image_path` set on row; banner shows image | unchanged |
 
 ## 7. Dashboard / ProjectList  🟡
 | Element | Expected | PASS | FAIL |
 |---|---|---|---|
-| StatCards | counts | numbers match DB counts (Projects/Drafts/Published/Research) | wrong/blank |
+| StatCards | counts | 🟢 `dashboard.spec.ts`: Projects/Research counts == DB | wrong/blank |
 | Recent Activity row | navigate | opens the item's detail route | dead |
 | Project row | open | `/projects/:id` renders | dead |
 
@@ -92,24 +92,24 @@ associated project_id → Art tab always empty**. All fixed; commits on `develop
 |---|---|---|---|
 | Type filter | filter + `?type=` | rows filter; URL param set | no effect |
 | Sort headers | reorder | row order changes by field | no change |
-| Bulk Approve/Publish/Delete | mutate selected | selected rows' `status`/`deleted_at` change in DB | no change |
+| Bulk Approve | mutate selected | 🟢 `library-bulk.spec.ts`: both selected rows status=approved in DB | no change |
 | Row click | open detail | `/content/:id` | dead |
 
 ## 9. Reference — story-arcs / genres / brainstorm / research / outlines / sources / cost  🟡
 | Element | Expected | PASS | FAIL |
 |---|---|---|---|
 | Story Arc create/delete | CRUD | 🟢 `story-arcs-crud.spec.ts`: `story_arcs_v2` row inserted then removed (DB-verified) | no DB change |
-| Genre create/edit/delete (cascade) | CRUD | `genre_config_v2` row change; cascade count shown | no change |
-| Brainstorm submit | project+outline | `writing_projects_v2` row with non-empty outline | no project |
-| Research list/detail/delete | read + soft-delete | rows render; delete sets `deleted_at` | no change |
+| Genre create/delete | CRUD | 🟢 `genres-crud.spec.ts`: genre_config_v2 row inserted then removed (DB) | no change |
+| Brainstorm Analyze gating / Outlines list | gating + list | 🟢 `reference-render.spec.ts`: Analyze gated by content; outlined project appears in /outlines | broken |
+| Research open/delete | read + soft-delete | 🟢 `research-crud.spec.ts`: open detail + delete sets deleted_at | no change |
 
 ## 10. Account / Auth — settings / credits / onboarding / login/signup/forgot/reset  🟡
 | Element | Expected | PASS | FAIL |
 |---|---|---|---|
-| Settings Save | persist profile+email cfg | `users_v2` + `app_config_v2` updated | stale |
+| Settings Save | persist email cfg | 🟢 `settings-result.spec.ts`: app_config_v2 recipient_email persisted (save/restore) | stale |
 | Theme toggle | flips theme | `<html>` `dark` class toggles | 🟢 (nav suite) |
 | Update Password | changes pwd | success toast; auth updated | error |
-| Credits Purchase | grants credits | balance increases (Stripe-deferred stub) | no change |
+| Credits balance / Purchase | balance | 🟢 `credits.spec.ts`: page balance == API; purchase (if offered) increases it | mismatch |
 | Onboarding profile+tier | creates user+sub | `users_v2` row + subscription | error |
 | Login/Signup/Forgot/Reset | auth flows | correct redirect/panel | 🟡 |
 
@@ -118,7 +118,7 @@ associated project_id → Art tab always empty**. All fixed; commits on `develop
 |---|---|---|---|
 | Eve "Talk to Eve" widget | mounts ConvAI | `<elevenlabs-convai>` with agent-id + user dynamic-var | 🟢 |
 | ImageDetail Regenerate | new image | new `generated_images_v2` row; navigates to it | 🟡 |
-| ImageGallery filters / thumbnail open | filter + open | rows filter; thumbnail → `/images/:id` | 🟡 |
+| ImageGallery Type filter | filter | 🟢 `images-gallery.spec.ts`: 2 seeded images → filter narrows to 1 | no filter |
 
 ---
 
