@@ -33,10 +33,18 @@ test.describe('Newsletter — editions + generate + templates + help', () => {
     const values = await editionSelect.locator('option').evaluateAll((opts) =>
       (opts as HTMLOptionElement[]).map((o) => o.value).filter(Boolean),
     );
-    test.skip(values.length < 2, 'need ≥2 editions to prove preselect');
-    const target = values[values.length - 1]; // NOT the default (first) — proves the param is honoured
-    await page.goto(`/newsletter/generate?edition=${encodeURIComponent(target)}`);
-    await expect(page.locator('#edition')).toHaveValue(target, { timeout: 15_000 });
+    test.skip(values.length < 1, 'need ≥1 edition');
+    // Stale/invalid ?edition must fall back to a real edition (never leave the select on a bogus id).
+    await page.goto('/newsletter/generate?edition=does-not-exist-00000000');
+    await expect(editionSelect).toHaveValue(/.+/, { timeout: 15_000 });
+    const fellBackTo = await editionSelect.inputValue();
+    expect(values).toContain(fellBackTo);
+    // With ≥2 editions we can also prove a VALID non-default id is honoured.
+    if (values.length >= 2) {
+      const target = values[values.length - 1]; // not the default (first)
+      await page.goto(`/newsletter/generate?edition=${encodeURIComponent(target)}`);
+      await expect(editionSelect).toHaveValue(target, { timeout: 15_000 });
+    }
   });
 
   test('Generate form: edition/send-date controls + submit present', async ({ page }) => {
