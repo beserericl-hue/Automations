@@ -82,6 +82,32 @@ export function eqUser(): string {
   return `user_id=eq.${encodeURIComponent(DEMO_USER_ID)}`;
 }
 
+// --------------------------------------------------------------------------- disposable projects
+export async function seedProject(fields: { title: string; genre_slug?: string; outline?: Record<string, unknown> }): Promise<string> {
+  const row = {
+    user_id: DEMO_USER_ID,
+    title: fields.title,
+    genre_slug: fields.genre_slug ?? 'post-apocalyptic',
+    outline: fields.outline ?? {},
+    project_type: 'book',
+    status: 'in_progress',
+  };
+  const res = await fetch(`${SUPA_URL}/rest/v1/writing_projects_v2`, {
+    method: 'POST',
+    headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify(row),
+  });
+  if (!res.ok) throw new Error(`seedProject ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const [created] = (await res.json()) as Array<{ id: string }>;
+  return created.id;
+}
+
+export async function deleteProject(id: string): Promise<void> {
+  await supaDelete('published_content_v2', `project_id=eq.${id}`);
+  await supaDelete('story_bible_v2', `project_id=eq.${id}`);
+  await supaDelete('writing_projects_v2', `id=eq.${id}`);
+}
+
 // --------------------------------------------------------------------------- disposable content rows
 /** Insert a disposable published_content_v2 row (owned by the demo user) and return its id. */
 export async function seedContent(fields: {
