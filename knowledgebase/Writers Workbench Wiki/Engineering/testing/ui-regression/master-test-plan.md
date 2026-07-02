@@ -98,7 +98,7 @@ associated project_id → Art tab always empty**. All fixed; commits on `develop
 ## 9. Reference — story-arcs / genres / brainstorm / research / outlines / sources / cost  🟡
 | Element | Expected | PASS | FAIL |
 |---|---|---|---|
-| Story Arc create/edit/delete | CRUD | `story_arcs_v2` row inserted/updated/removed | no DB change |
+| Story Arc create/delete | CRUD | 🟢 `story-arcs-crud.spec.ts`: `story_arcs_v2` row inserted then removed (DB-verified) | no DB change |
 | Genre create/edit/delete (cascade) | CRUD | `genre_config_v2` row change; cascade count shown | no change |
 | Brainstorm submit | project+outline | `writing_projects_v2` row with non-empty outline | no project |
 | Research list/detail/delete | read + soft-delete | rows render; delete sets `deleted_at` | no change |
@@ -124,7 +124,7 @@ associated project_id → Art tab always empty**. All fixed; commits on `develop
 
 ### Green today (result-asserting, passing on DEV)
 `newsletter-wizard` (feeds+template+subscriber+**Preview**), `content-lifecycle` (status transitions),
-`project-export` (.docx download), `project-art` (chapter artwork → gallery), `eve-voice-widget`, plus the
+`project-export` (.docx download), `project-art` (chapter artwork → gallery), `story-arcs-crud` (create→DB→delete), `eve-voice-widget`, plus the
 `nav-render` render/guard smoke. See [[result-asserting-suite]].
 
 ### Pending (next, same methodology)
