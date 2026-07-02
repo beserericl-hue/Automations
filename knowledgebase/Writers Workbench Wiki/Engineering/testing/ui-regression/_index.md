@@ -38,6 +38,8 @@ The `chromium` project depends on `auth.setup.ts`, which seeds the session via t
 password-grant path when `E2E_BASE_URL` is set. Run engine tests separately with
 `scripts/e2e_full_verify.py` (see [[engine-chat-e2e-suite]]).
 
+**[[master-test-plan]]** — the full matrix: every page, every button, PASS + FAIL criteria, and covering-test status.
+
 ## Coverage map — one page per feature area
 
 Each page lists: routes covered, every interactive element + its expected result, the stable Playwright
