@@ -312,12 +312,30 @@ feedsRouter.post(
       return;
     }
 
+    // Dedup against feeds already attached to this edition. We can't use a DB upsert with
+    // onConflict here — newsletter_feed_sources_v2 has no unique constraint on (user_id, edition_id,
+    // url), so ON CONFLICT errors out ("no unique or exclusion constraint matching"). Filter in code
+    // instead: fetch existing URLs, insert only the genuinely new rows.
+    const { data: existingRows, error: existErr } = await supabase
+      .from('newsletter_feed_sources_v2')
+      .select('url')
+      .eq('edition_id', editionId);
+    if (existErr) {
+      logger.error({ existErr, userId, editionId }, 'import-from-genre existing-feeds lookup failed');
+      res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: existErr.message } });
+      return;
+    }
+    const existingUrls = new Set((existingRows ?? []).map((r) => String(r.url).toLowerCase()));
+    const newRows = rows.filter((r) => !existingUrls.has(r.url.toLowerCase()));
+
+    if (newRows.length === 0) {
+      res.status(201).json({ success: true, genre: genre.genre_slug, inserted: 0, skipped_duplicate: rows.length });
+      return;
+    }
+
     const { data: inserted, error: insErr } = await supabase
       .from('newsletter_feed_sources_v2')
-      .upsert(rows, {
-        onConflict: 'user_id,edition_id,url',
-        ignoreDuplicates: true,
-      })
+      .insert(newRows)
       .select('id');
     if (insErr) {
       logger.error({ insErr, userId, editionId, slug: body.genre_slug }, 'import-from-genre insert failed');

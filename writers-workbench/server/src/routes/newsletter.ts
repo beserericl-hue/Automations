@@ -132,6 +132,41 @@ newsletterRouter.post(
       res.status(500).json({ success: false, error: { code: 'DB_INSERT_FAILED', message: error.message } });
       return;
     }
+
+    // Seed a per-edition default template by cloning the canonical system starter template. Without
+    // this a brand-new edition has NO default template, so the setup wizard's Template step previews
+    // nothing AND newsletter generation fails with NO_DEFAULT_TEMPLATE. Best-effort: a clone failure
+    // never blocks edition creation (the user can still create a template manually).
+    try {
+      const { data: starter } = await supabase
+        .from('newsletter_templates_v2')
+        .select('html, sample_data')
+        .is('user_id', null)
+        .eq('is_default', true)
+        .eq('active', true)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (starter?.html) {
+        const { error: tplErr } = await supabase.from('newsletter_templates_v2').insert({
+          user_id: userId,
+          edition_id: data.id,
+          name: `${data.display_name} — Default`,
+          description: 'Auto-created default template. Edit or replace it any time.',
+          source_type: 'user',
+          html: starter.html,
+          sample_data: starter.sample_data ?? {},
+          is_default: true,
+          active: true,
+        });
+        if (tplErr) logger.warn({ tplErr, editionId: data.id, userId }, 'default template seed failed (non-fatal)');
+      } else {
+        logger.warn({ editionId: data.id }, 'no system starter template found to seed edition default');
+      }
+    } catch (e) {
+      logger.warn({ e, editionId: data.id }, 'default template seed threw (non-fatal)');
+    }
+
     res.status(201).json({ success: true, edition: data });
   },
 );

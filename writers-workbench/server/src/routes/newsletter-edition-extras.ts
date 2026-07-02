@@ -438,21 +438,30 @@ editionExtrasRouter.post(
       return;
     }
 
+    // Dedup against existing subscribers in code — the table has no unique constraint matching
+    // (user_id, edition_id, email), so a DB upsert with onConflict errors ("no unique or exclusion
+    // constraint matching"). Fetch existing emails for this edition and insert only the new ones.
+    const { data: existingSubs, error: existErr } = await supabase
+      .from('newsletter_subscribers_v2')
+      .select('email')
+      .eq('edition_id', editionId);
+    if (existErr) {
+      logger.error({ existErr, editionId, userId }, 'csv import existing-subscriber lookup failed');
+      res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: existErr.message } });
+      return;
+    }
+    const existingEmails = new Set((existingSubs ?? []).map((r) => String(r.email).toLowerCase()));
+    const newRows = rows.filter((r) => !existingEmails.has(r.email));
+
     // Insert in chunks. Postgres rejects very large parameter counts; chunk
     // size of 1000 keeps us comfortably under any common limit.
     const CHUNK = 1000;
     let totalInserted = 0;
-    for (let i = 0; i < rows.length; i += CHUNK) {
-      const chunk = rows.slice(i, i + CHUNK);
-      // Use a duplicate-tolerant upsert: existing rows (matching the
-      // (user_id, edition_id, lower(email)) unique index) are kept untouched
-      // because we don't update on conflict.
+    for (let i = 0; i < newRows.length; i += CHUNK) {
+      const chunk = newRows.slice(i, i + CHUNK);
       const { data, error } = await supabase
         .from('newsletter_subscribers_v2')
-        .upsert(chunk, {
-          onConflict: 'user_id,edition_id,email',
-          ignoreDuplicates: true,
-        })
+        .insert(chunk)
         .select('id');
       if (error) {
         logger.error({ error, editionId, userId, chunk_size: chunk.length }, 'csv import insert failed');
