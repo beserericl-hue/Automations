@@ -599,3 +599,17 @@ user's data. Prompt + LLM unchanged. PROD (agent_2801) and V1 (agent_6401) NOT t
 tool preserved for revert. Verified: widget mounts agent_0001 with the demo user in the Workbench UI
 (e2e/regression/eve-voice-widget.spec.ts, green), and the exact tool payload round-trips through the engine
 (list→data 23 outlines; write→queued blog job). Full details + revert in [[eve-voice-widget]].
+
+## [2026-07-02] build | Result-asserting UI regression suite — 3 real backend bugs fixed
+
+Upgraded the UI suite to ASSERT RESULTS (DOM output + DB row), data-isolated per test (create → assert →
+hard-delete), pinned to demo user +14105914612. Harness e2e/pages/api.ts (bearer + service-key REST via
+Node fetch — Playwright's browser-like context is rejected by the new sb_secret keys). Modules green on
+DEV: newsletter-wizard (feeds/template-preview/subscriber all asserted in DB), content-lifecycle (status
+transitions on the exact row), project-export (real .docx download). Found + fixed 3 real user-facing
+bugs the old click-only tests missed: import-from-genre and CSV subscriber import both 500'd on a broken
+onConflict upsert with no matching unique constraint (42P10) — deduped in code; and new editions had no
+default template (wizard preview blank + generation NO_DEFAULT_TEMPLATE) — seed a per-edition default on
+create. Commit 6110b5d + specs. Details in [[result-asserting-suite]]. Remaining modules (newsletter-crud,
+project tabs incl. cover art, content-detail async Q/A + annotations Apply, library, reference, account)
+follow the same pattern.

@@ -7,6 +7,11 @@ last_reviewed: 2026-07-02
 
 # UI Regression Suite — run this after every sprint
 
+> **Result-asserting upgrade (2026-07-02):** the suite now PROVES each function worked (DOM result + DB
+> row), data-isolated per test — see **[[result-asserting-suite]]** (harness + modules + the 3 real
+> backend bugs it already found and fixed). New/upgraded specs supersede the older presence-only ones.
+
+
 This is the **authoritative regression plan** for the Writer's Workbench UI. It was built from a
 verified inventory of `writers-workbench/client/src/App.tsx` + every route component (not a summary),
 and every element listed here has a **covering Playwright test** in `writers-workbench/e2e/regression/`.
