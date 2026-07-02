@@ -63,10 +63,11 @@ test.describe('Newsletter — editions + generate + templates + help', () => {
   });
 
   test('HelpButton opens and closes the help slide-over', async ({ page }) => {
-    await page.goto('/newsletter');
-    await expect(page.getByText(/Newsletter|Generate/i).first()).toBeVisible({ timeout: 20_000 });
+    // /newsletter/editions has a HelpButton (the home page does not).
+    await page.goto('/newsletter/editions');
+    await expect(page.getByText(/newsletter|Edition|New newsletter/i).first()).toBeVisible({ timeout: 20_000 });
     const help = page.locator('button[title^="Help:"]').first();
-    if (!(await help.isVisible().catch(() => false))) test.skip(true, 'no HelpButton on this page');
+    await expect(help).toBeVisible({ timeout: 15_000 });
     await help.click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible({ timeout: 8_000 });
