@@ -106,6 +106,9 @@ export default function ContentDetail() {
     onSuccess: () => {
       setSaveStatus('saved');
       queryClient.invalidateQueries({ queryKey: ['content-detail', id] });
+      // Each save snapshots a new content_versions_v2 row — refresh the Version History list too, else
+      // the panel shows a stale (cached) version list until a full page reload.
+      queryClient.invalidateQueries({ queryKey: ['content-versions', id] });
       setTimeout(() => setSaveStatus(null), 3000);
     },
     onError: () => {
