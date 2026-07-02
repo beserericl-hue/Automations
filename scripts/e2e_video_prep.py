@@ -151,21 +151,44 @@ def main():
          lambda resp, jr, res: (int(res.get("count") or 0) >= 3,
                                 f"entries={res.get('count')} found={res.get('found')}"))
 
-    # VP10 — inject the deliberate drift (DB): Maya Chen -> Maya Chan in ch3 (drift-scanner demo)
+    # VP10 — inject a deliberate character-name drift in ch3 (the drift-scanner demo). marketing-copy
+    # assumes the protagonist is "Maya Chen"; the brainstorm actually generates the name, so target the
+    # REAL protagonist (outline character #0) and swap ONE occurrence for a near-variant the scanner
+    # catches (edit distance 1-2), e.g. "Mara" -> "Maera". Falls back to the literal Maya Chen->Chan.
+    import re as _re
+
+    def _variant(name: str) -> str:
+        # insert/alter one letter to make a scanner-detectable near-miss of the same name
+        for i, ch in enumerate(name):
+            if i > 0 and ch.lower() in "aeiou":
+                return name[:i] + ("e" if ch.lower() != "e" else "a") + name[i:]  # double the vowel region
+        return name + "e"
+
     drift_ev = "skipped (no project)"
     ok = False
     if proj:
         rows = _supa("GET", "published_content_v2",
                      f"project_id=eq.{proj['id']}&content_type=eq.chapter&chapter_number=eq.3&select=id,content_text&limit=1")
-        if rows and "Maya Chen" in (rows[0].get("content_text") or ""):
-            new_text = (rows[0]["content_text"].replace("Maya Chen", "Maya Chan", 1))
-            _supa("PATCH", "published_content_v2", f"id=eq.{rows[0]['id']}", {"content_text": new_text})
-            ok = True
-            drift_ev = "injected 'Maya Chen'->'Maya Chan' (1 occurrence) in ch3"
-        elif rows:
-            drift_ev = "ch3 exists but no 'Maya Chen' occurrence to alter"
-        else:
+        text = rows[0].get("content_text") if rows else None
+        if not rows:
             drift_ev = "ch3 not found"
+        elif "Maya Chen" in (text or ""):
+            _supa("PATCH", "published_content_v2", f"id=eq.{rows[0]['id']}",
+                  {"content_text": text.replace("Maya Chen", "Maya Chan", 1)})
+            ok, drift_ev = True, "injected 'Maya Chen'->'Maya Chan' (1 occurrence) in ch3"
+        else:
+            # target the real protagonist's first name (outline character #0)
+            chars = (proj.get("outline") or {}).get("characters") or []
+            proto = (chars[0].get("name") if chars and isinstance(chars[0], dict) else "") or ""
+            first = proto.split()[0] if proto else ""
+            m = _re.search(rf"\b{_re.escape(first)}\b", text or "") if first else None
+            if m:
+                variant = _variant(first)
+                new_text = (text[: m.start()] + variant + text[m.end():])
+                _supa("PATCH", "published_content_v2", f"id=eq.{rows[0]['id']}", {"content_text": new_text})
+                ok, drift_ev = True, f"injected name drift '{first}'->'{variant}' (1 occurrence) in ch3"
+            else:
+                drift_ev = f"ch3 exists but protagonist name ('{first or 'unknown'}') not found to alter"
     results.append({"id": "VP10", "title": "Inject deliberate drift in ch3 (DB)",
                     "verdict": "PASS" if ok else "FAIL", "evidence": drift_ev})
     print(f"\n=== VP10: inject drift\n    {'PASS' if ok else 'FAIL'} :: {drift_ev}", flush=True)
