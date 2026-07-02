@@ -1,6 +1,113 @@
 # Session Context — Writer's Workbench Engine (Path B) parity + cutover
 
-_Last updated: 2026-06-20. Branch: `develop` (all work committed + pushed)._
+_Last updated: 2026-07-02. Branch: `develop` (all work committed + pushed)._
+
+---
+
+# LATEST SESSION (2026-07-02) — Engine gap repair (G1–G20) + live 157-run + B-roll UI E2E + video-prep
+
+Next-session goals: (1) fix the test harness to thread voice conversation context + isolate
+lifecycle-test data; (2) build a COMPLETE UI + engine regression suite covering every page, button, and
+function — no skips — then rebuild the vault testing docs.
+
+## What this session did (all on `develop`, deployed to DEV)
+- **Engine gap repair (G1–G20 + round-2 + a lifecycle fix)** — the 20 gaps from `scripts/e2e_out/RESULTS.md`
+  are all fixed and **verified live**. Commits `3d5b47c`, `c64c0a1`, `283f528`, `fd2b7cb`. 345 unit tests
+  green. Highlights: completion emails now embed the deliverable (research/outline/cover-art `<img>`/social)
+  [G1]; `chapter.write` resolves/creates project_id from title [G9]; brainstorm persists + honours chapter
+  count [G12]; lifecycle strict title match, never mutates on no-match [G11]; word-count coercion [G6];
+  Prologue/Epilogue [G19]; retrieve search + not-found [G15/G18]; pre-Gemini routing overrides
+  [G3/G7/G10/G13/G16/G17]; `app_config_v2` [G2]; outline render [G20]; and lifecycle "approve/publish
+  **chapter N of** `<project>`" resolves the project first then scopes by chapter number (`283f528`).
+- **Full 157-test live run** (chat `/internal/hub` + voice `/internal/hub/voice`): **151 PASS, 6 FAIL** —
+  all 6 non-engine-bugs (see below). Report:
+  `knowledgebase/Writers Workbench Wiki/Engineering/testing/engine-e2e-full-rerun-report.md`.
+- **Marketing B-roll UI E2E** (Playwright): `writers-workbench/e2e/video-broll.spec.ts` +
+  `e2e/pages/workbench.page.ts` — **15/15 green, stable**; follows `marketing-copy.md` §4 scene-by-scene.
+- **Video-prep chat E2E**: `scripts/e2e_video_prep.py` seeds demo project "The Last Signal"
+  (id `dd10c1c3-e025-4cd7-854d-21db32a2e4da`) entirely via chat. VP01–VP09 pass, VP10 (ch3 drift) fixed.
+
+## Environments / creds / how to run
+- **DEV engine gateway**: `https://writer-engine-gateway-develop.up.railway.app`. Header
+  `x-service-secret: <64-char SERVICE_SHARED_SECRET>` from
+  `railway variables --service writer-engine-gateway --environment develop --kv | grep SERVICE_SHARED_SECRET`.
+  Chat `POST /internal/hub {message,user_id}`; voice `POST /internal/hub/voice
+  {user_message_request, system__caller_id}`; poll `GET /internal/write/jobs/{id}`. Gemini is the primary
+  router on DEV — deterministic overrides live in `hub/router.py::_deterministic_override`.
+- **DEV Supabase** `gvbvwcnmjkdpclcisqrr.supabase.co`: URL + SERVICE_ROLE key in
+  `writers-workbench/engine/.env`. Anon key (`VITE_SUPABASE_ANON_KEY`) + `VITE_SUPABASE_URL` from Railway
+  `WritersWorkbench` develop env. Test user `+14105914612` (`eric@agileadtesting.com`). **URL-encode the
+  `+` as `%2B` in REST queries** (a raw `+` decodes to a space → 0 rows — this bit us).
+- **DEV Workbench**: `https://writersworkbench-develop.up.railway.app`. Login
+  `eric@agileadtesting.com` / `Fr332bafami!y` (marketing-copy §2).
+- **Engine E2E harness**: `scripts/e2e_manifest.py` → `scripts/e2e_out/manifest.json` from
+  `knowledgebase/.../testing/engine-chat-e2e-suite.md` (157 tests). `scripts/e2e_full_verify.py` runs all
+  through chat/voice, polls, verifies vs DEV Supabase, writes `scripts/e2e_out/verify/<id>.json`. Env:
+  `E2E_SECRET, SUPA_URL, SUPA_KEY, E2E_USER, E2E_TIMEOUT` (900–1500; chapter writes are slow but persist
+  when done). Subset via `E2E_ONLY="R01,R06,V03"`.
+- **Playwright UI**: `writers-workbench/playwright.config.ts`, test dir `e2e/`. Register a new spec by
+  adding its filename to the `chromium` project's `testMatch` regex. Run vs DEV (no local servers):
+  `E2E_BASE_URL=https://writersworkbench-develop.up.railway.app E2E_TEST_EMAIL=eric@agileadtesting.com
+  E2E_TEST_PASSWORD='Fr332bafami!y' SUPABASE_URL=<dev> VITE_SUPABASE_ANON_KEY=<dev anon>
+  npx playwright test <spec> --project=chromium`. `auth.setup.ts` uses the Supabase password-grant API
+  path when `E2E_BASE_URL` is set. Optional deterministic chapter picking: `E2E_SUPA_URL,
+  E2E_SUPA_SERVICE_KEY, E2E_USER_ID`. Reusable `e2e/pages/workbench.page.ts` (`WorkbenchPage`).
+
+## The 6 non-passing tests (harness limitations to fix — NOT engine bugs)
+1. **R79** Write Epilogue — actual PASS (epilogue persisted as chapter #999; job outran the 15-min poll).
+2. **R89** Revert Outline — actual PASS (`reverted=true`); verifier graded the wrong step of a 2-step test.
+3. **R98** Undelete — op works; target row wasn't in `deleted` state at that point (run-ordering).
+4. **V36** Voice Undelete — same as R98.
+5. **V03** Voice email "that research" — multi-turn pronoun; engine safely not-found w/o conversation ctx.
+6. **V22** Voice research→"blog about that" — step 1 ran+persisted; step 2 needs conversation context.
+
+→ Harness fixes for next session: (a) **thread voice conversation context** — carry a `conversation_id`
+and pass prior-turn context so pronouns ("that/it/that research") resolve; the hub already accepts a
+`context` object (`last_list`, `project_title`) and `e2e_full_verify.py::run_step` already threads a
+test's own steps — extend to voice + pronoun resolution. (b) **isolate lifecycle-test data** — seed a
+disposable, known-state row per approve/reject/delete/undelete test (and clean up) instead of mutating
+shared DEV rows, so results don't depend on run order.
+
+## UI route → component inventory (starting point for the FULL UI regression suite)
+Client `writers-workbench/client/src/`; router `client/src/App.tsx`. Every route + its component and the
+buttons/functions to cover:
+- `/login` LoginPage (email/pwd/show-hide/Sign In/Forgot/Sign Up/Google/error) · `/signup` SignupPage ·
+  `/forgot-password` · `/reset-password` · `/onboarding` OnboardingPage (profile→tier PricingCards
+  Trial/Standard/Pro + "Most Popular"→done; redirects onboarded users to `/`).
+- `/` Dashboard ("Welcome back"; StatCards Projects/Drafts/Published/Research; Recent Activity table).
+- `/projects` ProjectList (rows `role=button aria-label="Open project <title>"`) · `/projects/:id`
+  ProjectDetail — 9 tab buttons w/ count suffix ("Chapters (N)"): Overview, Outline, Chapters, Story
+  Bible, Art, Social, Research, Cost, Export. **ProjectDetail content is NOT inside `<main>`.** "Generate
+  Cover Art" is on Overview; Art tab = ImageGallery (tiles are Supabase-storage imgs, or "No images yet");
+  Export tab = "Choose Page Size & Export" (disabled until an approved chapter) → ExportDialog modal (KDP
+  sizes incl. 6x9). · `/projects/:id/bible` StoryBiblePanel · `/trash` TrashView.
+- `/library` ContentLibrary (table rows `<td onClick navigate('/content/:id')>`; bulk approve/publish/
+  delete; sort headers) · `/content/:id` ContentDetail (RichTextEditor; lifecycle buttons; "Engine QA"
+  panel h3; AnnotationsPanel drift+Apply; QAReportPanel; VersionHistory; ImageGallery picker; Provenance;
+  chapter-only "Rewrite with research" → RewriteWithResearchModal[research focus textarea/useQa/style/
+  citationMode]).
+- `/images/:id` ImageDetail · `/research`+`/research/:id` · `/brainstorm` · `/outlines` · `/story-arcs`
+  StoryArcBrowser ("N arcs available"; cards expand/edit/delete; Create Custom Arc) · `/genres` GenreList
+  (public/private; pagination; edit/delete cascade confirm) · `/cost` · `/sources` · `/settings` ·
+  `/admin/*` · `/superuser/*` · `/credits` CreditsPage (buy credits; per-credit pricing, NOT tier cards).
+- Newsletter (prefix `/newsletter`): Home · generate · execution/:id · **approvals** PendingApprovals ·
+  **approvals/:token** ApprovalDetail (stage heading, token, ApprovalPayload{Stories,Subject,Image},
+  ApprovalResolveForm Approve/Reject/Revise, rendered HTML preview) · sends · sends/:id · ingestion ·
+  templates(+new/:id TemplateEditor `aria-label="Template HTML source"`) · **editions** EditionsList
+  ("My newsletters"; New newsletter; table; show-disabled; edit/disable) · editions/new+/:id EditionEditor
+  (display/sender/signature name+role, genre, cadence+send-time, intro; Save) · editions/:id/feeds ·
+  editions/:id/setup EditionSetupWizard ("Copy feeds from genre"; add subscribers).
+Conventions: `getByRole('button'/'link'/'heading',{name})`, `getByLabel`, `aria-label="Open <thing>
+<title>"`, dialog close `aria-label="Close"`, HelpButton `button[title^="Help:"]`. Existing UI specs:
+`e2e/authenticated.spec.ts`, `sprint*-*.spec.ts`, `newsletter-fullflow.spec.ts`; page objects
+`e2e/pages/{login,newsletter,workbench}.page.ts`. Vault index: `knowledgebase/.../testing/_index.md`.
+
+## Guardrails
+- NEVER touch PROD (Supabase `faklxfakgzkpkbxfihzh`, PROD n8n, PROD Eve `agent_2801kks580vnf5q80j3bd0n0x45v`)
+  without explicit permission — all work on DEV / `develop`. Don't `railway up` the engine (repo-connected).
+  Base tables immutable (migrations 008+). Keep test outputs. Prompts to copy → fenced code blocks.
+
+---
 
 ## LATEST SESSION (2026-06-20) — Engine E2E parity sprints E2E-1..E2E-5 ALL SHIPPED (on `develop`)
 
