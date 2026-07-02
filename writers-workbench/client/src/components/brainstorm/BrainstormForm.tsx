@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
@@ -24,6 +24,10 @@ export default function BrainstormForm() {
   const [title, setTitle] = useState('');
   const [genreSlug, setGenreSlug] = useState('');
   const [storyArc, setStoryArc] = useState('');
+  // Raw parse suggestions kept so we can re-match once the genres/arcs lists finish loading (they may
+  // resolve AFTER the parse response, which would otherwise leave the auto-filled selects empty).
+  const [genreSuggestion, setGenreSuggestion] = useState('');
+  const [arcSuggestion, setArcSuggestion] = useState('');
   const [chapterCount, setChapterCount] = useState('');
   const [themes, setThemes] = useState<string[]>([]);
   const [newTheme, setNewTheme] = useState('');
@@ -105,6 +109,15 @@ export default function BrainstormForm() {
     [arcs]
   );
 
+  // Re-apply a parse suggestion once the genres/arcs lists finish loading (the parse response can arrive
+  // first, in which case the initial match returned '' and the auto-filled select stayed empty).
+  useEffect(() => {
+    if (genres?.length && genreSuggestion && !genreSlug) setGenreSlug(matchGenre(genreSuggestion));
+  }, [genres, genreSuggestion, genreSlug, matchGenre]);
+  useEffect(() => {
+    if (arcs?.length && arcSuggestion && !storyArc) setStoryArc(matchArc(arcSuggestion));
+  }, [arcs, arcSuggestion, storyArc, matchArc]);
+
   // Parse content with AI
   const handleParse = async () => {
     setParsing(true);
@@ -140,6 +153,8 @@ export default function BrainstormForm() {
 
       const data: ParsedFields = await res.json();
       setTitle(data.title || '');
+      setGenreSuggestion(data.genre_suggestion || '');
+      setArcSuggestion(data.story_arc || '');
       setGenreSlug(matchGenre(data.genre_suggestion));
       setStoryArc(matchArc(data.story_arc));
       setThemes(data.themes || []);

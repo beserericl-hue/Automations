@@ -137,7 +137,105 @@ export async function seedResearch(topic: string, genre = 'post-apocalyptic'): P
   return ((await res.json()) as Array<{ id: string }>)[0].id;
 }
 export async function deleteResearch(id: string): Promise<void> {
+  await supaDelete('research_report_projects_v2', `report_id=eq.${id}`);
   await supaDelete('research_reports_v2', `id=eq.${id}`);
+}
+
+/** Link a research report to a project (research_report_projects_v2) so it shows in that project's Research tab. */
+export async function linkResearchToProject(reportId: string, projectId: string): Promise<void> {
+  const res = await fetch(`${SUPA_URL}/rest/v1/research_report_projects_v2`, {
+    method: 'POST',
+    headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({ user_id: DEMO_USER_ID, report_id: reportId, project_id: projectId }),
+  });
+  if (!res.ok) throw new Error(`linkResearchToProject ${res.status}: ${(await res.text()).slice(0, 200)}`);
+}
+
+// --------------------------------------------------------------------------- disposable social posts
+export async function seedSocialPost(fields: {
+  projectId: string;
+  platform: 'twitter' | 'linkedin' | 'instagram' | 'facebook';
+  postText: string;
+  hashtags?: string[];
+  status?: string;
+}): Promise<string> {
+  const res = await fetch(`${SUPA_URL}/rest/v1/social_posts_v2`, {
+    method: 'POST',
+    headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify({
+      user_id: DEMO_USER_ID, project_id: fields.projectId, platform: fields.platform,
+      post_text: fields.postText, hashtags: fields.hashtags ?? [], status: fields.status ?? 'draft', metadata: {},
+    }),
+  });
+  if (!res.ok) throw new Error(`seedSocialPost ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return ((await res.json()) as Array<{ id: string }>)[0].id;
+}
+
+// --------------------------------------------------------------------------- disposable story-bible entries
+export async function seedBibleEntry(fields: {
+  projectId: string;
+  name: string;
+  description: string;
+  entryType?: string;
+  chapterIntroduced?: number;
+}): Promise<string> {
+  const res = await fetch(`${SUPA_URL}/rest/v1/story_bible_v2`, {
+    method: 'POST',
+    headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify({
+      user_id: DEMO_USER_ID, project_id: fields.projectId, entry_type: fields.entryType ?? 'character',
+      name: fields.name, description: fields.description, chapter_introduced: fields.chapterIntroduced ?? 1, metadata: {},
+    }),
+  });
+  if (!res.ok) throw new Error(`seedBibleEntry ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return ((await res.json()) as Array<{ id: string }>)[0].id;
+}
+
+// --------------------------------------------------------------------------- disposable token usage (Cost tab)
+/** Insert a token_usage_v2 row tagged with a project_id so the project-scoped Cost tab has data to render. */
+export async function seedTokenUsage(projectId: string): Promise<string> {
+  const res = await fetch(`${SUPA_URL}/rest/v1/token_usage_v2`, {
+    method: 'POST',
+    headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify({
+      user_id: DEMO_USER_ID, workflow_name: 'E2E Cost Regression', model: 'e2e-model',
+      input_tokens: 100, output_tokens: 50, total_tokens: 150, cost_usd: 0.0123,
+      metadata: { project_id: projectId },
+    }),
+  });
+  if (!res.ok) throw new Error(`seedTokenUsage ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return ((await res.json()) as Array<{ id: string }>)[0].id;
+}
+
+/** Insert a private story arc directly (story_arcs_v2) for EDIT tests. Returns its id. */
+export async function seedStoryArc(fields: { name: string; description: string; promptText?: string }): Promise<string> {
+  const res = await fetch(`${SUPA_URL}/rest/v1/story_arcs_v2`, {
+    method: 'POST',
+    headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify({
+      user_id: DEMO_USER_ID, name: fields.name, description: fields.description,
+      prompt_text: fields.promptText ?? 'Structure the story in five disposable beats: [beat1]…[beat5].',
+    }),
+  });
+  if (!res.ok) throw new Error(`seedStoryArc ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return ((await res.json()) as Array<{ id: string }>)[0].id;
+}
+
+/** Insert a private genre directly (genre_config_v2) for EDIT tests. Returns its id. */
+export async function seedGenre(fields: {
+  genreName: string; genreSlug: string; description: string; guidelines?: string;
+}): Promise<string> {
+  const res = await fetch(`${SUPA_URL}/rest/v1/genre_config_v2`, {
+    method: 'POST',
+    headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify({
+      user_id: DEMO_USER_ID, genre_name: fields.genreName, genre_slug: fields.genreSlug,
+      description: fields.description, writing_guidelines: fields.guidelines ?? 'Tone: disposable. Regression only.',
+      keywords: ['disposable'], rss_feed_urls: [], source_urls: [], subreddit_names: [], goodreads_shelves: [], active: true,
+    }),
+  });
+  if (!res.ok) throw new Error(`seedGenre ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return ((await res.json()) as Array<{ id: string }>)[0].id;
 }
 
 // --------------------------------------------------------------------------- disposable content rows

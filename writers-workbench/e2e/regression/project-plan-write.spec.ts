@@ -43,21 +43,37 @@ test.describe('ProjectDetail Outline + Write (result-asserting)', () => {
   });
 
   test('Write button runs chapter.write → a chapter with real content is persisted', async ({ page }) => {
-    test.setTimeout(600_000);
-    await page.goto(`/projects/${projectId}?tab=outline`);
-    // The per-chapter Write button — targeted by its title (only appears once a chapter outline exists).
-    const writeBtn = page.locator('button[title*="Write this chapter"], button[title*="Rewrite this chapter"]').first();
-    await expect(writeBtn).toBeVisible({ timeout: 20_000 });
-    await writeBtn.click();
-    await page.getByRole('button', { name: /Send without notes|Write Chapter/i }).first().click();
+    test.setTimeout(900_000); // chapter.write is the slowest engine op (sub-chapter loop)
+    // Dedicated project with a MINIMAL pre-seeded chapter_outline (1 sub-brief) so the Write button
+    // appears immediately and chapter.write does a single sub-chapter pass (fast).
+    const wp = await seedProject({
+      title: `E2E Write ${Date.now()}`,
+      outline: {
+        ...OUTLINE,
+        chapters: [{
+          chapter_number: 1, title: 'The Signal', beat: 'Mara answers the transmission.',
+          chapter_outline: { sub_chapter_briefs: [{ number: 1, title: 'The Call',
+            brief: 'Mara hears the impossible signal at dusk and answers it; the drowned voice replies.',
+            arc_beat: 'inciting incident', characters: ['Mara', 'Elias'] }] },
+        }],
+      },
+    });
+    try {
+      await page.goto(`/projects/${wp}?tab=outline`);
+      const writeBtn = page.locator('button[title*="Write this chapter"], button[title*="Rewrite this chapter"]').first();
+      await expect(writeBtn).toBeVisible({ timeout: 20_000 });
+      await writeBtn.click();
+      await page.getByRole('button', { name: /Send without notes|Write Chapter/i }).first().click();
 
-    // Result: a chapter_1 published_content_v2 row with substantial content_text appears.
-    await expect
-      .poll(async () => {
-        const rows = await supaGet('published_content_v2',
-          `project_id=eq.${projectId}&content_type=eq.chapter&chapter_number=eq.1&select=content_text`);
-        return (rows[0]?.content_text ?? '').split(/\s+/).filter(Boolean).length;
-      }, { timeout: 560_000, message: 'chapter.write never persisted a chapter with content' })
-      .toBeGreaterThan(200);
+      await expect
+        .poll(async () => {
+          const rows = await supaGet('published_content_v2',
+            `project_id=eq.${wp}&content_type=eq.chapter&chapter_number=eq.1&select=content_text`);
+          return (rows[0]?.content_text ?? '').split(/\s+/).filter(Boolean).length;
+        }, { timeout: 880_000, message: 'chapter.write never persisted a chapter with content' })
+        .toBeGreaterThan(200);
+    } finally {
+      await deleteProject(wp);
+    }
   });
 });

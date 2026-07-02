@@ -49,11 +49,22 @@ export default defineConfig({
     {
       name: 'chromium',
       testMatch: /authenticated\.spec\.ts|sprint3-crud\.spec\.ts|sprint5-observability\.spec\.ts|sprint7-critical-paths\.spec\.ts|qa-button-verify\.spec\.ts|image-debug\.spec\.ts|chapter-outline-version\.spec\.ts|capture-manual-screenshots\.spec\.ts|newsletter-fullflow\.spec\.ts|sprint-regression-suite\.spec\.ts|video-broll\.spec\.ts|regression\/.*\.spec\.ts/,
+      // Sign-out revokes the SHARED Supabase session server-side, which 401s every other authenticated
+      // test in the same run. It's verified in its own dedicated 'signout' project (runs last, re-mints).
+      testIgnore: /regression\/topbar-signout\.spec\.ts/,
       dependencies: ['setup'],
       use: {
         ...devices['Desktop Chrome'],
         storageState: AUTH_FILE,
       },
+    },
+    // Sign-out — isolated project (revokes the shared Supabase session, so it must NOT run alongside
+    // other authenticated tests). Run explicitly: `npx playwright test --project=signout`.
+    {
+      name: 'signout',
+      testMatch: /regression\/topbar-signout\.spec\.ts/,
+      dependencies: ['setup'],
+      use: { ...devices['Desktop Chrome'], storageState: AUTH_FILE },
     },
     // Firefox — unauthenticated only (authenticated covered by chromium)
     {
