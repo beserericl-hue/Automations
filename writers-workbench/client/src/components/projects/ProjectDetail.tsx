@@ -12,6 +12,7 @@ import SocialMediaPanel from '../social/SocialMediaPanel';
 import CostDashboard from '../cost/CostDashboard';
 import { useEngineJobQueue } from '../../hooks/useEngineJobQueue';
 import { useChapterRepair } from '../../hooks/useChapterRepair';
+import { useImageGenerator } from '../../hooks/useImageGenerator';
 import CommandDialog from '../shared/CommandDialog';
 import RewriteWithResearchModal from '../content/RewriteWithResearchModal';
 import type { WritingProject, PublishedContent, StoryBibleEntry, ResearchReport, GenreConfig, StoryArc, OutlineCharacter, OutlineChapter, ChapterOutline, SubChapter } from '../../types/database';
@@ -419,8 +420,8 @@ export default function ProjectDetail() {
             genreConfig={genreConfig ?? null}
           />
         )}
-        {activeTab === 'outline' && <OutlineTab outline={outline} storyArc={storyArc ?? null} projectId={id!} projectTitle={project.title} userId={userId!} writtenChapterNumbers={new Set((chapters || []).map(c => c.chapter_number).filter((n): n is number => n != null))} projectUpdatedAt={project.updated_at} outlineVersionInfo={outlineVersionInfo ?? null} />}
-        {activeTab === 'chapters' && <ChaptersTab chapters={chapters} qaByChapter={qaByChapter} projectId={id!} projectTitle={project.title} projectType={project.project_type} userId={userId!} />}
+        {activeTab === 'outline' && <OutlineTab outline={outline} storyArc={storyArc ?? null} projectId={id!} projectTitle={project.title} genreSlug={project.genre_slug} userId={userId!} writtenChapterNumbers={new Set((chapters || []).map(c => c.chapter_number).filter((n): n is number => n != null))} projectUpdatedAt={project.updated_at} outlineVersionInfo={outlineVersionInfo ?? null} />}
+        {activeTab === 'chapters' && <ChaptersTab chapters={chapters} qaByChapter={qaByChapter} projectId={id!} projectTitle={project.title} projectType={project.project_type} genreSlug={project.genre_slug} userId={userId!} />}
         {activeTab === 'bible' && <BibleTab entries={bibleEntries} projectId={id!} />}
         {activeTab === 'art' && <ArtTab projectId={id!} />}
         {activeTab === 'social' && <SocialTab projectId={id!} />}
@@ -599,7 +600,7 @@ function getChapterMeta(co: OutlineChapter['chapter_outline']): ChapterOutline |
   return null;
 }
 
-function OutlineTab({ outline, storyArc, projectId, projectTitle, userId, writtenChapterNumbers, projectUpdatedAt, outlineVersionInfo }: { outline: WritingProject['outline']; storyArc: StoryArc | null; projectId: string; projectTitle: string; userId: string; writtenChapterNumbers: Set<number>; projectUpdatedAt: string; outlineVersionInfo: { totalVersions: number; latestVersion: { version_number: number; created_at: string; revision_note: string | null } | null } | null }) {
+function OutlineTab({ outline, storyArc, projectId, projectTitle, genreSlug, userId, writtenChapterNumbers, projectUpdatedAt, outlineVersionInfo }: { outline: WritingProject['outline']; storyArc: StoryArc | null; projectId: string; projectTitle: string; genreSlug: string | null | undefined; userId: string; writtenChapterNumbers: Set<number>; projectUpdatedAt: string; outlineVersionInfo: { totalVersions: number; latestVersion: { version_number: number; created_at: string; revision_note: string | null } | null } | null }) {
   const [bookOverviewOpen, setBookOverviewOpen] = useState(true);
   const [expandedChapters, setExpandedChapters] = useState<Set<number | string>>(new Set());
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -633,8 +634,12 @@ function OutlineTab({ outline, storyArc, projectId, projectTitle, userId, writte
     setExpandedChapters(new Set());
   };
 
-  const coverState = jobQueue.stateOf('cover-art');
-  const coverQueued = coverState != null;
+  // Book cover art via the /api/images pipeline so it's stored WITH project_id and appears in the Art
+  // tab (the old NL-hub path dropped project_id, so covers never showed up in the gallery).
+  const coverGen = useImageGenerator();
+  const qc = useQueryClient();
+  const coverState = coverGen.stateOf('book-cover');
+  const coverQueued = coverState === 'submitting' || coverState === 'polling' || coverState === 'saving';
   const coverError = coverState === 'error';
 
   return (
@@ -685,16 +690,21 @@ function OutlineTab({ outline, storyArc, projectId, projectTitle, userId, writte
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   disabled={coverQueued}
-                  onClick={() => {
+                  onClick={async () => {
                     const premise = (outline.premise || '').trim();
-                    const cmd = `generate cover art for ${projectTitle}.`
-                      + (premise ? ` Design a book cover that captures this premise: ${premise}` : '');
-                    void jobQueue.enqueue('cover-art', cmd, [['generated-images']]);
+                    const prompt = `Professional book cover illustration for ${genreSlug ? `a ${genreSlug.replace(/-/g, ' ')} ` : ''}novel titled "${projectTitle}". `
+                      + (premise ? `Capture this premise: ${premise}. ` : '')
+                      + 'Cinematic, evocative. No text, no lettering, no title overlay.';
+                    const ok = await coverGen.generate('book-cover', {
+                      prompt, projectId, genreSlug: genreSlug || undefined,
+                      title: projectTitle, imageType: 'cover_art',
+                    });
+                    if (ok) void qc.invalidateQueries({ queryKey: ['generated-images'] });
                   }}
                   className="rounded-lg px-3 py-1.5 text-xs font-medium border border-fuchsia-300 text-fuchsia-700 hover:bg-fuchsia-50 dark:border-fuchsia-700 dark:text-fuchsia-400 dark:hover:bg-fuchsia-950 disabled:opacity-60 whitespace-nowrap"
-                  title="Generate book cover art from the premise. Runs in the background and is added to the Art gallery — generate as many as you like; select one when publishing."
+                  title="Generate book cover art from the premise. Added to the Art gallery — generate as many as you like; select one when publishing."
                 >
-                  {coverQueued ? (coverError ? 'Retry cover art' : 'Queued — generating…') : 'Generate Cover Art'}
+                  {coverQueued ? 'Generating…' : coverError ? 'Retry cover art' : coverState === 'done' ? 'Cover ✓' : 'Generate Cover Art'}
                 </button>
                 <span className="text-[11px] text-gray-400">Adds to the Art gallery — generate as many as you like; pick one when you publish.</span>
               </div>
@@ -1024,6 +1034,7 @@ function ChaptersTab({
   projectId,
   projectTitle,
   projectType,
+  genreSlug,
   userId,
 }: {
   chapters: (Pick<PublishedContent, 'id' | 'title' | 'chapter_number' | 'status' | 'updated_at'> & { content_text: string | null })[] | undefined;
@@ -1031,6 +1042,7 @@ function ChaptersTab({
   projectId: string;
   projectTitle: string;
   projectType: string | null | undefined;
+  genreSlug: string | null | undefined;
   userId: string;
 }) {
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -1038,6 +1050,10 @@ function ChaptersTab({
   const [dialogConfig, setDialogConfig] = useState<{ title: string; description: string; sendLabel: string; buildCommand: (notes: string) => string; invalidate: ReadonlyArray<readonly unknown[]> } | null>(null);
   // Queue chapter rewrites so the click returns immediately; results refetch when the job completes.
   const jobQueue = useEngineJobQueue(userId);
+  // Per-chapter artwork generation → generated_images_v2 (image_type=chapter_art, associated with the
+  // project so it appears in the Art tab). Reuses the proven /api/images pipeline.
+  const artGen = useImageGenerator();
+  const qc = useQueryClient();
   const [rewriteResearchTarget, setRewriteResearchTarget] = useState<{
     id: string;
     label: string;
@@ -1138,6 +1154,36 @@ function ChaptersTab({
                     >
                       Rewrite with research
                     </button>
+                    {(() => {
+                      const artKey = `chapter-art-${ch.id}`;
+                      const st = artGen.stateOf(artKey);
+                      const busy = st === 'submitting' || st === 'polling' || st === 'saving';
+                      const label = busy ? 'Generating…' : st === 'done' ? 'Art ✓' : st === 'error' ? 'Retry art' : 'Generate Art';
+                      const scene = (ch.content_text || '').replace(/\s+/g, ' ').slice(0, 400);
+                      const prompt = `Illustration for ${genreSlug ? `a ${genreSlug.replace(/-/g, ' ')} ` : ''}novel chapter titled "${ch.title}". `
+                        + (scene ? `Depict a dramatic scene capturing this chapter: ${scene}. ` : `A dramatic scene capturing the mood of this chapter. `)
+                        + 'Cinematic, atmospheric. No text, no lettering, no title overlay.';
+                      return (
+                        <button
+                          disabled={busy}
+                          onClick={async () => {
+                            const ok = await artGen.generate(artKey, {
+                              prompt,
+                              projectId,
+                              genreSlug: genreSlug || undefined,
+                              title: `${projectTitle} — ${ch.title}`,
+                              imageType: 'chapter_art',
+                              metadata: { chapter_number: ch.chapter_number, chapter_title: ch.title, content_id: ch.id },
+                            });
+                            if (ok) void qc.invalidateQueries({ queryKey: ['generated-images'] });
+                          }}
+                          className="rounded-lg px-3 py-1.5 text-xs font-medium border border-indigo-300 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-700 dark:text-indigo-400 dark:hover:bg-indigo-950 disabled:opacity-50 whitespace-nowrap"
+                          title="Generate cover art for this chapter — added to the Art gallery"
+                        >
+                          {label}
+                        </button>
+                      );
+                    })()}
                   </div>
                 </td>
               </tr>

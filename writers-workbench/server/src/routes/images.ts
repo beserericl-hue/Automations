@@ -171,7 +171,7 @@ imagesRouter.get('/status/:taskId', requireAuth, async (req: Request, res: Respo
  */
 imagesRouter.post('/save', requireAuth, async (req: Request, res: Response) => {
   const userId = req.userId!;
-  const { image_url, prompt, project_id, genre_slug, title } = req.body;
+  const { image_url, prompt, project_id, genre_slug, title, image_type, metadata } = req.body;
 
   if (!image_url) {
     res.status(400).json({ success: false, error: { code: 'BAD_REQUEST', message: 'image_url is required' } });
@@ -212,13 +212,15 @@ imagesRouter.post('/save', requireAuth, async (req: Request, res: Response) => {
       .insert({
         user_id: userId,
         project_id: project_id || null,
-        image_type: 'cover_art',
+        // Honour a caller-supplied image_type (e.g. 'chapter_art') so per-chapter art is filterable in
+        // the gallery; default to 'cover_art' for the book cover flow.
+        image_type: (typeof image_type === 'string' && image_type.trim()) ? image_type.trim() : 'cover_art',
         storage_path: storagePath,
         original_prompt: (prompt || '').substring(0, 10000),
         genre_slug: genre_slug || null,
         image_format: 'png',
         generation_model: 'nano-banana-pro',
-        metadata: { title: title || 'Untitled' },
+        metadata: { title: title || 'Untitled', ...(metadata && typeof metadata === 'object' ? metadata : {}) },
       })
       .select()
       .single();

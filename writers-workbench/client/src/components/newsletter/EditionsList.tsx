@@ -16,6 +16,9 @@ import HelpButton from './HelpButton';
 import type { NewsletterEdition } from '../../types/database';
 
 interface EditionsResponse { success: boolean; editions: NewsletterEdition[] }
+interface TemplateLite { id: string; is_default: boolean; active: boolean }
+interface TemplatesResponse { success: boolean; templates: TemplateLite[] }
+interface PreviewResponse { success: boolean; html: string }
 
 export default function EditionsList() {
   const navigate = useNavigate();
@@ -23,6 +26,38 @@ export default function EditionsList() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [includeDisabled, setIncludeDisabled] = useState(false);
+
+  // Newsletter preview — renders the edition's active default template into a modal iframe.
+  const [previewEdition, setPreviewEdition] = useState<NewsletterEdition | null>(null);
+  const [previewHtml, setPreviewHtml] = useState<string>('');
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+
+  async function handlePreview(e: NewsletterEdition) {
+    setPreviewEdition(e);
+    setPreviewHtml('');
+    setPreviewError(null);
+    setPreviewLoading(true);
+    try {
+      const tpls = await apiFetch<TemplatesResponse>(
+        `/api/newsletter/templates?edition_id=${encodeURIComponent(e.id)}`,
+      );
+      const def = (tpls.templates ?? []).find((t) => t.is_default && t.active) ?? (tpls.templates ?? [])[0];
+      if (!def) {
+        setPreviewError('This newsletter has no template yet. Create one from the Templates page.');
+        return;
+      }
+      const res = await apiFetch<PreviewResponse>(
+        `/api/newsletter/templates/${encodeURIComponent(def.id)}/preview`,
+        { method: 'POST', body: JSON.stringify({ data: {} }) },
+      );
+      setPreviewHtml(res.html || '');
+    } catch (err) {
+      setPreviewError(err instanceof ApiError ? err.message : 'Failed to render preview');
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
 
   const editionsQuery = useQuery({
     queryKey: ['newsletter-editions', { includeDisabled }],
@@ -152,6 +187,12 @@ export default function EditionsList() {
                   <td className="px-4 py-2 text-right">
                     <div className="flex items-center justify-end gap-3">
                       <button
+                        onClick={() => handlePreview(e)}
+                        className="text-xs font-medium text-brand-700 hover:text-brand-800 dark:text-brand-300"
+                      >
+                        Preview
+                      </button>
+                      <button
                         onClick={() => navigate(`/newsletter/editions/${encodeURIComponent(e.id)}/feeds`)}
                         className="text-xs font-medium text-brand-700 hover:text-brand-800 dark:text-brand-300"
                       >
@@ -188,6 +229,49 @@ export default function EditionsList() {
           </table>
         )}
       </section>
+
+      {previewEdition && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setPreviewEdition(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Preview of ${previewEdition.display_name}`}
+        >
+          <div
+            className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-xl bg-white shadow-xl dark:bg-gray-900"
+            onClick={(ev) => ev.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3 dark:border-gray-800">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                Preview — {previewEdition.display_name}
+              </h2>
+              <button
+                onClick={() => setPreviewEdition(null)}
+                className="rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+              >
+                Close
+              </button>
+            </div>
+            <div className="min-h-[300px] flex-1 overflow-hidden p-4">
+              {previewLoading ? (
+                <div className="p-8 text-center text-sm text-gray-400">Rendering…</div>
+              ) : previewError ? (
+                <div role="alert" className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+                  {previewError}
+                </div>
+              ) : (
+                <iframe
+                  title="Newsletter preview"
+                  sandbox=""
+                  srcDoc={previewHtml}
+                  className="block h-[60vh] w-full rounded border border-gray-200 dark:border-gray-700"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
