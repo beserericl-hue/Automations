@@ -82,6 +82,50 @@ export function eqUser(): string {
   return `user_id=eq.${encodeURIComponent(DEMO_USER_ID)}`;
 }
 
+// --------------------------------------------------------------------------- disposable content rows
+/** Insert a disposable published_content_v2 row (owned by the demo user) and return its id. */
+export async function seedContent(fields: {
+  title: string;
+  content_type?: string;
+  status?: string;
+  content_text?: string;
+  project_id?: string | null;
+  chapter_number?: number | null;
+  genre_slug?: string;
+  metadata?: Record<string, unknown>;
+}): Promise<string> {
+  const row = {
+    user_id: DEMO_USER_ID,
+    title: fields.title,
+    content_type: fields.content_type ?? 'chapter',
+    status: fields.status ?? 'draft',
+    content_text: fields.content_text ?? 'Disposable regression content. '.repeat(20),
+    genre_slug: fields.genre_slug ?? 'post-apocalyptic',
+    project_id: fields.project_id ?? null,
+    chapter_number: fields.chapter_number ?? null,
+    metadata: fields.metadata ?? {},
+  };
+  const res = await fetch(`${SUPA_URL}/rest/v1/published_content_v2`, {
+    method: 'POST',
+    headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify(row),
+  });
+  if (!res.ok) throw new Error(`seedContent ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const [created] = (await res.json()) as Array<{ id: string }>;
+  return created.id;
+}
+
+/** Read a single content row's fields (for before/after result assertions). */
+export async function getContent(id: string, select = 'id,status,content_text,metadata'): Promise<any | null> {
+  const rows = await supaGet('published_content_v2', `id=eq.${id}&select=${select}`);
+  return rows[0] ?? null;
+}
+
+export async function deleteContent(id: string): Promise<void> {
+  await supaDelete('content_versions_v2', `content_id=eq.${id}`);
+  await supaDelete('published_content_v2', `id=eq.${id}`);
+}
+
 /** Hard-delete a disposable newsletter edition and ALL its children (teardown; bypasses the soft delete). */
 export async function hardDeleteEdition(id: string): Promise<void> {
   await supaDelete('newsletter_subscribers_v2', `edition_id=eq.${encodeURIComponent(id)}`);
