@@ -305,8 +305,162 @@ export async function deleteContent(id: string): Promise<void> {
 
 /** Hard-delete a disposable newsletter edition and ALL its children (teardown; bypasses the soft delete). */
 export async function hardDeleteEdition(id: string): Promise<void> {
+  await supaDelete('newsletter_approvals_v2', `edition_id=eq.${encodeURIComponent(id)}`);
+  await supaDelete('newsletter_sends_v2', `edition_id=eq.${encodeURIComponent(id)}`);
   await supaDelete('newsletter_subscribers_v2', `edition_id=eq.${encodeURIComponent(id)}`);
   await supaDelete('newsletter_feed_sources_v2', `edition_id=eq.${encodeURIComponent(id)}`);
   await supaDelete('newsletter_templates_v2', `edition_id=eq.${encodeURIComponent(id)}`);
   await supaDelete('newsletter_editions_v2', `id=eq.${encodeURIComponent(id)}`);
+}
+
+
+// --------------------------------------------------------------------------- newsletter (agent C helpers)
+
+/** Insert a disposable newsletter_templates_v2 row (owned by the demo user) and return its id. */
+export async function seedTemplate(fields: {
+  edition_id: string;
+  name: string;
+  html?: string;
+  is_default?: boolean;
+  active?: boolean;
+  sample_data?: Record<string, unknown>;
+}): Promise<string> {
+  const row = {
+    user_id: DEMO_USER_ID,
+    edition_id: fields.edition_id,
+    name: fields.name,
+    source_type: 'user',
+    html: fields.html ?? '<!doctype html><html><body><h1>{{title}}</h1><p>Seed template.</p></body></html>',
+    sample_data: fields.sample_data ?? { title: 'Seed title' },
+    is_default: fields.is_default ?? false,
+    active: fields.active ?? true,
+  };
+  const res = await fetch(`${SUPA_URL}/rest/v1/newsletter_templates_v2`, {
+    method: 'POST',
+    headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify(row),
+  });
+  if (!res.ok) throw new Error(`seedTemplate ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return ((await res.json()) as Array<{ id: string }>)[0].id;
+}
+
+export async function deleteTemplate(id: string): Promise<void> {
+  await supaDelete('newsletter_templates_v2', `id=eq.${encodeURIComponent(id)}`);
+}
+
+/** Insert a disposable newsletter_feed_sources_v2 row and return its id. */
+export async function seedFeed(fields: {
+  edition_id: string;
+  name: string;
+  url?: string;
+  url_type?: string;
+  active?: boolean;
+}): Promise<string> {
+  const row = {
+    edition_id: fields.edition_id,
+    user_id: DEMO_USER_ID,
+    name: fields.name,
+    url: fields.url ?? `https://example.com/e2e-feed-${Math.floor(Math.random() * 1e9)}.xml`,
+    url_type: fields.url_type ?? 'rss',
+    fetch_interval_minutes: 240,
+    active: fields.active ?? true,
+  };
+  const res = await fetch(`${SUPA_URL}/rest/v1/newsletter_feed_sources_v2`, {
+    method: 'POST',
+    headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify(row),
+  });
+  if (!res.ok) throw new Error(`seedFeed ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return ((await res.json()) as Array<{ id: string }>)[0].id;
+}
+
+/** Insert a disposable newsletter_sends_v2 row (owned by the demo user) and return its id. */
+export async function seedSend(fields: {
+  edition_id: string;
+  subject: string;
+  status?: string;
+  html_body?: string;
+  markdown_body?: string;
+  send_date?: string;
+}): Promise<string> {
+  const row = {
+    user_id: DEMO_USER_ID,
+    edition_id: fields.edition_id,
+    subject: fields.subject,
+    preheader: 'Disposable regression send',
+    status: fields.status ?? 'sent',
+    send_date: fields.send_date ?? new Date().toISOString().slice(0, 10),
+    html_body: fields.html_body ?? '<!doctype html><html><body><h1>E2E send body</h1><p>Rendered HTML for the regression detail view.</p></body></html>',
+    markdown_body: fields.markdown_body ?? '# E2E send\n\nDisposable markdown source for the regression detail view.',
+  };
+  const res = await fetch(`${SUPA_URL}/rest/v1/newsletter_sends_v2`, {
+    method: 'POST',
+    headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify(row),
+  });
+  if (!res.ok) throw new Error(`seedSend ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return ((await res.json()) as Array<{ id: string }>)[0].id;
+}
+
+export async function deleteSend(id: string): Promise<void> {
+  await supaDelete('newsletter_sends_v2', `id=eq.${encodeURIComponent(id)}`);
+}
+
+/** Insert a disposable OPEN newsletter_approvals_v2 row (owned by the demo user) and return {id, token}. */
+export async function seedApproval(fields: {
+  edition_id: string;
+  stage?: 'stories' | 'subject_line';
+  payload?: Record<string, unknown>;
+}): Promise<{ id: string; token: string }> {
+  // Token must satisfy the server's ^[A-Za-z0-9_-]{20,128}$ (ApprovalTokenParamSchema).
+  const token = `e2etok${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
+    .replace(/[^A-Za-z0-9_-]/g, '')
+    .slice(0, 40)
+    .padEnd(24, 'x');
+  const stage = fields.stage ?? 'stories';
+  const payload = fields.payload ?? (stage === 'stories'
+    ? { top_selected_stories: [{ title: 'E2E disposable story headline' }] }
+    : { subject_line: 'E2E disposable subject line' });
+  const row = {
+    token,
+    user_id: DEMO_USER_ID,
+    edition_id: fields.edition_id,
+    execution_id: `e2e-exec-${Date.now()}`,
+    // A resume_url the server can't reach → resolveApproval persists the decision FIRST,
+    // then the n8n resume POST fails → status 502 "resume_failed". The decision/resolved_at
+    // IS written to the DB regardless; that persisted result is what the test asserts.
+    resume_url: 'https://n8n.agileadautomation.com/__e2e_resume_will_not_exist',
+    stage,
+    payload,
+    expires_at: new Date(Date.now() + 48 * 3600 * 1000).toISOString(),
+  };
+  const res = await fetch(`${SUPA_URL}/rest/v1/newsletter_approvals_v2`, {
+    method: 'POST',
+    headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify(row),
+  });
+  if (!res.ok) throw new Error(`seedApproval ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const [created] = (await res.json()) as Array<{ id: string; token: string }>;
+  return { id: created.id, token: created.token };
+}
+
+export async function deleteApproval(id: string): Promise<void> {
+  await supaDelete('newsletter_approvals_v2', `id=eq.${encodeURIComponent(id)}`);
+}
+
+/** Seed a project already soft-deleted (deleted_at set) so TrashView renders it. Returns its id. */
+export async function seedTrashedProject(title: string): Promise<string> {
+  const id = await seedProject({ title });
+  await fetch(`${SUPA_URL}/rest/v1/writing_projects_v2?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({ deleted_at: new Date().toISOString() }),
+  });
+  return id;
+}
+
+/** Read a project's deleted_at (null once restored). */
+export async function projectDeletedAt(id: string): Promise<string | null | undefined> {
+  const rows = await supaGet('writing_projects_v2', `id=eq.${id}&select=deleted_at`);
+  return rows[0]?.deleted_at;
 }
