@@ -45,10 +45,28 @@ python3 scripts/e2e_video_prep.py
 through the Newsletter **Setup Wizard** (UI) — feed import, subscribers, cadence. There is no
 engine/chat op for creating a newsletter edition, so it must be seeded by hand in the DEV Workbench.
 
+## Results (2026-07-02, DEV)
+
+Full run: **VP01–VP09 pass, VP10 fixed**. "The Last Signal" seeded with an 8-chapter Hero's-Journey
+outline; ch1–3 written (7827 / 5710 / 8284 words) and **all three approved**; cover art generated;
+Story Bible auto-populated to **82 entries**; a deliberate ch3 name drift injected.
+
+Two things the live run surfaced and fixed:
+- **Engine fix** — "approve/publish **chapter N of** `<project>`" returned not-found because lifecycle
+  matched the *project* title against the *chapter's* title (its own outline title). Now it resolves the
+  project first and scopes by chapter number (commit `283f528`; same class as G18). Verified live.
+- **Protagonist name** — the brainstorm *generates* the protagonist name, so the marketing-copy
+  assumption of "Maya Chen" doesn't appear in the prose (this run produced **Mara Voss**). VP10 now
+  targets the real protagonist (outline character #0) and swaps one occurrence for a scanner-detectable
+  near-variant (e.g. `Mara → Meara`). If the demo needs the name to be exactly "Maya Chen", lock it in
+  the brainstorm prompt / edit the outline before writing.
+
 ## Notes
 
 - VP01 uses the engine's resolve-or-create-project path, so re-running finds the existing project
   rather than duplicating it. The chapter writes auto-populate the Story Bible (VP09) and are keyed on
   (project_id, chapter_number), so re-running overwrites rather than duplicating chapters.
+- Chapter writes are slow (sub-chapter fan-out + research + drift QA); use `E2E_TIMEOUT=1500` so a cold
+  first-chapter write doesn't false-fail on the poll window (jobs persist when they finish regardless).
 - The deliberate ch3 drift (VP10) should be re-applied each demo day — the drift scanner stores results
   and may mark the row dismissed ([[marketing-copy]] §7).
