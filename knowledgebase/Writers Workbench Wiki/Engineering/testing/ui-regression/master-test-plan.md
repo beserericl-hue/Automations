@@ -155,17 +155,17 @@ cover. All fixed on `develop`.
 |---|---|---|---|
 | Restore → confirm | un-delete | `deleted_at` cleared in DB; row leaves trash | still deleted |
 
-## 14. Admin / Superuser — `/admin`, `/superuser` 🔒 ROLE-GATED
+## 14. Admin / Superuser — `/admin`, `/superuser` 🔒 OUT OF SCOPE (decision 2026-07-02)
 Demo user `+14105914612` is a normal user; the ~64 admin/superuser controls (user table, impersonation,
 role/status edits, global config, queue/exec dashboards) can only be **access-asserted** (denial) as demo.
-Result-asserting their effects needs an elevated DEV test account. **Awaiting user decision** — see
-[[admin-superuser]].
+Result-asserting their real effects needs an elevated DEV test account. **Decided out-of-scope for this
+sprint** (2026-07-02) — revisit when an elevated DEV superuser account is available. See [[admin-superuser]].
 
 ---
 
 ## Coverage gaps (only these remain outside the green suite)
 - 🟡 LogoUploader (stamp_url), AnnotationsPanel Apply Fix, newsletter ingestion drawer, onboarding + Update
   Password (need a throwaway auth user), some login/signup/forgot/reset flows.
-- 🔒 Admin + Superuser panels — blocked on an elevated test account.
+- 🔒 Admin + Superuser panels — **out of scope by decision 2026-07-02**; revisit with an elevated DEV account.
 
 Everything else on this page is 🟢 and re-runnable via `e2e/run-regression.sh`. See [[result-asserting-suite]].
