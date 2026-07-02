@@ -128,6 +128,7 @@ The catalog. One line per page. When answering a question, scan this first to fi
 ## Testing
 
 - [[testing/_index]]
+- **[[ui-regression/_index|UI Regression Suite]]** — run-after-every-sprint UI plan: every page/button/expected result + covering Playwright test (`e2e/regression/`). One page per feature area + findings.
 - [[unit-tests]] — Vitest + RTL test inventory.
 - [[e2e-tests]] — Playwright projects + spec files + CI gotchas.
 - [[engine-chat-e2e-suite]] — functional E2E through the engine chat interface (catalog ops + genres/arcs + gaps).

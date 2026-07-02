@@ -7,6 +7,10 @@ last_reviewed: 2026-06-10
 
 # Testing
 
+- **[[ui-regression/_index|UI Regression Suite]]** — the authoritative, no-gaps **run-after-every-sprint**
+  UI plan: every page, every button, its expected result, and the covering Playwright test in
+  `writers-workbench/e2e/regression/`. One page per feature area + findings. Pair with [[engine-chat-e2e-suite]]
+  for the engine side.
 - [[unit-tests]] — Vitest + RTL. Per-sprint test files.
 - [[e2e-tests]] — Playwright projects (chromium-noauth, chromium-authenticated). Spec files per sprint.
 - [[newsletter-test-plan]] — 114-test **manual** QA plan (PR #69-#75). Manual/UI; n8n era.

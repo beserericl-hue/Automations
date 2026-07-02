@@ -567,3 +567,23 @@ User required E2E-3/4/5 fully satisfied. Built: (R54-R61) brainstorm.short-story
 ## [2026-07-02] build | Engine E2E gap repair (G1-G20) + full live re-run (151/157)
 
 Repaired all 20 gaps from the prior live report (RESULTS.md). HIGH: G1 completion emails now embed the deliverable (research report, brainstorm outline w/ characters+chapters, cover-art <img>, blog/newsletter/chapter prose) — verified by reading the emails; G9 chapter.write resolves/creates project_id from title (was ValidationError); G12 brainstorm resolve-or-create project + honour target_chapter_count (8 not 39); G11 lifecycle strict exact-then-fuzzy title match, never mutates on no-match; G6 word-count coercion; G19 Prologue/Epilogue coercion. Plus routing (G3/G7/G10/G13/G16/G17 pre-Gemini deterministic overrides), search/not-found (G15/G18), list filters (G14), app_config_v2 (G2), markdown headings (G5), outline render (G20). Round-2 defects surfaced BY the live run (lifecycle content_type over-filter, research_report alias, outline-retrieve wrong table, "find" keyword pollution, retrieval-vs-generation routing) also fixed. 345 unit tests green; shipped to develop (3d5b47c, c64c0a1). Full 157-test suite re-run live through chat + voice APIs, verified vs DEV DB + emails: 151 PASS, 6 FAIL — all 6 non-engine-bugs (2 actual passes: R79 epilogue persisted, R89 revert succeeded; 2 undelete run-ordering; 2 multi-turn pronoun context). See [[engine-e2e-full-rerun-report]]. Also built [[video-prep-e2e]] (seed "The Last Signal" demo via chat).
+
+## [2026-07-02] build | E2E harness fixes (6 non-passing → pass) + complete UI regression suite
+
+Goal 1 — engine E2E harness: threaded voice/chat conversation context + demonstrative pronoun
+resolution ("blog about that", "email me that research") in hub/router.py; email-content gained an
+allow_recent fallback so a single-turn "that research" resolves to the most-recent report. Isolated
+lifecycle-test data — scripts/e2e_full_verify.py now seeds a disposable, uniquely-titled known-state
+row per approve/reject/delete/undelete/publish test, retargets the command, asserts the DB transition
+on THAT row, and cleans up (no run-order dependence). R79 verify-by-persisted-row when the poll times
+out; R89 grades the LAST step's route. The 6 previously non-passing tests (R79, R89, R98, V36, V03,
+V22) now pass live on DEV. 351 engine unit tests green. Commit f9b6d0a on develop.
+
+Goal 2 — complete UI regression suite: 7-agent inventory of App.tsx + every route component (verified
+vs source), then Playwright specs under writers-workbench/e2e/regression/ (nav-render, project-detail,
+content-detail, library, reference, settings, newsletter) covering every reachable route, all 9
+ProjectDetail tabs, ContentDetail editor/lifecycle/versions/rewrite-modal, Library filters/sort/bulk,
+reference-form CRUD open/cancel, Settings theme+danger-zone, and the newsletter surfaces. Fixed a real
+a11y bug it surfaced (RewriteWithResearchModal missing role="dialog"/aria-modal) + test-robustness
+(async-load settle waits, correct editor-toolbar accessible names). Documented in [[ui-regression/_index]]
+(one page per feature area + findings). Commit 2aed98c on develop.
