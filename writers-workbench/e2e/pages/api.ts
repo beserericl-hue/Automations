@@ -174,6 +174,27 @@ export async function seedContent(fields: {
 }
 
 /** Read a single content row's fields (for before/after result assertions). */
+/** Seed a chapter_qa_v2 row (used to put a chapter into a known drift state so Fix Drift renders). */
+export async function seedChapterQa(projectId: string, chapterNumber: number, aligned: boolean): Promise<string> {
+  const res = await fetch(`${SUPA_URL}/rest/v1/chapter_qa_v2`, {
+    method: 'POST',
+    headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify({
+      user_id: DEMO_USER_ID, project_id: projectId, chapter_number: chapterNumber, aligned,
+      drift_report: { aligned, character_drift: aligned ? 0 : 2 }, status: 'ok', word_count: 500,
+    }),
+  });
+  if (!res.ok) throw new Error(`seedChapterQa ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return ((await res.json()) as Array<{ id: string }>)[0].id;
+}
+
+/** Latest chapter_qa_v2 row for a project+chapter (for asserting a repair/QA result). */
+export async function latestChapterQa(projectId: string, chapterNumber: number): Promise<any | null> {
+  const rows = await supaGet('chapter_qa_v2',
+    `project_id=eq.${projectId}&chapter_number=eq.${chapterNumber}&order=created_at.desc&limit=1&select=id,aligned,created_at,status`);
+  return rows[0] ?? null;
+}
+
 export async function getContent(id: string, select = 'id,status,content_text,metadata'): Promise<any | null> {
   const rows = await supaGet('published_content_v2', `id=eq.${id}&select=${select}`);
   return rows[0] ?? null;
