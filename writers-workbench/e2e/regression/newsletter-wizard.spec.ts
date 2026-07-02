@@ -117,4 +117,23 @@ test.describe('Newsletter Setup Wizard (result-asserting)', () => {
     await expect(page.getByRole('button', { name: /Generate now/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /Back to my newsletters/i })).toBeVisible();
   });
+
+  test('editions-list Preview renders the newsletter default template as real HTML', async ({ page }) => {
+    await page.goto('/newsletter/editions');
+    // Find this edition's row (its slug === editionId is shown) and click its Preview action.
+    const row = page.locator('tr', { hasText: editionId }).first();
+    await expect(row).toBeVisible({ timeout: 20_000 });
+    await row.getByRole('button', { name: 'Preview' }).click();
+
+    const dialog = page.getByRole('dialog', { name: /Preview of/i });
+    await expect(dialog).toBeVisible({ timeout: 10_000 });
+    const iframe = dialog.locator('iframe[title="Newsletter preview"]');
+    await expect(iframe).toBeVisible({ timeout: 10_000 });
+    await expect
+      .poll(async () => (await iframe.getAttribute('srcdoc'))?.length ?? 0,
+        { timeout: 15_000, message: 'newsletter preview iframe rendered no HTML' })
+      .toBeGreaterThan(100);
+    await dialog.getByRole('button', { name: 'Close' }).click();
+    await expect(dialog).toBeHidden({ timeout: 8_000 });
+  });
 });

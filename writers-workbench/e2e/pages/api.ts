@@ -103,6 +103,7 @@ export async function seedProject(fields: { title: string; genre_slug?: string; 
 }
 
 export async function deleteProject(id: string): Promise<void> {
+  await supaDelete('generated_images_v2', `project_id=eq.${id}`);
   await supaDelete('published_content_v2', `project_id=eq.${id}`);
   await supaDelete('story_bible_v2', `project_id=eq.${id}`);
   await supaDelete('writing_projects_v2', `id=eq.${id}`);
