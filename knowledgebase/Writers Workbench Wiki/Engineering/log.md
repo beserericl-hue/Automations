@@ -613,3 +613,17 @@ default template (wizard preview blank + generation NO_DEFAULT_TEMPLATE) — see
 create. Commit 6110b5d + specs. Details in [[result-asserting-suite]]. Remaining modules (newsletter-crud,
 project tabs incl. cover art, content-detail async Q/A + annotations Apply, library, reference, account)
 follow the same pattern.
+
+## [2026-07-02] build | Full result-asserting UI regression — every page, DB-verified; 6 bugs fixed
+
+Built result-asserting, data-isolated tests for every page (create→assert DOM+DB→hard-delete), pinned to
+demo user +14105914612. New specs: newsletter-wizard(+Preview), newsletter-crud, content-lifecycle,
+content-editor, content-qa, project-export, project-art, project-detail-crud, story-arcs-crud, genres-crud,
+story-bible-crud, research-crud, reference-render, settings-result, dashboard, library-bulk, credits,
+images-gallery, eve-voice-widget + nav-render smoke. Real bugs found + fixed (result-asserting caught what
+click-only missed): import-from-genre 500 (broken upsert), CSV subscriber import 500 (same), new editions
+had no default template, newsletter had no Preview button, per-chapter artwork missing + book cover never
+associated project_id (Art tab always empty). Also fixed test-harness issues (sb_secret keys rejected from
+browser context → Node fetch; fullyParallel broke stateful-spec order → serial mode; placeholder
+case-insensitivity; StatCard value sibling; config-load race). Full matrix + PASS/FAIL per element in
+[[master-test-plan]] and [[result-asserting-suite]]. Removed superseded presence-only specs.
