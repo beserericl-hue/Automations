@@ -15,6 +15,7 @@ import json
 import os
 import re
 import time
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
@@ -45,6 +46,9 @@ def _get(path):
 
 
 def _supa(table, query=""):
+    # URL-encode the phone-number user_id: a raw '+' in a query string is decoded to a SPACE by the
+    # server (eq.+14105914612 -> eq. 14105914612 -> no match), which produced false "0 rows" FAILs.
+    query = query.replace(USER, urllib.parse.quote(USER, safe=""))
     url = f"{SUPA_URL}/rest/v1/{table}?{query}"
     req = urllib.request.Request(url, headers={"apikey": SUPA_KEY, "authorization": f"Bearer {SUPA_KEY}"})
     try:
@@ -54,13 +58,63 @@ def _supa(table, query=""):
         return {"_error": str(e)[:200]}
 
 
-def run_step(source, prompt):
+PICKED = {}  # test_id -> a representative title produced/listed by that test (for placeholder substitution)
+_PLACEHOLDER = re.compile(r"\[[^\]]*?from\s+([RV]\d+)[^\]]*?\]", re.I)
+_ANY_BRACKET = re.compile(r"\[[^\]]+\]")
+
+
+def _pick_title(res, resp):
+    """Choose a representative title from a step result (for later [title from RXX] substitution)."""
+    if not isinstance(res, dict):
+        return None
+    items = res.get("items")
+    if isinstance(items, list) and items:
+        for it in items:
+            if isinstance(it, dict) and it.get("title"):
+                return it["title"]
+    for k in ("subject", "title"):
+        if res.get(k):
+            return res[k]
+    ol = res.get("outline") or {}
+    return ol.get("title")
+
+
+def resolve_prompt(prompt, picked):
+    """Substitute [ ... from RXX ] placeholders with the real title that test produced. Falls back to a
+    recent DEV draft title so a scripted approve/publish/delete test can still exercise the engine."""
+    def _sub(m):
+        ref = m.group(1).upper()
+        return picked.get(ref) or _fallback_draft_title() or m.group(0)
+    out = _PLACEHOLDER.sub(_sub, prompt)
+    # any remaining bracket placeholder (e.g. "[title]") -> fallback draft title
+    if _ANY_BRACKET.search(out):
+        out = _ANY_BRACKET.sub(lambda m: _fallback_draft_title() or m.group(0), out)
+    return out
+
+
+_FALLBACK = {"t": None}
+
+
+def _fallback_draft_title():
+    if _FALLBACK["t"] is None:
+        rows = _supa("published_content_v2", f"user_id=eq.{USER}&status=eq.draft&order=created_at.desc&limit=1&select=title")
+        _FALLBACK["t"] = (rows[0]["title"] if isinstance(rows, list) and rows else "")
+    return _FALLBACK["t"]
+
+
+def run_step(source, prompt, context=None):
     """Drive one step; poll an async job to completion. Returns {response, job_result}."""
     try:
         if source == "voice":
-            resp = _post("/internal/hub/voice", {"user_message_request": prompt, "system__caller_id": USER})
+            body = {"user_message_request": prompt, "system__caller_id": USER}
+            if context:
+                body["context"] = context
+            resp = _post("/internal/hub/voice", body)
         else:
-            resp = _post("/internal/hub", {"message": prompt, "user_id": USER})
+            body = {"message": prompt, "user_id": USER}
+            if context:
+                body["context"] = context
+            resp = _post("/internal/hub", body)
     except Exception as e:  # noqa: BLE001
         return {"response": {"_error": str(e)[:300]}, "job_result": None}
     out = {"response": resp, "job_result": None}
@@ -299,8 +353,24 @@ def main():
             runs = []
         else:
             runs = []
+            ctx = {}  # conversation context carried across steps of THIS test ("publish it", "that")
             for src, prompt in t["steps"]:
-                runs.append(run_step(src, prompt))
+                rp = resolve_prompt(prompt, PICKED)
+                out = run_step(src, rp, context=ctx or None)
+                out["resolved_prompt"] = rp
+                runs.append(out)
+                # capture context for the next step: last list + the chosen title as active project
+                _rr, _jr, _res = _result_of(out)
+                title = _pick_title(_res, _rr)
+                if title:
+                    ctx = {"project_title": title, "last_list": (_res.get("items") or [])[:10]}
+            # remember a representative title for later tests' [title from <this id>] placeholders
+            picked_title = None
+            for out in runs:
+                _rr, _jr, _res = _result_of(out)
+                picked_title = _pick_title(_res, _rr) or picked_title
+            if picked_title:
+                PICKED[t["id"]] = picked_title
             try:
                 verdict, ev = verify(t, runs)
             except Exception as e:  # noqa: BLE001

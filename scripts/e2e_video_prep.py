@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+"""Video-prep E2E — seed the marketing-video demo state THROUGH THE CHAT INTERFACE.
+
+Runs the "Pre-recording setup" (marketing-copy.md §2) as chat commands against the engine hub, polls
+each generative job to completion, verifies each artifact in the DEV database, then injects the one
+deliberate drift (Maya Chen -> Maya Chan in ch3) the drift-scanner demo needs. Every prep step is a
+real chat message to /internal/hub — nothing is done by hand.
+
+Demo project: "The Last Signal" (post-apocalyptic, Hero's Journey, Maya Chen, 6 chapters; ch1-3 written
++ approved; cover art; story bible auto-populated; one drift in ch3).
+
+The "Wasteland Wire" newsletter is a Setup-Wizard (UI) flow with no engine/chat op, so it is out of
+scope here and flagged for manual setup.
+
+Env: E2E_SECRET, SUPA_URL, SUPA_KEY, E2E_USER (default +14105914612).
+"""
+from __future__ import annotations
+
+import json
+import os
+import time
+import urllib.parse
+import urllib.request
+
+GATEWAY = os.environ.get("E2E_GATEWAY", "https://writer-engine-gateway-develop.up.railway.app")
+SECRET = os.environ["E2E_SECRET"]
+USER = os.environ.get("E2E_USER", "+14105914612")
+TIMEOUT = int(os.environ.get("E2E_TIMEOUT", "900"))
+SUPA_URL = os.environ["SUPA_URL"].rstrip("/")
+SUPA_KEY = os.environ["SUPA_KEY"]
+PROJECT = "The Last Signal"
+OUT = "scripts/e2e_out/video_prep"
+
+
+def _post(path, body):
+    req = urllib.request.Request(f"{GATEWAY}{path}", data=json.dumps(body).encode(),
+                                 headers={"content-type": "application/json", "x-service-secret": SECRET},
+                                 method="POST")
+    with urllib.request.urlopen(req, timeout=130) as r:
+        return json.loads(r.read().decode())
+
+
+def _get(path):
+    req = urllib.request.Request(f"{GATEWAY}{path}", headers={"x-service-secret": SECRET})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return json.loads(r.read().decode())
+
+
+def _supa(method, table, query="", body=None):
+    query = query.replace(USER, urllib.parse.quote(USER, safe=""))
+    url = f"{SUPA_URL}/rest/v1/{table}?{query}" if query else f"{SUPA_URL}/rest/v1/{table}"
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(url, data=data, method=method, headers={
+        "apikey": SUPA_KEY, "authorization": f"Bearer {SUPA_KEY}",
+        "content-type": "application/json", "prefer": "return=representation"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        txt = r.read().decode()
+        return json.loads(txt) if txt else []
+
+
+def chat(message):
+    """Send one chat message; poll an async job to completion. Returns (response, job_result)."""
+    resp = _post("/internal/hub", {"message": message, "user_id": USER})
+    jr = None
+    jid = resp.get("job_id")
+    if jid and resp.get("kind") == "queued":
+        deadline = time.time() + TIMEOUT
+        while time.time() < deadline:
+            time.sleep(8)
+            jr = _get(f"/internal/write/jobs/{jid}")
+            if jr.get("status") in ("complete", "error", "not_found", "failed"):
+                break
+    return resp, jr
+
+
+def _result(resp, jr):
+    res = ((resp.get("data") or {}).get("payload") or {}).get("result")
+    if res is None and jr:
+        res = jr.get("result")
+        if isinstance(res, dict):
+            res = (res.get("payload") or {}).get("result", res)
+    return res if isinstance(res, dict) else {}
+
+
+def _project_id():
+    rows = _supa("GET", "writing_projects_v2",
+                 f"user_id=eq.{USER}&title=ilike.*Last%20Signal*&select=id,title,outline,chapter_count&limit=1")
+    return rows[0] if rows else None
+
+
+def main():
+    os.makedirs(OUT, exist_ok=True)
+    results = []
+
+    def step(sid, title, message, verify_fn):
+        print(f"\n=== {sid}: {title}\n    chat> {message[:90]}", flush=True)
+        resp, jr = chat(message)
+        res = _result(resp, jr)
+        try:
+            ok, ev = verify_fn(resp, jr, res)
+        except Exception as e:  # noqa: BLE001
+            ok, ev = False, f"verify error: {str(e)[:200]}"
+        verdict = "PASS" if ok else "FAIL"
+        rec = {"id": sid, "title": title, "message": message, "verdict": verdict, "evidence": ev,
+               "response": resp, "job_result": jr}
+        json.dump(rec, open(f"{OUT}/{sid}.json", "w"), indent=2, default=str)
+        results.append({"id": sid, "title": title, "verdict": verdict, "evidence": ev})
+        print(f"    {verdict} :: {ev}", flush=True)
+        return res
+
+    # VP01 — brainstorm the demo novel (creates project + 6-chapter outline)
+    step("VP01", "Brainstorm 'The Last Signal' (post-apoc, Hero's Journey, 6 ch)",
+         "Brainstorm a post-apocalyptic novel called \"The Last Signal\" using the Hero's Journey arc "
+         "with 6 chapters. The protagonist is Maya Chen, a former radio engineer, twenty-eight, who "
+         "intercepts a signal that shouldn't exist and follows it across the Rust Coast wastelands in 2087.",
+         lambda resp, jr, res: (
+             (res.get("persist") or {}).get("persisted") and _project_id() is not None,
+             f"persisted={(res.get('persist') or {}).get('persisted')} "
+             f"chapters={len((res.get('outline') or {}).get('chapters') or [])} project_found={_project_id() is not None}"))
+
+    proj = _project_id()
+    pev = f"project_id={proj['id'] if proj else None}"
+    print(f"    project: {pev}", flush=True)
+
+    # VP02-04 — write chapters 1..3
+    for ch in (1, 2, 3):
+        step(f"VP0{ch + 1}", f"Write chapter {ch} of The Last Signal",
+             f"Write chapter {ch} of \"The Last Signal\"",
+             (lambda c: lambda resp, jr, res: (
+                 bool((res.get("persist") or {}).get("persisted")) and (res.get("word_count") or 0) > 200,
+                 f"persisted={(res.get('persist') or {}).get('persisted')} words={res.get('word_count')}"))(ch))
+
+    # VP05-07 — approve chapters 1..3
+    for ch in (1, 2, 3):
+        step(f"VP0{ch + 4}", f"Approve chapter {ch} of The Last Signal",
+             f"Approve chapter {ch} of \"The Last Signal\"",
+             lambda resp, jr, res: (str(res.get("status")) == "approved",
+                                    f"status={res.get('status')} error={res.get('error')}"))
+
+    # VP08 — cover art
+    step("VP08", "Generate cover art for The Last Signal",
+         "Generate cover art for \"The Last Signal\"",
+         lambda resp, jr, res: (
+             bool(res.get("image_url", "").startswith("http")) or bool(
+                 _supa("GET", "generated_images_v2", f"user_id=eq.{USER}&order=created_at.desc&limit=1&select=id")),
+             f"image_url={str(res.get('image_url'))[:50]}"))
+
+    # VP09 — story bible auto-populated (from the chapter writes)
+    step("VP09", "Story bible for The Last Signal (auto-populated)",
+         "Get the story bible for \"The Last Signal\"",
+         lambda resp, jr, res: (int(res.get("count") or 0) >= 3,
+                                f"entries={res.get('count')} found={res.get('found')}"))
+
+    # VP10 — inject the deliberate drift (DB): Maya Chen -> Maya Chan in ch3 (drift-scanner demo)
+    drift_ev = "skipped (no project)"
+    ok = False
+    if proj:
+        rows = _supa("GET", "published_content_v2",
+                     f"project_id=eq.{proj['id']}&content_type=eq.chapter&chapter_number=eq.3&select=id,content_text&limit=1")
+        if rows and "Maya Chen" in (rows[0].get("content_text") or ""):
+            new_text = (rows[0]["content_text"].replace("Maya Chen", "Maya Chan", 1))
+            _supa("PATCH", "published_content_v2", f"id=eq.{rows[0]['id']}", {"content_text": new_text})
+            ok = True
+            drift_ev = "injected 'Maya Chen'->'Maya Chan' (1 occurrence) in ch3"
+        elif rows:
+            drift_ev = "ch3 exists but no 'Maya Chen' occurrence to alter"
+        else:
+            drift_ev = "ch3 not found"
+    results.append({"id": "VP10", "title": "Inject deliberate drift in ch3 (DB)",
+                    "verdict": "PASS" if ok else "FAIL", "evidence": drift_ev})
+    print(f"\n=== VP10: inject drift\n    {'PASS' if ok else 'FAIL'} :: {drift_ev}", flush=True)
+
+    # summary
+    json.dump(results, open(f"{OUT}/summary.json", "w"), indent=2)
+    counts = {}
+    for r in results:
+        counts[r["verdict"]] = counts.get(r["verdict"], 0) + 1
+    print(f"\n===== VIDEO PREP DONE :: {counts} =====")
+    print("NOTE: 'The Wasteland Wire' newsletter is a Setup-Wizard (UI) flow with no chat/engine op — "
+          "seed it manually per marketing-copy.md §2.")
+
+
+if __name__ == "__main__":
+    main()
