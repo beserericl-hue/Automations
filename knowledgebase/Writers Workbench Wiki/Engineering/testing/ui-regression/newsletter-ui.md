@@ -39,6 +39,24 @@ Spec: `writers-workbench/e2e/regression/newsletter.spec.ts`. Render of every new
 - HelpButton open/close.
 - Approvals + Sends read views render.
 
+## Setup Wizard — result-asserting (spec: `regression/newsletter-wizard.spec.ts`)
+
+Data-isolated: creates a throwaway edition (API), walks Feeds→Template→Subscriber→Done asserting the
+DOM result **and** the DB row at each step, then hard-deletes the edition + children. Bars proven:
+feed import grows the list AND writes `newsletter_feed_sources_v2` rows; the Template step previews real
+HTML (iframe `srcdoc` > 100 chars, not the "no default" empty state) AND a default `newsletter_templates_v2`
+row exists; the subscriber add writes a `newsletter_subscribers_v2` row.
+
+### Bugs found + fixed (2026-07-02, commit `6110b5d`)
+- ✅ **`import-from-genre` 500'd on every call** — `.upsert(..., {onConflict:'user_id,edition_id,url'})`
+  but `newsletter_feed_sources_v2` has no matching unique constraint (`42P10`). The wizard's "Copy N feeds"
+  never worked. Fixed by deduping in code (fetch existing edition URLs, insert only new rows).
+- ✅ **CSV subscriber import** — identical broken upsert (`onConflict:'user_id,edition_id,email'`), same
+  `42P10`. Same code-dedup fix (`newsletter-edition-extras.ts`).
+- ✅ **New editions had no default template** — the Template step previewed nothing AND generation would
+  fail `NO_DEFAULT_TEMPLATE`. Edition create now seeds a per-edition default template by cloning the system
+  starter (`newsletter.ts`, best-effort/non-fatal). Both fixes are schema-change-free.
+
 ## FINDINGS (real dead controls / bugs)
 
 - **Generate template-override is a dead control** — `#template` value is never sent to
