@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
@@ -78,12 +78,14 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
       {/* Logo + collapse toggle */}
       <div className="flex h-14 items-center justify-between border-b border-gray-200 dark:border-gray-800 px-3">
         {open ? (
-          <div className="flex items-center min-w-0 flex-1">
+          <Link to="/" aria-label="Go to dashboard" title="Dashboard" className="flex items-center min-w-0 flex-1">
             <img src="/assets/logo-blue.png" alt="Course Worx" className="h-10 max-w-[160px] object-contain brightness-110 dark:hidden" />
             <img src="/assets/logo-white.png" alt="Course Worx" className="h-10 max-w-[160px] object-contain brightness-125 hidden dark:block" />
-          </div>
+          </Link>
         ) : (
-          <img src="/assets/favicon.png" alt="CW" className="h-7 shrink-0 brightness-110 dark:brightness-125" />
+          <Link to="/" aria-label="Go to dashboard" title="Dashboard" className="shrink-0">
+            <img src="/assets/favicon.png" alt="CW" className="h-7 shrink-0 brightness-110 dark:brightness-125" />
+          </Link>
         )}
         <button
           onClick={onToggle}
