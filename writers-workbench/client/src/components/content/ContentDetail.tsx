@@ -13,6 +13,7 @@ import QAReportPanel from './QAReportPanel';
 import AnnotationsPanel from './AnnotationsPanel';
 import ProvenancePanel from './ProvenancePanel';
 import RewriteWithResearchModal from './RewriteWithResearchModal';
+import { useToast } from '../../contexts/ToastContext';
 import { useChapterRepair } from '../../hooks/useChapterRepair';
 import type { PublishedContent, GeneratedImage } from '../../types/database';
 
@@ -30,6 +31,7 @@ export default function ContentDetail() {
   const [scheduleDate, setScheduleDate] = useState('');
   const [showImagePicker, setShowImagePicker] = useState(false);
   const [showRewriteModal, setShowRewriteModal] = useState(false);
+  const { addToast } = useToast();
 
   const { data: item, isLoading, isError, error } = useQuery({
     queryKey: ['content-detail', id, isImpersonating],
@@ -379,6 +381,12 @@ export default function ContentDetail() {
           hasQaReport={!!(item.metadata as Record<string, unknown> | null | undefined)?.['last_qa_report']}
           projectType={
             (item.metadata as Record<string, unknown> | null | undefined)?.['project_type'] as string | undefined
+          }
+          onEnqueued={() =>
+            addToast(
+              'Rewrite with research queued — it runs in the background (~2-4 min); the chapter refreshes when it finishes.',
+              'success',
+            )
           }
           onClose={() => setShowRewriteModal(false)}
         />

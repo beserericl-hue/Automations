@@ -15,6 +15,7 @@ import { useChapterRepair } from '../../hooks/useChapterRepair';
 import { useImageGenerator } from '../../hooks/useImageGenerator';
 import CommandDialog from '../shared/CommandDialog';
 import RewriteWithResearchModal from '../content/RewriteWithResearchModal';
+import { useToast } from '../../contexts/ToastContext';
 import type { WritingProject, PublishedContent, StoryBibleEntry, ResearchReport, GenreConfig, StoryArc, OutlineCharacter, OutlineChapter, ChapterOutline, SubChapter } from '../../types/database';
 import { normalizeOutlineChapter } from '../../types/database';
 
@@ -641,6 +642,14 @@ function OutlineTab({ outline, storyArc, projectId, projectTitle, genreSlug, use
   const coverState = coverGen.stateOf('book-cover');
   const coverQueued = coverState === 'submitting' || coverState === 'polling' || coverState === 'saving';
   const coverError = coverState === 'error';
+  const [coverModalOpen, setCoverModalOpen] = useState(false);
+  const [coverPrompt, setCoverPrompt] = useState('');
+  const defaultCoverPrompt = () => {
+    const premise = (outline.premise || '').trim();
+    return `Professional book cover illustration for ${genreSlug ? `a ${genreSlug.replace(/-/g, ' ')} ` : ''}novel titled "${projectTitle}". `
+      + (premise ? `Capture this premise: ${premise}. ` : '')
+      + 'Cinematic, evocative. No text, no lettering, no title overlay.';
+  };
 
   return (
     <div className="space-y-4">
@@ -690,24 +699,61 @@ function OutlineTab({ outline, storyArc, projectId, projectTitle, genreSlug, use
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   disabled={coverQueued}
-                  onClick={async () => {
-                    const premise = (outline.premise || '').trim();
-                    const prompt = `Professional book cover illustration for ${genreSlug ? `a ${genreSlug.replace(/-/g, ' ')} ` : ''}novel titled "${projectTitle}". `
-                      + (premise ? `Capture this premise: ${premise}. ` : '')
-                      + 'Cinematic, evocative. No text, no lettering, no title overlay.';
-                    const ok = await coverGen.generate('book-cover', {
-                      prompt, projectId, genreSlug: genreSlug || undefined,
-                      title: projectTitle, imageType: 'cover_art',
-                    });
-                    if (ok) void qc.invalidateQueries({ queryKey: ['generated-images'] });
-                  }}
+                  onClick={() => { setCoverPrompt(defaultCoverPrompt()); setCoverModalOpen(true); }}
                   className="rounded-lg px-3 py-1.5 text-xs font-medium border border-fuchsia-300 text-fuchsia-700 hover:bg-fuchsia-50 dark:border-fuchsia-700 dark:text-fuchsia-400 dark:hover:bg-fuchsia-950 disabled:opacity-60 whitespace-nowrap"
-                  title="Generate book cover art from the premise. Added to the Art gallery — generate as many as you like; select one when publishing."
+                  title="Generate book cover art. Opens a prompt you can edit; the result is added to the Art gallery."
                 >
                   {coverQueued ? 'Generating…' : coverError ? 'Retry cover art' : coverState === 'done' ? 'Cover ✓' : 'Generate Cover Art'}
                 </button>
                 <span className="text-[11px] text-gray-400">Adds to the Art gallery — generate as many as you like; pick one when you publish.</span>
               </div>
+
+              {/* Cover-art prompt modal — lets the user edit the image prompt before generating. */}
+              {coverModalOpen && (
+                <div
+                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                  onClick={() => setCoverModalOpen(false)}
+                >
+                  <div
+                    className="w-full max-w-lg rounded-lg bg-white dark:bg-gray-900 p-5 shadow-xl"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">Generate cover art</h3>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Edit the image prompt, then generate. The result is added to the Art gallery.
+                    </p>
+                    <textarea
+                      value={coverPrompt}
+                      onChange={(e) => setCoverPrompt(e.target.value)}
+                      rows={5}
+                      className="mt-3 w-full rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+                      placeholder="Describe the cover art…"
+                    />
+                    <div className="mt-4 flex justify-end gap-2">
+                      <button
+                        onClick={() => setCoverModalOpen(false)}
+                        className="rounded-lg px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        disabled={coverQueued || !coverPrompt.trim()}
+                        onClick={async () => {
+                          const ok = await coverGen.generate('book-cover', {
+                            prompt: coverPrompt.trim(), projectId, genreSlug: genreSlug || undefined,
+                            title: projectTitle, imageType: 'cover_art',
+                          });
+                          if (ok) void qc.invalidateQueries({ queryKey: ['generated-images'] });
+                          setCoverModalOpen(false);
+                        }}
+                        className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                      >
+                        {coverQueued ? 'Generating…' : 'Generate'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {outline.premise && (
                 <div>
@@ -1054,6 +1100,7 @@ function ChaptersTab({
   // project so it appears in the Art tab). Reuses the proven /api/images pipeline.
   const artGen = useImageGenerator();
   const qc = useQueryClient();
+  const { addToast } = useToast();
   const [rewriteResearchTarget, setRewriteResearchTarget] = useState<{
     id: string;
     label: string;
@@ -1226,6 +1273,12 @@ function ChaptersTab({
           chapterLabel={rewriteResearchTarget.label}
           hasQaReport={false}
           projectType={projectType}
+          onEnqueued={() =>
+            addToast(
+              `Rewrite with research queued for ${rewriteResearchTarget.label} — it runs in the background (~2-4 min); the chapter refreshes when it finishes.`,
+              'success',
+            )
+          }
           onClose={() => setRewriteResearchTarget(null)}
         />
       )}
