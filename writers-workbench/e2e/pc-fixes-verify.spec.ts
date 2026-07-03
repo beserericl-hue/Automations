@@ -39,6 +39,24 @@ test.describe('PC-parity fixes', () => {
     await expect(page.getByText('The Workbench')).toHaveCount(0);
   });
 
+  test('Approval detail shows a rendered email preview (marketing Scene 6)', async ({ page }) => {
+    await page.goto('/newsletter/approvals', { waitUntil: 'domcontentloaded' });
+    const emptyState = page.getByText(/no pending approvals/i);
+    const reviewLink = page.getByRole('link', { name: /Review/i }).first();
+    await expect(emptyState.or(reviewLink)).toBeVisible({ timeout: 20_000 });
+    if (await emptyState.isVisible().catch(() => false)) {
+      test.skip(true, 'no pending approvals seeded — nothing to preview');
+    }
+    await reviewLink.click();
+    // The "Email preview" panel renders the branded template in an iframe.
+    await expect(page.getByRole('heading', { name: /Email preview/i })).toBeVisible({ timeout: 20_000 });
+    const preview = page.frameLocator('iframe[title="Approval email preview"]');
+    await expect(preview.getByText(/Wasteland Wire/i).first()).toBeVisible({ timeout: 20_000 });
+    // A selected story must appear in the rendered email, and old branding must not.
+    await expect(preview.getByText(/Solar Superstorm/i).first()).toBeVisible();
+    await expect(preview.getByText(/Workbench/i)).toHaveCount(0);
+  });
+
   test('Generate Cover Art opens the modal instead of generating immediately', async ({ page }) => {
     await page.goto('/projects', { waitUntil: 'domcontentloaded' });
     const proj = page.getByText('The Last Signal').first();
