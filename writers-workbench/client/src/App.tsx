@@ -27,6 +27,7 @@ import TrashView from './components/projects/TrashView';
 import AdminPanel from './components/admin/AdminPanel';
 import BrainstormForm from './components/brainstorm/BrainstormForm';
 import ImageDetail from './components/images/ImageDetail';
+import ImageGalleryPage from './components/images/ImageGalleryPage';
 
 const ContentLibrary = lazyRetry(() => import('./components/content/ContentLibrary'));
 const CostDashboard = lazyRetry(() => import('./components/cost/CostDashboard'));
@@ -92,6 +93,7 @@ export default function App() {
                     <Route path="research" element={<ResearchList />} />
                     <Route path="research/:id" element={<ResearchDetail />} />
                     <Route path="brainstorm" element={<BrainstormForm />} />
+                    <Route path="gallery" element={<ImageGalleryPage />} />
                     <Route path="outlines" element={<OutlineList />} />
                     <Route path="story-arcs" element={<StoryArcBrowser />} />
                     <Route path="genres" element={<GenreList />} />
