@@ -364,7 +364,9 @@ class NewsletterSagaDriver:
                 "edition_id": edition_id,
                 "subject": subj.subject_line,
                 "pre_header_text": subj.pre_header_text,
-                "masthead": "The Workbench",
+                # Masthead comes from the edition (newsletter_name), not a hardcoded default, so a
+                # themed edition (e.g. "The Wasteland Wire") isn't rendered as "The Workbench".
+                "masthead": cfg.get("newsletter_name") or "The Workbench",
                 "markdown_body": assembled.markdown_body,
                 "permalink_url": permalink_placeholder,
                 "send_date": send_date,

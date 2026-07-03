@@ -82,10 +82,15 @@ app.use(
           'wss://*.elevenlabs.io',
         ],
         'img-src': ["'self'", 'data:', 'blob:', 'https:'],
-        'script-src': ["'self'", 'https://unpkg.com', 'https://*.elevenlabs.io'],
+        // 'blob:' + 'wasm-unsafe-eval' are required by the ElevenLabs ConvAI widget ("Talk to Eve"):
+        // it loads its rawAudioProcessor AudioWorklet from a blob: URL (Chrome enforces script-src for
+        // AudioWorklet.addModule, NOT worker-src — this is why Eve failed on Chrome/PC with
+        // "Failed to load the rawAudioProcessor worklet module" while working on other browsers) and
+        // compiles a WASM audio module. Without these the widget throws and voice never initialises.
+        'script-src': ["'self'", 'blob:', "'wasm-unsafe-eval'", 'https://unpkg.com', 'https://*.elevenlabs.io'],
         'media-src': ["'self'", 'blob:', 'data:', 'https://*.elevenlabs.io'],
         'frame-src': ["'self'", 'https://*.elevenlabs.io'],
-        'worker-src': ["'self'", 'blob:'],
+        'worker-src': ["'self'", 'blob:', 'https://*.elevenlabs.io'],
         'font-src': ["'self'", 'https:', 'data:'],
         'style-src': ["'self'", 'https:', "'unsafe-inline'"],
       },
@@ -258,8 +263,23 @@ app.use('/assets', express.static(path.join(publicPath, 'assets'), {
   immutable: true,
 }));
 
-// Everything else (non-asset static files)
-app.use(express.static(publicPath, { maxAge: '1h' }));
+// Everything else (non-asset static files). CRITICAL: index:false so a request for `/` does NOT
+// get served the cached index.html here — it must fall through to the SPA handler below, which sets
+// no-cache. Previously express.static served `/` and `/index.html` with max-age=3600, so browsers
+// pinned a stale index.html for up to an hour after a deploy and kept loading OLD hashed JS chunks
+// (symptom: a fix worked on one machine but a second machine still ran the old bundle). We also
+// no-cache index.html explicitly in case it's requested by name.
+app.use(
+  express.static(publicPath, {
+    maxAge: '1h',
+    index: false,
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('index.html')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      }
+    },
+  }),
+);
 
 // SPA fallback — index.html must never be cached to prevent stale chunk errors after deploys
 app.get('*', (_req, res) => {

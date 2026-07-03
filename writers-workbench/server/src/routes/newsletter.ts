@@ -927,7 +927,7 @@ newsletterRouter.get('/approvals/open', requireAuth, async (req: Request, res: R
 
   let query = supabase
     .from('newsletter_approvals_v2')
-    .select('id, token, user_id, execution_id, stage, payload, created_at, expires_at, resolved_at, decision, feedback')
+    .select('id, token, user_id, execution_id, edition_id, stage, payload, created_at, expires_at, resolved_at, decision, feedback')
     .eq('user_id', userId)
     .is('resolved_at', null)
     .gt('expires_at', nowIso)

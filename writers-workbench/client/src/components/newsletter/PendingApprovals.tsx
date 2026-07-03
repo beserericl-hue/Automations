@@ -27,10 +27,9 @@ interface OpenApproval {
   created_at: string;
   expires_at: string;
   approval_url: string | null;
-  // Edition is denormalized onto newsletter_approvals_v2 (mig 012) but
-  // not yet surfaced in the in-app approvals list. Future cleanup: pull
-  // edition_id into the SELECT and render the badge per-row instead of
-  // hardcoding "ai-news" in callers.
+  // Edition denormalized onto newsletter_approvals_v2 (mig 012) and now
+  // returned by /approvals/open, so each row renders its OWN edition badge.
+  edition_id: string | null;
 }
 
 interface ApprovalsOpenResponse {
@@ -65,9 +64,11 @@ export default function PendingApprovals() {
   });
 
   const editions = editionsQuery.data?.editions ?? [];
-  // For 2a, the seeded `ai-news` edition is the only one in play; pick
-  // it as the visual stand-in if more than one ever lives here.
-  const fallbackEdition = editions.find((e) => e.id === 'ai-news') ?? editions[0];
+  // Resolve each approval's OWN edition by its edition_id (mig 012 denormalization).
+  // Only fall back to the first edition if a legacy row has no edition_id at all.
+  const editionById = new Map(editions.map((e) => [e.id, e] as const));
+  const resolveEdition = (a: OpenApproval): NewsletterEdition | undefined =>
+    (a.edition_id ? editionById.get(a.edition_id) : undefined) ?? editions[0];
 
   // Defensive client-side filter: drop rows that aged out between fetch
   // and render. Server already does this, so usually no-op.
@@ -129,7 +130,10 @@ export default function PendingApprovals() {
                       <span className="ml-2 text-xs text-gray-400">{STAGE_LABEL[a.stage]}</span>
                     </td>
                     <td className="px-4 py-2">
-                      {fallbackEdition ? <EditionBadge edition={fallbackEdition} /> : <span className="text-gray-400">—</span>}
+                      {(() => {
+                        const ed = resolveEdition(a);
+                        return ed ? <EditionBadge edition={ed} /> : <span className="text-gray-400">—</span>;
+                      })()}
                     </td>
                     <td className="px-4 py-2 max-w-md truncate">
                       {excerpt(a)}
