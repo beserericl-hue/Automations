@@ -10,3 +10,7 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+// The ElevenLabs convai widget ships no type declarations — it's a side-effecting import that
+// registers the <elevenlabs-convai> custom element.
+declare module '@elevenlabs/convai-widget-embed';

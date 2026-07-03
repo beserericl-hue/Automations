@@ -44,17 +44,16 @@ export default function EveWidget({ onEnd }: EveWidgetProps) {
   const { profile } = useUser();
 
   useEffect(() => {
-    // Load the ElevenLabs convai widget script once
+    // Load the ElevenLabs convai widget as a BUNDLED dependency (registers the <elevenlabs-convai>
+    // custom element) instead of a fragile unpkg CDN <script> — that CDN load could be blocked by
+    // CSP / ad-blockers / network and left the widget broken with a console error. The import is
+    // side-effecting (it self-registers the element) and lazy so it doesn't bloat the initial bundle.
     if (!scriptLoadedRef.current) {
-      const existing = document.querySelector('script[src*="elevenlabs/convai-widget"]');
-      if (!existing) {
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/@elevenlabs/convai-widget-embed';
-        script.async = true;
-        script.type = 'text/javascript';
-        document.body.appendChild(script);
-      }
       scriptLoadedRef.current = true;
+      import('@elevenlabs/convai-widget-embed').catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('Eve voice widget failed to load', err);
+      });
     }
 
     // Create the custom element

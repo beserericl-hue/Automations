@@ -13,6 +13,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@elevenlabs/convai-widget-embed": "^0.14.8",
     "@supabase/supabase-js": "^2.49.4",
     "@tanstack/react-query": "^5.75.5",
     "@tiptap/extension-character-count": "^3.22.3",
