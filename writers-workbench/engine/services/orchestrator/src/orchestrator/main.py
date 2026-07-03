@@ -204,6 +204,10 @@ def build_app() -> FastAPI:
             "user_id": body.get("user_id", ""),
             "max_stories": int(body.get("max_stories", 5)),
             "previous_newsletter_content": body.get("previous_newsletter_content", ""),
+            # Edition theme so the pick step selects on-topic stories (see NewsletterSagaDriver
+            # ._stage_picking). Absent/None for editions with no genre configured.
+            "genre": body.get("genre") or None,
+            "newsletter_name": body.get("newsletter_name") or None,
         }
         execution_id = await driver.start(cfg=cfg)
         # If arq is available, hand off to the worker; else drive inline so the response carries the first pause.
