@@ -227,9 +227,14 @@ contentActionsRouter.get('/:id/annotations', async (req: Request, res: Response)
         const characters = Array.isArray(scan.characters) ? (scan.characters as Record<string, unknown>[]) : [];
         for (const c of characters) {
           const flags = Array.isArray(c.drift_flags) ? (c.drift_flags as Record<string, unknown>[]) : [];
+          const chapterText = chapter.content_text || '';
           for (const f of flags) {
             if (f.chapter_number !== chapter.chapter_number) continue;
             const variant = (f.variant as string | undefined) || '';
+            // Skip STALE drift flags whose drifted spelling is no longer in the chapter (already
+            // fixed / text edited since the scan ran). Surfacing them shows an "Apply Fix" that
+            // 422s on click — a bad look, especially in a demo. A resolved finding shouldn't appear.
+            if (variant && !chapterText.includes(variant)) continue;
             const ctx = (f.context as string | undefined) || '';
             const flagType = (f.type as string | undefined) || 'drift';
             const sev = (f.severity as string | undefined) || 'medium';
