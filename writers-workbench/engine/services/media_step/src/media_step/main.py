@@ -210,6 +210,37 @@ def _social_system() -> str:
     )
 
 
+_VALID_SOCIAL = {"twitter", "linkedin", "instagram", "facebook"}
+
+
+async def _persist_social_posts(payload: dict, posts: dict) -> dict | None:
+    """Persist generated social posts to social_posts_v2 so they show in the project Social tab (and the
+    /social library). Resolves project_id from a supplied project_title (chat/voice pass a title, not a
+    UUID). Only the four DB-valid platforms are stored. Best-effort — never breaks generation."""
+    settings = get_settings()
+    user_id = payload.get("user_id")
+    if not (user_id and settings.supabase_url and settings.supabase_service_role_key):
+        return {"persisted": False, "reason": "no user_id / supabase"}
+    try:
+        from writer_engine.persist_helpers import resolve_project_id
+        from writer_engine.supabase.client import get_supabase_admin
+
+        client = await get_supabase_admin()
+        project_id = payload.get("project_id")
+        if not project_id and payload.get("project_title"):
+            project_id, _row = await resolve_project_id(
+                client, user_id=str(user_id), title=str(payload["project_title"]))
+        rows = [{"user_id": str(user_id), "project_id": project_id, "platform": p,
+                 "post_text": t.strip(), "status": "draft"}
+                for p, t in posts.items() if p in _VALID_SOCIAL and str(t).strip()]
+        if not rows:
+            return {"persisted": False, "reason": "no valid-platform posts to save"}
+        await client.table("social_posts_v2").insert(rows).execute()
+        return {"persisted": True, "count": len(rows), "project_id": project_id}
+    except Exception as exc:  # noqa: BLE001
+        return {"persisted": False, "error": str(exc)[:200]}
+
+
 async def _op_social_posts(payload: dict) -> dict:
     platforms = list(payload.get("platforms") or ["twitter", "linkedin"])
     summary = str(payload.get("summary") or payload.get("title") or "")
@@ -223,9 +254,11 @@ async def _op_social_posts(payload: dict) -> dict:
             max_tokens=1200,
         )
         data = json.loads(extract_json(resp.text))
-        return {p: str(data.get(p, "")) for p in platforms}
+        posts = {p: str(data.get(p, "")) for p in platforms}
     except (ProviderNotRegistered, json.JSONDecodeError, ValueError):
-        return {p: f"(fixture) social post for {p}: {summary[:60]}" for p in platforms}
+        posts = {p: f"(fixture) social post for {p}: {summary[:60]}" for p in platforms}
+    persisted = await _persist_social_posts(payload, posts)
+    return {**posts, "persist": persisted}
 
 
 async def _op_scrape_url(payload: dict) -> dict:

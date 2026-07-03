@@ -504,6 +504,14 @@ def _social_params(message: str) -> dict[str, Any]:
     im = _INLINE_CONTENT.search(message)
     if im and len(im.group(1).strip()) > 20:
         params["summary"] = im.group(1).strip()
+    # project/content title so the persisted posts link to the right project's Social tab, e.g.
+    # "Repurpose The Last Signal for social media" / 'repurpose "X" into twitter posts'.
+    tm = re.search(r'\brepurpose\s+(?:the\s+)?["“]?(.+?)["”]?\s+(?:for|into|to|on)\b', message, re.I)
+    if tm:
+        title = tm.group(1).strip(" \"“”")
+        if title.lower() not in {"this", "that", "it", "content"} and len(title) > 2:
+            params["project_title"] = title
+            params.setdefault("summary", title)
     return params
 
 

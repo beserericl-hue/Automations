@@ -15,8 +15,9 @@ def test_social_system_has_craft_voice() -> None:
 @pytest.mark.asyncio
 async def test_social_posts_fixture_path() -> None:
     out = await _op_social_posts({"summary": "A novel about cathedrals", "platforms": ["twitter", "linkedin"]})
-    assert set(out) == {"twitter", "linkedin"}
-    assert all(isinstance(v, str) and v for v in out.values())
+    posts = {k: v for k, v in out.items() if k != "persist"}  # op now also returns a persist result dict
+    assert set(posts) == {"twitter", "linkedin"}
+    assert all(isinstance(v, str) and v for v in posts.values())
 
 
 @pytest.mark.asyncio
