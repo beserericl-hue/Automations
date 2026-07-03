@@ -178,6 +178,10 @@ class NewsletterSagaDriver:
                 "articles": articles,
                 "max_stories": int(cfg.get("max_stories", 5)),
                 "feedback": feedback,
+                # Edition theme — the picker uses this to select on-topic stories instead of
+                # defaulting to a generic "technical reader" audience.
+                "genre": cfg.get("genre") or None,
+                "newsletter_name": cfg.get("newsletter_name") or None,
             },
         )
         if out.status is StepStatus.ERROR:

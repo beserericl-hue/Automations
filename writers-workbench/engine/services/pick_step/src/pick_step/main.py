@@ -28,12 +28,34 @@ def _fixture(max_stories: int) -> PickedStories:
     )
 
 
+def _audience_directive(genre: str | None) -> str:
+    """A genre-specific audience line so the picker selects on-theme stories.
+
+    The default seed prompt targets a generic "technical reader"; for a themed edition
+    (e.g. a post-apocalyptic fiction newsletter) that filters out exactly the stories the
+    reader wants. When the edition carries a genre we override the audience here.
+    """
+    g = (genre or "").strip()
+    if not g:
+        return ""
+    label = g.replace("-", " ").replace("_", " ")
+    return (
+        f"\n\nAUDIENCE OVERRIDE: This newsletter is a {label} publication. Pick the stories that "
+        f"matter most to readers who love {label} — prioritise on-theme articles and de-prioritise "
+        f"off-topic items. Ignore any earlier instruction to select for a generic technical reader."
+    )
+
+
 async def _pick(
-    router: LLMRouter, articles: list[dict], max_stories: int, feedback: str | None
+    router: LLMRouter,
+    articles: list[dict],
+    max_stories: int,
+    feedback: str | None,
+    genre: str | None = None,
 ) -> PickedStories:
     settings = get_settings()
     store = get_prompt_store()
-    system = store.get("newsletter.pick_top_stories.system")
+    system = store.get("newsletter.pick_top_stories.system") + _audience_directive(genre)
     user_template = store.get("newsletter.pick_top_stories.user_template")
     articles_text = "\n\n".join(
         f"- ({a.get('id')}) {a.get('title')} — {a.get('source_name')}" for a in articles
@@ -59,9 +81,10 @@ async def handler(inp: StepInput) -> StepOutput:
     articles = list(inp.payload.get("articles") or [])
     max_stories = int(inp.payload.get("max_stories") or 5)
     feedback = inp.payload.get("feedback")
+    genre = inp.payload.get("genre")
     router = get_router(service=STEP_NAME)
     try:
-        picked = await _pick(router, articles, max_stories, feedback)
+        picked = await _pick(router, articles, max_stories, feedback, genre=genre)
     except ProviderNotRegistered:
         picked = _fixture(max_stories)
     return StepOutput(

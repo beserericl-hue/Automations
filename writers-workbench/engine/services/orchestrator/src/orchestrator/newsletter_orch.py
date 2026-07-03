@@ -77,7 +77,9 @@ class NewsletterOrchestrator(OrchestratorBase):
             return {"execution_id": str(execution_id), "status": "skipped_no_content"}
 
         # ----- pick (with HITL gate + revision loop) -----
-        picked = await self._pick_with_gate(execution_id, articles, max_stories)
+        picked = await self._pick_with_gate(
+            execution_id, articles, max_stories, genre=cfg.get("genre") or None
+        )
         if picked is None:
             return {"execution_id": str(execution_id), "status": "rejected"}
 
@@ -219,7 +221,8 @@ class NewsletterOrchestrator(OrchestratorBase):
     # ---------- HITL helpers ----------
 
     async def _pick_with_gate(
-        self, execution_id: UUID, articles: list[dict[str, Any]], max_stories: int
+        self, execution_id: UUID, articles: list[dict[str, Any]], max_stories: int,
+        genre: str | None = None,
     ) -> PickedStories | None:
         await self.advance(execution_id, Stage.PICKING, message="picking top stories")
         feedback: str | None = None
@@ -227,7 +230,12 @@ class NewsletterOrchestrator(OrchestratorBase):
             pick_out = await run_step_via_http(
                 _step("pick"),
                 execution_id=execution_id,
-                payload={"articles": articles, "max_stories": max_stories, "feedback": feedback},
+                payload={
+                    "articles": articles,
+                    "max_stories": max_stories,
+                    "feedback": feedback,
+                    "genre": genre,
+                },
             )
             if pick_out.status is StepStatus.ERROR:
                 await self.fail(

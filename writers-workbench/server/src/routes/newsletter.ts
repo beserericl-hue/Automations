@@ -434,6 +434,7 @@ async function triggerN8nWebhook(
 async function triggerEngine(
   body: import('zod').infer<typeof GenerateSchema>,
   userId: string,
+  editionMeta?: { genre: string | null; newsletter_name: string | null },
 ): Promise<{ ok: true; data: UpstreamGenerateResult } | { ok: false; status: number; code: string; message: string }> {
   const engineUrl = process.env.NEWSLETTER_SERVICE_URL;
   const serviceSecret = process.env.SERVICE_SHARED_SECRET;
@@ -446,6 +447,10 @@ async function triggerEngine(
     user_id: userId,
     previous_newsletter_content: body.previous_newsletter_content ?? '',
     max_stories: 5,
+    // Edition theme so the story picker selects on-topic articles (a post-apocalyptic edition
+    // should not surface generic tech news). Null when the edition has no genre configured.
+    genre: editionMeta?.genre ?? null,
+    newsletter_name: editionMeta?.newsletter_name ?? null,
   };
   let upstream: Response | undefined;
   try {
@@ -539,7 +544,7 @@ newsletterRouter.post(
     const supabase = getSupabaseAdmin();
     const { data: edition, error: editionErr } = await supabase
       .from('newsletter_editions_v2')
-      .select('id')
+      .select('id, genre, newsletter_name, display_name')
       .eq('id', body.edition_id)
       .eq('user_id', userId)
       .eq('enabled', true)
@@ -562,8 +567,15 @@ newsletterRouter.post(
     }
 
     const backend = getBackend();
+    const editionMeta = {
+      genre: (edition as { genre?: string | null }).genre ?? null,
+      newsletter_name:
+        (edition as { newsletter_name?: string | null }).newsletter_name ??
+        (edition as { display_name?: string | null }).display_name ??
+        null,
+    };
     const result = backend === 'python'
-      ? await triggerEngine(body, userId)
+      ? await triggerEngine(body, userId, editionMeta)
       : await triggerN8nWebhook(body);
 
     if (!result.ok) {

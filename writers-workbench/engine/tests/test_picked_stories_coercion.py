@@ -75,3 +75,16 @@ def test_full_pickedstories_payload_with_dict_identifiers() -> None:
         }
     )
     assert ps.top_selected_stories[0].identifiers == ["a17b9520-e1dd-446b-b30c-a716b1641bc8"]
+
+
+def test_audience_directive_is_genre_aware() -> None:
+    """A themed edition overrides the default 'technical reader' audience so the picker
+    selects on-theme stories (regression: a post-apocalyptic edition surfaced tech news)."""
+    from pick_step.main import _audience_directive
+
+    d = _audience_directive("post-apocalyptic")
+    assert "post apocalyptic" in d
+    assert "AUDIENCE OVERRIDE" in d
+    # No genre → no override (default seed prompt unchanged)
+    assert _audience_directive(None) == ""
+    assert _audience_directive("") == ""
