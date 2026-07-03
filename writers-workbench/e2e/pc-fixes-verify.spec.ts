@@ -57,6 +57,19 @@ test.describe('PC-parity fixes', () => {
     await expect(preview.getByText(/Workbench/i)).toHaveCount(0);
   });
 
+  test('Image Gallery page (between Brainstorm and Outlines) shows all images', async ({ page }) => {
+    await page.goto('/projects', { waitUntil: 'domcontentloaded' });
+    // Sidebar link exists between Brainstorm and Outlines.
+    const galleryLink = page.getByRole('link', { name: /Image Gallery/i }).first();
+    await expect(galleryLink).toBeVisible({ timeout: 20_000 });
+    await galleryLink.click();
+    await expect(page).toHaveURL(/\/gallery$/);
+    await expect(page.getByRole('heading', { name: /Image Gallery/i })).toBeVisible({ timeout: 20_000 });
+    // The grid renders image thumbnails (DEV has 33 across projects).
+    await expect(page.locator('img[loading="lazy"]').first()).toBeVisible({ timeout: 20_000 });
+    expect(await page.locator('img[loading="lazy"]').count()).toBeGreaterThan(0);
+  });
+
   test('Generate Cover Art opens the modal instead of generating immediately', async ({ page }) => {
     await page.goto('/projects', { waitUntil: 'domcontentloaded' });
     const proj = page.getByText('The Last Signal').first();
