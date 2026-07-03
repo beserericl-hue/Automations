@@ -959,6 +959,141 @@ newsletterRouter.get('/approvals/open', requireAuth, async (req: Request, res: R
 
 /**
  * @openapi
+ * /newsletter/approvals/{token}/preview:
+ *   get:
+ *     tags: [Newsletter]
+ *     summary: Rendered HTML email preview for an approval (session-authenticated)
+ *     description: >
+ *       Renders the edition's branded default template with the approval's selected stories laid in,
+ *       so a reviewer sees what the email will look like BEFORE approving. Ownership enforced by user_id.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: Rendered HTML }
+ *       404: { description: Approval not found / not owned / no template }
+ */
+// Assemble a markdown body + lead block from an approval's selected stories.
+function assembleApprovalPreviewData(
+  stories: Array<{ title?: string; summary?: string; external_source_links?: string[] }>,
+  brandTitle: string,
+): Record<string, unknown> {
+  const clean = stories.filter((s) => s && (s.title || s.summary));
+  const [first, ...rest] = clean;
+  const linkLine = (s: { external_source_links?: string[] }) => {
+    const url = (s.external_source_links ?? []).find((u) => typeof u === 'string' && u.startsWith('http'));
+    return url ? `\n\n[Read more →](${url})` : '';
+  };
+  const body_md = rest
+    .map((s) => `## ${s.title ?? 'Untitled'}\n\n${s.summary ?? ''}${linkLine(s)}`)
+    .join('\n\n---\n\n');
+  return {
+    title: brandTitle,
+    preheader: `${clean.length} ${clean.length === 1 ? 'story' : 'stories'} this issue`,
+    issue: { date: new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }), number: 1 },
+    // Lead = the first story; the rest render in the body. Decorative sections are null so the
+    // template hides them (deepMerge won't fall back to sample_data for an explicit null).
+    lead: first
+      ? {
+          eyebrow: 'Lead story',
+          headline: first.title ?? '',
+          body_html: `<p>${(first.summary ?? '').replace(/</g, '&lt;')}</p>`,
+          read_more_url: (first.external_source_links ?? []).find((u) => typeof u === 'string' && u.startsWith('http')) ?? '#',
+          read_more_label: 'Read the full story →',
+        }
+      : null,
+    body_md,
+    sponsor: null,
+    pull_quote: null,
+    trending: null,
+    workbench_section: null,
+  };
+}
+
+newsletterRouter.get('/approvals/:token/preview', requireAuth, async (req: Request, res: Response) => {
+  const token = String(req.params.token || '');
+  const userId = req.userId!;
+  const supabase = getSupabaseAdmin();
+
+  // 1) Load the approval (ownership enforced by user_id).
+  const { data: approval, error: aErr } = await supabase
+    .from('newsletter_approvals_v2')
+    .select('edition_id, stage, payload')
+    .eq('token', token)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (aErr) {
+    res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: aErr.message } });
+    return;
+  }
+  if (!approval || !approval.edition_id) {
+    res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Approval not found or not owned by caller' } });
+    return;
+  }
+  const editionId = approval.edition_id as string;
+  const payload = (approval.payload ?? {}) as Record<string, unknown>;
+  const stories = (payload.top_selected_stories as Array<Record<string, unknown>> | undefined) ?? [];
+
+  // 2) Load the edition's active default template + brand identity.
+  const [{ data: tpl }, { data: editionRow }] = await Promise.all([
+    supabase
+      .from('newsletter_templates_v2')
+      .select('id, html, sample_data')
+      .eq('edition_id', editionId)
+      .eq('is_default', true)
+      .eq('active', true)
+      .maybeSingle(),
+    supabase
+      .from('newsletter_editions_v2')
+      .select('newsletter_name, display_name, stamp_url, signature_name, signature_role')
+      .eq('id', editionId)
+      .maybeSingle(),
+  ]);
+  if (!tpl) {
+    res.status(404).json({ success: false, error: { code: 'NO_DEFAULT_TEMPLATE', message: `No active default template for edition '${editionId}'.` } });
+    return;
+  }
+  const r = tpl as { id: string; html: string; sample_data: Record<string, unknown> };
+  const ed = (editionRow ?? {}) as { newsletter_name?: string | null; display_name?: string | null; stamp_url?: string | null; signature_name?: string | null; signature_role?: string | null };
+  const brandTitle = ed.newsletter_name || ed.display_name || 'Newsletter';
+
+  // 3) Compose data from the selected stories, layered under edition overrides.
+  const storyData = assembleApprovalPreviewData(
+    stories as Array<{ title?: string; summary?: string; external_source_links?: string[] }>,
+    brandTitle,
+  );
+  const editionData: Record<string, unknown> = {};
+  if (ed.stamp_url) editionData.stamp_url = ed.stamp_url;
+  if (ed.signature_name || ed.signature_role) {
+    editionData.signoff = {
+      ...(ed.signature_name ? { signature_name: ed.signature_name } : {}),
+      ...(ed.signature_role ? { role: ed.signature_role } : {}),
+    };
+  }
+  const mergedData = { ...editionData, ...storyData };
+
+  try {
+    const result = renderTemplate(r.html, mergedData, { sampleData: r.sample_data });
+    res.json({ success: true, html: result.html, warnings: result.warnings });
+  } catch (err) {
+    if (err instanceof TemplateCompileError) {
+      res.status(400).json({ success: false, error: { code: 'TEMPLATE_COMPILE_ERROR', message: err.message } });
+      return;
+    }
+    if (err instanceof TemplateRenderError) {
+      res.status(500).json({ success: false, error: { code: 'TEMPLATE_RENDER_ERROR', message: err.message } });
+      return;
+    }
+    logger.error({ err, editionId }, 'approval preview: unexpected render error');
+    res.status(500).json({ success: false, error: { code: 'INTERNAL', message: 'Unexpected error during render' } });
+  }
+});
+
+/**
+ * @openapi
  * /newsletter/approvals/{token}/resolve:
  *   post:
  *     tags: [Newsletter]

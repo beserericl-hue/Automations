@@ -15,6 +15,7 @@ import { apiFetch } from '../../lib/api';
 import ApprovalPayloadStories from './ApprovalPayloadStories';
 import ApprovalPayloadSubject from './ApprovalPayloadSubject';
 import ApprovalPayloadImage from './ApprovalPayloadImage';
+import ApprovalEmailPreview from './ApprovalEmailPreview';
 import ApprovalResolveForm from './ApprovalResolveForm';
 import StatusPill from './StatusPill';
 import type { NewsletterApprovalStage } from '../../types/database';
@@ -116,6 +117,7 @@ export default function ApprovalDetail() {
           ) : (
             <ApprovalPayloadSubject payload={approval.payload} />
           )}
+          <ApprovalEmailPreview token={approval.token} />
           <ApprovalResolveForm token={approval.token} onResolved={handleResolved} />
         </div>
       )}
