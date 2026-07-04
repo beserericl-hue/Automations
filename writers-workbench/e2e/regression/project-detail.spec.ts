@@ -24,7 +24,7 @@ const TAB_MARKERS: Record<string, RegExp> = {
 test.describe('ProjectDetail — all tabs + controls', () => {
   test('every tab renders its content', async ({ page }) => {
     const wb = new WorkbenchPage(page);
-    const id = await wb.openProjectByTitle('');
+    const id = await wb.openProjectByTitle('The Last Signal');
     test.skip(!id, 'no projects available on DEV to open');
 
     for (const [tab, marker] of Object.entries(TAB_MARKERS)) {
@@ -39,7 +39,7 @@ test.describe('ProjectDetail — all tabs + controls', () => {
 
   test('Edit form opens and cancels without saving', async ({ page }) => {
     const wb = new WorkbenchPage(page);
-    const id = await wb.openProjectByTitle('');
+    const id = await wb.openProjectByTitle('The Last Signal');
     test.skip(!id, 'no projects available');
     const edit = page.getByRole('button', { name: 'Edit', exact: true }).first();
     await edit.click();
@@ -51,7 +51,7 @@ test.describe('ProjectDetail — all tabs + controls', () => {
 
   test('Export tab: dialog opens (or button correctly disabled when nothing approved)', async ({ page }) => {
     const wb = new WorkbenchPage(page);
-    const id = await wb.openProjectByTitle('');
+    const id = await wb.openProjectByTitle('The Last Signal');
     test.skip(!id, 'no projects available');
     await wb.openProjectTab('Export');
     const exportBtn = page.getByRole('button', { name: /Choose Page Size & Export/ });
@@ -72,7 +72,7 @@ test.describe('ProjectDetail — all tabs + controls', () => {
   test('Delete Project opens the confirm dialog and cancels (no delete)', async ({ page }) => {
     const wb = new WorkbenchPage(page);
     const rp = new RegressionPage(page);
-    const id = await wb.openProjectByTitle('');
+    const id = await wb.openProjectByTitle('The Last Signal');
     test.skip(!id, 'no projects available');
     const del = page.getByRole('button', { name: 'Delete Project' });
     await expect(del).toBeVisible({ timeout: 10_000 });
