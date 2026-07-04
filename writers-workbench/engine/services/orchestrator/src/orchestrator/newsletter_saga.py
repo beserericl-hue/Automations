@@ -183,6 +183,7 @@ class NewsletterSagaDriver:
                 "genre": cfg.get("genre") or None,
                 "newsletter_name": cfg.get("newsletter_name") or None,
             },
+            timeout_s=240.0,  # LLM story selection can exceed the 60s default
         )
         if out.status is StepStatus.ERROR:
             raise RuntimeError(f"pick step error: {out.error}")
@@ -216,6 +217,7 @@ class NewsletterSagaDriver:
                 "top_selected_stories": [s.model_dump(mode="json") for s in picked.top_selected_stories],
                 "feedback": feedback,
             },
+            timeout_s=240.0,  # LLM subject-line generation can exceed the 60s default
         )
         if out.status is StepStatus.ERROR:
             raise RuntimeError(f"subject step error: {out.error}")
@@ -248,18 +250,29 @@ class NewsletterSagaDriver:
         for story in picked.top_selected_stories:
             story_payload = story.model_dump(mode="json")
             sources = [a for a in articles if a.get("id") in story.identifiers]
-            scrape_out = await run_step_via_http(
-                _step("scrape"),
-                execution_id=execution_id,
-                payload={"urls": story.external_source_links},
-            )
-            # scrape failures are non-fatal — the segment can still be written from the source
-            # markdown alone, so we degrade to no scraped content rather than aborting the run.
-            scraped = [] if scrape_out.status is StepStatus.ERROR else (scrape_out.payload.get("scraped") or [])
+            # Scrape supplemental URLs. TRULY non-fatal: run_step_via_http RAISES on a timeout / 5xx
+            # (it does not return an ERROR status), so a slow or dead external URL — e.g. a survivalist
+            # blog that hangs — would otherwise crash the whole stage and the newsletter would never
+            # send. Catch everything here and degrade to no scraped content. Generous timeout because a
+            # story can carry several URLs, each up to the scrape step's 30s Firecrawl budget.
+            try:
+                scrape_out = await run_step_via_http(
+                    _step("scrape"),
+                    execution_id=execution_id,
+                    payload={"urls": story.external_source_links},
+                    timeout_s=150.0,
+                )
+                scraped = [] if scrape_out.status is StepStatus.ERROR else (scrape_out.payload.get("scraped") or [])
+            except Exception:
+                scraped = []
+            # Image + segment are LLM-backed and routinely exceed the 60s default; give them headroom so
+            # a normal-latency generation isn't misread as a timeout — a raised timeout here aborts the
+            # whole run (advance() moves the saga to ERROR), which was silently killing sends on DEV.
             image_out = await run_step_via_http(
                 _step("image"),
                 execution_id=execution_id,
                 payload={"story": story_payload, "scraped_images": []},
+                timeout_s=240.0,
             )
             if image_out.status is StepStatus.ERROR:
                 raise RuntimeError(f"image step error for {story.title!r}: {image_out.error}")
@@ -272,6 +285,7 @@ class NewsletterSagaDriver:
                     "sources": sources + scraped,
                     "image_options": image_out.payload.get("options") or [],
                 },
+                timeout_s=240.0,
             )
             # A failed segment must abort the run — silently appending the empty error payload
             # produced a blank newsletter body (5 empty segments) on an earlier DEV run.
@@ -329,6 +343,7 @@ class NewsletterSagaDriver:
             _step("assemble"),
             execution_id=execution_id,
             payload={"segments": st.get("segments_data") or [], "remaining_items": remaining},
+            timeout_s=240.0,  # LLM intro + roundup composition can exceed the 60s default
         )
         assembled = AssembledNewsletter.model_validate(out.payload)
         await self._advance(
@@ -371,6 +386,7 @@ class NewsletterSagaDriver:
                 "permalink_url": permalink_placeholder,
                 "send_date": send_date,
             },
+            timeout_s=180.0,  # Handlebars render via the Workbench HTTP endpoint — headroom over 60s
         )
         rendered = RenderedNewsletter.model_validate(out.payload)
         row = NewsletterSendRow(
@@ -426,6 +442,7 @@ class NewsletterSagaDriver:
                 "subject": subj.subject_line,
                 "permalink_url": st.get("permalink_placeholder", ""),
             },
+            timeout_s=240.0,  # Postal delivery fans out one email per subscriber — headroom over 60s
         )
         delivery = DeliveryResult.model_validate(out.payload)
         await self._advance(
