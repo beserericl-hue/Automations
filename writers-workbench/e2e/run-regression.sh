@@ -30,6 +30,7 @@ HEAVY=(
   regression/project-art.spec.ts
   regression/newsletter-generate.spec.ts
   regression/newsletter-send-full.spec.ts
+  regression/cover-art-content.spec.ts
 )
 
 # Light = every other regression spec (computed so new light specs are picked up automatically).
