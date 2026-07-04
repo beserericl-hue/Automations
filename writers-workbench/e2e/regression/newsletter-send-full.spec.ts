@@ -46,7 +46,7 @@ test.describe('Newsletter FULL send (data path)', () => {
     // ── 2) Approve all three HITL gates from the Approval detail screen ────────
     // The gates fire in sequence (stories → subject → image); each time, the ONLY open approval
     // for this execution is the current gate. Approve whichever is open, three times.
-    const GATE_TIMEOUTS = [90_000, 90_000, 300_000]; // image gate waits on engine segments + image proposals
+    const GATE_TIMEOUTS = [120_000, 120_000, 600_000]; // image gate waits on 5 sequential segment+image builds
     for (let gate = 0; gate < 3; gate++) {
       let token: string | null = null;
       const deadline = Date.now() + GATE_TIMEOUTS[gate];
