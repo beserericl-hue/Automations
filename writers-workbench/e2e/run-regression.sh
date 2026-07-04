@@ -29,6 +29,7 @@ HEAVY=(
   regression/brainstorm-submit.spec.ts
   regression/project-art.spec.ts
   regression/newsletter-generate.spec.ts
+  regression/newsletter-send-full.spec.ts
 )
 
 # Light = every other regression spec (computed so new light specs are picked up automatically).
