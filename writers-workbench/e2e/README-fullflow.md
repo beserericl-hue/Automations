@@ -1,5 +1,18 @@
 # Newsletter Full-flow + Sprint Regression E2E
 
+## Authoritative per-screen coverage — `regression/all-screens-smoke.spec.ts`
+
+Every route in `client/src/App.tsx` has one from-the-screen test here (52 tests) so no
+screen ships untested (the gap that let the character-drift annotations screen ship
+without a test). Detail-page IDs are resolved at runtime from DEV via the service key.
+General PASS = the screen's anchor element is visible and the URL is the intended route;
+FAIL = anchor missing, crash/ErrorBoundary, or an unintended `*`→`/` redirect. Screens
+covered: login, signup, forgot/reset password, onboarding, dashboard, projects, project
+detail (+9 tabs), story bible, trash, content library, content detail (editor +
+annotations), image detail, image gallery, research list/detail, brainstorm, outlines,
+story arcs, genres, cost, sources, settings, credits, admin (+7 tabs), superuser (+3 tabs),
+and all 16 newsletter screens. Runs in Pass A of `run-regression.sh` automatically.
+
 Two Playwright specs added in this PR:
 
 - `e2e/newsletter-fullflow.spec.ts` — automated coverage of the 13 sections of [`writers-workbench/docs/newsletter-test.md`](../docs/newsletter-test.md) (the 114-test manual plan).
