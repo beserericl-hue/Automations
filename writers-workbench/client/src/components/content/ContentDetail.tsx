@@ -15,6 +15,7 @@ import ProvenancePanel from './ProvenancePanel';
 import RewriteWithResearchModal from './RewriteWithResearchModal';
 import { useToast } from '../../contexts/ToastContext';
 import { useChapterRepair } from '../../hooks/useChapterRepair';
+import { useImageGenerator } from '../../hooks/useImageGenerator';
 import type { PublishedContent, GeneratedImage } from '../../types/database';
 
 export default function ContentDetail() {
@@ -241,6 +242,53 @@ export default function ContentDetail() {
     coverImageMutation.mutate(image.storage_path);
   };
 
+  // Cover-art generation — same flow as the book-outline "Generate Cover Art" (modal prompt →
+  // image pipeline → generated_images_v2). Works for chapters, blog posts, and short stories.
+  // After generating, the new cover_art image is set as THIS content's cover so it displays.
+  const coverGen = useImageGenerator();
+  const coverGenState = coverGen.stateOf('content-cover');
+  const coverGenBusy = coverGenState === 'submitting' || coverGenState === 'polling' || coverGenState === 'saving';
+  const [coverModalOpen, setCoverModalOpen] = useState(false);
+  const [coverPrompt, setCoverPrompt] = useState('');
+  const defaultCoverPrompt = () => {
+    const kind = (item?.content_type || 'story').replace('_', ' ');
+    const genre = item?.genre_slug ? `${item.genre_slug.replace(/-/g, ' ')} ` : '';
+    return `A striking ${genre}cover image for the ${kind} "${item?.title ?? ''}". Editorial, high detail, no text.`;
+  };
+  const handleGenerateCover = async () => {
+    const startIso = new Date(Date.now() - 5000).toISOString();
+    const ok = await coverGen.generate('content-cover', {
+      prompt: coverPrompt.trim(),
+      projectId: item?.project_id ?? undefined,
+      genreSlug: item?.genre_slug ?? undefined,
+      title: item?.title,
+      imageType: 'cover_art',
+    });
+    setCoverModalOpen(false);
+    if (!ok) { addToast('Cover art generation failed — try again.', 'error'); return; }
+    // The pipeline saved the image before resolving; find it and set it as this content's cover.
+    try {
+      let q = supabase
+        .from('generated_images_v2')
+        .select('storage_path')
+        .eq('image_type', 'cover_art')
+        .gte('created_at', startIso)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      q = item?.project_id ? q.eq('project_id', item.project_id) : q.eq('user_id', userId!);
+      const { data } = await q;
+      const path = (data?.[0] as { storage_path?: string } | undefined)?.storage_path;
+      if (path) {
+        coverImageMutation.mutate(path);
+        addToast('Cover art generated and applied.', 'success');
+      } else {
+        addToast('Cover art generated — pick it from the gallery.', 'success');
+      }
+    } catch {
+      addToast('Cover art generated — pick it from the gallery.', 'success');
+    }
+  };
+
   const handleDeleteClick = async () => {
     // Get cascade count (content versions)
     const { count } = await supabase
@@ -402,6 +450,13 @@ export default function ContentDetail() {
           />
           <div className="absolute bottom-2 right-2 flex gap-1">
             <button
+              onClick={() => { setCoverPrompt(defaultCoverPrompt()); setCoverModalOpen(true); }}
+              disabled={coverGenBusy}
+              className="rounded bg-black/60 px-2 py-1 text-xs text-white hover:bg-black/80 disabled:opacity-60"
+            >
+              {coverGenBusy ? 'Generating…' : 'Generate Cover Art'}
+            </button>
+            <button
               onClick={() => setShowImagePicker(true)}
               className="rounded bg-black/60 px-2 py-1 text-xs text-white hover:bg-black/80"
             >
@@ -422,11 +477,52 @@ export default function ContentDetail() {
           </svg>
           <span className="text-sm text-gray-500">No cover image</span>
           <button
+            onClick={() => { setCoverPrompt(defaultCoverPrompt()); setCoverModalOpen(true); }}
+            disabled={coverGenBusy}
+            className="ml-auto rounded bg-fuchsia-600 px-2 py-1 text-xs font-medium text-white hover:bg-fuchsia-700 disabled:opacity-60"
+          >
+            {coverGenBusy ? 'Generating…' : 'Generate Cover Art'}
+          </button>
+          <button
             onClick={() => setShowImagePicker(true)}
-            className="ml-auto rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
+            className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
           >
             Choose from Gallery
           </button>
+        </div>
+      )}
+
+      {/* Cover-art prompt modal — edit the prompt before generating (same as the book-outline flow). */}
+      {coverModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setCoverModalOpen(false)}>
+          <div className="w-full max-w-lg rounded-lg bg-white dark:bg-gray-900 p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Generate cover art</h3>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Edit the image prompt, then generate. The result is added to the Art gallery and set as this cover.
+            </p>
+            <textarea
+              value={coverPrompt}
+              onChange={(e) => setCoverPrompt(e.target.value)}
+              rows={5}
+              className="mt-3 w-full rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+              placeholder="Describe the cover art…"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setCoverModalOpen(false)}
+                className="rounded-lg px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={coverGenBusy || !coverPrompt.trim()}
+                onClick={handleGenerateCover}
+                className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              >
+                {coverGenBusy ? 'Generating…' : 'Generate'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

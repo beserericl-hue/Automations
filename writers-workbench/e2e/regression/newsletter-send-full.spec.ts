@@ -73,13 +73,17 @@ test.describe('Newsletter FULL send (data path)', () => {
         .toBe('approve');
     }
 
-    // ── 3) DATA CREATED: a send row for this run with real content ────────────
+    // ── 3) DATA CREATED: the send row for this run with real content ──────────
+    // The persist step UPSERTs on (edition_id, send_date), so a re-send for the same day updates
+    // ONE row in place — created_at stays old. Match by send_date=today and assert THIS run
+    // updated it (updated_at >= start) with rendered html.
+    const today = new Date().toISOString().slice(0, 10);
     let send: { id: string; subject: string; html_body: string | null; status: string; provider_message_id: string | null } | undefined;
     await expect
       .poll(async () => {
         const rows = await supaGet<typeof send>(
           'newsletter_sends_v2',
-          `edition_id=eq.${EDITION}&created_at=gte.${encodeURIComponent(startIso)}&select=id,subject,html_body,status,provider_message_id&order=created_at.desc&limit=1`,
+          `edition_id=eq.${EDITION}&send_date=eq.${today}&updated_at=gte.${encodeURIComponent(startIso)}&select=id,subject,html_body,status,provider_message_id&limit=1`,
         ).catch(() => []);
         send = rows[0];
         return !!(send && send.html_body && send.subject);
