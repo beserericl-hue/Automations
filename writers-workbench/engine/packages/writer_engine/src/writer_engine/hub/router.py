@@ -493,25 +493,59 @@ def _retrieve_intent_params(message: str) -> dict[str, Any] | None:
     return params
 
 
+# Words that look like a title match but are NOT a project (platforms + generic nouns). A social
+# post "for social media" / "for LinkedIn" must not be mistaken for a project named that.
+_NON_TITLE_WORDS = set(_SOCIAL_PLATFORMS) | {
+    "this", "that", "it", "content", "social media", "social", "media",
+    "the newsletter", "our newsletter", "a newsletter", "newsletter", "the blog", "us",
+}
+
+
 def _social_params(message: str) -> dict[str, Any]:
-    """media.social-posts params (G7/G17): the platform(s) asked for + the inline content to repurpose.
-    'Repurpose this into LinkedIn posts: <text>' → platforms=[linkedin], summary=<text>."""
+    """media.social-posts params (G7/G17): the platform(s) asked for + the project + what the post is about.
+
+    Handles BOTH the canonical 'Repurpose <project> for social media' AND natural phrasings a real user
+    types, e.g. 'write a social media post for The Last Signal introducing our newsletter'. Without this,
+    the natural phrasing extracted no project (posts persisted with project_id=NULL → invisible in the
+    project's Social tab) and no content (the generator fell back to a '(fixture)' placeholder)."""
     low = message.lower()
     platforms = [v for k, v in _SOCIAL_PLATFORMS.items() if re.search(rf"\b{k}\b", low)]
-    # de-dup, preserve order
     platforms = list(dict.fromkeys(platforms)) or ["twitter", "linkedin"]
     params: dict[str, Any] = {"platforms": platforms}
     im = _INLINE_CONTENT.search(message)
     if im and len(im.group(1).strip()) > 20:
         params["summary"] = im.group(1).strip()
-    # project/content title so the persisted posts link to the right project's Social tab, e.g.
-    # "Repurpose The Last Signal for social media" / 'repurpose "X" into twitter posts'.
+
+    # ---- project title -------------------------------------------------------------------------
+    # 1) 'repurpose <title> for|into|to|on …'   2) '(social) post(s)/content for|about <title> …'
+    title: str | None = None
     tm = re.search(r'\brepurpose\s+(?:the\s+)?["“]?(.+?)["”]?\s+(?:for|into|to|on)\b', message, re.I)
     if tm:
-        title = tm.group(1).strip(" \"“”")
-        if title.lower() not in {"this", "that", "it", "content"} and len(title) > 2:
+        title = tm.group(1)
+    if title is None:
+        pm = re.search(
+            r'\b(?:posts?|content|blurb|announcement)\s+(?:for|about)\s+(?:the\s+)?["“]?(.+?)["”]?'
+            r'(?:\s+(?:introducing|announcing|about|regarding|promoting|to\s+promote|on|—|-|:)\b|["”]?\s*[.!?]?\s*$)',
+            message, re.I)
+        if pm:
+            title = pm.group(1)
+    if title:
+        title = title.strip(" \"“”.,")
+        if title.lower() not in _NON_TITLE_WORDS and len(title) > 2:
             params["project_title"] = title
-            params.setdefault("summary", title)
+
+    # ---- what the post is about (topic) → summary, so the generator has REAL content -----------
+    if "summary" not in params:
+        topic = re.search(
+            r'\b(?:introducing|announcing|about|regarding|promoting|to\s+promote|to\s+announce)\s+(.+?)[.!?\s]*$',
+            message, re.I)
+        if topic and len(topic.group(1).strip()) > 2:
+            t = topic.group(1).strip(" .\"“”")
+            # Compose with the project so the LLM writes a relevant post, not a generic one.
+            params["summary"] = f"A social post about {t} for '{params['project_title']}'." if params.get(
+                "project_title") else f"A social post about {t}."
+        elif params.get("project_title"):
+            params["summary"] = params["project_title"]
     return params
 
 

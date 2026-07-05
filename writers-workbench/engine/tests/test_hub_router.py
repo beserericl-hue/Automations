@@ -504,3 +504,24 @@ def test_email_me_the_blog_is_not_a_blog_write() -> None:
     # "email me the blog" must stay email-content, not get stolen by the blog-write override.
     d = _route("email me the blog post about Rome")
     assert d.tool == "library" and d.op == "email-content"
+
+
+def test_social_params_natural_phrasing_extracts_project_and_topic() -> None:
+    """Regression: a real user's phrasing (no 'repurpose' keyword) must still resolve the project and
+    give the generator real content — otherwise posts persist with project_id=NULL (invisible in the
+    project Social tab) and the generator falls back to a '(fixture)' placeholder. See media_step bug
+    2026-07-05."""
+    from writer_engine.hub.router import _social_params
+
+    p = _social_params("write a social media post for the last signal introducing our newsletter")
+    assert (p.get("project_title") or "").lower() == "last signal"
+    assert p.get("summary") and "fixture" not in p["summary"].lower()
+    assert len(p["summary"]) > 5
+
+    # Platform-only ask must NOT invent a project named "social media" / a platform.
+    q = _social_params("make a twitter post for social media")
+    assert q.get("project_title") is None
+
+    # Canonical 'repurpose' phrasing still works.
+    r = _social_params("Repurpose The Last Signal for social media")
+    assert (r.get("project_title") or "").lower() == "last signal"

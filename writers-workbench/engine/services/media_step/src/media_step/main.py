@@ -232,7 +232,8 @@ async def _persist_social_posts(payload: dict, posts: dict) -> dict | None:
                 client, user_id=str(user_id), title=str(payload["project_title"]))
         rows = [{"user_id": str(user_id), "project_id": project_id, "platform": p,
                  "post_text": t.strip(), "status": "draft"}
-                for p, t in posts.items() if p in _VALID_SOCIAL and str(t).strip()]
+                for p, t in posts.items()
+                if p in _VALID_SOCIAL and str(t).strip() and not str(t).lstrip().startswith("(fixture)")]
         if not rows:
             return {"persisted": False, "reason": "no valid-platform posts to save"}
         await client.table("social_posts_v2").insert(rows).execute()
@@ -243,20 +244,34 @@ async def _persist_social_posts(payload: dict, posts: dict) -> dict | None:
 
 async def _op_social_posts(payload: dict) -> dict:
     platforms = list(payload.get("platforms") or ["twitter", "linkedin"])
-    summary = str(payload.get("summary") or payload.get("title") or "")
-    router = get_router(service=STEP_NAME)
-    try:
-        resp = await router.complete(
-            provider="anthropic",
-            model=get_settings().model_cheap,
-            system=_social_system(),
-            prompt=f"WORK:\n{summary}\n\nPLATFORMS: {', '.join(platforms)}\nReturn JSON only.",
-            max_tokens=1200,
-        )
-        data = json.loads(extract_json(resp.text))
-        posts = {p: str(data.get(p, "")) for p in platforms}
-    except (ProviderNotRegistered, json.JSONDecodeError, ValueError):
-        posts = {p: f"(fixture) social post for {p}: {summary[:60]}" for p in platforms}
+    summary = str(payload.get("summary") or payload.get("title") or "").strip()
+    posts: dict[str, str] = {}
+    # An empty WORK yields garbage — don't even call the model; treat as "no content".
+    if len(summary) >= 3:
+        router = get_router(service=STEP_NAME)
+        try:
+            resp = await router.complete(
+                provider="anthropic",
+                model=get_settings().model_cheap,
+                system=_social_system(),
+                prompt=f"WORK:\n{summary}\n\nPLATFORMS: {', '.join(platforms)}\nReturn JSON only.",
+                max_tokens=1200,
+            )
+            data = json.loads(extract_json(resp.text))
+            posts = {p: str(data.get(p, "")).strip() for p in platforms}
+        except (ProviderNotRegistered, json.JSONDecodeError, ValueError):
+            posts = {}
+    # A real post needs real content. If we have none, DON'T persist a placeholder or report success —
+    # the old code saved a "(fixture) social post…" row (with project_id NULL) and the chat told the user
+    # it was "finished, in the content library." Surface an actionable error instead.
+    if not any(posts.values()):
+        return {
+            "error": "insufficient_context",
+            "message": (
+                "I couldn't generate a social post — tell me which project and what the post is about, e.g. "
+                "\"Write a LinkedIn post for The Last Signal introducing our newsletter.\""
+            ),
+        }
     persisted = await _persist_social_posts(payload, posts)
     return {**posts, "persist": persisted}
 
@@ -298,11 +313,22 @@ async def handler(inp: StepInput) -> StepOutput:
             status=StepStatus.ERROR,
             error={"code": "UNKNOWN_OP", "message": op},  # type: ignore[arg-type]
         )
+    result = await OPS[op](inp.payload)
+    # An op that couldn't produce a real deliverable returns {"error": …}; surface it as a step ERROR so
+    # the hub/UI reports "couldn't generate" instead of "finished" for a post that was never created.
+    if isinstance(result, dict) and result.get("error"):
+        return StepOutput(
+            execution_id=inp.execution_id,
+            step_name=STEP_NAME,
+            status=StepStatus.ERROR,
+            error={"code": str(result.get("error")),  # type: ignore[arg-type]
+                   "message": str(result.get("message") or result.get("error"))},
+        )
     return StepOutput(
         execution_id=inp.execution_id,
         step_name=STEP_NAME,
         status=StepStatus.OK,
-        payload={"op": op, "result": await OPS[op](inp.payload)},
+        payload={"op": op, "result": result},
     )
 
 
