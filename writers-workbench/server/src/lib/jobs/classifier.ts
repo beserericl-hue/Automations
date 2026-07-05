@@ -99,7 +99,9 @@ const RULES: Rule[] = [
     jobType: 'write_blog',
   },
   {
-    test: /\b(write\s+)?newsletter\b/i,
+    // Require an action verb so a topic-mention ("…introducing our newsletter") doesn't get
+    // mis-classified as a newsletter WRITE (that stole social/blog posts before).
+    test: /\b(write|create|compose|draft|generate|build|send|prepare|put\s+together)\s+(?:me\s+|a\s+|the\s+|this\s+week'?s?\s+|next\s+|our\s+)*newsletter\b/i,
     tier: 'medium',
     jobType: 'write_newsletter',
   },
@@ -110,12 +112,14 @@ const RULES: Rule[] = [
   },
   // ---------- background: assets / analytics / side effects ----------
   {
-    test: /\b(cover\s+art|generate\s+cover)\b/i,
+    // Canonical "cover art" + natural "make/design/create a (book) cover".
+    test: /\b(cover\s+art|generate\s+cover|(?:make|design|create|generate)\s+(?:me\s+)?(?:a\s+)?(?:book\s+)?cover)\b/i,
     tier: 'background',
     jobType: 'cover_art',
   },
   {
-    test: /\brepurpose\b.*\bsocial\b/i,
+    // Canonical "repurpose … social" + natural "(write|make|create) a social (media) post".
+    test: /\brepurpose\b.*\bsocial\b|\bsocial\s+(?:media\s+)?posts?\b|\b(?:tweet|linkedin|facebook|instagram)\s+post\b/i,
     tier: 'background',
     jobType: 'repurpose_social',
   },

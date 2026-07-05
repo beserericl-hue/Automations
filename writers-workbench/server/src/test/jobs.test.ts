@@ -119,6 +119,22 @@ describe('classifyJob', () => {
     expect(c.jobType).toBe('chat_generic');
   });
 
+  // Natural-phrasing regression (2026-07-05): a real user doesn't type the canonical command.
+  it.each([
+    // A social ask that mentions "newsletter" as a TOPIC must NOT be stolen by the newsletter rule.
+    ['write a social media post for The Last Signal introducing our newsletter', 'repurpose_social'],
+    ['create a linkedin post for The Last Signal', 'repurpose_social'],
+    ['Repurpose The Last Signal for social media', 'repurpose_social'],
+    // Natural cover-art phrasings.
+    ['make a book cover for The Last Signal', 'cover_art'],
+    ['design a cover for The Last Signal', 'cover_art'],
+    // Newsletter WRITE still requires an action verb; a topic-mention doesn't trigger it.
+    ["put together this week's newsletter", 'write_newsletter'],
+    ['write a blog post about our newsletter launch', 'write_blog'],
+  ])('natural phrasing %s -> %s', (msg, jobType) => {
+    expect(classifyJob(msg).jobType).toBe(jobType);
+  });
+
   it('assigns BullMQ priority matching the tier', () => {
     expect(classifyJob('list drafts').priority).toBe(PRIORITY_BY_TIER.sync);
     expect(classifyJob('write chapter 2').priority).toBe(PRIORITY_BY_TIER.heavy);

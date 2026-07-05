@@ -8,6 +8,25 @@ import CreditExhaustionModal from '../credits/CreditExhaustionModal';
 
 type JobStatus = 'queued' | 'active' | 'completed' | 'failed';
 
+// Where each kind of job's result actually lands, so the completion message points the user to the
+// right place instead of always saying "Content Library" (social posts go to a project's Social tab,
+// cover art to the Art gallery, etc.). Keyed by the classifier's jobType.
+function jobDestination(jobType?: string): string {
+  switch (jobType) {
+    case 'repurpose_social': return "the project's Social tab";
+    case 'cover_art': return 'the Art gallery (and the project)';
+    case 'research_report': return 'your Research reports';
+    case 'brainstorm_story':
+    case 'edit_outline': return 'your Outlines (and the project)';
+    case 'write_newsletter': return 'Newsletter → Pending approvals';
+    case 'format_kindle': return 'your downloads (Export)';
+    case 'write_chapter':
+    case 'write_short_story':
+    case 'write_blog':
+    default: return 'your Content Library';
+  }
+}
+
 interface Message {
   role: 'user' | 'assistant';
   content: string;
@@ -172,7 +191,7 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
             jobStatus: detail.status,
             content:
               detail.status === 'completed'
-                ? 'Done — results are in your Content Library.'
+                ? `Done — results are in ${jobDestination(m.jobType)}.`
                 : detail.status === 'failed'
                   ? `Job failed: ${detail.error || 'unknown error'}`
                   : m.content,
@@ -212,7 +231,7 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
           setMessages((prev) => prev.map((m) => (m.jobId === jobId ? {
             ...m, jobStatus: st,
             content: st === 'completed'
-              ? 'Done — results are in your Content Library (and emailed to you).'
+              ? `Done — results are in ${jobDestination(m.jobType)} (and emailed to you).`
               : st === 'failed' ? `Job failed: ${j.error || 'unknown error'}` : m.content,
           } : m)));
         } catch {
