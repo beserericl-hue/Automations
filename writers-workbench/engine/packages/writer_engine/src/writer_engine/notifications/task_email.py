@@ -209,6 +209,13 @@ async def send_task_completion_email(tool: str, body: dict, result: dict | None)
     Best-effort and opt-out-able (``body['notify'] is False``)."""
     if tool not in _EMAIL_TOOLS or not result or body.get("notify") is False:
         return False
+    # Don't email the user for E2E-fixture projects. The regression suite runs chapter.write etc.
+    # against disposable projects titled "E2E …" (e.g. "E2E Write 1783…"), which are intentionally
+    # tiny (a single-sub-chapter outline for speed) — a real user shouldn't get "Chapter 1 … ready"
+    # mails for those 1,300-word test artifacts. Real projects are never named this way.
+    _title = str(body.get("title") or body.get("project_title") or body.get("project") or "")
+    if _title[:4].lower() == "e2e ":
+        return False
     settings = get_settings()
     if not (settings.supabase_url and settings.supabase_service_role_key):
         return False
