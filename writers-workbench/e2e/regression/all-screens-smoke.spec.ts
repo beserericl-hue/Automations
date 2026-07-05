@@ -296,6 +296,9 @@ test.describe('Newsletter screens', () => {
     await expectScreen(page, page.getByRole('heading', { name: /Email preview/i }));
     const preview = page.frameLocator('iframe[title="Approval email preview"]');
     await expect(preview.getByText(/Wasteland Wire/i).first()).toBeVisible({ timeout: 20_000 });
+    // No phantom logo/stamp image when the edition has no stamp_url — a broken <img> (the old
+    // /static/logos/courseworx-stamp-black.png fallback) must never render.
+    await expect(preview.locator('img[alt*="stamp" i]')).toHaveCount(0);
   });
 
   test('Scheduled sends /newsletter/sends', async ({ page }) => {
