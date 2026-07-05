@@ -37,16 +37,25 @@ test.describe('Social repurpose (data path)', () => {
 
     const input = page.getByPlaceholder('Type a message...');
     await expect(input).toBeVisible({ timeout: 10_000 });
-    await input.fill('Repurpose The Last Signal for social media');
+    // Use a REAL user's natural phrasing — NOT the canonical "repurpose … for" happy path. This is the
+    // exact input that shipped orphaned "(fixture)" posts (bug 2026-07-05).
+    await input.fill('write a social media post for The Last Signal introducing our newsletter');
     await input.press('Enter');
 
-    // DATA CREATED: new social_posts_v2 rows for the project (engine job is async).
+    // DATA CREATED: new social_posts_v2 rows for THE PROJECT (project_id resolved from the title, not NULL).
     await expect
-      .poll(async () => (await supaGet<{ id: string }>(
+      .poll(async () => (await supaGet<{ id: string; post_text: string }>(
         'social_posts_v2',
-        `project_id=eq.${PROJECT_ID}&created_at=gte.${encodeURIComponent(startIso)}&select=id`,
-      ).catch(() => [])).length, { timeout: 5 * 60_000, message: 'no social_posts_v2 rows created after the chat repurpose command' })
+        `project_id=eq.${PROJECT_ID}&created_at=gte.${encodeURIComponent(startIso)}&select=id,post_text`,
+      ).catch(() => [])).length, { timeout: 5 * 60_000, message: 'no project-linked social_posts_v2 rows created after the chat command' })
       .toBeGreaterThan(0);
+
+    // And the content must be REAL — never a "(fixture)" placeholder.
+    const created = await supaGet<{ post_text: string }>(
+      'social_posts_v2',
+      `project_id=eq.${PROJECT_ID}&created_at=gte.${encodeURIComponent(startIso)}&select=post_text`,
+    ).catch(() => []);
+    expect(created.some((r) => (r.post_text || '').startsWith('(fixture)')), 'no fixture placeholder posts').toBe(false);
 
     // DATA DISPLAYED: the project's Social tab shows posts (count grew and text renders).
     await page.goto(`/projects/${PROJECT_ID}?tab=social`, { waitUntil: 'domcontentloaded' });
