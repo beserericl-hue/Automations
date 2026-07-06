@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import unicodedata
 from typing import Any
 from uuid import uuid4
 
@@ -1455,6 +1456,12 @@ def _edit_distance(a: str, b: str) -> int:
     return prev[-1]
 
 
+def _deaccent(s: str) -> str:
+    """Strip diacritics (NFKD → drop combining marks): 'Tomás' → 'Tomas', 'José' → 'Jose'. Used so the
+    drift scanner's ASCII tokeniser doesn't split accented names into unusably short fragments."""
+    return "".join(ch for ch in unicodedata.normalize("NFKD", s) if not unicodedata.combining(ch))
+
+
 def _character_name_consistency(text: str, roster: list[dict]) -> dict:
     """Deterministic character-name cross-check (R119): which roster names appear, and any capitalized
     word in the prose that is a near-miss of a roster name (a likely rename, e.g. Mara→Meara).
@@ -1469,14 +1476,19 @@ def _character_name_consistency(text: str, roster: list[dict]) -> dict:
     ``consistent`` reflects RENAMES only — a roster character simply not appearing in one chapter is not
     an inconsistency (names_missing is still reported, for information)."""
     roster_full = [str(c.get("name") or "").strip() for c in roster if str(c.get("name") or "").strip()]
-    roster_tokens = {t.lower() for n in roster_full for t in re.findall(r"[A-Za-z]{4,}", n)}
-    low = text.lower()
-    present = [n for n in roster_full if n and re.search(rf"\b{re.escape(n.split()[0].lower())}\b", low)]
+    # De-accent before tokenising: "Tomás" → "Tomas" (a 5-char token). Without this the accented "á"
+    # split the name into "Tom"+"s" (both < 4 chars → no token), so the scanner was BLIND to any
+    # accented character — a real drift like "Thomas" for canonical "Tomás" went uncaught.
+    roster_tokens = {t.lower() for n in roster_full for t in re.findall(r"[A-Za-z]{4,}", _deaccent(n))}
+    low = _deaccent(text).lower()
+    present = [n for n in roster_full if n and re.search(rf"\b{re.escape(_deaccent(n.split()[0]).lower())}\b", low)]
     missing = [n for n in roster_full if n not in present]
     from collections import Counter
 
     renames: list[dict] = []
     seen: set[str] = set()
+    # Candidates come from the ORIGINAL text (an ASCII-only regex, so a "found" word stays a real span
+    # for Apply Fix); we only de-accent the roster tokens they're compared against.
     for w in Counter(re.findall(r"\b[A-Z][a-z]{3,}\b", text)):  # >= 4-letter capitalised words only
         wl = w.lower()
         if wl in seen or wl in roster_tokens or wl in _NAME_STOP:

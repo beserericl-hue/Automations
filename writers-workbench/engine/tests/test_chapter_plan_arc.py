@@ -138,6 +138,18 @@ def test_character_name_consistency_clean_when_names_match():
     assert out["consistent"] is True and out["possible_renames"] == []
 
 
+def test_character_name_consistency_catches_accented_name_drift():
+    # Regression (2026-07-06): the ASCII tokeniser split "Tomás" into "Tom"+"s" (both < 4 chars) so an
+    # accented character was invisible to the scanner and a real drift ("Thomas") went uncaught.
+    roster = [{"name": "Tomás Reyes"}, {"name": "Mara Voss"}]
+    text = "Tomás led the way. Much later, Thomas paused at the ridge. Mara followed."
+    out = ch._character_name_consistency(text, roster)
+    assert out["consistent"] is False
+    assert any(r["found"] == "Thomas" for r in out["possible_renames"])
+    # The canonical accented name still registers as present (de-accented match).
+    assert "Tomás Reyes" in out["names_present"]
+
+
 def test_write_auto_plan_guard_plans_not_writes(monkeypatch):
     outline = {"story_arc_name": "X", "chapters": [{"chapter_number": 3, "title": "C", "beat": "c"}]}
 
