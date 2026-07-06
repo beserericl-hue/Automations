@@ -744,6 +744,71 @@ contentActionsRouter.post('/:id/repair', async (req: Request, res: Response) => 
   }
 });
 
+// Rewrite a chapter to FIX its Q/A findings. Unlike /:id/repair (generic drift repair), this reads
+// the chapter's Q/A Consistency Report and threads the flagged checks + their suggestions into the
+// rewrite as style directives, so the one-click rewrite targets exactly what the report flagged
+// (e.g. "No flat paragraphs: rewrite so Mara's attention to the peeling tape is the entry point…").
+// Reuses chapter.repair (line-edit + drift correction + re-QA + re-persist). Async → engine job id.
+contentActionsRouter.post('/:id/rewrite-to-fix-qa', async (req: Request, res: Response) => {
+  const userId = req.userId;
+  if (!userId) {
+    res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED' } });
+    return;
+  }
+  const id = String(req.params.id);
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data: chapter, error } = await supabase
+      .from('published_content_v2')
+      .select('id, user_id, chapter_number, content_type, project_id, metadata')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (error || !chapter) {
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Chapter not found' } });
+      return;
+    }
+    if (chapter.content_type !== 'chapter') {
+      res.status(400).json({ success: false, error: { code: 'NOT_A_CHAPTER', message: 'Q/A fix targets chapters' } });
+      return;
+    }
+    const meta = (chapter.metadata ?? {}) as Record<string, unknown>;
+    const report = (meta.qa_report ?? meta.last_qa_report ?? {}) as { checks?: Array<{ name?: string; status?: string; details?: string }> };
+    const flagged = (Array.isArray(report.checks) ? report.checks : []).filter(
+      (c) => c && c.status && String(c.status).toUpperCase() !== 'PASS',
+    );
+    const directive = flagged.length
+      ? `Fix these Q/A findings without changing the plot, roster, or outline. ${flagged
+          .map((c) => `${c.name ?? 'issue'}: ${c.details ?? ''}`.trim())
+          .join(' | ')}`
+      : 'Strengthen every paragraph — remove flat/expository prose, sharpen imagery and dialogue, keep the plot and roster identical.';
+
+    const job = await callEngineWriteTool('chapter', {
+      op: 'repair',
+      project_id: chapter.project_id,
+      chapter_number: chapter.chapter_number,
+      user_id: userId,
+      research_focus: '',
+      style_directives: directive,
+      use_qa_report: true,
+      persist: true,
+      async: true,
+    });
+    logger.info(
+      { userId, contentId: id, jobId: job.job_id, flagged: flagged.length },
+      'content-actions: rewrite-to-fix-qa queued via engine',
+    );
+    res.status(202).json({ success: true, jobId: job.job_id, engineJob: true, status: job.status ?? 'queued' });
+  } catch (err) {
+    logger.error({ err, userId, contentId: id }, 'content-actions: rewrite-to-fix-qa failed');
+    res.status(502).json({
+      success: false,
+      error: { code: 'ENGINE_UNREACHABLE', message: err instanceof Error ? err.message : 'Engine error' },
+    });
+  }
+});
+
 const LifecycleSchema = z.object({
   action: z.enum(['approve', 'publish', 'reject', 'schedule', 'unschedule', 'draft']),
   schedule_date: z.string().optional(),

@@ -44,6 +44,26 @@ export default function QAReportPanel({ metadata, contentId, contentTitle, chapt
     await jobQueue.enqueue('qa', message, [['content-detail', contentId]]);
   }
 
+  // One-click "Rewrite to fix Q/A": queues a chapter rewrite that targets the flagged checks. The
+  // chapter refetches when the engine job completes (trackJob polls /api/jobs/engine/:id).
+  const fixState = jobQueue.stateOf('qa-fix');
+  const fixRunning = fixState === 'queued';
+  async function fixQA() {
+    if (fixRunning) return;
+    const { data: s } = await supabase.auth.getSession();
+    const token = s?.session?.access_token;
+    try {
+      const res = await fetch(`/api/content/${contentId}/rewrite-to-fix-qa`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      const body = (await res.json()) as { jobId?: string };
+      if (body.jobId) jobQueue.trackJob('qa-fix', body.jobId, [['content-detail', contentId]]);
+    } catch {
+      /* button re-enables on next render */
+    }
+  }
+
   if (!report || !report.checks?.length) {
     return (
       <div className="rounded-lg border border-gray-200 px-4 py-3 dark:border-gray-700">
@@ -101,6 +121,16 @@ export default function QAReportPanel({ metadata, contentId, contentTitle, chapt
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {!allPass && (
+            <button
+              onClick={(e) => { e.stopPropagation(); void fixQA(); }}
+              disabled={fixRunning}
+              title="Rewrite this chapter to address the flagged Q/A findings — queues in the background"
+              className="rounded px-2 py-1 text-[10px] font-medium bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50"
+            >
+              {fixRunning ? 'Rewriting…' : 'Rewrite to fix Q/A'}
+            </button>
+          )}
           <button
             onClick={(e) => { e.stopPropagation(); void runQACheck(); }}
             disabled={qaRunning}
@@ -120,6 +150,11 @@ export default function QAReportPanel({ metadata, contentId, contentTitle, chapt
       {qaRunning && (
         <div className="px-4 py-2 text-xs text-green-600 dark:text-green-400 border-t border-gray-200 dark:border-gray-700 bg-green-50 dark:bg-green-950/20">
           Q/A re-check queued — results will refresh when it finishes.
+        </div>
+      )}
+      {fixRunning && (
+        <div className="px-4 py-2 text-xs text-brand-700 dark:text-brand-300 border-t border-gray-200 dark:border-gray-700 bg-brand-50 dark:bg-brand-950/20">
+          Rewrite-to-fix-Q/A queued — the chapter (and its Q/A report) refresh when it finishes (~2–4 min).
         </div>
       )}
 

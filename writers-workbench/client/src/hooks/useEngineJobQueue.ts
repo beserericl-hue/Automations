@@ -62,6 +62,13 @@ export function useEngineJobQueue(userId: string | undefined) {
     [userId, finish],
   );
 
+  /** Track an engine job created by a dedicated endpoint (returns a job_id directly, not via a hub
+   *  command) so it gets the same background poll + query invalidation as enqueue(). */
+  const trackJob = useCallback((key: string, jobId: string, invalidate: QueryKey[] = []) => {
+    invalidateRef.current[key] = invalidate;
+    setJobs((prev) => ({ ...prev, [key]: { state: 'queued', jobId } }));
+  }, []);
+
   /** Manually drop a tracked job (e.g. to dismiss an error and re-enable the button). */
   const clear = useCallback((key: string) => {
     delete invalidateRef.current[key];
@@ -108,5 +115,5 @@ export function useEngineJobQueue(userId: string | undefined) {
 
   const stateOf = useCallback((key: string): QueuedJobState | undefined => jobs[key]?.state, [jobs]);
 
-  return { jobs, enqueue, clear, stateOf };
+  return { jobs, enqueue, trackJob, clear, stateOf };
 }

@@ -19,13 +19,14 @@ import { useToast } from '../../contexts/ToastContext';
 import type { WritingProject, PublishedContent, StoryBibleEntry, ResearchReport, GenreConfig, StoryArc, OutlineCharacter, OutlineChapter, ChapterOutline, SubChapter } from '../../types/database';
 import { normalizeOutlineChapter } from '../../types/database';
 
-const TABS = ['overview', 'outline', 'chapters', 'bible', 'art', 'social', 'research', 'cost', 'export'] as const;
+const TABS = ['overview', 'outline', 'chapters', 'qa', 'bible', 'art', 'social', 'research', 'cost', 'export'] as const;
 type Tab = typeof TABS[number];
 
 const tabLabels: Record<Tab, string> = {
   overview: 'Overview',
   outline: 'Outline',
   chapters: 'Chapters',
+  qa: 'Q/A',
   bible: 'Story Bible',
   art: 'Art',
   social: 'Social',
@@ -76,7 +77,7 @@ export default function ProjectDetail() {
   });
 
   // Chapters
-  type ChapterRow = Pick<PublishedContent, 'id' | 'title' | 'chapter_number' | 'status' | 'updated_at'> & { content_text: string | null };
+  type ChapterRow = Pick<PublishedContent, 'id' | 'title' | 'chapter_number' | 'status' | 'updated_at'> & { content_text: string | null; metadata?: Record<string, unknown> | null };
   const { data: chapters } = useQuery({
     queryKey: ['project-chapters', id, isImpersonating],
     queryFn: async () => {
@@ -92,12 +93,13 @@ export default function ProjectDetail() {
             status: c.status,
             updated_at: c.updated_at,
             content_text: c.content_text ?? null,
+            metadata: (c as { metadata?: Record<string, unknown> | null }).metadata ?? null,
           }) as ChapterRow)
           .sort((a, b) => (a.chapter_number ?? 0) - (b.chapter_number ?? 0));
       }
       const { data, error } = await supabase
         .from('published_content_v2')
-        .select('id, title, chapter_number, status, content_text, updated_at')
+        .select('id, title, chapter_number, status, content_text, updated_at, metadata')
         .eq('project_id', id!)
         .eq('user_id', userId!)
         .eq('content_type', 'chapter')
@@ -423,6 +425,7 @@ export default function ProjectDetail() {
         )}
         {activeTab === 'outline' && <OutlineTab outline={outline} storyArc={storyArc ?? null} projectId={id!} projectTitle={project.title} genreSlug={project.genre_slug} userId={userId!} writtenChapterNumbers={new Set((chapters || []).map(c => c.chapter_number).filter((n): n is number => n != null))} projectUpdatedAt={project.updated_at} outlineVersionInfo={outlineVersionInfo ?? null} />}
         {activeTab === 'chapters' && <ChaptersTab chapters={chapters} qaByChapter={qaByChapter} projectId={id!} projectTitle={project.title} projectType={project.project_type} genreSlug={project.genre_slug} userId={userId!} />}
+        {activeTab === 'qa' && <QATab chapters={chapters} qaByChapter={qaByChapter} userId={userId!} />}
         {activeTab === 'bible' && <BibleTab entries={bibleEntries} projectId={id!} />}
         {activeTab === 'art' && <ArtTab projectId={id!} />}
         {activeTab === 'social' && <SocialTab projectId={id!} />}
@@ -1576,6 +1579,103 @@ function SocialTab({ projectId }: { projectId: string }) {
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Social Media Posts</h3>
       </div>
       <SocialMediaPanel projectId={projectId} />
+    </div>
+  );
+}
+
+// Project-level Q/A: every chapter's craft-QA + consistency-report status in one place, with a
+// one-click "Rewrite to fix Q/A" per flagged chapter. The chapter list refetches when a fix completes.
+function QATab({ chapters, qaByChapter, userId }: {
+  chapters: Array<{ id: string; title: string; chapter_number: number | null; status: string; metadata?: Record<string, unknown> | null }> | undefined;
+  qaByChapter?: Record<number, { aligned: boolean | null; qaAvg: number | null }>;
+  userId: string;
+}) {
+  const jobQueue = useEngineJobQueue(userId);
+  const rows = (chapters ?? []).slice().sort((a, b) => (a.chapter_number ?? 0) - (b.chapter_number ?? 0));
+
+  async function fixQA(contentId: string) {
+    const key = `qa-fix:${contentId}`;
+    if (jobQueue.stateOf(key) === 'queued') return;
+    const { data: s } = await supabase.auth.getSession();
+    const token = s?.session?.access_token;
+    try {
+      const res = await fetch(`/api/content/${contentId}/rewrite-to-fix-qa`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      const body = (await res.json()) as { jobId?: string };
+      if (body.jobId) jobQueue.trackJob(key, body.jobId, [['project-chapters'], ['content-detail', contentId]]);
+    } catch { /* button re-enables on next render */ }
+  }
+
+  if (!rows.length) return <EmptyState message="No chapters yet. Write chapters to see their Q/A." />;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-gray-500 dark:text-gray-400">
+        Craft-QA scores come from writing each chapter; the consistency report is the on-demand 9-check
+        rubric (run it from a chapter). When a chapter has flagged checks, use <strong>Rewrite to fix Q/A</strong>.
+      </p>
+      <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+            <tr>
+              <th className="px-4 py-2">#</th>
+              <th className="px-4 py-2">Chapter</th>
+              <th className="px-4 py-2">Craft QA</th>
+              <th className="px-4 py-2">Consistency report</th>
+              <th className="px-4 py-2 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((ch) => {
+              const num = ch.chapter_number ?? 0;
+              const craft = qaByChapter?.[num]?.qaAvg;
+              const report = (ch.metadata as { qa_report?: { checks?: Array<{ status?: string }> } } | null | undefined)?.qa_report;
+              const checks = report?.checks ?? [];
+              const pass = checks.filter((c) => String(c.status).toUpperCase() === 'PASS').length;
+              const flagged = checks.length - pass;
+              const key = `qa-fix:${ch.id}`;
+              const fixing = jobQueue.stateOf(key) === 'queued';
+              return (
+                <tr key={ch.id} className="border-t border-gray-100 dark:border-gray-800">
+                  <td className="px-4 py-2 text-gray-500">{num}</td>
+                  <td className="px-4 py-2">
+                    <Link to={`/content/${ch.id}`} className="font-medium text-brand-700 hover:text-brand-800 dark:text-brand-300">{ch.title}</Link>
+                  </td>
+                  <td className="px-4 py-2">
+                    {craft != null ? (
+                      <span className={craft >= 0.8 ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}>{craft.toFixed(2)}</span>
+                    ) : <span className="text-gray-400">—</span>}
+                  </td>
+                  <td className="px-4 py-2">
+                    {checks.length ? (
+                      <span className={flagged === 0 ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}>
+                        {pass}/{checks.length} passed{flagged > 0 ? ` · ${flagged} flagged` : ''}
+                      </span>
+                    ) : <span className="text-gray-400">not run</span>}
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      {flagged > 0 && (
+                        <button
+                          onClick={() => void fixQA(ch.id)}
+                          disabled={fixing}
+                          title="Rewrite this chapter to address its flagged Q/A findings — queues in the background"
+                          className="rounded px-2 py-1 text-xs font-medium bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50"
+                        >
+                          {fixing ? 'Rewriting…' : 'Rewrite to fix Q/A'}
+                        </button>
+                      )}
+                      <Link to={`/content/${ch.id}`} className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400">Open →</Link>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
