@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import ReactMarkdown from 'react-markdown';
 import { useUser } from '../../contexts/UserContext';
 import { supabase } from '../../config/supabase';
@@ -133,6 +133,18 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
   const { profile, refreshSubscription } = useUser();
   const location = useLocation();
   const params = useParams<{ id: string }>();
+  const queryClient = useQueryClient();
+  // When a chat-dispatched engine job finishes, its result lands in the DB (a new brainstorm project, a
+  // written chapter, etc.) but the lists that show it were never told to refetch — so it appeared only
+  // after a manual refresh. Invalidate the queries a job's result can affect so it shows up on its own.
+  const refreshAfterJob = useCallback(() => {
+    for (const key of [
+      ['projects'], ['sidebar-projects'], ['outlines'], ['project-chapters'],
+      ['content-list'], ['dashboard-counts'], ['dashboard-recent'], ['research-list'],
+    ]) {
+      void queryClient.invalidateQueries({ queryKey: key });
+    }
+  }, [queryClient]);
   const [messages, setMessages] = useState<Message[]>(loadMessages);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -183,6 +195,7 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
         error?: string;
       } | undefined;
       if (!detail?.jobId) return;
+      if (detail.status === 'completed') refreshAfterJob();
       setMessages((prev) =>
         prev.map((m) => {
           if (m.jobId !== detail.jobId) return m;
@@ -201,7 +214,7 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
     }
     window.addEventListener('chat-job-status', handleJobStatus);
     return () => window.removeEventListener('chat-job-status', handleJobStatus);
-  }, []);
+  }, [refreshAfterJob]);
 
   // CR-008 C: engine jobs (Path B) have no SSE callback — poll their status until terminal.
   const engineJobKey = messages
@@ -228,6 +241,7 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
           const j = (await r.json()) as { status: string; error?: string };
           const st = statusMap[j.status] ?? 'active';
           if (stopped) return;
+          if (st === 'completed') refreshAfterJob();
           setMessages((prev) => prev.map((m) => (m.jobId === jobId ? {
             ...m, jobStatus: st,
             content: st === 'completed'
@@ -242,7 +256,7 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
     const timer = setInterval(poll, 20000);
     void poll();
     return () => { stopped = true; clearInterval(timer); };
-  }, [engineJobKey]);
+  }, [engineJobKey, refreshAfterJob]);
 
   const handleResizeStart = useCallback(
     (e: React.MouseEvent) => {
