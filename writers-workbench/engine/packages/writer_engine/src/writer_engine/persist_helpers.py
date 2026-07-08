@@ -152,7 +152,7 @@ async def persist_chapter(
     """Idempotent (project_id, chapter_number) upsert into published_content_v2 + a content_versions_v2
     snapshot (W3). Returns the content id."""
     existing = await (
-        client.table("published_content_v2").select("id")
+        client.table("published_content_v2").select("id, metadata")
         .eq("project_id", project_id).eq("content_type", "chapter").eq("chapter_number", chapter_number)
         .limit(1).execute()
     )
@@ -164,6 +164,13 @@ async def persist_chapter(
     }
     if rows:
         content_id = str(rows[0]["id"])
+        # MERGE metadata on a re-write (repair/rewrite): the caller passes only the write-time keys
+        # (chapter_run_id, word_count, sub_chapter_count, craft_qa, drift_report). Overwriting the whole
+        # metadata column here WIPED fields the rewrite doesn't own — most visibly ``qa_report`` (the Q/A
+        # Consistency Report the user ran, which then vanished from the UI), plus ``dismissed_annotations``
+        # and ``last_qa_report``. Preserve the prior keys; only refresh the ones we produced this run.
+        prior_meta = rows[0].get("metadata") if isinstance(rows[0].get("metadata"), dict) else {}
+        row["metadata"] = {**(prior_meta or {}), **(metadata or {})}
         # Stamp updated_at on re-writes (repair/rewrite) — there is no DB trigger, so without this the
         # row's updated_at stays frozen at first-write time and the UI sorts/refreshes stale.
         from datetime import UTC, datetime
