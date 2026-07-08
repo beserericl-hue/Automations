@@ -1,6 +1,6 @@
 ---
 name: guardrails
-description: "Scan any Every draft for recurring editorial-review failures: clarity and evidence gaps, argument problems, mechanics red flags, second-order AI tells, and, for Working Overtime only, column-specific voice tics and structural throat-clearing. Use when reviewing or polishing Every writing before submission. Reports findings with line-level diagnoses and suggested fixes. Pairs with ai-check and every-style."
+description: "Scan a draft for recurring review failures and flag them with line-level diagnoses + fixes. Two modes: FICTION (a Writers Workbench novel chapter) is scanned against the Ken Follett style guide — the craft rules the engine writes to (prose transparency, dialogue, scene construction, character, no-boring-bits, period language); NON-FICTION (an Every essay/column) is scanned for clarity/evidence, argument, mechanics, AI tells, and column-specific voice tics. Use when reviewing or polishing before submission."
 user_invocable: true
 ---
 
@@ -8,9 +8,12 @@ user_invocable: true
 
 ## Overview
 
-This skill scans drafts against patterns that recur in Every pre-publication review. The first four categories apply to any Every draft. Categories 5 and 6 are Working Overtime-specific; do not apply them to other columns or ghostwritten work.
+This skill scans a draft and reports flags with diagnoses + suggested fixes. It does **not** rewrite the whole draft — surface the problems and let the writer make the calls.
 
-This skill produces a findings report. It does **not** rewrite the whole draft. Katie wants to see flags with diagnoses and suggested fixes, then make the editorial calls herself.
+**First, pick the mode by content type:**
+
+- **Fiction — a Writers Workbench novel chapter / prose fiction.** Scan against the **Ken Follett style guide** — the same craft rules the Workbench engine writes to (`writer_engine/prompt_store/follett_seeds.py`): prose transparency, dialogue as a duel, scene construction (dramatic question + BME + a story turn every 4–6 pages), character (no milk-and-water POV, a moral complication), no boring bits, research/period language. The full catalog is `references/follett-style-guardrails.md`. This is the mode to use for the Workbench final-Q/A review; the Every categories below do **not** apply to fiction.
+- **Non-fiction — an Every essay/column.** Apply the Every categories: the first four are universal; categories 5–6 are Working Overtime-specific. (Katie wants flags, not rewrites.)
 
 ## When this skill auto-triggers
 
@@ -23,7 +26,21 @@ For generic AI-tell detection, use `ai-check`. For Every house mechanics, use `e
 
 ## Detection categories
 
-### Universal: apply to every Every draft
+### Fiction (Writers Workbench chapters): the Ken Follett style guide
+
+For a novel chapter, scan these seven — the full "flag and fix" catalog is in `references/follett-style-guardrails.md`, with `[Follett § …]` citations to the engine's craft layer:
+
+1. **Prose transparency** — vague intensifiers ("it was as if…"), adverb-laden verbs, Latinate-over-Anglo-Saxon diction, literary mannerisms at unearned moments, unjustified long sentences.
+2. **Dialogue** — phonetic dialect (especially only for poor/marginalized characters), fancy speech tags ("ejaculated", "retorted"), adverb tags, monologue where a volley belongs.
+3. **Scene construction** — no dramatic question, missing beginning-middle-end, story-turn drought (need one every 4–6 pages), information delivered as lecture, POV chosen by importance instead of emotional stake.
+4. **Character** — milk-and-water POV, the too-perfect good guy, no moral complication, roster drift (name/role/trait changes — treat any drift-scanner hit as a hard flag).
+5. **No boring bits / pacing** — flat eventless passages, soggy middle, monotone emotional line.
+6. **Research & period** — research dumps, anachronistic language, missing local color.
+7. **First line / opening** — dead openings (weather alone, waking up, over ~25 words).
+
+When the draft is fiction, apply ONLY this section; skip the Every categories below.
+
+### Universal: apply to every Every draft (non-fiction)
 
 1. **Editorial clarity and evidence** — missing "why" or "so what," missing specifics, unidentified people/companies/terms, source and attribution gaps, TKs in review copy, jargon without translation, naming a tool when the category is the point, and muddy connective logic.
 2. **Argument-level guardrails** — straw men, false binaries, AI determinism, technical intimidation, suffering Olympics, false universality.
@@ -55,7 +72,7 @@ For any Every scan, read `references/editorial-clarity-evidence.md` for the univ
 
 ### Step 1: Identify the content type
 
-Determine whether the draft is Working Overtime or another Every format. This sets whether Categories 5 and 6 apply.
+First: **fiction or non-fiction?** A Writers Workbench novel chapter (story prose, characters, scenes) → load `references/follett-style-guardrails.md` and scan the seven Follett categories; skip everything Every-specific below. An Every essay/column → continue: determine whether it's Working Overtime (Categories 5–6 apply) or another format (Categories 1–4 only).
 
 ### Step 2: Scan in priority order
 
@@ -194,8 +211,9 @@ Log it as a watch-item. Don't try to force it into an existing category. Two app
 
 ## References
 
-- `references/editorial-clarity-evidence.md` — universal Every editorial clarity and evidence rules. Load for every scan.
-- `references/working-overtime-guardrails.md` — supplemental pattern history and examples for Working Overtime-only scans. It is not the universal source of truth for this skill.
+- `references/follett-style-guardrails.md` — **the Ken Follett style guide as a "flag and cut" catalog. Load for every FICTION scan (Writers Workbench chapters); it is the source of truth for the fiction mode.**
+- `references/editorial-clarity-evidence.md` — universal Every editorial clarity and evidence rules. Load for non-fiction (Every) scans.
+- `references/working-overtime-guardrails.md` — supplemental pattern history and examples for Working Overtime-only scans. Not the universal source of truth for this skill.
 
 ## Updating the catalog
 

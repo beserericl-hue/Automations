@@ -655,3 +655,13 @@ chapter.review op returning findings in the existing qa_report.checks shape → 
 consume them unchanged). Flagged that `guardrails` is EveryInc-specific (Working Overtime column, Katie,
 ai-check/every-style companions) and needs adaptation before product use. Not yet integrated into the
 engine — this is the design + vendored source.
+
+## [2026-07-07] build | guardrails lens: added the Ken Follett style guide (fiction mode)
+Made the draft-review-kit `guardrails` skill dual-mode. Authored
+skills/guardrails/references/follett-style-guardrails.md — the Ken Follett craft rules (from the engine's
+follett_seeds.py) as a "flag and cut" catalog for FICTION: prose transparency, dialogue, scene
+construction (dramatic question + BME + story-turn every 4–6 pages), character (no milk-and-water POV,
+moral complication, roster drift), no-boring-bits/pacing, research/period language, first line — cited
+[Follett § …]. Updated guardrails SKILL.md: description, a fiction-vs-non-fiction mode branch in the
+Overview + Detection categories + scan Step 1, and References. Fiction mode is the one the Workbench final
+Q/A uses; the Every non-fiction categories no longer apply to chapters. See [[draft-review-kit]].

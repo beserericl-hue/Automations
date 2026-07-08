@@ -38,11 +38,16 @@ lenses add named, opinionated critique voices a user can invoke on a finished ch
 - **panel** — convenes several reviewers and *synthesizes* consensus, tensions, and prioritized fixes.
 - **debate** — reviewers *argue with each other* across rounds until tensions resolve or reach acknowledged stalemate.
 
-### ⚠ Org-specific — needs adaptation
-- **guardrails** — scans for evidence/argument/mechanics/AI-tell failures. **Written for EveryInc**: it
-  references their "Working Overtime" column, an editor ("Katie"), and companion skills `ai-check` /
-  `every-style` that do not exist here. Categories 1–4 (clarity/evidence, argument, mechanics, AI tells)
-  are reusable; categories 5–6 are column-specific and must be stripped or rewritten before use in the product.
+### guardrails — dual-mode (adapted for the Workbench)
+- **guardrails** — scans a draft and flags failures with diagnoses + fixes. Now has **two modes** (adapted 2026-07-07):
+  - **Fiction (Workbench chapters)** → scans against the **Ken Follett style guide**, the same craft rules the
+    engine writes to (`follett_seeds.py`): prose transparency, dialogue-as-duel, scene construction (dramatic
+    question + BME + a story turn every 4–6 pages), character (no milk-and-water POV, a moral complication),
+    no boring bits, research/period language. Catalog: `skills/guardrails/references/follett-style-guardrails.md`.
+    **This is the mode for the Workbench final Q/A.**
+  - **Non-fiction (Every essays)** → the original clarity/evidence, argument, mechanics, and AI-tell categories.
+    Still references EveryInc's "Working Overtime" column + companion skills (`ai-check`/`every-style`) that
+    don't exist here; that path isn't used by the Workbench.
 
 ## Suggested order (from the kit's README)
 `dev-edit` (while structure can still move) → one reader lens (`asshole`/`mom`/`eli5`) → one or two craft
