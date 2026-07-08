@@ -627,3 +627,31 @@ associated project_id (Art tab always empty). Also fixed test-harness issues (sb
 browser context → Node fetch; fullyParallel broke stateful-spec order → serial mode; placeholder
 case-insensitivity; StatCard value sibling; config-load race). Full matrix + PASS/FAIL per element in
 [[master-test-plan]] and [[result-asserting-suite]]. Removed superseded presence-only specs.
+
+## [2026-07-05] update | marketing-copy scenes 7–8 → Tech Ahir MVP CTA
+Reframed the video's closing two scenes (previously Pricing + generic Workbench CTA) into a Tech Ahir
+call-to-action: The Writers Workbench is positioned as an example MVP that Tech Ahir built. Revised the
+Heygen spoken script (full block + per-scene blocks), the timeline B-roll directions (landing-page hero
+→ what-we-build → Writers Workbench case study → contact/CTA), the shot-list checklist, and the
+pre-launch flags. Added a "B-roll source — Tech Ahir landing page" callout at the top of §3 with a URL
+PLACEHOLDER — the actual landing-page URL was not provided in the request; left as TBD per vault rules.
+Scenes 1–6 unchanged.
+
+## [2026-07-05] update | marketing-copy scenes 7–8 — Tech Ahir URL + real page sections
+Received the landing-page URL (https://lp.techahir.com/3day-minimum-viable-product-mvp) and fetched it.
+Inserted the URL into the §3 B-roll callout, scene 8 caption, and pre-launch flags. Rewrote scenes 7–8
+B-roll against the ACTUAL page structure: hero ("A working SaaS MVP. In 3 days. From $1,500."), the
+"PROOF — LIVE APPLICATIONS" section (which already features Writer's Workbench as a case study), and the
+final "THIS IS THE MOMENT" / "Book a Call" CTA. Folded real hooks into the spoken script (3 days, from
+$1,500, real auth/data/deployed live, book a call).
+
+## [2026-07-07] setup | vendored EveryInc draft-review-kit + final-Q/A integration design
+Copied the EveryInc draft-review-kit (13 editorial review skills — asshole, mom, eli5, hemingway,
+sorkin, hitchcock, vonnegut, sedaris, dev-edit, line-edit, panel, debate, guardrails) into the repo at
+writers-workbench/draft-review-kit/ (full kit incl. README, plugin manifests, LICENSE; .git excluded).
+Reviewed each and wrote [[draft-review-kit]] documenting what each lens does and the design for wiring
+them into the Writers Workbench final Q/A feature (skill body → engine review-prompt seed → new
+chapter.review op returning findings in the existing qa_report.checks shape → Q/A panel + Rewrite-to-fix
+consume them unchanged). Flagged that `guardrails` is EveryInc-specific (Working Overtime column, Katie,
+ai-check/every-style companions) and needs adaptation before product use. Not yet integrated into the
+engine — this is the design + vendored source.

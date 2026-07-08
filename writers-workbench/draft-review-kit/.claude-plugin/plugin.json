@@ -1,0 +1,17 @@
+{
+  "name": "draft-review-kit",
+  "version": "0.1.0",
+  "description": "A focused kit of feedback-first writing review skills for stress-testing drafts, arguments, pacing, clarity, and line-level prose.",
+  "author": {
+    "name": "Katie Parrott"
+  },
+  "keywords": [
+    "writing",
+    "editing",
+    "review",
+    "feedback",
+    "skills"
+  ],
+  "repository": "",
+  "license": "MIT"
+}

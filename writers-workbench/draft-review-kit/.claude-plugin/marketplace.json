@@ -1,0 +1,27 @@
+{
+  "name": "draft-review-kit-local",
+  "owner": {
+    "name": "Katie Parrott"
+  },
+  "metadata": {
+    "description": "Feedback-first writing review skills for stress-testing drafts.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "draft-review-kit",
+      "description": "A focused kit of feedback-first writing review skills for stress-testing drafts, arguments, pacing, clarity, and line-level prose.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Katie Parrott"
+      },
+      "tags": [
+        "writing",
+        "editing",
+        "review",
+        "feedback"
+      ],
+      "source": "./"
+    }
+  ]
+}

@@ -12,6 +12,7 @@ The catalog. One line per page. When answering a question, scan this first to fi
 ## At the top
 
 - [[marketing-copy]] — production sales copy: tagline, 90-word elevator pitch, 3-min video script, B-roll suggestions. Generated 2026-05-10.
+- [[draft-review-kit]] — 13 vendored editorial review lenses (Hemingway, Sorkin, guardrails, panel…) + the design for wiring them into the final Q/A feature. Vendored 2026-07-07.
 
 ## Read first
 

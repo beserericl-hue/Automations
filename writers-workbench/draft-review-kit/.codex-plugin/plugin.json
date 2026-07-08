@@ -1,0 +1,36 @@
+{
+  "name": "draft-review-kit",
+  "version": "0.1.0",
+  "description": "A focused kit of feedback-first writing review skills for stress-testing drafts, arguments, pacing, clarity, and line-level prose.",
+  "author": {
+    "name": "Katie Parrott"
+  },
+  "license": "MIT",
+  "keywords": [
+    "writing",
+    "editing",
+    "review",
+    "feedback",
+    "skills"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Draft Review Kit",
+    "shortDescription": "Feedback-first review skills for drafts",
+    "longDescription": "Draft Review Kit is a compact set of writing-review skills for stress-testing drafts. It includes developmental editing, hostile reads, general-reader checks, clarity checks, craft lenses, panel/debate review, and line editing.",
+    "developerName": "Katie Parrott",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Run a developmental edit on this draft.",
+      "Give this the least charitable read.",
+      "Convene a panel of reviewers for this piece."
+    ],
+    "brandColor": "#2563EB",
+    "screenshots": []
+  }
+}
