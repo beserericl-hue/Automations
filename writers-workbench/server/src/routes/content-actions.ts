@@ -809,6 +809,54 @@ contentActionsRouter.post('/:id/rewrite-to-fix-qa', async (req: Request, res: Re
   }
 });
 
+// Run the Q/A Consistency check as a true BACKGROUND engine job. The old path went through the chat hub
+// (enqueueHubCommand → /api/chat/proxy → callEngineHub) which could hold the HTTP request open for the
+// whole multi-minute QA run — so it hit the edge timeout and died, and navigating away killed it. This
+// enqueues an arq write-tool job (async:true) that runs in the worker independent of the request/browser
+// and persists the qa_report; the UI polls /api/jobs/engine/:id and refetches when it completes.
+contentActionsRouter.post('/:id/run-qa', async (req: Request, res: Response) => {
+  const userId = req.userId;
+  if (!userId) {
+    res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED' } });
+    return;
+  }
+  const id = String(req.params.id);
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data: chapter, error } = await supabase
+      .from('published_content_v2')
+      .select('id, user_id, chapter_number, content_type, project_id')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (error || !chapter) {
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Chapter not found' } });
+      return;
+    }
+    if (chapter.content_type !== 'chapter') {
+      res.status(400).json({ success: false, error: { code: 'NOT_A_CHAPTER', message: 'Q/A targets chapters' } });
+      return;
+    }
+    const job = await callEngineWriteTool('chapter', {
+      op: 'qa',
+      project_id: chapter.project_id,
+      chapter_number: chapter.chapter_number,
+      user_id: userId,
+      persist: true,
+      async: true,
+    });
+    logger.info({ userId, contentId: id, jobId: job.job_id }, 'content-actions: run-qa queued via engine');
+    res.status(202).json({ success: true, jobId: job.job_id, engineJob: true, status: job.status ?? 'queued' });
+  } catch (err) {
+    logger.error({ err, userId, contentId: id }, 'content-actions: run-qa failed');
+    res.status(502).json({
+      success: false,
+      error: { code: 'ENGINE_UNREACHABLE', message: err instanceof Error ? err.message : 'Engine error' },
+    });
+  }
+});
+
 const LifecycleSchema = z.object({
   action: z.enum(['approve', 'publish', 'reject', 'schedule', 'unschedule', 'draft']),
   schedule_date: z.string().optional(),

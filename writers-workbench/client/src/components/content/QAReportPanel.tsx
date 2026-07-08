@@ -12,22 +12,7 @@ interface QAReportPanelProps {
   userId: string;
 }
 
-async function buildQAMessage(contentTitle: string, chapterNumber: number | null, projectId: string | null) {
-  let projectTitle = '';
-  if (projectId) {
-    const { data } = await supabase
-      .from('writing_projects_v2')
-      .select('title')
-      .eq('id', projectId)
-      .maybeSingle();
-    projectTitle = data?.title || '';
-  }
-
-  const chapterLabel = chapterNumber != null ? `chapter ${chapterNumber}` : contentTitle;
-  return projectTitle ? `q/a ${chapterLabel} of ${projectTitle}` : `q/a ${chapterLabel}`;
-}
-
-export default function QAReportPanel({ metadata, contentId, contentTitle, chapterNumber, projectId, userId }: QAReportPanelProps) {
+export default function QAReportPanel({ metadata, contentId, userId }: QAReportPanelProps) {
   const [expanded, setExpanded] = useState(false);
   const report = metadata?.qa_report as QAReport | undefined;
 
@@ -38,10 +23,22 @@ export default function QAReportPanel({ metadata, contentId, contentTitle, chapt
   const qaRunning = qaState === 'queued';
   const qaError = qaState === 'error';
 
+  // Queue the Q/A as a background engine job (POST returns immediately with a job_id; the arq worker runs
+  // it independent of this request/tab, so navigating away can't kill it). Poll + refetch via trackJob.
   async function runQACheck() {
     if (qaRunning) return;
-    const message = await buildQAMessage(contentTitle, chapterNumber, projectId);
-    await jobQueue.enqueue('qa', message, [['content-detail', contentId]]);
+    const { data: s } = await supabase.auth.getSession();
+    const token = s?.session?.access_token;
+    try {
+      const res = await fetch(`/api/content/${contentId}/run-qa`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      const body = (await res.json()) as { jobId?: string };
+      if (body.jobId) jobQueue.trackJob('qa', body.jobId, [['content-detail', contentId]]);
+    } catch {
+      /* button re-enables on next render */
+    }
   }
 
   // One-click "Rewrite to fix Q/A": queues a chapter rewrite that targets the flagged checks. The
