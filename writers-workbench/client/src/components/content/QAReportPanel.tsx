@@ -155,10 +155,10 @@ export default function QAReportPanel({ metadata, contentId, userId }: QAReportP
         </div>
       )}
 
-      {/* Expanded checks list */}
+      {/* Expanded checks — 2-per-row grid so all checks stay visible without scrolling */}
       {expanded && (
         <div className="border-t border-gray-200 dark:border-gray-700">
-          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+          <div className="grid grid-cols-1 gap-px bg-gray-100 dark:bg-gray-800 sm:grid-cols-2">
             {report.checks.map((check, i) => (
               <CheckRow key={i} check={check} />
             ))}
@@ -177,7 +177,7 @@ export default function QAReportPanel({ metadata, contentId, userId }: QAReportP
 function CheckRow({ check }: { check: QACheck }) {
   const isPass = check.status === 'PASS';
   return (
-    <div className="flex items-start gap-3 px-4 py-2.5">
+    <div className="flex items-start gap-3 px-4 py-2.5 h-full bg-white dark:bg-gray-900">
       {isPass ? (
         <svg className="h-4 w-4 mt-0.5 text-green-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
