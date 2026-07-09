@@ -32,6 +32,11 @@ export default function ContentDetail() {
   const [scheduleDate, setScheduleDate] = useState('');
   const [showImagePicker, setShowImagePicker] = useState(false);
   const [showRewriteModal, setShowRewriteModal] = useState(false);
+  // Layout: the review panels (Q/A, drift, annotations, sources, versions) live in a tabbed side rail
+  // so only one is on screen at a time and each scrolls on its own — instead of stacking vertically and
+  // pushing the editor off-screen. `focusMode` pops the editor into a full-screen overlay.
+  const [activeTab, setActiveTab] = useState<'qa' | 'annotations' | 'sources' | 'versions'>('qa');
+  const [focusMode, setFocusMode] = useState(false);
   const { addToast } = useToast();
 
   const { data: item, isLoading, isError, error } = useQuery({
@@ -347,6 +352,27 @@ export default function ContentDetail() {
 
   const statusActions = getStatusActions(item.status);
 
+  // Review-rail tabs. Q/A + drift + annotations only apply to chapters; every content type has sources
+  // and version history.
+  const isChapter = item.content_type === 'chapter';
+  const meta = (item.metadata || {}) as Record<string, unknown>;
+  const qaReport = meta.qa_report as { checks?: { status?: string }[] } | undefined;
+  const qaFlagged = qaReport?.checks?.filter((c) => c.status && c.status !== 'PASS').length ?? 0;
+  const driftReport = meta.drift_report as { aligned?: boolean } | undefined;
+  const hasDrift = driftReport?.aligned === false;
+  const tabs: { id: 'qa' | 'annotations' | 'sources' | 'versions'; label: string; badge?: number; warn?: boolean }[] = [
+    ...(isChapter
+      ? ([
+          { id: 'qa', label: 'Q/A', badge: qaFlagged || undefined, warn: qaFlagged > 0 || hasDrift },
+          { id: 'annotations', label: 'Review' },
+        ] as const)
+      : []),
+    { id: 'sources', label: 'Sources' },
+    { id: 'versions', label: 'Versions' },
+  ];
+  // Keep the active tab valid for this content type (non-chapters have no qa/annotations tab).
+  const currentTab = tabs.some((t) => t.id === activeTab) ? activeTab : tabs[0].id;
+
   return (
     <div className="flex flex-col h-full gap-4">
       {/* Header */}
@@ -579,41 +605,111 @@ export default function ContentDetail() {
         </div>
       )}
 
-      {/* Engine QA/drift (CR-005): the engine stores drift + craft-QA in the chapter metadata. */}
-      {item.content_type === 'chapter' && <EngineQaPanel metadata={item.metadata} contentId={id!} />}
-
-      {/* Q/A Report (for chapters) */}
-      {item.content_type === 'chapter' && (
-        <QAReportPanel
-          metadata={item.metadata}
-          contentId={id!}
-          contentTitle={item.title}
-          chapterNumber={item.chapter_number}
-          projectId={item.project_id}
-          userId={userId!}
-        />
-      )}
-
-      {/* S12-13 — shared review-annotations panel (drift_scan + genre_eval) */}
-      {item.content_type === 'chapter' && <AnnotationsPanel contentId={id!} />}
-
-      {/* Sources / Provenance */}
-      <ProvenancePanel contentId={id!} />
-
-      {/* Editor + Version History */}
+      {/* Body: editor on the left, a tabbed review rail on the right. The editor container flips to a
+          full-screen fixed overlay in focus mode (single editor instance — no remount, no lost keystrokes). */}
       <div className="flex flex-1 min-h-0 gap-4">
-        <div className="flex-1 min-w-0">
-          <RichTextEditor
-            content={editorContent}
-            onChange={handleSave}
-          />
+        <div
+          className={
+            focusMode
+              ? 'fixed inset-0 z-40 flex flex-col gap-2 bg-white p-4 dark:bg-gray-950'
+              : 'flex flex-1 min-w-0 flex-col min-h-0'
+          }
+        >
+          <div className="flex shrink-0 items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-sm font-semibold text-gray-900 dark:text-white">Editor</span>
+              {focusMode && <span className="truncate text-xs text-gray-400">{item.title}</span>}
+              {saveStatus === 'saving' && <span className="text-xs text-gray-400">Saving…</span>}
+              {saveStatus === 'saved' && <span className="text-xs text-green-500">Saved</span>}
+              {saveStatus === 'error' && <span className="text-xs text-red-500">Save failed</span>}
+            </div>
+            <button
+              onClick={() => setFocusMode((f) => !f)}
+              title={focusMode ? 'Exit full-screen editing' : 'Edit full screen — hides the review panels'}
+              className="flex shrink-0 items-center gap-1 rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+            >
+              {focusMode ? (
+                <>
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
+                  </svg>
+                  Exit full screen
+                </>
+              ) : (
+                <>
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M20.25 3.75v4.5m0-4.5h-4.5m4.5 0L15 9m5.25 11.25v-4.5m0 4.5h-4.5m4.5 0L15 15M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15" />
+                  </svg>
+                  Full screen
+                </>
+              )}
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <RichTextEditor content={editorContent} onChange={handleSave} />
+          </div>
         </div>
-        <VersionHistory
-          contentId={id!}
-          onRestore={() => {
-            queryClient.invalidateQueries({ queryKey: ['content-detail', id] });
-          }}
-        />
+
+        {/* Review rail — tabbed so panels don't stack and cut each other off; each tab body scrolls. */}
+        {!focusMode && (
+          <aside className="flex w-[380px] shrink-0 flex-col min-h-0 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="flex shrink-0 overflow-x-auto border-b border-gray-200 dark:border-gray-700">
+              {tabs.map((t) => {
+                const active = t.id === currentTab;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setActiveTab(t.id)}
+                    className={`flex items-center gap-1.5 whitespace-nowrap px-3 py-2 text-xs font-medium border-b-2 -mb-px transition ${
+                      active
+                        ? 'border-brand-600 text-brand-700 dark:text-brand-300'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                    }`}
+                  >
+                    {t.label}
+                    {t.badge != null && (
+                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                        t.warn
+                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300'
+                          : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                      }`}>
+                        {t.badge}
+                      </span>
+                    )}
+                    {t.badge == null && t.warn && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-4">
+              {currentTab === 'qa' && isChapter && (
+                <>
+                  <EngineQaPanel metadata={item.metadata} contentId={id!} />
+                  <QAReportPanel
+                    metadata={item.metadata}
+                    contentId={id!}
+                    contentTitle={item.title}
+                    chapterNumber={item.chapter_number}
+                    projectId={item.project_id}
+                    userId={userId!}
+                  />
+                </>
+              )}
+              {currentTab === 'annotations' && isChapter && <AnnotationsPanel contentId={id!} />}
+              {currentTab === 'sources' && <ProvenancePanel contentId={id!} />}
+              {currentTab === 'versions' && (
+                <VersionHistory
+                  contentId={id!}
+                  onRestore={() => {
+                    queryClient.invalidateQueries({ queryKey: ['content-detail', id] });
+                  }}
+                />
+              )}
+            </div>
+          </aside>
+        )}
       </div>
 
       <ConfirmDialog
