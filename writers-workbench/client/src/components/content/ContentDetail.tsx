@@ -652,7 +652,7 @@ export default function ContentDetail() {
 
         {/* Review rail — tabbed so panels don't stack and cut each other off; each tab body scrolls. */}
         {!focusMode && (
-          <aside className="flex w-[380px] shrink-0 flex-col min-h-0 rounded-lg border border-gray-200 dark:border-gray-700">
+          <aside className="flex w-[440px] xl:w-[520px] shrink-0 flex-col min-h-0 rounded-lg border border-gray-200 dark:border-gray-700">
             <div className="flex shrink-0 overflow-x-auto border-b border-gray-200 dark:border-gray-700">
               {tabs.map((t) => {
                 const active = t.id === currentTab;
