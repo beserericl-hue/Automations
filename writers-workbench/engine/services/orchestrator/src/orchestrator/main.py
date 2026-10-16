@@ -214,7 +214,7 @@ def build_app() -> FastAPI:
             execution_id = await orch.start(initial_state=body)
         return await orch.run(execution_id, payload=body)
 
-    async def _locate_job(job_id: str) -> tuple[Any, Any, str]:
+    async def _locate_job(job_id: str) -> tuple[Any, Any, str | None]:
         """Find which queue holds ``job_id``.
 
         A caller holding a job_id does not know which queue took it, and arq's ``Job`` is bound to
@@ -223,19 +223,23 @@ def build_app() -> FastAPI:
         take the first that recognises the id. ``POLL_QUEUES`` includes the pre-split ``newsletter``
         queue so jobs enqueued before a deploy keep polling correctly while they drain.
 
-        ``complete`` and ``in_progress`` are derived from queue-independent keys, so a finished job
-        resolves on the first attempt regardless of where it ran.
+        The returned queue is ``None`` unless it is actually known. ``complete`` and ``in_progress``
+        come from queue-INDEPENDENT keys (``arq:result:<id>`` and ``arq:in-progress:<id>``), so the
+        first queue asked answers for a job that ran anywhere — naming that queue in the response
+        would be a guess dressed as a fact. Only ``queued``/``deferred`` are derived from a specific
+        queue's sorted set and can be attributed.
         """
         from arq.jobs import Job, JobStatus
 
-        first: tuple[Any, Any, str] | None = None
+        attributable = {JobStatus.queued, JobStatus.deferred}
+        first: tuple[Any, Any, str | None] | None = None
         for queue in POLL_QUEUES:
             job = Job(job_id, redis=app.state.arq_pool, _queue_name=queue)
             status = await job.status()
             if status != JobStatus.not_found:
-                return job, status, queue
+                return job, status, (queue if status in attributable else None)
             if first is None:
-                first = (job, status, queue)
+                first = (job, status, None)
         assert first is not None  # POLL_QUEUES is never empty
         return first
 
@@ -280,7 +284,9 @@ def build_app() -> FastAPI:
         if app.state.arq_pool is None:
             raise HTTPException(http_status.HTTP_503_SERVICE_UNAVAILABLE, detail="async queue unavailable")
         job, status, queue = await _locate_job(job_id)
-        out: dict[str, Any] = {"job_id": job_id, "status": status.value, "queue": queue}
+        out: dict[str, Any] = {"job_id": job_id, "status": status.value}
+        if queue is not None:
+            out["queue"] = queue
         if status == JobStatus.complete:
             try:
                 out["result"] = await job.result(timeout=1)

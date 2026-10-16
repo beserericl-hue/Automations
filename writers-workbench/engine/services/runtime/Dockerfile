@@ -10,6 +10,23 @@ WORKDIR /app
 
 COPY --from=ghcr.io/astral-sh/uv:0.5.13 /uv /usr/local/bin/uv
 
+# The LOCK FILE, and --frozen with no fallback.
+#
+# This image used to copy every pyproject.toml but NOT uv.lock, so `uv sync` resolved dependencies
+# fresh at build time: the deployed engine ran whatever was newest on the day it built, not what the
+# test suite had ever run against. That is not a theoretical risk — it is how `chapter.qa` and
+# `chapter.plan` came to fail on DEV with
+#
+#     TypeError: AsyncMessages.create() got an unexpected keyword argument 'temperature'
+#
+# while ruff, mypy and 600+ tests were green locally against the locked anthropic 0.105.2. Several
+# other Dockerfiles asked for `uv sync --frozen ... || uv sync ...`, which with no lock present meant
+# the --frozen arm always failed and the unlocked fallback always ran: a guard that could not fire.
+#
+# --frozen with no fallback now, so a stale lock fails the BUILD instead of silently shipping
+# untested dependency versions.
+COPY uv.lock ./
+
 # Workspace metadata + the library and every step service.
 COPY pyproject.toml ./
 COPY packages/writer_engine/pyproject.toml packages/writer_engine/README.md ./packages/writer_engine/
@@ -64,7 +81,7 @@ COPY services/steps_app/src ./services/steps_app/src
 COPY services/runtime/entrypoint.sh /entrypoint.sh
 
 # Install every workspace package at once.
-RUN uv sync --all-packages --no-dev
+RUN uv sync --frozen --all-packages --no-dev
 RUN chmod +x /entrypoint.sh
 
 ENV PATH="/app/.venv/bin:$PATH"

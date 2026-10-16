@@ -14,7 +14,14 @@ from typing import Any
 import pytest
 
 from orchestrator import worker as worker_mod
-from writer_engine.queues import HEAVY, INTERACTIVE, QUEUE_HEAVY, QUEUE_INTERACTIVE
+from writer_engine.queues import (
+    HEAVY,
+    INTERACTIVE,
+    KIND_CRASH,
+    KIND_STEP_ERROR,
+    QUEUE_HEAVY,
+    QUEUE_INTERACTIVE,
+)
 
 
 @pytest.fixture
@@ -173,3 +180,72 @@ async def test_recording_works_even_without_a_profile_in_ctx(
     with pytest.raises(RuntimeError):
         await worker_mod.run_write_tool_job({}, "chapter", {"op": "write"})
     assert recorded[0]["queue"] == ""
+
+
+# --- a step that returns an error is also a lost chapter --------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_a_returned_step_error_is_recorded_with_its_own_kind(
+    recorded: list[dict[str, Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Found by probing DEV: two chapter ops failed, and the DLQ was empty.
+
+    The step returned StepOutput(status=error) rather than raising, so the job "succeeded" and the
+    only record was an arq result that expires after keep_result. The user's chapter still did not
+    get made.
+    """
+
+    class _ErrOut:
+        def model_dump(self, **_: Any) -> dict[str, Any]:
+            return {
+                "status": "error",
+                "error": {"code": "TypeError", "message": "unexpected keyword argument"},
+                "payload": {},
+            }
+
+    async def _returns_error(*_a: Any, **_k: Any) -> Any:
+        return _ErrOut()
+
+    monkeypatch.setattr(worker_mod, "run_step_via_http", _returns_error)
+    out = await worker_mod.run_write_tool_job(
+        {"queue_profile": HEAVY, "job_id": "job-7"}, "chapter", {"op": "qa", "chapter_number": 3}
+    )
+    assert out["status"] == "error"  # still returned to the caller, unchanged
+
+    assert len(recorded) == 1
+    entry = recorded[0]
+    assert entry["kind"] == KIND_STEP_ERROR
+    assert "TypeError" in entry["error"]
+    assert entry["args"]["chapter_number"] == 3
+
+
+@pytest.mark.asyncio
+async def test_a_crash_and_a_step_error_are_distinguishable(
+    recorded: list[dict[str, Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An operator triaging the DLQ needs to know which half of the system failed."""
+
+    async def _boom(*_a: Any, **_k: Any) -> Any:
+        raise TimeoutError("x")
+
+    monkeypatch.setattr(worker_mod, "run_step_via_http", _boom)
+    with pytest.raises(TimeoutError):
+        await worker_mod.run_write_tool_job({"queue_profile": HEAVY}, "chapter", {"op": "write"})
+    assert recorded[0]["kind"] == KIND_CRASH
+
+
+@pytest.mark.asyncio
+async def test_a_successful_step_records_nothing_either_way(
+    recorded: list[dict[str, Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class _Ok:
+        def model_dump(self, **_: Any) -> dict[str, Any]:
+            return {"status": "ok", "payload": {"result": {}}}
+
+    async def _ok(*_a: Any, **_k: Any) -> Any:
+        return _Ok()
+
+    monkeypatch.setattr(worker_mod, "run_step_via_http", _ok)
+    await worker_mod.run_write_tool_job({"queue_profile": HEAVY}, "chapter", {"op": "write"})
+    assert recorded == []

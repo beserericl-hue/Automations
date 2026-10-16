@@ -144,6 +144,15 @@ DLQ_KEY = "engine:dlq"
 DLQ_MAX = 500
 
 
+KIND_CRASH = "crash"
+"""The job raised. arq stores the exception as the result and forgets it after keep_result."""
+
+KIND_STEP_ERROR = "step_error"
+"""The step returned StepOutput(status=error). The job "succeeded" — nothing crashed — but the
+user's chapter/report still did not get made, and the only record was a job result that expires.
+Found by probing DEV: two failing chapter ops left an empty DLQ and a 2-hour paper trail."""
+
+
 async def record_dead_letter(
     *,
     queue: str,
@@ -151,6 +160,7 @@ async def record_dead_letter(
     args: Any,
     error: str,
     job_id: str | None = None,
+    kind: str = KIND_CRASH,
 ) -> None:
     """Push a terminal job failure onto the DLQ. Never raises — a DLQ write must not mask the error."""
     try:
@@ -160,6 +170,7 @@ async def record_dead_letter(
         entry = json.dumps(
             {
                 "ts": time.time(),
+                "kind": kind,
                 "queue": queue,
                 "function": function,
                 "job_id": job_id,
@@ -172,7 +183,7 @@ async def record_dead_letter(
         await push
         trim: Any = client.ltrim(DLQ_KEY, 0, DLQ_MAX - 1)
         await trim
-        logger.error("queue.dead_letter", queue=queue, function=function, job_id=job_id)
+        logger.error("queue.dead_letter", kind=kind, queue=queue, function=function, job_id=job_id)
     except Exception as exc:  # pragma: no cover - best effort by design
         logger.warning("queue.dead_letter_write_failed", error=str(exc)[:160])
 
@@ -204,6 +215,8 @@ __all__ = [
     "HEAVY_OPS",
     "INTERACTIVE",
     "INTERACTIVE_OPS",
+    "KIND_CRASH",
+    "KIND_STEP_ERROR",
     "POLL_QUEUES",
     "QUEUE_HEAVY",
     "QUEUE_INTERACTIVE",

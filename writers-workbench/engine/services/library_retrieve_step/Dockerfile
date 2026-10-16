@@ -5,6 +5,11 @@ WORKDIR /app
 
 COPY --from=ghcr.io/astral-sh/uv:0.4.18 /uv /usr/local/bin/uv
 
+# uv.lock + --frozen with no fallback: this used to be `--frozen || uv sync`, and because the lock
+# was never copied into the image the fallback was the only arm that ever ran — so the deployed
+# dependencies were whatever resolved on build day rather than what the tests ran against. See
+# services/runtime/Dockerfile for the failure that exposed it.
+COPY uv.lock ./
 COPY pyproject.toml ./
 COPY packages/writer_engine/pyproject.toml packages/writer_engine/README.md ./packages/writer_engine/
 COPY services/library_retrieve_step/pyproject.toml ./services/library_retrieve_step/
@@ -12,7 +17,7 @@ COPY services/library_retrieve_step/pyproject.toml ./services/library_retrieve_s
 COPY packages/writer_engine/src ./packages/writer_engine/src
 COPY services/library_retrieve_step/src ./services/library_retrieve_step/src
 
-RUN uv sync --frozen --package library-retrieve-step --no-dev || uv sync --package library-retrieve-step --no-dev
+RUN uv sync --frozen --package library-retrieve-step --no-dev
 
 ENV PATH="/app/.venv/bin:$PATH"
 EXPOSE 8002

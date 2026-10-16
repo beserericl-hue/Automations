@@ -19,7 +19,14 @@ from arq.connections import RedisSettings
 
 from writer_engine.config import get_settings
 from writer_engine.idempotency import RunClaim, claim_run, complete_run, fail_run
-from writer_engine.queues import HEAVY, INTERACTIVE, QueueProfile, record_dead_letter
+from writer_engine.queues import (
+    HEAVY,
+    INTERACTIVE,
+    KIND_CRASH,
+    KIND_STEP_ERROR,
+    QueueProfile,
+    record_dead_letter,
+)
 from writer_engine.state_machine.durable import RedisSagaRepo
 from writer_engine.state_machine.saga import StepRef, run_step_via_http
 from writer_engine.telemetry.logging import get_logger
@@ -30,7 +37,14 @@ from .write_tools import WORKER_STEP_TIMEOUT_S, resolve_step_url
 logger = get_logger("orchestrator.worker")
 
 
-async def _dlq(ctx: dict[str, Any], function: str, args: Any, exc: BaseException) -> None:
+async def _dlq(
+    ctx: dict[str, Any],
+    function: str,
+    args: Any,
+    exc: BaseException | str,
+    *,
+    kind: str = KIND_CRASH,
+) -> None:
     """Record a terminal job failure (B5).
 
     Recorded from inside the job rather than from arq's ``after_job_end`` hook, because that hook's
@@ -44,12 +58,14 @@ async def _dlq(ctx: dict[str, Any], function: str, args: Any, exc: BaseException
     which arq fails without ever entering the coroutine.
     """
     profile = ctx.get("queue_profile")
+    detail = exc if isinstance(exc, str) else f"{type(exc).__name__}: {exc}"
     await record_dead_letter(
         queue=getattr(profile, "name", ""),
         function=function,
         args=args,
-        error=f"{type(exc).__name__}: {exc}",
+        error=detail,
         job_id=str(ctx.get("job_id") or "") or None,
+        kind=kind,
     )
 
 
@@ -183,6 +199,19 @@ async def run_write_tool_job(ctx: dict[str, Any], tool: str, body: dict[str, Any
         duration_s=round(time.monotonic() - started, 1),
         error=(dumped.get("error") or {}).get("message") if str(status).lower() == "error" else None,
     )
+    if str(status).lower() == "error":
+        # The job did not crash, so nothing above recorded this — but the user's work still did not
+        # get made, and arq drops the result after keep_result. Record it with its own kind so an
+        # operator can tell a returned error from a crash.
+        err = dumped.get("error") or {}
+        await _dlq(
+            ctx,
+            "run_write_tool_job",
+            {"tool": tool, "op": op, "chapter_number": chapter, "user_id": body.get("user_id")},
+            f"{err.get('code') or 'ERROR'}: {err.get('message') or 'step returned error'}",
+            kind=KIND_STEP_ERROR,
+        )
+
     # CR-009: email the result + metadata on success (n8n parity). Best-effort — never affects the job.
     if str(status).lower() == "ok":
         try:

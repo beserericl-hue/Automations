@@ -128,7 +128,33 @@ def test_a_job_is_found_whichever_queue_holds_it(
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "queued"
-    assert body["queue"] == queue
+    assert body["queue"] == queue  # queued comes from THIS queue's sorted set, so it is attributable
+
+
+def test_a_finished_jobs_queue_is_not_guessed(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Seen on DEV: an interactive job reported "queue": "engine-heavy" once it completed.
+
+    `complete` and `in_progress` come from queue-independent keys, so the first queue asked answers
+    for a job that ran anywhere. Naming it would be a guess dressed as a fact, so the field is
+    omitted instead.
+    """
+
+    class _Done:
+        def __init__(self, job_id: str, *, redis: Any = None, _queue_name: str = "") -> None:
+            pass
+
+        async def status(self) -> JobStatus:
+            return JobStatus.complete
+
+        async def result(self, **_: Any) -> dict[str, Any]:
+            return {"status": "ok"}
+
+    import arq.jobs
+
+    monkeypatch.setattr(arq.jobs, "Job", _Done)
+    body = client.get("/pipelines/write/jobs/job-1", headers=SECRET).json()
+    assert body["status"] == "complete"
+    assert "queue" not in body
 
 
 def test_every_queue_is_tried_before_reporting_not_found(
@@ -137,6 +163,7 @@ def test_every_queue_is_tried_before_reporting_not_found(
     asked = _patch_job(monkeypatch, lives_on=None)
     r = client.get("/pipelines/write/jobs/nope", headers=SECRET)
     assert r.json()["status"] == "not_found"
+    assert "queue" not in r.json()
     assert asked == list(POLL_QUEUES), "a queue skipped here is a job reported lost"
 
 
