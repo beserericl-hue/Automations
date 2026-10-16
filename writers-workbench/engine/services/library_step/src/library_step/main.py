@@ -7,6 +7,7 @@ from datetime import UTC
 
 from writer_engine.config import get_settings
 from writer_engine.fixtures import guard_fixture_fallback
+from writer_engine.library_helpers import optional_int
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
 from writer_engine.step_service import build_step_app
 from writer_engine.telemetry.logging import get_logger
@@ -113,13 +114,10 @@ async def _op_lifecycle(payload: dict) -> dict:
         # NOTE: do NOT filter by content_type here. The router/Gemini often passes a noise content_type
         # ("draft", "blog") that does not equal the stored value ("blog_post") and would exclude the real
         # row → a false not-found (it regressed approve/publish/reject/delete). Title match is the gate.
-        chn = payload.get("chapter_number")
+        chn = optional_int(payload.get("chapter_number"))
         pid = None
-        if chn not in (None, ""):
-            import contextlib as _cl
-
-            with _cl.suppress(TypeError, ValueError):
-                q = q.eq("chapter_number", int(chn))
+        if chn is not None:
+            q = q.eq("chapter_number", chn)
             # 'approve/publish/... chapter N of <project>' — the term is the PROJECT title, but a chapter's
             # own title (e.g. "The Carrier Wave") won't contain it. Resolve the project first so the
             # chapter-number filter + project scope pick the right row (VP06/VP07 class).
@@ -773,12 +771,9 @@ async def _revert_chapter(client, payload: dict, version_number: int, user_id) -
         if user_id:
             q = q.eq("user_id", user_id)
         q = q.eq("content_type", "chapter")
-        ch = payload.get("chapter_number")
-        if ch not in (None, ""):
-            import contextlib
-
-            with contextlib.suppress(TypeError, ValueError):
-                q = q.eq("chapter_number", int(ch))
+        ch = optional_int(payload.get("chapter_number"))
+        if ch is not None:
+            q = q.eq("chapter_number", ch)
         match = _best_match(getattr(await q.limit(200).execute(), "data", None) or [], term, ("title",))
         if not match:
             return {"reverted": False, "error_message": "chapter not found"}
@@ -832,10 +827,11 @@ async def _op_revert(payload: dict) -> dict:
     client = await _supabase_or_none()
     if client is None:
         return {"reverted": False, "error_message": "supabase not configured"}
-    version_number = payload.get("version_number")
-    if version_number in (None, ""):
-        return {"reverted": False, "error_message": "version_number required"}
-    version_number = int(version_number)
+    version_number = optional_int(payload.get("version_number"))
+    if version_number is None:
+        # Covers absent AND non-numeric ("revert to version abc") — previously int() would raise
+        # and surface as an opaque step error instead of this message.
+        return {"reverted": False, "error_message": "a numeric version_number is required"}
     user_id = payload.get("user_id")
     scope = _clean_str(payload.get("scope")).lower() or "outline"
 

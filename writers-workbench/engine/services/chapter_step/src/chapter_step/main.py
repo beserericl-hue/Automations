@@ -14,6 +14,7 @@ import unicodedata
 from typing import Any
 from uuid import uuid4
 
+from writer_engine.library_helpers import optional_int
 from writer_engine.llm import ProviderNotRegistered, complete_structured, get_router
 from writer_engine.prompt_store import compose_craft_system, seed_default_prompts
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
@@ -360,12 +361,12 @@ def _adjacent_chapter_context(outline: dict[str, Any], chapter_number: int) -> s
         return None
 
     lines: list[str] = []
-    nums = [c.get("chapter_number") for c in chapters if isinstance(c, dict)]
-    try:
-        ordered = sorted(n for n in nums if str(n).lstrip("-").isdigit())
-        idx = ordered.index(int(chapter_number)) if str(chapter_number).lstrip("-").isdigit() else -1
-    except (ValueError, TypeError):
-        idx, ordered = -1, []
+    # optional_int drops absent/non-numeric entries, so `ordered` is a clean list[int] and the
+    # try/except that previously covered int()/sorted() on None is unnecessary (H8).
+    nums = [optional_int(c.get("chapter_number")) for c in chapters if isinstance(c, dict)]
+    ordered = sorted(n for n in nums if n is not None)
+    this_n = optional_int(chapter_number)
+    idx = ordered.index(this_n) if this_n is not None and this_n in ordered else -1
     prev_n = ordered[idx - 1] if idx > 0 else None
     next_n = ordered[idx + 1] if 0 <= idx < len(ordered) - 1 else None
     prev = _find(prev_n) if prev_n is not None else None
@@ -1966,10 +1967,8 @@ async def _op_qa(payload: dict) -> dict:
         ctx = await _load_context(str(project_id), payload)
         roster = roster or ctx.get("roster") or []
         if not chapter_text:
-            try:
-                chapter_text = await _load_persisted_chapter(str(project_id), int(chapter_number))
-            except (TypeError, ValueError):
-                chapter_text = ""
+            ch_n = optional_int(chapter_number)
+            chapter_text = await _load_persisted_chapter(str(project_id), ch_n) if ch_n is not None else ""
     period = str(payload.get("period") or "contemporary")
     roster_text = _roster_text(roster) if roster else ""
     name_check = _character_name_consistency(chapter_text, roster) if roster else None

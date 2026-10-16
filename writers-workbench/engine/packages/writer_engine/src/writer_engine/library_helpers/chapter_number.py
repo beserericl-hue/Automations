@@ -41,6 +41,33 @@ def normalize_chapter_number(value: Any) -> int:
         return 1
 
 
+def optional_int(value: Any) -> int | None:
+    """Coerce to ``int``, or ``None`` when absent or not a number.
+
+    The companion to :func:`normalize_chapter_number` for callers that must distinguish "no value
+    supplied" from a value. ``normalize_chapter_number`` defaults to 1, which is right when writing
+    (chapter 1 is a sensible default) and WRONG when selecting (defaulting a missing
+    ``chapter_number`` or ``version_number`` to 1 would revert or mutate the wrong row).
+
+    Also the type-safe replacement for the ``if x not in (None, ""): int(x)`` pattern — that guard
+    does not narrow ``Any | None`` for a type checker, so those sites each carried a
+    ``contextlib.suppress(TypeError, ValueError)`` to cover the crash it could not rule out (H8).
+    """
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return int(text)
+    except ValueError:
+        return None
+
+
 def chapter_label(chapter_number: Any, title: str | None = None) -> str:
     """Human label for a chapter: "Prologue — t" / "Epilogue — t" / "Chapter N — t".
 

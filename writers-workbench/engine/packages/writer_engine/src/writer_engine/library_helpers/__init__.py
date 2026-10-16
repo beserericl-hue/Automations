@@ -19,6 +19,7 @@ from .chapter_number import (
     PROLOGUE_NUMBER,
     chapter_label,
     normalize_chapter_number,
+    optional_int,
 )
 from .email_recipients import resolve_recipients
 from .jsonb_merge import jsonb_deep_merge
@@ -35,6 +36,7 @@ __all__ = [
     "next_version_number",
     "normalize_chapter_number",
     "normalize_title",
+    "optional_int",
     "resolve_recipients",
     "titles_match",
 ]

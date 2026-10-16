@@ -78,8 +78,27 @@ check_untyped_defs = true
 files = [
     "packages/writer_engine/src",
     "services/gateway/src",
+    "services/steps_app/src",
     "services/orchestrator/src",
     "services/library_retrieve_step/src",
+    "services/gather_step/src",
+    "services/pick_step/src",
+    "services/subject_step/src",
+    "services/scrape_step/src",
+    "services/segment_step/src",
+    "services/image_step/src",
+    "services/assemble_step/src",
+    "services/render_step/src",
+    "services/persist_step/src",
+    "services/deliver_step/src",
+    "services/chapter_step/src",
+    "services/research_step/src",
+    "services/brainstorm_step/src",
+    "services/media_step/src",
+    "services/library_step/src",
+    "services/story_bible_step/src",
+    "services/approval_step/src",
+    "services/notify_step/src",
 ]
 plugins = ["pydantic.mypy"]
 
