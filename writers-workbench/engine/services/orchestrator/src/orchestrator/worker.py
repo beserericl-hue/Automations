@@ -100,11 +100,21 @@ def build_redis_settings() -> RedisSettings:
     return RedisSettings.from_dsn(get_settings().redis_url)
 
 
+# The worker writes its heartbeat here; /admin/ready reads it (B2). Named explicitly rather than
+# relying on arq's "<queue_name>:health-check" default so the reader can't drift from the writer.
+ARQ_HEALTH_CHECK_KEY = "engine:arq:health-check"
+
+
 class WorkerSettings:
     redis_settings = build_redis_settings()
     functions: ClassVar[list[Any]] = [advance_newsletter_saga, run_write_tool_job]
     queue_name = "newsletter"
     max_jobs = 16
+    health_check_key = ARQ_HEALTH_CHECK_KEY
+    # arq defaults to 3600s, which would let a dead worker look alive for an hour — useless as a
+    # heartbeat. 30s means /admin/ready notices a stopped worker within ~a minute (arq sets the key's
+    # TTL just past this interval).
+    health_check_interval = 30
     # Keep job results long enough for the UI/hub to poll a long generation (must outlive job_timeout).
     keep_result = 7200
     # job_timeout must cover the WORST case, not the solo case. A solo chapter is ~12 min, but under

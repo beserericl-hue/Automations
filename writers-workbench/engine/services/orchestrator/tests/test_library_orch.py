@@ -45,10 +45,16 @@ async def test_orchestrator_runs_library_retrieve(fake_redis, _no_progress_publi
     assert {Stage.INIT.value, Stage.GATHERING.value, Stage.SAVED.value}.issubset(stages)
 
 
-def test_orchestrator_health() -> None:
+def test_orchestrator_health_reports_service() -> None:
+    """/admin/health answers and names the service.
+
+    It no longer asserts 200 unconditionally — that assertion was the B2 bug in test form. With the
+    step services unreachable in-process, 503 is the CORRECT answer. See test_health.py for the
+    status-code semantics.
+    """
     from orchestrator.main import app as orch_app
 
     client = TestClient(orch_app)
     r = client.get("/admin/health")
-    assert r.status_code == 200
+    assert r.status_code in (200, 503)
     assert r.json()["service"] == "orchestrator"

@@ -14,3 +14,15 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "services/runtime/Dockerfile"
+
+# B2: declare the healthcheck so Railway acts on /admin/health. Without this Railway never probed the
+# engine at all, so a dead step service (B1) left the container running and serving failures
+# indefinitely. /admin/health 503s when any in-container step is unreachable, which — until the
+# process model collapses under B10 — makes a container restart the automatic remedy.
+#
+# Deliberately /admin/health, NOT /admin/ready: readiness also gates on Redis/Supabase, and a blip
+# there must not restart-loop the container.
+[deploy]
+healthcheckPath = "/admin/health"
+healthcheckTimeout = 30
+restartPolicyType = "ALWAYS"

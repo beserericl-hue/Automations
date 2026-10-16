@@ -12,10 +12,42 @@ from gateway.main import app
 
 
 def test_health_open() -> None:
+    """Liveness stays flat-OK and open: the gateway is a stateless proxy (B2)."""
     client = TestClient(app)
     r = client.get("/admin/health")
     assert r.status_code == 200
     assert r.json() == {"status": "ok", "service": "gateway"}
+
+
+def test_ready_503_when_orchestrator_unreachable() -> None:
+    """Readiness requires the orchestrator; nothing is listening in-process, so it must refuse."""
+    client = TestClient(app)
+    r = client.get("/admin/ready")
+    assert r.status_code == 503
+    body = r.json()
+    assert body["status"] == "unhealthy"
+    assert body["failed_required"] == ["orchestrator"]
+
+
+def test_ready_200_when_orchestrator_healthy(monkeypatch: pytest.MonkeyPatch) -> None:
+    from gateway import main as gw_main
+    from writer_engine.health import CheckResult
+
+    async def _ok(name: str, url: str, **_: Any) -> CheckResult:
+        return CheckResult(name=name, ok=True)
+
+    monkeypatch.setattr(gw_main, "probe_http", _ok)
+    client = TestClient(app)
+    r = client.get("/admin/ready")
+    assert r.status_code == 200
+    assert r.json()["status"] == "ok"
+
+
+def test_liveness_does_not_depend_on_orchestrator() -> None:
+    """Guard the anti-cascade property: /admin/health must pass even with the orchestrator down."""
+    client = TestClient(app)
+    assert client.get("/admin/ready").status_code == 503
+    assert client.get("/admin/health").status_code == 200
 
 
 def test_internal_requires_service_secret() -> None:

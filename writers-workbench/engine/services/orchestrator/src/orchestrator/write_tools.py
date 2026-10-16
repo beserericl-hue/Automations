@@ -22,6 +22,30 @@ WRITE_TOOL_URLS: dict[str, Callable[[Any], str]] = {
     "notify": lambda s: s.notify_step_url,
 }
 
+# Newsletter saga step services (not hub-routable tools, so absent from WRITE_TOOL_URLS above).
+NEWSLETTER_STEP_URLS: dict[str, Callable[[Any], str]] = {
+    "gather": lambda s: s.gather_step_url,
+    "pick": lambda s: s.pick_step_url,
+    "subject": lambda s: s.subject_step_url,
+    "scrape": lambda s: s.scrape_step_url,
+    "segment": lambda s: s.segment_step_url,
+    "image": lambda s: s.image_step_url,
+    "assemble": lambda s: s.assemble_step_url,
+    "render": lambda s: s.render_step_url,
+    "persist": lambda s: s.persist_step_url,
+    "deliver": lambda s: s.deliver_step_url,
+}
+
+# Every step service the orchestrator can dial — the set /admin/health probes (B2). Keep in sync when
+# a step is added, or health will report a container as fine while one of its processes is dead.
+# library_retrieve is the F0 vertical-slice demo, superseded by `library` (A9) — probed so long as the
+# entrypoint still starts it; drop both together.
+ALL_STEP_URLS: dict[str, Callable[[Any], str]] = {
+    **WRITE_TOOL_URLS,
+    **NEWSLETTER_STEP_URLS,
+    "library_retrieve": lambda s: s.library_retrieve_step_url,
+}
+
 # Tools whose generation routinely exceeds the synchronous edge limit — default to async.
 ASYNC_DEFAULT_TOOLS = frozenset({"chapter", "brainstorm", "research"})
 

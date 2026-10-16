@@ -11,11 +11,19 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from arq import create_pool
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi import status as http_status
 
 from writer_engine.auth import require_service_secret
 from writer_engine.config import get_settings
+from writer_engine.health import (
+    probe_arq_worker,
+    probe_http,
+    probe_redis,
+    probe_supabase,
+    run_checks,
+    summarise,
+)
 from writer_engine.redis_client.client import close_redis
 from writer_engine.state_machine.durable import RedisSagaRepo
 from writer_engine.state_machine.orchestrator import InMemoryStateStore
@@ -26,8 +34,8 @@ from writer_engine.telemetry.metrics import HTTP_LATENCY, HTTP_REQUESTS, metrics
 from .library_orch import LibraryRetrieveOrchestrator
 from .newsletter_orch import NewsletterOrchestrator
 from .newsletter_saga import NewsletterSagaDriver
-from .worker import build_redis_settings
-from .write_tools import is_async, resolve_step_url
+from .worker import ARQ_HEALTH_CHECK_KEY, build_redis_settings
+from .write_tools import ALL_STEP_URLS, is_async, resolve_step_url
 
 # When set, the durable saga driver enqueues advance via this arq pool. Tests set it to None and drive
 # advance() directly so they don't need a live Redis + arq worker.
@@ -86,8 +94,52 @@ def build_app() -> FastAPI:
         return response
 
     @app.get("/admin/health")
-    async def health() -> dict[str, str]:
-        return {"status": "ok", "service": SERVICE}
+    async def health(response: Response) -> dict[str, Any]:
+        """Liveness — can this container serve? (B2)
+
+        Probes every in-container step service. These run as background processes in the same
+        container (B1), so an unreachable step means this container is broken and a restart is the
+        correct remedy — hence 503, which Railway's healthcheck acts on. External dependencies are
+        deliberately NOT checked here; they belong in /admin/ready so a Supabase or Redis blip
+        degrades readiness instead of causing a container restart loop.
+        """
+        settings = get_settings()
+        checks = await run_checks(
+            [
+                probe_http(f"step:{name}", f"{getter(settings)}/admin/health")
+                for name, getter in ALL_STEP_URLS.items()
+            ]
+        )
+        body, ok = summarise(SERVICE, checks)
+        if not ok:
+            response.status_code = http_status.HTTP_503_SERVICE_UNAVAILABLE
+            logger.error("health.unhealthy", failed=body.get("failed_required"))
+        return body
+
+    @app.get("/admin/ready")
+    async def ready(response: Response) -> dict[str, Any]:
+        """Readiness — should work be routed here? (B2)
+
+        Everything /admin/health checks, plus Redis (required — it carries the queue, the shared
+        Anthropic budget, the HITL gates and SSE), the arq worker heartbeat and Supabase. The latter
+        two are optional so a blip reports `degraded` rather than withdrawing the instance.
+
+        This is the hook a load balancer and the graceful-drain work (B7) build on.
+        """
+        settings = get_settings()
+        probes: list[Any] = [
+            probe_http(f"step:{name}", f"{getter(settings)}/admin/health")
+            for name, getter in ALL_STEP_URLS.items()
+        ]
+        probes.append(probe_redis(required=True))
+        probes.append(probe_arq_worker(health_check_key=ARQ_HEALTH_CHECK_KEY, required=False))
+        probes.append(probe_supabase(required=False))
+        checks = await run_checks(probes)
+        body, ok = summarise(SERVICE, checks)
+        if not ok:
+            response.status_code = http_status.HTTP_503_SERVICE_UNAVAILABLE
+            logger.error("ready.unhealthy", failed=body.get("failed_required"))
+        return body
 
     @app.get("/metrics")
     async def metrics() -> Any:

@@ -13,9 +13,11 @@ from collections.abc import Callable
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
+from fastapi import status as http_status
 
 from writer_engine.config import get_settings
+from writer_engine.health import probe_http, run_checks, summarise
 from writer_engine.redis_client.client import close_redis
 from writer_engine.telemetry.logging import configure_logging, get_logger
 from writer_engine.telemetry.metrics import HTTP_LATENCY, HTTP_REQUESTS, metrics_app, observe_latency
@@ -60,7 +62,35 @@ def build_app() -> FastAPI:
 
     @app.get("/admin/health")
     async def health() -> dict[str, str]:
+        """Liveness. Flat OK is correct here: the gateway is a stateless proxy, so the only thing a
+        restart fixes is the process being wedged — which this answering at all disproves.
+
+        Deliberately does NOT check the orchestrator (B2): if it did, an orchestrator restart would
+        fail the gateway's healthcheck too and restart it in sympathy. The orchestrator dependency
+        belongs in /admin/ready, which withdraws the instance from the load balancer without
+        bouncing it.
+        """
         return {"status": "ok", "service": SERVICE}
+
+    @app.get("/admin/ready")
+    async def ready(response: Response) -> dict[str, Any]:
+        """Readiness — can this gateway usefully serve? Requires the orchestrator it forwards to.
+
+        The hook for multi-replica routing + graceful drain (B7/C1).
+        """
+        checks = await run_checks(
+            [
+                probe_http(
+                    "orchestrator",
+                    f"{get_settings().orchestrator_url}/admin/health",
+                    required=True,
+                )
+            ]
+        )
+        body, ok = summarise(SERVICE, checks)
+        if not ok:
+            response.status_code = http_status.HTTP_503_SERVICE_UNAVAILABLE
+        return body
 
     @app.get("/metrics")
     async def metrics() -> Any:

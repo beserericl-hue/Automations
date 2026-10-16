@@ -11,3 +11,11 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "services/gateway/Dockerfile"
+
+# B2: see railway.runtime.toml. The gateway's /admin/health is liveness only (it is a stateless
+# proxy); its orchestrator dependency lives in /admin/ready so an orchestrator restart does not
+# bounce the gateway in sympathy.
+[deploy]
+healthcheckPath = "/admin/health"
+healthcheckTimeout = 30
+restartPolicyType = "ALWAYS"
