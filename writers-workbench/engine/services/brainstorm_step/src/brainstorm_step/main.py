@@ -328,10 +328,6 @@ async def _op_short_story(payload: dict) -> dict:
     return {"outline": outline_dict, "persist": persisted}
 
 
-async def _op_chapter(payload: dict) -> dict:
-    return {"chapter_outline": {"chapter_number": payload.get("chapter_number", 1), "beats": []}}
-
-
 def _roster_text(characters: list) -> str:
     out = []
     for c in characters:
@@ -524,7 +520,9 @@ async def _op_create_project(payload: dict) -> dict:
 OPS = {
     "story": _op_story,
     "short-story": _op_short_story,
-    "chapter": _op_chapter,
+    # A9: `chapter` removed — it returned {'beats': []} unconditionally, i.e. silently
+    # succeeded with nothing. Superseded by `chapter.plan` (E2E-4), which loads the story
+    # arc and emits the full sub-chapter schema. Unknown ops now return UNKNOWN_OP.
     "edit-outline": _op_edit_outline,
     "revise-outline": _op_revise_outline,
     "create-project": _op_create_project,

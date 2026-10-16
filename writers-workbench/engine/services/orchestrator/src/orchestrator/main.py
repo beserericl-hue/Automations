@@ -33,7 +33,7 @@ from writer_engine.telemetry.logging import configure_logging, get_logger
 from writer_engine.telemetry.metrics import HTTP_LATENCY, HTTP_REQUESTS, metrics_app, observe_latency
 
 from .library_orch import LibraryRetrieveOrchestrator
-from .newsletter_orch import NewsletterOrchestrator
+from .newsletter_orch import NewsletterOrchestrator, resolution_hook_installed
 from .newsletter_saga import NewsletterSagaDriver
 from .worker import ARQ_HEALTH_CHECK_KEY, build_redis_settings
 from .write_tools import ALL_STEP_URLS, is_async, resolve_step_url
@@ -265,7 +265,22 @@ def build_app() -> FastAPI:
 
     @app.post("/pipelines/newsletter/run", dependencies=[Depends(require_service_secret)])
     async def run_newsletter(body: dict[str, Any]) -> dict[str, Any]:
-        """Synchronous newsletter run — kept for the in-process E2E test (the auto-approve-hook path)."""
+        """Synchronous newsletter run — TEST ONLY (A10).
+
+        ``NewsletterOrchestrator`` auto-resolves the three HITL gates via the test hook, which is
+        what the in-process L2 test needs and what must never happen to a real newsletter: it would
+        send without any human review of stories, subject or images. Any holder of the service
+        secret could previously reach this route, so it now refuses unless a test has installed the
+        hook. Production goes to ``/pipelines/newsletter/run-durable``.
+        """
+        if not resolution_hook_installed():
+            raise HTTPException(
+                status_code=http_status.HTTP_410_GONE,
+                detail=(
+                    "/pipelines/newsletter/run is test-only (it auto-approves the HITL gates). "
+                    "Use /pipelines/newsletter/run-durable."
+                ),
+            )
         orch = NewsletterOrchestrator(app.state.store)
         exec_id_str = body.get("execution_id")
         if exec_id_str:

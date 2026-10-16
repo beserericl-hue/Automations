@@ -1,4 +1,12 @@
-"""The vertical-slice step service.
+"""DEPRECATED (A9) — superseded by `library_step`.
+
+Kept because it is the F0 vertical-slice proof and the simplest L2 test of the
+orchestration primitive (gateway -> orchestrator -> step -> SSE) in
+services/orchestrator/tests/test_library_orch.py. It is NOT in the hub catalog, so no
+user action can reach it. Remove it together with its STEP_NAMES / ALL_STEP_URLS /
+STEP_APPS entries and that test once a replacement L2 test exists.
+
+The vertical-slice step service.
 
 Returns a list of recent ``content_ingestion_v2`` rows for the given user_id (or an in-memory fixture when
 Supabase isn't configured — so the local docker-compose demo works without secrets). This is intentionally simple

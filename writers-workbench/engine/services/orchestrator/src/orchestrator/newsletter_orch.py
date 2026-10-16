@@ -327,3 +327,15 @@ def set_resolution_hook(hook):  # type: ignore[no-untyped-def]
     """Tests use this to auto-resolve gates so :meth:`run` flows end-to-end synchronously."""
     global _TEST_HOOK
     _TEST_HOOK = hook
+
+
+def resolution_hook_installed() -> bool:
+    """True only when a test has installed the auto-approve hook (A10).
+
+    This class auto-resolves the three HITL gates, which is exactly what the synchronous L2 test
+    needs and exactly what must never happen to a real newsletter — it would send without any human
+    review. ``/pipelines/newsletter/run`` gates on this so the path is simply not callable outside a
+    test; production uses ``/pipelines/newsletter/run-durable`` (NewsletterSagaDriver), which holds
+    the gates until a real operator resolves them.
+    """
+    return _TEST_HOOK is not None
