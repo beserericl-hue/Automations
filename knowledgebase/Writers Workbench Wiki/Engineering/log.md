@@ -1047,3 +1047,104 @@ resumed on its 30s cadence a minute later.
 3 (PROD cutover, starting with regenerating the dangerous workflow-id map), Gate 4 (turn n8n off,
 which E1 now has a producer for). The one judgement call to revisit: the `recorded`-mode parity
 number (0.667) is not the A4 gate — that needs `live`/shadow on same inputs.
+
+## [2026-10-16] Gate 2 complete | queue split, DLQ, run ledger, per-provider budgets, alerting, load test
+
+Updated: [[remaining-work-inventory]] §Gate 2 (full measurement table + what the data says about
+B7/B12/B10).
+
+**B4/B5 — two queues, one worker each.** Everything ran on one arq queue (`newsletter`,
+`max_jobs=16`, uniform `job_timeout=5400`). arq's `job_timeout`/`max_jobs`/`max_tries` belong to the
+**Worker**, not the job, so splitting the queues *is* the mechanism for per-operation timeouts:
+`engine-heavy` (8 slots, 5400s) and `engine-interactive` (24 slots, 600s). Routing is keyed on
+`(tool, op)` because the spread *within* a tool is the whole problem.
+
+Ops were classified against each step's `OPS` dict and its `max_tokens` arguments rather than by
+feel — `chapter.plan` and `brainstorm.edit-outline` both emit up to 32768 tokens and
+`media.cover-art` polls KIE.AI for 180s, so all three are heavy. The interactive ceiling is 600s and
+not the ~120s these ops take, because a job waits on the **LLM token budget** before it generates
+anything (`llm_budget_max_wait_s` is 300): a 180s ceiling would have killed interactive jobs under
+exactly the contention the split exists to survive. A test pins that invariant to the setting.
+
+**B5 — the DLQ.** arq has no dead-letter queue: a failed job's result expires and the failure is
+simply gone. Recorded from inside the job, NOT from arq's `after_job_end` hook — that hook's ctx
+carries only `job_id`/`job_try`/`enqueue_time`/`score`, no exception and no args, so it cannot tell
+failure from success, and arq's "max retries exceeded" branch returns before it runs at all. The
+hook version would have been a silent no-op. Also learned: **a plain exception is terminal in arq**
+(only `Retry`/`RetryJob`/`CancelledError` re-queue), so `max_tries` never gave a crashed chapter
+write a second attempt.
+
+**B6 — the run ledger (`engine_job_runs`, migration 028).** B6 asked us to *prove* idempotency, so
+the first half is a measurement: run every persist helper twice and count rows. `persist_chapter`,
+`persist_canon`, `persist_bible` and `persist_outline` are idempotent; `persist_content`,
+`persist_research`, `persist_chapter_qa` and `persist_token_usage` **duplicate** — and the worst is
+token_usage_v2, which is billing data, so a retry over-reports what a user owes. Two of the tables
+are immutable base tables and cannot gain a dedupe key, so the key lives in one meta table. A run
+already recorded `complete` does not execute again, which stops duplicated LLM spend as well as
+duplicated rows. **028 is not yet applied** — needs the DEV pooler DSN; the code fails open and that
+path was exercised 100+ times during the load test.
+
+**B8 — every provider gated and retried.** Audited what each client actually did on a 429 first,
+which decided the fix: anthropic retried (SDK), openai retried (SDK), and **gemini, perplexity,
+firecrawl and kieai had no retry at all**. gemini carries every hub turn and perplexity is the whole
+of `research.run`, so one 429 failed a user's request outright. Added a Redis-shared per-provider
+RPM/TPM window plus jittered 429/5xx retries honouring `Retry-After`. The limits are **caps we
+chose, not limits we measured** — only Anthropic publishes its ceilings in response headers — so
+every one is overridable with `PROVIDER_RATE_LIMITS`.
+
+Two things found while doing it: the router wrapped both budget calls in
+`contextlib.suppress(Exception)`, so a budget whose signature had drifted would have silently
+disabled rate limiting engine-wide; and my own `is_retryable` matched exception class-name suffixes
+and did not match `httpx.ReadTimeout`, caught by its own test.
+
+**B13/C1/C2 — the Redis decision.** Chosen: keep Railway Redis (one container, no replica) and make
+its failure loud rather than buy HA. Watchdog re-runs the readiness probes every 60s and emails on a
+transition plus recovery, per-check keys, debounced in Redis via `SET NX EX` so N instances send ONE
+email — and failing **open** when Redis itself is down, since that is the most likely subject of an
+alert. Delivery verified end to end through Postal. `GET /admin/dashboard` answers the three
+questions an incident asks in one request; depth alone would have misled, because arq keeps a
+*running* job in the queue's sorted set.
+
+Also closed the other half of the Redis decision: `create_approval`/`resolve_approval` have always
+mirrored HITL gates to `newsletter_approvals_v2`, but `get_approval` only read Redis and an
+in-process dict — so losing Redis turned every pending approval into "unknown approval token" while
+the row sat intact in Postgres. It now falls back to the mirror. No migration needed.
+
+**B11 — the load test, and the two faults it found.** 10 users: 20/20 ok. 20 users: 40/40 ok, peak
+`running` exactly 24 (the configured cap) with the overflow waiting ~31s. 20 users + 6 heavy:
+**37/46 and a container restart**, then **46/46** after the fixes.
+
+1. `redis.exceptions.TimeoutError: Timeout connecting to server` → the heavy worker exited rc=1 →
+   B1's fail-fast stopped everything. 94 jobs had completed, 8 were in flight, all 8 died. arq ships
+   a **one-second** socket connect timeout and its `conn_retries` only cover pool creation. Redis was
+   busy, not down.
+2. The supervisor amplified a transient blip into a container restart. It now restarts a dead child
+   in place (5 per 5 minutes, then the old exit-1), because an arq worker's jobs live in Redis and a
+   replacement picks them up.
+
+The 9 lost jobs left no dead letters, which is correct rather than a gap: killed processes do not run
+`except` blocks.
+
+**What the data changes.** The binding constraint at 20 users is the interactive worker's slot count
+— not CPU, not memory, and **not the step process**, which contradicts the assumption that B10's
+one-container design would be the ceiling. No step gets peeled out on this evidence. B12
+(autoscaling) stays unjustified: nothing queued longer than 31s, nothing was lost. 50 users needs
+~2.5× the interactive slots, which is a `max_jobs` change or a second instance (B7) — to be decided
+with a 50-user run, not extrapolated from 20.
+
+**Found incidentally, both real and both now fixed.** (1) No engine Dockerfile copied `uv.lock`, so
+`uv sync` resolved dependencies fresh at build time and the deployed engine ran whatever was newest
+on build day — which is how `chapter.*` came to fail on DEV with `AsyncMessages.create() got an
+unexpected keyword argument 'temperature'` while the whole suite was green locally. 21 of the 22
+Dockerfiles also asked for `uv sync --frozen ... || uv sync ...`, and with no lock in the image the
+`--frozen` arm could never succeed, so the unlocked fallback was the only arm that ever ran. (2) The
+replacement `ANTHROPIC_API_KEY` is an **account-level** key (`sk-ant-usr-`), which Anthropic refuses
+unless the request names a workspace; `ANTHROPIC_WORKSPACE_ID` is now sent as a default header by
+both the engine adapter and the Node server's own client.
+
+**Decisions recorded:** everything stays on DEV until the engine is complete — no PROD cutover, so
+Gate 3 is off the plan for now. n8n is being eliminated, so its Anthropic credentials are not a
+concern.
+
+**Still open:** apply migration 028 to DEV (needs the pooler DSN), and add an external uptime check
+on `/admin/health` — the watchdog is inside the engine and cannot report the engine being dead.

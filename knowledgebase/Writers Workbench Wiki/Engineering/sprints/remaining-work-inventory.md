@@ -405,14 +405,72 @@ Exit criterion met in the sense that the harness now exists and produces a numbe
 (0.667 on `recorded` mode) is **not** the A4 gate — that needs `live`/shadow mode on same inputs, and
 A13 is the one regression it found so far. Re-run `recorded` once a fresh capture exists post-A13.
 
-### Gate 2 — Make the scaling story real
+### Gate 2 — Make the scaling story real — **COMPLETE 2026-10-16**
 
 **B4** split heavy/interactive queues · **B5** per-op timeouts + DLQ · **B6** prove idempotency ·
-**B8** per-provider budgets · **B13** HA Redis + alerting (**C1**, **C2**).
+**B8** per-provider budgets · **B13** Redis decision + alerting (**C1**, **C2**) · exit via **B11**.
 
-Exit: run **B11** — actually load-test 10 and 20 concurrent users. That measurement decides
-**B7**/**B12**, settles whether any step gets peeled out of the B10 container, and tells us what 50
-users costs.
+#### What shipped
+
+| Item | Done | Note |
+|---|---|---|
+| **B4** | ✅ | Two queues (`engine-heavy` 8 slots / `engine-interactive` 24 slots), one arq worker each. Routed by `(tool, op)` — the spread *within* a tool is the problem: `chapter.write` is the longest job and `chapter.qa` one of the shortest. Process table 3 → 4. |
+| **B5** | ✅ | Per-queue `job_timeout` (5400s / 600s) + a capped Redis DLQ at `GET /admin/dlq`. |
+| **B6** | 🟡 | Run ledger (`engine_job_runs`, migration **028**) claims a `run_id` before work and short-circuits a completed run. **Code deployed and fail-open; 028 NOT APPLIED — blocked on the DEV pooler DSN.** |
+| **B8** | ✅ | Per-provider RPM/TPM budgets for gemini / perplexity / openai / firecrawl / kieai, plus 429 retries where there were none. |
+| **B13** | ✅ | Decision: keep Railway Redis, make failure loud. Watchdog + email alerting + HITL gates readable from Postgres. |
+| **C1** | ✅ | `GET /admin/dashboard` — readiness, per-queue depth/running/waiting, recent dead letters. |
+| **C2** | ✅ | `ALERT_EMAIL` via Postal, debounced in Redis. Delivery verified end to end. |
+| **B11** | ✅ | `scripts/load_test.py`. Numbers below. |
+
+#### B11 measurements (DEV, every op a real LLM call)
+
+| Load | Result | Wall | Queue wait p95 | Total p95 |
+|---|---|---|---|---|
+| 10 users × 2 interactive | 20/20 ok | 44s | 2.5s | 38s |
+| 20 users × 2 interactive | 40/40 ok | 75s | 26.7s | 67s |
+| 20 users + 6 heavy (first run) | **37/46 — container restart** | 67s | 31s | 65s |
+| 20 users + 6 heavy (after fixes) | **46/46 ok** | 94s | 30.8s | 86s |
+
+Peak interactive `running` hit exactly 24 — the configured `max_jobs` — with the overflow waiting
+for a slot. **B4 holds:** heavy work ran on its own worker with a 2.4s queue wait while 40
+interactive jobs were in flight, which is precisely the starvation the split was meant to remove.
+
+#### The two faults the load test found
+
+1. **A one-second Redis connect timeout cost the whole container.** arq ships `conn_timeout=1`, and
+   its `conn_retries` only cover pool *creation*. At 20 users a connect attempt timed out, the heavy
+   worker exited rc=1, and B1's fail-fast then stopped every other process: 94 jobs had completed, 8
+   were in flight, all 8 died. Redis was busy, not down. Now 10s with `retry_on_timeout` and an idle
+   health check.
+2. **The supervisor amplified it.** Exiting as soon as *any* child dies is right for a child whose
+   death makes the container useless and wrong for an arq worker, whose jobs live in Redis. It now
+   restarts a dead child in place (5 per 5 minutes, then the old exit-1).
+
+The 9 lost jobs left **no dead letters**, and that is correct rather than a B5 gap: the processes
+were killed, so nothing ran an `except` block. The DLQ covers a job that fails, not a job whose
+process is killed — the restart policy is what shrinks that window.
+
+#### What the data says about B7 / B12 / B10
+
+* **One instance holds 20 users** for this mix. The binding constraint is the interactive worker's
+  24 slots, not CPU, not memory, and not the step process — which contradicts the pre-measurement
+  assumption that B10's one-container design would be the ceiling. **No step gets peeled out of the
+  B10 container on this evidence.**
+* **Redis is the real single point of failure**, confirmed by being the only thing that actually
+  broke. The chosen mitigation is alerting, not HA.
+* **50 users** on this mix needs roughly 2.5× the interactive slots. That is either `max_jobs` (one
+  process, more concurrency) or a second instance (**B7**) — a decision to make with a 50-user run,
+  not from a 20-user extrapolation. **B12** (autoscaling) remains unjustified: nothing queued for
+  longer than 31s and nothing was lost.
+
+#### Still open from Gate 2
+
+* **Migration 028** needs applying to DEV (pooler DSN). Until then B6 logs
+  `idempotency.claim_unavailable` on every job and falls open — observed 100+ times under load, so
+  the fail-open path is itself well tested.
+* **An external uptime check** on `/admin/health`. The watchdog lives inside the engine and
+  therefore cannot report the engine being entirely dead.
 
 ### Gate 3 — Ship it
 
