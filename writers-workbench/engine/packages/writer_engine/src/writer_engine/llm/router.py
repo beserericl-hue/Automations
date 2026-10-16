@@ -14,6 +14,19 @@ class ProviderNotRegistered(KeyError):
     Step services catch this specifically to fall back to local fixtures while letting real provider
     errors (rate limits, network, validation) surface unmasked. Subclasses KeyError for back-compat
     with earlier ``except KeyError:`` fallback paths.
+
+    Only raised when fixture fallback is ENABLED — see :class:`ProviderNotConfigured`.
+    """
+
+
+class ProviderNotConfigured(RuntimeError):
+    """A provider has no adapter AND fixture fallback is disabled for this environment (A1).
+
+    Deliberately **not** a subclass of :class:`ProviderNotRegistered` (nor of ``KeyError``): the ~23
+    ``except ProviderNotRegistered:`` fallback handlers across the step services must NOT catch it.
+    Raising a different type is what turns "key missing" from a silent placeholder result into a
+    ``StepOutput(status=ERROR)`` at every one of those sites at once, without editing each one — and
+    without any site being able to opt itself back into faking success.
     """
 
 
@@ -141,7 +154,22 @@ class LLMRouter:
         stream: bool = False,
     ) -> LLMResponse:
         if provider not in self._adapters:
-            raise ProviderNotRegistered(f"unknown LLM provider: {provider}")
+            # A1: a provider with no adapter almost always means its API key is absent or mistyped
+            # in this environment. Unless fixtures are explicitly enabled, refuse with a type the
+            # step services' fixture handlers do not catch, so the step reports an error instead of
+            # persisting and emailing placeholder content as real work.
+            from writer_engine.fixtures import fixture_fallback_allowed
+
+            msg = (
+                f"LLM provider '{provider}' has no registered adapter — its API key is most likely "
+                f"unset for this environment"
+            )
+            if not fixture_fallback_allowed():
+                raise ProviderNotConfigured(
+                    f"{msg}. Fixture fallback is disabled (ALLOW_FIXTURE_FALLBACK is not set), so "
+                    f"this call will not be replaced with placeholder content."
+                )
+            raise ProviderNotRegistered(msg)
         # Annotated dict[str, Any]: inferred as dict[str, float | int | str | None], which makes the
         # **splat below a type error on every parameter without catching anything real.
         kwargs: dict[str, Any] = dict(

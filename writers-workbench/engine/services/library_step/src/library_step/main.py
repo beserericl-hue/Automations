@@ -6,6 +6,7 @@ import re
 from datetime import UTC
 
 from writer_engine.config import get_settings
+from writer_engine.fixtures import guard_fixture_fallback
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
 from writer_engine.step_service import build_step_app
 from writer_engine.telemetry.logging import get_logger
@@ -59,6 +60,11 @@ async def _op_lifecycle(payload: dict) -> dict:
     # list_deleted is a READ of the trash (no target row) — handle first.
     if action == "list_deleted":
         if client is None:
+            # A1: an empty list is indistinguishable from "you have no deleted items".
+            guard_fixture_fallback(
+                step=STEP_NAME,
+                reason="Supabase is not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY unset)",
+            )
             return {"items": [], "fixture": True}
         q = (
             client.table("published_content_v2")
@@ -240,6 +246,11 @@ async def _op_retrieve(payload: dict) -> dict:
     instead of dumping every row."""
     client = await _supabase_or_none()
     if client is None:
+        # A1: without this, a misconfigured env reports "not found" for content that exists.
+        guard_fixture_fallback(
+            step=STEP_NAME,
+            reason="Supabase is not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY unset)",
+        )
         return {"items": [], "fixture": True, "found": False, "count": 0}
 
     raw_ct = _clean_str(payload.get("content_type")).lower().replace(" ", "_").replace("-", "_")
@@ -660,6 +671,11 @@ async def _op_versions(payload: dict) -> dict:
     scope=content → content_versions_v2 by content_id. mode=get returns one version's full body."""
     client = await _supabase_or_none()
     if client is None:
+        # A1: an empty version list would read as "this item has no history".
+        guard_fixture_fallback(
+            step=STEP_NAME,
+            reason="Supabase is not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY unset)",
+        )
         return {"versions": [], "fixture": True}
     scope = _clean_str(payload.get("scope")).lower()
     mode = _clean_str(payload.get("mode")).lower() or "list"

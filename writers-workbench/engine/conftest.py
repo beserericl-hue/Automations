@@ -12,6 +12,10 @@ import pytest
 os.environ.setdefault("SERVICE_SHARED_SECRET", "test-secret")
 os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
+# A1: the suite runs key-less, so step services MUST be allowed to substitute fixtures. In DEV/PROD
+# this is unset, which makes a missing provider key fail loudly instead of persisting placeholder
+# content as real work. Tests that assert the fail-loud path turn it off explicitly.
+os.environ.setdefault("ALLOW_FIXTURE_FALLBACK", "true")
 
 # Override any provider/Supabase keys that may be in .env so tests use fixtures (no real API calls).
 # Tests that want real keys should opt in by clearing these in their own setup.
@@ -25,6 +29,18 @@ for _isolated_key in (
     "FIRECRAWL_API_KEY",
     "POSTAL_API_KEY",
     "POSTAL_API_URL",
+    # These were MISSING, so the "no real API calls" contract above was not actually upheld on any
+    # machine with a populated .env (found while adding the A1 tests):
+    #   KIEAI_API_KEY        -> media.cover-art made real, paid image-generation calls
+    #   ELEVENLABS_*         -> writer_engine.eve is gated on both being present; with both set a
+    #                           test could place a REAL outbound phone call to a real number
+    #   WORKBENCH_API_URL /  -> gather/notify reach the live DEV Workbench
+    #   INGESTION_SECRET
+    "KIEAI_API_KEY",
+    "ELEVENLABS_API_KEY",
+    "ELEVENLABS_AGENT_ID",
+    "WORKBENCH_API_URL",
+    "INGESTION_SECRET",
 ):
     os.environ[_isolated_key] = ""
 

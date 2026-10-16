@@ -17,6 +17,7 @@ from datetime import UTC
 import httpx
 
 from writer_engine.config import get_settings
+from writer_engine.fixtures import guard_fixture_fallback
 from writer_engine.llm import ProviderNotRegistered, get_router
 from writer_engine.llm.structured import extract_json
 from writer_engine.prompt_store import compose_craft_system, seed_default_prompts
@@ -202,6 +203,12 @@ async def _op_cover_art(payload: dict) -> dict:
         image = await _dalle_cover(prompt, key=settings.openai_api_key)
         provider = "dalle" if image else provider
     if image is None:
+        # A1: no image provider produced anything — almost always KIEAI_API_KEY/OPENAI_API_KEY
+        # missing. A placehold.co URL previously got persisted and emailed as the user's cover art.
+        guard_fixture_fallback(
+            step=STEP_NAME,
+            reason="no image provider available (KIEAI_API_KEY / OPENAI_API_KEY unset or both failed)",
+        )
         return {
             "image_url": f"https://placehold.co/1600x2400?text={_slug(title)}",
             "provider": "stub",
@@ -325,6 +332,9 @@ async def _op_scrape_url(payload: dict) -> dict:
     if not url:
         return {"url": None, "markdown": "", "html": "", "metadata": {}, "note": "no url"}
     if not settings.firecrawl_api_key:
+        # A1: scraped text feeds newsletter segments and blog grounding. A "(stub — …)" body silently
+        # became the source material for generated copy.
+        guard_fixture_fallback(step=STEP_NAME, reason="FIRECRAWL_API_KEY not set")
         return {"url": url, "markdown": "(stub — FIRECRAWL_API_KEY not set)", "html": "", "metadata": {}}
     body = {"url": url, "formats": ["markdown", "html"]}
     async with httpx.AsyncClient(timeout=90.0) as client:

@@ -21,9 +21,12 @@ class EngineSettings(BaseSettings):
         extra="ignore",
     )
 
-    # Auth
-    service_shared_secret: str = Field(default="dev-service-secret-change-me", alias="SERVICE_SHARED_SECRET")
-    admin_token: str = Field(default="dev-admin-token-change-me", alias="ADMIN_TOKEN")
+    # Auth. Default EMPTY, never a placeholder value (G3): a well-known default like
+    # "dev-service-secret-change-me" means an environment that forgets to set these is wide open to
+    # anyone who has read this file. Empty is treated as "not configured" and fails closed — see
+    # writer_engine.auth.service_secret.
+    service_shared_secret: str = Field(default="", alias="SERVICE_SHARED_SECRET")
+    admin_token: str = Field(default="", alias="ADMIN_TOKEN")
 
     # Supabase
     supabase_url: str = Field(default="", alias="SUPABASE_URL")
@@ -91,6 +94,11 @@ class EngineSettings(BaseSettings):
 
     # Feature flags (F1-A). Embeddings default OFF → falls through to the n8n shim.
     enable_python_embeddings: bool = Field(default=False, alias="ENABLE_PYTHON_EMBEDDINGS")
+
+    # A1: allow step services to substitute placeholder content when a provider key is missing.
+    # Default FALSE so a misconfigured DEV/PROD environment fails loudly instead of persisting and
+    # emailing a fixture as real work. Set true only for the key-less local stack + tests.
+    allow_fixture_fallback: bool = Field(default=False, alias="ALLOW_FIXTURE_FALLBACK")
 
     # Embeddings (F1-A prereq #5). OpenAI text-embedding model + the pgvector match RPC name.
     embedding_model: str = Field(default="text-embedding-3-small", alias="EMBEDDING_MODEL")
