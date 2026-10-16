@@ -248,3 +248,138 @@ async def test_index_embeds_before_deleting(monkeypatch: pytest.MonkeyPatch) -> 
         assert not any(c.startswith("delete:") for c in calls), "deleted canon despite a failed embed"
     finally:
         get_settings.cache_clear()
+
+
+# --- sub_chapter coverage + the reindex guard --------------------------------------------------
+
+
+def test_sub_chapters_are_chunked() -> None:
+    """sub_chapter is the LARGEST doc_type n8n produced (126 of 169 rows on one DEV project).
+
+    The first version of build_canon_chunks omitted it, which would have made the delete-then-insert
+    reindex destroy ~75% of a project's canon.
+    """
+    outline = {
+        "premise": "p",
+        "chapters": [
+            {
+                "number": 14,
+                "title": "The Override",
+                "summary": "s",
+                "chapter_outline": {
+                    "sub_chapters": [
+                        {
+                            "number": 1,
+                            "title": "The Override",
+                            "brief": "Cogwheel is paralysed by a control key.",
+                            "arc_beat": "Step 1 - Comfort Zone",
+                            "setting": "A London street",
+                            "characters": ["Cogwheel", "Blackwood"],
+                            "emotional_tone": "Horror",
+                        },
+                        {"number": 2, "title": "Carriage", "brief": "Taken away."},
+                        {"number": None, "brief": "no number -> skipped"},
+                    ]
+                },
+            }
+        ],
+    }
+    chunks = {c["doc_id"]: c for c in embed_mod.build_canon_chunks(outline, [])}
+    assert "ch14_sc1" in chunks, "sub_chapter chunks must be produced"
+    assert "ch14_sc2" in chunks
+    assert len([k for k in chunks if k.startswith("ch14_sc")]) == 2, "numberless sub must be skipped"
+
+    first = chunks["ch14_sc1"]
+    assert first["doc_type"] == "sub_chapter"
+    # n8n's title convention, so engine- and n8n-indexed rows stay queryable together.
+    assert first["doc_title"] == "Ch14 Sub1: The Override"
+    for expected in ("Sub-chapter 1 of Chapter 14", "Brief:", "Arc beat:", "Setting:", "Characters:"):
+        assert expected in first["content"], expected
+
+
+def test_sub_chapter_content_omits_absent_fields() -> None:
+    """A sparse sub-chapter must not embed dangling 'Setting:' labels with no value."""
+    outline = {
+        "chapters": [
+            {
+                "number": 1,
+                "title": "T",
+                "summary": "s",
+                "chapter_outline": {"sub_chapters": [{"number": 1, "title": "A", "brief": "b"}]},
+            }
+        ]
+    }
+    body = {c["doc_id"]: c for c in embed_mod.build_canon_chunks(outline, [])}["ch1_sc1"]["content"]
+    assert "Setting:" not in body
+    assert "Emotional tone:" not in body
+    assert "Brief: b" in body
+
+
+def test_reindex_coverage_guard_threshold_is_set() -> None:
+    assert 0 < embed_mod.MIN_REINDEX_COVERAGE < 1
+
+
+async def test_reindex_refuses_a_large_coverage_drop(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The guard that makes delete-then-insert safe: a chunker that stops producing a doc_type must
+    not be able to wipe that canon silently."""
+    monkeypatch.setenv("ENABLE_PYTHON_EMBEDDINGS", "true")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    get_settings.cache_clear()
+    deleted: list[str] = []
+
+    class _Q:
+        def __init__(self, t: str) -> None:
+            self._t = t
+
+        def select(self, *_a: object, **_k: object) -> _Q:
+            return self
+
+        def eq(self, *_a: object, **_k: object) -> _Q:
+            return self
+
+        def is_(self, *_a: object, **_k: object) -> _Q:
+            return self
+
+        def limit(self, *_a: object) -> _Q:
+            return self
+
+        def delete(self) -> _Q:
+            deleted.append(self._t)
+            return self
+
+        def insert(self, *_a: object) -> _Q:
+            return self
+
+        async def execute(self) -> object:
+            t = self._t
+
+            class R:
+                # One tiny outline -> 1 chunk, against 100 existing rows.
+                data = (
+                    [{"outline": {"premise": "only a premise"}}]
+                    if t == "writing_projects_v2"
+                    else ([{"id": f"r{i}"} for i in range(100)] if t == "writing_embeddings_v2" else [])
+                )
+
+            return R()
+
+    class _Client:
+        def table(self, name: str) -> _Q:
+            return _Q(name)
+
+    async def _client() -> _Client:
+        return _Client()
+
+    async def _embed(texts: list[str]) -> list[list[float]]:
+        return [[0.0] * 4 for _ in texts]
+
+    import writer_engine.supabase.client as sb
+
+    monkeypatch.setattr(sb, "get_supabase_admin", _client)
+    monkeypatch.setattr(embed_mod, "embed_texts", _embed)
+    try:
+        with pytest.raises(RuntimeError, match="refusing to reindex"):
+            await embed_mod.index_project_canon(user_id="+1", project_id="p")
+        assert "writing_embeddings_v2" not in deleted, "canon was deleted despite the guard"
+    finally:
+        get_settings.cache_clear()

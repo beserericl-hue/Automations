@@ -21,6 +21,10 @@ dependencies = [
     "uvicorn[standard]>=0.30.0",
     "sse-starlette>=2.1.0",
     "tenacity>=8.5.0",
+    # A3: required by writer_engine.embeddings. Imported lazily so the module loads without it, but
+    # ENABLE_PYTHON_EMBEDDINGS=true is useless unless it is installed — retrieval silently degrades
+    # to no grounding, which is the exact silent-no-op class A1 exists to prevent.
+    "openai>=1.40.0",
 ]
 
 [build-system]

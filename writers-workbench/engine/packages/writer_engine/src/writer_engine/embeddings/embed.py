@@ -165,6 +165,10 @@ async def re_embed_project(*, user_id: str, project_id: str) -> int:
 #   chapter_brief  doc_id "ch_<n>"       title "Ch <n> — <title>"
 #   bible_entry    doc_id "<row uuid>"   title "[<entry_type>] <name>"
 
+# A reindex replacing fewer than this fraction of the existing rows is treated as a chunker bug
+# rather than a legitimate shrink. See the guard in index_project_canon.
+MIN_REINDEX_COVERAGE = 0.6
+
 CanonChunk = dict[str, Any]
 
 
@@ -231,6 +235,43 @@ def build_canon_chunks(outline: dict[str, Any], bible_rows: list[dict[str, Any]]
             _chunk("chapter_brief", f"ch_{num}", f"Ch {num} — {title}" if title else f"Ch {num}", body)
         )
 
+        # sub_chapter is the LARGEST doc_type n8n produced (126 of 169 rows on one DEV project), and
+        # the richest per-scene canon there is. Omitting it would make a reindex destructive: the
+        # delete-then-insert would drop every sub_chapter row and never regenerate it.
+        plan = ch.get("chapter_outline")
+        subs = (plan or {}).get("sub_chapters") if isinstance(plan, dict) else None
+        for sub in subs or []:
+            if not isinstance(sub, dict):
+                continue
+            s_num = sub.get("number")
+            s_title = str(sub.get("title") or "").strip()
+            if s_num is None:
+                continue
+            s_body = "\n".join(
+                part
+                for part in (
+                    f"Sub-chapter {s_num} of Chapter {num}: {s_title}".strip(),
+                    f"Brief: {sub.get('brief') or sub.get('beat') or ''}".strip(),
+                    f"Arc beat: {sub.get('arc_beat') or ''}".strip() if sub.get("arc_beat") else "",
+                    f"Setting: {sub.get('setting') or ''}".strip() if sub.get("setting") else "",
+                    f"Characters: {', '.join(str(c) for c in sub.get('characters') or [])}"
+                    if sub.get("characters")
+                    else "",
+                    f"Emotional tone: {sub.get('emotional_tone') or ''}".strip()
+                    if sub.get("emotional_tone")
+                    else "",
+                )
+                if part and not part.endswith(":")
+            )
+            chunks.append(
+                _chunk(
+                    "sub_chapter",
+                    f"ch{num}_sc{s_num}",
+                    f"Ch{num} Sub{s_num}: {s_title}" if s_title else f"Ch{num} Sub{s_num}",
+                    s_body,
+                )
+            )
+
     for row in bible_rows:
         if not isinstance(row, dict):
             continue
@@ -288,6 +329,32 @@ async def index_project_canon(*, user_id: str, project_id: str) -> int:
     if len(vectors) != len(chunks):
         logger.warning("embeddings.index_vector_count_mismatch", chunks=len(chunks), vectors=len(vectors))
         return 0
+
+    # Coverage guard. The reindex is delete-then-insert, so a chunker that silently stops producing
+    # a doc_type would WIPE that canon. (Caught for real: the first version of build_canon_chunks
+    # omitted sub_chapter, the largest doc_type — 126 of 169 rows on one project — so a reindex would
+    # have destroyed ~75% of it.) Refuse to replace a materially larger existing set.
+    existing_resp = (
+        await client.table(EMBEDDINGS_TABLE)
+        .select("id")
+        .eq("user_id", user_id)
+        .eq("project_id", str(project_id))
+        .execute()
+    )
+    existing = len(_rows(existing_resp))
+    if existing and len(chunks) < existing * MIN_REINDEX_COVERAGE:
+        logger.error(
+            "embeddings.index_refused_coverage_drop",
+            project_id=str(project_id),
+            existing=existing,
+            new=len(chunks),
+            min_ratio=MIN_REINDEX_COVERAGE,
+        )
+        raise RuntimeError(
+            f"refusing to reindex project {project_id}: would replace {existing} canon rows with "
+            f"only {len(chunks)} (below {MIN_REINDEX_COVERAGE:.0%} coverage). Check the chunker "
+            "covers every doc_type before forcing this."
+        )
 
     await (
         client.table(EMBEDDINGS_TABLE)
