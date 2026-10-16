@@ -34,7 +34,7 @@ def test_embeddings_enabled_when_flag_set(monkeypatch) -> None:
 async def test_match_returns_empty_when_disabled(monkeypatch) -> None:
     monkeypatch.delenv("ENABLE_PYTHON_EMBEDDINGS", raising=False)
     get_settings.cache_clear()
-    out = await embeddings.match_writing_documents(query="q", user_id="+1")
+    out = await embeddings.match_project_canon(query="q", user_id="+1")
     assert out == []
 
 
@@ -42,7 +42,7 @@ async def test_match_returns_empty_when_disabled(monkeypatch) -> None:
 async def test_re_embed_noop_when_disabled(monkeypatch) -> None:
     monkeypatch.delenv("ENABLE_PYTHON_EMBEDDINGS", raising=False)
     get_settings.cache_clear()
-    assert await embeddings.re_embed_project(user_id="+1", project_title="p") == 0
+    assert await embeddings.re_embed_project(user_id="+1", project_id="p") == 0
 
 
 @pytest.mark.asyncio

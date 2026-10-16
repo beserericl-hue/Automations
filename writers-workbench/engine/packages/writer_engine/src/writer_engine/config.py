@@ -102,7 +102,9 @@ class EngineSettings(BaseSettings):
 
     # Embeddings (F1-A prereq #5). OpenAI text-embedding model + the pgvector match RPC name.
     embedding_model: str = Field(default="text-embedding-3-small", alias="EMBEDDING_MODEL")
-    embedding_match_rpc: str = Field(default="match_writing_documents", alias="EMBEDDING_MATCH_RPC")
+    # A3: must match the function migration 027 creates. The old default
+    # ("match_writing_documents") named a function that exists nowhere.
+    embedding_match_rpc: str = Field(default="match_writing_embeddings_v2", alias="EMBEDDING_MATCH_RPC")
 
     # Inter-service
     orchestrator_url: str = Field(default="http://localhost:8001", alias="ORCHESTRATOR_URL")

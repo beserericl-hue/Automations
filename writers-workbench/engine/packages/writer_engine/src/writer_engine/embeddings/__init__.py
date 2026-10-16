@@ -6,7 +6,7 @@ through to the existing n8n embedding shim — so shipping this package is non-b
 
 Public surface (mirrors the n8n embedding sub-flow):
 - :func:`embed_texts` — OpenAI embeddings for a batch of strings.
-- :func:`match_writing_documents` — pgvector similarity search via a Supabase RPC.
+- :func:`match_project_canon` — pgvector similarity search over writing_embeddings_v2 (A3).
 - :func:`re_embed_project` — re-embed all chunks for a project (async, best-effort).
 """
 
@@ -15,13 +15,13 @@ from __future__ import annotations
 from .embed import (
     embed_texts,
     embeddings_enabled,
-    match_writing_documents,
+    match_project_canon,
     re_embed_project,
 )
 
 __all__ = [
     "embed_texts",
     "embeddings_enabled",
-    "match_writing_documents",
+    "match_project_canon",
     "re_embed_project",
 ]
