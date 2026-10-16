@@ -1501,18 +1501,13 @@ async def _persist_chapter_if_requested(
                 content=research_used,
                 genre_slug=genre,
             )
-            topics = _facts_topics(research_used)
-            if topics:
-                await persist_bible(
-                    client,
-                    project_id=str(project_id),
-                    user_id=str(user_id),
-                    entries=[
-                        {"entry_type": "research", "name": t, "description": research_used[:500]}
-                        for t in topics[:12]
-                    ],
-                    chapter_number=chapter_number,
-                )
+            # A6: the duplicate `research` story-bible write is GONE. persist_research above already
+            # stores the full research text in research_reports_v2 (linked to the project by
+            # migration 026); this additionally wrote up to 12 topic-label rows per chapter into
+            # story_bible_v2, each carrying a 500-char truncation of the same text. On DEV that was
+            # 493 rows — and every sampled row's text was verified present verbatim inside a linked
+            # report, so they were pure duplication. They also polluted the Story Bible tab with a
+            # type no consumer rendered. Research belongs in research_reports_v2, not the bible.
             bible_info["research_persisted"] = True
         except Exception as exc:
             logger.warning("chapter.research.persist_failed", chapter=chapter_number, error=str(exc)[:200])

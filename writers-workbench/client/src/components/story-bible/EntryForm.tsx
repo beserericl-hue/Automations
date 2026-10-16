@@ -4,8 +4,11 @@ import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
 import { apiFetch } from '../../lib/api';
 import type { StoryBibleEntry } from '../../types/database';
+import { CANONICAL_ENTRY_TYPES } from '../../lib/story-bible-types';
 
-const ENTRY_TYPES = ['character', 'location', 'event', 'timeline', 'plot_thread', 'world_rule'] as const;
+// A6: offer the vocabulary the ENGINE writes, so a manually-added entry files alongside the
+// extractor's entries instead of into a section the engine never populates.
+const ENTRY_TYPES = CANONICAL_ENTRY_TYPES;
 
 const typeLabels: Record<string, string> = {
   character: 'Character',

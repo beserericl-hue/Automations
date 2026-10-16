@@ -27,14 +27,20 @@ TWO OF THE MAPPINGS ARE UNAMBIGUOUS (same concept, different word):
     place  -> location
     object -> item
 
-TWO NEED A DECISION, which is why this script does not guess:
+DECIDED 2026-10-16 — the ENGINE vocabulary is canonical:
 
-    concept  (719 rows) — the table has no equivalent. plot_thread is the closest but not the same
-                          thing; world_rule (client-only) is arguably closer. Could also justify
-                          adding `concept` to the CHECK instead of remapping.
-    research (493 rows) — arguably not a story-bible entry at all. chapter_step writes these as
-                          research-topic records; they may belong in research_reports_v2, or be
-                          dropped. Deleting 493 rows is destructive, so it is not defaulted.
+    character | place | object | concept | event
+
+Confirmed by probing DEV: `pg_constraint` shows **no CHECK on entry_type at all**, so the table's
+documented set was never enforced and the engine's words are simply what the data contains. The
+consumers move instead of the data: the client now groups by the types actually PRESENT
+(`client/src/lib/story-bible-types.ts`), so `place`/`object`/`concept` render and no row can be
+hidden by a hardcoded list again. **No remap of place/object/concept is needed.**
+
+    research (493 rows) — retired with --retire-research. chapter_step's duplicate write is removed;
+                          persist_research already stores the FULL text in research_reports_v2
+                          (project-linked by migration 026), and every sampled bible row's text was
+                          verified present verbatim inside a linked report. Soft-delete only.
 
 Usage::
 
@@ -57,13 +63,24 @@ import urllib.request
 
 # The table's canonical vocabulary (docs/base-tables.md). Anything outside this is invisible to a
 # consumer that filters on it.
+# Historical/documented set, kept only to report on. The real canonical set is ENGINE_CANONICAL.
 CANONICAL = {"character", "event", "item", "location", "organization", "plot_thread"}
 
-# Only the mappings that are the same concept under a different word. Deliberately does NOT include
-# `concept` or `research` — see the module docstring.
-SETTLED_MAP = {"place": "location", "object": "item"}
+# Empty by decision: the engine vocabulary won, so place/object/concept are canonical and must NOT
+# be remapped. Kept as a hook for a future rename rather than deleted.
+SETTLED_MAP: dict[str, str] = {}
+
+# The engine's canonical vocabulary (writer_engine.schemas.chapter.BibleEntry).
+ENGINE_CANONICAL = {"character", "place", "object", "concept", "event"}
 
 PAGE = 1000
+
+
+def _utc_now_iso() -> str:
+    """Explicit ISO timestamp — 'now()' is not a valid timestamptz literal over PostgREST."""
+    from datetime import UTC, datetime
+
+    return datetime.now(UTC).isoformat()
 
 
 def _req(url: str, *, method: str = "GET", body: bytes | None = None) -> tuple[int, bytes, dict]:
@@ -102,7 +119,11 @@ def fetch_all() -> list[dict]:
 def diagnose(rows: list[dict]) -> dict:
     live = [r for r in rows if not r.get("deleted_at")]
     by_type = collections.Counter(r.get("entry_type") for r in live)
-    noncanonical = {t: n for t, n in by_type.items() if t not in CANONICAL}
+    # Measured against the ENGINE vocabulary (the 2026-10-16 decision), not the never-enforced
+    # table CHECK. `research` is reported separately since it is retired, not remapped.
+    noncanonical = {
+        t: n for t, n in by_type.items() if t not in ENGINE_CANONICAL and t != "research"
+    }
     dup_keys = collections.Counter(
         (r.get("project_id"), r.get("entry_type"), (r.get("name") or "").strip().lower())
         for r in live
@@ -123,6 +144,11 @@ def diagnose(rows: list[dict]) -> dict:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="A6 story-bible entry_type normalisation")
     ap.add_argument("--apply", action="store_true", help="actually write (default: dry run)")
+    ap.add_argument(
+        "--retire-research",
+        action="store_true",
+        help="soft-delete entry_type='research' rows (content already lives in research_reports_v2)",
+    )
     ap.add_argument(
         "--map",
         action="append",
@@ -155,10 +181,18 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  rows: {diag['total']}  live: {diag['live']}  soft-deleted: {diag['soft_deleted']}")
     print("  entry_type distribution:")
     for t, n in diag["by_type"].items():
-        flag = "" if t in CANONICAL else "   <-- NOT in the table's CHECK"
+        if t in ENGINE_CANONICAL:
+            flag = "   (canonical)"
+        elif t == "research":
+            flag = "   <-- retire (duplicates research_reports_v2)"
+        else:
+            flag = "   <-- legacy, outside the canonical set"
+        
         print(f"    {str(t):14} {n:5}{flag}")
-    print(f"  non-canonical rows: {diag['noncanonical_rows']} "
-          f"({100 * diag['noncanonical_rows'] // max(diag['live'], 1)}% of live)")
+    canonical_n = sum(n for t, n in diag["by_type"].items() if t in ENGINE_CANONICAL)
+    print(f"  canonical (engine vocabulary): {canonical_n} "
+          f"({100 * canonical_n // max(diag['live'], 1)}% of live)")
+    print(f"  legacy rows outside it: {diag['noncanonical_rows']}")
     print(f"  true duplicate groups: {diag['duplicate_groups']} "
           f"-> {diag['redundant_rows']} redundant rows")
 
@@ -170,13 +204,27 @@ def main(argv: list[str] | None = None) -> int:
     if not planned:
         print("    (none)")
     if undecided:
-        print("\n  UNDECIDED (needs a canonical-vocabulary decision; not touched):")
+        print("\n  legacy types present (no remap configured; left as-is and still rendered):")
         for t, n in undecided.items():
             print(f"    {t}  ({n} rows)")
 
     if not args.apply:
         print("\nDRY RUN — nothing written. Re-run with --apply once the mapping is settled.")
         return 0
+
+    research_n = diag["by_type"].get("research", 0)
+    if args.retire_research and research_n:
+        print(f"\n  retire-research: {research_n} rows -> soft-delete (deleted_at)")
+        if args.apply:
+            status, raw, _h = _req(
+                "/rest/v1/story_bible_v2?entry_type=eq.research&deleted_at=is.null",
+                method="PATCH",
+                body=json.dumps({"deleted_at": _utc_now_iso()}).encode(),
+            )
+            if status not in (200, 204):
+                print(f"  retire-research FAILED ({status}): {raw[:200]!r}", file=sys.stderr)
+                return 1
+            print(f"  retired {research_n} research rows (reversible: deleted_at = null)")
 
     print("\napplying...")
     changed = 0

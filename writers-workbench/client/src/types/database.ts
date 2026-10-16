@@ -146,7 +146,11 @@ export interface StoryBibleEntry {
   id: string;
   user_id: string;
   project_id: string;
-  entry_type: 'character' | 'event' | 'location' | 'timeline' | 'plot_thread' | 'world_rule';
+  // A6: the ENGINE's vocabulary is canonical (story_bible_v2 has no CHECK on this column, and 72%
+  // of live rows used the engine's words). `(string & {})` keeps autocomplete for the known set
+  // while accepting historical//future types, because a narrow union here is what led consumers
+  // to filter rows out entirely.
+  entry_type: 'character' | 'place' | 'object' | 'concept' | 'event' | (string & {});
   name: string;
   description: string;
   metadata: Record<string, unknown>;

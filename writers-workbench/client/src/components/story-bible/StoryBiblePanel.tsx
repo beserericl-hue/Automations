@@ -7,26 +7,44 @@ import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import EntryForm from './EntryForm';
 import type { StoryBibleEntry, WritingProject } from '../../types/database';
+import { entryTypeLabel, entryTypesPresent } from '../../lib/story-bible-types';
 
-const ENTRY_TYPES = ['character', 'location', 'event', 'timeline', 'plot_thread', 'world_rule'] as const;
 
+// A6: labels/icons are a presentation nicety only — an unknown type still renders, using a
+// derived label and a default icon. The old hardcoded ENTRY_TYPES list was used to *filter*, so
+// any row outside it (2341 of 3226 on DEV, 72%) was never shown at all.
 const typeLabels: Record<string, string> = {
   character: 'Characters',
-  location: 'Locations',
+  place: 'Places',
+  object: 'Objects',
+  concept: 'Concepts',
   event: 'Events',
+  location: 'Locations',
+  item: 'Items',
+  organization: 'Organizations',
   timeline: 'Timeline',
   plot_thread: 'Plot Threads',
   world_rule: 'World Rules',
+  world_building: 'World Building',
+  research: 'Research Notes',
 };
 
 const typeIcons: Record<string, string> = {
   character: '\u{1F464}',
-  location: '\u{1F3D4}',
+  place: '\u{1F3D4}',
+  object: '\u{1F5BC}',
+  concept: '\u{1F4A1}',
   event: '\u{26A1}',
+  location: '\u{1F3D4}',
+  item: '\u{1F5BC}',
+  organization: '\u{1F3DB}',
   timeline: '\u{23F3}',
   plot_thread: '\u{1F9F5}',
   world_rule: '\u{1F30D}',
+  world_building: '\u{1F30D}',
+  research: '\u{1F4DA}',
 };
+const DEFAULT_ICON = '\u{1F4D3}';
 
 export default function StoryBiblePanel() {
   const { id } = useParams<{ id: string }>();
@@ -79,8 +97,10 @@ export default function StoryBiblePanel() {
     enabled: !!id && !!userId,
   });
 
-  // Group entries by type
-  const grouped = ENTRY_TYPES.reduce((acc, type) => {
+  // A6: group by the types actually PRESENT (canonical order first, unknowns last) rather than a
+  // hardcoded list, so vocabulary drift can reorder the sections but can never hide a row.
+  const presentTypes = entryTypesPresent(entries);
+  const grouped = presentTypes.reduce((acc, type) => {
     acc[type] = entries?.filter(e => e.entry_type === type) || [];
     return acc;
   }, {} as Record<string, StoryBibleEntry[]>);
@@ -157,14 +177,14 @@ export default function StoryBiblePanel() {
         </div>
       ) : (
         <div className="space-y-6">
-          {ENTRY_TYPES.map(type => {
+          {presentTypes.map(type => {
             const typeEntries = grouped[type];
             if (!typeEntries.length) return null;
             return (
               <div key={type} className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
                 <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
                   <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {typeIcons[type]} {typeLabels[type]} ({typeEntries.length})
+                    {typeIcons[type] ?? DEFAULT_ICON} {typeLabels[type] ?? entryTypeLabel(type)} ({typeEntries.length})
                   </h2>
                 </div>
                 <div className="divide-y divide-gray-100 dark:divide-gray-800">
