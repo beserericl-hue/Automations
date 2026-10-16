@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 from dataclasses import dataclass
 from typing import Any, Protocol
+
+from writer_engine.telemetry.logging import get_logger
+
+logger = get_logger("llm.router")
 
 
 class ProviderNotRegistered(KeyError):
@@ -43,17 +46,21 @@ class LLMResponse:
 
 
 class TokenBudget(Protocol):
-    """The slice of ``rate_limit.AnthropicBudget`` the router depends on.
+    """The slice of ``rate_limit.LLMBudget`` the router depends on.
 
     Declared as a Protocol rather than typing ``budget`` as ``object`` so the two calls below are
-    type-checked, and so any future per-provider budget (CR-010 C2) only has to satisfy this shape.
+    type-checked. ``provider`` is part of the shape (B8): the router gates EVERY provider, and which
+    gate applies — Anthropic's per-model token budget or the per-provider request budget — is the
+    budget's business, not the router's.
     """
 
     async def wait_for_capacity(
-        self, *, model: str, input_tokens: int, output_tokens: int, max_wait_s: float
+        self, *, provider: str, model: str, input_tokens: int, output_tokens: int, max_wait_s: float
     ) -> None: ...
 
-    async def record_usage(self, *, model: str, input_tokens: int, output_tokens: int) -> None: ...
+    async def record_usage(
+        self, *, provider: str, model: str, input_tokens: int, output_tokens: int
+    ) -> None: ...
 
 
 class LLMAdapter(Protocol):
@@ -79,8 +86,10 @@ class LLMRouter:
     limits here:
       * a per-INSTANCE concurrency semaphore (``max_concurrent``) so one engine instance handling ~10
         users never oversubscribes;
-      * the Redis-shared ``AnthropicBudget`` (``budget``) so ALL instances together stay under the
-        account-wide per-minute TPM/RPM — the call WAITS for budget rather than failing on 429.
+      * the Redis-shared ``LLMBudget`` (``budget``) so ALL instances together stay under each
+        provider's account-wide per-minute limit — the call WAITS for budget rather than failing on
+        429. Anthropic is gated on tokens (it publishes its ceilings in response headers); every
+        other provider is gated on requests per minute (B8).
     Both are optional: with neither set (tests / local), the router is a plain dispatcher.
     """
 
@@ -111,17 +120,28 @@ class LLMRouter:
         cache_system: bool,
         stream: bool,
     ) -> LLMResponse:
-        # Reserve account-wide budget for Anthropic (queues if the per-minute window is full).
+        # Reserve account-wide budget (queues if the provider's per-minute window is full).
         # Budget exhausted past max_wait or a Redis hiccup -> proceed anyway; the adapter's 429
         # retry/backoff is the final backstop. Never block a job forever here.
-        if provider == "anthropic" and self._budget is not None:
+        if self._budget is not None:
             est_in = (len(prompt) + len(system or "")) // 4  # ~4 chars/token
-            with contextlib.suppress(Exception):
+            try:
                 await self._budget.wait_for_capacity(
+                    provider=provider,
                     model=model,
                     input_tokens=est_in,
                     output_tokens=max_tokens,
                     max_wait_s=self._budget_max_wait_s,
+                )
+            except Exception as exc:
+                # Logged, not swallowed: a suppressed TypeError here (a budget whose signature has
+                # drifted) would silently disable rate limiting across the whole engine, and the
+                # first symptom would be a wall of 429s under load.
+                logger.warning(
+                    "router.budget_wait_failed",
+                    provider=provider,
+                    model=model,
+                    error=f"{type(exc).__name__}: {str(exc)[:160]}",
                 )
         resp = await self._adapters[provider].complete(
             model=model,
@@ -132,12 +152,19 @@ class LLMRouter:
             cache_system=cache_system,
             stream=stream,
         )
-        if provider == "anthropic" and self._budget is not None:
-            with contextlib.suppress(Exception):
+        if self._budget is not None:
+            try:
                 await self._budget.record_usage(
+                    provider=provider,
                     model=resp.model or model,
                     input_tokens=resp.input_tokens,
                     output_tokens=resp.output_tokens,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "router.budget_record_failed",
+                    provider=provider,
+                    error=f"{type(exc).__name__}: {str(exc)[:160]}",
                 )
         return resp
 

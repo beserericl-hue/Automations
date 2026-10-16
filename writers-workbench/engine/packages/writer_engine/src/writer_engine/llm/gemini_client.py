@@ -5,6 +5,7 @@ from __future__ import annotations
 import google.generativeai as genai  # type: ignore[import-untyped]
 
 from writer_engine.config import get_settings
+from writer_engine.rate_limit.retry import with_retry
 from writer_engine.telemetry.metrics import LLM_CALLS, LLM_TOKENS
 
 from .router import LLMResponse
@@ -47,7 +48,11 @@ class GeminiAdapter:
             return response.text or "", in_tok, out_tok
 
         try:
-            text, in_tok, out_tok = await asyncio.to_thread(_call)
+            # B8: this adapter had NO retry, and it carries every hub turn (voice + chat), so one
+            # 429 failed the user's request outright.
+            text, in_tok, out_tok = await with_retry(
+                lambda: asyncio.to_thread(_call), provider=self.provider, model=model
+            )
         except Exception:
             LLM_CALLS.labels(service=self._service, provider=self.provider, model=model, status="error").inc()
             raise

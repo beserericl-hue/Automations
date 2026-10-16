@@ -21,6 +21,7 @@ from writer_engine.fixtures import guard_fixture_fallback
 from writer_engine.llm import ProviderNotRegistered, get_router
 from writer_engine.llm.structured import extract_json
 from writer_engine.prompt_store import compose_craft_system, seed_default_prompts
+from writer_engine.rate_limit.provider_budget import call_provider
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
 from writer_engine.step_service import build_step_app
 
@@ -56,9 +57,17 @@ async def _kieai_cover(prompt: str, *, key: str, timeout_s: int = 180) -> bytes 
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {key}"}
     body = {"model": "google/nano-banana", "callBackUrl": "", "input": {"prompt": prompt, "image_urls": []}}
     async with httpx.AsyncClient(timeout=60.0) as client:
-        try:
+
+        async def _create() -> httpx.Response:
             r = await client.post(_KIEAI_CREATE, headers=headers, json=body)
             r.raise_for_status()
+            return r
+
+        try:
+            # B8: only the createTask call is budgeted. The recordInfo polls below hit the same API
+            # but gating them would stall the poll loop against its own 180s deadline, so they are
+            # left ungated (they are cheap, and one generation is already accounted for here).
+            r = await call_provider("kieai", _create, model="google/nano-banana")
             task_id = (r.json().get("data") or {}).get("taskId")
             if not task_id:
                 return None
@@ -338,7 +347,8 @@ async def _op_scrape_url(payload: dict) -> dict:
         return {"url": url, "markdown": "(stub — FIRECRAWL_API_KEY not set)", "html": "", "metadata": {}}
     body = {"url": url, "formats": ["markdown", "html"]}
     async with httpx.AsyncClient(timeout=90.0) as client:
-        try:
+
+        async def _post() -> httpx.Response:
             r = await client.post(
                 "https://api.firecrawl.dev/v1/scrape",
                 headers={
@@ -348,6 +358,10 @@ async def _op_scrape_url(payload: dict) -> dict:
                 json=body,
             )
             r.raise_for_status()
+            return r
+
+        try:
+            r = await call_provider("firecrawl", _post)  # B8: budget + 429 retry
             data = r.json().get("data") or {}
             return {
                 "url": url,

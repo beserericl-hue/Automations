@@ -29,11 +29,11 @@ class _Budget:
         self.waited = []
         self.recorded = []
 
-    async def wait_for_capacity(self, *, model, input_tokens, output_tokens, max_wait_s):
-        self.waited.append((model, input_tokens, output_tokens))
+    async def wait_for_capacity(self, *, provider, model, input_tokens, output_tokens, max_wait_s):
+        self.waited.append((provider, model, input_tokens, output_tokens))
 
-    async def record_usage(self, *, model, input_tokens, output_tokens):
-        self.recorded.append((model, input_tokens, output_tokens))
+    async def record_usage(self, *, provider, model, input_tokens, output_tokens):
+        self.recorded.append((provider, model, input_tokens, output_tokens))
 
 
 def test_router_calls_budget_before_and_after() -> None:
@@ -43,9 +43,9 @@ def test_router_calls_budget_before_and_after() -> None:
     asyncio.run(
         r.complete(provider="anthropic", model="claude-sonnet-4-6", prompt="x" * 400, max_tokens=3000)
     )
-    assert b.waited and b.waited[0][0] == "claude-sonnet-4-6"
-    assert b.waited[0][1] == 100  # ~400 chars / 4 = 100 est input tokens
-    assert b.recorded == [("claude-sonnet-4-6", 10, 20)]  # actual usage recorded
+    assert b.waited and b.waited[0][:2] == ("anthropic", "claude-sonnet-4-6")
+    assert b.waited[0][2] == 100  # ~400 chars / 4 = 100 est input tokens
+    assert b.recorded == [("anthropic", "claude-sonnet-4-6", 10, 20)]  # actual usage recorded
 
 
 def test_router_caps_concurrency_per_instance() -> None:

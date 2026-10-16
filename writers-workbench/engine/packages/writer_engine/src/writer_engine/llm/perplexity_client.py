@@ -5,6 +5,7 @@ from __future__ import annotations
 import httpx
 
 from writer_engine.config import get_settings
+from writer_engine.rate_limit.retry import with_retry
 from writer_engine.telemetry.metrics import LLM_CALLS, LLM_TOKENS
 
 from .router import LLMResponse
@@ -42,13 +43,21 @@ class PerplexityAdapter:
             "max_tokens": max_tokens,
             "temperature": temperature,
         }
-        try:
+
+        async def _post() -> httpx.Response:
             resp = await self._client.post(
                 "https://api.perplexity.ai/chat/completions",
                 headers={"authorization": f"Bearer {self._api_key}", "content-type": "application/json"},
                 json=body,
             )
+            # Inside the retried callable: raise_for_status is what turns a 429 into the exception
+            # with_retry can recognise. Outside it, a 429 would be returned as a success.
             resp.raise_for_status()
+            return resp
+
+        try:
+            # B8: this adapter had NO retry, so one 429 failed a whole research run.
+            resp = await with_retry(_post, provider=self.provider, model=model)
         except Exception:
             LLM_CALLS.labels(service=self._service, provider=self.provider, model=model, status="error").inc()
             raise

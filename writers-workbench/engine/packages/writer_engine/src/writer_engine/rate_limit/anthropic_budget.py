@@ -33,10 +33,10 @@ from __future__ import annotations
 
 import asyncio
 import time
-import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from writer_engine.rate_limit import window as _window
 from writer_engine.redis_client import client as _redis_module
 from writer_engine.telemetry.logging import get_logger
 
@@ -69,7 +69,8 @@ DEFAULT_LIMITS: dict[str, ModelLimits] = {
 # Conservative fallback for any unknown model id — half of the smallest Tier-4 model.
 _DEFAULT_UNKNOWN = ModelLimits(input_tpm=225_000, output_tpm=45_000, rpm=500)
 
-_WINDOW_S = 60.0
+# The window itself lives in rate_limit.window (shared with the per-provider budget, B8).
+_WINDOW_S = _window.WINDOW_S
 _POLL_INTERVAL_S = 0.5
 
 
@@ -102,19 +103,7 @@ class AnthropicBudget:
         return f"{self._prefix}:{model}:{kind}"
 
     async def _current(self, client: redis.Redis, model: str, kind: str) -> int:
-        key = self._key(model, kind)
-        now = time.time()
-        cutoff = now - _WINDOW_S
-        await client.zremrangebyscore(key, "-inf", cutoff)
-        members = await client.zrangebyscore(key, cutoff, "+inf")
-        total = 0
-        for m in members:
-            try:
-                _, count = m.rsplit(":", 1)
-                total += int(count)
-            except (ValueError, AttributeError):
-                continue
-        return total
+        return await _window.current(client, self._key(model, kind))
 
     async def wait_for_capacity(
         self,
@@ -198,17 +187,11 @@ class AnthropicBudget:
         client = await self._client()
         if client is None:
             return
-        now = time.time()
-        token = uuid.uuid4().hex[:12]
+        token = _window.new_token()
         # Even when one number is 0 we still want the request to count toward RPM.
-        if input_tokens > 0:
-            await client.zadd(self._key(model, "input"), {f"{token}:{input_tokens}": now})
-            await client.expire(self._key(model, "input"), int(_WINDOW_S * 2))
-        if output_tokens > 0:
-            await client.zadd(self._key(model, "output"), {f"{token}:{output_tokens}": now})
-            await client.expire(self._key(model, "output"), int(_WINDOW_S * 2))
-        await client.zadd(self._key(model, "requests"), {f"{token}:1": now})
-        await client.expire(self._key(model, "requests"), int(_WINDOW_S * 2))
+        await _window.record(client, self._key(model, "input"), input_tokens, token=token)
+        await _window.record(client, self._key(model, "output"), output_tokens, token=token)
+        await _window.record(client, self._key(model, "requests"), 1, token=token)
 
     async def snapshot(self, model: str) -> dict[str, int]:
         """Return current sliding-window usage for the model. Used by /metrics + admin."""

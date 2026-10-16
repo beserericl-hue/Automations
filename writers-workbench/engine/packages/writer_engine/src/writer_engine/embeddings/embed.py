@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from writer_engine.config import get_settings
+from writer_engine.rate_limit.provider_budget import call_provider
 from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("embeddings")
@@ -60,7 +61,23 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
         ) from exc
 
     client = AsyncOpenAI(api_key=settings.openai_api_key)
-    resp = await client.embeddings.create(model=settings.embedding_model, input=texts)
+
+    # B8: budgeted like every other provider. The OpenAI SDK already retries a 429 itself, so this
+    # adds the account-wide window (shared across instances) rather than another retry. Token count
+    # is estimated at ~4 chars/token because the embedding limit is token-shaped.
+    est_tokens = sum(len(t) for t in texts) // 4
+
+    async def _embed() -> Any:
+        return await client.embeddings.create(model=settings.embedding_model, input=texts)
+
+    resp = await call_provider(
+        "openai",
+        _embed,
+        model=settings.embedding_model,
+        input_tokens=est_tokens,
+        attempts=1,  # the OpenAI SDK retries a 429 itself; another layer would multiply the wait
+        max_wait_s=30.0,
+    )
     # Preserve input order (OpenAI returns data sorted by index, but be explicit).
     ordered = sorted(resp.data, key=lambda d: d.index)
     return [d.embedding for d in ordered]

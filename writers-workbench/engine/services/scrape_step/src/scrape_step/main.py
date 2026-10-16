@@ -5,6 +5,7 @@ from __future__ import annotations
 import httpx
 
 from writer_engine.config import get_settings
+from writer_engine.rate_limit.provider_budget import call_provider
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
 from writer_engine.step_service import build_step_app
 
@@ -14,12 +15,19 @@ STEP_NAME = "scrape"
 async def _firecrawl(url: str, key: str) -> dict[str, str]:
     """Single-URL scrape against Firecrawl v1."""
     async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.post(
-            "https://api.firecrawl.dev/v1/scrape",
-            headers={"authorization": f"Bearer {key}", "content-type": "application/json"},
-            json={"url": url, "formats": ["markdown"]},
-        )
-        resp.raise_for_status()
+
+        async def _post() -> httpx.Response:
+            resp = await client.post(
+                "https://api.firecrawl.dev/v1/scrape",
+                headers={"authorization": f"Bearer {key}", "content-type": "application/json"},
+                json={"url": url, "formats": ["markdown"]},
+            )
+            resp.raise_for_status()
+            return resp
+
+        # B8: a newsletter fans this out once per story, so it is the easiest way to hit Firecrawl's
+        # per-minute limit — and it had neither a budget nor a retry.
+        resp = await call_provider("firecrawl", _post)
         data = resp.json()
         return {
             "url": url,

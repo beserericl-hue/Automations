@@ -74,6 +74,12 @@ class EngineSettings(BaseSettings):
     # DEFAULT_LIMITS in writer_engine.rate_limit.anthropic_budget. Set to override per env/tier.
     anthropic_tier: str = Field(default="", alias="ANTHROPIC_TIER")
     anthropic_budget_overrides: str = Field(default="", alias="ANTHROPIC_BUDGET_OVERRIDES")
+    # B8: per-provider request caps for everything that is NOT Anthropic (which has its own
+    # per-model token budget). Format "gemini=600,perplexity=30,openai=500/2000000" — rpm, or
+    # rpm/tpm. Empty = the conservative defaults in writer_engine.rate_limit.provider_budget.
+    # These are caps we chose, not limits the providers told us, so they belong in env.
+    provider_rate_limits: str = Field(default="", alias="PROVIDER_RATE_LIMITS")
+
     # Scaling (CR-003): per-INSTANCE cap on simultaneous in-flight LLM calls (sized so one engine
     # instance handles ~10 concurrent users without oversubscribing). Horizontal scale = add
     # instances; the Redis-shared AnthropicBudget keeps all instances under the account-wide limit.
