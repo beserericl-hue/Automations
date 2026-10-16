@@ -53,6 +53,14 @@ COPY services/approval_step/pyproject.toml ./services/approval_step/
 COPY services/notify_step/pyproject.toml ./services/notify_step/
 # B10: the aggregator that mounts every step in one process.
 COPY services/steps_app/pyproject.toml ./services/steps_app/
+# The gateway does NOT run in this container — it is its own Railway service. Its metadata and
+# source are still copied because `uv sync --frozen --all-packages` installs every workspace member
+# the LOCK names, and a member whose directory is absent fails the build with
+# "Distribution not found at: file:///app/services/gateway". That is exactly how the first attempt
+# at pinning this image failed. Copying the whole workspace keeps one rule — "this image has the
+# workspace the lock describes" — instead of a per-image package list that drifts from the process
+# table in writer_engine.runtime_processes.
+COPY services/gateway/pyproject.toml ./services/gateway/
 
 # Source for everything that runs in this container.
 COPY packages/writer_engine/src ./packages/writer_engine/src
@@ -77,6 +85,7 @@ COPY services/story_bible_step/src ./services/story_bible_step/src
 COPY services/approval_step/src ./services/approval_step/src
 COPY services/notify_step/src ./services/notify_step/src
 COPY services/steps_app/src ./services/steps_app/src
+COPY services/gateway/src ./services/gateway/src
 
 COPY services/runtime/entrypoint.sh /entrypoint.sh
 

@@ -80,3 +80,38 @@ def test_the_lock_file_is_in_the_build_context() -> None:
         if line.strip() and not line.strip().startswith("#")
     ]
     assert not any(p.rstrip("/") in {"uv.lock", "*.lock", "**/uv.lock"} for p in patterns), patterns
+
+
+def _workspace_members() -> list[str]:
+    import tomllib
+
+    data = tomllib.loads((ENGINE_ROOT / "pyproject.toml").read_text())
+    return list(data["tool"]["uv"]["workspace"]["members"])
+
+
+def test_the_workspace_has_members_to_check() -> None:
+    assert len(_workspace_members()) >= 20
+
+
+@pytest.mark.parametrize("dockerfile", DOCKERFILES, ids=lambda p: p.parent.name)
+def test_an_all_packages_image_copies_every_workspace_member(dockerfile: Path) -> None:
+    """`uv sync --frozen --all-packages` installs every member the LOCK names.
+
+    A member whose directory is absent from the image fails the build with
+    "Distribution not found at: file:///app/services/<name>" — which is exactly how the first
+    attempt at pinning the runtime image failed, after the unlocked sync had tolerated it for
+    months. The runtime container does not RUN the gateway, but with --all-packages it must still
+    carry it.
+
+    Images that sync a specific `--package` are exempt: they install one member and its
+    dependencies, and siblings may be absent.
+    """
+    body = dockerfile.read_text()
+    if not any("--all-packages" in line for line in body.splitlines() if "uv sync" in line):
+        pytest.skip("installs specific packages, not the whole workspace")
+    copied = body
+    missing = [m for m in _workspace_members() if f"COPY {m}/pyproject.toml" not in copied]
+    assert not missing, (
+        f"{dockerfile.relative_to(ENGINE_ROOT)} syncs --all-packages but never copies the "
+        f"pyproject.toml of: {missing}. The build will fail with 'Distribution not found'."
+    )
