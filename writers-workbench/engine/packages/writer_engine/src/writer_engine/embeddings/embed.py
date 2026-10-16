@@ -12,6 +12,19 @@ from typing import Any
 from writer_engine.config import get_settings
 
 
+def _rows(resp: Any) -> list[dict[str, Any]]:
+    """Coerce a Supabase/postgrest response's ``.data`` into a list of row dicts.
+
+    postgrest types ``.data`` as a broad JSON union, so indexing it or calling ``.get`` on its
+    elements is unchecked and would raise at runtime on an unexpected shape. Guard once at the
+    boundary instead of casting at every use.
+    """
+    data = getattr(resp, "data", None)
+    if not isinstance(data, list):
+        return []
+    return [row for row in data if isinstance(row, dict)]
+
+
 def embeddings_enabled() -> bool:
     """True when the Python embeddings path is turned on. Callers fall through to n8n when False."""
     return bool(get_settings().enable_python_embeddings)
@@ -79,7 +92,7 @@ async def match_writing_documents(
     if project_title:
         params["p_project_title"] = project_title
     resp = await client.rpc(settings.embedding_match_rpc, params).execute()
-    return list(resp.data or [])
+    return _rows(resp)
 
 
 async def re_embed_project(*, user_id: str, project_title: str) -> int:
@@ -102,11 +115,11 @@ async def re_embed_project(*, user_id: str, project_title: str) -> int:
         .eq("project_title", project_title)
         .execute()
     )
-    rows = list(rows_resp.data or [])
+    rows = _rows(rows_resp)
     if not rows:
         return 0
 
-    vectors = await embed_texts([r.get("content") or "" for r in rows])
+    vectors = await embed_texts([str(r.get("content") or "") for r in rows])
     count = 0
     for row, vec in zip(rows, vectors, strict=False):
         await client.table("writing_documents").update({"embedding": vec}).eq("id", row["id"]).execute()

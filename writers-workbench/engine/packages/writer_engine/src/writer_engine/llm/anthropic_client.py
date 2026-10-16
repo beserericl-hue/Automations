@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from anthropic import AsyncAnthropic
 
 from writer_engine.config import get_settings
@@ -39,14 +41,17 @@ class AnthropicAdapter:
         cache_system: bool = True,
         stream: bool = False,
     ) -> LLMResponse:
-        system_blocks: list[dict[str, object]] | None = None
+        system_blocks: list[dict[str, Any]] | None = None
         if system:
-            block: dict[str, object] = {"type": "text", "text": system}
+            block: dict[str, Any] = {"type": "text", "text": system}
             if cache_system:
                 block["cache_control"] = {"type": "ephemeral"}
             system_blocks = [block]
 
-        kwargs: dict[str, object] = {
+        # dict[str, Any] rather than dict[str, object]: these are splatted into the Anthropic SDK's
+        # heavily-overloaded create/stream signatures, and `object` values make every parameter a
+        # type error (20 of them) without catching anything real.
+        kwargs: dict[str, Any] = {
             "model": model,
             "max_tokens": max_tokens,
             "temperature": temperature,

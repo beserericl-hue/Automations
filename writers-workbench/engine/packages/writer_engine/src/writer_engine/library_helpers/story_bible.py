@@ -58,6 +58,8 @@ def merge_story_bible(base: dict[str, Any] | None, patch: dict[str, Any] | None)
     merged = jsonb_deep_merge(base, scalar_patch)
     for section in _LIST_SECTIONS:
         if section in patch and isinstance(patch[section], list):
-            base_list = base.get(section) if isinstance(base.get(section), list) else []
+            # Bind once, then narrow (calling .get twice leaves the type as `Any | list | None`).
+            raw_base = base.get(section)
+            base_list: list[Any] = raw_base if isinstance(raw_base, list) else []
             merged[section] = _union_by_key(base_list, patch[section])
     return merged

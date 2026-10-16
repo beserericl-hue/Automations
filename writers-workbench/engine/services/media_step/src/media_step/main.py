@@ -278,7 +278,9 @@ async def _persist_social_posts(payload: dict, posts: dict) -> dict | None:
             return {"persisted": False, "reason": "no valid-platform posts to save"}
         await client.table("social_posts_v2").insert(rows).execute()
         return {"persisted": True, "count": len(rows), "project_id": project_id}
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
+        # Persisting social posts is best-effort: the generated posts are already returned to the
+        # caller, so a DB failure must not fail the op. Reported, not raised.
         return {"persisted": False, "error": str(exc)[:200]}
 
 

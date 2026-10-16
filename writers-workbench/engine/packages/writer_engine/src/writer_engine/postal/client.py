@@ -88,7 +88,11 @@ class PostalClient:
         # (e.g. an unauthorised From → "UnauthenticatedFromAddress"). Surface those loudly instead
         # of reporting a phantom success — otherwise the saga reaches SENT having mailed no one.
         status = str(payload.get("status") or "")
-        data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+        # Bind once, then narrow — calling .get("data") twice left the type as `Any | dict | None`,
+        # so a null `data` in an error body would AttributeError on .get below instead of
+        # surfacing the Postal failure message.
+        raw_data = payload.get("data")
+        data: dict[str, Any] = raw_data if isinstance(raw_data, dict) else {}
         if status and status != "success":
             code = data.get("code")
             message = data.get("message")

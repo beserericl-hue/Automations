@@ -22,7 +22,19 @@ router = APIRouter(dependencies=[Depends(require_service_secret)])
 logger = get_logger("hub.gateway")
 
 
-def _write_url(tool: str) -> str:
+def _write_url(tool: str | None) -> str:
+    """Build the orchestrator write-pipeline URL for a dispatch plan's tool.
+
+    ``DispatchPlan.tool`` is ``str | None``. Every non-``reply`` plan is *expected* to carry a tool,
+    but nothing in the router enforces it — so a routing regression could reach here with ``None`` and
+    silently build ``/pipelines/write/None/run``, which the orchestrator answers with an opaque 404.
+    Fail loudly and attributably instead.
+    """
+    if not tool:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="dispatch plan selected an action but no tool — routing bug",
+        )
     return f"{get_settings().orchestrator_url}/pipelines/write/{tool}/run"
 
 

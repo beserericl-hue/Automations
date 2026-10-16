@@ -32,8 +32,9 @@ _TRAILING_COMMA_RE = re.compile(r",\s*([}\]])")
 # // line comments outside a string. Conservative — only matches when the // starts a line or
 # follows whitespace. Will not handle //-in-string-literal correctly; LLMs rarely produce that.
 _LINE_COMMENT_RE = re.compile(r"(?m)^\s*//.*$")
-# Smart quotes -> straight quotes.
-_SMART_QUOTES = str.maketrans({"“": '"', "”": '"', "‘": "'", "’": "'"})
+# Smart quotes -> straight quotes. The "ambiguous character" RUF001 warnings are the point here:
+# these ARE the smart quotes we translate away, so they must appear literally.
+_SMART_QUOTES = str.maketrans({"“": '"', "”": '"', "‘": "'", "’": "'"})  # noqa: RUF001
 
 
 def _strip_fence(text: str) -> str:

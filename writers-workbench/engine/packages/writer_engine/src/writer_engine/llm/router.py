@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class ProviderNotRegistered(KeyError):
@@ -27,6 +27,20 @@ class LLMResponse:
     model: str = ""
     provider: str = ""
     citations: tuple[str, ...] = ()
+
+
+class TokenBudget(Protocol):
+    """The slice of ``rate_limit.AnthropicBudget`` the router depends on.
+
+    Declared as a Protocol rather than typing ``budget`` as ``object`` so the two calls below are
+    type-checked, and so any future per-provider budget (CR-010 C2) only has to satisfy this shape.
+    """
+
+    async def wait_for_capacity(
+        self, *, model: str, input_tokens: int, output_tokens: int, max_wait_s: float
+    ) -> None: ...
+
+    async def record_usage(self, *, model: str, input_tokens: int, output_tokens: int) -> None: ...
 
 
 class LLMAdapter(Protocol):
@@ -58,7 +72,11 @@ class LLMRouter:
     """
 
     def __init__(
-        self, *, budget: object | None = None, max_concurrent: int = 0, budget_max_wait_s: float = 300.0
+        self,
+        *,
+        budget: TokenBudget | None = None,
+        max_concurrent: int = 0,
+        budget_max_wait_s: float = 300.0,
     ) -> None:
         self._adapters: dict[str, LLMAdapter] = {}
         self._budget = budget
@@ -124,7 +142,9 @@ class LLMRouter:
     ) -> LLMResponse:
         if provider not in self._adapters:
             raise ProviderNotRegistered(f"unknown LLM provider: {provider}")
-        kwargs = dict(
+        # Annotated dict[str, Any]: inferred as dict[str, float | int | str | None], which makes the
+        # **splat below a type error on every parameter without catching anything real.
+        kwargs: dict[str, Any] = dict(
             provider=provider,
             model=model,
             prompt=prompt,
