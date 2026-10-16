@@ -194,6 +194,26 @@ def live_template(key: str, baseline_text: str) -> tuple[str, set[str], list[str
     return adapted, fields_in(adapted), unmapped
 
 
+def render_live_prompt(key: str, store: Any, **fields: Any) -> str:
+    """Render the live prompt for ``key`` from the verbatim n8n baseline (A2).
+
+    Shared by every newsletter step so the translate -> adapt -> render pipeline is defined once.
+    Falls back to the placeholder seed when a baseline is unavailable, so a missing seed degrades to
+    the old behaviour rather than breaking the pipeline.
+    """
+    try:
+        baseline = store.get(f"n8n_baseline.{key}")
+    except KeyError:
+        # PromptStore.get RAISES on an unknown key rather than returning None, so the fallback has
+        # to catch — without this the documented "degrades to the placeholder seed" never happened
+        # and an absent baseline would crash the step instead.
+        baseline = ""
+    if not baseline:
+        return str(store.get(key)).format(**fields)
+    template, _fields, _unmapped = live_template(key, baseline)
+    return render(template, **fields)
+
+
 __all__ = [
     "ADAPTATIONS",
     "FIELD_DEFAULTS",
@@ -202,5 +222,6 @@ __all__ = [
     "fields_in",
     "live_template",
     "render",
+    "render_live_prompt",
     "translate",
 ]

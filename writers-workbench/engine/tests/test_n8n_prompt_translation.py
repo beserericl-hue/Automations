@@ -146,3 +146,91 @@ def test_picked_stories_accepts_the_n8n_chain_of_thought_field_name() -> None:
 
 def test_fields_in_finds_every_placeholder() -> None:
     assert fields_in("${a} text ${b_c} ${a}") == {"a", "b_c"}
+
+
+# --- every wired step renders its real brief with the fields it actually supplies ---------------
+#
+# The failure this prevents: render() is strict, so a step that forgets a field raises at generation
+# time rather than at import. These cases mirror exactly what each step passes.
+
+WIRED_PROMPTS = [
+    (
+        "newsletter.pick_top_stories.user_template",
+        {"articles": "- (1) A — Src", "max_stories": 5, "newsletter_date": "2026-10-16"},
+        10_000,
+    ),
+    (
+        "newsletter.subject.user_template",
+        {"stories_json": "[]", "articles": "- (1) A — Src", "newsletter_date": "2026-10-16"},
+        4_000,
+    ),
+    (
+        "newsletter.segment.user_template",
+        {
+            "story_title": "T",
+            "story_summary": "S",
+            "segment_sources": "src",
+            "external_sources": "src",
+            "subject_line": "SL",
+            "pre_header": "PH",
+            "newsletter_date": "2026-10-16",
+        },
+        10_000,
+    ),
+    (
+        "newsletter.intro.user_template",
+        {
+            "story_sections": "## A\nbody",
+            "subject_line": "SL",
+            "pre_header": "PH",
+            "newsletter_date": "2026-10-16",
+        },
+        4_000,
+    ),
+    (
+        "newsletter.other_top_stories.user_template",
+        {
+            "story_sections": "A",
+            "articles": "- (2) B",
+            "subject_line": "SL",
+            "newsletter_date": "2026-10-16",
+        },
+        6_000,
+    ),
+]
+
+
+@pytest.mark.parametrize(("key", "fields", "min_len"), WIRED_PROMPTS)
+def test_wired_prompt_renders_with_the_steps_field_set(key: str, fields: dict, min_len: int) -> None:
+    from writer_engine.prompt_store.n8n_translate import render_live_prompt
+
+    out = render_live_prompt(key, get_prompt_store(), **fields)
+    assert "${" not in out, f"{key}: an unrendered field reached the prompt"
+    assert "{{" not in out, f"{key}: a raw n8n token reached the prompt"
+    assert len(out) >= min_len, f"{key}: got {len(out)} chars — looks like the placeholder, not the brief"
+    for value in fields.values():
+        if isinstance(value, str) and len(value) > 1:
+            assert value in out, f"{key}: supplied value {value!r} did not reach the prompt"
+
+
+def test_render_live_prompt_falls_back_to_the_placeholder_seed() -> None:
+    """A missing baseline must degrade to the placeholder, not crash the step.
+
+    PromptStore.get RAISES on an unknown key, so the helper has to catch it — this test is what
+    caught that the documented fallback was unreachable.
+    """
+    from writer_engine.prompt_store.n8n_translate import render_live_prompt
+
+    store = get_prompt_store()
+    # A *.system key has a placeholder seed and no n8n baseline (only the 8 user_templates do).
+    out = render_live_prompt("newsletter.subject.system", store)
+    assert out
+    assert "${" not in out
+
+
+def test_render_live_prompt_raises_on_a_wholly_unknown_key() -> None:
+    """Fallback covers a missing BASELINE, not a missing prompt entirely — a typo'd key must fail."""
+    from writer_engine.prompt_store.n8n_translate import render_live_prompt
+
+    with pytest.raises(KeyError):
+        render_live_prompt("definitely.not.a.key", get_prompt_store(), a="x")

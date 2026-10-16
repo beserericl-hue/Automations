@@ -3,30 +3,16 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Any
 
 from writer_engine.config import get_settings
 from writer_engine.llm import LLMRouter, ProviderNotRegistered, complete_structured, get_router
 from writer_engine.prompt_store import get_prompt_store, seed_default_prompts
-from writer_engine.prompt_store.n8n_translate import live_template, render
+from writer_engine.prompt_store.n8n_translate import render_live_prompt
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
 from writer_engine.schemas.newsletter import PickedStories
 from writer_engine.step_service import build_step_app
 
 PICK_KEY = "newsletter.pick_top_stories.user_template"
-
-
-def render_live_prompt(key: str, store: Any, **fields: Any) -> str:
-    """Render the live prompt for ``key`` from the verbatim n8n baseline.
-
-    Falls back to the placeholder seed only if the baseline is unavailable, so a missing seed
-    degrades to the old behaviour rather than crashing the pipeline.
-    """
-    baseline = store.get(f"n8n_baseline.{key}")
-    if not baseline:
-        return str(store.get(key)).format(**fields)
-    template, _fields, _unmapped = live_template(key, baseline)
-    return render(template, **fields)
 
 
 STEP_NAME = "pick"

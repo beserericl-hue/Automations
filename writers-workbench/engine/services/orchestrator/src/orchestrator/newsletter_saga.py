@@ -216,6 +216,9 @@ class NewsletterSagaDriver:
             payload={
                 "top_selected_stories": [s.model_dump(mode="json") for s in picked.top_selected_stories],
                 "feedback": feedback,
+                # A2: the real n8n subject brief also reads the day's corpus + the date.
+                "articles": st.get("articles") or [],
+                "newsletter_date": str((st.get("cfg") or {}).get("send_date") or ""),
             },
             timeout_s=240.0,  # LLM subject-line generation can exceed the 60s default
         )
@@ -244,6 +247,7 @@ class NewsletterSagaDriver:
     async def _stage_writing_segments(self, execution_id: UUID, st: dict[str, Any]) -> Stage | None:
         articles = st["articles"]
         picked = PickedStories.model_validate(st["picked"])
+        subj = st.get("subject_proposal") or {}
         segments_data: list[dict[str, Any]] = []
         image_options_by_story: list[dict[str, Any]] = []
 
@@ -286,6 +290,11 @@ class NewsletterSagaDriver:
                     "story": story_payload,
                     "sources": sources + scraped,
                     "image_options": image_out.payload.get("options") or [],
+                    # A2: the real n8n segment brief writes each section against the chosen subject
+                    # line / pre-header so the sections and the subject stay on one angle.
+                    "subject_line": subj.get("subject_line", ""),
+                    "pre_header": subj.get("pre_header_text", ""),
+                    "newsletter_date": str((st.get("cfg") or {}).get("send_date") or ""),
                 },
                 timeout_s=240.0,
             )
@@ -344,7 +353,14 @@ class NewsletterSagaDriver:
         out = await run_step_via_http(
             _step("assemble"),
             execution_id=execution_id,
-            payload={"segments": st.get("segments_data") or [], "remaining_items": remaining},
+            payload={
+                "segments": st.get("segments_data") or [],
+                "remaining_items": remaining,
+                # A2: the intro + roundup briefs read the subject line and the date.
+                "subject_line": (st.get("subject_proposal") or {}).get("subject_line", ""),
+                "pre_header": (st.get("subject_proposal") or {}).get("pre_header_text", ""),
+                "newsletter_date": str((st.get("cfg") or {}).get("send_date") or ""),
+            },
             timeout_s=240.0,  # LLM intro + roundup composition can exceed the 60s default
         )
         assembled = AssembledNewsletter.model_validate(out.payload)

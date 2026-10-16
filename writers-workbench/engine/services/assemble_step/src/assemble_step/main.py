@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from writer_engine.llm import LLMRouter, ProviderNotRegistered, get_router
 from writer_engine.prompt_store import get_prompt_store, seed_default_prompts
+from writer_engine.prompt_store.n8n_translate import render_live_prompt
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
 from writer_engine.schemas.newsletter import AssembledNewsletter, StorySegment
 from writer_engine.step_service import build_step_app
@@ -16,7 +17,9 @@ DEFAULT_MODEL = "claude-haiku-4-5"
 async def _short(router: LLMRouter, system_key: str, user_key: str, model: str, **vars_: str) -> str:
     store = get_prompt_store()
     system = store.get(system_key)
-    user = store.get(user_key).format(**vars_)
+    # A2: render the real n8n brief for this key when one exists (intro 6.9k chars,
+    # other_top_stories 10.8k) instead of the placeholder seed.
+    user = render_live_prompt(user_key, store, **vars_)
     resp = await router.complete(
         provider="anthropic", model=model, system=system, prompt=user, max_tokens=600, temperature=0.5
     )
@@ -45,7 +48,12 @@ async def handler(inp: StepInput) -> StepOutput:
             "newsletter.intro.system",
             "newsletter.intro.user_template",
             model,
-            stories="\n".join(s.story_title for s in segments),
+            story_sections="\n\n".join(
+                f"## {s.story_title}\n{s.newsletter_section_content}" for s in segments
+            ),
+            subject_line=str(inp.payload.get("subject_line") or ""),
+            pre_header=str(inp.payload.get("pre_header") or ""),
+            newsletter_date=str(inp.payload.get("newsletter_date") or ""),
         )
     except ProviderNotRegistered:
         intro = _fixture_intro(segments)
@@ -56,7 +64,12 @@ async def handler(inp: StepInput) -> StepOutput:
             "newsletter.other_top_stories.system",
             "newsletter.other_top_stories.user_template",
             model,
-            items="\n".join(r.get("title", "") for r in remaining_items),
+            story_sections="\n".join(s.story_title for s in segments),
+            articles="\n".join(
+                f"- ({r.get('id')}) {r.get('title')} — {r.get('source_name')}" for r in remaining_items
+            ),
+            subject_line=str(inp.payload.get("subject_line") or ""),
+            newsletter_date=str(inp.payload.get("newsletter_date") or ""),
         )
     except ProviderNotRegistered:
         other = _fixture_other(remaining_items)

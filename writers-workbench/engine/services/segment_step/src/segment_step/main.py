@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import json
-
 from writer_engine.llm import LLMRouter, ProviderNotRegistered, complete_structured, get_router
 from writer_engine.prompt_store import get_prompt_store, seed_default_prompts
+from writer_engine.prompt_store.n8n_translate import render_live_prompt
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
 from writer_engine.schemas.newsletter import StorySegment
 from writer_engine.step_service import build_step_app
@@ -25,16 +24,33 @@ def _fixture(story: dict) -> StorySegment:
 
 
 async def _write(
-    router: LLMRouter, story: dict, sources: list[dict], image_options: list[str], model: str
+    router: LLMRouter,
+    story: dict,
+    sources: list[dict],
+    image_options: list[str],
+    model: str,
+    *,
+    ctx: dict | None = None,
 ) -> StorySegment:
     store = get_prompt_store()
     system = store.get("newsletter.segment.system")
-    user_template = store.get("newsletter.segment.user_template")
-    user = user_template.format(
-        story_json=json.dumps(story, ensure_ascii=False),
-        sources="\n\n".join(f"# {s.get('title', '')}\n{s.get('markdown', '')}" for s in sources)[:8000],
-        images="\n".join(image_options) or "(none)",
+    ctx = ctx or {}
+    src_text = "\n\n".join(f"# {s.get('title', '')}\n{s.get('markdown', '')}" for s in sources)[:8000]
+    # A2: the real n8n segment brief (16.5k chars) instead of the placeholder. Image options are not
+    # part of the n8n prompt's field set, so they are appended rather than interpolated.
+    user = render_live_prompt(
+        "newsletter.segment.user_template",
+        store,
+        story_title=str(story.get("title") or ""),
+        story_summary=str(story.get("summary") or ""),
+        segment_sources=src_text,
+        external_sources=src_text,
+        subject_line=str(ctx.get("subject_line") or ""),
+        pre_header=str(ctx.get("pre_header") or ""),
+        newsletter_date=str(ctx.get("newsletter_date") or ""),
     )
+    if image_options:
+        user += "\n\nAVAILABLE IMAGE URLS (choose at most one):\n" + "\n".join(image_options)
     segment, _ = await complete_structured(
         router,
         provider="anthropic",
@@ -53,7 +69,18 @@ async def handler(inp: StepInput) -> StepOutput:
     model = str(inp.payload.get("model") or DEFAULT_MODEL)
     router = get_router(service=STEP_NAME)
     try:
-        seg = await _write(router, story, sources, image_options, model)
+        seg = await _write(
+            router,
+            story,
+            sources,
+            image_options,
+            model,
+            ctx={
+                "subject_line": inp.payload.get("subject_line"),
+                "pre_header": inp.payload.get("pre_header"),
+                "newsletter_date": inp.payload.get("newsletter_date"),
+            },
+        )
     except ProviderNotRegistered:
         seg = _fixture(story)
     # The model sometimes omits the title; backfill the authoritative story title so downstream
