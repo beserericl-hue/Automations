@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 def _coerce_str_list(v: Any) -> Any:
@@ -79,7 +79,15 @@ class SelectedStory(BaseModel):
 
 class PickedStories(BaseModel):
     top_selected_stories: list[SelectedStory]
-    chain_of_thought: str = ""
+    # A2: the n8n editorial brief asks the model for `top_selected_stories_chain_of_thought`. The
+    # alias captures it rather than rewriting the prompt the model was tuned on — without it the
+    # field silently defaults to "" and the selection reasoning (which the brief demands for EVERY
+    # story considered) is thrown away.
+    chain_of_thought: str = Field(
+        default="", validation_alias=AliasChoices("chain_of_thought", "top_selected_stories_chain_of_thought")
+    )
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class SubjectLineProposal(BaseModel):

@@ -2,12 +2,32 @@
 
 from __future__ import annotations
 
+from datetime import date
+from typing import Any
+
 from writer_engine.config import get_settings
 from writer_engine.llm import LLMRouter, ProviderNotRegistered, complete_structured, get_router
 from writer_engine.prompt_store import get_prompt_store, seed_default_prompts
+from writer_engine.prompt_store.n8n_translate import live_template, render
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
 from writer_engine.schemas.newsletter import PickedStories
 from writer_engine.step_service import build_step_app
+
+PICK_KEY = "newsletter.pick_top_stories.user_template"
+
+
+def render_live_prompt(key: str, store: Any, **fields: Any) -> str:
+    """Render the live prompt for ``key`` from the verbatim n8n baseline.
+
+    Falls back to the placeholder seed only if the baseline is unavailable, so a missing seed
+    degrades to the old behaviour rather than crashing the pipeline.
+    """
+    baseline = store.get(f"n8n_baseline.{key}")
+    if not baseline:
+        return str(store.get(key)).format(**fields)
+    template, _fields, _unmapped = live_template(key, baseline)
+    return render(template, **fields)
+
 
 STEP_NAME = "pick"
 seed_default_prompts()
@@ -52,15 +72,25 @@ async def _pick(
     max_stories: int,
     feedback: str | None,
     genre: str | None = None,
+    newsletter_date: str | None = None,
 ) -> PickedStories:
     settings = get_settings()
     store = get_prompt_store()
     system = store.get("newsletter.pick_top_stories.system") + _audience_directive(genre)
-    user_template = store.get("newsletter.pick_top_stories.user_template")
     articles_text = "\n\n".join(
         f"- ({a.get('id')}) {a.get('title')} — {a.get('source_name')}" for a in articles
     )
-    user = user_template.format(articles=articles_text, max_stories=max_stories)
+    # A2: render the REAL n8n editorial brief, not the 2-line placeholder seed. The baseline brief
+    # (15.7k chars) is what encodes catchiest-first ordering, "avoid AI-safety stories", "avoid
+    # course ads", no duplicate company/subject, and source-dedup into one story slot — 18 months of
+    # editorial tuning that the placeholder threw away. See prompt_store.n8n_translate.
+    user = render_live_prompt(
+        PICK_KEY,
+        store,
+        articles=articles_text,
+        max_stories=max_stories,
+        newsletter_date=newsletter_date or date.today().isoformat(),
+    )
     if feedback:
         user += f"\n\nOperator feedback from prior round (incorporate): {feedback}"
     picked, _resp = await complete_structured(
@@ -84,7 +114,14 @@ async def handler(inp: StepInput) -> StepOutput:
     genre = inp.payload.get("genre")
     router = get_router(service=STEP_NAME)
     try:
-        picked = await _pick(router, articles, max_stories, feedback, genre=genre)
+        picked = await _pick(
+            router,
+            articles,
+            max_stories,
+            feedback,
+            genre=genre,
+            newsletter_date=inp.payload.get("newsletter_date"),
+        )
     except ProviderNotRegistered:
         picked = _fixture(max_stories)
     return StepOutput(
