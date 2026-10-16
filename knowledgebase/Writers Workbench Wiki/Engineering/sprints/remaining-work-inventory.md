@@ -14,14 +14,21 @@ API response, or an n8n query.
 
 **Driving question:** the engine must be complete and optimised enough to onboard additional users. The
 working assumption going in was that it may not yet handle *one* user correctly, let alone 50. Three
-findings confirm that concern:
+findings confirmed that concern — **all three are now fixed (Gate 0, 2026-10-16)**:
 
-- The runtime container launches **19 step services + an arq worker as unsupervised `&` background shell
-  jobs** — if one dies, nothing restarts it (**B1**).
-- `/admin/health` returns `{"status":"ok"}` **unconditionally** and checks nothing, so Railway cannot
-  detect B1 (**B2**).
-- **The engine has no CI.** `engine-ci.yml` — which [[log|the F0 log entry]] claims was delivered — does
-  not exist in the repo. The ~350 Python tests gate nothing (**H1**).
+- The runtime container launched **19 step services + an arq worker as unsupervised `&` background shell
+  jobs** — if one died, nothing restarted it (**B1** ✅).
+- `/admin/health` returned `{"status":"ok"}` **unconditionally** and checked nothing — and neither
+  `railway.*.toml` declared a `healthcheckPath`, so Railway was not probing the engine at all (**B2** ✅).
+- **The engine had no CI.** `engine-ci.yml` — which [[log|the F0 log entry]] claims was delivered — did
+  not exist in the repo, so ~350 Python tests gated nothing (**H1** ✅).
+
+> **What H1's absence had already cost, measured on 2026-10-16:** the engine had drifted to **61
+> unformatted files, 3 ruff errors and 45 mypy errors**, including **three latent `None`-crash bugs**
+> (an unguarded `str | None` into the gateway's write-URL builder; two double-`.get()` patterns whose
+> `isinstance` guards never narrowed, one of them in the Postal error path that previously let the
+> newsletter saga report SENT having mailed no one). Tests were green throughout — the defects were in
+> paths tests did not cover. This is the concrete argument for Gate 0 preceding everything else.
 
 Status legend used throughout:
 
@@ -141,8 +148,8 @@ certainly `chapter_step`.
 
 | ID | Item | St | Evidence | Impact |
 |---|---|---|---|---|
-| **B1** | **19 step services + arq worker run as unsupervised `&` background jobs in one container** | ⚠️ | `engine/services/runtime/entrypoint.sh` — only the orchestrator is `exec`'d; no supervisor, no restart | One dead step = every job through it fails while the container reports healthy. **Fix first** |
-| **B2** | **`/admin/health` checks nothing** | ⚠️ | `orchestrator/main.py:88-90` returns `{"status":"ok"}` flat — no check of the 19 steps, Redis, Supabase or the worker. No readiness/liveness split | Railway cannot detect B1; no graceful drain on deploy |
+| **B1** | ~~19 step services + arq worker run as unsupervised `&` background jobs~~ | ✅ **DONE** 2026-10-16 | Replaced by `writer_engine.supervisor` (`python -m writer_engine.supervisor`); process table in `writer_engine/runtime_processes.py`; `entrypoint.sh` is now a 1-line `exec`. Fail-fast: any child exiting stops the rest and exits non-zero, so Railway (`restartPolicyType=ALWAYS`) restarts clean. Written in Python because `wait -n`/`declare -A` need bash ≥4.3, which macOS does not ship — the shell version could not be tested outside the container | 9 unit tests on real subprocesses + a live smoke run that killed `chapter_step` and confirmed teardown + exit 1 |
+| **B2** | ~~`/admin/health` checks nothing~~ | ✅ **DONE** 2026-10-16 | orchestrator `/admin/health` now probes all 19 steps (503 if any is unreachable — a restart is the right remedy for an in-container process); new `/admin/ready` adds Redis (required) + arq heartbeat + Supabase (optional → `degraded`). Gateway keeps flat-OK liveness (stateless proxy) with its orchestrator dependency in `/admin/ready`, so an orchestrator restart does not bounce it in sympathy. New `writer_engine/health.py`. **Also found: neither `railway.*.toml` declared `healthcheckPath`, so Railway never probed the engine at all** — now set on both services | Verified live on DEV: runtime reports 19/19 steps + redis/arq/supabase ok; arq heartbeat visible (`health_check_interval` cut 3600s→30s, since the default let a dead worker look alive for an hour) |
 | **B3** | **`MAX_CONCURRENT_LLM` is per-*process*, not per-instance** | ⚠️ | Semaphore lives in the `LLMRouter` module singleton (`llm/factory.py:9`, `llm/router.py:62`); each of ~21 processes builds its own | The documented cap of 12 is really up to 12 × N processes. **CR-003's "~10 users per instance" sizing has no basis.** Fixed by B10 |
 | **B4** | **One arq queue for everything** | ❌ | `orchestrator/worker.py:87` `queue_name="newsletter"`, `max_jobs=16` — newsletter sagas, chapter writes, Q/A, plan, cover-art and lifecycle share 16 slots | A 96-chapter batch starves every interactive op (CR-010 C3) |
 | **B5** | **90-min timeout × 2 tries, uniform across ops** | ⚠️ | `worker.py:97,99` `job_timeout=5400`, `max_tries=2` | 16 stuck jobs = a 3-hour total stall. A Q/A needs seconds, not 90 minutes. No dead-letter path |
@@ -227,12 +234,14 @@ certainly `chapter_step`.
 
 | ID | Item | St | Detail |
 |---|---|---|---|
-| **H1** | **No engine CI exists** | ❌ | `.github/workflows/` contains only `ci.yml` + `release.yml`. No Python lint/mypy/pytest job anywhere. The `engine-ci.yml` recorded in [[log]] 2026-05-30 is not in the repo |
-| H2 | Required checks on `main` give the engine zero coverage | ⚠️ | `TypeScript & Lint`, `Unit Tests`, `Production Build`, `Schema Governance Check` |
+| **H1** | ~~No engine CI exists~~ | ✅ **DONE** 2026-10-16 | `.github/workflows/engine-ci.yml` — uv (pinned 0.5.13 to match `services/runtime/Dockerfile`) → `ruff check` → `ruff format --check` → `mypy` → `pytest`. Green on its first run. **Deliberately no `paths:` filter** so the check always reports and can safely be required (avoids the H6 trap). Suite stays credential-free |
+| **H2** | Required checks now cover the engine on `main` | ✅ **DONE** 2026-10-16 | `main` requires `TypeScript & Lint`, `Unit Tests`, `Production Build`, `Schema Governance Check`, **`Engine CI`** |
+| **H7** | **`develop` has NO required status checks at all** | ⚠️ NEW | `GET /branches/develop/protection/required_status_checks` → 404 "not enabled". Only a review is required, so engine work can merge to `develop` — the branch DEV deploys from — with CI red. Enabling a new gate class there is a policy call, left for the user |
+| **H8** | **mypy covers only 4 of 21 workspace members** | ⚠️ NEW | `pyproject.toml [tool.mypy] files` = `packages/writer_engine/src`, `gateway`, `orchestrator`, `library_retrieve_step`. The other **17 step services are not type-checked at all** — including `chapter_step` and `media_step`. Given that 3 latent `None`-crashes turned up in the *checked* quarter, this is a real gap; expanding coverage will surface a backlog, so it wants its own pass |
 | **H3** | **L5 parity was never measured** | ❌ | The ≥0.95 parity score is the stated precondition for every cutover ([[engine-framework-sprints]] F1-7.5 / [[engine-api-system-tests]]) |
 | H4 | L6 load/scalability suite never run | ❌ | See **B11** |
 | H5 | The 157-test engine E2E is a manual script, not CI | 🟡 | `scripts/e2e_full_verify.py` |
-| H6 | `ci.yml` has a `paths` filter, so some PRs cannot satisfy required checks | 🟡 | See [[ci-pipeline]] |
+| H6 | `ci.yml` has a `paths` filter, so some PRs cannot satisfy required checks | 🟡 | See [[ci-pipeline]]. `engine-ci.yml` deliberately avoids this |
 
 ---
 
@@ -259,20 +268,32 @@ Four gates, ordered so each makes the next measurable. This **supersedes** the f
 [[work-ordering-2026-05]], which assumed construction work that is already done and omitted the
 foundations that are not.
 
-### Gate 0 — Stop lying to ourselves (days, not weeks)
+### Gate 0 — Stop lying to ourselves (days, not weeks) — **MOSTLY DONE 2026-10-16**
 
-**B1** process supervisor · **B2** real health + readiness checks · **H1** engine CI (pytest + ruff +
-mypy) promoted to a required check · **A1** fail loud instead of returning a fixture · **G3** remove the
-insecure secret defaults.
+| Item | Status |
+|---|---|
+| **B1** process supervisor | ✅ done — `writer_engine.supervisor`, fail-fast, 9 tests + live smoke |
+| **B2** real health + readiness checks | ✅ done — both services, plus the missing Railway `healthcheckPath` |
+| **H1** engine CI promoted to a required check | ✅ done — `Engine CI` green and required on `main` |
+| **A1** fail loud instead of returning a fixture | ❌ **still open — next** |
+| **G3** remove the insecure secret defaults | ❌ **still open — next** |
 
-Nothing below is trustworthy until these land, because today a broken engine reports healthy and no gate
-catches it.
+Prerequisite work that fell out of H1: 61 files reformatted, 3 ruff errors and 45 mypy errors cleared
+(including the three latent `None`-crashes noted at the top). A red pipeline gates nothing, so making it
+green was part of the item rather than a separate task.
+
+Two new findings to fold in: **H7** (`develop` has no required checks at all) and **H8** (mypy covers
+only 4 of 21 workspace members).
 
 ### Gate 1 — Make one user provably correct
 
 **B10** collapse 21 → 3 processes (also fixes **B3** and **A5**) · **A2** real newsletter prompts ·
 **A3** embeddings on · **A4** full token accounting · **A9**/**A10** remove dead paths · **A6** bible
-cleanup.
+cleanup · **H8** extend mypy to the other 17 step services.
+
+B10 is now a smaller job than when it was written: `writer_engine/runtime_processes.py` is already the
+single source of truth for the process table, so collapsing means mounting the step apps as
+sub-applications of one uvicorn and pointing `*_STEP_URL` at path prefixes instead of ports.
 
 Exit: run **H3** and get an actual L5 parity number.
 

@@ -733,3 +733,80 @@ path is unsafe until regenerated; PROD `/api/health` reports `deployed_at: 2026-
 **BYOK deferred.** Per-user provider keys + feature-based monthly subscription were scoped and set aside
 as having too many loose pieces. Structural findings preserved in the inventory's Deferred section —
 notably that BYOK cannot be expressed in n8n credentials at all, so it depends on Gate 4.
+
+## [2026-10-16] build | Gate 0 — engine supervision (B1), real health checks (B2), engine CI (H1)
+
+Took the first three items of the [[remaining-work-inventory]] gate plan. All three shipped to
+`develop` and are live on DEV. Commits `7626961` `f42f8f9` `cd736d5` `f2c8064` `6f30b56`.
+
+**H1 — engine CI (and what its absence had cost).** `.github/workflows/engine-ci.yml` runs uv (pinned
+0.5.13 to match `services/runtime/Dockerfile`) → `ruff check` → `ruff format --check` → `mypy` →
+`pytest`. Green on its first run; added to the required status checks on `main`. Deliberately **no
+`paths:` filter** — a required check skipped by a path filter reports "expected but not reported" and
+blocks every PR that misses the filter (the H6 trap).
+
+Making the pipeline green first was part of the item: the engine had drifted to **61 unformatted files,
+3 ruff errors and 45 mypy errors**, and three of those were **real latent `None`-crash bugs**, not
+typing hygiene — (1) `gateway/routes/internal.py` passed `DispatchPlan.tool` (`str | None`) into
+`_write_url(tool: str)` at both call sites, so a routing regression would silently build
+`/pipelines/write/None/run` and surface as an opaque orchestrator 404; (2) `postal/client.py` called
+`payload.get("data")` twice so the `isinstance` guard never narrowed — a null `data` in a Postal error
+body would `AttributeError` instead of surfacing the send failure, the same class of bug that
+previously let the newsletter saga reach SENT having mailed no one; (3) the same double-`.get` pattern
+in `library_helpers/story_bible.py`. **Tests were green throughout** — these live in paths tests do not
+cover. That is the concrete case for Gate 0 preceding everything else.
+
+**B2 — real health + readiness.** `/admin/health` had returned `{"status":"ok"}` unconditionally,
+checking none of the 19 in-container steps, Redis, Supabase or the arq worker. Worse, **neither
+`railway.runtime.toml` nor `railway.gateway.toml` declared a `healthcheckPath`, so Railway was not
+probing the engine at all** — the 503 would have had nothing to act on. Now:
+- orchestrator `/admin/health` probes all 19 steps concurrently, 503 if any is unreachable (they are
+  in-container processes, so a restart is the correct remedy);
+- orchestrator `/admin/ready` adds Redis (required — it carries the queue, the shared Anthropic budget,
+  the HITL gates and SSE) plus the arq heartbeat and Supabase as optional → `degraded`, not 503, so a
+  blip does not cause a restart loop;
+- gateway `/admin/health` stays flat-OK (stateless proxy) with its orchestrator dependency in
+  `/admin/ready`, so an orchestrator restart does not bounce the gateway in sympathy;
+- new `writer_engine/health.py` (timeout-bounded probes that never raise; `ok | degraded | unhealthy`);
+- `write_tools.ALL_STEP_URLS` added so all 19 steps are probed, not just the 8 hub-routable tools;
+- arq `health_check_interval` 3600s → 30s with an explicit `ARQ_HEALTH_CHECK_KEY` — the default let a
+  dead worker look alive for an hour;
+- `healthcheckPath=/admin/health`, `healthcheckTimeout=30`, `restartPolicyType=ALWAYS` on both services.
+
+Readiness is also the hook the graceful-drain work (B7) builds on.
+
+**B1 — process supervision.** `entrypoint.sh` had launched 19 step services + the arq worker as bare
+`&` background jobs and then `exec`ed the orchestrator, with nothing watching the background jobs.
+Replaced with `writer_engine.supervisor` (`python -m writer_engine.supervisor`); `entrypoint.sh` is now
+a one-line `exec`. Policy is **fail fast**: any child exiting stops the rest and exits non-zero so
+Railway restarts the container clean. Children are deliberately not restarted in place — they are
+stateless, and each holds its own in-process caches (`LLMRouter`, `PromptStore`), so a partial restart
+leaves processes disagreeing about configuration.
+
+**Written in Python, not shell, on purpose.** `wait -n` and `declare -A` need bash ≥ 4.3; macOS ships
+3.2 and the Docker daemon was down, so a shell supervisor would have shipped unverified — unacceptable
+for the one piece whose entire job is noticing failure. `writer_engine/runtime_processes.py` is now the
+single source of truth for the process table, replacing three copies of the port list (the `start`
+lines, the `export *_STEP_URL` lines, and the `EngineSettings` defaults).
+
+**Verification.** 19 new unit tests (9 supervisor on real subprocesses, 10 cross-package asserting
+`STEP_PORTS` and `ALL_STEP_URLS` agree — so a step started without a health probe is caught) + 14 new
+health tests. Beyond that, a **live smoke run against the real process table**: booted all 19 steps +
+the orchestrator, confirmed `/admin/health` 200 with every step healthy, killed `chapter_step`
+out-of-band, then confirmed health flipped to 503 naming `step:chapter` **and** the supervisor detected
+it, tore down all siblings and exited 1. Clean teardown, no stray listeners. Then confirmed on the
+deployed DEV service: runtime `/admin/health` 19/19 ok, `/admin/ready` ok with a live arq heartbeat
+(`j_complete=0 j_failed=0 … queued=0`), gateway both green.
+
+**New findings filed in the inventory:** **H7** — `develop` has **no required status checks at all**
+(only a review), so engine work can merge to the branch DEV deploys from with CI red; enabling a new
+gate class there is a policy call left to the user. **H8** — mypy's `files` covers only 4 of 21
+workspace members, so **17 step services including `chapter_step` and `media_step` are not type-checked
+at all**; given 3 latent crashes surfaced in the checked quarter, this wants its own pass (folded into
+Gate 1).
+
+**Gate 0 remaining:** **A1** (fail loud instead of returning a fixture) and **G3** (remove the
+`dev-service-secret-change-me` / `dev-admin-token-change-me` defaults).
+
+Also noted: the local `engine/.venv` had stale shebangs pointing at `Automations/engine/` from before
+the engine moved under `writers-workbench/` — recreated. Local-only, gitignored.
