@@ -920,3 +920,72 @@ plan: run H3, then A2/A3 against it. **A6** (bible cleanup) is independent and c
 the branch DEV deploys from with CI red; enabling a gate class there is a policy call left to the user.
 **H8** is now closed. Also: the local `engine/.venv` had stale shebangs from before the engine moved
 under `writers-workbench/` (local-only, recreated).
+
+## [2026-10-16] build | H3 parity harness (finds a craft regression) + A2/A3/A6 + H7
+
+Third pass of the day. Commits `2b4e5c8` `4de9904` `158935f` `992796a` `be969f4`, Engine CI green on
+each, DEV healthy throughout (19/19 steps).
+
+**H7 — `develop` now requires Engine CI.** It had **no** `required_status_checks` object at all; the
+vault's "1 approving review on develop" was also stale — there was no review requirement either.
+Added `Engine CI` with `strict: false`, preserving `enforce_admins: false` (already the state), so
+admin direct pushes keep working while PRs are gated.
+
+**H3 — the parity harness, built and RUN.** `parity_score`/`shadow_summary` scored one pair;
+nothing produced pairs over a corpus, which is why the ≥0.95 gate every cutover depends on had never
+been measured. Added `run_corpus` + `render_report` to `writer_engine.parity` and
+`scripts/parity_run.py` with three modes: `recorded` (vs stored n8n-era artifacts — runnable now),
+`ab` (engine before vs after a change — the mode that makes A2/A3 measurable), `live` (the real A4
+shape, shadow-driven). A failing tool fails the whole run, because the gate is applied per tool at
+cutover and an aggregate can mask one bad tool.
+
+**It immediately found a real craft regression (A13).** 96 engine chapters vs 6 n8n-era ones:
+`word_count` agreed 6/6, `content_text` 6/6, **`sub_chapter_count` failed 6/6** (engine 1, n8n 2–14).
+All 96 engine chapters had the identical count — deterministic, not variance. Sub-chapters were
+joined with a bare blank line, so chapters read as one undivided block. Fixed structurally
+(`SCENE_BREAK.join`) so N sub-chapters yield N−1 breaks rather than trusting an advisory instruction;
+`---` matches the short-story op's own convention and what n8n emitted. Residual noted: the
+drift-correct streamed revision may not preserve separators.
+
+Two honesty bugs in my own harness, both caught by running it: it paired chapters by NUMBER across
+two different stories and then suppressed the structural caveat (`same_input` is now asserted by the
+caller, never inferred from a filename collision); and recorded artifacts are annotated CAPTURES, not
+raw step output, annotated differently per era — left unstripped, the engine capture's `---` rule
+itself counts as a scene break and every chapter scores exactly 2, so the metric measures the capture
+format instead of the prose.
+
+**A2 — the real editorial briefs, mechanism built, picker migrated.** New
+`prompt_store.n8n_translate`: classify each `{{ … }}` block by a distinctive marker rather than
+regexing the JS, and render with `string.Template` **not** `str.format` (three briefs contain literal
+braces from JSON examples). All 8 briefs translate with **zero unmapped**. Two real
+incompatibilities handled rather than papered over: the brief hardcodes a "four-item" list where the
+engine takes `max_stories` (a documented `ADAPTATIONS` delta that *raises* if it stops matching, so a
+silently-skipped adaptation can't revert behaviour), and it asks for
+`top_selected_stories_chain_of_thought` where the schema field is `chain_of_thought` — which
+defaults to `""`, so switching would have silently **discarded** the reasoning the brief demands for
+every story (fixed with a validation alias). `pick_step` now runs the real 15.7k-char brief instead
+of a two-line stub. 4 steps remain on placeholders, each needing saga fields threaded.
+
+**A3 — re-diagnosed: never a flag flip.** `writing_documents`, the table `embed.py` read and wrote,
+**does not exist**; the real table is `writing_embeddings_v2` (384 rows). `re_embed_project` filtered
+on `project_title` where the column is `project_id`. And **no vector-match function exists** under
+any related name, even probed with the exact parameter names the code sends. Enabling the flag would
+have 404'd every call. Code corrected; **migration 027** adds the missing function (additive,
+governance-clean, **not applied** — DEV needs the pooler DSN, PROD is Tier 3). Flag stays off, now
+blocked on the migration rather than on code. Full detail in [[remaining-work-inventory]] §A3.
+
+**A6 — re-diagnosed: a 3-way vocabulary mismatch, not duplication.** Recorded as "~1000 polluted
+rows, 297 character dupes". Measured: 3245 rows, **21** true duplicate groups (21 redundant rows),
+but **2341 rows (72%)** carry an `entry_type` outside the table's CHECK. The table, the engine
+`BibleEntry` Literal and the client TS type each define a *different* vocabulary, with only
+`character` and `event` common to all three — which is why the Story Bible tab hides most of what
+exists and why `ProjectDetail.tsx` already carries an `isJunkBibleName` workaround. The root cause is
+the contract, not the data. `scripts/story_bible_normalize.py` diagnoses and normalises by `UPDATE`
+never `DELETE`; `place → location` and `object → item` are unambiguous defaults, while **`concept`
+(719) and `research` (493) need a product decision and are deliberately not guessed**. Nothing was
+written. Detail in §A6.
+
+**Sequencing note that held up.** A2 and A3 were flagged as unmeasurable without H3, and building H3
+first is what surfaced the scene-break regression and what will measure the remaining prompt
+migration. Both A3 and A6 also turned out to be mis-sized in the inventory — in both cases the
+recorded fix could not have worked — which is the argument for verifying before executing.

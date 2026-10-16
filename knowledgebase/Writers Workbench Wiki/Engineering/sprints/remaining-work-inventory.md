@@ -130,11 +130,11 @@ certainly `chapter_step`.
 | ID | Item | St | Evidence | Impact |
 |---|---|---|---|---|
 | **A1** | ~~Fixture fallbacks fabricate deliverables~~ | ✅ **DONE** 2026-10-16 — gated on `ALLOW_FIXTURE_FALLBACK` (default false). Fixed centrally: 23 of the 29 sites funnel through one `raise` in `LLMRouter.complete`, which now raises the new `ProviderNotConfigured` — deliberately NOT a subclass of `ProviderNotRegistered`/`KeyError`, so no fixture handler catches it and no site can opt back into faking success. 6 non-router sites got explicit guards. | `research_step/main.py:70` returns `"(stub answer for: …)"`; `media_step/main.py:186,286`; `_fixture()` in `subject_step:18`, `segment_step:18`, `assemble_step:26`, `brainstorm_step:121`, `pick_step:21`; `library_step:57,202,542` return `{"fixture": True}` | The `ProviderNotRegistered` narrowing stopped *real* LLM errors being masked, but a *misconfigured key* still produces fake success. Only `media_step:264` was hardened against persisting a fixture. **Highest-priority correctness risk** |
-| **A2** | **Newsletter steps run on placeholder prompts, not the ported n8n prompts** | 🟡 **scoped, ready to execute — see §A2 below** | `prompt_store/n8n_seeds/__init__.py:5-7` — verbatim prompts load under `n8n_baseline.*` and "the step services keep using the placeholder seeds until the token-mapping work in Sprint 17 lands"; `prompt_store/seeds.py:3` "minimal … placeholders" | Severe, and measured 2026-10-16: the picker's live prompt is a **2-line stub** ("Pick the top {max_stories} stories") against a **15.7k-char editorial brief** sitting unused in `n8n_baseline.*` — which encodes catchiest-first, no AI-safety stories, no course ads, no duplicate company/subject, dedupe sources into one slot. Newsletter L5 parity is structural only, not prompt-fidelity. Chapter steps are unaffected (richer `follett_seeds.*`) |
-| **A3** | **Embeddings / canon grounding off.** `chapter.write` never retrieves project canon | ❌ | `config.py:95` `ENABLE_PYTHON_EMBEDDINGS=false`; `re_embed_project` exists but nothing triggers it; n8n `Sub - Embed Project Data` is the live embedder | CR-010 A2: "a quality-parity gap, not just a feature gap." **Blocks E1** |
+| **A2** | **Newsletter prompts** | 🟡 **mechanism built + picker migrated** — `prompt_store.n8n_translate` (all 8 briefs translate, zero unmapped); `pick_step` now runs the real 15.7k-char brief. 4 steps still on placeholders, each needing saga fields threaded. See §A2 | `prompt_store/n8n_seeds/__init__.py:5-7` — verbatim prompts load under `n8n_baseline.*` and "the step services keep using the placeholder seeds until the token-mapping work in Sprint 17 lands"; `prompt_store/seeds.py:3` "minimal … placeholders" | Severe, and measured 2026-10-16: the picker's live prompt is a **2-line stub** ("Pick the top {max_stories} stories") against a **15.7k-char editorial brief** sitting unused in `n8n_baseline.*` — which encodes catchiest-first, no AI-safety stories, no course ads, no duplicate company/subject, dedupe sources into one slot. Newsletter L5 parity is structural only, not prompt-fidelity. Chapter steps are unaffected (richer `follett_seeds.*`) |
+| **A3** | **Embeddings: re-diagnosed — was never a flag flip** | 🟡 **code fixed; blocked on migration 027** | `config.py:95` `ENABLE_PYTHON_EMBEDDINGS=false`; `re_embed_project` exists but nothing triggers it; n8n `Sub - Embed Project Data` is the live embedder | CR-010 A2: "a quality-parity gap, not just a feature gap." **Blocks E1** |
 | **A4** | ~~Token accounting is chapter-only~~ | ✅ **DONE** 2026-10-16 — moved into the step-service template, so all 19 steps and any future one are covered by one owner. `workflow` label is `<step>.<op>`; usage injected where `task_email` reads it, so token usage now appears in EVERY completion email; flushed on failure paths too (a step that burned tokens then failed still cost money). | `begin`/`flush` called only in `chapter_step`; brainstorm, research, media and the newsletter steps write no `token_usage_v2` | CostDashboard under-reports; credits were never calibrated (CR-007's "exact tokens-per-credit" is still unmeasured). **Blocks E1** |
 | **A5** | ~~Prompt hot-reload cannot work~~ | ✅ **DONE** 2026-10-16 — B10 collapsed the 19 stores to one, plus a correct fan-out: the gateway cannot reach the steps process (localhost-bound in the runtime container), so it fans out to the orchestrator, which owns that hop. | `PromptStore` is a module global (`prompt_store/store.py:65`); each of the 21 processes holds its own. `/admin/reload-prompts` on the gateway reloads nothing that generates text. `reload_from_supabase` swallows every exception and returns 0 (`store.py:44-50`) | Prompt tuning — the main quality lever — has no working production path. **B10's collapse largely fixes this** |
-| **A6** | **Story bible: polluted data, no hub write path** | 🟡 | ~1000 rows / 297 `character` dupes remain after the junk filter; `story_bible_step` has add/list but the catalog routes only `story_bible.list`; no edit/delete; `StoryBiblePanel` is read-only | Story Bible tab shows garbage and users cannot fix it |
+| **A6** | **Story bible: re-diagnosed — a 3-way vocabulary mismatch, not duplication** | 🟡 **diagnosed; needs one decision** | ~1000 rows / 297 `character` dupes remain after the junk filter; `story_bible_step` has add/list but the catalog routes only `story_bible.list`; no edit/delete; `StoryBiblePanel` is read-only | Story Bible tab shows garbage and users cannot fix it |
 | **A7** | **Drift detector over-flags** | 🟡 | 16 residual drifted chapters in the Burial Mound run; flags characterisation that *adds to* rather than *contradicts* a sparse roster bio | False positives train users to ignore the signal |
 | **A8** | **Eve callback is a gated dry run** | ❌ | `writer_engine/eve.py:114` returns `{"dry_run": True}` when `ELEVENLABS_API_KEY`/`AGENT_ID` are unset — they are unset by design. PROD Eve still calls the n8n PROD hub | Voice is the headline feature and is not on the engine. Pointing PROD Eve at the engine is baseline-protected and needs explicit authorisation |
 | **A9** | ~~Dead ops still routable~~ | ✅ **DONE** 2026-10-16 — `brainstorm.chapter` (returned `{"beats": []}` unconditionally) removed; unknown ops now `UNKNOWN_OP`. `library_retrieve_step` deprecation-marked rather than removed: not in the hub catalog so unreachable by users, and still the only L2 test of the orchestration primitive. | CR-010 A4: `brainstorm_step.chapter` returns empty beats (superseded by `chapter.plan`) but remains in OPS → misroutes. `library_retrieve_step` (the F0 demo, superseded by `library_step`) still runs on `:8002` and returns `fixture-1`/`fixture-2` | Silent wrong answers |
@@ -196,6 +196,70 @@ harness (H3, never run)** — which is also Gate 1's stated exit criterion. Run 
 migrate against it, or the result is unmeasurable. Two of the eight prompts (`edit_top_stories`,
 `edit_subject_line`) drive the HITL revision loops, which F2 (auto-memory `project_f2_newsletter_saga_complete`)
 records as never exercised (S-12), so they need a live revision run too.
+
+### §A3 — embeddings was never a flag flip (re-diagnosed 2026-10-16)
+
+Recorded as "code exists, flag off". Probed against DEV Supabase:
+
+- **`writing_documents` does not exist** in either project. `embed.py` read AND wrote it. The real
+  table is `writing_embeddings_v2` — 384 rows, populated by n8n `Sub - Embed Project Data`.
+- `re_embed_project` filtered on `project_title`; the real scoping column is `project_id`.
+- **No vector-match function exists**, under `match_writing_documents` or any related name, even
+  probed with the exact parameter names the code sends (PGRST202 every time). n8n searched through
+  the Supabase Vector Store node's own SQL, so a stored function was never created.
+
+Enabling the flag today would have 404'd on every call. Retrieval has to be **built**.
+
+Done: `embed.py` corrected (real table via `EMBEDDINGS_TABLE`, scoped by `project_id`, search renamed
+`match_project_canon`), `EMBEDDING_MATCH_RPC` default aligned, search degrades to `[]` on RPC failure
+so a chapter write still produces a chapter. **Migration 027** creates the missing function —
+additive, governance-clean, **not applied** (DEV needs the pooler DSN; the engine `.env` has REST
+credentials only. PROD is Tier 3).
+
+Remaining: apply 027, then trigger re-embed after outline saves and wire retrieval into
+`chapter.write`. Neither is testable until the function exists.
+
+### §A6 — story bible is a 3-way vocabulary mismatch (re-diagnosed 2026-10-16)
+
+Recorded as "~1000 polluted rows, 297 character dupes". Measured on DEV: 3245 rows (3226 live), **21**
+true duplicate groups → 21 redundant rows, but **2341 rows (72%)** carry an `entry_type` outside the
+table's CHECK. Three layers disagree, and only `character` and `event` are common to all three:
+
+| layer | vocabulary |
+|---|---|
+| table CHECK | character · event · item · location · organization · plot_thread |
+| engine `BibleEntry` Literal | character · event · **object** · **place** · **concept** (+ **research**, written ad hoc by `chapter_step:1463`) |
+| client `types/database.ts` | character · event · location · **timeline** · plot_thread · **world_rule** |
+
+That is why the Story Bible tab hides most of what exists, and why `ProjectDetail.tsx` already
+carries an `isJunkBibleName` client-side workaround. **The root cause is the contract, not the data.**
+
+`scripts/story_bible_normalize.py` diagnoses and (with `--apply`) normalises by `UPDATE`, never
+`DELETE`. Two mappings are unambiguous and are its defaults: `place → location` (423),
+`object → item` (706). **Two need a decision and are deliberately not guessed:**
+
+- **`concept` (719)** — no table equivalent. `plot_thread` is closest but not the same thing;
+  `world_rule` (client-only) is arguably closer; adding `concept` to the CHECK is also defensible.
+- **`research` (493)** — arguably not a bible entry at all; these look like research-topic records
+  that may belong in `research_reports_v2`, or be dropped. 493 destructive deletes are not defaulted.
+
+Once the canonical vocabulary is settled, fix it at the source (the engine Literal, the extract
+prompt, and the client type) before normalising the data, or it re-pollutes.
+
+### §A13 — chapters had no scene breaks (found by H3, FIXED 2026-10-16)
+
+The parity harness's first run: `word_count` agreed 6/6 and `content_text` 6/6, but
+`sub_chapter_count` failed 6/6 — engine 1, n8n 2–14. Across **all 96** engine chapters the count was
+identical, which is deterministic, not generation variance. Sub-chapters were joined with a bare
+blank line, so every chapter read as one undivided block while the n8n baseline's carried 1–13
+breaks. It matters because `follett_seeds.scene.bme_check` / `scene.turn_density` exist to enforce
+scene construction and a story turn every 4–6 pages, and the short-story op already instructed
+"use --- between scenes" — chapters were simply never told.
+
+Fixed structurally (`SCENE_BREAK.join`), so N sub-chapters deterministically yield N−1 breaks rather
+than relying on an advisory instruction. **Residual:** when the drift-correct pass fires a streamed
+revision it rewrites the whole chapter and may not preserve the separators; that path only triggers
+on real drift, so most chapters keep them — confirm on the next live run.
 
 ## C. Observability & reliability
 
@@ -269,9 +333,9 @@ records as never exercised (S-12), so they need a live revision run too.
 |---|---|---|---|
 | **H1** | ~~No engine CI exists~~ | ✅ **DONE** 2026-10-16 | `.github/workflows/engine-ci.yml` — uv (pinned 0.5.13 to match `services/runtime/Dockerfile`) → `ruff check` → `ruff format --check` → `mypy` → `pytest`. Green on its first run. **Deliberately no `paths:` filter** so the check always reports and can safely be required (avoids the H6 trap). Suite stays credential-free |
 | **H2** | Required checks now cover the engine on `main` | ✅ **DONE** 2026-10-16 | `main` requires `TypeScript & Lint`, `Unit Tests`, `Production Build`, `Schema Governance Check`, **`Engine CI`** |
-| **H7** | **`develop` has NO required status checks at all** | ⚠️ NEW | `GET /branches/develop/protection/required_status_checks` → 404 "not enabled". Only a review is required, so engine work can merge to `develop` — the branch DEV deploys from — with CI red. Enabling a new gate class there is a policy call, left for the user |
+| **H7** | ~~`develop` has no required status checks~~ | ✅ **DONE** 2026-10-16 — `Engine CI` required on `develop` (`strict: false`). `enforce_admins` was already false and was preserved, so admin direct pushes still work while PRs are gated. The vault's "1 approving review on develop" claim was also stale — there was no review requirement either. | `GET /branches/develop/protection/required_status_checks` → 404 "not enabled". Only a review is required, so engine work can merge to `develop` — the branch DEV deploys from — with CI red. Enabling a new gate class there is a policy call, left for the user |
 | **H8** | **mypy covers only 4 of 21 workspace members** | ⚠️ NEW | `pyproject.toml [tool.mypy] files` = `packages/writer_engine/src`, `gateway`, `orchestrator`, `library_retrieve_step`. The other **17 step services are not type-checked at all** — including `chapter_step` and `media_step`. Given that 3 latent `None`-crashes turned up in the *checked* quarter, this is a real gap; expanding coverage will surface a backlog, so it wants its own pass |
-| **H3** | **L5 parity was never measured** | ❌ | The ≥0.95 parity score is the stated precondition for every cutover ([[engine-framework-sprints]] F1-7.5 / [[engine-api-system-tests]]) |
+| **H3** | ~~L5 parity was never measured~~ | ✅ **DONE** 2026-10-16 — harness built (`run_corpus`/`render_report` + `scripts/parity_run.py`, 3 modes) and RUN. First run found a real craft regression (see **A13**). A failing tool fails the whole run, since the gate is per-tool at cutover. `live`/shadow mode still needed for the true same-input A4 number. | The ≥0.95 parity score is the stated precondition for every cutover ([[engine-framework-sprints]] F1-7.5 / [[engine-api-system-tests]]) |
 | H4 | L6 load/scalability suite never run | ❌ | See **B11** |
 | H5 | The 157-test engine E2E is a manual script, not CI | 🟡 | `scripts/e2e_full_verify.py` |
 | H6 | `ci.yml` has a `paths` filter, so some PRs cannot satisfy required checks | 🟡 | See [[ci-pipeline]]. `engine-ci.yml` deliberately avoids this |
