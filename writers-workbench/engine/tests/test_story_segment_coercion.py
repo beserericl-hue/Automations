@@ -21,9 +21,7 @@ def test_title_alias_maps_to_story_title() -> None:
 
 
 def test_content_alias_maps_to_section_content() -> None:
-    seg = StorySegment.model_validate(
-        {"story_title": "T", "content": "The section body in a 'content' key."}
-    )
+    seg = StorySegment.model_validate({"story_title": "T", "content": "The section body in a 'content' key."})
     assert seg.newsletter_section_content == "The section body in a 'content' key."
 
 

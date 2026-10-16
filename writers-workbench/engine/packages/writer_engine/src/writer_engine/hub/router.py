@@ -46,18 +46,24 @@ _CHAPTER_NUM_RE = re.compile(r"\bchapter\s+(\d{1,3})\b", re.I)
 _IS_LIST = re.compile(r"\b(list|show|all|retrieve|get)\s", re.I)
 _IS_WRITE = re.compile(r"\b(re)?(write|draft|compose)\s", re.I)
 _HAS_LIBRARY_ACTION = re.compile(
-    r"\b(approve|publish|reject|delete|undelete|schedule|unschedule|unpublish)\b", re.I)
+    r"\b(approve|publish|reject|delete|undelete|schedule|unschedule|unpublish)\b", re.I
+)
 _RETRIEVE = re.compile(
     r"\b(retrieve|pull\s+up|fetch\s+my|find\s+my|get\s+my\s+(draft|chapter|story|blog|newsletter|article|report)|"
     r"chapters?\s+from|all\s+chapters?\s+(from|of|in)|list\s+(story\s+)?arcs?|what\s+story\s+arcs?|available\s+arcs?|"
     r"(list|show|all)\s+(my\s+|all\s+)?(chapter\s+|book\s+)?outlines?|outline\s+(list|version|history)|"
     r"revert.{0,20}outline|restore.{0,20}outline|outline.{0,20}version|"
-    r"revert.{0,20}chapter|restore.{0,20}chapter|chapter.{0,20}version.{0,5}history)", re.I)
+    r"revert.{0,20}chapter|restore.{0,20}chapter|chapter.{0,20}version.{0,5}history)",
+    re.I,
+)
 _QA_CHAPTER = re.compile(
     r"\b(q/?a|qa|quality\s*(check|review|cleanup|clean\s*up)|clean\s*up|fix\s*(duplicate|name|inconsistenc)|dedup|edit)"
-    r"\s*.{0,30}(chapter|prologue|epilogue)", re.I)
+    r"\s*.{0,30}(chapter|prologue|epilogue)",
+    re.I,
+)
 _QA_CHAPTER2 = re.compile(
-    r"\b(chapter|prologue|epilogue).{0,20}(q/?a|cleanup|clean\s*up|fix\s*(duplicate|name)|dedup)", re.I)
+    r"\b(chapter|prologue|epilogue).{0,20}(q/?a|cleanup|clean\s*up|fix\s*(duplicate|name)|dedup)", re.I
+)
 _FIX_CHAPTER = re.compile(r"\bfix.{0,30}(chapter|prologue|epilogue)", re.I)
 _CONSISTENCY_CHECK = re.compile(r"\bcheck\b.{0,50}\b(consistency|character\s+names?)\b", re.I)
 _QA_FIXY = re.compile(r"\b(fix|repair|clean\s*up|dedup|duplicate|inconsist)", re.I)  # → repair vs qa split
@@ -65,34 +71,47 @@ _EDIT_OUTLINE = re.compile(
     r"\b(make\s+\w+.{0,20}(years?\s+old|age\s+\d)|change.{0,20}(age|name|title|role|description)|"
     r"rename\s+(chapter|character)|rename\s+\w+\s+to\b|update.{0,20}(age|description|premise|role)|"
     r"using\s+this\s+outline.{0,20}(make|change|update|fix|set)|edit.{0,15}outline|"
-    r"fix.{0,20}(chapter|brief|inconsisten|outline)|character\s+role\s+change|\d+\s+years?\s+old)", re.I)
+    r"fix.{0,20}(chapter|brief|inconsisten|outline)|character\s+role\s+change|\d+\s+years?\s+old)",
+    re.I,
+)
 _EDIT_OUTLINE_EXCLUDE = re.compile(
     r"\b(add.{0,10}chapter|new\s+chapter|change.{0,15}(arc|structure|timeline)|restructure|expand|brainstorm|rework)",
-    re.I)
+    re.I,
+)
 _BRAINSTORM = re.compile(
     r"\b(brainstorm|expand.{0,25}outline|add.{0,15}(more\s+)?chapter|develop.{0,20}character|"
     r"revis(e|ing).{0,20}(outline|story\s+arc)|rework.{0,20}(outline|story)|outline\s+(a|the|my|this)\s+\w|"
-    r"plan\s+(a|the|my)\s+(novel|book|story)|create\s+(a|the|my)\s+(outline|book))", re.I)
+    r"plan\s+(a|the|my)\s+(novel|book|story)|create\s+(a|the|my)\s+(outline|book))",
+    re.I,
+)
 _BRAINSTORM_REVISE = re.compile(  # revising an EXISTING outline vs a brand-new story
-    r"\b(revis(e|ing)|rework|expand|add.{0,15}chapter|develop.{0,20}character)", re.I)
+    r"\b(revis(e|ing)|rework|expand|add.{0,15}chapter|develop.{0,20}character)", re.I
+)
 _PROJECT_LIST = re.compile(
-    r"\b(list\s+(my\s+|all\s+)?projects?|my\s+projects?|all\s+projects?|what\s+projects?|show.{0,15}projects?)", re.I)
+    r"\b(list\s+(my\s+|all\s+)?projects?|my\s+projects?|all\s+projects?|what\s+projects?|show.{0,15}projects?)",
+    re.I,
+)
 _LIBRARY = re.compile(
     r"\b(approve|unschedule|unpublish|publish|reject|schedule|delete|undelete|restore\s+from\s+trash|"
     r"email\s+(me\s+)?(the\s+|my\s+|this\s+)?(outline|research|chapter|story|blog|newsletter|report|draft)|"
     r"send\s+(me\s+)?(the\s+|my\s+|this\s+)?(outline|research|chapter|story|blog|newsletter|report|draft)|"
     r"list\s+(all|draft|published|scheduled|approved|rejected|deleted)|show\s+(deleted|trash)|content\s+librar|"
-    r"version\s+histor|list\s+version|get\s+version)", re.I)
+    r"version\s+histor|list\s+version|get\s+version)",
+    re.I,
+)
 _WRITING = re.compile(r"\b(re)?(write|draft|compose)\b[\w\s]{0,30}\b(chapter|prologue|epilogue)\b", re.I)
 _WRITING_OUTLINE_EXCLUDE = re.compile(r"\b(write|draft|compose).{0,30}outline", re.I)
 _CHAPTER_OUTLINE = re.compile(
     r"\b(chapter\s+outline|outline.{0,15}(chapter|prologue|epilogue)|"
     r"create.{0,15}(chapter|prologue|epilogue).{0,15}outline|plan.{0,15}(chapter|prologue|epilogue)|"
-    r"prepare.{0,15}(chapter|prologue|epilogue))", re.I)
+    r"prepare.{0,15}(chapter|prologue|epilogue))",
+    re.I,
+)
 _BULK_APPROVE = re.compile(r"\b(approve|publish)\s+(all|every)\s+(chapters?|drafts?)", re.I)
 _APPROVE_BY_NUM = re.compile(
     r"^(approve|publish|reject|delete|schedule)\s+(?:(?:chapter|ch)\s*)?#?(\d{1,2})(?:\s+(?:of|for|from|in)\s+(.+))?\s*$",
-    re.I)
+    re.I,
+)
 _PROJECT_TAIL = re.compile(r"(?:of|for|from|in)\s+(?:the\s+)?(.+?)\s*$", re.I)
 
 # "email me …" / "send me an email …" — the on-demand email-content intent (E2E-1). Kept narrow so it
@@ -114,8 +133,17 @@ _TITLED = re.compile(r'(?:titled|called|named)\s+["“]?(.+?)["”]?\s*$', re.I)
 _TO_VERSION_TAIL = re.compile(r"\s*to\s+version\s+\d+.*$", re.I)
 
 _ORDINALS = {
-    "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5,
-    "sixth": 6, "seventh": 7, "eighth": 8, "ninth": 9, "tenth": 10, "last": -1,
+    "first": 1,
+    "second": 2,
+    "third": 3,
+    "fourth": 4,
+    "fifth": 5,
+    "sixth": 6,
+    "seventh": 7,
+    "eighth": 8,
+    "ninth": 9,
+    "tenth": 10,
+    "last": -1,
 }
 
 
@@ -168,7 +196,9 @@ def _chapter_params(message: str) -> dict[str, Any]:
     return params
 
 
-_USING_ARC = re.compile(r"\busing\s+(?:the\s+)?(.+?)(?=\s+(?:called|genre|for\b|about\b|title\b)|[.,\n]|$)", re.I)
+_USING_ARC = re.compile(
+    r"\busing\s+(?:the\s+)?(.+?)(?=\s+(?:called|genre|for\b|about\b|title\b)|[.,\n]|$)", re.I
+)
 _CALLED_TITLE = re.compile(r'\b(?:called|titled|named)\s+["“]?(.+?)["”]?(?=[.,\n]|\s+genre|$)', re.I)
 _NUM_CHAPTERS = re.compile(r"\b(\d{1,3})\s+chapters?\b", re.I)
 
@@ -177,7 +207,7 @@ def _extract_using_arc(message: str) -> str | None:
     m = _USING_ARC.search(message)
     if not m:
         return None
-    arc = m.group(1).strip(" \"“”")
+    arc = m.group(1).strip(' "“”')
     return arc or None
 
 
@@ -191,7 +221,7 @@ def _plan_params(message: str) -> dict[str, Any]:
         t = re.sub(r"\s+using\s+.*$", "", params["project_title"], flags=re.I)
         t = re.sub(r"^(?:chapter\s+\d+|prologue|epilogue)\s+of\s+", "", t, flags=re.I)
         t = re.sub(r"^of\s+", "", t, flags=re.I)
-        params["project_title"] = t.strip(" \"“”")
+        params["project_title"] = t.strip(' "“”')
     return params
 
 
@@ -207,7 +237,7 @@ def _story_params(message: str) -> dict[str, Any]:
         params["story_arc"] = arc
     tm = _CALLED_TITLE.search(message) or _TITLE_LABEL.search(message)
     if tm:
-        params["title"] = tm.group(1).strip(" \"“”")
+        params["title"] = tm.group(1).strip(' "“”')
     cm = _NUM_CHAPTERS.search(message)
     if cm:
         params["target_chapter_count"] = int(cm.group(1))
@@ -222,7 +252,7 @@ def _short_story_params(message: str) -> dict[str, Any]:
         params["story_arc"] = arc
     tm = _CALLED_TITLE.search(message) or _TITLE_LABEL.search(message)
     if tm:
-        params["title"] = tm.group(1).strip(" \"“”")
+        params["title"] = tm.group(1).strip(' "“”')
     sm = _SECTIONS.search(message)
     if sm:
         params["sections"] = int(sm.group(1))
@@ -265,7 +295,7 @@ def _email_params(message: str) -> dict[str, Any]:
             params["chapter_number"] = ch
         title = _extract_project_title(message)
         if title:
-            params["title"] = title.strip(" \"“”")
+            params["title"] = title.strip(' "“”')
         else:
             params["search_term"] = message
     return params
@@ -274,7 +304,7 @@ def _email_params(message: str) -> dict[str, Any]:
 def _clean_title(t: str | None) -> str | None:
     if not t:
         return None
-    return _TO_VERSION_TAIL.sub("", t).strip(" \"“”") or None
+    return _TO_VERSION_TAIL.sub("", t).strip(' "“”') or None
 
 
 def _versions_params(message: str) -> dict[str, Any]:
@@ -335,7 +365,7 @@ def _trash_params(message: str, action: str) -> dict[str, Any]:
         return params
     tm = _TITLED.search(message)
     if tm:
-        params["title"] = tm.group(1).strip(" \"“”")
+        params["title"] = tm.group(1).strip(' "“”')
     params["search_term"] = message  # op keyword-matches the row when no clean title
     return params
 
@@ -362,12 +392,11 @@ def _newsletter_params(message: str) -> dict[str, Any]:
     """Params for chapter.newsletter: topic + genre_slug + date from a 'write a newsletter …' message."""
     params: dict[str, Any] = {}
     low = message.lower()
-    tm = (
-        re.search(r'topic:\s*["“]?(.+?)["”]?(?:\.\s|\.$|$|\s+genre\s+slug)', message, re.I)
-        or re.search(r"\babout\s+(.+?)(?:\s+for\s+the\b|\s+date\b|\.\s|\.$|$)", message, re.I)
+    tm = re.search(r'topic:\s*["“]?(.+?)["”]?(?:\.\s|\.$|$|\s+genre\s+slug)', message, re.I) or re.search(
+        r"\babout\s+(.+?)(?:\s+for\s+the\b|\s+date\b|\.\s|\.$|$)", message, re.I
     )
     if tm:
-        params["topic"] = tm.group(1).strip(" \"“”")
+        params["topic"] = tm.group(1).strip(' "“”')
     gm = re.search(r"genre\s+slug:\s*([a-z][a-z-]+)", message, re.I)
     if gm:
         params["genre_slug"] = gm.group(1).strip().lower()
@@ -385,8 +414,12 @@ def _newsletter_params(message: str) -> dict[str, Any]:
 
 # --- content listing / research / social / story-bible detectors (G3/G4/G7/G10/G13/G16/G17) ---
 _STATUS_WORDS = {
-    "draft": "draft", "drafts": "draft", "published": "published", "scheduled": "scheduled",
-    "approved": "approved", "rejected": "rejected",
+    "draft": "draft",
+    "drafts": "draft",
+    "published": "published",
+    "scheduled": "scheduled",
+    "approved": "approved",
+    "rejected": "rejected",
 }
 _TYPE_WORDS = [
     (re.compile(r"\bblog(?:\s+post)?s?\b", re.I), "blog_post"),
@@ -396,9 +429,16 @@ _TYPE_WORDS = [
 ]
 _LIST_VERB = re.compile(r"\b(list|show|view|see|what(?:'s| are| is)?|display|browse)\b", re.I)
 _SOCIAL_PLATFORMS = {
-    "twitter": "twitter", "tweet": "twitter", "tweets": "twitter", "x": "twitter",
-    "linkedin": "linkedin", "facebook": "facebook", "instagram": "instagram", "insta": "instagram",
-    "threads": "threads", "tiktok": "tiktok",
+    "twitter": "twitter",
+    "tweet": "twitter",
+    "tweets": "twitter",
+    "x": "twitter",
+    "linkedin": "linkedin",
+    "facebook": "facebook",
+    "instagram": "instagram",
+    "insta": "instagram",
+    "threads": "threads",
+    "tiktok": "tiktok",
 }
 _INLINE_CONTENT = re.compile(r":\s*(.+)$", re.S)
 
@@ -441,14 +481,16 @@ def _research_params(message: str) -> dict[str, Any]:
     """research.run params: topic (the message) + genre_slug (G4: 'genre slug X' was dropped)."""
     params: dict[str, Any] = {"topic": message}
     gm = re.search(r"genre\s+slug:?\s*([a-z][a-z-]+)", message, re.I) or re.search(
-        r"\bgenre:?\s*([a-z][a-z-]+)", message, re.I)
+        r"\bgenre:?\s*([a-z][a-z-]+)", message, re.I
+    )
     if gm:
         params["genre_slug"] = gm.group(1).strip().lower()
     return params
 
 
 _RETRIEVE_LEAD = re.compile(
-    r"^\s*(?:please\s+)?(find|show|pull\s+up|pull|retrieve|fetch|load|grab|open|get|see|list|display)\b", re.I)
+    r"^\s*(?:please\s+)?(find|show|pull\s+up|pull|retrieve|fetch|load|grab|open|get|see|list|display)\b", re.I
+)
 _GEN_VERB = re.compile(r"\b(write|compose|create|generate|brainstorm|repurpose|research)\b", re.I)
 _RET_NOUN = [
     (re.compile(r"\boutlines?\b", re.I), "outline"),
@@ -472,8 +514,11 @@ def _retrieve_intent_params(message: str) -> dict[str, Any] | None:
     low = message.lower()
     # Yield to more specific intents that share a retrieval lead verb: version history, trash listing,
     # revert/restore, and 'call me back' (the callback flow) all handle 'show/pull up …' themselves.
-    if re.search(r"\bversion\b|\bhistory\b|\bdeleted\b|\btrash\b|\brevert\b|\brestore\b"
-                 r"|\bcall\s+me\b|\bcallback\b|help\s+me\s+(improve|revise|review)", low):
+    if re.search(
+        r"\bversion\b|\bhistory\b|\bdeleted\b|\btrash\b|\brevert\b|\brestore\b"
+        r"|\bcall\s+me\b|\bcallback\b|help\s+me\s+(improve|revise|review)",
+        low,
+    ):
         return None
     ctype = None
     for rx, val in _RET_NOUN:
@@ -496,8 +541,19 @@ def _retrieve_intent_params(message: str) -> dict[str, Any] | None:
 # Words that look like a title match but are NOT a project (platforms + generic nouns). A social
 # post "for social media" / "for LinkedIn" must not be mistaken for a project named that.
 _NON_TITLE_WORDS = set(_SOCIAL_PLATFORMS) | {
-    "this", "that", "it", "content", "social media", "social", "media",
-    "the newsletter", "our newsletter", "a newsletter", "newsletter", "the blog", "us",
+    "this",
+    "that",
+    "it",
+    "content",
+    "social media",
+    "social",
+    "media",
+    "the newsletter",
+    "our newsletter",
+    "a newsletter",
+    "newsletter",
+    "the blog",
+    "us",
 }
 
 
@@ -526,24 +582,31 @@ def _social_params(message: str) -> dict[str, Any]:
         pm = re.search(
             r'\b(?:posts?|content|blurb|announcement)\s+(?:for|about)\s+(?:the\s+)?["“]?(.+?)["”]?'
             r'(?:\s+(?:introducing|announcing|about|regarding|promoting|to\s+promote|on|—|-|:)\b|["”]?\s*[.!?]?\s*$)',
-            message, re.I)
+            message,
+            re.I,
+        )
         if pm:
             title = pm.group(1)
     if title:
-        title = title.strip(" \"“”.,")
+        title = title.strip(' "“”.,')
         if title.lower() not in _NON_TITLE_WORDS and len(title) > 2:
             params["project_title"] = title
 
     # ---- what the post is about (topic) → summary, so the generator has REAL content -----------
     if "summary" not in params:
         topic = re.search(
-            r'\b(?:introducing|announcing|about|regarding|promoting|to\s+promote|to\s+announce)\s+(.+?)[.!?\s]*$',
-            message, re.I)
+            r"\b(?:introducing|announcing|about|regarding|promoting|to\s+promote|to\s+announce)\s+(.+?)[.!?\s]*$",
+            message,
+            re.I,
+        )
         if topic and len(topic.group(1).strip()) > 2:
-            t = topic.group(1).strip(" .\"“”")
+            t = topic.group(1).strip(' ."“”')
             # Compose with the project so the LLM writes a relevant post, not a generic one.
-            params["summary"] = f"A social post about {t} for '{params['project_title']}'." if params.get(
-                "project_title") else f"A social post about {t}."
+            params["summary"] = (
+                f"A social post about {t} for '{params['project_title']}'."
+                if params.get("project_title")
+                else f"A social post about {t}."
+            )
         elif params.get("project_title"):
             params["summary"] = params["project_title"]
     return params
@@ -552,8 +615,12 @@ def _social_params(message: str) -> dict[str, Any]:
 def _decide(tool: str, op: str, params: dict[str, Any], conf: float = 0.6) -> HubDecision:
     spec = lookup(tool, op)
     return HubDecision(
-        kind=spec.kind if spec else "task", tool=tool, op=op, params=params,
-        assistant_message="", confidence=conf,
+        kind=spec.kind if spec else "task",
+        tool=tool,
+        op=op,
+        params=params,
+        assistant_message="",
+        confidence=conf,
     )
 
 
@@ -566,14 +633,17 @@ def _numbered_selection(req: HubRequest) -> HubDecision | None:
     msg = req.message.strip().lower()
 
     idx: int | None = None
-    m = (re.fullmatch(r"#?\s*(\d{1,2})", msg)
-         or re.fullmatch(r"(?:show\s+(?:me\s+)?|get\s+|open\s+|select\s+|pick\s+)#?(\d{1,2})", msg))
+    m = re.fullmatch(r"#?\s*(\d{1,2})", msg) or re.fullmatch(
+        r"(?:show\s+(?:me\s+)?|get\s+|open\s+|select\s+|pick\s+)#?(\d{1,2})", msg
+    )
     if m:
         idx = int(m.group(1))
     else:
         om = re.fullmatch(
             r"(?:show\s+(?:me\s+)?|get\s+|open\s+|select\s+|pick\s+)?(?:the\s+)?"
-            r"(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last)(?:\s+one)?", msg)
+            r"(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last)(?:\s+one)?",
+            msg,
+        )
         if om:
             idx = _ORDINALS[om.group(1)]
     if idx is None:
@@ -589,8 +659,12 @@ def _numbered_selection(req: HubRequest) -> HubDecision | None:
     if item.get("project_id"):
         params["project_id"] = item["project_id"]
     return HubDecision(
-        kind="info", tool="library", op="retrieve", params=params,
-        assistant_message=f"Opening {title or 'that item'}.", confidence=0.9,
+        kind="info",
+        tool="library",
+        op="retrieve",
+        params=params,
+        assistant_message=f"Opening {title or 'that item'}.",
+        confidence=0.9,
     )
 
 
@@ -623,21 +697,26 @@ def _deterministic_override(message: str) -> HubDecision | None:
         return _decide("chapter", "short-story", {"topic": msg}, 0.85)
 
     # G7/G17 — repurpose into social posts (explicit inline content + platform).
-    if (re.search(r"\brepurpose\b", low)
-            or re.search(r"\bsocial\s+(media\s+)?posts?\b", low)
-            or (re.search(r"\b(twitter|tweet|linkedin|facebook|instagram|threads|tiktok)\b", low)
-                and re.search(r"\bposts?\b", low))):
+    if (
+        re.search(r"\brepurpose\b", low)
+        or re.search(r"\bsocial\s+(media\s+)?posts?\b", low)
+        or (
+            re.search(r"\b(twitter|tweet|linkedin|facebook|instagram|threads|tiktok)\b", low)
+            and re.search(r"\bposts?\b", low)
+        )
+    ):
         return _decide("media", "social-posts", _social_params(msg), 0.85)
 
     # G13 — list / get an EXISTING research report (not run a new one). "get/find/pull up/retrieve the
     # research report" reads existing work; "run/do research on X" generates — keep those on research.run.
-    if ("research" in low
-            and re.search(r"\b(list|show|view|see|display|browse|get|fetch|find|pull\s+up|retrieve|open)\b", low)
-            and not _IS_WRITE.search(low)
-            and not re.search(r"\b(run|do|conduct|perform|start|new)\b[\w\s]{0,20}research", low)):
+    if (
+        "research" in low
+        and re.search(r"\b(list|show|view|see|display|browse|get|fetch|find|pull\s+up|retrieve|open)\b", low)
+        and not _IS_WRITE.search(low)
+        and not re.search(r"\b(run|do|conduct|perform|start|new)\b[\w\s]{0,20}research", low)
+    ):
         title = _extract_project_title(msg)
-        return _decide("library", "retrieve",
-                       {"content_type": "research", "search_term": title or msg}, 0.8)
+        return _decide("library", "retrieve", {"content_type": "research", "search_term": title or msg}, 0.8)
 
     # G3 — read the story bible (not write to it).
     if "story bible" in low and not re.search(r"\b(write|create|add|update|generate|build)\b", low):
@@ -713,7 +792,11 @@ def _heuristic_route(message: str) -> HubDecision:
 
     # 0d. TRASH ops → library.lifecycle. undelete / list_deleted / delete (checked in that order so
     #     "undelete" and "deleted" never fall into the bare-"delete" branch).
-    if re.search(r"\bundelete\b", low) or re.search(r"\bput\s+it\s+back\b", low) or re.search(r"\brestore\b.{0,20}draft", low):
+    if (
+        re.search(r"\bundelete\b", low)
+        or re.search(r"\bput\s+it\s+back\b", low)
+        or re.search(r"\brestore\b.{0,20}draft", low)
+    ):
         return _decide("library", "lifecycle", _trash_params(msg, "undelete"), 0.8)
     if re.search(r"\b(deleted|trash)\b", low) and re.search(r"\b(show|list|my|view)\b", low):
         return _decide("library", "lifecycle", _trash_params(msg, "list_deleted"), 0.8)
@@ -724,7 +807,9 @@ def _heuristic_route(message: str) -> HubDecision:
     #    list/retrieve and NOT a write. (preprocess line 1-11)
     is_list = bool(_IS_LIST.search(low))
     is_write = bool(_IS_WRITE.search(low))
-    is_outline_kw = ("chapter outline" in low) or ("outline" in low and ("prologue" in low or "epilogue" in low))
+    is_outline_kw = ("chapter outline" in low) or (
+        "outline" in low and ("prologue" in low or "epilogue" in low)
+    )
     if not is_list and not is_write and is_outline_kw:
         return _decide("chapter", "plan", _plan_params(msg), 0.7)
 
@@ -750,15 +835,23 @@ def _heuristic_route(message: str) -> HubDecision:
     # 2. mutually-excluding flags (computed once, resolved in priority order)
     has_lib_action = bool(_HAS_LIBRARY_ACTION.search(low))
     is_retrieve = (not has_lib_action) and bool(_RETRIEVE.search(low))
-    is_qa = bool(_QA_CHAPTER.search(low) or _QA_CHAPTER2.search(low) or _FIX_CHAPTER.search(low)
-                 or _CONSISTENCY_CHECK.search(low))
-    is_edit = (not is_retrieve and not is_qa
-               and bool(_EDIT_OUTLINE.search(low)) and not _EDIT_OUTLINE_EXCLUDE.search(low))
-    is_brainstorm = (not is_retrieve and not is_edit and bool(_BRAINSTORM.search(low)))
+    is_qa = bool(
+        _QA_CHAPTER.search(low)
+        or _QA_CHAPTER2.search(low)
+        or _FIX_CHAPTER.search(low)
+        or _CONSISTENCY_CHECK.search(low)
+    )
+    is_edit = (
+        not is_retrieve
+        and not is_qa
+        and bool(_EDIT_OUTLINE.search(low))
+        and not _EDIT_OUTLINE_EXCLUDE.search(low)
+    )
+    is_brainstorm = not is_retrieve and not is_edit and bool(_BRAINSTORM.search(low))
     is_project = bool(_PROJECT_LIST.search(low))
     is_library = bool(_LIBRARY.search(low))
-    is_writing = (not is_qa and bool(_WRITING.search(low)) and not _WRITING_OUTLINE_EXCLUDE.search(low))
-    is_chapter_outline = (not is_retrieve and not is_writing and bool(_CHAPTER_OUTLINE.search(low)))
+    is_writing = not is_qa and bool(_WRITING.search(low)) and not _WRITING_OUTLINE_EXCLUDE.search(low)
+    is_chapter_outline = not is_retrieve and not is_writing and bool(_CHAPTER_OUTLINE.search(low))
     is_bulk_approve = bool(_BULK_APPROVE.search(low))
 
     # priority order mirrors preprocess_message's sequence of early returns
@@ -836,6 +929,7 @@ def _heuristic_route(message: str) -> HubDecision:
 
 # --------------------------------------------------------------------------- Gemini
 
+
 def _router_system() -> str:
     return (
         "You are the routing brain of 'The Author Agent', a sci-fi/fiction writing assistant. "
@@ -897,8 +991,14 @@ async def _gemini_route(req: HubRequest, router: LLMRouter, model: str) -> HubDe
         ctx += f"\n(There is a list of {n} items currently shown to the user.)"
     prompt = f"User message:\n{req.message}{ctx}"
     decision, _resp = await complete_structured(
-        router, provider="gemini", model=model, system=_router_system(),
-        prompt=prompt, schema=HubDecision, max_tokens=1024, temperature=0.1,
+        router,
+        provider="gemini",
+        model=model,
+        system=_router_system(),
+        prompt=prompt,
+        schema=HubDecision,
+        max_tokens=1024,
+        temperature=0.1,
     )
     return _normalise(decision)
 
@@ -917,8 +1017,12 @@ def _normalise(decision: HubDecision) -> HubDecision:
             confidence=0.2,
         )
     return HubDecision(
-        kind=spec.kind, tool=spec.tool, op=spec.op, params=decision.params,
-        assistant_message=decision.assistant_message, confidence=decision.confidence,
+        kind=spec.kind,
+        tool=spec.tool,
+        op=spec.op,
+        params=decision.params,
+        assistant_message=decision.assistant_message,
+        confidence=decision.confidence,
     )
 
 
@@ -982,8 +1086,13 @@ async def route_message(
     #     misrouting these): social repurpose, status listings, story-bible read, arcs, research get.
     override = _deterministic_override(req.message)
     if override is not None:
-        logger.info("hub.route.override", source=req.source, tool=override.tool, op=override.op,
-                    msg_preview=req.message[:120])
+        logger.info(
+            "hub.route.override",
+            source=req.source,
+            tool=override.tool,
+            op=override.op,
+            msg_preview=req.message[:120],
+        )
         return _apply_conversation_context(req, override)
 
     # 2. Gemini (primary) — falls through to heuristics if unavailable or it returns junk
@@ -992,8 +1101,12 @@ async def route_message(
     try:
         decision = await _gemini_route(req, router, model or settings.hub_router_model)
         logger.info(
-            "hub.route.gemini", source=req.source, kind=decision.kind,
-            tool=decision.tool, op=decision.op, confidence=decision.confidence,
+            "hub.route.gemini",
+            source=req.source,
+            kind=decision.kind,
+            tool=decision.tool,
+            op=decision.op,
+            confidence=decision.confidence,
             msg_preview=req.message[:120],
         )
         return _apply_conversation_context(req, decision)
@@ -1005,7 +1118,11 @@ async def route_message(
     # 3. deterministic regex fallback
     fallback = _heuristic_route(req.message)
     logger.info(
-        "hub.route.heuristic", source=req.source, kind=fallback.kind,
-        tool=fallback.tool, op=fallback.op, msg_preview=req.message[:120],
+        "hub.route.heuristic",
+        source=req.source,
+        kind=fallback.kind,
+        tool=fallback.tool,
+        op=fallback.op,
+        msg_preview=req.message[:120],
     )
     return _apply_conversation_context(req, fallback)

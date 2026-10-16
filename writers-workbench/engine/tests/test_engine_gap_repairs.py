@@ -36,12 +36,17 @@ def test_coerce_chapter_number_prologue_epilogue():
 
 # --------------------------------------------------------------------------- G1 / G20 deliverables
 def test_render_outline_markdown_tolerates_varied_keys():
-    md = render_outline_markdown({
-        "title": "The Seed Vault", "premise": "A vault keeps the last seeds.",
-        "characters": [{"name": "Tayak", "role": "keeper"}],
-        "chapters": [{"number": 1, "title": "Descent", "summary": "She goes under."},
-                     {"chapter_number": 2, "title": "The Door", "beat": "It opens."}],
-    })
+    md = render_outline_markdown(
+        {
+            "title": "The Seed Vault",
+            "premise": "A vault keeps the last seeds.",
+            "characters": [{"name": "Tayak", "role": "keeper"}],
+            "chapters": [
+                {"number": 1, "title": "Descent", "summary": "She goes under."},
+                {"chapter_number": 2, "title": "The Door", "beat": "It opens."},
+            ],
+        }
+    )
     assert "# The Seed Vault" in md
     assert "**Tayak**" in md
     assert "1. **Descent** — She goes under." in md
@@ -51,7 +56,9 @@ def test_render_outline_markdown_tolerates_varied_keys():
 
 
 def test_deliverable_html_research_report():
-    html = _deliverable_html("research", "run", {"row": {"topic": "Rome", "report_markdown": "# Findings\n\nFact."}})
+    html = _deliverable_html(
+        "research", "run", {"row": {"topic": "Rome", "report_markdown": "# Findings\n\nFact."}}
+    )
     assert "Findings" in html and "Fact." in html
 
 
@@ -66,12 +73,18 @@ def test_deliverable_html_social_posts():
 
 
 def test_deliverable_html_outline():
-    html = _deliverable_html("brainstorm", "story", {"outline": {"title": "T", "chapters": [{"chapter_number": 1, "title": "A", "beat": "b"}]}})
+    html = _deliverable_html(
+        "brainstorm",
+        "story",
+        {"outline": {"title": "T", "chapters": [{"chapter_number": 1, "title": "A", "beat": "b"}]}},
+    )
     assert "Chapters" in html and "A" in html
 
 
 def test_build_task_email_research_subject_uses_topic():
-    subject, html = build_task_email("research", {"op": "run"}, {"row": {"topic": "Gladiators", "report_markdown": "R"}})
+    subject, html = build_task_email(
+        "research", {"op": "run"}, {"row": {"topic": "Gladiators", "report_markdown": "R"}}
+    )
     assert "Gladiators" in subject
     assert "R" in html
 
@@ -118,6 +131,7 @@ def _retrieve(tables, payload):
         return _Client(tables)
 
     import library_step.main as m
+
     orig = m._supabase_or_none
     m._supabase_or_none = fake
     try:
@@ -133,7 +147,9 @@ def test_retrieve_applies_search_term_and_found_flag():
     ]
     hit = _retrieve({"published_content_v2": rows}, {"search_term": "Titanic", "user_id": "u1"})
     assert hit["found"] is True and hit["count"] == 1 and hit["items"][0]["id"] == "1"
-    miss = _retrieve({"published_content_v2": rows}, {"search_term": "quantum surfing on Jupiter", "user_id": "u1"})
+    miss = _retrieve(
+        {"published_content_v2": rows}, {"search_term": "quantum surfing on Jupiter", "user_id": "u1"}
+    )
     assert miss["found"] is False and miss["count"] == 0
 
 

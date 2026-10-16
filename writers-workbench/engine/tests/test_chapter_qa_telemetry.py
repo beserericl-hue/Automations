@@ -60,10 +60,15 @@ def test_persist_chapter_qa_writes_full_row() -> None:
         "model": "claude-sonnet-4-6",
         "status": "ok",
     }
-    row_id = asyncio.run(persist_chapter_qa(
-        client, project_id="62cc734f-0000-0000-0000-000000000000", user_id="u1",
-        chapter_number=9, telemetry=telem,
-    ))
+    row_id = asyncio.run(
+        persist_chapter_qa(
+            client,
+            project_id="62cc734f-0000-0000-0000-000000000000",
+            user_id="u1",
+            chapter_number=9,
+            telemetry=telem,
+        )
+    )
     assert row_id == "qa-row-1"
     rows = client.sink["chapter_qa_v2"]
     assert len(rows) == 1
@@ -80,9 +85,15 @@ def test_persist_chapter_qa_writes_full_row() -> None:
 
 def test_persist_chapter_qa_defaults_status_ok() -> None:
     client = _FakeClient()
-    asyncio.run(persist_chapter_qa(
-        client, project_id="p", user_id="u", chapter_number=1, telemetry={"word_count": 10},
-    ))
+    asyncio.run(
+        persist_chapter_qa(
+            client,
+            project_id="p",
+            user_id="u",
+            chapter_number=1,
+            telemetry={"word_count": 10},
+        )
+    )
     assert client.sink["chapter_qa_v2"][0]["status"] == "ok"
     assert client.sink["chapter_qa_v2"][0]["drift_report"] is None
 
@@ -110,14 +121,20 @@ def test_bible_junk_filter_rejects_pollution() -> None:
 
 # --------------------------------------------------------------------------- CR-006 research link
 
+
 def test_persist_research_links_to_project() -> None:
     from writer_engine.persist_helpers import persist_research
 
     client = _FakeClient()
-    rid = asyncio.run(persist_research(
-        client, project_id="62cc734f-c861-4210-bc12-e9ea002fcf66", user_id="u1",
-        topic="The Burial Mound — Chapter 9 research", content="copper traded south",
-    ))
+    rid = asyncio.run(
+        persist_research(
+            client,
+            project_id="62cc734f-c861-4210-bc12-e9ea002fcf66",
+            user_id="u1",
+            topic="The Burial Mound — Chapter 9 research",
+            content="copper traded south",
+        )
+    )
     assert rid == "qa-row-1"
     # report written AND a project link row written
     assert client.sink["research_reports_v2"][0]["topic"].startswith("The Burial Mound")
@@ -131,8 +148,14 @@ def test_persist_research_no_link_without_project() -> None:
     from writer_engine.persist_helpers import persist_research
 
     client = _FakeClient()
-    asyncio.run(persist_research(
-        client, project_id=None, user_id="u1", topic="general research", content="x",
-    ))
+    asyncio.run(
+        persist_research(
+            client,
+            project_id=None,
+            user_id="u1",
+            topic="general research",
+            content="x",
+        )
+    )
     assert "research_reports_v2" in client.sink
     assert "research_report_projects_v2" not in client.sink  # no project -> no link

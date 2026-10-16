@@ -21,11 +21,13 @@ _DIMS = {
 
 def test_research_category_casing_normalised() -> None:
     p = ResearchPlan.model_validate(
-        {"questions": [
-            {"question": "Q1", "category": "PROFESSION / ROLE"},
-            {"question": "Q2", "category": "Daily Life"},
-            {"question": "Q3", "category": "FRAMEWORK"},
-        ]}
+        {
+            "questions": [
+                {"question": "Q1", "category": "PROFESSION / ROLE"},
+                {"question": "Q2", "category": "Daily Life"},
+                {"question": "Q3", "category": "FRAMEWORK"},
+            ]
+        }
     )
     assert [q.category for q in p.questions] == ["profession_role", "daily_life", "framework"]
 

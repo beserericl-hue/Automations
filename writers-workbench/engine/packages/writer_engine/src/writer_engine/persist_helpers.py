@@ -25,8 +25,15 @@ async def create_project(
     """Insert a new writing_projects_v2 row and return its id (W1)."""
     resp = await (
         client.table("writing_projects_v2")
-        .insert({"user_id": user_id, "title": title, "genre_slug": genre_slug,
-                 "project_type": project_type, "status": "draft"})
+        .insert(
+            {
+                "user_id": user_id,
+                "title": title,
+                "genre_slug": genre_slug,
+                "project_type": project_type,
+                "status": "draft",
+            }
+        )
         .execute()
     )
     rows = await _rows(resp)
@@ -65,8 +72,14 @@ async def resolve_project_id(
 
 
 async def resolve_or_create_project(
-    client: Any, *, user_id: str, title: str | None, project_id: str | None = None,
-    genre_slug: str = "", project_type: str = "story", create: bool = True,
+    client: Any,
+    *,
+    user_id: str,
+    title: str | None,
+    project_id: str | None = None,
+    genre_slug: str = "",
+    project_type: str = "story",
+    create: bool = True,
 ) -> tuple[str | None, dict | None]:
     """Resolve a project by id or title; create it (when ``create``) if the title matches nothing.
 
@@ -91,20 +104,29 @@ async def persist_outline(
     client: Any, *, project_id: str, user_id: str, outline: dict, note: str = "engine brainstorm"
 ) -> None:
     """Snapshot the prior outline to outline_versions_v2, then update writing_projects_v2.outline (W2)."""
-    cur = await (
-        client.table("writing_projects_v2").select("outline").eq("id", project_id).limit(1).execute()
-    )
+    cur = await client.table("writing_projects_v2").select("outline").eq("id", project_id).limit(1).execute()
     prior = (await _rows(cur) or [{}])[0].get("outline")
     if prior:
         vresp = await (
-            client.table("outline_versions_v2").select("version_number")
-            .eq("project_id", project_id).order("version_number", desc=True).limit(1).execute()
+            client.table("outline_versions_v2")
+            .select("version_number")
+            .eq("project_id", project_id)
+            .order("version_number", desc=True)
+            .limit(1)
+            .execute()
         )
         n = ((await _rows(vresp) or [{}])[0].get("version_number") or 0) + 1
         await (
             client.table("outline_versions_v2")
-            .insert({"user_id": user_id, "project_id": project_id, "version_number": n,
-                     "outline": prior, "revision_note": "pre-revision snapshot"})
+            .insert(
+                {
+                    "user_id": user_id,
+                    "project_id": project_id,
+                    "version_number": n,
+                    "outline": prior,
+                    "revision_note": "pre-revision snapshot",
+                }
+            )
             .execute()
         )
     chapter_count = len(outline.get("chapters") or [])
@@ -128,13 +150,22 @@ async def persist_canon(client: Any, *, project_id: str, user_id: str, outline: 
         f"TARGET CHAPTER COUNT: {chapter_count}\n"
         f"DRAMATIC QUESTION: {outline.get('dramatic_question') or ''}"
     )
-    row = {"user_id": user_id, "project_id": project_id, "entry_type": "concept",
-           "name": "Series Bible", "description": desc}
+    row = {
+        "user_id": user_id,
+        "project_id": project_id,
+        "entry_type": "concept",
+        "name": "Series Bible",
+        "description": desc,
+    }
     try:
         existing = await (
-            client.table("story_bible_v2").select("id")
-            .eq("project_id", project_id).eq("entry_type", "concept").eq("name", "Series Bible")
-            .limit(1).execute()
+            client.table("story_bible_v2")
+            .select("id")
+            .eq("project_id", project_id)
+            .eq("entry_type", "concept")
+            .eq("name", "Series Bible")
+            .limit(1)
+            .execute()
         )
         rows = await _rows(existing)
         if rows:
@@ -146,21 +177,38 @@ async def persist_canon(client: Any, *, project_id: str, user_id: str, outline: 
 
 
 async def persist_chapter(
-    client: Any, *, project_id: str, user_id: str, chapter_number: int, title: str,
-    content_text: str, genre_slug: str = "", metadata: dict | None = None,
+    client: Any,
+    *,
+    project_id: str,
+    user_id: str,
+    chapter_number: int,
+    title: str,
+    content_text: str,
+    genre_slug: str = "",
+    metadata: dict | None = None,
 ) -> str:
     """Idempotent (project_id, chapter_number) upsert into published_content_v2 + a content_versions_v2
     snapshot (W3). Returns the content id."""
     existing = await (
-        client.table("published_content_v2").select("id, metadata")
-        .eq("project_id", project_id).eq("content_type", "chapter").eq("chapter_number", chapter_number)
-        .limit(1).execute()
+        client.table("published_content_v2")
+        .select("id, metadata")
+        .eq("project_id", project_id)
+        .eq("content_type", "chapter")
+        .eq("chapter_number", chapter_number)
+        .limit(1)
+        .execute()
     )
     rows = await _rows(existing)
     row = {
-        "user_id": user_id, "title": title, "content_type": "chapter", "genre_slug": genre_slug,
-        "content_text": content_text, "status": "draft", "project_id": project_id,
-        "chapter_number": chapter_number, "metadata": metadata or {},
+        "user_id": user_id,
+        "title": title,
+        "content_type": "chapter",
+        "genre_slug": genre_slug,
+        "content_text": content_text,
+        "status": "draft",
+        "project_id": project_id,
+        "chapter_number": chapter_number,
+        "metadata": metadata or {},
     }
     if rows:
         content_id = str(rows[0]["id"])
@@ -182,15 +230,26 @@ async def persist_chapter(
         content_id = str((await _rows(ins) or [{"id": str(uuid4())}])[0]["id"])
     # version snapshot
     vresp = await (
-        client.table("content_versions_v2").select("version_number")
-        .eq("content_id", content_id).order("version_number", desc=True).limit(1).execute()
+        client.table("content_versions_v2")
+        .select("version_number")
+        .eq("content_id", content_id)
+        .order("version_number", desc=True)
+        .limit(1)
+        .execute()
     )
     n = ((await _rows(vresp) or [{}])[0].get("version_number") or 0) + 1
     await (
         client.table("content_versions_v2")
-        .insert({"user_id": user_id, "content_id": content_id, "version_number": n,
-                 "content_text": content_text, "changed_by": "engine",
-                 "change_note": f"chapter {chapter_number} (engine write)"})
+        .insert(
+            {
+                "user_id": user_id,
+                "content_id": content_id,
+                "version_number": n,
+                "content_text": content_text,
+                "changed_by": "engine",
+                "change_note": f"chapter {chapter_number} (engine write)",
+            }
+        )
         .execute()
     )
     return content_id
@@ -237,14 +296,22 @@ async def persist_bible(
         if _is_junk_bible_name(str(name), entry_type):
             continue
         row = {
-            "user_id": user_id, "project_id": project_id, "entry_type": entry_type, "name": name,
-            "description": e.get("description") or "", "last_chapter_seen": chapter_number,
+            "user_id": user_id,
+            "project_id": project_id,
+            "entry_type": entry_type,
+            "name": name,
+            "description": e.get("description") or "",
+            "last_chapter_seen": chapter_number,
         }
         try:
             existing = await (
-                client.table("story_bible_v2").select("id")
-                .eq("project_id", project_id).eq("entry_type", entry_type).eq("name", name)
-                .limit(1).execute()
+                client.table("story_bible_v2")
+                .select("id")
+                .eq("project_id", project_id)
+                .eq("entry_type", entry_type)
+                .eq("name", name)
+                .limit(1)
+                .execute()
             )
             rows = await _rows(existing)
             if rows:
@@ -266,8 +333,15 @@ async def persist_research(
     meta table (the topic prefix is kept too, for human-readable traceability)."""
     resp = await (
         client.table("research_reports_v2")
-        .insert({"user_id": user_id, "topic": topic, "genre_slug": genre_slug,
-                 "content": content, "status": "draft"})
+        .insert(
+            {
+                "user_id": user_id,
+                "topic": topic,
+                "genre_slug": genre_slug,
+                "content": content,
+                "status": "draft",
+            }
+        )
         .execute()
     )
     rows = await _rows(resp)
@@ -284,26 +358,47 @@ async def persist_research(
 
 
 async def persist_content(
-    client: Any, *, user_id: str, title: str, content_type: str, content_text: str,
-    genre_slug: str = "", project_id: str | None = None, metadata: dict | None = None,
+    client: Any,
+    *,
+    user_id: str,
+    title: str,
+    content_type: str,
+    content_text: str,
+    genre_slug: str = "",
+    project_id: str | None = None,
+    metadata: dict | None = None,
 ) -> str:
     """Insert a standalone piece (blog_post / short_story / etc.) into published_content_v2 + a
     content_versions_v2 snapshot. For non-chapter content (no chapter_number)."""
     ins = await (
         client.table("published_content_v2")
-        .insert({
-            "user_id": user_id, "title": title, "content_type": content_type,
-            "genre_slug": genre_slug, "content_text": content_text, "status": "draft",
-            "project_id": project_id, "metadata": metadata or {},
-        })
+        .insert(
+            {
+                "user_id": user_id,
+                "title": title,
+                "content_type": content_type,
+                "genre_slug": genre_slug,
+                "content_text": content_text,
+                "status": "draft",
+                "project_id": project_id,
+                "metadata": metadata or {},
+            }
+        )
         .execute()
     )
     content_id = str((await _rows(ins) or [{"id": str(uuid4())}])[0]["id"])
     await (
         client.table("content_versions_v2")
-        .insert({"user_id": user_id, "content_id": content_id, "version_number": 1,
-                 "content_text": content_text, "changed_by": "engine",
-                 "change_note": f"{content_type} (engine write)"})
+        .insert(
+            {
+                "user_id": user_id,
+                "content_id": content_id,
+                "version_number": 1,
+                "content_text": content_text,
+                "changed_by": "engine",
+                "change_note": f"{content_type} (engine write)",
+            }
+        )
         .execute()
     )
     return content_id
@@ -321,18 +416,24 @@ async def persist_token_usage(
         out = int(c.get("output_tokens") or 0)
         cr = int(c.get("cache_read_tokens") or 0)
         cw = int(c.get("cache_write_tokens") or 0)
-        rows.append({
-            "user_id": user_id,
-            "workflow_name": workflow,
-            "model": c.get("model"),
-            "input_tokens": inp,
-            "output_tokens": out,
-            # total includes cache tokens so cost analytics reflect the full billable footprint
-            "total_tokens": inp + out + cr + cw,
-            "cost_usd": c.get("cost_usd") or 0,
-            "metadata": {**(metadata or {}), "provider": c.get("provider"),
-                         "cache_read_tokens": cr, "cache_write_tokens": cw},
-        })
+        rows.append(
+            {
+                "user_id": user_id,
+                "workflow_name": workflow,
+                "model": c.get("model"),
+                "input_tokens": inp,
+                "output_tokens": out,
+                # total includes cache tokens so cost analytics reflect the full billable footprint
+                "total_tokens": inp + out + cr + cw,
+                "cost_usd": c.get("cost_usd") or 0,
+                "metadata": {
+                    **(metadata or {}),
+                    "provider": c.get("provider"),
+                    "cache_read_tokens": cr,
+                    "cache_write_tokens": cw,
+                },
+            }
+        )
     if not rows:
         return 0
     await client.table("token_usage_v2").insert(rows).execute()

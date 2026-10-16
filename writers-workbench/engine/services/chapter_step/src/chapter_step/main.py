@@ -80,14 +80,22 @@ async def _resolve_project_for_payload(payload: dict, *, create: bool) -> dict |
 
     client = await get_supabase_admin()
     pid, row = await resolve_or_create_project(
-        client, user_id=str(payload.get("user_id") or ""), title=str(payload["project_title"]),
-        genre_slug=str(payload.get("genre_slug") or payload.get("genre") or ""), create=create,
+        client,
+        user_id=str(payload.get("user_id") or ""),
+        title=str(payload["project_title"]),
+        genre_slug=str(payload.get("genre_slug") or payload.get("genre") or ""),
+        create=create,
     )
     if pid:
         payload["project_id"] = pid
-        logger.info("chapter.project_resolved", project_id=pid, title=str(payload["project_title"])[:80],
-                    created=row is None)
+        logger.info(
+            "chapter.project_resolved",
+            project_id=pid,
+            title=str(payload["project_title"])[:80],
+            created=row is None,
+        )
     return row
+
 
 # Craft seeds composed into a chapter WRITE (the load-bearing scene/prose/character guidance).
 _WRITE_SEEDS = [
@@ -108,7 +116,11 @@ _WRITE_SEEDS = [
 
 
 def _genre_block(genre_slug: str) -> str:
-    return f"GENRE: {genre_slug}. Honour this genre's conventions, themes, and reader expectations." if genre_slug else ""
+    return (
+        f"GENRE: {genre_slug}. Honour this genre's conventions, themes, and reader expectations."
+        if genre_slug
+        else ""
+    )
 
 
 def _arc_block(outline: dict[str, Any]) -> str:
@@ -258,7 +270,15 @@ def _compact_outline_view(outline: dict[str, Any], chapter_number: int) -> str:
         )
     if focal is not None:
         lines.append("\nTHIS CHAPTER (write this one):")
-        for k in ("chapter_number", "title", "act", "arc_point", "pov_character", "bridge_from_prior", "beat"):
+        for k in (
+            "chapter_number",
+            "title",
+            "act",
+            "arc_point",
+            "pov_character",
+            "bridge_from_prior",
+            "beat",
+        ):
             if focal.get(k):
                 lines.append(f"  {k}: {focal[k]}")
     if index:
@@ -283,8 +303,11 @@ def _chapter_header(ctx: dict[str, Any], roster: list, req: WriteChapterRequest)
 
 
 def _plan_system(
-    genre_slug: str, outline: dict[str, Any], *,
-    book_arc_block: str = "", chapter_arc_block: str = "",
+    genre_slug: str,
+    outline: dict[str, Any],
+    *,
+    book_arc_block: str = "",
+    chapter_arc_block: str = "",
 ) -> str:
     """System prompt for splitting a chapter into sub-chapter beats (E2E-4 dual-arc).
 
@@ -301,20 +324,27 @@ def _plan_system(
             "arc_beat. It MAY differ from the book arc (e.g. a quiet Kishōtenketsu chapter inside a "
             f"Hero's Journey novel); do NOT mix the two:\n{chapter_arc_block}"
         )
-    return compose_craft_system(
-        seed_keys=["follett_seeds.scene.event_list", "follett_seeds.scene.escalating_turn",
-                   "follett_seeds.scene.bme_check"],
-        genre_block=_genre_block(genre_slug),
-        arc_block=_arc_block(outline),
-    ) + arc_section + (
-        "\n\nReturn strict JSON matching SubChapterPlan: 3-7 sub-chapters. Each sub-chapter MUST carry: "
-        "number (1-based), title, brief (a concrete beat — a discrete movement, NOT a summary), "
-        "arc_beat (the CHAPTER-level arc stage it fulfils — use the chapter arc above if given, else the "
-        "book arc), characters (names taken EXACTLY from the CHARACTER ROSTER — never invent), setting, "
-        "emotional_tone, and connects_to_book_arc (how it advances the BOOK-level arc stage for this "
-        "chapter). Together the sub-chapters cover the chapter beginning/middle/end with at least one "
-        "story turn each. If the chapter arc is a non-conflict structure (Kishōtenketsu, Story Circle), "
-        "do NOT force combat/confrontation beats — honour that arc's shape."
+    return (
+        compose_craft_system(
+            seed_keys=[
+                "follett_seeds.scene.event_list",
+                "follett_seeds.scene.escalating_turn",
+                "follett_seeds.scene.bme_check",
+            ],
+            genre_block=_genre_block(genre_slug),
+            arc_block=_arc_block(outline),
+        )
+        + arc_section
+        + (
+            "\n\nReturn strict JSON matching SubChapterPlan: 3-7 sub-chapters. Each sub-chapter MUST carry: "
+            "number (1-based), title, brief (a concrete beat — a discrete movement, NOT a summary), "
+            "arc_beat (the CHAPTER-level arc stage it fulfils — use the chapter arc above if given, else the "
+            "book arc), characters (names taken EXACTLY from the CHARACTER ROSTER — never invent), setting, "
+            "emotional_tone, and connects_to_book_arc (how it advances the BOOK-level arc stage for this "
+            "chapter). Together the sub-chapters cover the chapter beginning/middle/end with at least one "
+            "story turn each. If the chapter arc is a non-conflict structure (Kishōtenketsu, Story Circle), "
+            "do NOT force combat/confrontation beats — honour that arc's shape."
+        )
     )
 
 
@@ -322,11 +352,13 @@ def _adjacent_chapter_context(outline: dict[str, Any], chapter_number: int) -> s
     """Prev/next chapter briefs (E2E-4 R112): so a chapter outline acknowledges what came before and
     sets up the hook into what follows, without drifting from the book outline."""
     chapters = (outline or {}).get("chapters") or []
+
     def _find(target: Any) -> dict | None:
         for ch in chapters:
             if isinstance(ch, dict) and str(ch.get("chapter_number")) == str(target):
                 return ch
         return None
+
     lines: list[str] = []
     nums = [c.get("chapter_number") for c in chapters if isinstance(c, dict)]
     try:
@@ -339,17 +371,27 @@ def _adjacent_chapter_context(outline: dict[str, Any], chapter_number: int) -> s
     prev = _find(prev_n) if prev_n is not None else None
     nxt = _find(next_n) if next_n is not None else None
     if prev:
-        lines.append(f"PREVIOUS CHAPTER ({prev.get('chapter_number')} — {prev.get('title','')}): "
-                     f"{prev.get('beat', prev.get('summary',''))} — acknowledge where this left off.")
+        lines.append(
+            f"PREVIOUS CHAPTER ({prev.get('chapter_number')} — {prev.get('title', '')}): "
+            f"{prev.get('beat', prev.get('summary', ''))} — acknowledge where this left off."
+        )
     if nxt:
-        lines.append(f"NEXT CHAPTER ({nxt.get('chapter_number')} — {nxt.get('title','')}): "
-                     f"{nxt.get('beat', nxt.get('summary',''))} — end on a hook that sets this up.")
+        lines.append(
+            f"NEXT CHAPTER ({nxt.get('chapter_number')} — {nxt.get('title', '')}): "
+            f"{nxt.get('beat', nxt.get('summary', ''))} — end on a hook that sets this up."
+        )
     return "\n".join(lines)
 
 
 async def _plan_subchapters(
-    ctx: dict[str, Any], req: WriteChapterRequest, n: int, model: str, *,
-    book_arc_block: str = "", chapter_arc_block: str = "", adjacent: str = "",
+    ctx: dict[str, Any],
+    req: WriteChapterRequest,
+    n: int,
+    model: str,
+    *,
+    book_arc_block: str = "",
+    chapter_arc_block: str = "",
+    adjacent: str = "",
 ) -> list[SubChapterBrief]:
     """Plan up to n sub-chapters for the chapter (E2E-4: dual-arc + prev/next). Fixture on no provider."""
     router = get_router(service=STEP_NAME)
@@ -359,8 +401,12 @@ async def _plan_subchapters(
             router,
             provider="anthropic",
             model=model,
-            system=_plan_system(ctx["genre_slug"], ctx["outline"],
-                                book_arc_block=book_arc_block, chapter_arc_block=chapter_arc_block),
+            system=_plan_system(
+                ctx["genre_slug"],
+                ctx["outline"],
+                book_arc_block=book_arc_block,
+                chapter_arc_block=chapter_arc_block,
+            ),
             prompt=(
                 f"{_chapter_header(ctx, ctx['roster'], req)}{adj}\n\n"
                 f"Split chapter {req.chapter_number} into {n} sub-chapters."
@@ -369,14 +415,19 @@ async def _plan_subchapters(
             max_tokens=4096,
         )
         briefs = plan.subchapters[:n]
-        return briefs or [SubChapterBrief(beat=f"Part {i + 1} of chapter {req.chapter_number}") for i in range(n)]
+        return briefs or [
+            SubChapterBrief(beat=f"Part {i + 1} of chapter {req.chapter_number}") for i in range(n)
+        ]
     except ProviderNotRegistered:
         return [SubChapterBrief(beat=f"Part {i + 1}") for i in range(n)]
 
 
 async def _persist_chapter_outline(
-    project_id: str, chapter_number: int, sub_chapters: list[dict],
-    chapter_story_arc: str, book_arc_name: str,
+    project_id: str,
+    chapter_number: int,
+    sub_chapters: list[dict],
+    chapter_story_arc: str,
+    book_arc_name: str,
 ) -> dict | None:
     """Save the chapter outline into ``writing_projects_v2.outline.chapters[N].chapter_outline`` (E2E-4
     R111/R118). Snapshots the prior outline to outline_versions_v2 first when one exists, so a re-plan
@@ -390,7 +441,13 @@ async def _persist_chapter_outline(
         from writer_engine.supabase.client import get_supabase_admin
 
         client = await get_supabase_admin()
-        cur = await client.table("writing_projects_v2").select("outline,user_id").eq("id", project_id).limit(1).execute()
+        cur = (
+            await client.table("writing_projects_v2")
+            .select("outline,user_id")
+            .eq("id", project_id)
+            .limit(1)
+            .execute()
+        )
         rows = getattr(cur, "data", None) or []
         if not rows:
             return {"persisted": False, "reason": "project not found"}
@@ -399,13 +456,28 @@ async def _persist_chapter_outline(
         chapters = list(outline.get("chapters") or [])
         # Snapshot the prior outline (R118: chapter-outline revision keeps history).
         try:
-            v = await client.table("outline_versions_v2").select("version_number").eq(
-                "project_id", project_id).order("version_number", desc=True).limit(1).execute()
+            v = (
+                await client.table("outline_versions_v2")
+                .select("version_number")
+                .eq("project_id", project_id)
+                .order("version_number", desc=True)
+                .limit(1)
+                .execute()
+            )
             vn = int(((getattr(v, "data", None) or [{}])[0].get("version_number")) or 0) + 1
-            await client.table("outline_versions_v2").insert({
-                "user_id": user_id, "project_id": project_id, "version_number": vn,
-                "outline": outline, "revision_note": f"pre chapter-outline snapshot (ch {chapter_number})",
-            }).execute()
+            await (
+                client.table("outline_versions_v2")
+                .insert(
+                    {
+                        "user_id": user_id,
+                        "project_id": project_id,
+                        "version_number": vn,
+                        "outline": outline,
+                        "revision_note": f"pre chapter-outline snapshot (ch {chapter_number})",
+                    }
+                )
+                .execute()
+            )
         except Exception as exc:
             logger.warning("plan.snapshot_failed", error=str(exc)[:160])
         found = False
@@ -458,8 +530,12 @@ async def _op_plan(payload: dict) -> dict:
     chapter_number = _coerce_chapter_number(payload.get("chapter_number"), 1)
     chapter_run_id = payload.get("chapter_run_id") or str(uuid4())
     req = WriteChapterRequest.model_validate(
-        {"project_id": project_id, "chapter_number": chapter_number, "chapter_run_id": chapter_run_id,
-         "sub_chapter_count_override": payload.get("sub_chapter_count_override")}
+        {
+            "project_id": project_id,
+            "chapter_number": chapter_number,
+            "chapter_run_id": chapter_run_id,
+            "sub_chapter_count_override": payload.get("sub_chapter_count_override"),
+        }
     )
     ctx = await _load_context(str(req.project_id), payload)
     settings = get_settings()
@@ -492,8 +568,13 @@ async def _op_plan(payload: dict) -> dict:
 
     adjacent = _adjacent_chapter_context(outline, chapter_number)
     briefs = await _plan_subchapters(
-        ctx, req, n_sub, model,
-        book_arc_block=book_arc_block, chapter_arc_block=chapter_arc_block, adjacent=adjacent,
+        ctx,
+        req,
+        n_sub,
+        model,
+        book_arc_block=book_arc_block,
+        chapter_arc_block=chapter_arc_block,
+        adjacent=adjacent,
     )
     for i, b in enumerate(briefs, start=1):
         if b.number is None:
@@ -503,7 +584,8 @@ async def _op_plan(payload: dict) -> dict:
     persist = None
     if payload.get("persist") and payload.get("project_id"):
         persist = await _persist_chapter_outline(
-            str(payload["project_id"]), chapter_number, sub_dicts, chapter_arc_name, book_arc_name)
+            str(payload["project_id"]), chapter_number, sub_dicts, chapter_arc_name, book_arc_name
+        )
 
     return {
         "chapter_number": chapter_number,
@@ -612,8 +694,15 @@ def _cached_write_system(base_system: str, header: str, grounding: str) -> str:
 
 
 async def _write_subchapter(
-    *, system: str, brief: SubChapterBrief, idx: int, total: int,
-    prior_tail: str, chapter_number: int, model: str, plan_context: str = "",
+    *,
+    system: str,
+    brief: SubChapterBrief,
+    idx: int,
+    total: int,
+    prior_tail: str,
+    chapter_number: int,
+    model: str,
+    plan_context: str = "",
 ) -> tuple[str, int, int]:
     """Write one sub-chapter (~2-3k words). ``system`` is the CACHED per-chapter prefix
     (craft + context + grounding); only the small per-sub beat/continuity goes in the user message.
@@ -683,9 +772,10 @@ def _outline_chapter_title(outline: dict[str, Any], chapter_number: int) -> str:
 
 def _arc_summary(outline: dict[str, Any]) -> str:
     o = outline or {}
-    return " ".join(
-        str(x) for x in (o.get("story_arc_name"), o.get("dramatic_question"), o.get("premise")) if x
-    ) or "(arc not specified — infer from premise)"
+    return (
+        " ".join(str(x) for x in (o.get("story_arc_name"), o.get("dramatic_question"), o.get("premise")) if x)
+        or "(arc not specified — infer from premise)"
+    )
 
 
 def _build_drift_system() -> str:
@@ -749,8 +839,13 @@ async def _detect_drift(
     for attempt in range(2):
         try:
             drift, _resp = await complete_structured(
-                router, provider="anthropic", model=model,
-                system=_build_drift_system(), prompt=prompt, schema=DriftReport, max_tokens=16384,
+                router,
+                provider="anthropic",
+                model=model,
+                system=_build_drift_system(),
+                prompt=prompt,
+                schema=DriftReport,
+                max_tokens=16384,
             )
             return drift
         except ProviderNotRegistered:
@@ -767,7 +862,9 @@ def _facts_topics(facts: str, limit: int = 14) -> list[str]:
     topics: list[str] = []
     for ln in facts.splitlines():
         ln = ln.strip()
-        m = re.match(r"^[-*•]\s*\*{0,2}([^:*]{4,80})\*{0,2}\s*[:—-]", ln) or re.match(r"^\*{2}([^*:]{4,80})\*{2}", ln)
+        m = re.match(r"^[-*•]\s*\*{0,2}([^:*]{4,80})\*{0,2}\s*[:—-]", ln) or re.match(
+            r"^\*{2}([^*:]{4,80})\*{2}", ln
+        )
         if m:
             t = m.group(1).strip(" *—-:")
             if t and t.lower() not in {x.lower() for x in topics}:
@@ -797,9 +894,7 @@ def _research_focus(ctx: dict[str, Any]) -> str:
     return "\n".join(parts)
 
 
-async def _chapter_research(
-    beat: str, *, period: str, title: str, focus: str = ""
-) -> tuple[str, list[str]]:
+async def _chapter_research(beat: str, *, period: str, title: str, focus: str = "") -> tuple[str, list[str]]:
     """Pre-write research grounding (Perplexity): given the chapter's planned beat, fetch SPECIFIC
     period facts / local color / material culture / real events to weave into the scene as it is
     written. ``focus`` binds the query to THIS story's specific people/place/culture so the research
@@ -814,7 +909,8 @@ async def _chapter_research(
         "NOT return facts about other cultures or regions — no European / Old-World / Stonehenge-style "
         "analogues unless STORY SUBJECT is itself European. If unsure, prefer facts specific to the named "
         "people and place over generic period facts."
-        if focus else ""
+        if focus
+        else ""
     )
     shape = (
         f'For a chapter of the historical novel "{title}", set in {period}, where: {beat}'
@@ -826,7 +922,11 @@ async def _chapter_research(
     )
     try:
         resp = await router.complete(
-            provider="perplexity", model="sonar-pro", system=None, prompt=shape, max_tokens=2048,
+            provider="perplexity",
+            model="sonar-pro",
+            system=None,
+            prompt=shape,
+            max_tokens=2048,
         )
     except ProviderNotRegistered:
         logger.warning("chapter.research.no_provider", reason="perplexity not registered")
@@ -839,8 +939,12 @@ async def _chapter_research(
     facts = resp.text.strip()
     if resp.citations:
         facts += "\n\nSOURCES: " + "; ".join(resp.citations[:8])
-    logger.info("chapter.research.ok", topics=len(_facts_topics(facts)), chars=len(facts),
-                citations=len(resp.citations or []))
+    logger.info(
+        "chapter.research.ok",
+        topics=len(_facts_topics(facts)),
+        chars=len(facts),
+        citations=len(resp.citations or []),
+    )
     return facts, _facts_topics(facts)
 
 
@@ -885,9 +989,17 @@ def _build_correct_system(genre_slug: str) -> str:
 
 
 async def _correct_drift(
-    text: str, *, drift: DriftReport, roster_text: str, genre_slug: str, model: str,
-    insist_length: bool = False, research_facts: str = "",
-    line_edit: bool = False, style_directives: str = "", citation_mode: str = "",
+    text: str,
+    *,
+    drift: DriftReport,
+    roster_text: str,
+    genre_slug: str,
+    model: str,
+    insist_length: bool = False,
+    research_facts: str = "",
+    line_edit: bool = False,
+    style_directives: str = "",
+    citation_mode: str = "",
 ) -> str:
     """QA cycle 2: streamed full-chapter revision that corrects story/character drift and, when
     ``research_facts`` is supplied (the repair path), WEAVES those researched facts into the prose to
@@ -904,7 +1016,8 @@ async def _correct_drift(
     insist = (
         "\n\nYOUR PREVIOUS REVISION WAS TOO SHORT. Return the FULL chapter — every scene, at least as "
         "long as the original. Fix ONLY the drift listed; keep all other prose intact. Do not condense."
-        if insist_length else ""
+        if insist_length
+        else ""
     )
     citation_clause = (
         " Carry each researched fact with an inline markdown footnote citation (e.g. [^1]) and list the "
@@ -918,11 +1031,13 @@ async def _correct_drift(
         f"RESEARCHED FACTS — weave these into the prose where they fit, as concrete sensory / material /"
         f" period detail (do NOT dump them as exposition, do NOT invent beyond them).{citation_clause}\n"
         f"{research_facts}\n"
-        if research_facts.strip() else ""
+        if research_facts.strip()
+        else ""
     )
     style_block = (
         f"\n\nAUTHOR STYLE DIRECTIVES (apply all of these to the revised prose):\n{style_directives}\n"
-        if style_directives.strip() else ""
+        if style_directives.strip()
+        else ""
     )
     user = (
         f"CHARACTER ROSTER (consistency reference):\n{roster_text}\n\n"
@@ -934,16 +1049,30 @@ async def _correct_drift(
         f"CHAPTER TO REVISE:\n{text}{insist}"
     )
     resp = await router.complete(
-        provider="anthropic", model=model, system=_build_correct_system(genre_slug),
-        prompt=user, max_tokens=32768, stream=True,
+        provider="anthropic",
+        model=model,
+        system=_build_correct_system(genre_slug),
+        prompt=user,
+        max_tokens=32768,
+        stream=True,
     )
     return _strip_em_dashes(_strip_scaffolding(resp.text.strip()))
 
 
 async def _drift_correct_pass(
-    text: str, *, ctx: dict[str, Any], req: WriteChapterRequest, roster_text: str, period: str,
-    model: str, min_length_ratio: float = 0.85, weave_research: bool = False, line_edit: bool = False,
-    research_focus: str = "", style_directives: str = "", citation_mode: str = "",
+    text: str,
+    *,
+    ctx: dict[str, Any],
+    req: WriteChapterRequest,
+    roster_text: str,
+    period: str,
+    model: str,
+    min_length_ratio: float = 0.85,
+    weave_research: bool = False,
+    line_edit: bool = False,
+    research_focus: str = "",
+    style_directives: str = "",
+    citation_mode: str = "",
 ) -> tuple[str, DriftReport | None, int]:
     """QA cycle 1 (detect drift vs outline/arc/roster + research gaps) -> QA cycle 2 (correct it).
 
@@ -957,8 +1086,12 @@ async def _drift_correct_pass(
     ``min_length_ratio`` is the floor below which a (shrinking) correction is rejected. At WRITE time
     it is 0.85; the REPAIR op uses a higher floor now that the roster is clean (less to cut)."""
     drift = await _detect_drift(
-        text, outline=ctx["outline"], chapter_number=req.chapter_number,
-        roster_text=roster_text, period=period, model=model,
+        text,
+        outline=ctx["outline"],
+        chapter_number=req.chapter_number,
+        roster_text=roster_text,
+        period=period,
+        model=model,
     )
     if drift is None:
         drift = DriftReport(aligned=True)  # line-edit still runs even when drift can't be scored
@@ -975,12 +1108,17 @@ async def _drift_correct_pass(
         if research_focus.strip():
             beat = f"{beat}\n\nAUTHOR RESEARCH FOCUS (prioritise this): {research_focus.strip()}"
         research_facts, _ = await _chapter_research(
-            beat, period=period, title=str(ctx.get("title") or ""), focus=_research_focus(ctx),
+            beat,
+            period=period,
+            title=str(ctx.get("title") or ""),
+            focus=_research_focus(ctx),
         )
     has_drift = bool(drift.story_drift or drift.character_drift)
     # Weave whenever we fetched facts — for an explicit research_focus there may be no QA gap to match,
     # but the author still wants those facts in the prose.
-    has_research_to_weave = bool(weave_research and research_facts and (drift.research_gaps or research_focus.strip()))
+    has_research_to_weave = bool(
+        weave_research and research_facts and (drift.research_gaps or research_focus.strip())
+    )
     has_author_directive = bool(research_focus.strip() or style_directives.strip())
     # line_edit revises EVERY chapter (sentence strengthening), even a clean one.
     if not (has_drift or has_research_to_weave or line_edit or has_author_directive):
@@ -988,15 +1126,28 @@ async def _drift_correct_pass(
     draft_words = len(text.split())
     floor = min_length_ratio * draft_words
     revised = await _correct_drift(
-        text, drift=drift, roster_text=roster_text, genre_slug=ctx["genre_slug"], model=model,
-        research_facts=research_facts, line_edit=line_edit,
-        style_directives=style_directives, citation_mode=citation_mode,
+        text,
+        drift=drift,
+        roster_text=roster_text,
+        genre_slug=ctx["genre_slug"],
+        model=model,
+        research_facts=research_facts,
+        line_edit=line_edit,
+        style_directives=style_directives,
+        citation_mode=citation_mode,
     )
     if len(revised.split()) < floor:
         retry = await _correct_drift(
-            text, drift=drift, roster_text=roster_text, genre_slug=ctx["genre_slug"], model=model,
-            insist_length=True, research_facts=research_facts, line_edit=line_edit,
-            style_directives=style_directives, citation_mode=citation_mode,
+            text,
+            drift=drift,
+            roster_text=roster_text,
+            genre_slug=ctx["genre_slug"],
+            model=model,
+            insist_length=True,
+            research_facts=research_facts,
+            line_edit=line_edit,
+            style_directives=style_directives,
+            citation_mode=citation_mode,
         )
         revised = max((revised, retry), key=lambda t: len(t.split()))
     if len(revised.split()) < floor:
@@ -1006,8 +1157,12 @@ async def _drift_correct_pass(
     # though cycle 2 fixed it — making the telemetry / project view read ~90% "drifted" when most are
     # actually clean. The post-correction report is what truly tells us which chapters still need repair.
     final_drift = await _detect_drift(
-        revised, outline=ctx["outline"], chapter_number=req.chapter_number,
-        roster_text=roster_text, period=period, model=model,
+        revised,
+        outline=ctx["outline"],
+        chapter_number=req.chapter_number,
+        roster_text=roster_text,
+        period=period,
+        model=model,
     )
     return revised, (final_drift or drift), 1
 
@@ -1034,14 +1189,18 @@ async def _op_write(payload: dict) -> dict:
     # Auto-plan guard (E2E-4 R116, opt-in via require_chapter_outline): "write chapter N" with no
     # reviewed chapter outline → create the outline first and STOP, so the author reviews it before any
     # prose is written. Opt-in so the proven auto-fan-out write path (Burial Mound) is unchanged.
-    if (payload.get("require_chapter_outline")
-            and not _briefs_from_payload(payload)
-            and not _saved_sub_chapters(ctx.get("outline") or {}, req.chapter_number)):
+    if (
+        payload.get("require_chapter_outline")
+        and not _briefs_from_payload(payload)
+        and not _saved_sub_chapters(ctx.get("outline") or {}, req.chapter_number)
+    ):
         plan_result = await _op_plan({**payload, "persist": True})
         return {
-            "planned": True, "wrote": False, "chapter_number": req.chapter_number,
+            "planned": True,
+            "wrote": False,
+            "chapter_number": req.chapter_number,
             "message": "No chapter outline existed — I created one and emailed it. Review it, then ask "
-                       "me to write the chapter.",
+            "me to write the chapter.",
             "plan": plan_result,
         }
 
@@ -1092,14 +1251,21 @@ async def _op_write(payload: dict) -> dict:
             # path (the validated baseline) is unchanged; the pre/post optimization test flips this.
             if bool(payload.get("parallel_subchapters")):
                 plan_text = _subchapter_plan_text(briefs)
-                results = await asyncio.gather(*[
-                    _write_subchapter(
-                        system=cached_system, brief=brief, idx=i, total=len(briefs),
-                        prior_tail="", chapter_number=req.chapter_number, model=model,
-                        plan_context=plan_text,
-                    )
-                    for i, brief in enumerate(briefs)
-                ])
+                results = await asyncio.gather(
+                    *[
+                        _write_subchapter(
+                            system=cached_system,
+                            brief=brief,
+                            idx=i,
+                            total=len(briefs),
+                            prior_tail="",
+                            chapter_number=req.chapter_number,
+                            model=model,
+                            plan_context=plan_text,
+                        )
+                        for i, brief in enumerate(briefs)
+                    ]
+                )
                 sub_texts = [t for t, _cr, _cw in results]
                 cache_read = sum(cr for _t, cr, _cw in results)
                 cache_write = sum(cw for _t, _cr, cw in results)
@@ -1108,8 +1274,13 @@ async def _op_write(payload: dict) -> dict:
                 prior_tail = ""
                 for i, brief in enumerate(briefs):
                     t, cr, cw = await _write_subchapter(
-                        system=cached_system, brief=brief, idx=i, total=len(briefs),
-                        prior_tail=prior_tail, chapter_number=req.chapter_number, model=model,
+                        system=cached_system,
+                        brief=brief,
+                        idx=i,
+                        total=len(briefs),
+                        prior_tail=prior_tail,
+                        chapter_number=req.chapter_number,
+                        model=model,
                     )
                     sub_texts.append(t)
                     cache_read += cr
@@ -1119,13 +1290,20 @@ async def _op_write(payload: dict) -> dict:
             # QA cycle 1 (detect drift vs outline/arc/roster) -> QA cycle 2 (correct it) — only fires a
             # streamed revision when there is real story/character drift. Research is already woven.
             text, drift_report, passes = await _drift_correct_pass(
-                text, ctx=ctx, req=req, roster_text=roster_text, period=period, model=model,
+                text,
+                ctx=ctx,
+                req=req,
+                roster_text=roster_text,
+                period=period,
+                model=model,
             )
             final_qa = await _score_chapter(text, period, roster_text)
             sub_count = len(briefs)
         else:
             resp = await router.complete(
-                provider="anthropic", model=model, system=system,
+                provider="anthropic",
+                model=model,
+                system=system,
                 prompt=f"{header}\n\nWrite chapter {req.chapter_number} in full, following the craft rules.",
                 max_tokens=8192,
             )
@@ -1141,15 +1319,16 @@ async def _op_write(payload: dict) -> dict:
                 low = _low_dims(qa)
                 if not low:
                     break
-                text = await _revise_chapter(text, low_dims=low, findings=qa.findings, model=model, genre_slug=ctx["genre_slug"])
+                text = await _revise_chapter(
+                    text, low_dims=low, findings=qa.findings, model=model, genre_slug=ctx["genre_slug"]
+                )
                 passes += 1
                 final_qa = None
             if max_passes > 0 and final_qa is None:
                 final_qa = await _score_chapter(text, period, _roster_text(roster))
             sub_count = 1
         scores = (
-            {k: v for k, v in final_qa.model_dump(mode="json").items() if k in QA_DIMS}
-            if final_qa else None
+            {k: v for k, v in final_qa.model_dump(mode="json").items() if k in QA_DIMS} if final_qa else None
         )
         text = _strip_em_dashes(text)  # writing directive: no em-dashes in output (write path too)
         out = WriteChapterResponse(
@@ -1213,11 +1392,20 @@ async def _persist_chapter_if_requested(
         # carries a banned dash regardless of whether the LLM correction was accepted.
         clean_text = _strip_em_dashes(out.content_text)
         content_id = await persist_chapter(
-            client, project_id=str(project_id), user_id=str(user_id), chapter_number=chapter_number,
-            title=chapter_title, content_text=clean_text, genre_slug=genre,
-            metadata={"chapter_run_id": str(out.chapter_run_id), "word_count": out.word_count,
-                      "sub_chapter_count": out.sub_chapter_count, "craft_qa": out.craft_qa,
-                      "drift_report": out.drift_report},
+            client,
+            project_id=str(project_id),
+            user_id=str(user_id),
+            chapter_number=chapter_number,
+            title=chapter_title,
+            content_text=clean_text,
+            genre_slug=genre,
+            metadata={
+                "chapter_run_id": str(out.chapter_run_id),
+                "word_count": out.word_count,
+                "sub_chapter_count": out.sub_chapter_count,
+                "craft_qa": out.craft_qa,
+                "drift_report": out.drift_report,
+            },
         )
     except Exception as exc:
         logger.exception("chapter.persist.failed", chapter=chapter_number, project=str(project_id))
@@ -1230,8 +1418,11 @@ async def _persist_chapter_if_requested(
 
         bible = await _op_extract_bible({"content_text": out.content_text})
         bible_info["bible_entries"] = await persist_bible(
-            client, project_id=str(project_id), user_id=str(user_id),
-            entries=bible.get("entries") or [], chapter_number=chapter_number,
+            client,
+            project_id=str(project_id),
+            user_id=str(user_id),
+            entries=bible.get("entries") or [],
+            chapter_number=chapter_number,
         )
     except Exception as exc:
         logger.warning("chapter.bible.failed", chapter=chapter_number, error=str(exc)[:200])
@@ -1245,16 +1436,23 @@ async def _persist_chapter_if_requested(
             from writer_engine.persist_helpers import persist_bible, persist_research
 
             await persist_research(
-                client, project_id=str(project_id), user_id=str(user_id),
-                topic=f"{project_title} — Chapter {chapter_number} research", content=research_used,
+                client,
+                project_id=str(project_id),
+                user_id=str(user_id),
+                topic=f"{project_title} — Chapter {chapter_number} research",
+                content=research_used,
                 genre_slug=genre,
             )
             topics = _facts_topics(research_used)
             if topics:
                 await persist_bible(
-                    client, project_id=str(project_id), user_id=str(user_id),
-                    entries=[{"entry_type": "research", "name": t, "description": research_used[:500]}
-                             for t in topics[:12]],
+                    client,
+                    project_id=str(project_id),
+                    user_id=str(user_id),
+                    entries=[
+                        {"entry_type": "research", "name": t, "description": research_used[:500]}
+                        for t in topics[:12]
+                    ],
                     chapter_number=chapter_number,
                 )
             bible_info["research_persisted"] = True
@@ -1268,7 +1466,10 @@ async def _persist_chapter_if_requested(
         from writer_engine.persist_helpers import persist_chapter_qa
 
         await persist_chapter_qa(
-            client, project_id=str(project_id), user_id=str(user_id), chapter_number=chapter_number,
+            client,
+            project_id=str(project_id),
+            user_id=str(user_id),
+            chapter_number=chapter_number,
             telemetry={
                 "chapter_run_id": str(out.chapter_run_id),
                 "aligned": (out.drift_report or {}).get("aligned") if out.drift_report else None,
@@ -1291,9 +1492,13 @@ async def _persist_chapter_if_requested(
         bible_info["telemetry_error"] = str(exc)[:200]
 
     logger.info(
-        "chapter.persisted", chapter=chapter_number, project=str(project_id),
-        word_count=out.word_count, aligned=(out.drift_report or {}).get("aligned") if out.drift_report else None,
-        bible_loaded=len(bible_loaded), bible_written=bible_info["bible_entries"],
+        "chapter.persisted",
+        chapter=chapter_number,
+        project=str(project_id),
+        word_count=out.word_count,
+        aligned=(out.drift_report or {}).get("aligned") if out.drift_report else None,
+        bible_loaded=len(bible_loaded),
+        bible_written=bible_info["bible_entries"],
         research=bool(research_used),
     )
     return {"persisted": True, "content_id": content_id, **bible_info}
@@ -1326,10 +1531,13 @@ async def _revise_chapter(
     # de-dup, preserve order
     seeds = list(dict.fromkeys(seeds))
     system = compose_craft_system(seed_keys=seeds, genre_block=_genre_block(genre_slug))
-    findings_text = "\n".join(
-        f"- [{f.get('dimension', '?')}] {f.get('problem', '')} -> FIX: {f.get('fix', '')}"
-        for f in findings
-    ) or "(no specific findings; apply the craft rules above)"
+    findings_text = (
+        "\n".join(
+            f"- [{f.get('dimension', '?')}] {f.get('problem', '')} -> FIX: {f.get('fix', '')}"
+            for f in findings
+        )
+        or "(no specific findings; apply the craft rules above)"
+    )
     user = (
         "Revise the chapter below to fix these craft issues, applying the rules in the system "
         "prompt. PRESERVE the story, characters, events, and POV exactly — improve only the prose, "
@@ -1412,7 +1620,9 @@ async def _score_chapter(text: str, period: str, roster_text: str = "") -> Chapt
     from writer_engine.config import get_settings
 
     router = get_router(service=STEP_NAME)
-    roster_block = f"CHARACTER ROSTER (check consistency against this):\n{roster_text}\n\n" if roster_text else ""
+    roster_block = (
+        f"CHARACTER ROSTER (check consistency against this):\n{roster_text}\n\n" if roster_text else ""
+    )
     try:
         qa, _resp = await complete_structured(
             router,
@@ -1435,12 +1645,63 @@ def _low_dims(qa: ChapterCraftQa, threshold: float = CRAFT_THRESHOLD) -> list[st
 
 
 _NAME_STOP = {
-    "the", "and", "but", "she", "her", "his", "him", "they", "them", "their", "you", "your", "this",
-    "that", "then", "there", "here", "when", "where", "what", "who", "why", "how", "chapter", "prologue",
-    "epilogue", "act", "scene", "part", "one", "two", "three", "four", "five", "six", "seven", "eight",
-    "nine", "ten", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
-    "january", "february", "march", "april", "june", "july", "august", "september", "october",
-    "november", "december",
+    "the",
+    "and",
+    "but",
+    "she",
+    "her",
+    "his",
+    "him",
+    "they",
+    "them",
+    "their",
+    "you",
+    "your",
+    "this",
+    "that",
+    "then",
+    "there",
+    "here",
+    "when",
+    "where",
+    "what",
+    "who",
+    "why",
+    "how",
+    "chapter",
+    "prologue",
+    "epilogue",
+    "act",
+    "scene",
+    "part",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+    "january",
+    "february",
+    "march",
+    "april",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december",
 }
 
 
@@ -1481,7 +1742,9 @@ def _character_name_consistency(text: str, roster: list[dict]) -> dict:
     # accented character — a real drift like "Thomas" for canonical "Tomás" went uncaught.
     roster_tokens = {t.lower() for n in roster_full for t in re.findall(r"[A-Za-z]{4,}", _deaccent(n))}
     low = _deaccent(text).lower()
-    present = [n for n in roster_full if n and re.search(rf"\b{re.escape(_deaccent(n.split()[0]).lower())}\b", low)]
+    present = [
+        n for n in roster_full if n and re.search(rf"\b{re.escape(_deaccent(n.split()[0]).lower())}\b", low)
+    ]
     missing = [n for n in roster_full if n not in present]
     from collections import Counter
 
@@ -1501,16 +1764,22 @@ def _character_name_consistency(text: str, roster: list[dict]) -> dict:
                 break
     return {
         "consistent": not renames,
-        "roster": roster_full, "names_present": present, "names_missing": missing,
+        "roster": roster_full,
+        "names_present": present,
+        "names_missing": missing,
         "possible_renames": renames,
     }
 
 
 _QA_DIM_LABELS = {
-    "character_follows_guide": "Character craft", "outline_follows_guide": "Follows the outline",
-    "dialogue_follows_guide": "Dialogue", "prose_transparent": "Prose clarity",
-    "story_turn_density": "Story turns / pacing", "no_boring_paragraphs": "No flat paragraphs",
-    "period_language_ok": "Period language", "character_consistency": "Character consistency",
+    "character_follows_guide": "Character craft",
+    "outline_follows_guide": "Follows the outline",
+    "dialogue_follows_guide": "Dialogue",
+    "prose_transparent": "Prose clarity",
+    "story_turn_density": "Story turns / pacing",
+    "no_boring_paragraphs": "No flat paragraphs",
+    "period_language_ok": "Period language",
+    "character_consistency": "Character consistency",
 }
 
 
@@ -1532,23 +1801,40 @@ def _build_qa_report(scores: dict, findings: list, name_check: dict | None) -> d
         if not isinstance(v, (int, float)):
             continue
         ok = v >= CRAFT_THRESHOLD
-        checks.append({"name": label, "status": "PASS" if ok else "NEEDS_REVIEW",
-                       "details": (find_by_dim.get(dim) or f"score {v:.2f}") if not ok else f"score {v:.2f}"})
+        checks.append(
+            {
+                "name": label,
+                "status": "PASS" if ok else "NEEDS_REVIEW",
+                "details": (find_by_dim.get(dim) or f"score {v:.2f}") if not ok else f"score {v:.2f}",
+            }
+        )
     # deterministic character-name consistency (drives the drift demo)
     if name_check is not None:
         renames = name_check.get("possible_renames") or []
         missing = name_check.get("names_missing") or []
         consistent = bool(name_check.get("consistent"))
-        detail = "All roster names consistent." if consistent else (
-            "Possible renames: " + ", ".join(f"{r.get('found')}→{r.get('closest_roster_name')}" for r in renames)
-            + ("; missing: " + ", ".join(missing) if missing else "")
+        detail = (
+            "All roster names consistent."
+            if consistent
+            else (
+                "Possible renames: "
+                + ", ".join(f"{r.get('found')}→{r.get('closest_roster_name')}" for r in renames)
+                + ("; missing: " + ", ".join(missing) if missing else "")
+            )
         )
-        checks.append({"name": "Character consistency",
-                       "status": "PASS" if consistent else "NEEDS_REVIEW", "details": detail})
+        checks.append(
+            {
+                "name": "Character consistency",
+                "status": "PASS" if consistent else "NEEDS_REVIEW",
+                "details": detail,
+            }
+        )
     return {"generated_at": datetime.now(UTC).isoformat(), "checks": checks}
 
 
-def _drift_scan_from_namecheck(name_check: dict | None, chapter_text: str, chapter_number: int) -> dict | None:
+def _drift_scan_from_namecheck(
+    name_check: dict | None, chapter_text: str, chapter_number: int
+) -> dict | None:
     """Build the ``outline._character_drift_scan`` structure the AnnotationsPanel reads, from the QA
     name-consistency result. Each near-miss variant (e.g. 'Meara' vs roster 'Mara') becomes a drift
     flag on this chapter with a ``replacement`` so the panel's one-click Apply can fix it."""
@@ -1567,19 +1853,29 @@ def _drift_scan_from_namecheck(name_check: dict | None, chapter_text: str, chapt
         canonical = next((n for n in roster if token in n.lower().split()), token.capitalize())
         replacement = canonical.split()[0] if canonical else token.capitalize()
         idx = chapter_text.find(variant)
-        context = chapter_text[max(0, idx - 30): idx + len(variant) + 30] if idx >= 0 else variant
-        chars.append({
-            "name": canonical, "name_format": canonical,
-            "drift_flags": [{
-                "chapter_number": chapter_number, "variant": variant, "context": context,
-                "type": "name_variant", "severity": "high", "replacement": replacement,
-            }],
-        })
+        context = chapter_text[max(0, idx - 30) : idx + len(variant) + 30] if idx >= 0 else variant
+        chars.append(
+            {
+                "name": canonical,
+                "name_format": canonical,
+                "drift_flags": [
+                    {
+                        "chapter_number": chapter_number,
+                        "variant": variant,
+                        "context": context,
+                        "type": "name_variant",
+                        "severity": "high",
+                        "replacement": replacement,
+                    }
+                ],
+            }
+        )
     return {"characters": chars, "generated_at": None} if chars else None
 
 
-async def _persist_qa_artifacts(payload: dict, scores: dict, findings: list, name_check: dict | None,
-                                chapter_text: str) -> dict | None:
+async def _persist_qa_artifacts(
+    payload: dict, scores: dict, findings: list, name_check: dict | None, chapter_text: str
+) -> dict | None:
     """Persist the QA report to the chapter row's ``metadata.qa_report`` (so the QAReportPanel displays
     it) and any character-name drift into the project's ``outline._character_drift_scan`` (so the
     AnnotationsPanel surfaces it with a one-click fix). Best-effort; never breaks the QA op."""
@@ -1588,7 +1884,9 @@ async def _persist_qa_artifacts(payload: dict, scores: dict, findings: list, nam
     project_id = payload.get("project_id")
     chn = payload.get("chapter_number")
     settings = get_settings()
-    if not (project_id and chn not in (None, "") and settings.supabase_url and settings.supabase_service_role_key):
+    if not (
+        project_id and chn not in (None, "") and settings.supabase_url and settings.supabase_service_role_key
+    ):
         return None
     try:
         cnum = _coerce_chapter_number(chn, 0)
@@ -1597,22 +1895,33 @@ async def _persist_qa_artifacts(payload: dict, scores: dict, findings: list, nam
         client = await get_supabase_admin()
         qa_report = _build_qa_report(scores or {}, findings or [], name_check)
         # merge qa_report into the chapter row's metadata (keyed on project+chapter)
-        cur = await (client.table("published_content_v2").select("id,metadata")
-                     .eq("project_id", str(project_id)).eq("content_type", "chapter")
-                     .eq("chapter_number", cnum).limit(1).execute())
+        cur = await (
+            client.table("published_content_v2")
+            .select("id,metadata")
+            .eq("project_id", str(project_id))
+            .eq("content_type", "chapter")
+            .eq("chapter_number", cnum)
+            .limit(1)
+            .execute()
+        )
         rows = getattr(cur, "data", None) or []
         if rows:
             meta = dict(rows[0].get("metadata") or {})
             meta["qa_report"] = qa_report
             from datetime import UTC, datetime
-            await (client.table("published_content_v2")
-                   .update({"metadata": meta, "updated_at": datetime.now(UTC).isoformat()})
-                   .eq("id", rows[0]["id"]).execute())
+
+            await (
+                client.table("published_content_v2")
+                .update({"metadata": meta, "updated_at": datetime.now(UTC).isoformat()})
+                .eq("id", rows[0]["id"])
+                .execute()
+            )
         # merge character drift into the project outline: keep OTHER chapters' flags, refresh THIS
         # chapter's (so re-running QA after a fix clears the stale flag, and other chapters aren't lost).
         new_chars = (_drift_scan_from_namecheck(name_check, chapter_text, cnum) or {}).get("characters") or []
-        po = await (client.table("writing_projects_v2").select("outline")
-                    .eq("id", str(project_id)).limit(1).execute())
+        po = await (
+            client.table("writing_projects_v2").select("outline").eq("id", str(project_id)).limit(1).execute()
+        )
         prows = getattr(po, "data", None) or []
         if prows:
             outline = dict(prows[0].get("outline") or {})
@@ -1625,11 +1934,17 @@ async def _persist_qa_artifacts(payload: dict, scores: dict, findings: list, nam
                     merged[nm] = {"name": nm, "name_format": c.get("name_format", nm), "drift_flags": flags}
             for c in new_chars:
                 nm = c["name"]
-                merged.setdefault(nm, {"name": nm, "name_format": c.get("name_format", nm), "drift_flags": []})
+                merged.setdefault(
+                    nm, {"name": nm, "name_format": c.get("name_format", nm), "drift_flags": []}
+                )
                 merged[nm]["drift_flags"].extend(c["drift_flags"])
             outline["_character_drift_scan"] = {"characters": list(merged.values())}
-            await (client.table("writing_projects_v2").update({"outline": outline})
-                   .eq("id", str(project_id)).execute())
+            await (
+                client.table("writing_projects_v2")
+                .update({"outline": outline})
+                .eq("id", str(project_id))
+                .execute()
+            )
         return {"qa_report_checks": len(qa_report["checks"]), "drift_characters": len(new_chars)}
     except Exception as exc:
         logger.warning("qa.persist_failed", error=str(exc)[:200])
@@ -1660,16 +1975,25 @@ async def _op_qa(payload: dict) -> dict:
     name_check = _character_name_consistency(chapter_text, roster) if roster else None
     qa = await _score_chapter(chapter_text, period, roster_text)
     if qa is None:
-        return {"chapter_id": payload.get("chapter_id"), "scores": None, "findings": [],
-                "character_consistency": name_check,
-                "note": "craft-QA JSON could not be parsed"}
+        return {
+            "chapter_id": payload.get("chapter_id"),
+            "scores": None,
+            "findings": [],
+            "character_consistency": name_check,
+            "note": "craft-QA JSON could not be parsed",
+        }
     scores = qa.model_dump(mode="json")
     findings = scores.pop("findings", [])
     # Persist qa_report (→ QAReportPanel) + character drift (→ AnnotationsPanel) so the UI shows results.
     persisted = await _persist_qa_artifacts(payload, scores, findings, name_check, chapter_text)
-    return {"chapter_id": payload.get("chapter_id"), "scores": scores, "findings": findings,
-            "character_consistency": name_check, "qa_report": _build_qa_report(scores, findings, name_check),
-            "persist": persisted}
+    return {
+        "chapter_id": payload.get("chapter_id"),
+        "scores": scores,
+        "findings": findings,
+        "character_consistency": name_check,
+        "qa_report": _build_qa_report(scores, findings, name_check),
+        "persist": persisted,
+    }
 
 
 async def _op_scan_drift(payload: dict) -> dict:
@@ -1682,8 +2006,12 @@ async def _op_scan_drift(payload: dict) -> dict:
     roster_text = _roster_text(payload.get("roster") or []) if payload.get("roster") else "(none)"
     period = str(payload.get("period") or "contemporary")
     drift = await _detect_drift(
-        text, outline=outline, chapter_number=chapter_number,
-        roster_text=roster_text, period=period, model=get_settings().model_default,
+        text,
+        outline=outline,
+        chapter_number=chapter_number,
+        roster_text=roster_text,
+        period=period,
+        model=get_settings().model_default,
     )
     if drift is None:
         return DriftScanResult(
@@ -1695,9 +2023,9 @@ async def _op_scan_drift(payload: dict) -> dict:
         + [DriftFinding(kind="character_drift", detail=d) for d in drift.character_drift]
         + [DriftFinding(kind="research_gap", detail=d) for d in drift.research_gaps]
     ) or [DriftFinding(kind="aligned", detail="no drift detected")]
-    return DriftScanResult(
-        chapter_id=payload.get("chapter_id") or uuid4(), findings=findings
-    ).model_dump(mode="json")
+    return DriftScanResult(chapter_id=payload.get("chapter_id") or uuid4(), findings=findings).model_dump(
+        mode="json"
+    )
 
 
 def _build_rewrite_system(genre_slug: str) -> str:
@@ -1735,11 +2063,16 @@ async def _op_rewrite(payload: dict) -> dict:
         payload.get("feedback") or payload.get("directive") or payload.get("instructions") or ""
     ).strip()
     if not text or not feedback:
-        return {"content_text": text, "word_count": len(text.split()), "rewritten": False,
-                "note": "rewrite needs both chapter_text and feedback"}
+        return {
+            "content_text": text,
+            "word_count": len(text.split()),
+            "rewritten": False,
+            "note": "rewrite needs both chapter_text and feedback",
+        }
     project_id = payload.get("project_id")
     ctx = (
-        await _load_context(str(project_id), payload) if project_id
+        await _load_context(str(project_id), payload)
+        if project_id
         else _apply_ctx_overrides({"genre_slug": "", "title": "", "outline": {}, "roster": []}, payload)
     )
     roster_text = _roster_text(ctx.get("roster") or [])
@@ -1751,23 +2084,34 @@ async def _op_rewrite(payload: dict) -> dict:
     router = get_router(service=STEP_NAME)
     try:
         resp = await router.complete(
-            provider="anthropic", model=model, system=_build_rewrite_system(ctx.get("genre_slug", "")),
+            provider="anthropic",
+            model=model,
+            system=_build_rewrite_system(ctx.get("genre_slug", "")),
             prompt=(
                 f"CHARACTER ROSTER (consistency reference):\n{roster_text}\n\n"
                 f"AUTHOR FEEDBACK (apply all of it):\n{feedback}\n\n"
                 f"CHAPTER TO REWRITE:\n{text}"
             ),
-            max_tokens=32768, stream=True,
+            max_tokens=32768,
+            stream=True,
         )
     except ProviderNotRegistered:
-        return {"content_text": text, "word_count": len(text.split()), "rewritten": False,
-                "note": "no LLM provider"}
+        return {
+            "content_text": text,
+            "word_count": len(text.split()),
+            "rewritten": False,
+            "note": "no LLM provider",
+        }
     rewritten = _strip_scaffolding(resp.text.strip())
     # Guard: a rewrite that collapsed the chapter (when the feedback did not ask to shorten) keeps the
     # original rather than shipping a truncated/condensed chapter.
     if not allow_shorten and len(rewritten.split()) < 0.9 * len(text.split()):
-        return {"content_text": text, "word_count": len(text.split()), "rewritten": False,
-                "note": "rewrite came back too short; kept the original"}
+        return {
+            "content_text": text,
+            "word_count": len(text.split()),
+            "rewritten": False,
+            "note": "rewrite came back too short; kept the original",
+        }
     return {"content_text": rewritten, "word_count": len(rewritten.split()), "rewritten": True}
 
 
@@ -1782,9 +2126,13 @@ async def _load_persisted_chapter(project_id: str, chapter_number: int) -> str:
 
     client = await get_supabase_admin()
     resp = await (
-        client.table("published_content_v2").select("content_text")
-        .eq("project_id", project_id).eq("content_type", "chapter").eq("chapter_number", chapter_number)
-        .limit(1).execute()
+        client.table("published_content_v2")
+        .select("content_text")
+        .eq("project_id", project_id)
+        .eq("content_type", "chapter")
+        .eq("chapter_number", chapter_number)
+        .limit(1)
+        .execute()
     )
     rows = getattr(resp, "data", None) or []
     return str(rows[0].get("content_text") or "") if rows else ""
@@ -1803,21 +2151,32 @@ async def _op_repair(payload: dict) -> dict:
     if not text and project_id:
         text = await _load_persisted_chapter(str(project_id), chapter_number)
     if not text:
-        return {"repaired": False, "reason": "no chapter text (give content_text or project_id+chapter_number)"}
+        return {
+            "repaired": False,
+            "reason": "no chapter text (give content_text or project_id+chapter_number)",
+        }
     ctx = (
-        await _load_context(str(project_id), payload) if project_id
+        await _load_context(str(project_id), payload)
+        if project_id
         else _apply_ctx_overrides({"genre_slug": "", "title": "", "outline": {}, "roster": []}, payload)
     )
     roster_text = _roster_text(ctx.get("roster") or [])
-    period = str(payload.get("period") or _outline_chapter_act(ctx.get("outline") or {}, chapter_number) or "contemporary")
+    period = str(
+        payload.get("period")
+        or _outline_chapter_act(ctx.get("outline") or {}, chapter_number)
+        or "contemporary"
+    )
     settings = get_settings()
     model = {"haiku": settings.model_cheap, "sonnet": settings.model_default}.get(
         str(payload.get("llm_strategy") or ""), settings.model_default
     )
-    req = WriteChapterRequest.model_validate({
-        "project_id": project_id or "00000000-0000-0000-0000-000000000000",
-        "chapter_number": chapter_number, "chapter_run_id": payload.get("chapter_run_id") or str(uuid4()),
-    })
+    req = WriteChapterRequest.model_validate(
+        {
+            "project_id": project_id or "00000000-0000-0000-0000-000000000000",
+            "chapter_number": chapter_number,
+            "chapter_run_id": payload.get("chapter_run_id") or str(uuid4()),
+        }
+    )
     # Repair accepts a shorter result while fixing drift, but not a gutted one. Floor raised 0.6 -> 0.8
     # after the stress test: with the polluted roster, repairs over-cut (ch30 fell 7k -> 2.8k words to
     # "align" against a self-contradictory cast). Now the roster is the clean outline cast, so there is
@@ -1830,9 +2189,18 @@ async def _op_repair(payload: dict) -> dict:
     style_directives = str(payload.get("style_directives") or "")
     citation_mode = str(payload.get("citation_mode") or "")
     new_text, drift, passes = await _drift_correct_pass(
-        text, ctx=ctx, req=req, roster_text=roster_text, period=period, model=model,
-        min_length_ratio=min_ratio, weave_research=True, line_edit=True,
-        research_focus=research_focus, style_directives=style_directives, citation_mode=citation_mode,
+        text,
+        ctx=ctx,
+        req=req,
+        roster_text=roster_text,
+        period=period,
+        model=model,
+        min_length_ratio=min_ratio,
+        weave_research=True,
+        line_edit=True,
+        research_focus=research_focus,
+        style_directives=style_directives,
+        citation_mode=citation_mode,
     )
     persist_result = None
     # Persist whenever persist is requested — NOT only when a correction happened. A repair that
@@ -1842,15 +2210,22 @@ async def _op_repair(payload: dict) -> dict:
     # _drift_correct_pass), so the stored aligned reflects the true final state either way.
     if payload.get("persist"):
         out = WriteChapterResponse(
-            chapter_id=uuid4(), chapter_run_id=req.chapter_run_id, content_text=new_text,
-            word_count=len(new_text.split()), sub_chapter_count=0, craft_passes=passes,
+            chapter_id=uuid4(),
+            chapter_run_id=req.chapter_run_id,
+            content_text=new_text,
+            word_count=len(new_text.split()),
+            sub_chapter_count=0,
+            craft_passes=passes,
             drift_report=drift.model_dump(mode="json") if drift else None,
         )
         persist_result = await _persist_chapter_if_requested(payload, ctx, out, model=model)
     d = drift.model_dump(mode="json") if drift else None
     return {
-        "repaired": bool(passes), "content_text": new_text, "word_count": len(new_text.split()),
-        "craft_passes": passes, "drift_report": d,
+        "repaired": bool(passes),
+        "content_text": new_text,
+        "word_count": len(new_text.split()),
+        "craft_passes": passes,
+        "drift_report": d,
         "drift_detected": (d is not None and not d.get("aligned", True)) if d else None,
         "persist": persist_result,
     }
@@ -1882,9 +2257,13 @@ async def _op_evaluate_genre(payload: dict) -> dict:
     router = get_router(service=STEP_NAME)
     try:
         ev, _resp = await complete_structured(
-            router, provider="anthropic", model=get_settings().model_default,
-            system=_build_genre_eval_system(genre), prompt=f"GENRE: {genre}\n\nCHAPTER:\n{text}",
-            schema=GenreEval, max_tokens=1024,
+            router,
+            provider="anthropic",
+            model=get_settings().model_default,
+            system=_build_genre_eval_system(genre),
+            prompt=f"GENRE: {genre}\n\nCHAPTER:\n{text}",
+            schema=GenreEval,
+            max_tokens=1024,
         )
         return ev.model_dump(mode="json")
     except ProviderNotRegistered:
@@ -1914,15 +2293,23 @@ async def _op_extract_bible(payload: dict) -> dict:
     router = get_router(service=STEP_NAME)
     try:
         extract, _resp = await complete_structured(
-            router, provider="anthropic", model=get_settings().model_default,
-            system=_build_extract_bible_system(), prompt=f"CHAPTER:\n{text}",
-            schema=BibleExtract, max_tokens=4096,
+            router,
+            provider="anthropic",
+            model=get_settings().model_default,
+            system=_build_extract_bible_system(),
+            prompt=f"CHAPTER:\n{text}",
+            schema=BibleExtract,
+            max_tokens=4096,
         )
         entries = [e.model_dump(mode="json") for e in extract.entries]
         persisted = await _persist_bible_if_requested(payload, entries)
         return {"entries": entries, "added": len(entries), "persist": persisted}
     except ProviderNotRegistered:
-        entries = [BibleEntry(entry_type="character", name="(fixture)", description="no LLM provider").model_dump(mode="json")]
+        entries = [
+            BibleEntry(entry_type="character", name="(fixture)", description="no LLM provider").model_dump(
+                mode="json"
+            )
+        ]
         return {"entries": entries, "added": len(entries)}
     except ValueError:
         return {"entries": [], "added": 0, "note": "extract-bible JSON could not be parsed"}
@@ -1947,7 +2334,10 @@ async def _persist_bible_if_requested(payload: dict, entries: list[dict]) -> dic
 
         client = await get_supabase_admin()
         added = await persist_bible(
-            client, project_id=str(project_id), user_id=str(user_id), entries=entries,
+            client,
+            project_id=str(project_id),
+            user_id=str(user_id),
+            entries=entries,
             chapter_number=payload.get("chapter_number"),
         )
         return {"persisted": True, "bible_entries": added}
@@ -1979,8 +2369,11 @@ async def _load_genre_guidelines(genre_slug: str) -> tuple[str, str]:
 
         client = await get_supabase_admin()
         r = await (
-            client.table("genre_config_v2").select("genre_name,writing_guidelines")
-            .eq("genre_slug", genre_slug).limit(1).execute()
+            client.table("genre_config_v2")
+            .select("genre_name,writing_guidelines")
+            .eq("genre_slug", genre_slug)
+            .limit(1)
+            .execute()
         )
         row = (getattr(r, "data", None) or [{}])[0]
         return (row.get("genre_name") or genre_slug, row.get("writing_guidelines") or "")
@@ -1988,8 +2381,15 @@ async def _load_genre_guidelines(genre_slug: str) -> tuple[str, str]:
         return (genre_slug, "")
 
 
-async def _persist_simple(payload: dict, *, title: str, content_type: str, content_text: str,
-                          genre_slug: str, metadata: dict | None = None) -> dict | None:
+async def _persist_simple(
+    payload: dict,
+    *,
+    title: str,
+    content_type: str,
+    content_text: str,
+    genre_slug: str,
+    metadata: dict | None = None,
+) -> dict | None:
     """Persist a standalone piece (blog/short story) to published_content_v2 when persist is requested."""
     from writer_engine.config import get_settings
 
@@ -2006,11 +2406,18 @@ async def _persist_simple(payload: dict, *, title: str, content_type: str, conte
 
         client = await get_supabase_admin()
         cid = await persist_content(
-            client, user_id=str(user_id), title=title, content_type=content_type,
-            content_text=_strip_em_dashes(content_text), genre_slug=genre_slug,
-            project_id=payload.get("project_id"), metadata=metadata or {},
+            client,
+            user_id=str(user_id),
+            title=title,
+            content_type=content_type,
+            content_text=_strip_em_dashes(content_text),
+            genre_slug=genre_slug,
+            project_id=payload.get("project_id"),
+            metadata=metadata or {},
         )
-        logger.info("compose.persisted", content_type=content_type, content_id=cid, words=len(content_text.split()))
+        logger.info(
+            "compose.persisted", content_type=content_type, content_id=cid, words=len(content_text.split())
+        )
         return {"persisted": True, "content_id": cid}
     except Exception as exc:
         logger.warning("compose.persist.failed", content_type=content_type, error=str(exc)[:200])
@@ -2027,11 +2434,16 @@ async def _op_blog(payload: dict) -> dict:
     keywords = payload.get("keywords") or ""
     target = _coerce_int(payload.get("target_length"), 1500)  # G6: router may pass "1500 words"
     genre_name, guidelines = await _load_genre_guidelines(genre_slug)
-    research, _ = await _chapter_research(
-        topic, period="contemporary", title=topic, focus=f"Genre: {genre_slug}. Blog topic: {topic}"
-    ) if topic else ("", [])
+    research, _ = (
+        await _chapter_research(
+            topic, period="contemporary", title=topic, focus=f"Genre: {genre_slug}. Blog topic: {topic}"
+        )
+        if topic
+        else ("", [])
+    )
     model = {"haiku": settings.model_cheap, "sonnet": settings.model_default}.get(
-        str(payload.get("llm_strategy") or ""), settings.model_default)
+        str(payload.get("llm_strategy") or ""), settings.model_default
+    )
     system = (
         f"You are a world-class blogger specializing in {genre_name}.\n\n## Genre Guidelines\n{guidelines}\n\n"
         f"## Writing Prime Directive\n{_PRIME_DIRECTIVE}\n\n## Requirements\n- Attention-grabbing headline\n"
@@ -2039,14 +2451,18 @@ async def _op_blog(payload: dict) -> dict:
         "- End with a discussion prompt\n- SEO-optimized without keyword stuffing\n\n"
         "Return strict JSON: {title, meta_description, body_markdown, tags}."
     )
-    prompt = (f"Write a blog post about: {topic}\nTarget length: {target} words\nSEO keywords: {keywords}\n\n"
-              f"## Research Context\n{research}")
+    prompt = (
+        f"Write a blog post about: {topic}\nTarget length: {target} words\nSEO keywords: {keywords}\n\n"
+        f"## Research Context\n{research}"
+    )
     try:
         resp = await get_router(service=STEP_NAME).complete(
-            provider="anthropic", model=model, system=system, prompt=prompt, max_tokens=8192)
+            provider="anthropic", model=model, system=system, prompt=prompt, max_tokens=8192
+        )
     except ProviderNotRegistered:
         return {"written": False, "reason": "no provider"}
     import json as _json
+
     title, body, meta = (topic[:80] or "Untitled Blog Post"), resp.text.strip(), {}
     try:
         m = re.search(r"\{.*\}", resp.text, re.S)
@@ -2057,10 +2473,21 @@ async def _op_blog(payload: dict) -> dict:
     except Exception:
         pass
     body = _strip_em_dashes(body)
-    persist = await _persist_simple(payload, title=title, content_type="blog_post",
-                                    content_text=body, genre_slug=genre_slug, metadata=meta)
-    return {"written": True, "title": title, "content_text": body, "word_count": len(body.split()),
-            "persist": persist}
+    persist = await _persist_simple(
+        payload,
+        title=title,
+        content_type="blog_post",
+        content_text=body,
+        genre_slug=genre_slug,
+        metadata=meta,
+    )
+    return {
+        "written": True,
+        "title": title,
+        "content_text": body,
+        "word_count": len(body.split()),
+        "persist": persist,
+    }
 
 
 async def _op_newsletter(payload: dict) -> dict:
@@ -2077,12 +2504,19 @@ async def _op_newsletter(payload: dict) -> dict:
     genre_slug = str(payload.get("genre_slug") or payload.get("genre") or "")
     send_date = str(payload.get("date") or payload.get("send_date") or "")
     genre_name, guidelines = await _load_genre_guidelines(genre_slug)
-    research, _ = await _chapter_research(
-        topic, period="contemporary", title=topic,
-        focus=f"Genre: {genre_slug}. Newsletter topic: {topic}",
-    ) if topic else ("", [])
+    research, _ = (
+        await _chapter_research(
+            topic,
+            period="contemporary",
+            title=topic,
+            focus=f"Genre: {genre_slug}. Newsletter topic: {topic}",
+        )
+        if topic
+        else ("", [])
+    )
     model = {"haiku": settings.model_cheap, "sonnet": settings.model_default}.get(
-        str(payload.get("llm_strategy") or ""), settings.model_default)
+        str(payload.get("llm_strategy") or ""), settings.model_default
+    )
     system = (
         f"You are an expert newsletter writer specializing in {genre_name}.\n\n## Genre Guidelines\n"
         f"{guidelines}\n\n## Writing Prime Directive\n{_PRIME_DIRECTIVE}\n\n## Requirements\n"
@@ -2099,7 +2533,8 @@ async def _op_newsletter(payload: dict) -> dict:
     )
     try:
         resp = await get_router(service=STEP_NAME).complete(
-            provider="anthropic", model=model, system=system, prompt=prompt, max_tokens=8192)
+            provider="anthropic", model=model, system=system, prompt=prompt, max_tokens=8192
+        )
     except ProviderNotRegistered:
         return {"written": False, "reason": "no provider"}
     data: dict = {}
@@ -2122,13 +2557,28 @@ async def _op_newsletter(payload: dict) -> dict:
         parts.append(str(data["outro"]))
     body = _strip_em_dashes("\n\n".join(p for p in parts if p).strip() or resp.text.strip())
     meta = {
-        "subject_line": subject_line, "pre_header": data.get("pre_header"),
-        "send_date": send_date, "section_count": len(sections),
+        "subject_line": subject_line,
+        "pre_header": data.get("pre_header"),
+        "send_date": send_date,
+        "section_count": len(sections),
     }
-    persist = await _persist_simple(payload, title=title, content_type="newsletter",
-                                    content_text=body, genre_slug=genre_slug, metadata=meta)
-    return {"written": True, "title": title, "subject_line": subject_line, "content_text": body,
-            "word_count": len(body.split()), "section_count": len(sections), "persist": persist}
+    persist = await _persist_simple(
+        payload,
+        title=title,
+        content_type="newsletter",
+        content_text=body,
+        genre_slug=genre_slug,
+        metadata=meta,
+    )
+    return {
+        "written": True,
+        "title": title,
+        "subject_line": subject_line,
+        "content_text": body,
+        "word_count": len(body.split()),
+        "section_count": len(sections),
+        "persist": persist,
+    }
 
 
 async def _op_short_story(payload: dict) -> dict:
@@ -2138,27 +2588,44 @@ async def _op_short_story(payload: dict) -> dict:
 
     settings = get_settings()
     # Prefer a stored/brainstormed outline (premise + 3-beat structure); fall back to a raw premise.
-    ctx = await _load_context(str(payload.get("project_id") or "00000000-0000-0000-0000-000000000000"), payload) \
-        if payload.get("project_id") else _apply_ctx_overrides(
-            {"genre_slug": payload.get("genre_slug") or "", "title": "", "outline": {}, "roster": []}, payload)
+    ctx = (
+        await _load_context(str(payload.get("project_id") or "00000000-0000-0000-0000-000000000000"), payload)
+        if payload.get("project_id")
+        else _apply_ctx_overrides(
+            {"genre_slug": payload.get("genre_slug") or "", "title": "", "outline": {}, "roster": []}, payload
+        )
+    )
     outline = ctx.get("outline") or {}
     premise = str(payload.get("premise") or outline.get("premise") or payload.get("message") or "").strip()
     genre_slug = str(ctx.get("genre_slug") or payload.get("genre_slug") or "")
     genre_name, guidelines = await _load_genre_guidelines(genre_slug)
-    title = str(outline.get("title") or payload.get("title") or (premise.split(".")[0][:60] if premise else "Untitled"))
+    title = str(
+        outline.get("title")
+        or payload.get("title")
+        or (premise.split(".")[0][:60] if premise else "Untitled")
+    )
     length = _coerce_int(payload.get("length"), 3000)  # G6: router may pass "2500 words"
     arc = _arc_summary(outline) if outline.get("chapters") or outline.get("story_arc_name") else ""
-    research, _ = await _chapter_research(
-        premise, period=str(payload.get("period") or "contemporary"), title=title,
-        focus=_research_focus(ctx) or f"Genre: {genre_slug}. Premise: {premise}",
-    ) if premise else ("", [])
+    research, _ = (
+        await _chapter_research(
+            premise,
+            period=str(payload.get("period") or "contemporary"),
+            title=title,
+            focus=_research_focus(ctx) or f"Genre: {genre_slug}. Premise: {premise}",
+        )
+        if premise
+        else ("", [])
+    )
     structure = ""
     if outline.get("chapters"):
         structure = "## Story Outline (follow exactly)\n" + "\n".join(
-            f"Beat {c.get('chapter_number') or c.get('number') or i}: {c.get('title','')} — "
-            f"{c.get('beat') or c.get('brief','')}" for i, c in enumerate(outline["chapters"], 1))
+            f"Beat {c.get('chapter_number') or c.get('number') or i}: {c.get('title', '')} — "
+            f"{c.get('beat') or c.get('brief', '')}"
+            for i, c in enumerate(outline["chapters"], 1)
+        )
     model = {"haiku": settings.model_cheap, "sonnet": settings.model_default}.get(
-        str(payload.get("llm_strategy") or ""), settings.model_default)
+        str(payload.get("llm_strategy") or ""), settings.model_default
+    )
     system = (
         f"You are a world-class {genre_name} author.\n\n## Genre Guidelines\n{guidelines}\n\n"
         f"## Writing Prime Directive\n{_PRIME_DIRECTIVE}\n\n"
@@ -2168,20 +2635,33 @@ async def _op_short_story(payload: dict) -> dict:
         "character; (3) Climax and resolution. Write the story text directly: no JSON, no metadata, "
         "no scene labels."
     )
-    prompt = (f"Write a complete short story titled \"{title}\" of approximately {length} words.\n\n"
-              f"Premise: {premise}\nTone: {payload.get('tone') or 'fitting the genre'}\n"
-              f"{structure}\n\n## Research\n{research}")
+    prompt = (
+        f'Write a complete short story titled "{title}" of approximately {length} words.\n\n'
+        f"Premise: {premise}\nTone: {payload.get('tone') or 'fitting the genre'}\n"
+        f"{structure}\n\n## Research\n{research}"
+    )
     try:
         resp = await get_router(service=STEP_NAME).complete(
-            provider="anthropic", model=model, system=system, prompt=prompt, max_tokens=16384, stream=True)
+            provider="anthropic", model=model, system=system, prompt=prompt, max_tokens=16384, stream=True
+        )
     except ProviderNotRegistered:
         return {"written": False, "reason": "no provider"}
     body = _strip_em_dashes(_strip_scaffolding(resp.text.strip()))
-    persist = await _persist_simple(payload, title=title, content_type="short_story",
-                                    content_text=body, genre_slug=genre_slug,
-                                    metadata={"premise": premise})
-    return {"written": True, "title": title, "content_text": body, "word_count": len(body.split()),
-            "persist": persist}
+    persist = await _persist_simple(
+        payload,
+        title=title,
+        content_type="short_story",
+        content_text=body,
+        genre_slug=genre_slug,
+        metadata={"premise": premise},
+    )
+    return {
+        "written": True,
+        "title": title,
+        "content_text": body,
+        "word_count": len(body.split()),
+        "persist": persist,
+    }
 
 
 OPS = {

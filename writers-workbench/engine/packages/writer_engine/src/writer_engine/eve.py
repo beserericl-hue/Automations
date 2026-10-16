@@ -71,25 +71,35 @@ class EveClient:
 
     async def upload_kb_doc(self, name: str, text: str) -> str:
         data = await self._request(
-            "POST", "/v1/convai/knowledge-base/text", json={"name": name, "text": text})
+            "POST", "/v1/convai/knowledge-base/text", json={"name": name, "text": text}
+        )
         return str(data.get("id") or "")
 
     async def attach_kb_doc(self, doc_id: str) -> None:
         await self._request(
-            "PATCH", f"/v1/convai/agents/{self.cfg['agent_id']}",
-            json={"conversation_config": {"agent": {"prompt": {"knowledge_base": [{"id": doc_id}]}}}})
+            "PATCH",
+            f"/v1/convai/agents/{self.cfg['agent_id']}",
+            json={"conversation_config": {"agent": {"prompt": {"knowledge_base": [{"id": doc_id}]}}}},
+        )
 
     async def set_first_message(self, callback_mode: str, title: str) -> None:
         msg = _FIRST_MESSAGE.get(callback_mode, _FIRST_MESSAGE["review"]).format(title=title or "content")
         await self._request(
-            "PATCH", f"/v1/convai/agents/{self.cfg['agent_id']}",
-            json={"conversation_config": {"agent": {"first_message": msg}}})
+            "PATCH",
+            f"/v1/convai/agents/{self.cfg['agent_id']}",
+            json={"conversation_config": {"agent": {"first_message": msg}}},
+        )
 
     async def outbound_call(self, phone: str) -> str:
         data = await self._request(
-            "POST", "/v1/convai/twilio/outbound-call",
-            json={"agent_id": self.cfg["agent_id"], "agent_phone_number_id": self.cfg["phone_number_id"],
-                  "to_number": phone})
+            "POST",
+            "/v1/convai/twilio/outbound-call",
+            json={
+                "agent_id": self.cfg["agent_id"],
+                "agent_phone_number_id": self.cfg["phone_number_id"],
+                "to_number": phone,
+            },
+        )
         return str(data.get("call_sid") or data.get("conversation_id") or "")
 
 
@@ -100,23 +110,37 @@ def _suppress():
 
 
 async def run_eve_callback(
-    *, content_type: str, content_title: str, content_text: str, callback_mode: str, phone: str,
+    *,
+    content_type: str,
+    content_title: str,
+    content_text: str,
+    callback_mode: str,
+    phone: str,
     client: EveClient | None = None,
 ) -> dict[str, Any]:
     """Run the WF-16 callback flow. GATED: real calls only when an agent is configured; otherwise a
     dry run that returns the planned payload and touches nothing (protects the PROD Eve agent)."""
     plan = {
-        "content_type": content_type, "content_title": content_title,
-        "content_text": content_text, "callback_mode": callback_mode, "phone": phone,
+        "content_type": content_type,
+        "content_title": content_title,
+        "content_text": content_text,
+        "callback_mode": callback_mode,
+        "phone": phone,
     }
     if client is None and not is_configured():
         logger.info("eve.callback.dry_run", callback_mode=callback_mode, content_type=content_type)
         return {"dry_run": True, "reason": "ELEVENLABS_API_KEY/AGENT_ID not configured", "planned": plan}
     c = client or EveClient(eve_config())
-    removed = await c.remove_session_docs()                       # 1. clean stale session docs FIRST
+    removed = await c.remove_session_docs()  # 1. clean stale session docs FIRST
     doc_id = await c.upload_kb_doc(f"{KB_DOC_PREFIX} {content_title}", content_text)  # 2. upload new
-    await c.attach_kb_doc(doc_id)                                 # 3. attach to agent
-    await c.set_first_message(callback_mode, content_title)       # 4. review/brainstorm greeting
-    call_id = await c.outbound_call(phone)                        # 5. outbound call to the caller
+    await c.attach_kb_doc(doc_id)  # 3. attach to agent
+    await c.set_first_message(callback_mode, content_title)  # 4. review/brainstorm greeting
+    call_id = await c.outbound_call(phone)  # 5. outbound call to the caller
     logger.info("eve.callback.placed", removed_docs=removed, kb_doc_id=doc_id, call_id=call_id)
-    return {"dry_run": False, "removed_docs": removed, "kb_doc_id": doc_id, "call_id": call_id, "planned": plan}
+    return {
+        "dry_run": False,
+        "removed_docs": removed,
+        "kb_doc_id": doc_id,
+        "call_id": call_id,
+        "planned": plan,
+    }

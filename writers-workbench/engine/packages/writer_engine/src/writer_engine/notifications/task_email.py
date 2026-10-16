@@ -36,9 +36,13 @@ async def _load_recipients(client: Any, user_id: str | None):
     # app_config_v2.recipient_email (what the user configured) wins; users_v2.email is the fallback.
     if not cfg.get("recipient_email") and user_id:
         with contextlib.suppress(Exception):
-            ur = await client.table("users_v2").select("email,bcc_email").eq(
-                "user_id", user_id
-            ).limit(1).execute()
+            ur = (
+                await client.table("users_v2")
+                .select("email,bcc_email")
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
             row = (getattr(ur, "data", None) or [{}])[0]
             if row.get("email"):
                 cfg["recipient_email"] = row["email"]
@@ -87,8 +91,11 @@ def _deliverable_html(tool: str, op: str, result: dict) -> str:
                     f"<p style='font-size:12px;color:#888'>{escape(url)}</p>"
                 )
         # social-posts: result is a {platform: post} mapping
-        posts = {k: v for k, v in result.items()
-                 if isinstance(v, str) and k not in {"note", "provider", "prompt", "error"}}
+        posts = {
+            k: v
+            for k, v in result.items()
+            if isinstance(v, str) and k not in {"note", "provider", "prompt", "error"}
+        }
         if posts:
             blocks = "".join(
                 f"<h3 style='font-family:system-ui,sans-serif;margin:12px 0 4px'>{escape(k.title())}</h3>"
@@ -102,7 +109,8 @@ def _deliverable_html(tool: str, op: str, result: dict) -> str:
     if prose:
         snippet = str(prose)[:_BODY_SNIPPET_CHARS] + (
             "\n\n… (truncated; open in the Workbench for the full text)"
-            if len(str(prose)) > _BODY_SNIPPET_CHARS else ""
+            if len(str(prose)) > _BODY_SNIPPET_CHARS
+            else ""
         )
         return (
             "<hr><div style='font-family:Georgia,serif;font-size:15px;line-height:1.6;"
@@ -121,7 +129,13 @@ def build_task_email(tool: str, body: dict, result: dict) -> tuple[str, str]:
         or (result.get("outline") or {}).get("title")
         or result.get("title")
     )
-    project = body.get("title") or body.get("project_title") or result_title or body.get("project_id") or "your project"
+    project = (
+        body.get("title")
+        or body.get("project_title")
+        or result_title
+        or body.get("project_id")
+        or "your project"
+    )
     label = _LABELS.get(tool, tool.title())
     what = f"{label} {chapter}".strip() if chapter is not None else label
     subject = f"[Writer's Workbench] {what} — {project} is ready"
@@ -142,13 +156,17 @@ def build_task_email(tool: str, body: dict, result: dict) -> tuple[str, str]:
         ("Aligned to outline", drift.get("aligned")) if drift else None,
         ("Craft QA", qa_avg) if qa_avg is not None else None,
         ("Research used", ", ".join(map(str, research_used))) if research_used else None,
-        ("Tokens", f"{tok.get('total_tokens'):,} (${tok.get('cost_usd')})") if tok.get("total_tokens") else None,
+        ("Tokens", f"{tok.get('total_tokens'):,} (${tok.get('cost_usd')})")
+        if tok.get("total_tokens")
+        else None,
         ("Your request", command) if command else None,
     ]
     rows_html = "".join(
         f"<tr><td style='padding:2px 12px 2px 0;color:#666'>{escape(str(k))}</td>"
         f"<td style='padding:2px 0'>{escape(str(v))}</td></tr>"
-        for item in meta if item for k, v in [item]
+        for item in meta
+        if item
+        for k, v in [item]
     )
     html = (
         f"<h2 style='font-family:system-ui,sans-serif'>{escape(what)} is ready</h2>"
@@ -161,8 +179,12 @@ def build_task_email(tool: str, body: dict, result: dict) -> tuple[str, str]:
 # Map a lifecycle ACTION (not status) to the past-tense verb used in the email. Actions that don't
 # notify (plain back-to-draft, unschedule) are absent → no email, matching n8n.
 _LIFECYCLE_VERB = {
-    "approve": "approved", "publish": "published", "reject": "rejected", "schedule": "scheduled",
-    "delete": "deleted", "undelete": "restored to drafts",
+    "approve": "approved",
+    "publish": "published",
+    "reject": "rejected",
+    "schedule": "scheduled",
+    "delete": "deleted",
+    "undelete": "restored to drafts",
 }
 
 
@@ -187,17 +209,21 @@ async def send_lifecycle_email(
         sched = ""
         if new_status == "scheduled" and isinstance(when, dict) and when.get("schedule_date"):
             sched = f" for {escape(str(when['schedule_date']))}"
-        subject = f"[Writer's Workbench] \"{content.get('title') or 'Untitled'}\" {verb}"
+        subject = f'[Writer\'s Workbench] "{content.get("title") or "Untitled"}" {verb}'
         html = (
             f"<p>Your {ctype} <strong>{title}</strong> has been <strong>{verb}</strong>{sched}.</p>"
             f"<p>Status: {escape(new_status)}</p>"
         )
         res = await send_email(
-            to=[rec.to], from_addr=settings.newsletter_from_address, subject=subject, html=html,
+            to=[rec.to],
+            from_addr=settings.newsletter_from_address,
+            subject=subject,
+            html=html,
             bcc=[rec.bcc] if rec.bcc else None,
         )
-        logger.info("lifecycle_email.sent", to=rec.to, status=new_status,
-                    message_id=getattr(res, "message_id", None))
+        logger.info(
+            "lifecycle_email.sent", to=rec.to, status=new_status, message_id=getattr(res, "message_id", None)
+        )
         return True
     except Exception as exc:  # never let a mail failure touch the DB write
         logger.warning("lifecycle_email.failed", status=new_status, error=str(exc)[:200])
@@ -229,11 +255,19 @@ async def send_task_completion_email(tool: str, body: dict, result: dict | None)
             return False
         subject, html = build_task_email(tool, body, result)
         res = await send_email(
-            to=[rec.to], from_addr=settings.newsletter_from_address, subject=subject, html=html,
+            to=[rec.to],
+            from_addr=settings.newsletter_from_address,
+            subject=subject,
+            html=html,
             bcc=[rec.bcc] if rec.bcc else None,
         )
-        logger.info("task_email.sent", to=rec.to, tool=tool, chapter=body.get("chapter_number"),
-                    message_id=getattr(res, "message_id", None))
+        logger.info(
+            "task_email.sent",
+            to=rec.to,
+            tool=tool,
+            chapter=body.get("chapter_number"),
+            message_id=getattr(res, "message_id", None),
+        )
         return True
     except Exception as exc:  # never let a mail failure touch the job
         logger.warning("task_email.failed", tool=tool, error=str(exc)[:200])

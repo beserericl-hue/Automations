@@ -24,7 +24,11 @@ def test_qa_has_character_consistency_dimension() -> None:
 
 def test_qa_accepts_consistency_and_research_gaps() -> None:
     qa = ChapterCraftQa.model_validate(
-        {**_BASE, "character_consistency": 0.7, "research_gaps": ["price of a copper pendant", "ossuary rite steps"]}
+        {
+            **_BASE,
+            "character_consistency": 0.7,
+            "research_gaps": ["price of a copper pendant", "ossuary rite steps"],
+        }
     )
     assert qa.character_consistency == 0.7
     assert qa.research_gaps == ["price of a copper pendant", "ossuary rite steps"]
@@ -64,11 +68,18 @@ def test_qa_tolerates_null_outline_follows_guide() -> None:
     # the EXACT live failure: model returned outline_follows_guide=null -> used to discard the whole QA
     from writer_engine.schemas.chapter import ChapterCraftQa
 
-    qa = ChapterCraftQa.model_validate({
-        "character_follows_guide": 0.82, "outline_follows_guide": None, "dialogue_follows_guide": 0.81,
-        "prose_transparent": 0.78, "story_turn_density": 0.72, "no_boring_paragraphs": 0.71,
-        "period_language_ok": 0.88, "character_consistency": 0.85,
-    })
+    qa = ChapterCraftQa.model_validate(
+        {
+            "character_follows_guide": 0.82,
+            "outline_follows_guide": None,
+            "dialogue_follows_guide": 0.81,
+            "prose_transparent": 0.78,
+            "story_turn_density": 0.72,
+            "no_boring_paragraphs": 0.71,
+            "period_language_ok": 0.88,
+            "character_consistency": 0.85,
+        }
+    )
     assert qa.outline_follows_guide == 1.0  # null -> default, not a validation failure
     assert qa.character_consistency == 0.85  # the real scores survive
     # missing dim + "N/A" string also default instead of failing

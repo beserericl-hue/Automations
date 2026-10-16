@@ -13,8 +13,13 @@ def test_slug_sanitizes() -> None:
 
 
 def test_cover_prompt_includes_title_genre_no_text() -> None:
-    p = _cover_prompt({"title": "The Burial Mound", "genre_slug": "ancient-history",
-                       "summary": "A Piscataway archaeologist excavates a mound."})
+    p = _cover_prompt(
+        {
+            "title": "The Burial Mound",
+            "genre_slug": "ancient-history",
+            "summary": "A Piscataway archaeologist excavates a mound.",
+        }
+    )
     assert "The Burial Mound" in p
     assert "ancient-history" in p
     assert "no text" in p  # covers must not render title text

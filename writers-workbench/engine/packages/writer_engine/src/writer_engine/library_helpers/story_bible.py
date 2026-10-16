@@ -45,9 +45,7 @@ def _union_by_key(base: list[Any], patch: list[Any]) -> list[Any]:
     return out
 
 
-def merge_story_bible(
-    base: dict[str, Any] | None, patch: dict[str, Any] | None
-) -> dict[str, Any]:
+def merge_story_bible(base: dict[str, Any] | None, patch: dict[str, Any] | None) -> dict[str, Any]:
     """Merge ``patch`` into the existing story bible, preserving existing entities.
 
     List sections (characters, locations, factions, items) are union-merged by name/id so a revision

@@ -19,7 +19,9 @@ class _Adapter:
         self.max_live = max(self.max_live, self.live)
         await asyncio.sleep(0.02)
         self.live -= 1
-        return LLMResponse(text="ok", input_tokens=10, output_tokens=20, model=kw["model"], provider="anthropic")
+        return LLMResponse(
+            text="ok", input_tokens=10, output_tokens=20, model=kw["model"], provider="anthropic"
+        )
 
 
 class _Budget:
@@ -38,7 +40,9 @@ def test_router_calls_budget_before_and_after() -> None:
     b = _Budget()
     r = LLMRouter(budget=b, max_concurrent=4)
     r.register(_Adapter())
-    asyncio.run(r.complete(provider="anthropic", model="claude-sonnet-4-6", prompt="x" * 400, max_tokens=3000))
+    asyncio.run(
+        r.complete(provider="anthropic", model="claude-sonnet-4-6", prompt="x" * 400, max_tokens=3000)
+    )
     assert b.waited and b.waited[0][0] == "claude-sonnet-4-6"
     assert b.waited[0][1] == 100  # ~400 chars / 4 = 100 est input tokens
     assert b.recorded == [("claude-sonnet-4-6", 10, 20)]  # actual usage recorded
@@ -50,9 +54,9 @@ def test_router_caps_concurrency_per_instance() -> None:
     r.register(adapter)
 
     async def go():
-        await asyncio.gather(*[
-            r.complete(provider="anthropic", model="m", prompt="p", max_tokens=10) for _ in range(20)
-        ])
+        await asyncio.gather(
+            *[r.complete(provider="anthropic", model="m", prompt="p", max_tokens=10) for _ in range(20)]
+        )
 
     asyncio.run(go())
     assert adapter.max_live <= 3  # never more than the per-instance cap in flight

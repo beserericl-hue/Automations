@@ -6,8 +6,12 @@ from writer_engine.parity import parity_score, shadow_summary
 
 
 def test_identical_chapter_scores_1() -> None:
-    art = {"content_text": "x " * 100, "word_count": 200, "sub_chapter_count": 5,
-           "craft_qa": {"prose_transparent": 0.9, "story_turn_density": 0.85}}
+    art = {
+        "content_text": "x " * 100,
+        "word_count": 200,
+        "sub_chapter_count": 5,
+        "craft_qa": {"prose_transparent": 0.9, "story_turn_density": 0.85},
+    }
     r = parity_score(art, dict(art), tool="chapter")
     assert r["score"] == 1.0
     assert r["agree"] == r["total"]
@@ -30,10 +34,18 @@ def test_missing_structural_key_lowers_score() -> None:
 
 
 def test_craft_dim_divergence_flagged() -> None:
-    eng = {"content_text": "x", "word_count": 7000, "sub_chapter_count": 5,
-           "craft_qa": {"story_turn_density": 0.4}}
-    base = {"content_text": "y", "word_count": 7000, "sub_chapter_count": 5,
-            "craft_qa": {"story_turn_density": 0.9}}  # 0.4 vs 0.9 diverges beyond craft_tol
+    eng = {
+        "content_text": "x",
+        "word_count": 7000,
+        "sub_chapter_count": 5,
+        "craft_qa": {"story_turn_density": 0.4},
+    }
+    base = {
+        "content_text": "y",
+        "word_count": 7000,
+        "sub_chapter_count": 5,
+        "craft_qa": {"story_turn_density": 0.9},
+    }  # 0.4 vs 0.9 diverges beyond craft_tol
     r = parity_score(eng, base, tool="chapter")
     assert any(c["check"] == "craft:story_turn_density" and not c["ok"] for c in r["checks"])
 

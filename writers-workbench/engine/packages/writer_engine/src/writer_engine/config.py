@@ -85,9 +85,7 @@ class EngineSettings(BaseSettings):
     # Newsletter From header. MUST be an address Postal is authorised to send from (the
     # courseworx.media server authenticates the From domain) — an unauthorised From returns a
     # status=error "UnauthenticatedFromAddress" and the mail is dropped.
-    newsletter_from_address: str = Field(
-        default="eve@courseworx.media", alias="NEWSLETTER_FROM_ADDRESS"
-    )
+    newsletter_from_address: str = Field(default="eve@courseworx.media", alias="NEWSLETTER_FROM_ADDRESS")
     postal_reply_to: str = Field(default="", alias="REPLY_TO_EMAIL")
     postal_default_bcc: str = Field(default="", alias="POSTAL_DEFAULT_BCC")
 
@@ -96,9 +94,7 @@ class EngineSettings(BaseSettings):
 
     # Embeddings (F1-A prereq #5). OpenAI text-embedding model + the pgvector match RPC name.
     embedding_model: str = Field(default="text-embedding-3-small", alias="EMBEDDING_MODEL")
-    embedding_match_rpc: str = Field(
-        default="match_writing_documents", alias="EMBEDDING_MATCH_RPC"
-    )
+    embedding_match_rpc: str = Field(default="match_writing_documents", alias="EMBEDDING_MATCH_RPC")
 
     # Inter-service
     orchestrator_url: str = Field(default="http://localhost:8001", alias="ORCHESTRATOR_URL")
@@ -115,9 +111,7 @@ class EngineSettings(BaseSettings):
     render_step_url: str = Field(default="http://localhost:8017", alias="RENDER_STEP_URL")
     persist_step_url: str = Field(default="http://localhost:8018", alias="PERSIST_STEP_URL")
     deliver_step_url: str = Field(default="http://localhost:8019", alias="DELIVER_STEP_URL")
-    library_retrieve_step_url: str = Field(
-        default="http://localhost:8002", alias="LIBRARY_RETRIEVE_STEP_URL"
-    )
+    library_retrieve_step_url: str = Field(default="http://localhost:8002", alias="LIBRARY_RETRIEVE_STEP_URL")
     # Write-workshop step services (F1-B) — same in-container localhost convention.
     chapter_step_url: str = Field(default="http://localhost:8020", alias="CHAPTER_STEP_URL")
     research_step_url: str = Field(default="http://localhost:8021", alias="RESEARCH_STEP_URL")

@@ -44,7 +44,11 @@ def _arc_block(arc: str) -> str:
 
 
 def _build_story_system(
-    genre: str, arc: str, title: str = "", target_chapters: int = 0, locked_synopsis: str = "",
+    genre: str,
+    arc: str,
+    title: str = "",
+    target_chapters: int = 0,
+    locked_synopsis: str = "",
     arc_text: str = "",
 ) -> str:
     """Pure: outline system = prime directive + genre + arc + plot/character seeds + outline gate.
@@ -56,7 +60,9 @@ def _build_story_system(
     """
     title_lock = (
         f'TITLE LOCK — the work is titled "{title}". Use this EXACT title in the `title` field. '
-        "Do NOT invent, translate, or 'improve' the title.\n\n" if title else ""
+        "Do NOT invent, translate, or 'improve' the title.\n\n"
+        if title
+        else ""
     )
     anchor = ""
     if target_chapters:
@@ -73,48 +79,53 @@ def _build_story_system(
         anchor = "\n" + anchor + "\n"
     # E2E-4: inject the arc's actual beats (from story_arcs_v2.prompt_text) so the outline honours the
     # named arc's structure and can tag each chapter's arc_notes to a real stage.
-    arc_beats = f"\n\nSTORY ARC BEATS — structure the chapters along THESE stages:\n{arc_text}\n" if arc_text else ""
+    arc_beats = (
+        f"\n\nSTORY ARC BEATS — structure the chapters along THESE stages:\n{arc_text}\n" if arc_text else ""
+    )
     # G12: when the author asks for a specific chapter count ("... 8 chapters"), HONOUR it instead of the
     # default Follett 60-72 scale — otherwise the model split the difference (a "8 chapter" request came
     # back as 39). The count anchor above still enforces the ±3 tolerance.
-    count_req = (
-        f"{target_chapters} chapters (±2)" if target_chapters
-        else "60-72 chapters"
-    )
+    count_req = f"{target_chapters} chapters (±2)" if target_chapters else "60-72 chapters"
     scale_line = (
         "SCALE — honour the requested chapter count exactly. Requirements:\n"
-        if target_chapters else
-        "SCALE — this is a full-length novel, not a short story (Follett-scale). Requirements:\n"
+        if target_chapters
+        else "SCALE — this is a full-length novel, not a short story (Follett-scale). Requirements:\n"
     )
-    return compose_craft_system(
-        seed_keys=_STORY_SEEDS, genre_block=_genre_block(genre), arc_block=_arc_block(arc)
-    ) + arc_beats + (
-        "\n\n" + title_lock + anchor +
-        "Produce the novel outline as strict JSON matching StoryOutline (title, premise, themes, "
-        "story_arc_name, dramatic_question, wow_factor, characters, chapters).\n\n"
-        + scale_line +
-        f"1. CHAPTERS: {count_req} PLUS a Prologue (chapter_number 0) and an Epilogue "
-        "(chapter_number = last+1). Each chapter entry is COMPACT — {chapter_number, title, act, "
-        "arc_point, pov_character, bridge_from_prior, beat, arc_notes} where `beat` is 1-2 sentences on "
-        "what happens (a dramatic movement with a story turn) and `arc_notes` names WHICH stage of the "
-        "named story arc this chapter fulfils (e.g. a Hero's Journey chapter: 'Crossing the Threshold'). "
-        "Keep entries compact so the whole arc fits.\n"
-        "2. STORY ARC — name ONE coherent arc in `story_arc_name` and make it a single unbroken "
-        "through-line: setup, escalating complications, a midpoint reversal, a crisis, a climax, and a "
-        "resolution. Tag every chapter's `act` and `arc_point` to its position on that arc. The arc "
-        "must honour the structure the premise implies (e.g. a layered excavation or vision-per-"
-        "artifact premise descends through time in order) — do not flatten or scramble it. No chapter "
-        "may sit off the arc.\n"
-        "3. CHARACTERS: include EVERY main character — all POV characters and every major supporting "
-        "character — as {name, role, archetype, off_axis_attribute, dramatic_question, description}. "
-        "Do not omit a character who drives events; the cast must be complete enough to write the "
-        "whole novel from this outline alone. Develop each main character along a visible arc.\n"
-        "4. COVERAGE: the chapters must cover the COMPLETE arc end-to-end — every major plot event, "
-        "character turning point, and historical/period event the premise implies — so a reader "
-        "finishes with a full understanding of the people and the time period.\n\n"
-        "Run the OUTLINE QUALITY GATE on yourself before returning; if it fails (wrong title, too few "
-        "chapters, missing characters, an incoherent or scrambled arc, gaps in coverage), revise and "
-        "only then return."
+    return (
+        compose_craft_system(
+            seed_keys=_STORY_SEEDS, genre_block=_genre_block(genre), arc_block=_arc_block(arc)
+        )
+        + arc_beats
+        + (
+            "\n\n"
+            + title_lock
+            + anchor
+            + "Produce the novel outline as strict JSON matching StoryOutline (title, premise, themes, "
+            "story_arc_name, dramatic_question, wow_factor, characters, chapters).\n\n"
+            + scale_line
+            + f"1. CHAPTERS: {count_req} PLUS a Prologue (chapter_number 0) and an Epilogue "
+            "(chapter_number = last+1). Each chapter entry is COMPACT — {chapter_number, title, act, "
+            "arc_point, pov_character, bridge_from_prior, beat, arc_notes} where `beat` is 1-2 sentences on "
+            "what happens (a dramatic movement with a story turn) and `arc_notes` names WHICH stage of the "
+            "named story arc this chapter fulfils (e.g. a Hero's Journey chapter: 'Crossing the Threshold'). "
+            "Keep entries compact so the whole arc fits.\n"
+            "2. STORY ARC — name ONE coherent arc in `story_arc_name` and make it a single unbroken "
+            "through-line: setup, escalating complications, a midpoint reversal, a crisis, a climax, and a "
+            "resolution. Tag every chapter's `act` and `arc_point` to its position on that arc. The arc "
+            "must honour the structure the premise implies (e.g. a layered excavation or vision-per-"
+            "artifact premise descends through time in order) — do not flatten or scramble it. No chapter "
+            "may sit off the arc.\n"
+            "3. CHARACTERS: include EVERY main character — all POV characters and every major supporting "
+            "character — as {name, role, archetype, off_axis_attribute, dramatic_question, description}. "
+            "Do not omit a character who drives events; the cast must be complete enough to write the "
+            "whole novel from this outline alone. Develop each main character along a visible arc.\n"
+            "4. COVERAGE: the chapters must cover the COMPLETE arc end-to-end — every major plot event, "
+            "character turning point, and historical/period event the premise implies — so a reader "
+            "finishes with a full understanding of the people and the time period.\n\n"
+            "Run the OUTLINE QUALITY GATE on yourself before returning; if it fails (wrong title, too few "
+            "chapters, missing characters, an incoherent or scrambled arc, gaps in coverage), revise and "
+            "only then return."
+        )
     )
 
 
@@ -154,9 +165,12 @@ async def _persist_outline_if_requested(payload: dict, outline_dict: dict) -> di
         if not project_id:
             title = str(payload.get("title") or outline_dict.get("title") or "Untitled")
             project_id, row = await resolve_or_create_project(
-                client, user_id=str(user_id), title=title,
+                client,
+                user_id=str(user_id),
+                title=title,
                 genre_slug=str(payload.get("genre_slug") or payload.get("genre") or ""),
-                project_type="story", create=True,
+                project_type="story",
+                create=True,
             )
             created = row is None
             payload["project_id"] = project_id  # thread it back so callers report the real id
@@ -185,8 +199,11 @@ async def _load_project_anchor(payload: dict) -> tuple[int, str]:
 
         client = await get_supabase_admin()
         resp = await (
-            client.table("writing_projects_v2").select("chapter_count,outline")
-            .eq("id", str(project_id)).limit(1).execute()
+            client.table("writing_projects_v2")
+            .select("chapter_count,outline")
+            .eq("id", str(project_id))
+            .limit(1)
+            .execute()
         )
         rows = list(getattr(resp, "data", None) or [])
         if rows:
@@ -260,17 +277,19 @@ def _build_short_story_system(
         "  Beat 1 — Opening: establish the world and introduce the protagonist.\n"
         "  Beat 2 — Rising action: develop the central conflict and deepen character.\n"
         "  Beat 3 — Climax & resolution: turn and land the ending.\n"
-        if not arc else ""
+        if not arc
+        else ""
     )
     return (
         f"You are brainstorming a SHORT STORY in the {genre or 'science fiction'} genre. From the "
         f"premise, develop a tight {n}-BEAT structure (this is a short story, not a novel):\n"
-        + default_beats +
-        f"Produce: a title, a one-paragraph premise, 2-4 themes, the full character roster (name, role, "
+        + default_beats
+        + f"Produce: a title, a one-paragraph premise, 2-4 themes, the full character roster (name, role, "
         f"a one-line arc each), and EXACTLY {n} chapters — one per beat (chapter_number 1..{n}, a title, "
         "a one-sentence beat, and `arc_notes` naming the arc stage). Keep it consistent and concrete."
-        + arc_block + title_lock +
-        "\n\nReturn strict JSON matching the outline schema."
+        + arc_block
+        + title_lock
+        + "\n\nReturn strict JSON matching the outline schema."
     )
 
 
@@ -293,10 +312,13 @@ async def _op_short_story(payload: dict) -> dict:
     router = get_router(service=STEP_NAME)
     try:
         outline, _resp = await complete_structured(
-            router, provider="anthropic", model=get_settings().model_default,
+            router,
+            provider="anthropic",
+            model=get_settings().model_default,
             system=_build_short_story_system(genre, arc, title, arc_text=arc_text, sections=sections),
             prompt=f"PREMISE:\n{premise}\n\nDevelop the short-story outline.",
-            schema=StoryOutline, max_tokens=8192,
+            schema=StoryOutline,
+            max_tokens=8192,
         )
     except ProviderNotRegistered:
         outline = _fixture_outline(payload)
@@ -330,9 +352,14 @@ async def _op_edit_outline(payload: dict) -> dict:
     lock = store.get("follett_seeds.character.locked_roster").format(
         locked_character_roster=_roster_text(outline.get("characters") or [])
     )
-    system = compose_craft_system(seed_keys=[]) + "\n\n" + lock + (
-        "\n\nApply ONLY the requested edits to the outline below. Preserve every existing character "
-        "and chapter not named in the edits. Return strict JSON matching StoryOutline."
+    system = (
+        compose_craft_system(seed_keys=[])
+        + "\n\n"
+        + lock
+        + (
+            "\n\nApply ONLY the requested edits to the outline below. Preserve every existing character "
+            "and chapter not named in the edits. Return strict JSON matching StoryOutline."
+        )
     )
     router = get_router(service=STEP_NAME)
     try:
@@ -359,12 +386,11 @@ def _build_revise_system(title: str) -> str:
     substantially restructure — add chapters, add NEW characters, add/interleave whole storylines —
     while preserving the title, the core premise, and every EXISTING character.
     """
-    title_lock = (
-        f'TITLE LOCK — the work is titled "{title}". Keep this EXACT title.\n\n' if title else ""
-    )
+    title_lock = f'TITLE LOCK — the work is titled "{title}". Keep this EXACT title.\n\n' if title else ""
     return compose_craft_system(seed_keys=_STORY_SEEDS) + (
-        "\n\n" + title_lock +
-        "You are REVISING an existing novel outline to implement a creative DIRECTIVE from the author. "
+        "\n\n"
+        + title_lock
+        + "You are REVISING an existing novel outline to implement a creative DIRECTIVE from the author. "
         "Produce the COMPLETE revised outline as strict JSON matching StoryOutline (title, premise, "
         "themes, story_arc_name, dramatic_question, wow_factor, characters, chapters).\n\n"
         "PRESERVE: the title; the core premise and its spine; and every EXISTING character — keep their "
@@ -406,7 +432,8 @@ async def _load_project_outline(payload: dict) -> dict:
     row = None
     if not pid and payload.get("project_title"):
         pid, row = await resolve_project_id(
-            client, user_id=payload.get("user_id"), title=str(payload["project_title"]))
+            client, user_id=payload.get("user_id"), title=str(payload["project_title"])
+        )
     if pid:
         payload["project_id"] = pid
     if row and row.get("outline"):
@@ -433,8 +460,11 @@ async def _op_revise_outline(payload: dict) -> dict:
     if not directive:
         return {"revised": False, "outline": outline}
     if not outline:
-        return {"revised": False, "outline": outline,
-                "error": "no outline to revise — I couldn't find a saved outline for that project"}
+        return {
+            "revised": False,
+            "outline": outline,
+            "error": "no outline to revise — I couldn't find a saved outline for that project",
+        }
     router = get_router(service=STEP_NAME)
     try:
         revised, _resp = await complete_structured(

@@ -57,8 +57,9 @@ class LLMRouter:
     Both are optional: with neither set (tests / local), the router is a plain dispatcher.
     """
 
-    def __init__(self, *, budget: object | None = None, max_concurrent: int = 0,
-                 budget_max_wait_s: float = 300.0) -> None:
+    def __init__(
+        self, *, budget: object | None = None, max_concurrent: int = 0, budget_max_wait_s: float = 300.0
+    ) -> None:
         self._adapters: dict[str, LLMAdapter] = {}
         self._budget = budget
         self._budget_max_wait_s = budget_max_wait_s
@@ -68,8 +69,16 @@ class LLMRouter:
         self._adapters[adapter.provider] = adapter
 
     async def _dispatch(
-        self, *, provider: str, model: str, prompt: str, system: str | None,
-        max_tokens: int, temperature: float, cache_system: bool, stream: bool,
+        self,
+        *,
+        provider: str,
+        model: str,
+        prompt: str,
+        system: str | None,
+        max_tokens: int,
+        temperature: float,
+        cache_system: bool,
+        stream: bool,
     ) -> LLMResponse:
         # Reserve account-wide budget for Anthropic (queues if the per-minute window is full).
         # Budget exhausted past max_wait or a Redis hiccup -> proceed anyway; the adapter's 429
@@ -78,17 +87,25 @@ class LLMRouter:
             est_in = (len(prompt) + len(system or "")) // 4  # ~4 chars/token
             with contextlib.suppress(Exception):
                 await self._budget.wait_for_capacity(
-                    model=model, input_tokens=est_in, output_tokens=max_tokens,
+                    model=model,
+                    input_tokens=est_in,
+                    output_tokens=max_tokens,
                     max_wait_s=self._budget_max_wait_s,
                 )
         resp = await self._adapters[provider].complete(
-            model=model, system=system, prompt=prompt, max_tokens=max_tokens,
-            temperature=temperature, cache_system=cache_system, stream=stream,
+            model=model,
+            system=system,
+            prompt=prompt,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            cache_system=cache_system,
+            stream=stream,
         )
         if provider == "anthropic" and self._budget is not None:
             with contextlib.suppress(Exception):
                 await self._budget.record_usage(
-                    model=resp.model or model, input_tokens=resp.input_tokens,
+                    model=resp.model or model,
+                    input_tokens=resp.input_tokens,
                     output_tokens=resp.output_tokens,
                 )
         return resp
@@ -108,8 +125,14 @@ class LLMRouter:
         if provider not in self._adapters:
             raise ProviderNotRegistered(f"unknown LLM provider: {provider}")
         kwargs = dict(
-            provider=provider, model=model, prompt=prompt, system=system,
-            max_tokens=max_tokens, temperature=temperature, cache_system=cache_system, stream=stream,
+            provider=provider,
+            model=model,
+            prompt=prompt,
+            system=system,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            cache_system=cache_system,
+            stream=stream,
         )
         if self._sem is not None:
             async with self._sem:
@@ -121,9 +144,12 @@ class LLMRouter:
             from writer_engine.telemetry import token_accounting
 
             token_accounting.record(
-                provider=provider, model=resp.model or model,
-                input_tokens=resp.input_tokens, output_tokens=resp.output_tokens,
-                cache_read=resp.cache_read_tokens, cache_write=resp.cache_write_tokens,
+                provider=provider,
+                model=resp.model or model,
+                input_tokens=resp.input_tokens,
+                output_tokens=resp.output_tokens,
+                cache_read=resp.cache_read_tokens,
+                cache_write=resp.cache_write_tokens,
             )
         except Exception:  # accounting must never break a generation
             pass

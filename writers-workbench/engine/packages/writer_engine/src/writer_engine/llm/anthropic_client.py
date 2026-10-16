@@ -68,8 +68,13 @@ class AnthropicAdapter:
             LLM_CALLS.labels(service=self._service, provider=self.provider, model=model, status="error").inc()
             # 429 / overloaded / network — the root cause of "silent" generation failures. The SDK
             # already retried max_retries times before this fires, so reaching here is terminal.
-            logger.warning("llm.call_failed", model=model, error_type=type(exc).__name__,
-                           error=str(exc)[:200], stream=stream)
+            logger.warning(
+                "llm.call_failed",
+                model=model,
+                error_type=type(exc).__name__,
+                error=str(exc)[:200],
+                stream=stream,
+            )
             raise
 
         text = "".join(
@@ -79,8 +84,9 @@ class AnthropicAdapter:
         # mid-JSON cutoffs). Surface it so a short/garbled chapter or unparseable JSON is attributable.
         stop_reason = getattr(msg, "stop_reason", None)
         if stop_reason == "max_tokens":
-            logger.warning("llm.truncated", model=model, max_tokens=max_tokens, chars=len(text),
-                           stream=stream)
+            logger.warning(
+                "llm.truncated", model=model, max_tokens=max_tokens, chars=len(text), stream=stream
+            )
         usage = getattr(msg, "usage", None)
         input_tokens = int(getattr(usage, "input_tokens", 0) or 0)
         output_tokens = int(getattr(usage, "output_tokens", 0) or 0)

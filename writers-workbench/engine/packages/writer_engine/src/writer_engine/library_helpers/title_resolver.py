@@ -35,7 +35,7 @@ def titles_match(a: str | None, b: str | None) -> bool:
     def _strip_article(s: str) -> str:
         for art in _ARTICLES:
             if s.startswith(art):
-                return s[len(art):]
+                return s[len(art) :]
         return s
 
     sa, sb = _strip_article(na), _strip_article(nb)

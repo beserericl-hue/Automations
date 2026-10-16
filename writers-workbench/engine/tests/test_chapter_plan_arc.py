@@ -18,6 +18,7 @@ from writer_engine.story_arcs import load_story_arc
 
 # --------------------------------------------------------------------------- arc loader
 
+
 class _ArcQuery:
     def __init__(self, rows):
         self._rows = rows
@@ -38,7 +39,9 @@ class _ArcClient:
 
 
 def test_load_story_arc_resolves_prompt_text():
-    client = _ArcClient([{"name": "The Hero's Journey", "prompt_text": "Call to Adventure; Crossing the Threshold"}])
+    client = _ArcClient(
+        [{"name": "The Hero's Journey", "prompt_text": "Call to Adventure; Crossing the Threshold"}]
+    )
     name, text = asyncio.run(load_story_arc(client, "hero"))
     assert name == "The Hero's Journey" and "Call to Adventure" in text
 
@@ -50,12 +53,20 @@ def test_load_story_arc_no_client_or_name():
 
 # --------------------------------------------------------------------------- rich schema
 
+
 def test_sub_chapter_brief_fields_and_brief_beat_alias():
-    b = SubChapterBrief.model_validate({
-        "number": 1, "title": "t", "brief": "the beat", "arc_beat": "Climax",
-        "characters": ["Mara"], "setting": "shore", "emotional_tone": "tense",
-        "connects_to_book_arc": "Resolution",
-    })
+    b = SubChapterBrief.model_validate(
+        {
+            "number": 1,
+            "title": "t",
+            "brief": "the beat",
+            "arc_beat": "Climax",
+            "characters": ["Mara"],
+            "setting": "shore",
+            "emotional_tone": "tense",
+            "connects_to_book_arc": "Resolution",
+        }
+    )
     assert b.beat == "the beat" and b.brief == "the beat"  # alias kept in sync
     assert b.arc_beat == "Climax" and b.characters == ["Mara"]
     # legacy beat-only input still populates brief
@@ -64,28 +75,44 @@ def test_sub_chapter_brief_fields_and_brief_beat_alias():
 
 # --------------------------------------------------------------------------- dual-arc plan
 
+
 def test_plan_loads_override_arc_emits_rich_subchapters_and_persists(monkeypatch):
-    outline = {"story_arc_name": "The Hero's Journey", "chapters": [
-        {"chapter_number": 1, "title": "A", "beat": "a"},
-        {"chapter_number": 2, "title": "B", "beat": "b"},
-        {"chapter_number": 3, "title": "C", "beat": "c"},
-    ]}
+    outline = {
+        "story_arc_name": "The Hero's Journey",
+        "chapters": [
+            {"chapter_number": 1, "title": "A", "beat": "a"},
+            {"chapter_number": 2, "title": "B", "beat": "b"},
+            {"chapter_number": 3, "title": "C", "beat": "c"},
+        ],
+    }
 
     async def fake_ctx(pid, payload):
-        return {"genre_slug": "post-apocalyptic", "title": "The Signal Beneath",
-                "outline": outline, "roster": [{"name": "Mara", "description": "the keeper"}]}
+        return {
+            "genre_slug": "post-apocalyptic",
+            "title": "The Signal Beneath",
+            "outline": outline,
+            "roster": [{"name": "Mara", "description": "the keeper"}],
+        }
 
     async def fake_cs(router, *, provider, model, system, prompt, schema, max_tokens):
         # assert both arcs reached the prompt (no cross-contamination check is live)
         assert "Book arc: The Hero's Journey" in system
         assert "Chapter arc: Fichtean Curve" in system
-        return SubChapterPlan(subchapters=[
-            SubChapterBrief(title="s1", brief="beat one", arc_beat="Rising Action",
-                            characters=["Mara"], setting="shore", emotional_tone="tense",
-                            connects_to_book_arc="Tests, Allies, Enemies"),
-            SubChapterBrief(title="s2", brief="beat two", arc_beat="Crisis", characters=["Mara"]),
-            SubChapterBrief(title="s3", brief="beat three", arc_beat="Climax", characters=["Mara"]),
-        ]), None
+        return SubChapterPlan(
+            subchapters=[
+                SubChapterBrief(
+                    title="s1",
+                    brief="beat one",
+                    arc_beat="Rising Action",
+                    characters=["Mara"],
+                    setting="shore",
+                    emotional_tone="tense",
+                    connects_to_book_arc="Tests, Allies, Enemies",
+                ),
+                SubChapterBrief(title="s2", brief="beat two", arc_beat="Crisis", characters=["Mara"]),
+                SubChapterBrief(title="s3", brief="beat three", arc_beat="Climax", characters=["Mara"]),
+            ]
+        ), None
 
     async def fake_arc(client, name):
         return (name or "", f"{name} beats") if name else ("", "")
@@ -105,10 +132,17 @@ def test_plan_loads_override_arc_emits_rich_subchapters_and_persists(monkeypatch
     monkeypatch.setattr("writer_engine.story_arcs.load_story_arc", fake_arc)
     monkeypatch.setattr("writer_engine.supabase.client.get_supabase_admin", fake_admin)
 
-    out = asyncio.run(ch._op_plan({
-        "project_id": str(uuid4()), "chapter_number": 2, "chapter_story_arc": "Fichtean Curve",
-        "persist": True, "user_id": "u1",
-    }))
+    out = asyncio.run(
+        ch._op_plan(
+            {
+                "project_id": str(uuid4()),
+                "chapter_number": 2,
+                "chapter_story_arc": "Fichtean Curve",
+                "persist": True,
+                "user_id": "u1",
+            }
+        )
+    )
 
     assert out["chapter_story_arc"] == "Fichtean Curve"  # per-chapter override
     assert out["book_arc"] == "The Hero's Journey"
@@ -122,6 +156,7 @@ def test_plan_loads_override_arc_emits_rich_subchapters_and_persists(monkeypatch
 
 
 # --------------------------------------------------------------------------- auto-plan guard
+
 
 def test_character_name_consistency_flags_rename():
     roster = [{"name": "Mara Okonkwo"}, {"name": "The Warlord"}]
@@ -162,8 +197,14 @@ def test_write_auto_plan_guard_plans_not_writes(monkeypatch):
     monkeypatch.setattr(ch, "_load_context", fake_ctx)
     monkeypatch.setattr(ch, "_op_plan", fake_plan)
 
-    out = asyncio.run(ch._op_write({
-        "project_id": str(uuid4()), "chapter_number": 3, "require_chapter_outline": True,
-    }))
+    out = asyncio.run(
+        ch._op_write(
+            {
+                "project_id": str(uuid4()),
+                "chapter_number": 3,
+                "require_chapter_outline": True,
+            }
+        )
+    )
     assert out["planned"] is True and out["wrote"] is False
     assert "review" in out["message"].lower()

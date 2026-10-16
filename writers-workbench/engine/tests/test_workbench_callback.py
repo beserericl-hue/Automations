@@ -32,7 +32,10 @@ async def test_noop_when_unconfigured(monkeypatch) -> None:
     monkeypatch.delenv("WORKBENCH_API_URL", raising=False)
     monkeypatch.delenv("NEWSLETTER_CALLBACK_SECRET", raising=False)
     get_settings.cache_clear()
-    assert await wc.notify_workbench_stage(uuid4(), "picking", cfg={"user_id": "+1", "edition_id": "ai-news"}) is False
+    assert (
+        await wc.notify_workbench_stage(uuid4(), "picking", cfg={"user_id": "+1", "edition_id": "ai-news"})
+        is False
+    )
 
 
 @pytest.mark.asyncio
@@ -72,7 +75,10 @@ async def test_posts_callback_when_configured(monkeypatch) -> None:
 
     monkeypatch.setattr(httpx, "AsyncClient", _Client)
     ok = await wc.notify_workbench_stage(
-        uuid4(), "awaiting_stories_approval", cfg={"user_id": "+14105914612", "edition_id": "ai-news"}, message="m"
+        uuid4(),
+        "awaiting_stories_approval",
+        cfg={"user_id": "+14105914612", "edition_id": "ai-news"},
+        message="m",
     )
     assert ok is True
     assert captured["url"].endswith("/api/callback/newsletter-stage")
@@ -103,6 +109,7 @@ async def test_post_failure_returns_false(monkeypatch) -> None:
             raise httpx.ConnectError("boom")
 
     monkeypatch.setattr(httpx, "AsyncClient", _Client)
-    assert await wc.notify_workbench_stage(
-        uuid4(), "picking", cfg={"user_id": "+1", "edition_id": "ai-news"}
-    ) is False
+    assert (
+        await wc.notify_workbench_stage(uuid4(), "picking", cfg={"user_id": "+1", "edition_id": "ai-news"})
+        is False
+    )

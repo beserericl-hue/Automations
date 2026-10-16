@@ -17,7 +17,9 @@ async def test_social_posts_no_provider_returns_error_not_fixture() -> None:
     # With no LLM provider registered (test env), the op must NOT fabricate a "(fixture)" post and
     # report success — that shipped a placeholder to the user's Social tab and the chat said
     # "finished, in the content library." It now surfaces an actionable error and persists nothing.
-    out = await _op_social_posts({"summary": "A novel about cathedrals", "platforms": ["twitter", "linkedin"]})
+    out = await _op_social_posts(
+        {"summary": "A novel about cathedrals", "platforms": ["twitter", "linkedin"]}
+    )
     assert out.get("error") == "insufficient_context"
     assert "twitter" not in out and "linkedin" not in out  # no fake posts returned
 

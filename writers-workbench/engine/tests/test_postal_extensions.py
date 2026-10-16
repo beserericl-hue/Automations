@@ -27,9 +27,7 @@ def capture(monkeypatch: pytest.MonkeyPatch) -> _Capture:
     class _Transport(httpx.AsyncBaseTransport):
         async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
             cap.last_body = json.loads(request.content)
-            return httpx.Response(
-                200, json={"status": "success", "data": {"message_id": "fake-mid-123"}}
-            )
+            return httpx.Response(200, json={"status": "success", "data": {"message_id": "fake-mid-123"}})
 
     real_init = httpx.AsyncClient.__init__
 
@@ -66,9 +64,7 @@ async def test_send_omits_optional_when_unset(capture: _Capture) -> None:
     """Optional fields stay out of the body when not passed — Postal rejects unknown keys."""
     client = PostalClient(api_url="http://postal.test", api_key="k")
     try:
-        await client.send(
-            to=["a@example.com"], from_addr="bot@example.com", subject="s", html="<p>x</p>"
-        )
+        await client.send(to=["a@example.com"], from_addr="bot@example.com", subject="s", html="<p>x</p>")
     finally:
         await client.aclose()
     body = capture.last_body
@@ -99,9 +95,7 @@ async def test_send_attachments_and_headers(capture: _Capture) -> None:
     assert body["plain_body"] == "plain"
     assert body["reply_to"] == "reply@example.com"
     assert body["headers"] == {"X-Trace": "abc"}
-    assert body["attachments"] == [
-        {"name": "cover.png", "content_type": "image/png", "data": "BASE64"}
-    ]
+    assert body["attachments"] == [{"name": "cover.png", "content_type": "image/png", "data": "BASE64"}]
     assert body["tag"] == "newsletter"
 
 
@@ -133,9 +127,7 @@ async def test_send_raises_on_postal_error_status(monkeypatch: pytest.MonkeyPatc
     client = PostalClient(api_url="http://postal.test", api_key="k")
     try:
         with pytest.raises(RuntimeError, match="UnauthenticatedFromAddress"):
-            await client.send(
-                to=["a@example.com"], from_addr="bot@bad.local", subject="s", html="<p>x</p>"
-            )
+            await client.send(to=["a@example.com"], from_addr="bot@bad.local", subject="s", html="<p>x</p>")
     finally:
         await client.aclose()
 
@@ -145,8 +137,6 @@ async def test_send_raises_without_credentials() -> None:
     client = PostalClient(api_url="", api_key="")
     try:
         with pytest.raises(RuntimeError, match="Postal not configured"):
-            await client.send(
-                to=["a@example.com"], from_addr="bot@example.com", subject="s", html="<p>x</p>"
-            )
+            await client.send(to=["a@example.com"], from_addr="bot@example.com", subject="s", html="<p>x</p>")
     finally:
         await client.aclose()

@@ -74,6 +74,7 @@ def test_internal_forwards_to_orchestrator(monkeypatch: pytest.MonkeyPatch) -> N
 
 # --------------------------------------------------------------------------- CR-004 hub
 
+
 def test_hub_requires_service_secret() -> None:
     client = TestClient(app)
     r = client.post("/internal/hub", json={"message": "hi"})
@@ -200,15 +201,25 @@ def _patch_orch_recording(monkeypatch: pytest.MonkeyPatch, calls: list[dict], re
 
 def test_hub_eve_callback_resolves_then_queues_when_found(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[dict] = []
-    _patch_orch_recording(monkeypatch, calls, {
-        "found": True, "content_type": "blog", "content_title": "Aqueducts",
-        "content_text": "How aqueducts carried water.", "callback_mode": "review", "phone": "+14105914612",
-    })
+    _patch_orch_recording(
+        monkeypatch,
+        calls,
+        {
+            "found": True,
+            "content_type": "blog",
+            "content_title": "Aqueducts",
+            "content_text": "How aqueducts carried water.",
+            "callback_mode": "review",
+            "phone": "+14105914612",
+        },
+    )
     client = TestClient(app)
     r = client.post(
         "/internal/hub",
-        json={"message": "Pull up my draft blog post about aqueducts and call me back to revise it",
-              "user_id": "+14105914612"},
+        json={
+            "message": "Pull up my draft blog post about aqueducts and call me back to revise it",
+            "user_id": "+14105914612",
+        },
         headers={"x-service-secret": "test-secret"},
     )
     assert r.status_code == 200
@@ -226,8 +237,10 @@ def test_hub_eve_callback_not_found_returns_data_no_job(monkeypatch: pytest.Monk
     client = TestClient(app)
     r = client.post(
         "/internal/hub",
-        json={"message": "Pull up my draft story about alien wizards on Neptune and call me back",
-              "user_id": "+14105914612"},
+        json={
+            "message": "Pull up my draft story about alien wizards on Neptune and call me back",
+            "user_id": "+14105914612",
+        },
         headers={"x-service-secret": "test-secret"},
     )
     assert r.status_code == 200
@@ -242,17 +255,20 @@ def test_hub_multi_task_fans_out_to_two_jobs(monkeypatch: pytest.MonkeyPatch) ->
     client = TestClient(app)
     r = client.post(
         "/internal/hub",
-        json={"message": "Write a newsletter about ancient Roman festivals for the ancient history "
-                         "genre and also pull up my research report about post apocalyptic trends and "
-                         "call me back to brainstorm", "user_id": "+14105914612"},
+        json={
+            "message": "Write a newsletter about ancient Roman festivals for the ancient history "
+            "genre and also pull up my research report about post apocalyptic trends and "
+            "call me back to brainstorm",
+            "user_id": "+14105914612",
+        },
         headers={"x-service-secret": "test-secret"},
     )
     assert r.status_code == 200
     body = r.json()
     assert body["kind"] == "queued"
     ops = {(j["tool"], j["op"]) for j in body["jobs"]}
-    assert ("chapter", "newsletter") in ops          # task 1: newsletter
-    assert ("notify", "eve-callback") in ops         # task 2: callback (brainstorm)
+    assert ("chapter", "newsletter") in ops  # task 1: newsletter
+    assert ("notify", "eve-callback") in ops  # task 2: callback (brainstorm)
     assert body["job_id"] == body["jobs"][0]["job_id"]
 
 

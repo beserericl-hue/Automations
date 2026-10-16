@@ -112,8 +112,6 @@ async def send_email(
     """One-shot send. The vertical slice does not need this; F2 deliver-svc + notify_step do."""
     client = PostalClient()
     try:
-        return await client.send(
-            to=to, from_addr=from_addr, subject=subject, html=html, cc=cc, bcc=bcc
-        )
+        return await client.send(to=to, from_addr=from_addr, subject=subject, html=html, cc=cc, bcc=bcc)
     finally:
         await client.aclose()

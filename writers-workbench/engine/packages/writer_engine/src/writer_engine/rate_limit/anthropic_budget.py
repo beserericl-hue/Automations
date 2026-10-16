@@ -146,23 +146,40 @@ class AnthropicBudget:
             ):
                 if stalled:
                     # We queued for TPM/RPM headroom and then got it — this is "queued", not "hung".
-                    logger.info("budget.capacity_granted", model=model,
-                                waited_s=round(time.time() - start, 1),
-                                in_used=in_used, out_used=out_used, req_used=req_used)
+                    logger.info(
+                        "budget.capacity_granted",
+                        model=model,
+                        waited_s=round(time.time() - start, 1),
+                        in_used=in_used,
+                        out_used=out_used,
+                        req_used=req_used,
+                    )
                 return
             if not stalled:
                 # First time we couldn't proceed: log WHICH limit is the bottleneck under load.
                 stalled = True
                 logger.info(
-                    "budget.stall", model=model,
-                    in_used=in_used, in_limit=limits.input_tpm,
-                    out_used=out_used, out_limit=limits.output_tpm,
-                    req_used=req_used, req_limit=limits.rpm,
-                    want_in=input_tokens, want_out=output_tokens, max_wait_s=max_wait_s,
+                    "budget.stall",
+                    model=model,
+                    in_used=in_used,
+                    in_limit=limits.input_tpm,
+                    out_used=out_used,
+                    out_limit=limits.output_tpm,
+                    req_used=req_used,
+                    req_limit=limits.rpm,
+                    want_in=input_tokens,
+                    want_out=output_tokens,
+                    max_wait_s=max_wait_s,
                 )
             if time.time() >= deadline:
-                logger.warning("budget.exhausted", model=model, waited_s=round(time.time() - start, 1),
-                               in_used=in_used, out_used=out_used, req_used=req_used)
+                logger.warning(
+                    "budget.exhausted",
+                    model=model,
+                    waited_s=round(time.time() - start, 1),
+                    in_used=in_used,
+                    out_used=out_used,
+                    req_used=req_used,
+                )
                 raise BudgetExhausted(
                     f"Anthropic budget exhausted for {model} after {max_wait_s:.1f}s "
                     f"(in={in_used}/{limits.input_tpm}, out={out_used}/{limits.output_tpm}, "

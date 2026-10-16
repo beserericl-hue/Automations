@@ -50,16 +50,28 @@ def _patch(monkeypatch, tables):
 
 
 def test_callback_resolves_and_builds_payload_dry_run(monkeypatch):
-    _patch(monkeypatch, {
-        "published_content_v2": [
-            {"title": "Roman Aqueducts", "content_text": "How aqueducts carried water.",
-             "content_type": "blog_post"},
-        ],
-    })
-    out = asyncio.run(nt._op_eve_callback({
-        "content_type": "blog", "search_term": "draft blog post about aqueducts",
-        "callback_mode": "review", "user_id": "+14105914612",
-    }))
+    _patch(
+        monkeypatch,
+        {
+            "published_content_v2": [
+                {
+                    "title": "Roman Aqueducts",
+                    "content_text": "How aqueducts carried water.",
+                    "content_type": "blog_post",
+                },
+            ],
+        },
+    )
+    out = asyncio.run(
+        nt._op_eve_callback(
+            {
+                "content_type": "blog",
+                "search_term": "draft blog post about aqueducts",
+                "callback_mode": "review",
+                "user_id": "+14105914612",
+            }
+        )
+    )
     assert out["invoked"] is True and out["found"] is True
     assert out["callback_mode"] == "review"
     assert out["content_type"] == "blog"  # routed label preserved
@@ -69,15 +81,24 @@ def test_callback_resolves_and_builds_payload_dry_run(monkeypatch):
 
 
 def test_callback_brainstorm_research_report(monkeypatch):
-    _patch(monkeypatch, {
-        "research_reports_v2": [
-            {"topic": "Post-Apocalyptic Trends 2026", "content": "Solarpunk is rising."},
-        ],
-    })
-    out = asyncio.run(nt._op_eve_callback({
-        "content_type": "research_report", "search_term": "research report on post apocalyptic trends",
-        "callback_mode": "brainstorm", "user_id": "+14105914612",
-    }))
+    _patch(
+        monkeypatch,
+        {
+            "research_reports_v2": [
+                {"topic": "Post-Apocalyptic Trends 2026", "content": "Solarpunk is rising."},
+            ],
+        },
+    )
+    out = asyncio.run(
+        nt._op_eve_callback(
+            {
+                "content_type": "research_report",
+                "search_term": "research report on post apocalyptic trends",
+                "callback_mode": "brainstorm",
+                "user_id": "+14105914612",
+            }
+        )
+    )
     assert out["invoked"] is True
     assert out["callback_mode"] == "brainstorm"
     assert out["content_type"] == "research_report"
@@ -85,32 +106,54 @@ def test_callback_brainstorm_research_report(monkeypatch):
 
 def test_callback_resolve_only_returns_found_without_eve(monkeypatch):
     # V30 sync pre-check: resolve_only returns the resolved content + found, never runs the ElevenLabs flow.
-    _patch(monkeypatch, {
-        "published_content_v2": [
-            {"title": "Roman Aqueducts", "content_text": "body", "content_type": "blog_post"},
-        ],
-    })
-    out = asyncio.run(nt._op_eve_callback({
-        "content_type": "blog", "search_term": "aqueducts", "callback_mode": "review",
-        "user_id": "+14105914612", "resolve_only": True,
-    }))
+    _patch(
+        monkeypatch,
+        {
+            "published_content_v2": [
+                {"title": "Roman Aqueducts", "content_text": "body", "content_type": "blog_post"},
+            ],
+        },
+    )
+    out = asyncio.run(
+        nt._op_eve_callback(
+            {
+                "content_type": "blog",
+                "search_term": "aqueducts",
+                "callback_mode": "review",
+                "user_id": "+14105914612",
+                "resolve_only": True,
+            }
+        )
+    )
     assert out["found"] is True and out["content_title"] == "Roman Aqueducts"
     assert "eve" not in out  # no callback performed during a resolve-only pre-check
 
 
 def test_callback_not_found_does_not_invoke(monkeypatch):
-    _patch(monkeypatch, {"published_content_v2": [
-        {"title": "Something Unrelated", "content_text": "x", "content_type": "short_story"},
-    ]})
-    out = asyncio.run(nt._op_eve_callback({
-        "content_type": "short_story", "search_term": "alien wizards on Neptune",
-        "callback_mode": "review", "user_id": "+14105914612",
-    }))
+    _patch(
+        monkeypatch,
+        {
+            "published_content_v2": [
+                {"title": "Something Unrelated", "content_text": "x", "content_type": "short_story"},
+            ]
+        },
+    )
+    out = asyncio.run(
+        nt._op_eve_callback(
+            {
+                "content_type": "short_story",
+                "search_term": "alien wizards on Neptune",
+                "callback_mode": "review",
+                "user_id": "+14105914612",
+            }
+        )
+    )
     assert out["invoked"] is False and out["found"] is False
     assert "couldn't find" in out["message"].lower()
 
 
 # --------------------------------------------------------------------------- WF-16 KB ordering (V29)
+
 
 class _MockEve:
     def __init__(self):
@@ -137,10 +180,16 @@ class _MockEve:
 
 def test_kb_cleanup_runs_before_upload():
     mock = _MockEve()
-    out = asyncio.run(run_eve_callback(
-        content_type="blog", content_title="Aqueducts", content_text="body",
-        callback_mode="review", phone="+14105914612", client=mock,
-    ))
+    out = asyncio.run(
+        run_eve_callback(
+            content_type="blog",
+            content_title="Aqueducts",
+            content_text="body",
+            callback_mode="review",
+            phone="+14105914612",
+            client=mock,
+        )
+    )
     assert out["dry_run"] is False
     # cleanup must precede upload so only the current "Eve Session:" doc remains
     assert mock.calls.index("remove") < mock.calls.index("upload:Eve Session: Aqueducts")

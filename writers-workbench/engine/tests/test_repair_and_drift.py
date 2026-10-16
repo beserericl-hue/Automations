@@ -27,10 +27,13 @@ def test_outline_chapter_act() -> None:
 
 def test_drift_report_tolerant_of_dict_items_and_nulls() -> None:
     # the live shapes: {"item": ...} entries, null lists, a wrapper
-    d = DriftReport.model_validate({
-        "story_drift": [{"item": "skips the hearing beat"}, None],
-        "character_drift": None, "research_gaps": "price of copper",
-    })
+    d = DriftReport.model_validate(
+        {
+            "story_drift": [{"item": "skips the hearing beat"}, None],
+            "character_drift": None,
+            "research_gaps": "price of copper",
+        }
+    )
     assert d.story_drift == ["skips the hearing beat"]  # dict flattened, None dropped
     assert d.character_drift == []
     assert d.research_gaps == ["price of copper"]

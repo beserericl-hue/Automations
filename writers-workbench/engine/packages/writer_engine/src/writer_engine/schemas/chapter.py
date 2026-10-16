@@ -303,8 +303,12 @@ class DriftReport(BaseModel):
                         s = x
                     elif isinstance(x, dict):
                         s = str(
-                            x.get("item") or x.get("issue") or x.get("detail")
-                            or x.get("problem") or x.get("description") or x
+                            x.get("item")
+                            or x.get("issue")
+                            or x.get("detail")
+                            or x.get("problem")
+                            or x.get("description")
+                            or x
                         )
                     else:
                         s = str(x)

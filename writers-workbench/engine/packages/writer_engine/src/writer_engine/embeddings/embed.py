@@ -36,8 +36,7 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
         from openai import AsyncOpenAI
     except ImportError as exc:  # pragma: no cover - optional dep
         raise RuntimeError(
-            "openai package not installed; add it to the service that sets "
-            "ENABLE_PYTHON_EMBEDDINGS=true"
+            "openai package not installed; add it to the service that sets ENABLE_PYTHON_EMBEDDINGS=true"
         ) from exc
 
     client = AsyncOpenAI(api_key=settings.openai_api_key)
@@ -110,11 +109,6 @@ async def re_embed_project(*, user_id: str, project_title: str) -> int:
     vectors = await embed_texts([r.get("content") or "" for r in rows])
     count = 0
     for row, vec in zip(rows, vectors, strict=False):
-        await (
-            client.table("writing_documents")
-            .update({"embedding": vec})
-            .eq("id", row["id"])
-            .execute()
-        )
+        await client.table("writing_documents").update({"embedding": vec}).eq("id", row["id"]).execute()
         count += 1
     return count

@@ -221,7 +221,10 @@ class NewsletterOrchestrator(OrchestratorBase):
     # ---------- HITL helpers ----------
 
     async def _pick_with_gate(
-        self, execution_id: UUID, articles: list[dict[str, Any]], max_stories: int,
+        self,
+        execution_id: UUID,
+        articles: list[dict[str, Any]],
+        max_stories: int,
         genre: str | None = None,
     ) -> PickedStories | None:
         await self.advance(execution_id, Stage.PICKING, message="picking top stories")

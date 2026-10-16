@@ -47,24 +47,43 @@ async def run_write_tool_job(_ctx: dict[str, Any], tool: str, body: dict[str, An
         return {"status": "error", "error": {"code": "UNKNOWN_TOOL", "message": tool}}
     chapter = body.get("chapter_number")
     op = body.get("op")
-    logger.info("worker.write_tool.start", tool=tool, op=op, chapter=chapter,
-                project=body.get("project_id") or body.get("project_title"), user_id=body.get("user_id"))
+    logger.info(
+        "worker.write_tool.start",
+        tool=tool,
+        op=op,
+        chapter=chapter,
+        project=body.get("project_id") or body.get("project_title"),
+        user_id=body.get("user_id"),
+    )
     started = time.monotonic()
     try:
         out = await run_step_via_http(
-            StepRef(name=tool, url=url), execution_id=uuid4(), payload=body,
+            StepRef(name=tool, url=url),
+            execution_id=uuid4(),
+            payload=body,
             timeout_s=WORKER_STEP_TIMEOUT_S,
         )
     except Exception:
         # arq will retry per max_tries; log so a timeout/crash is attributable to the chapter.
-        logger.exception("worker.write_tool.crashed", tool=tool, op=op, chapter=chapter,
-                         duration_s=round(time.monotonic() - started, 1))
+        logger.exception(
+            "worker.write_tool.crashed",
+            tool=tool,
+            op=op,
+            chapter=chapter,
+            duration_s=round(time.monotonic() - started, 1),
+        )
         raise
     dumped = out.model_dump(mode="json")
     status = dumped.get("status")
-    logger.info("worker.write_tool.finish", tool=tool, op=op, chapter=chapter, status=status,
-                duration_s=round(time.monotonic() - started, 1),
-                error=(dumped.get("error") or {}).get("message") if str(status).lower() == "error" else None)
+    logger.info(
+        "worker.write_tool.finish",
+        tool=tool,
+        op=op,
+        chapter=chapter,
+        status=status,
+        duration_s=round(time.monotonic() - started, 1),
+        error=(dumped.get("error") or {}).get("message") if str(status).lower() == "error" else None,
+    )
     # CR-009: email the result + metadata on success (n8n parity). Best-effort — never affects the job.
     if str(status).lower() == "ok":
         try:

@@ -14,10 +14,47 @@ STEP_NAME = "notify"
 logger = get_logger("notify_step")
 
 _CALLBACK_STOP = {
-    "the", "a", "an", "of", "for", "about", "on", "my", "me", "pull", "up", "call", "back", "and",
-    "to", "so", "we", "can", "let", "lets", "let's", "get", "load", "review", "revise", "it", "that",
-    "instead", "now", "help", "improve", "draft", "story", "report", "post", "blog", "research",
-    "newsletter", "chapter", "outline", "this",
+    "the",
+    "a",
+    "an",
+    "of",
+    "for",
+    "about",
+    "on",
+    "my",
+    "me",
+    "pull",
+    "up",
+    "call",
+    "back",
+    "and",
+    "to",
+    "so",
+    "we",
+    "can",
+    "let",
+    "lets",
+    "let's",
+    "get",
+    "load",
+    "review",
+    "revise",
+    "it",
+    "that",
+    "instead",
+    "now",
+    "help",
+    "improve",
+    "draft",
+    "story",
+    "report",
+    "post",
+    "blog",
+    "research",
+    "newsletter",
+    "chapter",
+    "outline",
+    "this",
 }
 
 
@@ -47,7 +84,8 @@ async def _op_email(payload: dict) -> dict:
 
 
 _CONTENT_TYPE_TABLE = {
-    "research_report": "research_reports_v2", "research": "research_reports_v2",
+    "research_report": "research_reports_v2",
+    "research": "research_reports_v2",
 }
 
 
@@ -80,8 +118,15 @@ async def _resolve_callback_content(payload: dict) -> dict | None:
             q = q.eq("user_id", user_id)
         rows = getattr(await q.limit(200).execute(), "data", None) or []
         m = _best(rows, ("topic",))
-        return None if not m else {"content_type": "research_report", "title": str(m.get("topic") or term),
-                                   "content_text": str(m.get("content") or "")}
+        return (
+            None
+            if not m
+            else {
+                "content_type": "research_report",
+                "title": str(m.get("topic") or term),
+                "content_text": str(m.get("content") or ""),
+            }
+        )
     # No strict content_type filter: the DB stores blog_post / short_story while the request/assertion
     # says "blog" / "short story" — the keyword match disambiguates, and the routed content_type label
     # is what the op reports back.
@@ -90,8 +135,15 @@ async def _resolve_callback_content(payload: dict) -> dict | None:
         q = q.eq("user_id", user_id)
     rows = getattr(await q.limit(200).execute(), "data", None) or []
     m = _best(rows, ("title", "content_text"))
-    return None if not m else {"content_type": str(m.get("content_type") or content_type or "content"),
-                               "title": str(m.get("title") or term), "content_text": str(m.get("content_text") or "")}
+    return (
+        None
+        if not m
+        else {
+            "content_type": str(m.get("content_type") or content_type or "content"),
+            "title": str(m.get("title") or term),
+            "content_text": str(m.get("content_text") or ""),
+        }
+    )
 
 
 async def _op_eve_callback(payload: dict) -> dict:
@@ -115,8 +167,11 @@ async def _op_eve_callback(payload: dict) -> dict:
         resolved = await _resolve_callback_content(payload)
         if not resolved:
             logger.info("eve.callback.not_found", search=payload.get("search_term"))
-            return {"invoked": False, "found": False,
-                    "message": "I couldn't find that to pull up, so there's nothing to call you back about."}
+            return {
+                "invoked": False,
+                "found": False,
+                "message": "I couldn't find that to pull up, so there's nothing to call you back about.",
+            }
         content_type = content_type or resolved["content_type"]
         content_title = resolved["title"]
         content_text = resolved["content_text"]
@@ -124,16 +179,30 @@ async def _op_eve_callback(payload: dict) -> dict:
     # resolve_only (V30): the hub pre-checks existence synchronously and only queues the real callback
     # when found — so a not-found request returns kind=data with NO job and NO ElevenLabs/outbound call.
     if payload.get("resolve_only"):
-        return {"found": True, "callback_mode": callback_mode, "phone": phone,
-                "content_type": content_type, "content_title": content_title, "content_text": content_text}
+        return {
+            "found": True,
+            "callback_mode": callback_mode,
+            "phone": phone,
+            "content_type": content_type,
+            "content_title": content_title,
+            "content_text": content_text,
+        }
 
     eve = await run_eve_callback(
-        content_type=content_type, content_title=content_title, content_text=content_text,
-        callback_mode=callback_mode, phone=phone,
+        content_type=content_type,
+        content_title=content_title,
+        content_text=content_text,
+        callback_mode=callback_mode,
+        phone=phone,
     )
     return {
-        "invoked": True, "found": True, "callback_mode": callback_mode, "phone": phone,
-        "content_type": content_type, "content_title": content_title, "eve": eve,
+        "invoked": True,
+        "found": True,
+        "callback_mode": callback_mode,
+        "phone": phone,
+        "content_type": content_type,
+        "content_title": content_title,
+        "eve": eve,
     }
 
 

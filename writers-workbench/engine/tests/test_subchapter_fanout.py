@@ -18,7 +18,9 @@ def test_plan_schema_tolerates_shapes() -> None:
     p = SubChapterPlan.model_validate(["Arrival", "The dig", "The vision"])
     assert [b.beat for b in p.subchapters] == ["Arrival", "The dig", "The vision"]
     # {sub_chapters: [...]} alias + dict items
-    p2 = SubChapterPlan.model_validate({"sub_chapters": [{"title": "T", "beat": "B", "pov_character": "Ana"}]})
+    p2 = SubChapterPlan.model_validate(
+        {"sub_chapters": [{"title": "T", "beat": "B", "pov_character": "Ana"}]}
+    )
     assert p2.subchapters[0].title == "T" and p2.subchapters[0].pov_character == "Ana"
     # {chapters: [...]} alias
     p3 = SubChapterPlan.model_validate({"chapters": [{"beat": "x"}]})
@@ -35,8 +37,11 @@ def test_plan_system_has_event_list_seed() -> None:
 @pytest.mark.asyncio
 async def test_plan_fixture_path_returns_n_briefs() -> None:
     # No provider -> deterministic fixture briefs (length n).
-    req = Req(project_id="00000000-0000-4000-8000-000000000001", chapter_number=1,
-              chapter_run_id="00000000-0000-4000-8000-0000000000aa")
+    req = Req(
+        project_id="00000000-0000-4000-8000-000000000001",
+        chapter_number=1,
+        chapter_run_id="00000000-0000-4000-8000-0000000000aa",
+    )
     ctx = {"genre_slug": "ancient-history", "title": "T", "outline": {}, "roster": []}
     briefs = await _plan_subchapters(ctx, req, 5, "claude-sonnet-4-6")
     assert len(briefs) == 5

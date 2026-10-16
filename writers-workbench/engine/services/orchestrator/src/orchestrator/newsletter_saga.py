@@ -262,7 +262,9 @@ class NewsletterSagaDriver:
                     payload={"urls": story.external_source_links},
                     timeout_s=150.0,
                 )
-                scraped = [] if scrape_out.status is StepStatus.ERROR else (scrape_out.payload.get("scraped") or [])
+                scraped = (
+                    [] if scrape_out.status is StepStatus.ERROR else (scrape_out.payload.get("scraped") or [])
+                )
             except Exception:
                 scraped = []
             # Image + segment are LLM-backed and routinely exceed the 60s default; give them headroom so

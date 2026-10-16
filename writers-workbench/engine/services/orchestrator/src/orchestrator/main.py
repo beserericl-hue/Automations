@@ -382,7 +382,9 @@ def build_app() -> FastAPI:
         try:
             saga_state = await app.state.saga_repo.load(UUID(execution_id))
         except KeyError as exc:
-            raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="execution not found") from exc
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND, detail="execution not found"
+            ) from exc
 
         st = saga_state.state
         stage_norm = stage.lower().strip()

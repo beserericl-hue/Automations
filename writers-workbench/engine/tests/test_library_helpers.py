@@ -106,6 +106,4 @@ def test_merge_story_bible_preserves_existing_characters() -> None:
 
 def test_merge_story_bible_empty_inputs() -> None:
     assert merge_story_bible(None, None) == {}
-    assert merge_story_bible({"characters": [{"name": "A"}]}, None) == {
-        "characters": [{"name": "A"}]
-    }
+    assert merge_story_bible({"characters": [{"name": "A"}]}, None) == {"characters": [{"name": "A"}]}

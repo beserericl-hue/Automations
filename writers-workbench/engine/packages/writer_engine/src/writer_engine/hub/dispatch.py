@@ -34,8 +34,7 @@ def build_dispatch_plan(decision: HubDecision, req: HubRequest) -> DispatchPlan:
     if decision.kind == "conversation":
         return DispatchPlan(
             action="reply",
-            assistant_message=decision.assistant_message
-            or "How can I help with your writing?",
+            assistant_message=decision.assistant_message or "How can I help with your writing?",
         )
 
     body: dict[str, Any] = dict(decision.params)
@@ -51,15 +50,19 @@ def build_dispatch_plan(decision: HubDecision, req: HubRequest) -> DispatchPlan:
     # library.lifecycle is an info op, but delete/undelete MUTATE + email and the suite drives them as
     # queued tasks (E2E-2 R94/R98); list_deleted + approve/publish/etc. stay synchronous reads/writes.
     force_task = (
-        decision.tool == "library" and decision.op == "lifecycle"
+        decision.tool == "library"
+        and decision.op == "lifecycle"
         and str(body.get("action", "")).lower() in {"delete", "undelete"}
     )
 
     if decision.kind == "info" and not force_task:
         body["async"] = False
         return DispatchPlan(
-            action="call_sync", assistant_message=decision.assistant_message,
-            tool=decision.tool, op=decision.op, body=body,
+            action="call_sync",
+            assistant_message=decision.assistant_message,
+            tool=decision.tool,
+            op=decision.op,
+            body=body,
         )
 
     # task — load-bearing generation: persist results (CR-001) and force the async queue path.
@@ -72,6 +75,9 @@ def build_dispatch_plan(decision: HubDecision, req: HubRequest) -> DispatchPlan:
         "Got it — I've started on that. It runs in the background and I'll let you know when it's ready."
     )
     return DispatchPlan(
-        action="enqueue", assistant_message=ack,
-        tool=decision.tool, op=decision.op, body=body,
+        action="enqueue",
+        assistant_message=ack,
+        tool=decision.tool,
+        op=decision.op,
+        body=body,
     )

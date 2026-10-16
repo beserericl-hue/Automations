@@ -53,34 +53,59 @@ def test_persist_chapter_merges_metadata_preserving_qa_report() -> None:
     dismissed_annotations, etc. persist_chapter must MERGE: refresh write-time keys, preserve the rest."""
     from writer_engine.persist_helpers import persist_chapter
 
-    prior = {"qa_report": {"checks": [{"name": "x", "status": "NEEDS_REVIEW"}]},
-             "dismissed_annotations": ["drift_scan:3:name_variant:Meara"],
-             "craft_qa": {"prose_transparent": 0.5}, "word_count": 100}
+    prior = {
+        "qa_report": {"checks": [{"name": "x", "status": "NEEDS_REVIEW"}]},
+        "dismissed_annotations": ["drift_scan:3:name_variant:Meara"],
+        "craft_qa": {"prose_transparent": 0.5},
+        "word_count": 100,
+    }
     captured: dict = {}
 
     class _Q:
-        def __init__(self, kind): self.kind = kind
-        def select(self, *_a, **_k): return self
-        def eq(self, *_a, **_k): return self
-        def order(self, *_a, **_k): return self
-        def limit(self, *_a, **_k): return self
+        def __init__(self, kind):
+            self.kind = kind
+
+        def select(self, *_a, **_k):
+            return self
+
+        def eq(self, *_a, **_k):
+            return self
+
+        def order(self, *_a, **_k):
+            return self
+
+        def limit(self, *_a, **_k):
+            return self
+
         def update(self, row):
             if self.kind == "published_content_v2":
                 captured["metadata"] = row.get("metadata")
             return self
-        def insert(self, *_a, **_k): return self
+
+        def insert(self, *_a, **_k):
+            return self
+
         async def execute(self):
             class _R:
                 data = [{"id": "cid-1", "metadata": prior}] if self.kind == "published_content_v2" else []
+
             return _R()
 
     class _Client:
-        def table(self, name): return _Q(name)
+        def table(self, name):
+            return _Q(name)
 
-    asyncio.run(persist_chapter(
-        _Client(), project_id="p", user_id="u", chapter_number=3, title="t", content_text="body",
-        metadata={"craft_qa": {"prose_transparent": 0.9}, "word_count": 200, "drift_report": {}},
-    ))
+    asyncio.run(
+        persist_chapter(
+            _Client(),
+            project_id="p",
+            user_id="u",
+            chapter_number=3,
+            title="t",
+            content_text="body",
+            metadata={"craft_qa": {"prose_transparent": 0.9}, "word_count": 200, "drift_report": {}},
+        )
+    )
     md = captured.get("metadata") or {}
     # preserved:
     assert "qa_report" in md and md["qa_report"]["checks"][0]["status"] == "NEEDS_REVIEW"

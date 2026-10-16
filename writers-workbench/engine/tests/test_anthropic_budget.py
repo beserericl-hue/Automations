@@ -46,9 +46,7 @@ async def test_noop_when_redis_unavailable(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(rc, "get_redis", _broken)
     budget = AnthropicBudget()
     # Should not raise — wait_for_capacity returns immediately, record_usage swallows.
-    await budget.wait_for_capacity(
-        model="claude-sonnet-4-6", input_tokens=10_000, output_tokens=3_000
-    )
+    await budget.wait_for_capacity(model="claude-sonnet-4-6", input_tokens=10_000, output_tokens=3_000)
     await budget.record_usage(model="claude-sonnet-4-6", input_tokens=10_000, output_tokens=3_000)
     snap = await budget.snapshot("claude-sonnet-4-6")
     assert snap == {"input_tokens": 0, "output_tokens": 0, "requests": 0}
@@ -57,12 +55,8 @@ async def test_noop_when_redis_unavailable(monkeypatch: pytest.MonkeyPatch) -> N
 @pytest.mark.asyncio
 async def test_records_and_reads_back_within_window(fake_redis) -> None:  # type: ignore[no-untyped-def]
     budget = AnthropicBudget(redis_client=fake_redis)
-    await budget.record_usage(
-        model="claude-sonnet-4-6", input_tokens=10_000, output_tokens=2_500
-    )
-    await budget.record_usage(
-        model="claude-sonnet-4-6", input_tokens=8_000, output_tokens=2_000
-    )
+    await budget.record_usage(model="claude-sonnet-4-6", input_tokens=10_000, output_tokens=2_500)
+    await budget.record_usage(model="claude-sonnet-4-6", input_tokens=8_000, output_tokens=2_000)
     snap = await budget.snapshot("claude-sonnet-4-6")
     assert snap == {"input_tokens": 18_000, "output_tokens": 4_500, "requests": 2}
 
@@ -75,9 +69,7 @@ async def test_wait_blocks_when_budget_exhausted(fake_redis) -> None:  # type: i
     }
     budget = AnthropicBudget(redis_client=fake_redis, limits=tiny)
     # Burn the input budget exactly.
-    await budget.record_usage(
-        model="claude-sonnet-4-6", input_tokens=5_000, output_tokens=900
-    )
+    await budget.record_usage(model="claude-sonnet-4-6", input_tokens=5_000, output_tokens=900)
     # Next call would push input over → exhausted within 1s of waiting.
     started = time.time()
     with pytest.raises(BudgetExhausted, match="claude-sonnet-4-6"):
@@ -94,9 +86,7 @@ async def test_wait_blocks_when_budget_exhausted(fake_redis) -> None:  # type: i
 async def test_wait_passes_when_under_budget(fake_redis) -> None:  # type: ignore[no-untyped-def]
     budget = AnthropicBudget(redis_client=fake_redis)
     # 100k input is well under Sonnet's 450k TPM ceiling.
-    await budget.record_usage(
-        model="claude-sonnet-4-6", input_tokens=100_000, output_tokens=10_000
-    )
+    await budget.record_usage(model="claude-sonnet-4-6", input_tokens=100_000, output_tokens=10_000)
     # Capacity check passes immediately, no exception.
     await budget.wait_for_capacity(
         model="claude-sonnet-4-6",
@@ -110,9 +100,7 @@ async def test_wait_passes_when_under_budget(fake_redis) -> None:  # type: ignor
 async def test_separate_models_have_separate_budgets(fake_redis) -> None:  # type: ignore[no-untyped-def]
     """Burning Sonnet doesn't affect Haiku — independent keys per model."""
     budget = AnthropicBudget(redis_client=fake_redis)
-    await budget.record_usage(
-        model="claude-sonnet-4-6", input_tokens=400_000, output_tokens=80_000
-    )
+    await budget.record_usage(model="claude-sonnet-4-6", input_tokens=400_000, output_tokens=80_000)
     snap_haiku = await budget.snapshot("claude-haiku-4-5-20251001")
     assert snap_haiku["input_tokens"] == 0
     assert snap_haiku["output_tokens"] == 0

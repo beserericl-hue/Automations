@@ -29,9 +29,7 @@ from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("token_accounting")
 
-_ctx: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar(
-    "token_usage_ctx", default=None
-)
+_ctx: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar("token_usage_ctx", default=None)
 
 # $ per 1,000,000 tokens: (input, output, cache_read, cache_write). Anthropic published rates
 # (Sonnet/Haiku/Opus 4.x); Perplexity sonar-pro and Gemini are approximate list prices. Override via
@@ -40,7 +38,7 @@ _DEFAULT_RATES: dict[str, tuple[float, float, float, float]] = {
     "claude-sonnet-4-6": (3.00, 15.00, 0.30, 3.75),
     "claude-haiku-4-5-20251001": (0.80, 4.00, 0.08, 1.00),
     "claude-opus-4-8": (15.00, 75.00, 1.50, 18.75),
-    "sonar-pro": (3.00, 15.00, 0.0, 0.0),       # Perplexity (approx; excl. per-request search fee)
+    "sonar-pro": (3.00, 15.00, 0.0, 0.0),  # Perplexity (approx; excl. per-request search fee)
     "gemini-2.5-flash": (0.30, 2.50, 0.0, 0.0),
     "gemini-2.5-pro": (1.25, 10.00, 0.0, 0.0),
 }
@@ -48,27 +46,30 @@ _DEFAULT_RATES: dict[str, tuple[float, float, float, float]] = {
 _FALLBACK_RATE = (3.00, 15.00, 0.30, 3.75)
 
 
-def cost_usd(model: str, input_tokens: int, output_tokens: int,
-             cache_read: int = 0, cache_write: int = 0) -> float:
+def cost_usd(
+    model: str, input_tokens: int, output_tokens: int, cache_read: int = 0, cache_write: int = 0
+) -> float:
     r = _DEFAULT_RATES.get(model, _FALLBACK_RATE)
     return round(
-        (input_tokens * r[0] + output_tokens * r[1] + cache_read * r[2] + cache_write * r[3])
-        / 1_000_000.0,
+        (input_tokens * r[0] + output_tokens * r[1] + cache_read * r[2] + cache_write * r[3]) / 1_000_000.0,
         6,
     )
 
 
-def begin(*, user_id: str | None, project_id: str | None = None,
-          chapter_number: Any = None, workflow: str = "") -> None:
+def begin(
+    *, user_id: str | None, project_id: str | None = None, chapter_number: Any = None, workflow: str = ""
+) -> None:
     """Start a request-scoped accounting context. No-op-safe to call without a user_id (rows just
     won't be persisted, but totals are still queryable in-process)."""
-    _ctx.set({
-        "user_id": user_id,
-        "project_id": project_id,
-        "chapter_number": chapter_number,
-        "workflow": workflow,
-        "calls": [],
-    })
+    _ctx.set(
+        {
+            "user_id": user_id,
+            "project_id": project_id,
+            "chapter_number": chapter_number,
+            "workflow": workflow,
+            "calls": [],
+        }
+    )
 
 
 def reset() -> None:
@@ -76,21 +77,30 @@ def reset() -> None:
     _ctx.set(None)
 
 
-def record(*, provider: str, model: str, input_tokens: int, output_tokens: int,
-           cache_read: int = 0, cache_write: int = 0) -> None:
+def record(
+    *,
+    provider: str,
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+    cache_read: int = 0,
+    cache_write: int = 0,
+) -> None:
     """Record one LLM call's usage into the active context (called by the router)."""
     ctx = _ctx.get()
     if ctx is None:
         return
-    ctx["calls"].append({
-        "provider": provider,
-        "model": model,
-        "input_tokens": int(input_tokens or 0),
-        "output_tokens": int(output_tokens or 0),
-        "cache_read_tokens": int(cache_read or 0),
-        "cache_write_tokens": int(cache_write or 0),
-        "cost_usd": cost_usd(model, input_tokens, output_tokens, cache_read, cache_write),
-    })
+    ctx["calls"].append(
+        {
+            "provider": provider,
+            "model": model,
+            "input_tokens": int(input_tokens or 0),
+            "output_tokens": int(output_tokens or 0),
+            "cache_read_tokens": int(cache_read or 0),
+            "cache_write_tokens": int(cache_write or 0),
+            "cost_usd": cost_usd(model, input_tokens, output_tokens, cache_read, cache_write),
+        }
+    )
 
 
 def snapshot() -> dict[str, Any]:
@@ -104,8 +114,11 @@ def snapshot() -> dict[str, Any]:
     cr = sum(c["cache_read_tokens"] for c in calls)
     cw = sum(c["cache_write_tokens"] for c in calls)
     return {
-        "calls": len(calls), "input_tokens": inp, "output_tokens": out,
-        "cache_read_tokens": cr, "cache_write_tokens": cw,
+        "calls": len(calls),
+        "input_tokens": inp,
+        "output_tokens": out,
+        "cache_read_tokens": cr,
+        "cache_write_tokens": cw,
         "total_tokens": inp + out + cr + cw,
         "cost_usd": round(sum(c["cost_usd"] for c in calls), 6),
     }
@@ -125,6 +138,7 @@ async def flush() -> dict[str, Any]:
         return snap
     try:
         from writer_engine.config import get_settings
+
         settings = get_settings()
         if not (settings.supabase_url and settings.supabase_service_role_key):
             return snap
@@ -134,11 +148,18 @@ async def flush() -> dict[str, Any]:
         client = await get_supabase_admin()
         meta_base = {"project_id": ctx.get("project_id"), "chapter_number": ctx.get("chapter_number")}
         await persist_token_usage(
-            client, user_id=str(user_id), workflow=ctx.get("workflow") or "engine",
-            calls=ctx["calls"], metadata=meta_base,
+            client,
+            user_id=str(user_id),
+            workflow=ctx.get("workflow") or "engine",
+            calls=ctx["calls"],
+            metadata=meta_base,
         )
-        logger.info("token_accounting.flushed", workflow=ctx.get("workflow"),
-                    chapter=ctx.get("chapter_number"), **snap)
+        logger.info(
+            "token_accounting.flushed",
+            workflow=ctx.get("workflow"),
+            chapter=ctx.get("chapter_number"),
+            **snap,
+        )
     except Exception as exc:  # never break the op on accounting
         logger.warning("token_accounting.flush_failed", error=str(exc)[:200], **snap)
     finally:

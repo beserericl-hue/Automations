@@ -41,7 +41,7 @@ def _cover_prompt(payload: dict) -> str:
     genre = str(payload.get("genre_slug") or payload.get("genre") or "")
     summary = str(payload.get("summary") or payload.get("premise") or "")
     parts = [
-        f"Professional book cover illustration for the novel \"{title}\"",
+        f'Professional book cover illustration for the novel "{title}"',
         f"a {genre} novel" if genre else "",
         summary[:400],
         "evocative, atmospheric, high detail, dramatic lighting, portrait orientation, "
@@ -88,8 +88,13 @@ async def _kieai_cover(prompt: str, *, key: str, timeout_s: int = 180) -> bytes 
 async def _dalle_cover(prompt: str, *, key: str) -> bytes | None:
     """OpenAI DALL-E 3 fallback — portrait book-cover size, returned as bytes."""
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {key}"}
-    body = {"model": "dall-e-3", "prompt": prompt[:3900], "size": "1024x1792", "n": 1,
-            "response_format": "b64_json"}
+    body = {
+        "model": "dall-e-3",
+        "prompt": prompt[:3900],
+        "size": "1024x1792",
+        "n": 1,
+        "response_format": "b64_json",
+    }
     async with httpx.AsyncClient(timeout=120.0) as client:
         try:
             r = await client.post(_OPENAI_IMAGES, headers=headers, json=body)
@@ -118,8 +123,12 @@ async def _upload_cover(image: bytes, *, user_id: str, title: str, settings) -> 
         try:
             r = await client.post(
                 f"{base}/storage/v1/object/cover-images/{path}",
-                headers={"apikey": key, "Authorization": f"Bearer {key}",
-                         "Content-Type": "image/png", "x-upsert": "true"},
+                headers={
+                    "apikey": key,
+                    "Authorization": f"Bearer {key}",
+                    "Content-Type": "image/png",
+                    "x-upsert": "true",
+                },
                 content=image,
             )
             r.raise_for_status()
@@ -129,8 +138,15 @@ async def _upload_cover(image: bytes, *, user_id: str, title: str, settings) -> 
 
 
 async def _record_generated_image(
-    *, storage_path: str, user_id: str, project_id: str | None, prompt: str,
-    genre_slug: str | None, provider: str, title: str, settings,
+    *,
+    storage_path: str,
+    user_id: str,
+    project_id: str | None,
+    prompt: str,
+    genre_slug: str | None,
+    provider: str,
+    title: str,
+    settings,
 ) -> bool:
     """Insert a generated_images_v2 row so the cover shows in the UI gallery / as the project cover.
 
@@ -156,8 +172,12 @@ async def _record_generated_image(
         try:
             r = await client.post(
                 f"{base}/rest/v1/generated_images_v2",
-                headers={"apikey": key, "Authorization": f"Bearer {key}",
-                         "Content-Type": "application/json", "Prefer": "return=minimal"},
+                headers={
+                    "apikey": key,
+                    "Authorization": f"Bearer {key}",
+                    "Content-Type": "application/json",
+                    "Prefer": "return=minimal",
+                },
                 json=body,
             )
             r.raise_for_status()
@@ -182,21 +202,33 @@ async def _op_cover_art(payload: dict) -> dict:
         image = await _dalle_cover(prompt, key=settings.openai_api_key)
         provider = "dalle" if image else provider
     if image is None:
-        return {"image_url": f"https://placehold.co/1600x2400?text={_slug(title)}",
-                "provider": "stub", "prompt": prompt}
+        return {
+            "image_url": f"https://placehold.co/1600x2400?text={_slug(title)}",
+            "provider": "stub",
+            "prompt": prompt,
+        }
 
     public_url, storage_path = await _upload_cover(image, user_id=user_id, title=title, settings=settings)
     recorded = False
     if storage_path:
         recorded = await _record_generated_image(
-            storage_path=storage_path, user_id=user_id,
+            storage_path=storage_path,
+            user_id=user_id,
             project_id=(str(payload["project_id"]) if payload.get("project_id") else None),
-            prompt=prompt, genre_slug=(payload.get("genre_slug") or payload.get("genre")),
-            provider=provider, title=title, settings=settings,
+            prompt=prompt,
+            genre_slug=(payload.get("genre_slug") or payload.get("genre")),
+            provider=provider,
+            title=title,
+            settings=settings,
         )
-    return {"image_url": public_url or "(generated, not persisted — storage unconfigured)",
-            "storage_path": storage_path, "provider": provider,
-            "persisted": bool(public_url), "db_recorded": recorded, "prompt": prompt}
+    return {
+        "image_url": public_url or "(generated, not persisted — storage unconfigured)",
+        "storage_path": storage_path,
+        "provider": provider,
+        "persisted": bool(public_url),
+        "db_recorded": recorded,
+        "prompt": prompt,
+    }
 
 
 def _social_system() -> str:
@@ -229,11 +261,19 @@ async def _persist_social_posts(payload: dict, posts: dict) -> dict | None:
         project_id = payload.get("project_id")
         if not project_id and payload.get("project_title"):
             project_id, _row = await resolve_project_id(
-                client, user_id=str(user_id), title=str(payload["project_title"]))
-        rows = [{"user_id": str(user_id), "project_id": project_id, "platform": p,
-                 "post_text": t.strip(), "status": "draft"}
-                for p, t in posts.items()
-                if p in _VALID_SOCIAL and str(t).strip() and not str(t).lstrip().startswith("(fixture)")]
+                client, user_id=str(user_id), title=str(payload["project_title"])
+            )
+        rows = [
+            {
+                "user_id": str(user_id),
+                "project_id": project_id,
+                "platform": p,
+                "post_text": t.strip(),
+                "status": "draft",
+            }
+            for p, t in posts.items()
+            if p in _VALID_SOCIAL and str(t).strip() and not str(t).lstrip().startswith("(fixture)")
+        ]
         if not rows:
             return {"persisted": False, "reason": "no valid-platform posts to save"}
         await client.table("social_posts_v2").insert(rows).execute()
@@ -269,7 +309,7 @@ async def _op_social_posts(payload: dict) -> dict:
             "error": "insufficient_context",
             "message": (
                 "I couldn't generate a social post — tell me which project and what the post is about, e.g. "
-                "\"Write a LinkedIn post for The Last Signal introducing our newsletter.\""
+                '"Write a LinkedIn post for The Last Signal introducing our newsletter."'
             ),
         }
     persisted = await _persist_social_posts(payload, posts)
@@ -289,14 +329,20 @@ async def _op_scrape_url(payload: dict) -> dict:
         try:
             r = await client.post(
                 "https://api.firecrawl.dev/v1/scrape",
-                headers={"Authorization": f"Bearer {settings.firecrawl_api_key}",
-                         "Content-Type": "application/json"},
+                headers={
+                    "Authorization": f"Bearer {settings.firecrawl_api_key}",
+                    "Content-Type": "application/json",
+                },
                 json=body,
             )
             r.raise_for_status()
             data = r.json().get("data") or {}
-            return {"url": url, "markdown": data.get("markdown") or "", "html": data.get("html") or "",
-                    "metadata": data.get("metadata") or {}}
+            return {
+                "url": url,
+                "markdown": data.get("markdown") or "",
+                "html": data.get("html") or "",
+                "metadata": data.get("metadata") or {},
+            }
         except Exception as e:
             return {"url": url, "markdown": "", "html": "", "metadata": {}, "error": str(e)[:200]}
 
@@ -321,8 +367,10 @@ async def handler(inp: StepInput) -> StepOutput:
             execution_id=inp.execution_id,
             step_name=STEP_NAME,
             status=StepStatus.ERROR,
-            error={"code": str(result.get("error")),  # type: ignore[arg-type]
-                   "message": str(result.get("message") or result.get("error"))},
+            error={
+                "code": str(result.get("error")),  # type: ignore[arg-type]
+                "message": str(result.get("message") or result.get("error")),
+            },
         )
     return StepOutput(
         execution_id=inp.execution_id,

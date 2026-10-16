@@ -22,11 +22,18 @@ def test_parallel_subs_run_concurrently_no_provider() -> None:
     # full write op: confirm the parallel flag path returns a chapter (fixture) without raising.
     import uuid
 
-    out = asyncio.run(CHAPTER_OPS["write"]({
-        "project_id": str(uuid.uuid4()), "chapter_number": 1, "chapter_run_id": str(uuid.uuid4()),
-        "parallel_subchapters": True, "sub_chapter_count_override": 3,
-        "sub_chapter_briefs": [{"beat": "a"}, {"beat": "b"}, {"beat": "c"}],
-    }))
+    out = asyncio.run(
+        CHAPTER_OPS["write"](
+            {
+                "project_id": str(uuid.uuid4()),
+                "chapter_number": 1,
+                "chapter_run_id": str(uuid.uuid4()),
+                "parallel_subchapters": True,
+                "sub_chapter_count_override": 3,
+                "sub_chapter_briefs": [{"beat": "a"}, {"beat": "b"}, {"beat": "c"}],
+            }
+        )
+    )
     assert "content_text" in out and "word_count" in out
 
 
@@ -37,11 +44,18 @@ def test_write_subchapter_plan_context_path_reaches_llm() -> None:
     from writer_engine.llm import ProviderNotRegistered
 
     try:
-        res = asyncio.run(_write_subchapter(
-            system="cached system prefix", brief=SubChapterBrief(beat="x"), idx=1, total=3,
-            prior_tail="", chapter_number=1, model="claude-sonnet-4-6",
-            plan_context="CHAPTER PLAN ...",
-        ))
+        res = asyncio.run(
+            _write_subchapter(
+                system="cached system prefix",
+                brief=SubChapterBrief(beat="x"),
+                idx=1,
+                total=3,
+                prior_tail="",
+                chapter_number=1,
+                model="claude-sonnet-4-6",
+                plan_context="CHAPTER PLAN ...",
+            )
+        )
         assert isinstance(res, tuple) and isinstance(res[0], str)  # (prose, cache_read, cache_write)
     except ProviderNotRegistered:
         pass  # no provider -> reached the LLM call via the plan-context branch (expected)

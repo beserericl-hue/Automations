@@ -22,17 +22,19 @@ class _Router:
 
 
 def test_newsletter_assembles_structure_and_persists_as_newsletter(monkeypatch):
-    payload_json = json.dumps({
-        "subject_line": "Power Structures in Space",
-        "pre_header": "How sci-fi predicts real politics",
-        "intro": "The intro hook.",
-        "sections": [
-            {"heading": "Empires", "body": "Body about empires. See https://example.com/a"},
-            {"heading": "Rebellions", "body": "Body about rebellions."},
-        ],
-        "outro": "What do you think?",
-        "title": "Power Structures in Space",
-    })
+    payload_json = json.dumps(
+        {
+            "subject_line": "Power Structures in Space",
+            "pre_header": "How sci-fi predicts real politics",
+            "intro": "The intro hook.",
+            "sections": [
+                {"heading": "Empires", "body": "Body about empires. See https://example.com/a"},
+                {"heading": "Rebellions", "body": "Body about rebellions."},
+            ],
+            "outro": "What do you think?",
+            "title": "Power Structures in Space",
+        }
+    )
     captured: dict = {}
 
     async def fake_research(*a, **k):
@@ -50,10 +52,17 @@ def test_newsletter_assembles_structure_and_persists_as_newsletter(monkeypatch):
     monkeypatch.setattr(ch, "_persist_simple", fake_persist)
     monkeypatch.setattr(ch, "get_router", lambda **k: _Router(payload_json))
 
-    out = asyncio.run(ch._op_newsletter({
-        "topic": "Power Structures in Space", "genre_slug": "political-scifi",
-        "user_id": "+14105914612", "persist": True, "date": "2026-03-10",
-    }))
+    out = asyncio.run(
+        ch._op_newsletter(
+            {
+                "topic": "Power Structures in Space",
+                "genre_slug": "political-scifi",
+                "user_id": "+14105914612",
+                "persist": True,
+                "date": "2026-03-10",
+            }
+        )
+    )
 
     assert out["written"] is True
     assert out["subject_line"] == "Power Structures in Space"

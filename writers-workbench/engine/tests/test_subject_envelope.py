@@ -81,9 +81,7 @@ def test_aliases_subject_and_preheader() -> None:
 
 
 def test_recommended_envelope_alias() -> None:
-    p = SubjectLineProposal.model_validate(
-        {"recommended": {"subject_line": "R", "pre_header_text": "RP"}}
-    )
+    p = SubjectLineProposal.model_validate({"recommended": {"subject_line": "R", "pre_header_text": "RP"}})
     assert p.subject_line == "R"
     assert p.pre_header_text == "RP"
 

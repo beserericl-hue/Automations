@@ -36,7 +36,9 @@ async def load_app_config(client, keys, user_id=None) -> dict[str, str]:
     cfg: dict[str, str] = {}
     global_cfg: dict[str, str] = {}
     with contextlib.suppress(Exception):
-        rows = await client.table("app_config_v2").select("key,value,user_id").in_("key", list(keys)).execute()
+        rows = (
+            await client.table("app_config_v2").select("key,value,user_id").in_("key", list(keys)).execute()
+        )
         for r in getattr(rows, "data", None) or []:
             if not r.get("value"):
                 continue

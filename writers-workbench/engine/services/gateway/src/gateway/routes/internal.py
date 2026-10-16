@@ -30,12 +30,17 @@ async def _execute_eve_callback(req: HubRequest, plan: Any) -> HubResponse:
     """V30: resolve the target content SYNCHRONOUSLY first; only queue the real callback when found, so
     a not-found request returns kind=data with NO job_id and NO outbound call / KB op."""
     url = _write_url("notify")
-    resolve = await _forward("POST", url, json={**plan.body, "resolve_only": True, "async": False}, timeout_s=60.0)
+    resolve = await _forward(
+        "POST", url, json={**plan.body, "resolve_only": True, "async": False}, timeout_s=60.0
+    )
     result = (resolve.get("payload") or {}).get("result") or {}
     if not result.get("found"):
         logger.info("hub.eve_callback.not_found", user_id=req.user_id)
         return HubResponse(
-            kind="data", tool="notify", op="eve-callback", data=result,
+            kind="data",
+            tool="notify",
+            op="eve-callback",
+            data=result,
             assistant_message=result.get("message") or "I couldn't find that to call you back about.",
         )
     body = {**plan.body}
@@ -45,8 +50,12 @@ async def _execute_eve_callback(req: HubRequest, plan: Any) -> HubResponse:
     enq = await _forward("POST", url, json={**body, "async": True}, timeout_s=30.0)
     logger.info("hub.eve_callback.queued", user_id=req.user_id, job_id=enq.get("job_id"))
     return HubResponse(
-        kind="queued", tool="notify", op="eve-callback", assistant_message=plan.assistant_message,
-        job_id=enq.get("job_id"), status=enq.get("status", "queued"),
+        kind="queued",
+        tool="notify",
+        op="eve-callback",
+        assistant_message=plan.assistant_message,
+        job_id=enq.get("job_id"),
+        status=enq.get("status", "queued"),
     )
 
 
@@ -68,16 +77,25 @@ async def _execute_multi(req: HubRequest, clauses: list[str]) -> HubResponse:
                 await _forward("POST", url, json=plan.body, timeout_s=120.0)
             else:
                 enq = await _forward("POST", url, json={**plan.body, "async": True}, timeout_s=30.0)
-                jobs.append({"tool": plan.tool, "op": plan.op,
-                             "job_id": enq.get("job_id"), "status": enq.get("status", "queued")})
+                jobs.append(
+                    {
+                        "tool": plan.tool,
+                        "op": plan.op,
+                        "job_id": enq.get("job_id"),
+                        "status": enq.get("status", "queued"),
+                    }
+                )
             if plan.assistant_message:
                 msgs.append(plan.assistant_message)
         except HTTPException as exc:
             logger.error("hub.multi.failed", tool=plan.tool, op=plan.op, detail=str(exc.detail)[:200])
     logger.info("hub.multi", user_id=req.user_id, tasks=len(clauses), jobs=len(jobs))
     return HubResponse(
-        kind="queued", assistant_message=" ".join(msgs) or "Working on those — I'll let you know.",
-        job_id=(jobs[0]["job_id"] if jobs else None), jobs=jobs, status="queued",
+        kind="queued",
+        assistant_message=" ".join(msgs) or "Working on those — I'll let you know.",
+        job_id=(jobs[0]["job_id"] if jobs else None),
+        jobs=jobs,
+        status="queued",
     )
 
 
@@ -94,8 +112,12 @@ async def _execute_hub(req: HubRequest) -> HubResponse:
     decision = await route_message(req)
     plan = build_dispatch_plan(decision, req)
     logger.info(
-        "hub.dispatch", action=plan.action, tool=plan.tool, op=plan.op,
-        params=list(plan.body.keys()), user_id=req.user_id,
+        "hub.dispatch",
+        action=plan.action,
+        tool=plan.tool,
+        op=plan.op,
+        params=list(plan.body.keys()),
+        user_id=req.user_id,
     )
 
     if plan.action == "reply":
@@ -106,8 +128,13 @@ async def _execute_hub(req: HubRequest) -> HubResponse:
         try:
             return await _execute_eve_callback(req, plan)
         except HTTPException as exc:
-            logger.error("hub.dispatch_failed", tool="notify", op="eve-callback",
-                         status_code=exc.status_code, detail=str(exc.detail)[:300])
+            logger.error(
+                "hub.dispatch_failed",
+                tool="notify",
+                op="eve-callback",
+                status_code=exc.status_code,
+                detail=str(exc.detail)[:300],
+            )
             raise
 
     url = _write_url(plan.tool)
@@ -116,26 +143,41 @@ async def _execute_hub(req: HubRequest) -> HubResponse:
             data = await _forward("POST", url, json=plan.body, timeout_s=120.0)
             logger.info("hub.sync_ok", tool=plan.tool, op=plan.op, user_id=req.user_id)
             return HubResponse(
-                kind="data", assistant_message=plan.assistant_message,
-                tool=plan.tool, op=plan.op, data=data,
+                kind="data",
+                assistant_message=plan.assistant_message,
+                tool=plan.tool,
+                op=plan.op,
+                data=data,
             )
 
         # enqueue — heavy generation; orchestrator returns {job_id, status, tool}
         enq = await _forward("POST", url, json=plan.body, timeout_s=30.0)
         logger.info(
-            "hub.enqueued", tool=plan.tool, op=plan.op, job_id=enq.get("job_id"),
-            user_id=req.user_id, chapter=plan.body.get("chapter_number"),
+            "hub.enqueued",
+            tool=plan.tool,
+            op=plan.op,
+            job_id=enq.get("job_id"),
+            user_id=req.user_id,
+            chapter=plan.body.get("chapter_number"),
             project=plan.body.get("project_id") or plan.body.get("project_title"),
         )
         return HubResponse(
-            kind="queued", assistant_message=plan.assistant_message,
-            tool=plan.tool, op=plan.op,
-            job_id=enq.get("job_id"), status=enq.get("status", "queued"),
+            kind="queued",
+            assistant_message=plan.assistant_message,
+            tool=plan.tool,
+            op=plan.op,
+            job_id=enq.get("job_id"),
+            status=enq.get("status", "queued"),
         )
     except HTTPException as exc:
         logger.error(
-            "hub.dispatch_failed", action=plan.action, tool=plan.tool, op=plan.op,
-            status_code=exc.status_code, detail=str(exc.detail)[:300], user_id=req.user_id,
+            "hub.dispatch_failed",
+            action=plan.action,
+            tool=plan.tool,
+            op=plan.op,
+            status_code=exc.status_code,
+            detail=str(exc.detail)[:300],
+            user_id=req.user_id,
         )
         raise
 
@@ -183,9 +225,7 @@ async def hub_voice(body: dict[str, Any]) -> dict[str, Any]:
     resp = await _execute_hub(req)
     # Flat shape ElevenLabs reads without nested-field config. For an info op with data, hand back a
     # short spoken line plus the data so the agent can summarise it aloud.
-    spoken = resp.assistant_message or (
-        "Here's what I found." if resp.kind == "data" else "Okay."
-    )
+    spoken = resp.assistant_message or ("Here's what I found." if resp.kind == "data" else "Okay.")
     out: dict[str, Any] = {"response": spoken, "kind": resp.kind}
     if resp.tool:
         out["tool"] = resp.tool

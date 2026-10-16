@@ -42,11 +42,12 @@ async def _op_list(payload: dict) -> dict:
             client, user_id=payload.get("user_id"), title=str(payload["project_title"])
         )
         if not project_id:
-            return {"entries": [], "found": False,
-                    "message": f"No project matching '{payload['project_title']}' found."}
-    resp = await (
-        client.table("story_bible_v2").select("*").eq("project_id", project_id).execute()
-    )
+            return {
+                "entries": [],
+                "found": False,
+                "message": f"No project matching '{payload['project_title']}' found.",
+            }
+    resp = await client.table("story_bible_v2").select("*").eq("project_id", project_id).execute()
     rows = getattr(resp, "data", None) or []
     return {"entries": rows, "count": len(rows), "found": bool(rows), "project_id": project_id}
 

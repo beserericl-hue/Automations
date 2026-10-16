@@ -68,8 +68,8 @@ EXPECTED_KEYS = {
 
 
 def test_all_documented_keys_present_and_nonempty() -> None:
-    assert set(FOLLETT_SEEDS) >= EXPECTED_KEYS, (
-        "missing craft seeds: " + ", ".join(sorted(EXPECTED_KEYS - set(FOLLETT_SEEDS)))
+    assert set(FOLLETT_SEEDS) >= EXPECTED_KEYS, "missing craft seeds: " + ", ".join(
+        sorted(EXPECTED_KEYS - set(FOLLETT_SEEDS))
     )
     for key in EXPECTED_KEYS:
         assert FOLLETT_SEEDS[key].strip(), f"{key} is empty"

@@ -24,8 +24,12 @@ seed_default_prompts()
 
 def _build_derive_user(topic: str, genre: str, setting: str) -> str:
     """The derive instruction (follett_seeds.research.derive) formatted for this project."""
-    return get_prompt_store().get("follett_seeds.research.derive").format(
-        topic=topic or "(unspecified)", genre=genre or "(unspecified)", setting=setting or "(unspecified)"
+    return (
+        get_prompt_store()
+        .get("follett_seeds.research.derive")
+        .format(
+            topic=topic or "(unspecified)", genre=genre or "(unspecified)", setting=setting or "(unspecified)"
+        )
     )
 
 
@@ -58,10 +62,7 @@ async def _derive(topic: str, genre: str, setting: str) -> list[str]:
 def _build_query_prompt(question: str, period: str, place: str) -> str:
     """Shape the Perplexity query per follett_seeds.research.perplexity_query."""
     shape = get_prompt_store().get("follett_seeds.research.perplexity_query")
-    return (
-        f"{shape}\n\nNow research, for a novel set in {period or 'the present'} {place or ''}: "
-        f"{question}"
-    )
+    return f"{shape}\n\nNow research, for a novel set in {period or 'the present'} {place or ''}: {question}"
 
 
 async def _query(question: str, period: str, place: str) -> str:
@@ -85,9 +86,12 @@ async def _query(question: str, period: str, place: str) -> str:
 
 def _synthesis_system() -> str:
     """Sal-and-the-potatoes: turn findings into scene seeds for existing characters."""
-    return compose_craft_system(
-        seed_keys=["follett_seeds.research.scene_seed", "follett_seeds.research.setback_opportunity"]
-    ) + "\n\nReturn a markdown research report: per finding give the fact, its citation, the 'surprise a modern reader' angle, and a scene seed (or mark BACKGROUND-ONLY)."
+    return (
+        compose_craft_system(
+            seed_keys=["follett_seeds.research.scene_seed", "follett_seeds.research.setback_opportunity"]
+        )
+        + "\n\nReturn a markdown research report: per finding give the fact, its citation, the 'surprise a modern reader' angle, and a scene seed (or mark BACKGROUND-ONLY)."
+    )
 
 
 async def _synthesize(topic: str, qa: list[dict[str, str]], characters: str) -> str:
@@ -114,18 +118,14 @@ async def _op_run(payload: dict) -> dict:
     place = str(payload.get("place") or "")
     characters = str(payload.get("characters") or "")
     questions = await _derive(req.topic, genre, setting)
-    qa: list[dict[str, str]] = [
-        {"question": q, "answer": await _query(q, period, place)} for q in questions
-    ]
+    qa: list[dict[str, str]] = [{"question": q, "answer": await _query(q, period, place)} for q in questions]
     report = await _synthesize(req.topic, qa, characters)
     row = ResearchReportRow(id=uuid4(), topic=req.topic, questions=questions, report_markdown=report)
     persisted = await _persist_research_if_requested(payload, req.topic, report, genre)
     return {"row": row.model_dump(mode="json"), "qa": qa, "persist": persisted}
 
 
-async def _persist_research_if_requested(
-    payload: dict, topic: str, report: str, genre: str
-) -> dict | None:
+async def _persist_research_if_requested(payload: dict, topic: str, report: str, genre: str) -> dict | None:
     """CR-001 (W5): when `persist` + user_id are supplied, save the report to research_reports_v2."""
     from writer_engine.config import get_settings
 
@@ -145,8 +145,12 @@ async def _persist_research_if_requested(
         client = await get_supabase_admin()
         labelled = f"[project {project_id}] {topic}" if project_id else topic
         rid = await persist_research(
-            client, project_id=str(project_id) if project_id else None, user_id=str(user_id),
-            topic=labelled, content=report, genre_slug=genre,
+            client,
+            project_id=str(project_id) if project_id else None,
+            user_id=str(user_id),
+            topic=labelled,
+            content=report,
+            genre_slug=genre,
         )
         return {"persisted": bool(rid), "research_id": rid}
     except Exception as exc:

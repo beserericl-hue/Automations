@@ -60,11 +60,15 @@ _APP_CONFIG = [{"key": "recipient_email", "value": "eric@agileadtesting.com"}]
 
 def test_inline_content_renders_and_sends(monkeypatch):
     sent = _patch(monkeypatch, {"app_config_v2": _APP_CONFIG})
-    out = asyncio.run(lib._op_email_content({
-        "user_id": "u1",
-        "subject": "Regression Test: Email Report",
-        "content": "# Heading\n\n- bullet one\n- bullet two\n\n1. first\n2. second",
-    }))
+    out = asyncio.run(
+        lib._op_email_content(
+            {
+                "user_id": "u1",
+                "subject": "Regression Test: Email Report",
+                "content": "# Heading\n\n- bullet one\n- bullet two\n\n1. first\n2. second",
+            }
+        )
+    )
     assert out["emailed"] is True
     assert out["to"] == "eric@agileadtesting.com"
     assert len(sent) == 1
@@ -77,9 +81,15 @@ def test_inline_content_renders_and_sends(monkeypatch):
 
 def test_explicit_recipient_overrides_app_config(monkeypatch):
     sent = _patch(monkeypatch, {"app_config_v2": _APP_CONFIG})
-    out = asyncio.run(lib._op_email_content({
-        "user_id": "u1", "content": "hello", "recipient": "override@example.com",
-    }))
+    out = asyncio.run(
+        lib._op_email_content(
+            {
+                "user_id": "u1",
+                "content": "hello",
+                "recipient": "override@example.com",
+            }
+        )
+    )
     assert out["emailed"] is True
     assert out["to"] == "override@example.com"
     assert sent[0]["to"] == ["override@example.com"]
@@ -88,19 +98,27 @@ def test_explicit_recipient_overrides_app_config(monkeypatch):
 def test_resolve_outline_renders_structure_not_json(monkeypatch):
     tables = {
         "app_config_v2": _APP_CONFIG,
-        "writing_projects_v2": [{
-            "title": "The Seed Vault",
-            "outline": {
-                "premise": "Seeds outlast the fall.",
-                "characters": [{"name": "Mara", "description": "the seed-keeper"}],
-                "chapters": [{"chapter_number": 1, "title": "The Vault", "beat": "Mara descends"}],
-            },
-        }],
+        "writing_projects_v2": [
+            {
+                "title": "The Seed Vault",
+                "outline": {
+                    "premise": "Seeds outlast the fall.",
+                    "characters": [{"name": "Mara", "description": "the seed-keeper"}],
+                    "chapters": [{"chapter_number": 1, "title": "The Vault", "beat": "Mara descends"}],
+                },
+            }
+        ],
     }
     sent = _patch(monkeypatch, tables)
-    out = asyncio.run(lib._op_email_content({
-        "user_id": "u1", "content_type": "outline", "title": "The Seed Vault",
-    }))
+    out = asyncio.run(
+        lib._op_email_content(
+            {
+                "user_id": "u1",
+                "content_type": "outline",
+                "title": "The Seed Vault",
+            }
+        )
+    )
     assert out["emailed"] is True
     assert "Outline" in out["subject"]
     html = sent[0]["html"]
@@ -112,16 +130,25 @@ def test_resolve_outline_renders_structure_not_json(monkeypatch):
 def test_not_found_sends_nothing(monkeypatch):
     tables = {
         "app_config_v2": _APP_CONFIG,
-        "published_content_v2": [{
-            "title": "An Entirely Different Tale", "content_text": "irrelevant",
-            "content_type": "short_story", "chapter_number": None,
-        }],
+        "published_content_v2": [
+            {
+                "title": "An Entirely Different Tale",
+                "content_text": "irrelevant",
+                "content_type": "short_story",
+                "chapter_number": None,
+            }
+        ],
     }
     sent = _patch(monkeypatch, tables)
-    out = asyncio.run(lib._op_email_content({
-        "user_id": "u1", "content_type": "short_story",
-        "search_term": "A Story That Definitely Does Not Exist",
-    }))
+    out = asyncio.run(
+        lib._op_email_content(
+            {
+                "user_id": "u1",
+                "content_type": "short_story",
+                "search_term": "A Story That Definitely Does Not Exist",
+            }
+        )
+    )
     assert out["emailed"] is False
     assert out.get("error_message")
     assert sent == []  # no email on not-found
@@ -133,15 +160,25 @@ def test_allow_recent_research_falls_back_to_most_recent(monkeypatch):
     tables = {
         "app_config_v2": _APP_CONFIG,
         "research_reports_v2": [
-            {"topic": "The fall of the Roman Empire", "content": "Rome fell because…", "created_at": "2026-07-02T00:00:00Z"},
+            {
+                "topic": "The fall of the Roman Empire",
+                "content": "Rome fell because…",
+                "created_at": "2026-07-02T00:00:00Z",
+            },
             {"topic": "An older unrelated report", "content": "stale", "created_at": "2026-01-01T00:00:00Z"},
         ],
     }
     sent = _patch(monkeypatch, tables)
-    out = asyncio.run(lib._op_email_content({
-        "user_id": "u1", "content_type": "research",
-        "subject": "voice test research report", "allow_recent": True,
-    }))
+    out = asyncio.run(
+        lib._op_email_content(
+            {
+                "user_id": "u1",
+                "content_type": "research",
+                "subject": "voice test research report",
+                "allow_recent": True,
+            }
+        )
+    )
     assert out["emailed"] is True
     assert sent[0]["subject"] == "voice test research report"
     assert "Rome fell because" in sent[0]["html"]
@@ -152,12 +189,22 @@ def test_research_without_allow_recent_and_no_match_is_not_found(monkeypatch):
     tables = {
         "app_config_v2": _APP_CONFIG,
         "research_reports_v2": [
-            {"topic": "The fall of the Roman Empire", "content": "Rome fell…", "created_at": "2026-07-02T00:00:00Z"},
+            {
+                "topic": "The fall of the Roman Empire",
+                "content": "Rome fell…",
+                "created_at": "2026-07-02T00:00:00Z",
+            },
         ],
     }
     sent = _patch(monkeypatch, tables)
-    out = asyncio.run(lib._op_email_content({
-        "user_id": "u1", "content_type": "research", "search_term": "Quantum Widgets of Neptune",
-    }))
+    out = asyncio.run(
+        lib._op_email_content(
+            {
+                "user_id": "u1",
+                "content_type": "research",
+                "search_term": "Quantum Widgets of Neptune",
+            }
+        )
+    )
     assert out["emailed"] is False
     assert sent == []

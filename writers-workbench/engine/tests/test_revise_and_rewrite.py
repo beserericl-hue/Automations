@@ -24,11 +24,15 @@ def test_plan_op_registered() -> None:
 
 
 def test_roster_from_outline() -> None:
-    roster = _roster_from_outline({"characters": [
-        {"name": "Saya", "role": "Past POV (1693)", "description": "the woman who ran"},
-        {"name": "Tayak"},
-        {"role": "no name — dropped"},
-    ]})
+    roster = _roster_from_outline(
+        {
+            "characters": [
+                {"name": "Saya", "role": "Past POV (1693)", "description": "the woman who ran"},
+                {"name": "Tayak"},
+                {"role": "no name — dropped"},
+            ]
+        }
+    )
     assert roster[0]["name"] == "Saya" and "1693" in roster[0]["description"]
     assert any(r["name"] == "Tayak" for r in roster)
     assert len(roster) == 2
@@ -36,20 +40,27 @@ def test_roster_from_outline() -> None:
 
 def test_apply_ctx_overrides_uses_outline_and_derives_roster() -> None:
     base = {"genre_slug": "g", "title": "DB Title", "outline": {"a": 1}, "roster": []}
-    ov = _apply_ctx_overrides(dict(base), {
-        "title": "The Burial Mound",
-        "outline": {"characters": [{"name": "Yanu", "role": "founding ancestor"}], "chapters": []},
-    })
+    ov = _apply_ctx_overrides(
+        dict(base),
+        {
+            "title": "The Burial Mound",
+            "outline": {"characters": [{"name": "Yanu", "role": "founding ancestor"}], "chapters": []},
+        },
+    )
     assert ov["title"] == "The Burial Mound"
     assert ov["outline"]["characters"][0]["name"] == "Yanu"
     assert ov["roster"][0]["name"] == "Yanu"  # roster derived from the override outline
 
 
 def test_briefs_from_payload_parses_dicts_and_strings() -> None:
-    briefs = _briefs_from_payload({"sub_chapter_briefs": [
-        {"title": "Arrival", "beat": "Saya reaches the river", "pov_character": "Saya"},
-        "She buries the pendant",
-    ]})
+    briefs = _briefs_from_payload(
+        {
+            "sub_chapter_briefs": [
+                {"title": "Arrival", "beat": "Saya reaches the river", "pov_character": "Saya"},
+                "She buries the pendant",
+            ]
+        }
+    )
     assert len(briefs) == 2
     assert briefs[0].title == "Arrival" and briefs[0].pov_character == "Saya"
     assert briefs[1].beat == "She buries the pendant"
@@ -100,11 +111,19 @@ def test_genre_eval_schema_coerces_0_100_and_wrapper() -> None:
 
 
 def test_bible_extract_normalizes_types_and_drops_invalid() -> None:
-    be = BibleExtract.model_validate({"entries": [
-        {"type": "Character", "name": "Tayak", "description": "archaeologist"},
-        {"entry_type": "weapon", "name": "atlatl", "description": "spear-thrower"},  # invalid -> concept
-        {"description": "no name — dropped"},
-    ]})
+    be = BibleExtract.model_validate(
+        {
+            "entries": [
+                {"type": "Character", "name": "Tayak", "description": "archaeologist"},
+                {
+                    "entry_type": "weapon",
+                    "name": "atlatl",
+                    "description": "spear-thrower",
+                },  # invalid -> concept
+                {"description": "no name — dropped"},
+            ]
+        }
+    )
     assert len(be.entries) == 2
     assert be.entries[0].entry_type == "character"
     assert be.entries[1].entry_type == "concept"
@@ -119,10 +138,17 @@ def test_compact_outline_view_is_lean() -> None:
     from chapter_step.main import _compact_outline_view
 
     outline = {
-        "title": "The Burial Mound", "premise": "dual timeline", "story_arc_name": "The Descent",
+        "title": "The Burial Mound",
+        "premise": "dual timeline",
+        "story_arc_name": "The Descent",
         "chapters": [
-            {"chapter_number": i, "title": f"Ch{i}", "act": "Act I", "pov_character": "Tayak",
-             "beat": "X" * 400}
+            {
+                "chapter_number": i,
+                "title": f"Ch{i}",
+                "act": "Act I",
+                "pov_character": "Tayak",
+                "beat": "X" * 400,
+            }
             for i in range(96)
         ],
     }
@@ -138,8 +164,13 @@ def test_compact_outline_view_is_lean() -> None:
 def test_story_system_anchors_chapter_count_and_synopsis() -> None:
     from brainstorm_step.main import _build_story_system
 
-    s = _build_story_system("ancient-history", "", "The Burial Mound", target_chapters=96,
-                            locked_synopsis="A Piscataway archaeologist excavates a mound.")
+    s = _build_story_system(
+        "ancient-history",
+        "",
+        "The Burial Mound",
+        target_chapters=96,
+        locked_synopsis="A Piscataway archaeologist excavates a mound.",
+    )
     assert "CHAPTER-COUNT ANCHOR" in s and "96" in s
     assert "LOCKED SYNOPSIS" in s and "Piscataway" in s
     # no anchor when not supplied
@@ -149,8 +180,12 @@ def test_story_system_anchors_chapter_count_and_synopsis() -> None:
 def test_outline_chapter_title_helper() -> None:
     from chapter_step.main import _outline_chapter_title
 
-    outline = {"chapters": [{"chapter_number": 0, "title": "Prologue: What the Ground Keeps"},
-                            {"chapter_number": 1, "title": "The Permit"}]}
+    outline = {
+        "chapters": [
+            {"chapter_number": 0, "title": "Prologue: What the Ground Keeps"},
+            {"chapter_number": 1, "title": "The Permit"},
+        ]
+    }
     assert _outline_chapter_title(outline, 0) == "Prologue: What the Ground Keeps"
     assert _outline_chapter_title(outline, 1) == "The Permit"
     assert _outline_chapter_title(outline, 5) == ""
@@ -158,4 +193,5 @@ def test_outline_chapter_title_helper() -> None:
 
 def test_persist_canon_importable() -> None:
     from writer_engine import persist_helpers
+
     assert hasattr(persist_helpers, "persist_canon")

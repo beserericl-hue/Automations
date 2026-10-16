@@ -19,8 +19,11 @@ async def load_story_arc(client: Any, name: str | None) -> tuple[str, str]:
     term = str(name).strip()
     try:
         resp = await (
-            client.table("story_arcs_v2").select("name,description,prompt_text")
-            .ilike("name", f"%{term}%").limit(1).execute()
+            client.table("story_arcs_v2")
+            .select("name,description,prompt_text")
+            .ilike("name", f"%{term}%")
+            .limit(1)
+            .execute()
         )
         rows = getattr(resp, "data", None) or []
         if rows:
@@ -39,7 +42,11 @@ async def list_story_arcs(client: Any, user_id: str | None = None) -> list[dict]
         return []
     try:
         resp = await (
-            client.table("story_arcs_v2").select("name,description,user_id").order("name").limit(100).execute()
+            client.table("story_arcs_v2")
+            .select("name,description,user_id")
+            .order("name")
+            .limit(100)
+            .execute()
         )
         rows = getattr(resp, "data", None) or []
     except Exception:

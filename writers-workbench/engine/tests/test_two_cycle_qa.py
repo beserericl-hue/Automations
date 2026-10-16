@@ -31,8 +31,12 @@ def test_drift_report_not_aligned_with_drift() -> None:
 
 def test_drift_report_tolerates_wrapper_and_dict_entries() -> None:
     d = DriftReport.model_validate(
-        {"drift_report": {"story_drift": [{"issue": "missing midpoint reversal"}],
-                          "character_drift": "Nora's age changed"}}
+        {
+            "drift_report": {
+                "story_drift": [{"issue": "missing midpoint reversal"}],
+                "character_drift": "Nora's age changed",
+            }
+        }
     )
     assert d.story_drift == ["missing midpoint reversal"]
     assert d.character_drift == ["Nora's age changed"]
@@ -42,9 +46,15 @@ def test_drift_report_tolerates_wrapper_and_dict_entries() -> None:
 def test_drift_report_flattens_item_dicts() -> None:
     # the exact shape the live detector returned: [{"item": "..."}]
     d = DriftReport.model_validate(
-        {"character_drift": [{"item": "Okafor is named chair, then Delgado is chair, then Okafor returns as a delegate"}]}
+        {
+            "character_drift": [
+                {"item": "Okafor is named chair, then Delgado is chair, then Okafor returns as a delegate"}
+            ]
+        }
     )
-    assert d.character_drift == ["Okafor is named chair, then Delgado is chair, then Okafor returns as a delegate"]
+    assert d.character_drift == [
+        "Okafor is named chair, then Delgado is chair, then Okafor returns as a delegate"
+    ]
     assert d.aligned is False
 
 
@@ -108,10 +118,17 @@ def test_strip_scaffolding_keeps_clean_prose() -> None:
 
 
 def test_chapter_outline_beat_matches_by_number() -> None:
-    outline = {"chapters": [
-        {"chapter_number": 0, "title": "Prologue", "beat": "the mound is consecrated"},
-        {"chapter_number": 1, "title": "The Notice", "act": "Act I", "beat": "Tayak gets the condemnation notice"},
-    ]}
+    outline = {
+        "chapters": [
+            {"chapter_number": 0, "title": "Prologue", "beat": "the mound is consecrated"},
+            {
+                "chapter_number": 1,
+                "title": "The Notice",
+                "act": "Act I",
+                "beat": "Tayak gets the condemnation notice",
+            },
+        ]
+    }
     beat = _chapter_outline_beat(outline, 1)
     assert "The Notice" in beat and "Act I" in beat and "condemnation" in beat
 
@@ -126,8 +143,12 @@ def test_response_carries_two_cycle_telemetry() -> None:
     from uuid import uuid4
 
     r = WriteChapterResponse(
-        chapter_id=uuid4(), chapter_run_id=uuid4(), content_text="x", word_count=1,
-        sub_chapter_count=5, craft_passes=1,
+        chapter_id=uuid4(),
+        chapter_run_id=uuid4(),
+        content_text="x",
+        word_count=1,
+        sub_chapter_count=5,
+        craft_passes=1,
         drift_report={"aligned": False, "story_drift": ["s"], "character_drift": [], "research_gaps": ["g"]},
         research_gaps_filled=["g"],
         sub_chapter_briefs=[{"title": "t", "beat": "b", "pov_character": "Tayak"}],

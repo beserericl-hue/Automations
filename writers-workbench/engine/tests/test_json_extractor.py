@@ -35,7 +35,7 @@ def test_fixes_trailing_comma_in_array() -> None:
 
 
 def test_quotes_unquoted_keys() -> None:
-    text = "{name: \"Eve\", age: 42}"
+    text = '{name: "Eve", age: 42}'
     assert try_repair_json(text) == '{"name": "Eve", "age": 42}'
 
 
@@ -52,7 +52,7 @@ def test_strips_line_comments() -> None:
 
 
 def test_smart_quotes_to_straight() -> None:
-    text = '{“name”: “Eve”, “age”: 42}'
+    text = "{“name”: “Eve”, “age”: 42}"
     repaired = try_repair_json(text)
     assert repaired == '{"name": "Eve", "age": 42}'
 
