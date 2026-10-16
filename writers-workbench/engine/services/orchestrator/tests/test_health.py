@@ -145,3 +145,65 @@ def test_summarise_unhealthy_on_required_failure() -> None:
     assert ok is False
     assert body["status"] == "unhealthy"
     assert body["failed_required"] == ["a"]
+
+
+# --- A5: prompt reload must reach the process that generates text ---------------------------
+
+
+def test_reload_prompts_requires_admin_token(client: TestClient) -> None:
+    assert client.post("/admin/reload-prompts").status_code == 401
+
+
+def test_reload_prompts_fans_out_to_the_steps_process(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A5: the orchestrator is the only service that can reach the steps app (localhost-bound),
+    so it owns that hop. Reloading only its own store would leave every prompt unchanged."""
+    called: list[str] = []
+
+    class _Resp:
+        status_code = 200
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, int]:
+            return {"loaded": 7}
+
+    class _Client:
+        async def __aenter__(self) -> _Client:
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+        async def post(self, url: str, **_: object) -> _Resp:
+            called.append(url)
+            return _Resp()
+
+    monkeypatch.setattr(orch_main.httpx, "AsyncClient", lambda **_: _Client())
+    r = client.post("/admin/reload-prompts", headers={"x-admin-token": "test-admin-token"})
+    assert r.status_code == 200
+    assert r.json()["steps_loaded"] == 7
+    assert called and called[0].endswith("/admin/reload-prompts")
+    assert "8030" in called[0], "must target the steps process, not itself"
+
+
+def test_reload_prompts_reports_a_steps_failure(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A failed fan-out must be reported, not swallowed — otherwise prompt tuning silently no-ops."""
+
+    class _Boom:
+        async def __aenter__(self) -> _Boom:
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+        async def post(self, *_: object, **__: object) -> None:
+            raise RuntimeError("connection refused")
+
+    monkeypatch.setattr(orch_main.httpx, "AsyncClient", lambda **_: _Boom())
+    r = client.post("/admin/reload-prompts", headers={"x-admin-token": "test-admin-token"})
+    assert r.status_code == 200
+    assert "steps_error" in r.json()
+    assert "connection refused" in r.json()["steps_error"]

@@ -106,6 +106,13 @@ class EngineSettings(BaseSettings):
 
     # Inter-service
     orchestrator_url: str = Field(default="http://localhost:8001", alias="ORCHESTRATOR_URL")
+    # Base URL of the steps process, for admin fan-out (A5 prompt reload). Prompts are consumed
+    # there, so a reload that does not reach it changes nothing that generates text.
+    #
+    # Read by the ORCHESTRATOR, which shares the runtime container with the steps process and so can
+    # reach it on localhost. The gateway is a separate service and cannot — it fans out to the
+    # orchestrator (via `orchestrator_url`), which then does this hop. Empty = skip.
+    steps_admin_url: str = Field(default="http://localhost:8030", alias="STEPS_ADMIN_URL")
 
     # Per-step service URLs (F1-A — runtime container binds these on localhost; orchestrator dials
     # them). Defaults match services/runtime/entrypoint.sh.

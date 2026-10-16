@@ -28,6 +28,7 @@ members = [
     "research-step",
     "scrape-step",
     "segment-step",
+    "steps-app",
     "story-bible-step",
     "subject-step",
     "writer-engine",
@@ -2731,6 +2732,61 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/cd/64/6debec8fc6e9abde0c7042145dc27a562bd1cd79350a55b80bf612a10ccb/starlette_testclient-0.4.1.tar.gz", hash = "sha256:9e993ffe12fab45606116257813986612262fe15c1bb6dc9e39cc68693ac1fc5", size = 12480, upload-time = "2024-04-29T10:54:28.503Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/25/44/f5209b889a344b1331a103aec4e9f906c7f67f9295fd287fdaa818179d95/starlette_testclient-0.4.1-py3-none-any.whl", hash = "sha256:dcf0eb237dc47f062ef5925f98330af46f67e547cb587119c9ae78c17ae6c1d1", size = 8143, upload-time = "2024-04-29T10:54:25.728Z" },
+]
+
+[[package]]
+name = "steps-app"
+version = "0.1.0"
+source = { editable = "services/steps_app" }
+dependencies = [
+    { name = "approval-step" },
+    { name = "assemble-step" },
+    { name = "brainstorm-step" },
+    { name = "chapter-step" },
+    { name = "deliver-step" },
+    { name = "fastapi" },
+    { name = "gather-step" },
+    { name = "image-step" },
+    { name = "library-retrieve-step" },
+    { name = "library-step" },
+    { name = "media-step" },
+    { name = "notify-step" },
+    { name = "persist-step" },
+    { name = "pick-step" },
+    { name = "render-step" },
+    { name = "research-step" },
+    { name = "scrape-step" },
+    { name = "segment-step" },
+    { name = "story-bible-step" },
+    { name = "subject-step" },
+    { name = "uvicorn", extra = ["standard"] },
+    { name = "writer-engine" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "approval-step", editable = "services/approval_step" },
+    { name = "assemble-step", editable = "services/assemble_step" },
+    { name = "brainstorm-step", editable = "services/brainstorm_step" },
+    { name = "chapter-step", editable = "services/chapter_step" },
+    { name = "deliver-step", editable = "services/deliver_step" },
+    { name = "fastapi", specifier = ">=0.115.0" },
+    { name = "gather-step", editable = "services/gather_step" },
+    { name = "image-step", editable = "services/image_step" },
+    { name = "library-retrieve-step", editable = "services/library_retrieve_step" },
+    { name = "library-step", editable = "services/library_step" },
+    { name = "media-step", editable = "services/media_step" },
+    { name = "notify-step", editable = "services/notify_step" },
+    { name = "persist-step", editable = "services/persist_step" },
+    { name = "pick-step", editable = "services/pick_step" },
+    { name = "render-step", editable = "services/render_step" },
+    { name = "research-step", editable = "services/research_step" },
+    { name = "scrape-step", editable = "services/scrape_step" },
+    { name = "segment-step", editable = "services/segment_step" },
+    { name = "story-bible-step", editable = "services/story_bible_step" },
+    { name = "subject-step", editable = "services/subject_step" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.30.0" },
+    { name = "writer-engine", editable = "packages/writer_engine" },
 ]
 
 [[package]]

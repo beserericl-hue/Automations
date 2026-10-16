@@ -34,6 +34,8 @@ COPY services/library_step/pyproject.toml ./services/library_step/
 COPY services/story_bible_step/pyproject.toml ./services/story_bible_step/
 COPY services/approval_step/pyproject.toml ./services/approval_step/
 COPY services/notify_step/pyproject.toml ./services/notify_step/
+# B10: the aggregator that mounts every step in one process.
+COPY services/steps_app/pyproject.toml ./services/steps_app/
 
 # Source for everything that runs in this container.
 COPY packages/writer_engine/src ./packages/writer_engine/src
@@ -57,6 +59,7 @@ COPY services/library_step/src ./services/library_step/src
 COPY services/story_bible_step/src ./services/story_bible_step/src
 COPY services/approval_step/src ./services/approval_step/src
 COPY services/notify_step/src ./services/notify_step/src
+COPY services/steps_app/src ./services/steps_app/src
 
 COPY services/runtime/entrypoint.sh /entrypoint.sh
 

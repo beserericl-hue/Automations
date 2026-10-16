@@ -10,11 +10,12 @@ from contextlib import asynccontextmanager
 from typing import Any
 from uuid import UUID, uuid4
 
+import httpx
 from arq import create_pool
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi import status as http_status
 
-from writer_engine.auth import require_service_secret
+from writer_engine.auth import require_admin_token, require_service_secret
 from writer_engine.config import get_settings
 from writer_engine.health import (
     probe_arq_worker,
@@ -140,6 +141,36 @@ def build_app() -> FastAPI:
             response.status_code = http_status.HTTP_503_SERVICE_UNAVAILABLE
             logger.error("ready.unhealthy", failed=body.get("failed_required"))
         return body
+
+    @app.post("/admin/reload-prompts", dependencies=[Depends(require_admin_token)])
+    async def reload_prompts() -> dict[str, Any]:
+        """Reload prompts here and in the steps process (A5).
+
+        The orchestrator shares the runtime container with the steps process, so it is the only
+        service that can reach it (the steps app binds to localhost). The gateway fans out to this
+        route rather than trying to reach the steps app itself.
+        """
+        from writer_engine.prompt_store import get_prompt_store
+
+        local = await get_prompt_store().reload_from_supabase()
+        out: dict[str, Any] = {"orchestrator_loaded": local}
+
+        steps_url = get_settings().steps_admin_url
+        if not steps_url:
+            out["steps_error"] = "STEPS_ADMIN_URL unset"
+            return out
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.post(
+                    f"{steps_url.rstrip('/')}/admin/reload-prompts",
+                    headers={"x-admin-token": get_settings().admin_token},
+                )
+                resp.raise_for_status()
+                out["steps_loaded"] = int((resp.json() or {}).get("loaded", 0))
+        except Exception as exc:
+            logger.warning("orchestrator.reload_prompts.steps_failed", error=str(exc)[:200])
+            out["steps_error"] = f"{type(exc).__name__}: {str(exc)[:160]}"
+        return out
 
     @app.get("/metrics")
     async def metrics() -> Any:

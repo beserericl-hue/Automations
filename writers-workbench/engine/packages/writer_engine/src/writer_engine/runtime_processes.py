@@ -1,16 +1,33 @@
 """The process table for the ``writer-engine-runtime`` container.
 
-Single source of truth for which processes run in the runtime image and on which ports. Previously
-this lived as literals in ``services/runtime/entrypoint.sh``, duplicated across the ``start`` lines
-and the ``export *_STEP_URL`` lines, with the orchestrator's own defaults as a third copy.
+Single source of truth for which processes run in the runtime image. Previously this lived as
+literals in ``services/runtime/entrypoint.sh``, duplicated across the ``start`` lines and the
+``export *_STEP_URL`` lines, with the orchestrator's own defaults as a third copy.
 
-Keep in sync with ``orchestrator.write_tools.ALL_STEP_URLS`` — a step started here but missing from
-that registry is a step ``/admin/health`` will not probe (B2), which is how a dead process stays
-invisible. ``tests/test_runtime_processes.py`` asserts the two agree.
+**B10 (2026-10-16): 21 processes → 3.** The container ran 19 step services as separate uvicorns plus
+the arq worker and the orchestrator. It now runs:
 
-B10 note: when the 21 processes collapse to 3, this table becomes the mount map for the single steps
-process rather than a list of uvicorn invocations. The port-per-step convention is preserved as the
-path prefix so ``*_STEP_URL`` indirection keeps working.
+1. ``steps_app`` — every step app mounted under ``/steps/<name>`` in ONE uvicorn
+2. the arq worker
+3. the orchestrator (the externally-bound process)
+
+The per-step architecture is unchanged — each step is still its own FastAPI app with its own
+``StepInput``/``StepOutput`` contract — only the deployment is unified. What this buys:
+
+* **B3** — one process means one ``LLMRouter`` singleton, so ``MAX_CONCURRENT_LLM`` is finally a real
+  per-container cap instead of ~19 independent semaphores.
+* **A5** — one ``PromptStore``, so ``/admin/reload-prompts`` reaches the code that generates text.
+* ~19 fewer Python interpreters.
+
+**Splitting back out is a config change, not a code change.** The orchestrator dials every step
+through ``<NAME>_STEP_URL``; this module just decides what those point at. Override any one of them
+to a hostname and that step runs wherever you like — which is exactly what ``docker-compose.yml``
+does, running one container per step and so continuously exercising the split topology. Per the B10
+decision, the per-service Railway split waits for the Gate 2 load data to say which step needs it.
+
+Keep ``STEP_NAMES`` in sync with ``orchestrator.write_tools.ALL_STEP_URLS`` and
+``steps_app.main.STEP_APPS`` — ``tests/test_runtime_processes.py`` asserts all three agree, because a
+step missing from any of them is a step the orchestrator cannot reach or health cannot see.
 """
 
 from __future__ import annotations
@@ -19,90 +36,92 @@ import os
 
 from writer_engine.supervisor import ManagedProcess
 
-# step name -> localhost port. Step names match the step service's STEP_NAME and the orchestrator's
-# ALL_STEP_URLS keys.
-STEP_PORTS: dict[str, int] = {
-    "library_retrieve": 8002,
+# Every step, in startup/mount order. Names match each step service's STEP_NAME, the keys of
+# orchestrator.write_tools.ALL_STEP_URLS, and the keys of steps_app.main.STEP_APPS.
+STEP_NAMES: tuple[str, ...] = (
+    # F0 vertical-slice demo, superseded by `library` (A9 — remove with its entry here).
+    "library_retrieve",
     # Newsletter saga steps (F2).
-    "gather": 8010,
-    "pick": 8011,
-    "subject": 8012,
-    "scrape": 8013,
-    "segment": 8014,
-    "image": 8015,
-    "assemble": 8016,
-    "render": 8017,
-    "persist": 8018,
-    "deliver": 8019,
+    "gather",
+    "pick",
+    "subject",
+    "scrape",
+    "segment",
+    "image",
+    "assemble",
+    "render",
+    "persist",
+    "deliver",
     # Write-workshop steps (F1).
-    "chapter": 8020,
-    "research": 8021,
-    "brainstorm": 8022,
-    "media": 8023,
-    "library": 8024,
-    "story_bible": 8025,
-    "approval": 8026,
-    "notify": 8027,
-}
+    "chapter",
+    "research",
+    "brainstorm",
+    "media",
+    "library",
+    "story_bible",
+    "approval",
+    "notify",
+)
 
+# All steps share one port now; they are told apart by mount path.
+DEFAULT_STEPS_PORT = 8030
 DEFAULT_ORCHESTRATOR_PORT = 8001
+STEP_MOUNT_PREFIX = "/steps"
 
 
-def step_module(name: str) -> str:
-    """ASGI import path for a step service. Every step package follows ``<name>_step.main:app``."""
-    return f"{name}_step.main:app"
+def step_mount_path(name: str) -> str:
+    """Path a step is mounted at inside the steps process."""
+    return f"{STEP_MOUNT_PREFIX}/{name}"
 
 
-def step_url_env(ports: dict[str, int] | None = None) -> dict[str, str]:
+def step_url_env(*, steps_port: int | None = None, host: str = "localhost") -> dict[str, str]:
     """The ``*_STEP_URL`` environment the orchestrator reads to dial each step.
 
     Set explicitly rather than relying on ``EngineSettings`` defaults so the container is
-    self-describing and a default drift cannot silently repoint a step.
+    self-describing and a default drift cannot silently repoint a step at a port nothing serves.
+
+    ``run_step_via_http`` POSTs ``{url}/run``, so a mounted step's URL is
+    ``http://host:port/steps/<name>`` and resolves to that sub-app's own ``/run`` route.
     """
-    ports = ports or STEP_PORTS
-    return {f"{name.upper()}_STEP_URL": f"http://localhost:{port}" for name, port in ports.items()}
+    port = steps_port or DEFAULT_STEPS_PORT
+    return {f"{name.upper()}_STEP_URL": f"http://{host}:{port}{step_mount_path(name)}" for name in STEP_NAMES}
 
 
 def build_runtime_processes(
     *,
     orchestrator_port: int | None = None,
-    ports: dict[str, int] | None = None,
+    steps_port: int | None = None,
 ) -> list[ManagedProcess]:
-    """Build the full process table: every step service, the arq worker, then the orchestrator.
+    """Build the process table: the steps app, the arq worker, then the orchestrator.
 
-    Step services bind to 127.0.0.1 — the orchestrator is the only externally reachable process.
+    The steps app binds to 127.0.0.1 — the orchestrator is the only externally reachable process.
+    The consumers (arq worker, orchestrator) are started last and receive the step URLs.
     """
-    ports = ports or STEP_PORTS
-    orch_port = orchestrator_port or int(os.environ.get("PORT", DEFAULT_ORCHESTRATOR_PORT))
-    step_env = step_url_env(ports)
+    s_port = steps_port or DEFAULT_STEPS_PORT
+    o_port = orchestrator_port or int(os.environ.get("PORT", DEFAULT_ORCHESTRATOR_PORT))
+    step_env = step_url_env(steps_port=s_port)
 
-    procs: list[ManagedProcess] = [
+    return [
         ManagedProcess(
-            name=f"{name}_step",
+            name="steps_app",
             argv=[
                 "uvicorn",
-                step_module(name),
+                "steps_app.main:app",
                 "--host",
                 "127.0.0.1",
                 "--port",
-                str(port),
+                str(s_port),
                 "--log-level",
                 "warning",
             ],
-        )
-        for name, port in ports.items()
-    ]
-
-    # arq drives the newsletter saga between HITL pauses and runs every async write job.
-    procs.append(
+        ),
+        # arq drives the newsletter saga between HITL pauses and runs every async write job.
         ManagedProcess(
             name="arq_worker",
             argv=["arq", "orchestrator.worker.WorkerSettings"],
             env=step_env,
-        )
-    )
-    # The externally-bound process; Railway routes to $PORT.
-    procs.append(
+        ),
+        # The externally-bound process; Railway routes to $PORT.
         ManagedProcess(
             name="orchestrator",
             argv=[
@@ -111,9 +130,8 @@ def build_runtime_processes(
                 "--host",
                 "0.0.0.0",
                 "--port",
-                str(orch_port),
+                str(o_port),
             ],
             env=step_env,
-        )
-    )
-    return procs
+        ),
+    ]

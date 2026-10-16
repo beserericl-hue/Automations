@@ -9,6 +9,7 @@ readme = "README.md"
 members = [
     "packages/writer_engine",
     "services/gateway",
+    "services/steps_app",
     "services/orchestrator",
     "services/library_retrieve_step",
     "services/gather_step",
@@ -57,6 +58,7 @@ src = [
     "services/gateway/src",
     "services/orchestrator/src",
     "services/library_retrieve_step/src",
+    "services/steps_app/src",
 ]
 
 [tool.ruff.lint]
@@ -99,6 +101,7 @@ testpaths = [
     "tests",
     "packages/writer_engine/tests",
     "services/gateway/tests",
+    "services/steps_app/tests",
     "services/orchestrator/tests",
     "services/library_retrieve_step/tests",
     "services/gather_step/tests",
