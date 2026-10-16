@@ -1,6 +1,9 @@
 """Cache the result of an async callable under a key in Redis for ``ttl`` seconds.
 
-Used by every step service: a step keyed on ``(execution_id, step_name)`` replays cheaply on retry.
+Used by the gather, persist and library_retrieve steps, which key on ``(execution_id, step_name)`` so
+a replayed step call does not redo the fetch. It is a CACHE, not a ledger: the key expires, and
+losing Redis loses it. It therefore says nothing about whether a job has already written rows — for
+that see ``run_ledger`` (B6), which is the mechanism covering the write tools.
 """
 
 from __future__ import annotations

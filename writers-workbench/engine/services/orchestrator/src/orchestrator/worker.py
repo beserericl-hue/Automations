@@ -18,6 +18,7 @@ from uuid import UUID, uuid4
 from arq.connections import RedisSettings
 
 from writer_engine.config import get_settings
+from writer_engine.idempotency import RunClaim, claim_run, complete_run, fail_run
 from writer_engine.queues import HEAVY, INTERACTIVE, QueueProfile, record_dead_letter
 from writer_engine.state_machine.durable import RedisSagaRepo
 from writer_engine.state_machine.saga import StepRef, run_step_via_http
@@ -63,6 +64,21 @@ async def advance_newsletter_saga(ctx: dict[str, Any], execution_id: str) -> dic
     return {"execution_id": execution_id, "result": result.value}
 
 
+async def _ledger() -> Any | None:
+    """The Supabase client for the run ledger, or None when it is not reachable.
+
+    Deliberately soft: an engine configured without Supabase (the key-less local stack, the test
+    suite) runs exactly as it did before B6 rather than refusing to work.
+    """
+    try:
+        from writer_engine.supabase.client import get_supabase_admin
+
+        return await get_supabase_admin()
+    except Exception as exc:
+        logger.warning("worker.ledger_unavailable", error=str(exc)[:160])
+        return None
+
+
 async def run_write_tool_job(ctx: dict[str, Any], tool: str, body: dict[str, Any]) -> dict[str, Any]:
     """Async write-tool job: dispatch to the step service off the request path (no edge timeout).
 
@@ -75,6 +91,43 @@ async def run_write_tool_job(ctx: dict[str, Any], tool: str, body: dict[str, Any
         return {"status": "error", "error": {"code": "UNKNOWN_TOOL", "message": tool}}
     chapter = body.get("chapter_number")
     op = body.get("op")
+
+    # B6: claim the run before doing any work. arq re-queues a job on CancelledError (a worker
+    # restart, a deploy, a SIGTERM mid-chapter), and four of the persist paths are plain INSERTs
+    # that duplicate under that — including token_usage_v2, which is billing data. The run_id is
+    # the arq job_id unless the caller supplied its own, so a retry shares it and a deliberate
+    # second request does not. See writer_engine.idempotency.
+    run_id = str(body.get("run_id") or ctx.get("job_id") or "")
+    ledger = await _ledger() if run_id else None
+    claim: RunClaim | None = None
+    if ledger is not None:
+        claim = await claim_run(
+            ledger,
+            run_id=run_id,
+            tool=tool,
+            op=str(op or ""),
+            queue=getattr(ctx.get("queue_profile"), "name", ""),
+            user_id=str(body.get("user_id") or ""),
+            project_id=body.get("project_id"),
+            chapter_number=chapter if isinstance(chapter, int) else None,
+        )
+        if claim.should_skip:
+            logger.warning(
+                "worker.write_tool.replay",
+                tool=tool,
+                op=op,
+                chapter=chapter,
+                run_id=run_id,
+                replayed_result=claim.replay is not None,
+            )
+            # The original output when it was small enough to keep; otherwise a truthful envelope.
+            # The Workbench polls a job for `status` and then refetches from the database, so this
+            # does not change what a user sees — see client/src/hooks/useEngineJobQueue.ts.
+            return claim.replay or {
+                "status": "ok",
+                "payload": {"result": {"idempotent_replay": True, "run_id": run_id}},
+            }
+
     logger.info(
         "worker.write_tool.start",
         tool=tool,
@@ -82,6 +135,7 @@ async def run_write_tool_job(ctx: dict[str, Any], tool: str, body: dict[str, Any
         chapter=chapter,
         project=body.get("project_id") or body.get("project_title"),
         user_id=body.get("user_id"),
+        run_id=run_id or None,
     )
     started = time.monotonic()
     try:
@@ -113,6 +167,10 @@ async def run_write_tool_job(ctx: dict[str, Any], tool: str, body: dict[str, Any
             },
             exc,
         )
+        if ledger is not None and claim is not None:
+            # Release the claim so a later attempt may run. Without this a crashed run would be
+            # permanently un-rerunnable.
+            await fail_run(ledger, run_id=run_id, error=f"{type(exc).__name__}: {exc}")
         raise
     dumped = out.model_dump(mode="json")
     status = dumped.get("status")
@@ -134,6 +192,17 @@ async def run_write_tool_job(ctx: dict[str, Any], tool: str, body: dict[str, Any
             await send_task_completion_email(tool, body, result)
         except Exception as exc:
             logger.warning("worker.task_email.error", tool=tool, error=str(exc)[:200])
+    if ledger is not None and claim is not None:
+        # A step that returns status=error is a real outcome, not a crash — record it as an error so
+        # a retry is allowed to try again rather than replaying the failure forever.
+        if str(status).lower() == "error":
+            await fail_run(
+                ledger,
+                run_id=run_id,
+                error=str((dumped.get("error") or {}).get("message") or "step returned error"),
+            )
+        else:
+            await complete_run(ledger, run_id=run_id, result=dumped)
     return dumped
 
 

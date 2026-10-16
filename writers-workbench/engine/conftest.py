@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import os
 from collections.abc import AsyncIterator, Iterator
 from typing import Any
@@ -51,6 +52,120 @@ try:
     _gs.cache_clear()
 except ImportError:
     pass
+
+
+# --- a fake PostgREST (B6 and anything else that needs to count rows) -------------------------
+#
+# Enough of the supabase-py async query builder to exercise the persist helpers and the run ledger
+# against real row counts. A mock that records calls cannot answer "did this write two rows?", which
+# is the only question B6 asks.
+
+# The run ledger's primary key (writer_engine.idempotency.run_ledger.TABLE). Spelled out rather
+# than imported so this conftest stays importable before writer_engine is on the path;
+# tests/test_idempotency_b6.py asserts the two agree.
+LEDGER_TABLE = "engine_job_runs"
+
+
+class FakeResp:
+    def __init__(self, data: list[dict[str, Any]]) -> None:
+        self.data = data
+
+
+class FakeQuery:
+    """Enough of the supabase-py query builder to exercise select/insert/update/eq/order/limit."""
+
+    def __init__(self, db: FakeSupabase, table: str) -> None:
+        self.db = db
+        self.table_name = table
+        self.filters: list[tuple[str, Any]] = []
+        self._op = ""
+        self._payload: Any = None
+        self._order: tuple[str, bool] | None = None
+        self._limit: int | None = None
+
+    # -- builders
+    def select(self, *_a: Any, **_k: Any) -> FakeQuery:
+        self._op = "select"
+        return self
+
+    def insert(self, payload: Any) -> FakeQuery:
+        self._op = "insert"
+        self._payload = payload
+        return self
+
+    def update(self, payload: Any) -> FakeQuery:
+        self._op = "update"
+        self._payload = payload
+        return self
+
+    def eq(self, col: str, val: Any) -> FakeQuery:
+        self.filters.append((col, val))
+        return self
+
+    def order(self, col: str, desc: bool = False) -> FakeQuery:
+        self._order = (col, desc)
+        return self
+
+    def limit(self, n: int) -> FakeQuery:
+        self._limit = n
+        return self
+
+    # -- execution
+    def _matching(self) -> list[dict[str, Any]]:
+        rows = self.db.tables.setdefault(self.table_name, [])
+        return [r for r in rows if all(r.get(c) == v for c, v in self.filters)]
+
+    async def execute(self) -> FakeResp:
+        rows = self.db.tables.setdefault(self.table_name, [])
+        if self._op == "select":
+            out = self._matching()
+            if self._order:
+                col, desc = self._order
+                out = sorted(out, key=lambda r: (r.get(col) is None, r.get(col)), reverse=desc)
+            if self._limit is not None:
+                out = out[: self._limit]
+            return FakeResp([copy.deepcopy(r) for r in out])
+        if self._op == "insert":
+            items = self._payload if isinstance(self._payload, list) else [self._payload]
+            made = []
+            for item in items:
+                row = {**item}
+                pk = self.db.primary_keys.get(self.table_name)
+                if pk:
+                    if any(r.get(pk) == row.get(pk) for r in rows):
+                        raise RuntimeError(
+                            f'duplicate key value violates unique constraint "{self.table_name}_pkey"'
+                        )
+                else:
+                    row.setdefault("id", f"{self.table_name}-{len(rows) + 1}")
+                rows.append(row)
+                made.append(copy.deepcopy(row))
+            return FakeResp(made)
+        if self._op == "update":
+            touched = self._matching()
+            for r in touched:
+                r.update(self._payload)
+            return FakeResp([copy.deepcopy(r) for r in touched])
+        raise AssertionError(f"unsupported op {self._op!r}")
+
+
+class FakeSupabase:
+    def __init__(self) -> None:
+        self.tables: dict[str, list[dict[str, Any]]] = {}
+        # Only the ledger has a real primary key that must conflict.
+        self.primary_keys: dict[str, str] = {LEDGER_TABLE: "run_id"}
+
+    def table(self, name: str) -> FakeQuery:
+        return FakeQuery(self, name)
+
+    def count(self, name: str) -> int:
+        return len(self.tables.get(name, []))
+
+
+@pytest.fixture
+def fake_supabase() -> FakeSupabase:
+    """An in-memory stand-in for the service-role Supabase client."""
+    return FakeSupabase()
 
 
 @pytest.fixture(autouse=True)
