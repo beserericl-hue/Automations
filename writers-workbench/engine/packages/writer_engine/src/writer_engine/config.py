@@ -163,6 +163,10 @@ class EngineSettings(BaseSettings):
     # 30 seconds during an outage is a monitor that gets filtered into a folder.
     alert_repeat_minutes: int = Field(default=30, alias="ALERT_REPEAT_MINUTES")
 
+    # How often the in-process watchdog re-runs the readiness probes. 0 disables it. 60s means an
+    # outage is reported within about a minute rather than when someone next uses the product.
+    watchdog_interval_seconds: float = Field(default=60.0, alias="WATCHDOG_INTERVAL_SECONDS")
+
     # Observability
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     metrics_port: int = Field(default=9090, alias="METRICS_PORT")

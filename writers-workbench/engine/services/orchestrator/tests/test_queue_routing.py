@@ -18,6 +18,8 @@ from fastapi.testclient import TestClient
 
 from orchestrator import main as orch_main
 from writer_engine.queues import (
+    HEAVY,
+    INTERACTIVE,
     POLL_QUEUES,
     QUEUE_HEAVY,
     QUEUE_INTERACTIVE,
@@ -220,3 +222,115 @@ def test_dlq_limit_is_clamped(client: TestClient, monkeypatch: pytest.MonkeyPatc
     for asked in (0, -5, 10_000):
         client.get(f"/admin/dlq?limit={asked}", headers=ADMIN)
     assert seen == [1, 1, 500]
+
+
+# --- /admin/dashboard (C1) --------------------------------------------------------------------
+
+
+def test_dashboard_requires_the_admin_token(client: TestClient) -> None:
+    """Queue contents and job arguments name users and projects."""
+    assert client.get("/admin/dashboard").status_code == 401
+
+
+def test_dashboard_answers_the_three_incident_questions(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """is it up / is it working / what broke — in one request, because four was nobody."""
+
+    async def _ready() -> tuple[dict[str, Any], bool]:
+        return {
+            "status": "degraded",
+            "checks": {"redis": {"ok": True, "required": True}},
+        }, True
+
+    async def _dlq(limit: int = 10) -> list[dict[str, Any]]:
+        return [{"kind": "crash", "error": "TimeoutError", "queue": QUEUE_HEAVY}]
+
+    monkeypatch.setattr(orch_main, "_readiness_with_verdict", _ready)
+    monkeypatch.setattr(orch_main, "read_dead_letters", _dlq)
+
+    body = client.get("/admin/dashboard", headers=ADMIN).json()
+    assert body["status"] == "degraded"
+    assert body["servable"] is True
+    assert body["checks"]["redis"]["ok"] is True
+    assert set(body["queues"]) == set(POLL_QUEUES)
+    assert body["dead_letters"]["shown"] == 1
+
+
+def test_dashboard_separates_running_from_waiting(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """arq keeps a RUNNING job in the queue's sorted set.
+
+    Counting the set alone would report busy-but-fine as backed-up, which is the one distinction
+    the number exists to make.
+    """
+
+    async def _ready() -> tuple[dict[str, Any], bool]:
+        return {"status": "ok", "checks": {}}, True
+
+    async def _dlq(limit: int = 10) -> list[dict[str, Any]]:
+        return []
+
+    class _Def:
+        def __init__(self, job_id: str) -> None:
+            self.job_id = job_id
+
+    async def _queued_jobs(*, queue_name: str) -> list[Any]:
+        return [_Def("running-1"), _Def("waiting-1"), _Def("waiting-2")] if queue_name == QUEUE_HEAVY else []
+
+    class _Job:
+        def __init__(self, job_id: str, *, redis: Any = None, _queue_name: str = "") -> None:
+            self.job_id = job_id
+
+        async def status(self) -> JobStatus:
+            return JobStatus.in_progress if self.job_id.startswith("running") else JobStatus.queued
+
+    monkeypatch.setattr(orch_main, "_readiness_with_verdict", _ready)
+    monkeypatch.setattr(orch_main, "read_dead_letters", _dlq)
+    monkeypatch.setattr(orch_main, "Job", _Job)
+    client.app.state.arq_pool.queued_jobs = _queued_jobs  # type: ignore[attr-defined]
+
+    heavy = client.get("/admin/dashboard", headers=ADMIN).json()["queues"][QUEUE_HEAVY]
+    assert heavy["depth"] == 3
+    assert heavy["running"] == 1
+    assert heavy["waiting"] == 2
+
+
+def test_dashboard_shows_each_queues_sizing(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The timeout and slot count are half of reading a depth number correctly."""
+
+    async def _ready() -> tuple[dict[str, Any], bool]:
+        return {"status": "ok", "checks": {}}, True
+
+    async def _dlq(limit: int = 10) -> list[dict[str, Any]]:
+        return []
+
+    monkeypatch.setattr(orch_main, "_readiness_with_verdict", _ready)
+    monkeypatch.setattr(orch_main, "read_dead_letters", _dlq)
+    queues = client.get("/admin/dashboard", headers=ADMIN).json()["queues"]
+    assert queues[QUEUE_HEAVY]["job_timeout_s"] == HEAVY.job_timeout
+    assert queues[QUEUE_INTERACTIVE]["max_jobs"] == INTERACTIVE.max_jobs
+    # The pre-split queue is marked as such rather than given a profile it no longer has.
+    assert queues[QUEUE_LEGACY].get("legacy") is True
+
+
+def test_dashboard_survives_an_unreachable_queue(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A dashboard that 500s during an incident is worse than one that reports a gap."""
+
+    async def _ready() -> tuple[dict[str, Any], bool]:
+        return {"status": "ok", "checks": {}}, True
+
+    async def _dlq(limit: int = 10) -> list[dict[str, Any]]:
+        return []
+
+    async def _boom(*, queue_name: str) -> list[Any]:
+        raise ConnectionError("redis down")
+
+    monkeypatch.setattr(orch_main, "_readiness_with_verdict", _ready)
+    monkeypatch.setattr(orch_main, "read_dead_letters", _dlq)
+    client.app.state.arq_pool.queued_jobs = _boom  # type: ignore[attr-defined]
+
+    r = client.get("/admin/dashboard", headers=ADMIN)
+    assert r.status_code == 200
+    assert "ConnectionError" in r.json()["queues"][QUEUE_HEAVY]["error"]

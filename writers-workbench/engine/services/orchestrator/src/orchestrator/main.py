@@ -12,6 +12,7 @@ from uuid import UUID, uuid4
 
 import httpx
 from arq import create_pool
+from arq.jobs import Job
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi import status as http_status
 
@@ -29,6 +30,8 @@ from writer_engine.queues import (
     ALL_QUEUES,
     POLL_QUEUES,
     QUEUE_HEAVY,
+    QUEUE_LEGACY,
+    profile_for,
     queue_for,
     read_dead_letters,
 )
@@ -38,6 +41,9 @@ from writer_engine.state_machine.orchestrator import InMemoryStateStore
 from writer_engine.state_machine.saga import StepRef, run_step_via_http
 from writer_engine.telemetry.logging import configure_logging, get_logger
 from writer_engine.telemetry.metrics import HTTP_LATENCY, HTTP_REQUESTS, metrics_app, observe_latency
+from writer_engine.watchdog import Watchdog
+from writer_engine.watchdog import start as watchdog_start
+from writer_engine.watchdog import stop as watchdog_stop
 
 from .library_orch import LibraryRetrieveOrchestrator
 from .newsletter_orch import NewsletterOrchestrator, resolution_hook_installed
@@ -53,6 +59,40 @@ SERVICE = "orchestrator"
 logger = get_logger(SERVICE)
 
 
+async def _readiness_with_verdict() -> tuple[dict[str, Any], bool]:
+    """Run every readiness probe. Returns the response body and whether it is servable.
+
+    Module level, not a closure: the watchdog (C2) evaluates the same probes on a timer, and a
+    second copy of this list would drift — the kind of drift where a newly added dependency is
+    checked by the endpoint and not by the monitor, so nothing alerts on it.
+    """
+    settings = get_settings()
+    probes: list[Any] = [
+        probe_http(f"step:{name}", f"{getter(settings)}/admin/health")
+        for name, getter in ALL_STEP_URLS.items()
+    ]
+    probes.append(probe_redis(required=True))
+    # One probe per queue (B4): with two workers, "a worker is alive" is not the question — a dead
+    # interactive worker leaves every Q/A queued while heavy work looks fine.
+    probes += [
+        probe_arq_worker(
+            health_check_key=f"{ARQ_HEALTH_CHECK_KEY}:{queue}",
+            name=f"arq_worker:{queue}",
+            required=False,
+        )
+        for queue in ALL_QUEUES
+    ]
+    probes.append(probe_supabase(required=False))
+    checks = await run_checks(probes)
+    return summarise(SERVICE, checks)
+
+
+async def _readiness() -> dict[str, Any]:
+    """Just the body — the shape the watchdog consumes."""
+    body, _ok = await _readiness_with_verdict()
+    return body
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> Any:
     settings = get_settings()
@@ -66,9 +106,25 @@ async def lifespan(app: FastAPI) -> Any:
     except Exception as exc:
         logger.warning("arq pool unavailable; saga driver will run advance() inline", error=str(exc))
         app.state.arq_pool = None
+
+    # C2: the watchdog. /admin/ready has told the truth since B2, but only to whoever asked it —
+    # which is how the 2026-05-19 Redis outage ran for nine days. This re-runs the same probes on a
+    # timer and emails on a transition. It evaluates `_readiness()` rather than HTTP-ing its own
+    # route, so it keeps working when the public listener is the thing that is wedged.
+    app.state.watchdog_task = None
+    if settings.watchdog_interval_seconds > 0:
+        dog = Watchdog(
+            _readiness,
+            interval_s=settings.watchdog_interval_seconds,
+            service=SERVICE,
+            dead_letters=read_dead_letters,
+        )
+        app.state.watchdog_task = watchdog_start(dog)
+
     try:
         yield
     finally:
+        await watchdog_stop(getattr(app.state, "watchdog_task", None))
         if getattr(app.state, "arq_pool", None) is not None:
             await app.state.arq_pool.close()
         await close_redis()
@@ -129,30 +185,14 @@ def build_app() -> FastAPI:
         """Readiness — should work be routed here? (B2)
 
         Everything /admin/health checks, plus Redis (required — it carries the queue, the shared
-        Anthropic budget, the HITL gates and SSE), the arq worker heartbeat and Supabase. The latter
-        two are optional so a blip reports `degraded` rather than withdrawing the instance.
+        provider budgets, the HITL gates and SSE), both arq worker heartbeats and Supabase. The
+        latter are optional so a blip reports `degraded` rather than withdrawing the instance.
 
-        This is the hook a load balancer and the graceful-drain work (B7) build on.
+        This is the hook a load balancer, the graceful-drain work (B7) and the C2 watchdog build on.
+        The evaluation itself lives in ``_readiness`` so the watchdog runs the SAME probes rather
+        than a drifting copy of them — and so it does not have to HTTP its own process.
         """
-        settings = get_settings()
-        probes: list[Any] = [
-            probe_http(f"step:{name}", f"{getter(settings)}/admin/health")
-            for name, getter in ALL_STEP_URLS.items()
-        ]
-        probes.append(probe_redis(required=True))
-        # One probe per queue (B4): with two workers, "a worker is alive" is not the question —
-        # a dead interactive worker leaves every Q/A queued while heavy work looks fine.
-        probes += [
-            probe_arq_worker(
-                health_check_key=f"{ARQ_HEALTH_CHECK_KEY}:{queue}",
-                name=f"arq_worker:{queue}",
-                required=False,
-            )
-            for queue in ALL_QUEUES
-        ]
-        probes.append(probe_supabase(required=False))
-        checks = await run_checks(probes)
-        body, ok = summarise(SERVICE, checks)
+        body, ok = await _readiness_with_verdict()
         if not ok:
             response.status_code = http_status.HTTP_503_SERVICE_UNAVAILABLE
             logger.error("ready.unhealthy", failed=body.get("failed_required"))
@@ -198,6 +238,69 @@ def build_app() -> FastAPI:
         """
         entries = await read_dead_letters(limit=max(1, min(limit, 500)))
         return {"count": len(entries), "entries": entries}
+
+    @app.get("/admin/dashboard", dependencies=[Depends(require_admin_token)])
+    async def dashboard() -> dict[str, Any]:
+        """One request that answers "is the engine healthy, busy, or stuck?" (C1).
+
+        Everything here was already knowable, but only by assembling four separate calls and
+        knowing which Redis keys to read — which in practice meant nobody looked. The fields are
+        chosen to answer the three questions actually asked during an incident:
+
+          is it up          -> readiness, per dependency
+          is it working     -> queue depth and in-flight count, per queue
+          what broke        -> the most recent dead letters, newest first
+
+        Admin-token gated: queue contents and job arguments name users and projects.
+        """
+        from arq.jobs import JobStatus
+
+        body, servable = await _readiness_with_verdict()
+        out: dict[str, Any] = {
+            "status": body.get("status"),
+            "servable": servable,
+            "checks": body.get("checks", {}),
+        }
+
+        queues: dict[str, Any] = {}
+        for name in POLL_QUEUES:
+            profile = profile_for(name)
+            entry: dict[str, Any] = {
+                "max_jobs": profile.max_jobs,
+                "job_timeout_s": profile.job_timeout,
+                "max_tries": profile.max_tries,
+            }
+            if name == QUEUE_LEGACY:
+                # Pre-split queue: shown only so a non-zero depth after a deploy is visible while
+                # it drains. Nothing is ever enqueued here.
+                entry = {"legacy": True}
+            if app.state.arq_pool is not None:
+                try:
+                    jobs = await app.state.arq_pool.queued_jobs(queue_name=name)
+                    # arq keeps a job in the queue's sorted set while it runs, so "queued" alone
+                    # would count running work as waiting — which is the difference between
+                    # "backed up" and "busy".
+                    running = 0
+                    waiting = 0
+                    for job in jobs:
+                        status = await Job(
+                            job.job_id or "", redis=app.state.arq_pool, _queue_name=name
+                        ).status()
+                        if status == JobStatus.in_progress:
+                            running += 1
+                        else:
+                            waiting += 1
+                    entry["running"] = running
+                    entry["waiting"] = waiting
+                    entry["depth"] = len(jobs)
+                except Exception as exc:
+                    entry["error"] = f"{type(exc).__name__}: {str(exc)[:120]}"
+            queues[name] = entry
+        out["queues"] = queues
+
+        entries = await read_dead_letters(limit=10)
+        out["dead_letters"] = {"recent": entries, "shown": len(entries)}
+        return out
 
     @app.get("/metrics")
     async def metrics() -> Any:
