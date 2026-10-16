@@ -13,15 +13,19 @@ Public surface (mirrors the n8n embedding sub-flow):
 from __future__ import annotations
 
 from .embed import (
+    build_canon_chunks,
     embed_texts,
     embeddings_enabled,
+    index_project_canon,
     match_project_canon,
     re_embed_project,
 )
 
 __all__ = [
+    "build_canon_chunks",
     "embed_texts",
     "embeddings_enabled",
+    "index_project_canon",
     "match_project_canon",
     "re_embed_project",
 ]

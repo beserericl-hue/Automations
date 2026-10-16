@@ -688,7 +688,46 @@ def _subchapter_plan_text(briefs: list[SubChapterBrief]) -> str:
     )
 
 
-def _cached_write_system(base_system: str, header: str, grounding: str) -> str:
+async def _canon_grounding(ctx: dict[str, Any], beat: str, *, user_id: str | None) -> str:
+    """Retrieve this project's own canon from the vector store to ground the chapter (A3).
+
+    The quality gap CR-010 A2 recorded: n8n re-embedded project data and grounded every sub-chapter
+    via vector search, while the engine wrote prose from the outline header alone. This restores the
+    retrieval half — the chapter's beat is the query, so the model is handed the specific
+    characters / prior sub-chapters / bible entries that beat touches, not just the roster summary.
+
+    Best-effort by construction: returns "" when embeddings are disabled, when the match function is
+    absent, or on any failure, so a chapter write never fails for want of grounding.
+    """
+    if not beat or not user_id:
+        return ""
+    try:
+        from writer_engine.embeddings import embeddings_enabled, match_project_canon
+
+        if not embeddings_enabled():
+            return ""
+        rows = await match_project_canon(
+            query=beat,
+            user_id=str(user_id),
+            project_id=str(ctx.get("project_id") or "") or None,
+            match_count=8,
+            match_threshold=0.35,
+        )
+    except Exception as exc:
+        logger.warning("chapter.canon_retrieval_failed", error=str(exc)[:160])
+        return ""
+    if not rows:
+        return ""
+    lines: list[str] = []
+    for r in rows:
+        title = str(r.get("doc_title") or r.get("doc_id") or "").strip()
+        body = " ".join(str(r.get("content") or "").split())[:600]
+        if body:
+            lines.append(f"- [{r.get('doc_type')}] {title}: {body}")
+    return "\n".join(lines)
+
+
+def _cached_write_system(base_system: str, header: str, grounding: str, canon: str = "") -> str:
     """Prompt-caching: fold the per-chapter shared context (project/outline/roster header + research
     grounding) into the system block so it is CACHED once and reused across all sub-chapter calls,
     instead of re-sending it in every (uncached) user message. Only the per-sub beat/continuity then
@@ -699,6 +738,14 @@ def _cached_write_system(base_system: str, header: str, grounding: str) -> str:
             "RESEARCH GROUNDING — weave the relevant facts below into the prose as concrete sensory/"
             "material detail and accurate period language (dramatized, never an info-dump or a list):\n"
             + grounding
+        )
+    if canon:
+        # A3: retrieved from this project's own vector store, so it is established canon rather than
+        # research. Contradicting it is drift, which is why the instruction is stricter than for
+        # research grounding. Lives in the CACHED block: one retrieval serves every sub-chapter.
+        parts.append(
+            "PROJECT CANON (already established in this book — stay consistent with it; do NOT "
+            "contradict or re-introduce these as new):\n" + canon
         )
     return "\n\n".join(parts)
 
@@ -1254,7 +1301,8 @@ async def _op_write(payload: dict) -> dict:
             # Prompt caching: the craft system + chapter context + research grounding are identical
             # across all sub-chapters, so fold them into ONE cached system prefix (cache-write on the
             # first sub, cache-read on the rest) instead of re-sending them in every user message.
-            cached_system = _cached_write_system(system, header, research_facts)
+            canon = await _canon_grounding(ctx, beat, user_id=payload.get("user_id"))
+            cached_system = _cached_write_system(system, header, research_facts, canon)
             # F2.5 optimization: write the sub-chapters CONCURRENTLY (wall-time = slowest sub, not the
             # sum) when `parallel_subchapters` is set. Each parallel sub is coordinated by the full
             # chapter plan instead of the prior sub's tail. Default OFF so the sequential prior-tail

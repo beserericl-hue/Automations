@@ -17,8 +17,10 @@ from writer_engine.prompt_store import compose_craft_system, get_prompt_store, s
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
 from writer_engine.schemas.chapter import StoryOutline
 from writer_engine.step_service import build_step_app
+from writer_engine.telemetry.logging import get_logger
 
 STEP_NAME = "brainstorm"
+logger = get_logger(STEP_NAME)
 seed_default_prompts()
 
 _STORY_SEEDS = [
@@ -517,6 +519,31 @@ async def _op_create_project(payload: dict) -> dict:
         return {"created": False, "error": str(exc)[:200]}
 
 
+# A3: ops that change the outline invalidate the project's canon vectors, so reindex after them.
+# Without this, retrieval (chapter.write's PROJECT CANON block) serves stale canon — or, for any
+# project n8n never indexed, nothing at all. Mirrors the n8n WF-21 fan-out that re-embedded after
+# every outline / chapter-outline save.
+_REINDEX_OPS = frozenset({"story", "short-story", "edit-outline", "revise-outline"})
+
+
+async def _reindex_canon(op: str, payload: dict, result: dict) -> None:
+    """Best-effort canon reindex. Never raises — a failed reindex must not fail the user's save."""
+    if op not in _REINDEX_OPS:
+        return
+    user_id = payload.get("user_id")
+    project_id = result.get("project_id") or payload.get("project_id")
+    if not user_id or not project_id:
+        return
+    try:
+        from writer_engine.embeddings import index_project_canon
+
+        n = await index_project_canon(user_id=str(user_id), project_id=str(project_id))
+        if n:
+            logger.info("brainstorm.canon_reindexed", op=op, chunks=n, project_id=str(project_id))
+    except Exception as exc:
+        logger.warning("brainstorm.canon_reindex_failed", op=op, error=str(exc)[:160])
+
+
 OPS = {
     "story": _op_story,
     "short-story": _op_short_story,
@@ -538,11 +565,14 @@ async def handler(inp: StepInput) -> StepOutput:
             status=StepStatus.ERROR,
             error={"code": "UNKNOWN_OP", "message": op},  # type: ignore[arg-type]
         )
+    result = await OPS[op](inp.payload)
+    if isinstance(result, dict):
+        await _reindex_canon(op, inp.payload, result)
     return StepOutput(
         execution_id=inp.execution_id,
         step_name=STEP_NAME,
         status=StepStatus.OK,
-        payload={"op": op, "result": await OPS[op](inp.payload)},
+        payload={"op": op, "result": result},
     )
 
 
