@@ -11,6 +11,8 @@ are), only that they agree on the shape and the measurable craft dimensions a re
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any
 
 # Per-tool structural keys whose PRESENCE + rough shape should agree between engine and n8n.
@@ -95,3 +97,93 @@ def shadow_summary(scores: list[dict[str, Any]], *, threshold: float = 0.95) -> 
         "threshold": threshold,
         "passes_A4": bool(vals) and mean >= threshold,
     }
+
+
+# --- H3: the corpus harness ---------------------------------------------------------------------
+#
+# parity_score + shadow_summary above score ONE pair. What was missing (H3) was anything that
+# produces pairs over a corpus and renders the A4 verdict — so the >=0.95 gate that every cutover is
+# supposed to depend on had never been measured. These functions are the harness; the artifact
+# loading and the engine/baseline invocation live in scripts/parity_run.py, which is corpus-specific.
+
+
+@dataclass(frozen=True)
+class ParityCase:
+    """One engine artifact paired with the baseline it is being compared against."""
+
+    case_id: str
+    tool: str
+    engine: dict[str, Any]
+    baseline: dict[str, Any]
+    note: str = ""
+
+
+def run_corpus(
+    cases: Sequence[ParityCase],
+    *,
+    threshold: float = 0.95,
+    craft_tol: float = 0.15,
+) -> dict[str, Any]:
+    """Score every case and aggregate per tool and overall.
+
+    Returns the full report: per-case scores, per-tool means, and the overall A4 verdict. Per-tool
+    means matter because the gate is applied per tool at cutover — an overall mean can hide one tool
+    sitting well below the line.
+    """
+    per_case: list[dict[str, Any]] = []
+    for case in cases:
+        scored = parity_score(case.engine, case.baseline, tool=case.tool, craft_tol=craft_tol)
+        scored["case_id"] = case.case_id
+        if case.note:
+            scored["note"] = case.note
+        per_case.append(scored)
+
+    by_tool: dict[str, Any] = {}
+    for tool in sorted({c.tool for c in cases}):
+        subset = [s for s in per_case if s["tool"] == tool]
+        by_tool[tool] = shadow_summary(subset, threshold=threshold)
+
+    overall = shadow_summary(per_case, threshold=threshold)
+    failing = sorted(t for t, v in by_tool.items() if not v["passes_A4"])
+    return {
+        "threshold": threshold,
+        "overall": overall,
+        "by_tool": by_tool,
+        "failing_tools": failing,
+        "passes": overall["passes_A4"] and not failing,
+        "cases": per_case,
+    }
+
+
+def render_report(report: dict[str, Any], *, title: str = "L5 parity report") -> str:
+    """Render a run as markdown. Kept here so the CLI and any CI job emit the same shape."""
+    verdict = "PASS" if report["passes"] else "FAIL"
+    lines = [
+        f"# {title}",
+        "",
+        f"**Verdict: {verdict}** (threshold {report['threshold']}) — "
+        f"{report['overall']['runs']} cases, mean {report['overall']['mean_parity']}, "
+        f"min {report['overall']['min_parity']}",
+        "",
+        "| tool | cases | mean | min | passes |",
+        "|---|---:|---:|---:|---|",
+    ]
+    for tool, agg in report["by_tool"].items():
+        mark = "yes" if agg["passes_A4"] else "**NO**"
+        lines.append(f"| {tool} | {agg['runs']} | {agg['mean_parity']} | {agg['min_parity']} | {mark} |")
+    if report["failing_tools"]:
+        lines += ["", f"Tools below the gate: **{', '.join(report['failing_tools'])}**"]
+
+    worst = sorted(report["cases"], key=lambda c: c["score"])[:10]
+    if worst:
+        lines += [
+            "",
+            "## Lowest-scoring cases",
+            "",
+            "| case | tool | score | failed checks |",
+            "|---|---|---:|---|",
+        ]
+        for c in worst:
+            failed = ", ".join(k["check"] for k in c["checks"] if not k["ok"]) or "—"
+            lines.append(f"| {c['case_id']} | {c['tool']} | {c['score']} | {failed} |")
+    return "\n".join(lines) + "\n"
