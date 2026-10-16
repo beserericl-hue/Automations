@@ -1,0 +1,65 @@
+name: Engine CI
+
+# H1 from the remaining-work inventory: the Python engine is the product and had NO CI. ~350 unit
+# tests, ruff and mypy ran only when someone remembered locally, and the codebase had drifted to
+# 61 unformatted files / 3 ruff errors / 45 mypy errors (incl. 3 latent None-crashes) by the time
+# this landed.
+#
+# Deliberately NO `paths:` filter, unlike ci.yml. A required status check that is skipped by a path
+# filter reports as "expected but not reported" and blocks every PR that does not touch the filtered
+# paths — the trap documented as H6 in the inventory. The engine suite is seconds; the uv install is
+# cached. Running it on every PR is cheaper than the foot-gun.
+#
+# The suite must stay runnable WITHOUT provider credentials: no API keys are supplied here, and step
+# services fall back to local fixtures when a provider is unregistered. If a test ever needs a live
+# key, it belongs in the DEV E2E suite (scripts/e2e_full_verify.py), not here.
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: engine-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: writers-workbench/engine
+
+jobs:
+  engine:
+    # This job name is the status-check context used by branch protection. Changing it silently
+    # disables the required check — rename in GitHub settings at the same time.
+    name: Engine CI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          # Matches the pin in services/runtime/Dockerfile so CI resolves what production builds.
+          version: '0.5.13'
+          enable-cache: true
+          cache-dependency-glob: writers-workbench/engine/uv.lock
+
+      - name: Set up Python
+        # requires-python = ">=3.12"; the runtime image is python:3.12-slim.
+        run: uv python install 3.12
+
+      - name: Sync workspace (all 21 members + dev group)
+        run: uv sync --all-packages --all-extras --group dev
+
+      - name: Lint (ruff check)
+        run: uv run ruff check .
+
+      - name: Format (ruff format --check)
+        run: uv run ruff format --check .
+
+      - name: Types (mypy)
+        run: uv run mypy
+
+      - name: Tests (pytest)
+        run: uv run pytest -q
