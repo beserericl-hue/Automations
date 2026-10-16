@@ -989,3 +989,61 @@ written. Detail in §A6.
 first is what surfaced the scene-break regression and what will measure the remaining prompt
 migration. Both A3 and A6 also turned out to be mis-sized in the inventory — in both cases the
 recorded fix could not have worked — which is the argument for verifying before executing.
+
+## [2026-10-16] build | Gate 1 complete — A2, A3, A6 + the three decisions
+
+Fourth pass. Commits `848d2c5` `05c6a9e` `f9a7019` `874aa4d`, Engine CI + Workbench CI green, DEV
+healthy (19/19 steps).
+
+Three decisions taken by the user and executed:
+
+**A3 — embeddings. Migration 027 APPLIED to DEV.** Verified against the live 384 vectors: querying
+with a row's own embedding returns it at 1.0000 with related canon below (premise 0.69, sub_chapter
+0.65). Prerequisites confirmed first — `vector` extension present, `embedding` is `vector(1536)`
+matching text-embedding-3-small, ivfflat index already there. Flag enabled on both DEV engine
+services. `chapter.write` now retrieves canon with the chapter BEAT as the query, folded into the
+**cached** system block so one embed + one RPC serves every sub-chapter.
+
+Three further problems caught by exercising it against live DEV rather than trusting it:
+(1) **`openai` was not a dependency of any engine service** — enabling the flag would have made every
+retrieval degrade silently to no grounding, the same silent-no-op class A1 exists to prevent;
+(2) **`build_canon_chunks` omitted `sub_chapter`**, the LARGEST doc_type (126 of 169 rows on one
+project), so the delete-then-insert reindex would have destroyed ~75% of that project's canon —
+caught before anyone ran it; (3) added a **coverage guard** (the general form of 2) that refuses a
+reindex replacing <60% of existing rows. Nothing wrote the table before, so the producer
+(`index_project_canon`) is new; it reproduces n8n's coverage exactly against the real DEV outline —
+sub_chapter 126=126, chapter_brief 21=21, character 7=7, premise 1=1, book_arc 1=1. Also confirmed
+there is **no** embedding-model mismatch: a project-scoped well-matched query scores 0.53-0.54, so
+the 0.35 threshold is sound and the earlier 0.21 readings were cross-project noise it correctly
+excludes.
+
+**A6 — engine vocabulary is canonical.** Decided after finding that `pg_constraint` shows **no CHECK
+on `story_bible_v2.entry_type` at all**, so the documented vocabulary was never enforced and the
+engine's words are simply what 72% of rows contain. The real bug was in the UI: `StoryBiblePanel`
+grouped by a hardcoded list, so any row outside it was **filtered out and never rendered**. It now
+groups by the types actually present (canonical first, then legacy, then unknowns sorted), so drift
+can reorder sections but can never hide a row. 493 duplicate `research` rows retired — but only
+after verifying every sampled row's text appears **verbatim** inside a linked `research_reports_v2`
+report, and by soft-delete (all 493 still present, reversible). chapter_step's duplicate write
+removed. Live rows 3226 → 2733, of which 2677 (**97%**) are canonical. **Zero destructive deletes.**
+
+**A2 — all newsletter briefs live.** pick 15,234 · segment 15,700 · other_top_stories 10,232 · intro
+6,604 · subject 5,521 chars, replacing one-liners. Saga fields threaded (corpus+date to subject;
+subject_line/pre_header/date to segment and assemble; intro now receives full story SECTIONS rather
+than a title list). `newsletter.image.user_template` deliberately not wired — `image_step` uses no
+prompt, it proposes URLs. A parametrized test renders each brief with exactly its step's field set
+and asserts nothing unrendered survives, which moves a forgotten field from generation time to CI.
+That test also caught that `render_live_prompt`'s documented placeholder fallback was **unreachable**
+(`PromptStore.get` raises rather than returning None), so an absent baseline would have crashed the
+step.
+
+**H7 earlier in the day** also stands: `Engine CI` is now required on both `main` and `develop`.
+
+Incidental validation of B2: during the A2 deploy, readiness correctly reported `degraded` with
+`arq_worker: false` (not `unhealthy`), so it would not have bounced the container; the heartbeat
+resumed on its 30s cadence a minute later.
+
+**Gate 1 is complete.** Remaining on the inventory: Gate 2 (the load test and the scale items), Gate
+3 (PROD cutover, starting with regenerating the dangerous workflow-id map), Gate 4 (turn n8n off,
+which E1 now has a producer for). The one judgement call to revisit: the `recorded`-mode parity
+number (0.667) is not the A4 gate — that needs `live`/shadow on same inputs.
