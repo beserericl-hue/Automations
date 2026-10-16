@@ -42,6 +42,11 @@ for _isolated_key in (
     "ELEVENLABS_AGENT_ID",
     "WORKBENCH_API_URL",
     "INGESTION_SECRET",
+    # Added after tests/test_anthropic_workspace.py failed only on a developer machine: pydantic
+    # falls back to the .env FILE when an env var is absent, so monkeypatch.delenv could not make a
+    # setting look unconfigured while .env defined it. The suite's result must not depend on what
+    # happens to be in a local .env.
+    "ANTHROPIC_WORKSPACE_ID",
 ):
     os.environ[_isolated_key] = ""
 

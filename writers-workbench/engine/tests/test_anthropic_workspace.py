@@ -33,7 +33,10 @@ def _adapter(monkeypatch: pytest.MonkeyPatch, *, workspace: str | None) -> Any:
 
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-key")
     if workspace is None:
-        monkeypatch.delenv("ANTHROPIC_WORKSPACE_ID", raising=False)
+        # NOT delenv: pydantic falls back to the .env FILE when the variable is absent, so deleting
+        # it lets a developer's local .env decide the outcome of this test. conftest pins the
+        # variable to "" for the whole suite, which is what an unconfigured deployment looks like.
+        monkeypatch.setenv("ANTHROPIC_WORKSPACE_ID", "")
     else:
         monkeypatch.setenv("ANTHROPIC_WORKSPACE_ID", workspace)
     get_settings.cache_clear()
@@ -53,7 +56,10 @@ def test_the_workspace_header_is_sent_when_configured(monkeypatch: pytest.Monkey
 
 
 def test_no_header_is_sent_when_unconfigured(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A workspace-scoped key carries its workspace implicitly; the header would be noise."""
+    """A workspace-scoped key carries its workspace implicitly; the header would be noise.
+
+    "Unconfigured" is an empty value rather than a deleted one on purpose — see _adapter.
+    """
     adapter = _adapter(monkeypatch, workspace=None)
     assert "anthropic-workspace-id" not in _sent_headers(adapter)
 
