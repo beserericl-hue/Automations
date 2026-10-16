@@ -106,6 +106,7 @@ async def probe_supabase(*, timeout_s: float = DEFAULT_TIMEOUT_S, required: bool
 async def probe_arq_worker(
     *,
     health_check_key: str,
+    name: str = "arq_worker",
     timeout_s: float = DEFAULT_TIMEOUT_S,
     required: bool = False,
 ) -> CheckResult:
@@ -122,16 +123,16 @@ async def probe_arq_worker(
         raw = await asyncio.wait_for(client.get(health_check_key), timeout=timeout_s)
         if not raw:
             return CheckResult(
-                name="arq_worker",
+                name=name,
                 ok=False,
                 detail=f"no heartbeat at {health_check_key}",
                 required=required,
             )
         detail = raw.decode() if isinstance(raw, bytes) else str(raw)
-        return CheckResult(name="arq_worker", ok=True, detail=detail[:120], required=required)
+        return CheckResult(name=name, ok=True, detail=detail[:120], required=required)
     except Exception as exc:
         return CheckResult(
-            name="arq_worker",
+            name=name,
             ok=False,
             detail=f"{type(exc).__name__}: {str(exc)[:120]}",
             required=required,

@@ -1,0 +1,216 @@
+"""Queue topology: heavy vs interactive, per-queue timeouts, and the dead-letter queue (B4/B5).
+
+Everything used to run on ONE arq queue named ``newsletter`` with ``max_jobs=16`` and a uniform
+``job_timeout=5400`` (90 minutes). Two consequences:
+
+* **B4 — a batch starves interactive work.** A 96-chapter "write all" fills all 16 slots for hours,
+  so a Q/A, a chapter plan or a cover-art request queues behind it. Those are the operations a user
+  is sitting and waiting on.
+* **B5 — the timeout fits the worst case, so it fits nothing.** A chapter write legitimately needs 90
+  minutes; a Q/A needs seconds. At 5400s a wedged Q/A holds a slot for an hour and a half, and with
+  ``max_tries=2`` it then does it again.
+
+arq's ``job_timeout`` and ``max_jobs`` are properties of a **Worker**, not of a job — so splitting
+the queues *is* the mechanism for per-operation timeouts. One worker per queue, each sized for the
+work it carries.
+
+Jobs are routed by ``(tool, op)`` rather than by tool, because the spread *within* a tool is the
+whole problem: ``chapter.write`` is the longest job in the system and ``chapter.qa`` is one of the
+shortest.
+"""
+
+from __future__ import annotations
+
+import json
+import time
+from dataclasses import dataclass
+from typing import Any
+
+from writer_engine.telemetry.logging import get_logger
+
+logger = get_logger("queues")
+
+QUEUE_HEAVY = "engine-heavy"
+QUEUE_INTERACTIVE = "engine-interactive"
+
+# Poll order matters: a caller holding a job_id does not know which queue took it, so the poller
+# tries each in turn. Heavy first because long jobs are the ones actually being polled repeatedly.
+ALL_QUEUES: tuple[str, ...] = (QUEUE_HEAVY, QUEUE_INTERACTIVE)
+
+# The legacy single queue. Kept ONLY so jobs enqueued before this split can still be polled and
+# drained after a deploy; nothing new is ever enqueued here. Remove once no in-flight job predates
+# the split (a few hours of retention).
+QUEUE_LEGACY = "newsletter"
+POLL_QUEUES: tuple[str, ...] = (*ALL_QUEUES, QUEUE_LEGACY)
+
+
+@dataclass(frozen=True)
+class QueueProfile:
+    """Sizing for one queue's worker."""
+
+    name: str
+    max_jobs: int
+    job_timeout: int
+    max_tries: int
+    keep_result: int
+
+
+# heavy: few slots, long ceiling. The ceiling stays 90 min because a 10-concurrent batch shares one
+# account's output-TPM, which genuinely stretches a single chapter well past 30 minutes.
+HEAVY = QueueProfile(name=QUEUE_HEAVY, max_jobs=8, job_timeout=5400, max_tries=2, keep_result=7200)
+# interactive: more slots, short ceiling. A user is waiting on these, so a wedged job frees its slot
+# in minutes rather than occupying it for an hour and a half. max_tries=1 because a retry the user is
+# actively waiting through is worse than a prompt error.
+#
+# The ceiling is 600s and NOT the ~120s these operations actually take, because a job spends time
+# queued on the LLM budget before it spends any time generating: `llm_budget_max_wait_s` is 300, so
+# under the very contention this split exists to survive, an interactive job can legitimately wait 5
+# minutes for an output-token grant and only then start. A 180s ceiling would kill those jobs
+# precisely when the system is busy — the opposite of the intent. 600s leaves the full budget wait
+# plus a generation pass, and is still 9x tighter than the one-size-fits-all 5400.
+INTERACTIVE = QueueProfile(
+    name=QUEUE_INTERACTIVE, max_jobs=24, job_timeout=600, max_tries=1, keep_result=3600
+)
+
+PROFILES: dict[str, QueueProfile] = {p.name: p for p in (HEAVY, INTERACTIVE)}
+
+# (tool, op) pairs that belong on the heavy queue. Anything not listed is interactive, so a NEW op
+# defaults to the short timeout — a wrong-but-fast classification is recoverable, where defaulting a
+# new interactive op to a 90-minute ceiling re-creates the B5 problem silently.
+# Classified by what the operation actually emits, not by how it feels: an op with a >=16k
+# max_tokens call or an upstream poll loop measured in minutes is heavy. Checked against each step's
+# OPS dict and its max_tokens arguments rather than assumed.
+HEAVY_OPS: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("chapter", "write"),
+        ("chapter", "rewrite"),  # 32768 max_tokens
+        ("chapter", "repair"),
+        ("chapter", "plan"),  # 32768 max_tokens on the sub-chapter fan-out
+        ("chapter", "blog"),
+        ("chapter", "short-story"),
+        ("chapter", "newsletter"),
+        ("brainstorm", "story"),
+        ("brainstorm", "short-story"),
+        ("brainstorm", "revise-outline"),
+        ("brainstorm", "edit-outline"),  # re-emits the whole StoryOutline at 32768
+        ("research", "run"),
+        ("media", "cover-art"),  # KIE.AI createTask -> poll recordInfo, 180s ceiling of its own
+    }
+)
+
+# Ops that are interactive BY DECISION rather than by default. Functionally identical to leaving
+# them out — routing only consults HEAVY_OPS — but recording them means a reader can tell "sized and
+# judged short" from "nobody looked at it", and the drift test in tests/test_queues.py can insist
+# that every async-dispatched op in the hub catalog appears in one list or the other.
+INTERACTIVE_OPS: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("chapter", "qa"),  # one pass over one chapter
+        ("chapter", "scan-drift"),  # single structured call
+        ("chapter", "evaluate-genre"),  # 1024 max_tokens
+        ("chapter", "extract-bible"),  # 4096 max_tokens
+        ("brainstorm", "create-project"),  # a DB insert, no generation
+        ("media", "social-posts"),
+        ("notify", "eve-callback"),
+        ("library", "revert"),  # version swap
+        ("library", "email-content"),  # one Postal send
+    }
+)
+
+# Whole tools that are heavy regardless of op.
+HEAVY_TOOLS: frozenset[str] = frozenset()
+
+
+def queue_for(tool: str, op: str | None = None) -> str:
+    """Which queue a ``(tool, op)`` belongs on.
+
+    Defaults to the interactive queue, deliberately — see ``HEAVY_OPS``.
+    """
+    if tool in HEAVY_TOOLS:
+        return QUEUE_HEAVY
+    return QUEUE_HEAVY if (tool, str(op or "")) in HEAVY_OPS else QUEUE_INTERACTIVE
+
+
+def profile_for(queue: str) -> QueueProfile:
+    return PROFILES.get(queue, INTERACTIVE)
+
+
+# --- dead-letter queue -------------------------------------------------------------------------
+#
+# arq has no DLQ: when a job exhausts max_tries it is simply gone, which is how a failed chapter
+# write becomes a user asking "where is my chapter?" with nothing in the system to point at. Record
+# terminal failures to a capped Redis list so they are inspectable.
+
+DLQ_KEY = "engine:dlq"
+DLQ_MAX = 500
+
+
+async def record_dead_letter(
+    *,
+    queue: str,
+    function: str,
+    args: Any,
+    error: str,
+    job_id: str | None = None,
+) -> None:
+    """Push a terminal job failure onto the DLQ. Never raises — a DLQ write must not mask the error."""
+    try:
+        from writer_engine.redis_client.client import get_redis
+
+        client = await get_redis()
+        entry = json.dumps(
+            {
+                "ts": time.time(),
+                "queue": queue,
+                "function": function,
+                "job_id": job_id,
+                "error": str(error)[:1000],
+                "args": str(args)[:2000],
+            }
+        )
+        # redis-py's sync/async stubs are a union, so the awaitable is bound to Any first.
+        push: Any = client.lpush(DLQ_KEY, entry)
+        await push
+        trim: Any = client.ltrim(DLQ_KEY, 0, DLQ_MAX - 1)
+        await trim
+        logger.error("queue.dead_letter", queue=queue, function=function, job_id=job_id)
+    except Exception as exc:  # pragma: no cover - best effort by design
+        logger.warning("queue.dead_letter_write_failed", error=str(exc)[:160])
+
+
+async def read_dead_letters(limit: int = 50) -> list[dict[str, Any]]:
+    """Most-recent-first DLQ entries, for ``/admin/dlq``."""
+    try:
+        from writer_engine.redis_client.client import get_redis
+
+        client = await get_redis()
+        pending: Any = client.lrange(DLQ_KEY, 0, max(limit, 1) - 1)
+        raw = await pending
+    except Exception as exc:
+        logger.warning("queue.dead_letter_read_failed", error=str(exc)[:160])
+        return []
+    out: list[dict[str, Any]] = []
+    for item in raw or []:
+        try:
+            out.append(json.loads(item.decode() if isinstance(item, bytes) else item))
+        except Exception:
+            continue
+    return out
+
+
+__all__ = [
+    "ALL_QUEUES",
+    "DLQ_KEY",
+    "HEAVY",
+    "HEAVY_OPS",
+    "INTERACTIVE",
+    "INTERACTIVE_OPS",
+    "POLL_QUEUES",
+    "QUEUE_HEAVY",
+    "QUEUE_INTERACTIVE",
+    "QUEUE_LEGACY",
+    "QueueProfile",
+    "profile_for",
+    "queue_for",
+    "read_dead_letters",
+    "record_dead_letter",
+]

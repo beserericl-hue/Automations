@@ -25,6 +25,13 @@ from writer_engine.health import (
     run_checks,
     summarise,
 )
+from writer_engine.queues import (
+    ALL_QUEUES,
+    POLL_QUEUES,
+    QUEUE_HEAVY,
+    queue_for,
+    read_dead_letters,
+)
 from writer_engine.redis_client.client import close_redis
 from writer_engine.state_machine.durable import RedisSagaRepo
 from writer_engine.state_machine.orchestrator import InMemoryStateStore
@@ -78,7 +85,7 @@ def build_app() -> FastAPI:
         async def enqueue(execution_id: UUID) -> None:
             if app.state.arq_pool is not None:
                 await app.state.arq_pool.enqueue_job(
-                    "advance_newsletter_saga", str(execution_id), _queue_name="newsletter"
+                    "advance_newsletter_saga", str(execution_id), _queue_name=QUEUE_HEAVY
                 )
 
         return NewsletterSagaDriver(app.state.saga_repo, enqueue_advance=enqueue)
@@ -133,7 +140,16 @@ def build_app() -> FastAPI:
             for name, getter in ALL_STEP_URLS.items()
         ]
         probes.append(probe_redis(required=True))
-        probes.append(probe_arq_worker(health_check_key=ARQ_HEALTH_CHECK_KEY, required=False))
+        # One probe per queue (B4): with two workers, "a worker is alive" is not the question —
+        # a dead interactive worker leaves every Q/A queued while heavy work looks fine.
+        probes += [
+            probe_arq_worker(
+                health_check_key=f"{ARQ_HEALTH_CHECK_KEY}:{queue}",
+                name=f"arq_worker:{queue}",
+                required=False,
+            )
+            for queue in ALL_QUEUES
+        ]
         probes.append(probe_supabase(required=False))
         checks = await run_checks(probes)
         body, ok = summarise(SERVICE, checks)
@@ -172,6 +188,17 @@ def build_app() -> FastAPI:
             out["steps_error"] = f"{type(exc).__name__}: {str(exc)[:160]}"
         return out
 
+    @app.get("/admin/dlq", dependencies=[Depends(require_admin_token)])
+    async def dlq(limit: int = 50) -> dict[str, Any]:
+        """Terminal job failures (B5).
+
+        arq keeps a failed job's result only for ``keep_result`` seconds and then forgets it, so
+        without this a failed chapter write leaves nothing behind to point at. Entries are
+        most-recent-first and capped; see ``writer_engine.queues.DLQ_MAX``.
+        """
+        entries = await read_dead_letters(limit=max(1, min(limit, 500)))
+        return {"count": len(entries), "entries": entries}
+
     @app.get("/metrics")
     async def metrics() -> Any:
         return metrics_app()
@@ -186,6 +213,31 @@ def build_app() -> FastAPI:
         else:
             execution_id = await orch.start(initial_state=body)
         return await orch.run(execution_id, payload=body)
+
+    async def _locate_job(job_id: str) -> tuple[Any, Any, str]:
+        """Find which queue holds ``job_id``.
+
+        A caller holding a job_id does not know which queue took it, and arq's ``Job`` is bound to
+        one queue name at construction: ``status()`` reads the queue's own sorted set, so asking the
+        wrong queue reports ``not_found`` for a job that is sitting there queued. Try each queue and
+        take the first that recognises the id. ``POLL_QUEUES`` includes the pre-split ``newsletter``
+        queue so jobs enqueued before a deploy keep polling correctly while they drain.
+
+        ``complete`` and ``in_progress`` are derived from queue-independent keys, so a finished job
+        resolves on the first attempt regardless of where it ran.
+        """
+        from arq.jobs import Job, JobStatus
+
+        first: tuple[Any, Any, str] | None = None
+        for queue in POLL_QUEUES:
+            job = Job(job_id, redis=app.state.arq_pool, _queue_name=queue)
+            status = await job.status()
+            if status != JobStatus.not_found:
+                return job, status, queue
+            if first is None:
+                first = (job, status, queue)
+        assert first is not None  # POLL_QUEUES is never empty
+        return first
 
     @app.post("/pipelines/write/{tool}/run", dependencies=[Depends(require_service_secret)])
     async def run_write_tool(tool: str, body: dict[str, Any]) -> dict[str, Any]:
@@ -205,10 +257,11 @@ def build_app() -> FastAPI:
                 raise HTTPException(
                     http_status.HTTP_503_SERVICE_UNAVAILABLE, detail="async queue unavailable"
                 )
-            job = await app.state.arq_pool.enqueue_job(
-                "run_write_tool_job", tool, body, _queue_name="newsletter"
-            )
-            return {"job_id": job.job_id, "status": "queued", "tool": tool}
+            # B4: route by (tool, op). A chapter write goes to the heavy queue; a Q/A or a plan
+            # goes to the interactive queue, where it is not stuck behind a 96-chapter batch.
+            queue = queue_for(tool, body.get("op"))
+            job = await app.state.arq_pool.enqueue_job("run_write_tool_job", tool, body, _queue_name=queue)
+            return {"job_id": job.job_id, "status": "queued", "tool": tool, "queue": queue}
 
         exec_id = body.get("execution_id")
         out = await run_step_via_http(
@@ -222,13 +275,12 @@ def build_app() -> FastAPI:
     @app.get("/pipelines/write/jobs/{job_id}", dependencies=[Depends(require_service_secret)])
     async def write_job_status(job_id: str) -> dict[str, Any]:
         """Poll an async write-tool job: returns {status, result?}. status ∈ queued|in_progress|complete|not_found."""
-        from arq.jobs import Job, JobStatus
+        from arq.jobs import JobStatus
 
         if app.state.arq_pool is None:
             raise HTTPException(http_status.HTTP_503_SERVICE_UNAVAILABLE, detail="async queue unavailable")
-        job = Job(job_id, redis=app.state.arq_pool, _queue_name="newsletter")
-        status = await job.status()
-        out: dict[str, Any] = {"job_id": job_id, "status": status.value}
+        job, status, queue = await _locate_job(job_id)
+        out: dict[str, Any] = {"job_id": job_id, "status": status.value, "queue": queue}
         if status == JobStatus.complete:
             try:
                 out["result"] = await job.result(timeout=1)
@@ -245,11 +297,9 @@ def build_app() -> FastAPI:
         Returns ``{job_id, aborted}`` where ``aborted`` is arq's confirmation. A job that already completed
         (or never existed) returns ``aborted: false`` rather than erroring — cancel is idempotent/safe to spam.
         """
-        from arq.jobs import Job
-
         if app.state.arq_pool is None:
             raise HTTPException(http_status.HTTP_503_SERVICE_UNAVAILABLE, detail="async queue unavailable")
-        job = Job(job_id, redis=app.state.arq_pool, _queue_name="newsletter")
+        job, _status, _queue = await _locate_job(job_id)
         try:
             aborted = await job.abort(timeout=2)
         except Exception as exc:  # already finished / result expired — nothing to abort
@@ -311,7 +361,7 @@ def build_app() -> FastAPI:
         # If arq is available, hand off to the worker; else drive inline so the response carries the first pause.
         if app.state.arq_pool is not None:
             await app.state.arq_pool.enqueue_job(
-                "advance_newsletter_saga", str(execution_id), _queue_name="newsletter"
+                "advance_newsletter_saga", str(execution_id), _queue_name=QUEUE_HEAVY
             )
             return {"execution_id": str(execution_id), "result": "queued"}
         result = await driver.advance(execution_id)
@@ -448,7 +498,7 @@ def build_app() -> FastAPI:
                 )
                 if app.state.arq_pool is not None:
                     await app.state.arq_pool.enqueue_job(
-                        "advance_newsletter_saga", str(eid), _queue_name="newsletter"
+                        "advance_newsletter_saga", str(eid), _queue_name=QUEUE_HEAVY
                     )
                 else:
                     await driver.advance(eid)

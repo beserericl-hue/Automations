@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 from orchestrator import main as orch_main
 from orchestrator.write_tools import ALL_STEP_URLS
 from writer_engine.health import CheckResult, summarise
+from writer_engine.queues import ALL_QUEUES
 
 
 @pytest.fixture
@@ -98,8 +99,8 @@ def test_ready_degraded_not_503_when_only_optional_fails(
     async def _redis_ok(**_: Any) -> CheckResult:
         return CheckResult(name="redis", ok=True, required=True)
 
-    async def _worker_missing(**_: Any) -> CheckResult:
-        return CheckResult(name="arq_worker", ok=False, detail="no heartbeat", required=False)
+    async def _worker_missing(**kwargs: Any) -> CheckResult:
+        return CheckResult(name=kwargs["name"], ok=False, detail="no heartbeat", required=False)
 
     async def _supabase_ok(**_: Any) -> CheckResult:
         return CheckResult(name="supabase", ok=True, required=False)
@@ -111,16 +112,41 @@ def test_ready_degraded_not_503_when_only_optional_fails(
     r = client.get("/admin/ready")
     assert r.status_code == 200
     assert r.json()["status"] == "degraded"
-    assert r.json()["failed_optional"] == ["arq_worker"]
+    # One entry per queue (B4): a dead interactive worker is a different outage from a dead heavy one.
+    assert r.json()["failed_optional"] == [f"arq_worker:{q}" for q in ALL_QUEUES]
 
 
-def test_ready_uses_the_same_key_the_worker_writes() -> None:
-    """Reader/writer drift on the heartbeat key would silently always report 'no heartbeat'."""
-    from orchestrator.worker import ARQ_HEALTH_CHECK_KEY, WorkerSettings
+def test_ready_uses_the_same_keys_the_workers_write(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reader/writer drift on the heartbeat key would silently always report 'no heartbeat'.
 
-    assert WorkerSettings.health_check_key == ARQ_HEALTH_CHECK_KEY
+    Compares the keys /admin/ready actually probes against the keys the worker classes declare,
+    rather than re-deriving the format in the test — the format living in two places is the drift.
+    """
+    from orchestrator.worker import WorkerSettingsHeavy, WorkerSettingsInteractive
+
+    probed: set[str] = set()
+
+    async def _capture(**kwargs: Any) -> CheckResult:
+        probed.add(kwargs["health_check_key"])
+        return CheckResult(name=kwargs["name"], ok=True, required=False)
+
+    async def _ok(**_: Any) -> CheckResult:
+        return CheckResult(name="x", ok=True, required=False)
+
+    _all_steps_healthy(monkeypatch)
+    monkeypatch.setattr(orch_main, "probe_arq_worker", _capture)
+    monkeypatch.setattr(orch_main, "probe_redis", _ok)
+    monkeypatch.setattr(orch_main, "probe_supabase", _ok)
+    client.get("/admin/ready")
+
+    written = {WorkerSettingsHeavy.health_check_key, WorkerSettingsInteractive.health_check_key}
+    assert probed == written
+    assert len(written) == 2, "both workers writing one key makes either one look alive"
     # arq's 3600s default would let a dead worker look alive for an hour.
-    assert WorkerSettings.health_check_interval <= 60
+    assert WorkerSettingsHeavy.health_check_interval <= 60
+    assert WorkerSettingsInteractive.health_check_interval <= 60
 
 
 # --- summarise() status mapping -------------------------------------------------------------

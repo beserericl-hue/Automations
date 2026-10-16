@@ -54,22 +54,39 @@ def test_no_duplicate_step_names() -> None:
     assert len(set(STEP_NAMES)) == len(STEP_NAMES)
 
 
-# --- B10: three processes, not twenty-one -----------------------------------------------------
+# --- B10: four processes, not twenty-one ------------------------------------------------------
 
 
-def test_runtime_runs_exactly_three_processes() -> None:
+def test_runtime_runs_exactly_four_processes() -> None:
     procs = build_runtime_processes(orchestrator_port=8001)
     names = [p.name for p in procs]
-    assert names == ["steps_app", "arq_worker", "orchestrator"], (
-        "B10 collapsed 21 processes to 3; a regression here reintroduces the ~19 independent "
-        "LLMRouter semaphores (B3) and the unreachable prompt reload (A5)"
+    assert names == [
+        "steps_app",
+        "arq_worker_heavy",
+        "arq_worker_interactive",
+        "orchestrator",
+    ], (
+        "B10 collapsed 21 processes to 3 (+1 for the B4 queue split); a regression here "
+        "reintroduces the ~19 independent LLMRouter semaphores (B3) and the unreachable prompt "
+        "reload (A5)"
     )
+
+
+def test_one_worker_per_queue() -> None:
+    """B4/B5: arq's job_timeout is per-Worker, so a queue with no worker is a queue that never runs."""
+    procs = {p.name: p for p in build_runtime_processes(orchestrator_port=8001)}
+    settings_args = {p.argv[1] for p in procs.values() if p.argv and p.argv[0] == "arq"}
+    assert settings_args == {
+        "orchestrator.worker.WorkerSettingsHeavy",
+        "orchestrator.worker.WorkerSettingsInteractive",
+    }
 
 
 def test_consumers_start_after_the_steps_app() -> None:
     """arq and the orchestrator dial the steps, so the steps process is spawned first."""
     names = [p.name for p in build_runtime_processes(orchestrator_port=8001)]
-    assert names.index("steps_app") < names.index("arq_worker")
+    assert names.index("steps_app") < names.index("arq_worker_heavy")
+    assert names.index("steps_app") < names.index("arq_worker_interactive")
     assert names.index("steps_app") < names.index("orchestrator")
 
 
@@ -114,7 +131,7 @@ def test_step_url_env_matches_engine_settings_aliases() -> None:
 
 def test_consumers_receive_every_step_url() -> None:
     procs = {p.name: p for p in build_runtime_processes(orchestrator_port=8001)}
-    for consumer in ("arq_worker", "orchestrator"):
+    for consumer in ("arq_worker_heavy", "arq_worker_interactive", "orchestrator"):
         env = procs[consumer].env
         for name in STEP_NAMES:
             assert f"{name.upper()}_STEP_URL" in env, f"{consumer} cannot dial {name}"

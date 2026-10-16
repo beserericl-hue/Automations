@@ -115,10 +115,18 @@ def build_runtime_processes(
                 "warning",
             ],
         ),
-        # arq drives the newsletter saga between HITL pauses and runs every async write job.
+        # arq drives the newsletter saga between HITL pauses and runs every async write job. Two
+        # workers, because arq's job_timeout/max_jobs belong to the Worker and not the job (B4/B5):
+        # heavy = few slots, 90-minute ceiling; interactive = many slots, 3-minute ceiling, so a
+        # 96-chapter batch cannot starve the Q/A a user is waiting on.
         ManagedProcess(
-            name="arq_worker",
-            argv=["arq", "orchestrator.worker.WorkerSettings"],
+            name="arq_worker_heavy",
+            argv=["arq", "orchestrator.worker.WorkerSettingsHeavy"],
+            env=step_env,
+        ),
+        ManagedProcess(
+            name="arq_worker_interactive",
+            argv=["arq", "orchestrator.worker.WorkerSettingsInteractive"],
             env=step_env,
         ),
         # The externally-bound process; Railway routes to $PORT.
