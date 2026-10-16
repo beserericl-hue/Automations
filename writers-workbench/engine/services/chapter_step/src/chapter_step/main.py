@@ -647,6 +647,16 @@ def _strip_em_dashes(text: str) -> str:
     return _EM_DASH_RE.sub(", ", text)
 
 
+# Separator inserted between merged sub-chapters. Found by the L5 parity harness (H3): sub-chapters
+# were joined with a bare blank line, so all 96 chapters of the Burial Mound run contained ZERO
+# internal scene breaks while the n8n baseline's carried 1-13. The craft layer asks for scene
+# construction and a story turn every 4-6 pages (follett_seeds.scene.bme_check, scene.turn_density),
+# and the short-story op already instructs "use --- between scenes" — chapters just never did it.
+# Done structurally rather than by prompt instruction: N sub-chapters deterministically yield N-1
+# breaks, where an instruction is advisory and silently drops.
+SCENE_BREAK = "\n\n---\n\n"
+
+
 def _strip_scaffolding(text: str) -> str:
     """Drop leading meta/scaffolding paragraphs so the chapter starts on real story prose — not a
     'Confirmed cast' block, a 'POV CHARACTER: …' preamble, or a '## Chapter N — Revised Draft'
@@ -1286,7 +1296,7 @@ async def _op_write(payload: dict) -> dict:
                     cache_read += cr
                     cache_write += cw
                     prior_tail = " ".join(t.split()[-800:])
-            text = "\n\n".join(sub_texts)
+            text = SCENE_BREAK.join(sub_texts)
             # QA cycle 1 (detect drift vs outline/arc/roster) -> QA cycle 2 (correct it) — only fires a
             # streamed revision when there is real story/character drift. Research is already woven.
             text, drift_report, passes = await _drift_correct_pass(
