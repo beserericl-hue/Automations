@@ -3,7 +3,7 @@ name: Remaining work inventory (engine completion + scale to 50 users)
 description: Evidence-backed inventory of everything left to finish in the Writers Workbench engine, categorised A–I by workstream with per-item status (not implemented / partial / implemented-but-wrong). Includes the two decisions taken 2026-10-15 — ingestion moves to the engine and n8n is turned off (E1), and the runtime container collapses 21 processes to 3 rather than splitting into per-step Railway services (B10). Supersedes the sprint-status framing in planned-sprints and python-migration-roadmap.
 type: concept
 tags: [sprints, engine, inventory, scaling, parity, remaining-work, gate-plan, 2026-10]
-last_reviewed: 2026-10-15
+last_reviewed: 2026-10-16
 ---
 
 # Remaining work inventory
@@ -129,16 +129,16 @@ certainly `chapter_step`.
 
 | ID | Item | St | Evidence | Impact |
 |---|---|---|---|---|
-| **A1** | **Fixture fallbacks fabricate deliverables.** A missing or invalid provider key yields a plausible artifact that is then persisted and emailed | ⚠️ | `research_step/main.py:70` returns `"(stub answer for: …)"`; `media_step/main.py:186,286`; `_fixture()` in `subject_step:18`, `segment_step:18`, `assemble_step:26`, `brainstorm_step:121`, `pick_step:21`; `library_step:57,202,542` return `{"fixture": True}` | The `ProviderNotRegistered` narrowing stopped *real* LLM errors being masked, but a *misconfigured key* still produces fake success. Only `media_step:264` was hardened against persisting a fixture. **Highest-priority correctness risk** |
-| **A2** | **Newsletter steps run on placeholder prompts, not the ported n8n prompts** | 🟡 | `prompt_store/n8n_seeds/__init__.py:5-7` — verbatim prompts load under `n8n_baseline.*` and "the step services keep using the placeholder seeds until the token-mapping work in Sprint 17 lands"; `prompt_store/seeds.py:3` "minimal … placeholders" | Newsletter L5 parity is structural only, not prompt-fidelity. Chapter steps are unaffected — they use the richer `follett_seeds.*` layer |
+| **A1** | ~~Fixture fallbacks fabricate deliverables~~ | ✅ **DONE** 2026-10-16 — gated on `ALLOW_FIXTURE_FALLBACK` (default false). Fixed centrally: 23 of the 29 sites funnel through one `raise` in `LLMRouter.complete`, which now raises the new `ProviderNotConfigured` — deliberately NOT a subclass of `ProviderNotRegistered`/`KeyError`, so no fixture handler catches it and no site can opt back into faking success. 6 non-router sites got explicit guards. | `research_step/main.py:70` returns `"(stub answer for: …)"`; `media_step/main.py:186,286`; `_fixture()` in `subject_step:18`, `segment_step:18`, `assemble_step:26`, `brainstorm_step:121`, `pick_step:21`; `library_step:57,202,542` return `{"fixture": True}` | The `ProviderNotRegistered` narrowing stopped *real* LLM errors being masked, but a *misconfigured key* still produces fake success. Only `media_step:264` was hardened against persisting a fixture. **Highest-priority correctness risk** |
+| **A2** | **Newsletter steps run on placeholder prompts, not the ported n8n prompts** | 🟡 **scoped, ready to execute — see §A2 below** | `prompt_store/n8n_seeds/__init__.py:5-7` — verbatim prompts load under `n8n_baseline.*` and "the step services keep using the placeholder seeds until the token-mapping work in Sprint 17 lands"; `prompt_store/seeds.py:3` "minimal … placeholders" | Severe, and measured 2026-10-16: the picker's live prompt is a **2-line stub** ("Pick the top {max_stories} stories") against a **15.7k-char editorial brief** sitting unused in `n8n_baseline.*` — which encodes catchiest-first, no AI-safety stories, no course ads, no duplicate company/subject, dedupe sources into one slot. Newsletter L5 parity is structural only, not prompt-fidelity. Chapter steps are unaffected (richer `follett_seeds.*`) |
 | **A3** | **Embeddings / canon grounding off.** `chapter.write` never retrieves project canon | ❌ | `config.py:95` `ENABLE_PYTHON_EMBEDDINGS=false`; `re_embed_project` exists but nothing triggers it; n8n `Sub - Embed Project Data` is the live embedder | CR-010 A2: "a quality-parity gap, not just a feature gap." **Blocks E1** |
-| **A4** | **Token accounting is chapter-only** | 🟡 | `begin`/`flush` called only in `chapter_step`; brainstorm, research, media and the newsletter steps write no `token_usage_v2` | CostDashboard under-reports; credits were never calibrated (CR-007's "exact tokens-per-credit" is still unmeasured). **Blocks E1** |
-| **A5** | **Prompt hot-reload cannot work** | ⚠️ | `PromptStore` is a module global (`prompt_store/store.py:65`); each of the 21 processes holds its own. `/admin/reload-prompts` on the gateway reloads nothing that generates text. `reload_from_supabase` swallows every exception and returns 0 (`store.py:44-50`) | Prompt tuning — the main quality lever — has no working production path. **B10's collapse largely fixes this** |
+| **A4** | ~~Token accounting is chapter-only~~ | ✅ **DONE** 2026-10-16 — moved into the step-service template, so all 19 steps and any future one are covered by one owner. `workflow` label is `<step>.<op>`; usage injected where `task_email` reads it, so token usage now appears in EVERY completion email; flushed on failure paths too (a step that burned tokens then failed still cost money). | `begin`/`flush` called only in `chapter_step`; brainstorm, research, media and the newsletter steps write no `token_usage_v2` | CostDashboard under-reports; credits were never calibrated (CR-007's "exact tokens-per-credit" is still unmeasured). **Blocks E1** |
+| **A5** | ~~Prompt hot-reload cannot work~~ | ✅ **DONE** 2026-10-16 — B10 collapsed the 19 stores to one, plus a correct fan-out: the gateway cannot reach the steps process (localhost-bound in the runtime container), so it fans out to the orchestrator, which owns that hop. | `PromptStore` is a module global (`prompt_store/store.py:65`); each of the 21 processes holds its own. `/admin/reload-prompts` on the gateway reloads nothing that generates text. `reload_from_supabase` swallows every exception and returns 0 (`store.py:44-50`) | Prompt tuning — the main quality lever — has no working production path. **B10's collapse largely fixes this** |
 | **A6** | **Story bible: polluted data, no hub write path** | 🟡 | ~1000 rows / 297 `character` dupes remain after the junk filter; `story_bible_step` has add/list but the catalog routes only `story_bible.list`; no edit/delete; `StoryBiblePanel` is read-only | Story Bible tab shows garbage and users cannot fix it |
 | **A7** | **Drift detector over-flags** | 🟡 | 16 residual drifted chapters in the Burial Mound run; flags characterisation that *adds to* rather than *contradicts* a sparse roster bio | False positives train users to ignore the signal |
 | **A8** | **Eve callback is a gated dry run** | ❌ | `writer_engine/eve.py:114` returns `{"dry_run": True}` when `ELEVENLABS_API_KEY`/`AGENT_ID` are unset — they are unset by design. PROD Eve still calls the n8n PROD hub | Voice is the headline feature and is not on the engine. Pointing PROD Eve at the engine is baseline-protected and needs explicit authorisation |
-| **A9** | **Dead ops still routable** | 🟡 | CR-010 A4: `brainstorm_step.chapter` returns empty beats (superseded by `chapter.plan`) but remains in OPS → misroutes. `library_retrieve_step` (the F0 demo, superseded by `library_step`) still runs on `:8002` and returns `fixture-1`/`fixture-2` | Silent wrong answers |
-| **A10** | **Two newsletter orchestrators coexist** | 🟡 | `newsletter_orch.py:316` — "placeholder — the gate is held until the resume endpoint fires (real impl in F3)" — alongside the durable `newsletter_saga.py` | Ambiguity about which path actually runs |
+| **A9** | ~~Dead ops still routable~~ | ✅ **DONE** 2026-10-16 — `brainstorm.chapter` (returned `{"beats": []}` unconditionally) removed; unknown ops now `UNKNOWN_OP`. `library_retrieve_step` deprecation-marked rather than removed: not in the hub catalog so unreachable by users, and still the only L2 test of the orchestration primitive. | CR-010 A4: `brainstorm_step.chapter` returns empty beats (superseded by `chapter.plan`) but remains in OPS → misroutes. `library_retrieve_step` (the F0 demo, superseded by `library_step`) still runs on `:8002` and returns `fixture-1`/`fixture-2` | Silent wrong answers |
+| **A10** | ~~Two newsletter orchestrators coexist~~ | ✅ **DONE** 2026-10-16 — `/pipelines/newsletter/run` drives the sync orchestrator, which **auto-resolves all three HITL gates** (it would send with no human review) and was reachable by any holder of the service secret. Now 410s unless a test installed the hook; production already used `run-durable`, and a test guards that wiring. | `newsletter_orch.py:316` — "placeholder — the gate is held until the resume endpoint fires (real impl in F3)" — alongside the durable `newsletter_saga.py` | Ambiguity about which path actually runs |
 | **A11** | **Newsletter cadence ignores time-of-day / day-of-week** | 🟡 | Cron checks day-interval only; `cadence` + `cadence_send_time` on `newsletter_editions_v2` are decorative | The scheduling UI lies to the user |
 | **A12** | **`/v1/*` B2B surface is a stub** | ❌ | `auth/api_key.py:17` `tenant_id="tenant-stub"`; `gateway/routes/v1.py` "F0 stub" | Acceptable for now — just do not count it as built |
 
@@ -163,6 +163,39 @@ certainly `chapter_step`.
 | **B13** | **Redis is an un-alerted SPOF** | ⚠️ | Queue, Anthropic budget, HITL gates, SSE pub/sub, sessions and the idempotency cache all live on it. Not HA. It died silently for 9 days in May (auto-memory `project_prod_redis_outage_risk`; [[log]] 2026-05-28) | A single failure takes the engine down invisibly |
 
 ---
+
+### §A2 — the newsletter prompt migration, scoped
+
+Audited 2026-10-16. **8 prompts** in `n8n_baseline.*` (not 16), 1.8k–16.5k chars each, 2–7 n8n
+expression tokens apiece. Every token resolves to a value the Python steps already hold, so this is a
+mechanical rewiring rather than a redesign:
+
+| n8n expression | Python source |
+|---|---|
+| `new Date(…Date).format("yyyy-MM-dd","America/Chicago")` | the run's newsletter date |
+| `$('set_trigger_inputs').item.json["Previous Newsletter Content"]` | previous newsletter content |
+| `$('combine_markdown_content').item.json.content_result` | the gathered markdown corpus |
+| `$('combine_tweet_content')…` | **N/A** — no tweet ingestion in the engine; substitute `"N/A"` |
+| `$node["set_current_stories"]…top_selected_stories` | picked stories JSON |
+| `$('subject_examples').item.json.subject_line_examples` | subject-line examples |
+| `$node["set_selected_stories"].json.subject_line` / `.pre_header_text` | subject / pre-header |
+| `$node["set_current_segment"].json.current_story.title` / `.summary` | the current story |
+| `$node["aggregate_segment_text_content"]…join("\n\n")` | segment source text |
+| `$('aggregate_segment_external_source_content')…` | scraped external sources |
+| `$('set_combined_sections_content').item.json.story_sections` | assembled sections |
+| `$node["share_*_approval_feedback"].data.data.text` | HITL revision feedback |
+| `$('stories_prompt')…` / `$('set_subject_line_prompt')…` | the original prompt (edit variants) |
+| `JSON.stringify($node["pick_top_stories"].json.output)` | the prior output being revised |
+
+**Mechanism note:** do NOT render these with `str.format()`. Three prompts contain literal `{`/`}`
+(JSON examples), which `.format()` would misparse and which forces error-prone brace doubling.
+Translate `{{ expr }}` → `${field}` and render with `string.Template`, which ignores stray braces.
+
+**Sequencing:** A2 and A3 are the two items whose effect is only visible through the **L5 parity
+harness (H3, never run)** — which is also Gate 1's stated exit criterion. Run the harness first, then
+migrate against it, or the result is unmeasurable. Two of the eight prompts (`edit_top_stories`,
+`edit_subject_line`) drive the HITL revision loops, which F2 (auto-memory `project_f2_newsletter_saga_complete`)
+records as never exercised (S-12), so they need a live revision run too.
 
 ## C. Observability & reliability
 
@@ -224,7 +257,7 @@ certainly `chapter_step`.
 |---|---|---|---|
 | **G1** | **Plaintext user passwords committed in the vault** | ⚠️ | [[credentials-map]] carries live passwords, and the vault sits inside the git repo |
 | G2 | Unrotated since May: PROD Postgres password + 4 API keys that transited a chat stream | ⚠️ | `scripts/NEXT_SESSION_PROMPT.md` carry-forward |
-| **G3** | **Insecure defaults in code** | ⚠️ | `config.py:25-26` — `service_shared_secret="dev-service-secret-change-me"`, `admin_token="dev-admin-token-change-me"`. An environment that forgets to set these is open |
+| **G3** | ~~Insecure defaults in code~~ | ✅ **DONE** 2026-10-16 — both secrets default to empty and fail CLOSED with 503 ("not configured"), distinguished from the 401 for a wrong secret. Verified both are really set on DEV before shipping, by probing `/internal` and `/admin` with the old placeholders (both 401). | `config.py:25-26` — `service_shared_secret="dev-service-secret-change-me"`, `admin_token="dev-admin-token-change-me"`. An environment that forgets to set these is open |
 | G4 | No log redaction | ❌ | See **C3** |
 | G5 | n8n API key duplicated across `.env`, `.mcp.json` and 2 Railway services | 🟡 | See [[credentials-map]] |
 
@@ -275,8 +308,10 @@ foundations that are not.
 | **B1** process supervisor | ✅ done — `writer_engine.supervisor`, fail-fast, 9 tests + live smoke |
 | **B2** real health + readiness checks | ✅ done — both services, plus the missing Railway `healthcheckPath` |
 | **H1** engine CI promoted to a required check | ✅ done — `Engine CI` green and required on `main` |
-| **A1** fail loud instead of returning a fixture | ❌ **still open — next** |
-| **G3** remove the insecure secret defaults | ❌ **still open — next** |
+| **A1** fail loud instead of returning a fixture | ✅ done — `ALLOW_FIXTURE_FALLBACK`, fixed centrally at the router |
+| **G3** remove the insecure secret defaults | ✅ done — empty defaults, fail closed with 503 |
+
+**Gate 0 is COMPLETE** (2026-10-16), all five items verified live on DEV.
 
 Prerequisite work that fell out of H1: 61 files reformatted, 3 ruff errors and 45 mypy errors cleared
 (including the three latent `None`-crashes noted at the top). A red pipeline gates nothing, so making it
@@ -287,13 +322,21 @@ only 4 of 21 workspace members).
 
 ### Gate 1 — Make one user provably correct
 
-**B10** collapse 21 → 3 processes (also fixes **B3** and **A5**) · **A2** real newsletter prompts ·
-**A3** embeddings on · **A4** full token accounting · **A9**/**A10** remove dead paths · **A6** bible
-cleanup · **H8** extend mypy to the other 17 step services.
+| Item | Status |
+|---|---|
+| **B10** collapse 21 → 3 processes (also fixes **B3** and **A5**) | ✅ done 2026-10-16 — `services/steps_app` mounts all 19 steps in one uvicorn; verified live on DEV |
+| **H8** extend mypy to the other 17 step services | ✅ done — 89 → **131** files checked, which surfaced 5 more latent `None` crashes |
+| **A9** / **A10** remove dead paths | ✅ done |
+| **A4** full token accounting | ✅ done — moved into the step template, so all 19 steps are covered |
+| **A2** real newsletter prompts | ❌ open — **scoped and ready**, see §A2 |
+| **A3** embeddings on | ❌ open |
+| **A6** bible cleanup | ❌ open |
 
-B10 is now a smaller job than when it was written: `writer_engine/runtime_processes.py` is already the
-single source of truth for the process table, so collapsing means mounting the step apps as
-sub-applications of one uvicorn and pointing `*_STEP_URL` at path prefixes instead of ports.
+**Sequencing correction (2026-10-16).** The remaining three are not simply "next": **A2** and **A3**
+are the two items whose effect is invisible without the **L5 parity harness (H3)** — which is this
+gate's own stated exit criterion. Doing them before the harness exists means shipping unmeasurable
+quality changes to the newsletter and to chapter grounding. **Run H3 first**, then A2/A3 against it.
+**A6** is independent (a DEV data cleanup) and can go any time.
 
 Exit: run **H3** and get an actual L5 parity number.
 

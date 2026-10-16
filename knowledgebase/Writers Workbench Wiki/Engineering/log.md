@@ -810,3 +810,113 @@ Gate 1).
 
 Also noted: the local `engine/.venv` had stale shebangs pointing at `Automations/engine/` from before
 the engine moved under `writers-workbench/` — recreated. Local-only, gitignored.
+
+## [2026-10-16] build | Gate 0 complete (A1, G3) + Gate 1: B10, H8, A4, A5, A9, A10
+
+Continued from the Gate 0 entry above. Commits `8ca371c` `70741d9` `8be8d72` `9077355` `204bca7`,
+all on `develop`, Engine CI green on each, each verified live on DEV (`/admin/health` 19/19 steps).
+
+### Gate 0 — now COMPLETE
+
+**A1 — fixture fallbacks no longer fake success.** Every step substitutes placeholder content when
+its provider adapter is absent; that is how the key-less local stack and the suite run. The F1-A
+prereq narrowed those handlers to `ProviderNotRegistered` so real provider errors surface, and that
+worked. The dangerous half remained: a **misconfigured** environment (key absent or mistyped) was
+indistinguishable from a working one at the call site, so a plausible artifact got persisted and
+emailed to the user as real work. Now gated on `ALLOW_FIXTURE_FALLBACK` (default false; true in
+`conftest.py` + `.env.example`). Fixed **centrally** rather than at 29 call sites: 23 funnel through
+one `raise` in `LLMRouter.complete`, which now raises a new `ProviderNotConfigured` — deliberately
+NOT a subclass of `ProviderNotRegistered` or `KeyError`, so none of the fixture handlers catch it and
+no site can opt itself back into faking success. The 6 non-router sites (media cover-art + Firecrawl
+scrape, three library Supabase-unconfigured returns) got explicit `guard_fixture_fallback()` calls.
+
+**G3 — no placeholder secrets.** `SERVICE_SHARED_SECRET` / `ADMIN_TOKEN` defaulted to
+`dev-service-secret-change-me` / `dev-admin-token-change-me`, so any environment that forgot to set
+them accepted a secret that is public in this repo's history. Both now default empty and fail
+**closed** with 503 ("not configured"), deliberately distinguished from the 401 for a wrong secret so
+a misconfigured service is diagnosable. Verified both are genuinely set on DEV *before* shipping, by
+probing `/internal` and `/admin` with the old placeholders (both 401). `/admin/health` and
+`/admin/ready` sit outside the admin gate, so healthchecks are unaffected either way.
+
+**Found while writing the A1 tests: a real test-isolation hole.** `conftest.py`'s stated "no real API
+calls" contract was not upheld — `KIEAI_API_KEY` was absent from the isolation list, so on any
+machine with a populated `.env` the suite made **real, paid KIE.AI image-generation calls**. Worse,
+`ELEVENLABS_API_KEY` + `ELEVENLABS_AGENT_ID` were likewise unisolated, and `writer_engine.eve` is
+gated on exactly those two being present — so a test could have placed a **real outbound phone call**.
+Added both plus `WORKBENCH_API_URL` and `INGESTION_SECRET` (which reach the live DEV Workbench).
+
+### Gate 1 — B10, H8, A4, A5, A9, A10 done
+
+**B10 — 21 processes → 3.** New `services/steps_app` mounts every step under `/steps/<name>` in one
+uvicorn; the runtime now runs steps_app + arq worker + orchestrator. The per-step architecture is
+untouched (each step is still its own FastAPI app with its own contract) — only the deployment is
+unified. This **fixes B3**: `MAX_CONCURRENT_LLM` lives in the `LLMRouter` module singleton, so there
+were ~19 independent semaphores and the documented cap of 12 was really up to 12 × 19, which is why
+CR-003's "~10 users per instance" sizing had no basis. It also **fixes A5** (one `PromptStore`), plus
+a correct reload fan-out: the gateway cannot reach the steps process (localhost-bound inside the
+runtime container), so it fans out to the orchestrator, which owns that hop. The split stays one env
+var away — the basis of the B10 decision — and `docker-compose.yml` still runs one container per step,
+so the split topology stays exercised. Mounted sub-app lifespans are deliberately not propagated
+(they only log and `close_redis()`; closing the shared client 19 times would be wrong).
+
+**H8 — mypy across all 21 workspace members**, 89 → **131** source files. The other 17 step services,
+including `chapter_step` and `media_step`, had never been type-checked. It surfaced 5 more errors, all
+the same shape: `if x not in (None, ""): int(x)` does not narrow `Any | None`, so each site carried a
+`contextlib.suppress(TypeError, ValueError)` for a crash it could not rule out. Replaced with a new
+`library_helpers.optional_int()` — the companion to `normalize_chapter_number`, returning `int | None`
+instead of defaulting to 1, because that default is right when *writing* and wrong when *selecting*
+(defaulting a missing `chapter_number`/`version_number` to 1 reverts the wrong row). One site now
+returns "a numeric version_number is required" where `"revert to version abc"` previously raised
+inside `int()`.
+
+**A4 — token accounting for every step.** CR-007 wired `begin()`/`flush()` into `chapter_step` only,
+so brainstorm, research, media and all ten newsletter steps wrote no `token_usage_v2` rows — leaving
+CostDashboard under-reporting and CR-007's own "exact tokens-per-credit" question unanswerable.
+Moved into the step-service template: one owner covers all 19 steps and any added later. `workflow`
+label is `<step>.<op>`; usage is injected where `notifications.task_email` already reads it, so token
+usage now appears in **every** completion email, not just chapters; flushed on the failure paths too,
+because a step that burned tokens and then failed still cost money and dropping that record is how
+recorded cost silently diverges from the Anthropic bill. `chapter_step`'s own calls removed (a second
+`begin()` resets the template's context mid-request).
+
+**A9 / A10 — paths that silently succeeded.** `brainstorm.chapter` returned
+`{"chapter_outline": {"beats": []}}` unconditionally — it always "succeeded" with nothing. Superseded
+by `chapter.plan` (E2E-4), absent from the hub catalog, zero references: removed.
+`/pipelines/newsletter/run` drives `NewsletterOrchestrator`, which **auto-resolves all three HITL
+gates** — it would send a newsletter with no human review of stories, subject or images — and was
+reachable by any holder of the service secret. It now 410s pointing at `run-durable` unless a test
+installed the hook. Production already used `run-durable`, so this closes a door rather than fixing a
+live bug; a test now guards that gateway wiring too. `library_retrieve_step` is deprecation-marked
+rather than removed: not in the hub catalog so unreachable by users, and still the only L2 test of the
+orchestration primitive.
+
+### Verification approach
+
+Beyond ~80 new unit tests, two live smoke runs against the **real** process table rather than mocks:
+B1/B2 (booted all 19 steps, killed `chapter_step`, confirmed health flipped to 503 naming it AND the
+supervisor tore down siblings and exited 1) and B10 (3-process table, all 19 steps healthy at their
+`/steps/<name>` mounts, a real step `/run` dispatching through its mount, then killing the steps
+process and confirming health 503s for all 19 + supervisor exit 1 — which makes the collapse's
+tradeoff explicit: losing one process now loses all 19 steps, exactly why B1/B2 had to land first).
+
+### A2 scoped, and a sequencing correction
+
+Audited the newsletter prompt gap and filed the full token→field mapping in the inventory (§A2). It is
+worse than recorded: the picker's live prompt is a **2-line stub** against a **15.7k-char editorial
+brief** sitting unused in `n8n_baseline.*` (catchiest-first, no AI-safety stories, no course ads, no
+duplicate company/subject, dedupe sources into one slot). 8 prompts, 1.8k–16.5k chars, 2–7 n8n
+expression tokens each; every token resolves to a value the steps already hold, so it is mechanical
+rewiring. Mechanism note recorded: do **not** use `str.format()` — three prompts contain literal
+braces (JSON examples); translate `{{ expr }}` → `${field}` and render with `string.Template`.
+
+**Did not execute A2 or A3.** Both are the items whose effect is invisible without the **L5 parity
+harness (H3, never run)** — which is Gate 1's own stated exit criterion. Running them first would ship
+unmeasurable quality changes to newsletter output and chapter canon-grounding. Recorded in the gate
+plan: run H3, then A2/A3 against it. **A6** (bible cleanup) is independent and can go any time.
+
+### New findings filed
+
+**H7** — `develop` has no required status checks at all (only a review), so engine work can merge to
+the branch DEV deploys from with CI red; enabling a gate class there is a policy call left to the user.
+**H8** is now closed. Also: the local `engine/.venv` had stale shebangs from before the engine moved
+under `writers-workbench/` (local-only, recreated).
