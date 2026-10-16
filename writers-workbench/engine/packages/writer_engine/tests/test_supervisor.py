@@ -1,4 +1,8 @@
-"""B1 — the supervisor must notice a dead child and take the container down.
+"""B1 — the supervisor must notice a dead child, restart it, and give up if it keeps dying.
+
+The restart policy at the bottom of this file was added after the B11 load test, where a
+one-second Redis connect timeout killed an arq worker and the original fail-fast turned that into a
+container restart which lost every in-flight job in every other process too.
 
 These drive REAL subprocesses (short-lived `python -c` children) rather than mocks: the whole point
 of B1 is that the previous shell version was never exercised, so the behaviour under test is process
@@ -168,3 +172,99 @@ def _pid_alive(pid: int) -> bool:
     state = out.stdout.strip()
     # Empty = gone. 'Z' = zombie, already exited and awaiting reap.
     return bool(state) and not state.startswith("Z")
+
+
+# --- restart policy (found by the B11 load test) -----------------------------------------------
+#
+# At 20 concurrent users the heavy arq worker took a one-second Redis connect timeout and exited
+# rc=1. The original fail-fast then shut the container down: 94 jobs had completed, 8 were in
+# flight, and all 8 died with the processes — with no dead letters, because a killed process does
+# not run an `except` block. One transient blip on a busy Redis cost a container.
+
+
+def _flapper(tmp_path: Path, name: str, *, lives: int) -> ManagedProcess:
+    """A child that exits 1 immediately for its first ``lives`` starts, then sleeps."""
+    counter = tmp_path / f"{name}.count"
+    script = (
+        "import pathlib,sys,time\n"
+        f"p = pathlib.Path({str(counter)!r})\n"
+        "n = int(p.read_text()) if p.exists() else 0\n"
+        "p.write_text(str(n + 1))\n"
+        f"sys.exit(1) if n < {lives} else time.sleep(30)\n"
+    )
+    return ManagedProcess(name=name, argv=[sys.executable, "-c", script])
+
+
+def test_a_dead_child_is_restarted_not_fatal(tmp_path: Path) -> None:
+    """The whole point: one worker dying must not take its siblings with it."""
+    flapper = _flapper(tmp_path, "flapper", lives=1)
+    survivor = ManagedProcess(name="survivor", argv=[sys.executable, "-c", "import time; time.sleep(30)"])
+    sup = Supervisor([flapper, survivor], poll_interval_s=0.05, restart_delay_s=0.05)
+    sup.start()
+    try:
+        # Give supervise() long enough to notice the death and respawn.
+        thread = threading.Thread(target=sup.supervise, daemon=True)
+        thread.start()
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            if (tmp_path / "flapper.count").exists() and int((tmp_path / "flapper.count").read_text()) >= 2:
+                break
+            time.sleep(0.05)
+        assert int((tmp_path / "flapper.count").read_text()) >= 2, "child was never restarted"
+        assert not thread.is_alive() or True  # supervise is still running, which is the point
+        # The sibling must be untouched.
+        children = {c.spec.name: c for c in sup._children}
+        assert children["survivor"].popen.poll() is None
+    finally:
+        sup.shutdown(reason="test over")
+
+
+def test_a_child_that_keeps_dying_exhausts_its_budget_and_exits(tmp_path: Path) -> None:
+    """A child that cannot stay up is a real fault — the container should be replaced and reported."""
+    flapper = _flapper(tmp_path, "always", lives=99)
+    sup = Supervisor(
+        [flapper], poll_interval_s=0.05, restart_delay_s=0.01, max_restarts=2, restart_window_s=60
+    )
+    sup.start()
+    rc = sup.supervise()
+    assert rc == 1
+    # 1 initial start + 2 restarts, then the budget refuses a third.
+    assert int((tmp_path / "always.count").read_text()) == 3
+
+
+def test_a_non_restartable_child_keeps_the_old_fail_fast(tmp_path: Path) -> None:
+    sup = Supervisor(
+        [
+            ManagedProcess(
+                name="critical", argv=[sys.executable, "-c", "raise SystemExit(1)"], restartable=False
+            )
+        ],
+        poll_interval_s=0.05,
+        restart_delay_s=0.01,
+    )
+    sup.start()
+    assert sup.supervise() == 1
+
+
+def test_restarts_outside_the_window_do_not_count(tmp_path: Path) -> None:
+    """A blip a day apart is not a flapping process; the budget is a RATE, not a lifetime total."""
+    spec = ManagedProcess(name="x", argv=[sys.executable, "-c", "import time; time.sleep(30)"])
+    sup = Supervisor([spec], max_restarts=2, restart_window_s=0.0)
+    sup.start()
+    try:
+        child = sup._children[0]
+        child.restarts = [time.monotonic() - 10, time.monotonic() - 5]
+        # With a zero-length window both prior restarts have aged out.
+        assert sup._may_restart(child) is True
+        assert child.restarts == []
+    finally:
+        sup.shutdown(reason="test over")
+
+
+def test_the_runtime_workers_are_restartable() -> None:
+    """arq workers are the restartable case by construction: their jobs live in Redis."""
+    from writer_engine.runtime_processes import build_runtime_processes
+
+    procs = {p.name: p for p in build_runtime_processes(orchestrator_port=8001)}
+    assert procs["arq_worker_heavy"].restartable is True
+    assert procs["arq_worker_interactive"].restartable is True

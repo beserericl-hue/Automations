@@ -34,6 +34,14 @@ class EngineSettings(BaseSettings):
 
     # Redis
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
+    # arq's RedisSettings defaults to a ONE SECOND socket connect timeout, which the B11 load test
+    # at 20 users blew through: the heavy worker took `redis.exceptions.TimeoutError: Timeout
+    # connecting to server` and exited, taking the container with it. Redis was not down — it was
+    # busy. 10s is still short enough to notice a genuinely dead Redis within one readiness cycle.
+    redis_connect_timeout_s: int = Field(default=10, alias="REDIS_CONNECT_TIMEOUT_S")
+    # Pool ceiling per process. The interactive worker alone may hold 24 jobs, each of which touches
+    # Redis for budget, progress and the ledger, and the orchestrator shares the container.
+    redis_max_connections: int = Field(default=64, alias="REDIS_MAX_CONNECTIONS")
 
     # LLM providers
     anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")

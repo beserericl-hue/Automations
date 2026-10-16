@@ -14,10 +14,33 @@ _redis: redis.Redis | None = None
 
 
 async def get_redis() -> redis.Redis:
-    """Return the process-wide async Redis client, creating it on first call."""
+    """Return the process-wide async Redis client, creating it on first call.
+
+    The connection options are the ones the B11 load test asked for. At 20 concurrent users a
+    connect attempt timed out and killed an arq worker (arq's own default is a 1s connect timeout);
+    Redis was busy, not down. Everything this client carries — the queues, the shared provider
+    budgets, the HITL gates, SSE — is better served by waiting a few seconds than by erroring.
+
+    * ``socket_connect_timeout`` / ``socket_timeout``: generous enough to ride out a busy moment,
+      short enough that a genuinely dead Redis is still noticed inside one readiness cycle.
+    * ``retry_on_timeout``: redis-py retries the command rather than surfacing a timeout that most
+      call sites would only log and swallow, silently losing a budget reservation or a gate write.
+    * ``health_check_interval``: pings an idle pooled connection before reuse, which is what
+      prevents the "first request after a quiet period fails" class of error behind a proxy.
+    * ``max_connections``: a ceiling, so a burst cannot open unbounded sockets.
+    """
     global _redis
     if _redis is None:
-        _redis = redis.from_url(get_settings().redis_url, decode_responses=True)
+        settings = get_settings()
+        _redis = redis.from_url(
+            settings.redis_url,
+            decode_responses=True,
+            socket_connect_timeout=settings.redis_connect_timeout_s,
+            socket_timeout=settings.redis_connect_timeout_s,
+            retry_on_timeout=True,
+            health_check_interval=30,
+            max_connections=settings.redis_max_connections,
+        )
     return _redis
 
 

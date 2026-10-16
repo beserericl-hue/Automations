@@ -236,7 +236,21 @@ async def run_write_tool_job(ctx: dict[str, Any], tool: str, body: dict[str, Any
 
 
 def build_redis_settings() -> RedisSettings:
-    return RedisSettings.from_dsn(get_settings().redis_url)
+    """arq connection settings, with the defaults that survived the B11 load test.
+
+    arq ships ``conn_timeout=1`` — one second to complete a socket connect. Under 20 concurrent
+    users that timed out, and arq treats a Redis error in its main loop as fatal: the worker exited
+    rc=1 and (before the supervisor learned to restart a child) took the container with it. Redis
+    was not down, it was busy.
+
+    ``conn_retries``/``conn_retry_delay`` only cover pool CREATION, so they do not help a connection
+    taken from the pool mid-run; the timeout is what matters there.
+    """
+    settings = get_settings()
+    redis = RedisSettings.from_dsn(settings.redis_url)
+    redis.conn_timeout = settings.redis_connect_timeout_s
+    redis.max_connections = settings.redis_max_connections
+    return redis
 
 
 # The worker writes its heartbeat here; /admin/ready reads it (B2). Named explicitly rather than

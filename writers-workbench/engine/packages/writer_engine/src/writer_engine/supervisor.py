@@ -41,6 +41,20 @@ logger = get_logger("supervisor")
 DEFAULT_DRAIN_TIMEOUT_S = 25.0
 DEFAULT_POLL_INTERVAL_S = 0.5
 
+# Restart budget. Measured need, not a guess: during the B11 load test at 20 users the heavy arq
+# worker took a `redis.exceptions.TimeoutError: Timeout connecting to server` (arq's socket connect
+# timeout is ONE second) and exited rc=1. The original fail-fast then shut the whole container down
+# — 94 jobs had completed, 8 were in flight, and all 8 died with the processes, leaving no dead
+# letters because nothing got to run an `except` block. One transient Redis blip cost a container.
+#
+# 5 restarts in 5 minutes tolerates a blip per worker without tolerating a genuinely broken child:
+# past the budget the container still exits 1, so the platform replaces and reports it.
+DEFAULT_MAX_RESTARTS = 5
+DEFAULT_RESTART_WINDOW_S = 300.0
+# Enough to not hot-loop a child that fails instantly at startup; short enough that a worker is back
+# before a user notices.
+DEFAULT_RESTART_DELAY_S = 1.0
+
 
 @dataclass(frozen=True)
 class ManagedProcess:
@@ -49,16 +63,29 @@ class ManagedProcess:
     name: str
     argv: Sequence[str]
     env: Mapping[str, str] = field(default_factory=dict)
+    restartable: bool = True
+    """Whether a lone death of this child is worth retrying in place (see Supervisor)."""
 
 
 @dataclass
 class _Child:
     spec: ManagedProcess
     popen: subprocess.Popen[bytes]
+    restarts: list[float] = field(default_factory=list)
+    """Monotonic timestamps of this child's restarts, for the rate cap."""
 
 
 class Supervisor:
-    """Start a set of child processes and exit as soon as any of them does.
+    """Start a set of child processes, restart a child that dies, and give up if one keeps dying.
+
+    The original version exited as soon as ANY child did. That is right for a child whose death
+    makes the container useless, and wrong for an arq worker: a worker's jobs live in Redis, so a
+    replacement picks them up, and arq re-queues whatever was cancelled. Killing the container
+    instead loses every in-flight job in every OTHER process too.
+
+    So: restart a dead child in place, up to ``max_restarts`` within ``restart_window_s``, then
+    fall back to the original behaviour and exit 1 so the platform replaces the container. A child
+    marked ``restartable=False`` keeps the old semantics.
 
     Usage::
 
@@ -73,12 +100,18 @@ class Supervisor:
         *,
         drain_timeout_s: float = DEFAULT_DRAIN_TIMEOUT_S,
         poll_interval_s: float = DEFAULT_POLL_INTERVAL_S,
+        max_restarts: int = DEFAULT_MAX_RESTARTS,
+        restart_window_s: float = DEFAULT_RESTART_WINDOW_S,
+        restart_delay_s: float = DEFAULT_RESTART_DELAY_S,
     ) -> None:
         if not processes:
             raise ValueError("Supervisor needs at least one process")
         self._specs = list(processes)
         self._drain_timeout_s = drain_timeout_s
         self._poll_interval_s = poll_interval_s
+        self._max_restarts = max_restarts
+        self._restart_window_s = restart_window_s
+        self._restart_delay_s = restart_delay_s
         self._children: list[_Child] = []
         self._signalled: int | None = None
 
@@ -127,11 +160,57 @@ class Supervisor:
                     name=dead.spec.name,
                     pid=dead.popen.pid,
                     returncode=rc,
+                    restarts=len(dead.restarts),
                 )
+                if self._may_restart(dead):
+                    self._restart(dead)
+                    continue
                 self.shutdown(reason=f"{dead.spec.name} exited (rc={rc})")
                 return 1
 
             time.sleep(self._poll_interval_s)
+
+    def _may_restart(self, child: _Child) -> bool:
+        """Is this death worth retrying in place rather than replacing the container?
+
+        Yes for a FIRST (or occasional) death of a restartable child. No once it has died
+        ``max_restarts`` times inside ``restart_window_s`` — a child that keeps dying is a real
+        fault, and a container that silently loops a broken process forever is worse than one the
+        platform replaces and reports.
+        """
+        if not child.spec.restartable:
+            return False
+        cutoff = time.monotonic() - self._restart_window_s
+        child.restarts = [t for t in child.restarts if t >= cutoff]
+        if len(child.restarts) >= self._max_restarts:
+            logger.error(
+                "supervisor.restart_budget_exhausted",
+                name=child.spec.name,
+                restarts=len(child.restarts),
+                window_s=self._restart_window_s,
+            )
+            return False
+        return True
+
+    def _restart(self, child: _Child) -> None:
+        """Respawn one child in place, leaving its siblings running."""
+        time.sleep(self._restart_delay_s)
+        env = {**os.environ, **child.spec.env}
+        try:
+            child.popen = subprocess.Popen(list(child.spec.argv), env=env)
+        except Exception:
+            # Cannot respawn: fall back to the old behaviour rather than pretending it is alive.
+            logger.error("supervisor.restart_failed", name=child.spec.name)
+            self.shutdown(reason=f"restart of {child.spec.name} failed")
+            raise
+        child.restarts.append(time.monotonic())
+        logger.warning(
+            "supervisor.child_restarted",
+            name=child.spec.name,
+            pid=child.popen.pid,
+            restarts=len(child.restarts),
+            budget=self._max_restarts,
+        )
 
     def _first_dead(self) -> _Child | None:
         for child in self._children:
