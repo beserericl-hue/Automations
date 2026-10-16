@@ -25,9 +25,23 @@ class AnthropicAdapter:
         key = api_key or settings.anthropic_api_key
         if not key:
             raise RuntimeError("Anthropic not configured — set ANTHROPIC_API_KEY")
+        # An ACCOUNT-level key (sk-ant-usr-...) must name a workspace on every request or Anthropic
+        # refuses it with a 400; a workspace-scoped key (sk-ant-api03-...) carries its workspace
+        # implicitly. Set as a default header rather than per call so streaming and non-streaming,
+        # and any future call site, cannot diverge. Omitted entirely when unset, because sending an
+        # empty workspace id is worse than sending none.
+        headers = (
+            {"anthropic-workspace-id": settings.anthropic_workspace_id.strip()}
+            if settings.anthropic_workspace_id.strip()
+            else None
+        )
         # 429 backstop: the SDK retries with exponential backoff honoring Retry-After. The Redis
         # budget keeps us under the per-minute limit; this catches residual bursts (CR-003 scaling).
-        self._client = AsyncAnthropic(api_key=key, max_retries=settings.anthropic_max_retries)
+        self._client = AsyncAnthropic(
+            api_key=key,
+            max_retries=settings.anthropic_max_retries,
+            default_headers=headers,
+        )
         self._service = service
 
     async def complete(

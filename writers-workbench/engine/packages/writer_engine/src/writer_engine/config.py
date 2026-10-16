@@ -70,6 +70,17 @@ class EngineSettings(BaseSettings):
     model_cheap: str = Field(default="claude-haiku-4-5-20251001", alias="MODEL_CHEAP")
     model_premium: str = Field(default="claude-opus-4-8", alias="MODEL_PREMIUM")
 
+    # Required when ANTHROPIC_API_KEY is an ACCOUNT-level key (prefix sk-ant-usr-) rather than a
+    # workspace-scoped one (sk-ant-api03-). Anthropic rejects every Messages call made with an
+    # account key unless the request names a workspace:
+    #
+    #   400 invalid_request_error — "This API key is not scoped to a workspace, so this request
+    #   must include the anthropic-workspace-id header"
+    #
+    # Empty for a workspace-scoped key, where the workspace is implicit and the header must NOT be
+    # sent. See writer_engine.llm.anthropic_client.
+    anthropic_workspace_id: str = Field(default="", alias="ANTHROPIC_WORKSPACE_ID")
+
     # Anthropic rate-limit budget (F1-A prereq #4). Empty string = use the baked-in Tier-4
     # DEFAULT_LIMITS in writer_engine.rate_limit.anthropic_budget. Set to override per env/tier.
     anthropic_tier: str = Field(default="", alias="ANTHROPIC_TIER")
@@ -144,6 +155,13 @@ class EngineSettings(BaseSettings):
     story_bible_step_url: str = Field(default="http://localhost:8025", alias="STORY_BIBLE_STEP_URL")
     approval_step_url: str = Field(default="http://localhost:8026", alias="APPROVAL_STEP_URL")
     notify_step_url: str = Field(default="http://localhost:8027", alias="NOTIFY_STEP_URL")
+
+    # Alerting (C2). Empty recipient = log only, which is what the engine did for its whole life:
+    # the 2026-05-19 Redis outage ran nine days because nothing ever told anyone.
+    alert_email: str = Field(default="", alias="ALERT_EMAIL")
+    # How long a condition stays quiet after it has been reported once. A monitor that mails every
+    # 30 seconds during an outage is a monitor that gets filtered into a folder.
+    alert_repeat_minutes: int = Field(default=30, alias="ALERT_REPEAT_MINUTES")
 
     # Observability
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")

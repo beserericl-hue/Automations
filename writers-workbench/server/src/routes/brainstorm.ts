@@ -52,7 +52,15 @@ async function parseBookProposal(text: string): Promise<{
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
-  const client = new Anthropic({ apiKey });
+  // An ACCOUNT-level key (sk-ant-usr-...) must name a workspace on every request or Anthropic
+  // refuses it with 400 "This API key is not scoped to a workspace"; a workspace-scoped key
+  // (sk-ant-api03-...) carries its workspace implicitly and must NOT send the header. Mirrors
+  // writer_engine.llm.anthropic_client — this route builds its own client, so it needs its own copy.
+  const workspaceId = process.env.ANTHROPIC_WORKSPACE_ID?.trim();
+  const client = new Anthropic({
+    apiKey,
+    ...(workspaceId ? { defaultHeaders: { 'anthropic-workspace-id': workspaceId } } : {}),
+  });
 
   const message = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
