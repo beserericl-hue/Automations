@@ -665,3 +665,71 @@ moral complication, roster drift), no-boring-bits/pacing, research/period langua
 [Follett § …]. Updated guardrails SKILL.md: description, a fiction-vs-non-fiction mode branch in the
 Overview + Detection categories + scan Step 1, and References. Fiction mode is the one the Workbench final
 Q/A uses; the Every non-fiction categories no longer apply to chapters. See [[draft-review-kit]].
+
+## [2026-10-15] update | remaining-work inventory + two architecture decisions (E1 ingestion, B10 process model)
+
+Audited the engine against the **live repo, live n8n and both Railway tiers** rather than the planning
+docs, and filed [[remaining-work-inventory]] under `sprints/` as the plan of record. Driving question:
+can the engine onboard additional users — the working assumption was that it may not handle one user
+correctly, let alone 50.
+
+**Three findings justify that concern.** (1) `engine/services/runtime/entrypoint.sh` starts 19 step
+services + the arq worker as **unsupervised `&` background shell jobs**; only the orchestrator is
+`exec`'d, so a dead step is never restarted. (2) `orchestrator/main.py:88-90` `/admin/health` returns
+`{"status":"ok"}` **unconditionally** — it checks none of the 19 steps, Redis, Supabase or the worker, so
+Railway cannot detect (1). (3) **The engine has no CI** — `.github/workflows/` holds only `ci.yml` +
+`release.yml`; the `engine-ci.yml` this log claimed on 2026-05-30 is not in the repo, and the required
+checks on `main` give the engine zero coverage, so ~350 Python tests gate nothing.
+
+**Inventory** — 9 categories, every item cited to code/line, a live API response or an n8n query, each
+marked ❌ not implemented / 🟡 partial / ⚠️ implemented-but-wrong: A correctness for one user (12) ·
+B scale to 50 users (13) · C observability (4) · D release+tier debt (9) · E unintegrated subsystems (9)
+· F data/schema debt (4) · G security hygiene (5) · H test/CI debt (6) · I never-started features (10).
+
+**Decision 1 — E1: content ingestion moves to the engine and n8n gets turned off.** Resolves the open
+fork in CR-010 A3. `scrape_step` already does per-URL Firecrawl; the port adds a genre-loop scheduler +
+indexer replacing `PROD - Data: AI Scraping Pipeline`, `Data: Content Ingestion`, `AI News Data
+Ingestion V2` (87 nodes) and the multi-user ingestion cron. **Makes A3 (embeddings, currently
+`ENABLE_PYTHON_EMBEDDINGS=false`) and A4 (token accounting, chapter-only) hard prerequisites** — both
+duties are performed by n8n workflows today (`Sub - Embed Project Data`, `Sub - Token Usage Tracker`) and
+would vanish silently with it. V1 (`Orig`) and the unrelated n8n tenants (CSHSE, Upwork) are out of
+scope per [[tier-separation]].
+
+**Decision 2 — B10: one image, 21 processes → 3; defer the per-step Railway split.** Recommended and
+accepted. Rationale: the orchestrator already dials every step through `*_STEP_URL` env vars
+(`config.py:108-129`), so topology is **already a config decision** — mounting step apps in one uvicorn
+under `/steps/<name>` prefixes vs. splitting to `*.railway.internal` changes nothing else, and the
+StepInput/StepOutput contracts survive either way. Splitting buys no throughput today because **B9**
+(account-wide Anthropic TPM, ~5 chapters/min on Tier-4 Sonnet) is the binding constraint and the Burial
+Mound run showed adding instances does not help. Collapsing **fixes B3** — `MAX_CONCURRENT_LLM` lives in
+the `LLMRouter` module singleton, so there are currently ~21 independent semaphores and CR-003's "~10
+users per instance" sizing has no basis — and also largely fixes **A5** (prompt hot-reload reaches only
+one of 21 in-process stores). Target: orchestrator HTTP / arq worker / all steps in one supervised
+uvicorn. Two verification tasks recorded before co-locating: confirm no step does blocking I/O or
+CPU-heavy work (`render_step` Jinja, `image_step` are suspects → 3 may become 4), and confirm the Gemini
+client's thread-pool wrap keeps the loop free. Revisit after Gate 2 and peel out only the step the load
+data indicts.
+
+**Gate plan (supersedes [[work-ordering-2026-05]]).** Gate 0 stop-lying-to-ourselves (supervisor, real
+health check, engine CI as a required check, fail-loud instead of fixtures, remove the
+`dev-service-secret-change-me` defaults) → Gate 1 one user provably correct (B10 collapse, real
+newsletter prompts, embeddings on, full token accounting, dead-path removal) exiting on a measured L5
+parity number → Gate 2 scaling real (queue split, per-op timeouts + DLQ, idempotency proof, per-provider
+budgets, HA Redis + alerting) exiting on an actual 10- and 20-user load test → Gate 3 ship (regenerate
+the workflow ID map FIRST, verify PROD migrations, F1-7.5 acceptance + shadow, close the 3.5-month PROD
+gap) → Gate 4 turn n8n off.
+
+**Also recorded as stale-doc corrections** (pages not yet rewritten): [[python-migration-roadmap]] and
+[[planned-sprints]] present the Python rewrite as future work when the engine is built, deployed,
+hub-routed and passing a 161-test parity suite on DEV — what remains is cutover and hardening; the hub
+port (roadmap Sprint 22 / F4) **already shipped** via CR-004 Path B; **[[workflow-id-map]] IDs map to the
+wrong names** against live n8n (`TVNfTVwOrCAnWBo7` is `PROD - Sub - Manage Research Reports`, not
+`Tool - QA Chapter`; `Ugc2BonNNMCoeXP0` is `PROD - Data: AI Scraping Pipeline`, not `Tool - Format
+Kindle Book`; `dk75OYTASeu6NkTr` is `PROD - Sub - Token Usage Tracker`, not `Tool - Write Short Story`)
+and `scripts/promote-dev-to-prod.py` reads that file to rewrite `executeWorkflow` refs, so the promotion
+path is unsafe until regenerated; PROD `/api/health` reports `deployed_at: 2026-07-01` / `version:
+"unknown"` against DEV's `2026-10-10`.
+
+**BYOK deferred.** Per-user provider keys + feature-based monthly subscription were scoped and set aside
+as having too many loose pieces. Structural findings preserved in the inventory's Deferred section —
+notably that BYOK cannot be expressed in n8n credentials at all, so it depends on Gate 4.

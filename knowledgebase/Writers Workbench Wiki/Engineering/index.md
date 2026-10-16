@@ -109,6 +109,7 @@ The catalog. One line per page. When answering a question, scan this first to fi
 ## Sprints
 
 - [[sprints/_index]]
+- [[remaining-work-inventory]] — **PLAN OF RECORD (2026-10-15)**: everything left to finish in the engine, A–I with per-item status + the 4-gate sequencing. Supersedes [[work-ordering-2026-05]].
 - [[engine-e2e-parity-sprints]] — minimal sprints (E2E-1..E2E-5) to make the full [[engine-chat-e2e-suite]] runnable.
 - [[completed-sprints]] — Sprint 0-12 + newsletter cluster summary.
 - [[sprint-8-rbac]] — RBAC + tiers + credits + impersonation deep dive.
@@ -166,7 +167,9 @@ The catalog. One line per page. When answering a question, scan this first to fi
 | What credentials does PROD n8n need? | [[credentials-map]] |
 | What changed in v1.1.0? | [[releases-and-tags]] |
 | Why did Sprint 13 disappear? | [[planned-sprints]] (replaced by 16-18) |
-| What's the current work order? | [[work-ordering-2026-05]] |
+| What's the current work order? | [[remaining-work-inventory]] gate plan (supersedes [[work-ordering-2026-05]]) |
+| What's left to build in the engine? | [[remaining-work-inventory]] |
+| Why is the promotion script unsafe? | [[remaining-work-inventory]] D3 — [[workflow-id-map]] IDs are wrong |
 
 ## Page-type counts
 

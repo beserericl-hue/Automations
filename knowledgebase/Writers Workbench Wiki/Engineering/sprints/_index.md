@@ -13,6 +13,12 @@ Two source-of-truth conventions:
 
 ## Pages
 
+- [[remaining-work-inventory]] — **CURRENT PLAN OF RECORD (2026-10-15)**: evidence-backed inventory of
+  everything left to finish in the engine (categories A–I, per-item status), the 4-gate sequencing that
+  supersedes [[work-ordering-2026-05]], and the two decisions of 2026-10-15 — ingestion moves to the
+  engine and n8n is turned off (E1); the runtime container collapses 21 processes to 3 rather than
+  splitting into per-step Railway services (B10). Read this before [[planned-sprints]] or
+  [[python-migration-roadmap]], both of which understate what is already built.
 - [[completed-sprints]] — Sprint 0-7, 8, 10.a, 10.b, 11, 12 — all DEV-complete + most PROD-released.
 - [[newsletter-cluster]] — PRs #69, #70, #72, #73, #74, #75 — DEV-only.
 - [[sprint-8-rbac]] — RBAC + tiers + credits + impersonation deep dive.
