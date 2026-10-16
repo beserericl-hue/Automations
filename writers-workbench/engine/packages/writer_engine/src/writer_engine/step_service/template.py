@@ -30,6 +30,7 @@ from writer_engine.auth import require_admin_token, require_service_secret
 from writer_engine.config import get_settings
 from writer_engine.redis_client.client import close_redis
 from writer_engine.schemas import StepError, StepInput, StepOutput, StepStatus
+from writer_engine.telemetry import token_accounting
 from writer_engine.telemetry.logging import configure_logging, get_logger
 from writer_engine.telemetry.metrics import (
     HTTP_LATENCY,
@@ -89,12 +90,28 @@ def build_step_app(step_name: str, handler: StepHandler) -> FastAPI:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"step_name mismatch: this service handles '{step_name}', got '{inp.step_name}'",
             )
+        # A4 / CR-007: account every LLM call this step makes and write per-call token + cost rows
+        # to token_usage_v2. Done HERE rather than per step because it was previously wired only in
+        # chapter_step, so brainstorm, research, media and every newsletter step recorded nothing —
+        # leaving CostDashboard under-reporting and the credit model ungrounded. One owner in the
+        # template covers all 19 steps and any step added later.
+        op = inp.payload.get("op")
+        token_accounting.begin(
+            user_id=inp.payload.get("user_id"),
+            project_id=inp.payload.get("project_id"),
+            chapter_number=inp.payload.get("chapter_number"),
+            workflow=f"{step_name}.{op}" if op else step_name,
+        )
         try:
             with observe_latency(STEP_LATENCY, service=step_name, step=step_name, status="ok"):
-                return await handler(inp)
+                out = await handler(inp)
         except HTTPException:
+            await token_accounting.flush()
             raise
         except Exception as exc:  # log + return structured error envelope
+            # Flush first: a step that burned tokens and THEN failed still cost real money, and
+            # dropping that record is how cost silently diverges from the Anthropic bill.
+            await token_accounting.flush()
             logger.exception("step.error", step=step_name, execution_id=str(inp.execution_id))
             return StepOutput(
                 execution_id=inp.execution_id,
@@ -102,5 +119,16 @@ def build_step_app(step_name: str, handler: StepHandler) -> FastAPI:
                 status=StepStatus.ERROR,
                 error=StepError(code=type(exc).__name__, message=str(exc)),
             )
+        usage = await token_accounting.flush()
+        if usage.get("calls"):
+            # Prefer payload["result"], which is where notifications.task_email looks (:147) and
+            # where chapter_step used to put it. Doing it here means token usage now appears in the
+            # completion email for EVERY tool, not only chapters.
+            inner = out.payload.get("result")
+            if isinstance(inner, dict):
+                inner.setdefault("token_usage", usage)
+            else:
+                out.payload.setdefault("token_usage", usage)
+        return out
 
     return app

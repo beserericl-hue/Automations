@@ -32,7 +32,6 @@ from writer_engine.schemas.chapter import (
     WriteChapterResponse,
 )
 from writer_engine.step_service import build_step_app
-from writer_engine.telemetry import token_accounting
 from writer_engine.telemetry.logging import get_logger
 
 STEP_NAME = "chapter"
@@ -2687,20 +2686,11 @@ async def handler(inp: StepInput) -> StepOutput:
             status=StepStatus.ERROR,
             error={"code": "UNKNOWN_OP", "message": f"unknown op '{op}'"},  # type: ignore[arg-type]
         )
-    # CR-007: account every LLM call this op makes (sub-chapters, research, drift, QA, correction) and
-    # write per-call token + cost rows to token_usage_v2 for billing.
-    token_accounting.begin(
-        user_id=inp.payload.get("user_id"),
-        project_id=inp.payload.get("project_id"),
-        chapter_number=inp.payload.get("chapter_number"),
-        workflow=f"chapter.{op}",
-    )
-    try:
-        result = await OPS[op](inp.payload)
-    finally:
-        usage = await token_accounting.flush()
-    if isinstance(result, dict):
-        result.setdefault("token_usage", usage)
+    # CR-007 accounting now lives in the step-service template (A4), which wraps every step's /run
+    # and injects the usage into payload["result"]["token_usage"] — the same place this used to, and
+    # the place notifications.task_email reads. Keeping a second begin()/flush() here would reset
+    # the template's context mid-request.
+    result = await OPS[op](inp.payload)
     return StepOutput(
         execution_id=inp.execution_id,
         step_name=STEP_NAME,
