@@ -301,3 +301,65 @@ async def test_each_chunk_sends_its_own_text(key: None, api: _Api) -> None:
     assert "alpha" in api.calls[0]
     assert "beta" in api.calls[1]
     assert "gamma" in api.calls[2]
+
+
+# --- the spend ceiling -------------------------------------------------------------------------
+#
+# Measured against the live API on 2026-10-17: billing is ~2x the input words on `standard` and ~6x
+# on `super`, and the account is pay-as-you-go with remainingCredits already at 0. So nothing
+# upstream would stop a mistaken "humanize all" — 96 chapters x 7k words is ~1.3M billed words.
+
+
+@pytest.mark.asyncio
+async def test_the_pass_stops_at_the_word_ceiling(
+    key: None, api: _Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HUMANIZE_MAX_WORDS_PER_RUN", "150")
+    get_settings.cache_clear()
+    # Four scenes of 100 words; the stub bills the chunk's own word count, so the ceiling bites
+    # partway through.
+    text = SCENE.join([_para(100, w) for w in ("alpha", "beta", "gamma", "delta")])
+
+    out = await hz.humanize_text(text)
+    assert out.stopped_at_budget is True
+    assert out.words_spent <= 200  # stopped as soon as it was at or over the ceiling
+    assert out.humanized_chunks < 4
+    # Everything it did not humanize keeps its original text, and the structure is still intact.
+    assert "delta" in out.text
+    assert out.text.count("---") == 3
+
+
+@pytest.mark.asyncio
+async def test_a_generous_ceiling_does_not_interfere(
+    key: None, api: _Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HUMANIZE_MAX_WORDS_PER_RUN", "100000")
+    get_settings.cache_clear()
+    out = await hz.humanize_text(SCENE.join([_para(100, "alpha"), _para(100, "beta")]))
+    assert out.stopped_at_budget is False
+    assert out.humanized_chunks == 2
+
+
+@pytest.mark.asyncio
+async def test_a_zero_ceiling_means_unlimited_not_disabled(
+    key: None, api: _Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """0 is the escape hatch for an operator who knows what they are spending."""
+    monkeypatch.setenv("HUMANIZE_MAX_WORDS_PER_RUN", "0")
+    get_settings.cache_clear()
+    out = await hz.humanize_text(SCENE.join([_para(100, "alpha"), _para(100, "beta")]))
+    assert out.stopped_at_budget is False
+    assert out.humanized_chunks == 2
+
+
+@pytest.mark.asyncio
+async def test_the_metered_charge_is_recorded(key: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    """On a payg account with 0 remaining credits, meteredChargedCredits IS the cost."""
+
+    async def _billed(chunk: str, **kw: Any) -> dict[str, Any]:
+        return {"result": "rewritten", "wordsSpent": 60, "meteredChargedCredits": 60}
+
+    monkeypatch.setattr(hz, "_stealthify", _billed)
+    out = await hz.humanize_text(SCENE.join([_para(100, "a"), _para(100, "b")]))
+    assert out.charged_credits == 120
+    assert out.as_report()["charged_credits"] == 120

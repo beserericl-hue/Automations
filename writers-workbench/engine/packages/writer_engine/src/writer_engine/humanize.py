@@ -31,6 +31,28 @@ in this codebase:
 
 Off unless ``STEALTHGPT_API_KEY`` is set. It costs real money per word and, on fiction, a strong
 setting can flatten literary voice — so it never runs just because a key happens to exist.
+
+MEASURED AGAINST THE LIVE API, 2026-10-17, on one 29-word passage of The Burial Mound. The numbers
+are a single sample, but the behaviours were consistent and they decide how this should be used:
+
+    mode   model      detect  billed  kept the character's name?
+    High   standard   86       67     NO  — replaced "Tayak" with "He"
+    Low    standard   99       61     yes — but changed "frost" to "snow"
+    Low    super      90      195     yes — reordered events, invented "They were all right"
+    Medium standard   88       60     yes — returned the text UNCHANGED, and billed for it
+    Medium super      85      158     yes — invented "careful not to kick ice crystals into the night"
+
+Three conclusions worth keeping:
+
+* ``howLikelyToBeDetected`` RISES as the mode weakens (Low 99 > Medium 88 > High 86), so a lower
+  number is better. On a 29-word sample the figure is probably not meaningful at all.
+* ``super`` bills roughly 6x the input words and invents content. For fiction that is worse than
+  flattening: it adds events the author did not write.
+* Billing is ~2x input words even on ``standard``, and ``meteredChargedCredits`` is the real cost
+  signal on a pay-as-you-go account where ``remainingCredits`` sits at 0.
+
+Hence ``humanize_max_words_per_run``: nothing else in the system would stop a mistaken pass over a
+whole novel.
 """
 
 from __future__ import annotations
@@ -74,8 +96,14 @@ class HumanizeResult:
     humanized_chunks: int = 0
     failed_chunks: list[int] = field(default_factory=list)
     words_spent: int = 0
+    charged_credits: int = 0
+    """`meteredChargedCredits` — the actual cost on a pay-as-you-go account, which is what
+    `remainingCredits` does NOT tell you when the balance is already 0."""
     remaining_credits: int | None = None
     detectability: Any = None
+    stopped_at_budget: bool = False
+    """True when the per-run word ceiling halted the pass. The remaining chunks keep their original
+    text, exactly like a failed chunk."""
     skipped: str = ""
     """Why nothing happened, when nothing happened (not configured / empty input)."""
 
@@ -95,8 +123,10 @@ class HumanizeResult:
             "failed_chunks": self.failed_chunks,
             "partial": self.partial,
             "words_spent": self.words_spent,
+            "charged_credits": self.charged_credits,
             "remaining_credits": self.remaining_credits,
             "detectability": self.detectability,
+            "stopped_at_budget": self.stopped_at_budget,
             "skipped": self.skipped or None,
         }
 
@@ -191,9 +221,18 @@ async def humanize_text(
 
     from writer_engine.rate_limit.provider_budget import call_provider
 
+    budget_words = max(0, int(settings.humanize_max_words_per_run))
     for i, chunk in enumerate(chunks):
         if len(chunk.split()) < MIN_WORDS:
             # Passed through, not counted as a failure: there is nothing here worth paying to rewrite.
+            pieces.append(chunk)
+            continue
+        if budget_words and out.words_spent >= budget_words:
+            # Stop spending, keep the rest of the text as written, and say so. Billing is ~2x the
+            # input words on `standard` and ~6x on `super`, and the account has no credit buffer, so
+            # the ceiling is the only thing between a mistaken "humanize all" and a large bill.
+            out.stopped_at_budget = True
+            out.failed_chunks.append(i)
             pieces.append(chunk)
             continue
 
@@ -234,6 +273,8 @@ async def humanize_text(
         pieces.append(result)
         out.humanized_chunks += 1
         out.words_spent += int(payload.get("wordsSpent") or 0)
+        with contextlib.suppress(TypeError, ValueError):
+            out.charged_credits += int(payload.get("meteredChargedCredits") or 0)
         if payload.get("remainingCredits") is not None:
             # Informational only — a provider that changes this field's type must not fail the pass.
             with contextlib.suppress(TypeError, ValueError):
@@ -252,13 +293,22 @@ async def humanize_text(
         # scene break silently is exactly the failure A13 fixed and a regex undid.
         logger.warning("humanize.scene_breaks_lost", before=scenes_before, after=scenes_after)
 
+    if out.stopped_at_budget:
+        logger.warning(
+            "humanize.budget_reached",
+            words_spent=out.words_spent,
+            ceiling=budget_words,
+            unhumanized_chunks=len(out.failed_chunks),
+        )
     logger.info(
         "humanize.done",
         chunks=out.chunks,
         humanized=out.humanized_chunks,
         failed=len(out.failed_chunks),
         words_spent=out.words_spent,
+        charged_credits=out.charged_credits,
         remaining_credits=out.remaining_credits,
+        stopped_at_budget=out.stopped_at_budget,
     )
     return out
 

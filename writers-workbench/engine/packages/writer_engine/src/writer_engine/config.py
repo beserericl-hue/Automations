@@ -68,6 +68,12 @@ class EngineSettings(BaseSettings):
     stealthgpt_model: str = Field(default="standard", alias="STEALTHGPT_MODEL")
     # High | Medium | Low. How hard it rewrites — the knob that trades detectability for voice.
     stealthgpt_mode: str = Field(default="High", alias="STEALTHGPT_MODE")
+    # Hard ceiling on BILLED words for a single humanize pass. Measured against the live API on
+    # 2026-10-17: a 29-word passage billed 60 words on `standard` and 195 on `super`, i.e. roughly
+    # 2x and 6x the input. The account is `billingMode: payg` with no prepaid credit buffer, so
+    # nothing upstream would stop a mistaken "humanize all": 96 chapters x 7k words x 2 is about
+    # 1.3M billed words. 20000 covers two or three chapters and makes a runaway pass impossible.
+    humanize_max_words_per_run: int = Field(default=20_000, alias="HUMANIZE_MAX_WORDS_PER_RUN")
 
     # Delivery
     postal_api_key: str = Field(default="", alias="POSTAL_API_KEY")
