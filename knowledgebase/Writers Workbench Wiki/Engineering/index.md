@@ -74,6 +74,7 @@ The catalog. One line per page. When answering a question, scan this first to fi
 - [[newsletter-workflows]] — newsletter cron + cadence + agent (DEV-only).
 - [[chapter-writer-architecture]] — Worker - Write Chapter sub-chapter + continuity merge + bible extraction.
 - [[tool-workflow-pattern]] — common shape + `$fromAI()` + activation cycle.
+- [[parallel-content-system-separation]] — the 17 AI Dev Roundup / Content Studio workflows sharing this instance: measured coupling, the n8n-dataTable blocker, and E8/E9 resolved as defects inside that system.
 
 ## ElevenLabs (Eve)
 

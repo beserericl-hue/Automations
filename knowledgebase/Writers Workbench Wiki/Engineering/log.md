@@ -1292,3 +1292,102 @@ rejection rate stays near 50%.
 **Still open:** the fiction path would need `protect` built from the project's canon (roster + bible
 + the chapter's research terms) before it could be reconsidered; invented additions are not
 detectable by a term check at all; the `lite` model is untested.
+
+## [2026-10-17] build | DEV n8n turned off — E1 ingestion, E7 review lenses, the scheduled publisher, and the E4 separation plan
+
+**DEV now runs on the engine alone.** 36 DEV Workbench workflows deactivated; 0 remain active. The
+24 `PROD - …` workflows and the V1 tree are untouched, and the 49 other active workflows (the
+parallel content system plus the unrelated tenants) were not touched either.
+
+**E1 — the engine writes `content_ingestion_v2`.** `gather_step` had always read that table and
+nothing in the engine had ever written it; the only producers were two n8n workflows, and both were
+broken. `AI News Data Ingestion V2` had errored every four hours since 2026-09-24 at
+`search_existing` with `prefix: key is required` — one feed entry missing `isoDate` emptied
+`$json.isoDate.substring(0, 10)` and the 400 aborted the whole execution (J6). `DEV - Newsletter
+Ingestion (Multi-User Cron)` had been "succeeding" every 30 minutes in under two seconds and
+uploading nothing: its `split_per_feed` loop was never wired back from `report_run`, so it handled
+the first feed and stopped — after `/feeds/due` had already stamped `last_fetched_at` on all 32
+rows, which is why the feed table looked healthy throughout. One row in
+`newsletter_ingestion_runs_v2`, from 2026-04-29, reporting a hardcoded `items_uploaded: 1`.
+
+New `writer_engine.ingestion` package (keys / sources / feeds / enrich / store / pipeline) plus an
+`ingestion` step service. Measured facts that shaped it:
+
+- **7 of the 32 live feeds were XML** and n8n's item parser only understood JSON Feeds, so they
+  yielded zero items on every tick. The port sniffs the body, not the extension.
+- **Feed body lengths**, measured across the live feeds: Strange Horizons 1,429 words median and
+  beehiiv 1,812, every other feed 3–61. So a 400-word threshold cleanly separates "this feed
+  syndicates the whole piece" from "this is a teaser", and the former is no longer scraped.
+- **The nine `wasteland-wire` RSS feeds all share one row name** (`"<genre> — RSS"`, from
+  `/feeds/import-from-genre`), so labelling by feed name collided Strange Horizons, Clarkesworld,
+  Escape Pod and three Medium tags under one `source_name`. Publisher label now comes from the modal
+  item domain, except for subreddits and competitor newsletters where the name IS the publisher.
+- **The relevance gate had to become genre-aware.** The prompt ported verbatim from n8n says "Only
+  AI and AI Adjacent content should be considered relevant", which correctly rejects every
+  post-apocalyptic fiction item in the `wasteland-wire` edition — silently discarding a whole
+  edition's corpus. n8n never hit this because n8n never polled those feeds.
+- **`complete_structured` does not send the schema.** Dropping the n8n output-parser node meant the
+  gate's JSON never matched and, because the gate fails open, it logged `relevance_unavailable` and
+  kept every item: a filter that silently stopped filtering. Found on the first live run; the
+  prompts now name their keys and cap the reasoning length (a verdict truncated mid-string at 1024
+  tokens had the same effect).
+
+Migration **029** adds `newsletter_feed_sources_v2.item_type` (applied to DEV): `gather_step`
+filters `type != 'newsletter'`, and once the feed list moved out of hardcoded n8n nodes into a table
+the six competitor-newsletter feeds had nowhere to say they were newsletters. Verified live — those
+six now write `type='newsletter'` and are excluded from story candidates.
+
+**Two silent-failure jobs n8n was the only owner of:**
+
+- **The engine had no clock.** `/cron/newsletter-cadence` and the new `/cron/ingestion` were both
+  driven by n8n schedule triggers, so "n8n off" would have stopped the newsletter being generated
+  AND the corpus being refilled, with no error in either case — an endpoint nobody calls looks
+  exactly like an endpoint with nothing to do. New `writer_engine.scheduler`, three jobs, inside the
+  orchestrator.
+- **Nothing published scheduled content.** Found by enumerating what each DEV workflow actually
+  does, not from the inventory: `17 Cron: Scheduled Publisher` was the only thing that ever flipped
+  `status='scheduled'` to published. New `writer_engine.publisher` finds the due rows and hands each
+  to the existing `library.lifecycle` action=publish, which already owns the version snapshot, the
+  flip and the email. It keeps `metadata.schedule_date` where n8n deleted it, and carries no
+  hardcoded Supabase key, which the n8n code node did.
+
+**A silent failure in the replacement, inside an hour.** `resolve_step_url` consulted
+`WRITE_TOOL_URLS` (what the hub may route to) rather than `ALL_STEP_URLS` (what the worker can
+dial), so `run_write_tool_job("ingestion", …)` returned `UNKNOWN_TOOL` and the job **completed**
+carrying an error payload. Nothing raised, nothing hit the DLQ, the scheduler reported success every
+30 minutes, and the corpus stayed empty — the exact failure mode E1 replaced, reproduced in the
+replacement. `tests/test_queues.py` now asserts every classified `(tool, op)` resolves a step URL.
+
+**E7 — `chapter.review`.** The Draft Review Kit's 13 lenses, vendored into the engine package so
+they ship in the image, with three adaptations: the `## Invocation` sections stripped (their
+load-bearing instruction is "ask the user what needs cutting", and there is nobody to answer inside
+a step service), `panel`/`debate` treated as orchestrators over member lenses rather than prompts,
+and `guardrails` forced to fiction mode with the Follett catalogue inlined. Persists to
+`metadata.review_report`, deliberately **not** `metadata.qa_report`, because the panel's
+NEEDS_REVIEW rows drive `rewrite-to-fix-qa` and a critique lens must not be able to trigger an
+automated rewrite of a chapter that passes every rubric. Verified live on Burial Mound ch.1: 7
+findings quoting the chapter verbatim.
+
+**E8 and E9 resolved as classification, not code.** Both live inside the parallel content system,
+not the Workbench: Blotato appears nowhere in the engine or the Express server, there is no
+`scheduled_blogs` table, and no "Posted" string in `server/src` or `client/src`, so no Workbench
+user ever sees the LinkedIn failure. The two RSS endpoints read n8n data tables and use the
+Workbench URL only as a `<link>` base. Written up with the measured coupling of all 17 workflows in
+[[parallel-content-system-separation]] — where the finding is that **12 of 17 read or write n8n data
+tables**, so the blocker is application state living inside the orchestrator, not re-pointable
+automation.
+
+**Open, with evidence:**
+
+- **Firecrawl returns 402 Payment Required**, which skipped 62 of 72 items on the first real tick.
+  The scrape path is unproven live and needs account credit.
+- **Reddit 403s the four `wasteland-wire` `reddit.com/r/<x>/.json` feeds** from a datacenter IP. The
+  three ai-news reddit feeds go through rss.app and work.
+- `risingshadow.net` returns **410 Gone** — a dead feed row.
+- **`chapter.qa`'s craft scoring returned `scores: null`** on Burial Mound ch.1 ("craft-QA JSON could
+  not be parsed"), while `chapter.review` read the same chapter fine. A `chapter.qa` robustness
+  issue, not a hub or retrieval one.
+- The five new research reports note "no existing characters have been named for this project",
+  because they were run before the outline existed; re-running them now would yield true scene seeds.
+
+Created: [[parallel-content-system-separation]]. Updated: [[index]].
