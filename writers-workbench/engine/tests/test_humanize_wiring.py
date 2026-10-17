@@ -279,3 +279,58 @@ async def test_social_posts_are_untouched_when_the_humanizer_is_off(
     out, report = await media_main._humanize_posts(dict(posts), {})
     assert out == posts
     assert report is None
+
+
+# --- the extractor's false positives, found by a live run ---------------------------------------
+#
+# The first version protected any capitalised word that never appeared lower-cased. On a real blog
+# generation that protected Textiles, Grain, Organic, Wood, Lead, Books, Discussion and Share — so
+# 7 of 8 chunks were rejected and 2,796 words were billed to humanize one chunk. The missing
+# condition: a real proper noun appears mid-sentence at least once.
+
+
+def test_a_sentence_initial_common_noun_is_not_protected() -> None:
+    """Follett prose is full of short declaratives whose first word looks like a name."""
+    draft = (
+        "Shipwrecks preserve a skewed picture of ancient trade. Wood rots. Textiles dissolve. "
+        "Grain leaves nothing behind. Organic cargo is invisible to us now."
+    )
+    terms = hz.extract_protected_terms(draft)
+    assert not ({"Wood", "Textiles", "Grain", "Organic"} & set(terms)), terms
+
+
+def test_a_bold_label_is_not_protected() -> None:
+    draft = "**Books**\n\nThe trade reached the port of Ugarit by sea.\n\n**Discussion prompt:** ask."
+    terms = hz.extract_protected_terms(draft)
+    assert "Ugarit" in terms
+    assert not ({"Books", "Discussion"} & set(terms)), terms
+
+
+def test_a_real_proper_noun_still_survives_the_stricter_rule() -> None:
+    """The rule must not throw away the terms it exists to protect.
+
+    These are the names the live run lost for real: Anatolian, Cypriot, Egypt, Hittite, Ugarit.
+    """
+    draft = (
+        "Lead-isotope analysis traced the copper to Cyprus. The ingots reached Ugarit and Egypt, "
+        "and the Hittite court recorded them. Tin came the other way from Anatolian sources, "
+        "carried by Cypriot crews."
+    )
+    terms = set(hz.extract_protected_terms(draft))
+    assert {"Cyprus", "Ugarit", "Egypt", "Hittite", "Anatolian", "Cypriot"} <= terms
+    # "Lead" opens a sentence and is a metal, not a place.
+    assert "Lead" not in terms
+
+
+def test_the_known_limitation_a_name_only_ever_at_a_sentence_start() -> None:
+    """Stated rather than hidden: such a name is NOT protected.
+
+    The trade was made deliberately. Protecting every sentence-initial capital rejected 7 of 8
+    chunks on a real draft and billed 2,796 words to humanize one of them; letting an occasional
+    name through unprotected costs at most that one term. A caller who knows the term matters can
+    always pass it via `extra` or `protect`.
+    """
+    draft = "Anatolian tin moved west. " + ("The route was long. " * 8)
+    assert "Anatolian" not in hz.extract_protected_terms(draft)
+    # And the escape hatch works.
+    assert "Anatolian" in hz.extract_protected_terms(draft, extra=["Anatolian"])

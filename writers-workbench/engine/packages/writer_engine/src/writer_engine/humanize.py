@@ -633,11 +633,28 @@ guarantee that every rewrite is rejected."""
 def extract_protected_terms(text: str, *, extra: Iterable[str] = ()) -> list[str]:
     """Pull the terms a non-fiction draft's claims rest on: its dates and its proper nouns.
 
-    Conservative by design. A capitalised token counts as a name only when it is not ordinary
-    English, is four characters or more, and never appears lower-cased elsewhere in the text — the
-    last condition is what keeps a sentence-initial "Bread" or "Climate" out of the list. Headings
-    are skipped entirely: they are reworded by every setting, so protecting their words would
+    Conservative by design, in three stages, because the first version was not conservative enough
+    and a live blog generation rejected 7 of 8 chunks on terms that were not names at all.
+
+    A capitalised token counts as a name only when:
+
+    1. it is not ordinary English (``_COMMON_CAPS``) and is four characters or more;
+    2. it never appears lower-cased elsewhere in the text — this catches "Climate" opening a
+       sentence in a text that also says "climate";
+    3. **it appears at least once mid-sentence.** This is the condition that was missing. Follett
+       prose is full of short declaratives — "Wood rots. Textiles dissolve." — whose first words are
+       capitalised, never lower-cased anywhere, and not ordinary enough for a stoplist. The live run
+       protected ``Textiles``, ``Grain``, ``Organic``, ``Wood``, ``Lead``, ``Books``, ``Discussion``
+       and ``Share``, and so rejected almost every chunk: 2,796 words billed for one humanized
+       chunk out of eight. A real proper noun ("the port of Ugarit") occurs mid-sentence at least
+       once; a sentence-initial common noun does not.
+
+    Headings are skipped entirely: every setting rewords them, so protecting their words would
     reject every rewrite.
+
+    List items are NOT skipped, deliberately. A reading list's titles and author names end up
+    protected, which makes that chunk reject and keep its original — the right outcome for a
+    bibliography, at the cost of one wasted call.
     """
     body = "\n".join(line for line in text.splitlines() if not line.strip().startswith("#"))
     lower_words = {w.lower() for w in re.findall(r"\b[a-z][a-z'-]{2,}\b", body)}
@@ -651,12 +668,18 @@ def extract_protected_terms(text: str, *, extra: Iterable[str] = ()) -> list[str
             seen.add(t)
             terms.append(t)
 
+    def mid_sentence(word: str) -> bool:
+        """True when the word follows a lower-case word or a comma somewhere in the text."""
+        return bool(re.search(rf"[a-z,;:]\s+{re.escape(word)}\b", body))
+
     for extra_term in extra:
         add(str(extra_term))
     for date in _DATE_RE.findall(body):
         add(date)
     for word in re.findall(r"\b([A-Z][a-zA-Z]{3,})\b", body):
         if word in _COMMON_CAPS or word.lower() in lower_words:
+            continue
+        if not mid_sentence(word):
             continue
         add(word)
     return terms[:MAX_PROTECTED_TERMS]
