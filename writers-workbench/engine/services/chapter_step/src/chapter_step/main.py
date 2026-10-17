@@ -640,13 +640,30 @@ LINE_EDIT_RULES = (
 )
 
 # Deterministic backstop applied after the LLM line-edit so no banned dash survives.
-_EM_DASH_RE = re.compile(f"\\s*(?:{_EM}|{_EN}|--)\\s*")
+#
+# The `--` branch is fenced with lookarounds so it cannot match INSIDE a longer hyphen run. Without
+# them it matched the first two hyphens of the `---` scene separator and, because `\s*` sits outside
+# the group, swallowed the surrounding newlines too — turning every sub-chapter seam into the
+# literal text ", -" in the middle of the prose:
+#
+#     "…walked through the gate.\n\n---\n\nThe receiver swept…"
+#     "…walked through the gate., -  The receiver swept…"
+#
+# So A13's structural scene breaks (SCENE_BREAK.join, below) were deleted by this function on the
+# very next line, and replaced with visible punctuation garbage. Measured on a live chapter 6 write:
+# 5 sub-chapters, 0 scene breaks, 5 instances of ", -". A13 recorded the drift-correct pass as the
+# residual risk to confirm on the next live run; the actual culprit fires on EVERY chapter,
+# regardless of drift (that run had craft_passes=0 and zero drift).
+_EM_DASH_RE = re.compile(f"\\s*(?:{_EM}|{_EN}|(?<!-)--(?!-))\\s*")
 
 
 def _strip_em_dashes(text: str) -> str:
     """Last-resort guarantee that no em-dash / en-dash-as-dash / double-hyphen survives (the LLM
     line-edit does the real rewriting; this catches stragglers). Replaces the dash with a comma +
-    space, which keeps the sentence grammatical without re-introducing the banned character."""
+    space, which keeps the sentence grammatical without re-introducing the banned character.
+
+    A run of three or more hyphens is left alone: it is a separator, not a dash. See the regex above.
+    """
     return _EM_DASH_RE.sub(", ", text)
 
 
