@@ -232,7 +232,9 @@ def _scene_count(text: str) -> int:
     return len([s for s in _SCENE_SPLIT.split(text) if s.strip()])
 
 
-async def _stealthify(chunk: str, *, model: str, mode: str, key: str, timeout_s: float) -> dict[str, Any]:
+async def _stealthify(
+    chunk: str, *, model: str, mode: str, key: str, timeout_s: float, output_format: str = "markdown"
+) -> dict[str, Any]:
     """One stealthify call. Raises on a non-2xx so the retry layer can see it."""
     body = {
         "prompt": chunk,
@@ -240,7 +242,7 @@ async def _stealthify(chunk: str, *, model: str, mode: str, key: str, timeout_s:
         "model": model,
         "mode": mode,
         "qualityMode": "quality",
-        "outputFormat": "text",
+        "outputFormat": output_format,
     }
     async with httpx.AsyncClient(timeout=timeout_s) as client:
         resp = await client.post(
@@ -257,6 +259,7 @@ async def humanize_text(
     *,
     model: str | None = None,
     mode: str | None = None,
+    output_format: str | None = None,
     protect: Iterable[str] = (),
     timeout_s: float = 180.0,
 ) -> HumanizeResult:
@@ -273,7 +276,8 @@ async def humanize_text(
         return HumanizeResult(text=text, skipped="empty input")
 
     use_model = (model or settings.stealthgpt_model or "standard").strip()
-    use_mode = (mode or settings.stealthgpt_mode or "High").strip()
+    use_mode = (mode or settings.stealthgpt_mode or "Low").strip()
+    use_format = (output_format or settings.stealthgpt_output_format or "markdown").strip()
 
     scenes_before = _scene_count(text)
     chunks = chunk_text(text)
@@ -300,7 +304,14 @@ async def humanize_text(
         # Bound as a default argument, not captured: a closure over the loop variable would send
         # the LAST chunk on every retry.
         async def _call(c: str = chunk) -> dict[str, Any]:
-            return await _stealthify(c, model=use_model, mode=use_mode, key=key, timeout_s=timeout_s)
+            return await _stealthify(
+                c,
+                model=use_model,
+                mode=use_mode,
+                key=key,
+                timeout_s=timeout_s,
+                output_format=use_format,
+            )
 
         try:
             payload = await call_provider(
@@ -402,14 +413,294 @@ def strip_banned_dashes(text: str) -> str:
 __all__ = [
     "CHUNK_WORDS",
     "ENDPOINT",
+    "MAX_PROTECTED_TERMS",
     "MIN_PARAGRAPH_RATIO",
     "MIN_WORDS",
     "SCENE_BREAK",
     "HumanizeResult",
     "chunk_text",
     "enabled",
+    "extract_protected_terms",
+    "humanize_draft",
     "humanize_text",
     "judge_rewrite",
     "strip_banned_dashes",
     "terms_present",
 ]
+
+
+# --- what to protect in a non-fiction draft ----------------------------------------------------
+#
+# Fiction has a roster and a bible to read a protect list from. A blog post has neither, so the
+# list has to come out of the draft itself. Measured on a real post: the terms that mattered were
+# the dates (High dropped 1185 BCE and 1300 BCE, the two the article was about) and the proper
+# nouns (Ugarit, Alashiya, Hattusa all survived; Canaanite, Anatolian, Sardinian did not).
+
+_DATE_RE = re.compile(r"\b\d{1,4}\s?(?:BCE|BC|CE|AD)\b|\b(?:1[0-9]{3}|20[0-9]{2})\b")
+
+# Capitalised words that are ordinary English rather than names. Kept deliberately short: a word
+# wrongly treated as a name causes a spurious rejection, which wastes the spend AND skips the
+# humanizing, so this list errs toward excluding.
+_COMMON_CAPS = frozenset(
+    [
+        "The",
+        "A",
+        "An",
+        "And",
+        "But",
+        "Or",
+        "So",
+        "If",
+        "As",
+        "At",
+        "By",
+        "For",
+        "From",
+        "In",
+        "Into",
+        "Of",
+        "On",
+        "To",
+        "Up",
+        "With",
+        "Not",
+        "No",
+        "Now",
+        "Here",
+        "There",
+        "When",
+        "What",
+        "Who",
+        "Why",
+        "How",
+        "That",
+        "This",
+        "These",
+        "Those",
+        "It",
+        "He",
+        "She",
+        "They",
+        "We",
+        "You",
+        "His",
+        "Her",
+        "Their",
+        "Its",
+        "Was",
+        "Were",
+        "Is",
+        "Are",
+        "Be",
+        "Been",
+        "Being",
+        "Have",
+        "Has",
+        "Had",
+        "Do",
+        "Does",
+        "Did",
+        "Can",
+        "Could",
+        "Will",
+        "Would",
+        "Should",
+        "May",
+        "Might",
+        "Must",
+        "One",
+        "Two",
+        "Three",
+        "Four",
+        "Five",
+        "Six",
+        "Seven",
+        "Eight",
+        "Nine",
+        "Ten",
+        "First",
+        "Second",
+        "Third",
+        "Next",
+        "Last",
+        "Even",
+        "Only",
+        "Once",
+        "Every",
+        "Each",
+        "Some",
+        "Many",
+        "Most",
+        "Both",
+        "All",
+        "Nothing",
+        "Something",
+        "Everything",
+        "Someone",
+        "Anyone",
+        "Perhaps",
+        "Maybe",
+        "Because",
+        "While",
+        "Until",
+        "Since",
+        "Though",
+        "Although",
+        "After",
+        "Before",
+        "Behind",
+        "Above",
+        "Below",
+        "Later",
+        "Still",
+        "Yet",
+        "Today",
+        "Yesterday",
+        "Tomorrow",
+        "Another",
+        "Other",
+        "Others",
+        "Very",
+        "Just",
+        "Then",
+        "Than",
+        "Also",
+        "About",
+        "Across",
+        "Around",
+        "Over",
+        "Under",
+        "Between",
+        "Within",
+        "Without",
+        "Instead",
+        "However",
+        "Meanwhile",
+        "Therefore",
+        "Finally",
+        "Eventually",
+        "Ultimately",
+        "Rarely",
+        "Often",
+        "Always",
+        "Never",
+        "Sometimes",
+        "Here's",
+        "There's",
+        "Let",
+        "Take",
+        "Put",
+        "Make",
+        "Made",
+        "Get",
+        "Got",
+        "Say",
+        "Said",
+        "See",
+        "Saw",
+        "Know",
+        "Knew",
+        "Think",
+        "Thought",
+        "Yes",
+        "Maybe",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+        "January",
+        "February",
+        "March",
+        "April",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+    ]
+)
+
+MAX_PROTECTED_TERMS = 80
+"""A ceiling on the extracted list. Past this the check stops being a guard and starts being a
+guarantee that every rewrite is rejected."""
+
+
+def extract_protected_terms(text: str, *, extra: Iterable[str] = ()) -> list[str]:
+    """Pull the terms a non-fiction draft's claims rest on: its dates and its proper nouns.
+
+    Conservative by design. A capitalised token counts as a name only when it is not ordinary
+    English, is four characters or more, and never appears lower-cased elsewhere in the text — the
+    last condition is what keeps a sentence-initial "Bread" or "Climate" out of the list. Headings
+    are skipped entirely: they are reworded by every setting, so protecting their words would
+    reject every rewrite.
+    """
+    body = "\n".join(line for line in text.splitlines() if not line.strip().startswith("#"))
+    lower_words = {w.lower() for w in re.findall(r"\b[a-z][a-z'-]{2,}\b", body)}
+
+    terms: list[str] = []
+    seen: set[str] = set()
+
+    def add(term: str) -> None:
+        t = term.strip()
+        if t and t not in seen:
+            seen.add(t)
+            terms.append(t)
+
+    for extra_term in extra:
+        add(str(extra_term))
+    for date in _DATE_RE.findall(body):
+        add(date)
+    for word in re.findall(r"\b([A-Z][a-zA-Z]{3,})\b", body):
+        if word in _COMMON_CAPS or word.lower() in lower_words:
+            continue
+        add(word)
+    return terms[:MAX_PROTECTED_TERMS]
+
+
+async def humanize_draft(
+    text: str,
+    *,
+    content_type: str,
+    payload: dict[str, Any] | None = None,
+    protect: Iterable[str] | None = None,
+) -> tuple[str, dict[str, Any] | None]:
+    """Humanize a NON-FICTION draft, or return it untouched.
+
+    Returns ``(text, report)``. ``report`` is None when the pass did not run at all, so a caller
+    can tell "disabled" from "ran and rejected everything".
+
+    Runs only when: a key is configured, ``HUMANIZE_NON_FICTION`` is on, and the request did not
+    pass ``humanize: false``. Fiction call sites simply do not call this — the exclusion is the
+    absence of a call, not a content_type check here, because a content_type string is easy to get
+    wrong and the consequence (a chapter silently humanized) is the thing we decided against.
+    """
+    settings = get_settings()
+    request = payload or {}
+    if request.get("humanize") is False:
+        return text, None
+    if not settings.humanize_non_fiction or not enabled():
+        return text, None
+    if not text.strip():
+        return text, None
+
+    terms = list(protect) if protect is not None else extract_protected_terms(text)
+    result = await humanize_text(text, protect=terms)
+    report = result.as_report()
+    report["content_type"] = content_type
+    report["protected_terms"] = len(terms)
+    if result.skipped:
+        return text, report
+    logger.info(
+        "humanize.draft",
+        content_type=content_type,
+        humanized=result.humanized_chunks,
+        of=result.chunks,
+        rejected=len(result.rejected),
+        words_spent=result.words_spent,
+    )
+    return result.text, report

@@ -64,10 +64,21 @@ class EngineSettings(BaseSettings):
     # default everywhere: it is a paid per-word service, and on fiction a strong setting can flatten
     # literary voice, so it must never run unless someone asked for it.
     stealthgpt_api_key: str = Field(default="", alias="STEALTHGPT_API_KEY")
-    # super | standard | lite. The API requires the field; `standard` is what the n8n sub defaults to.
+    # super | standard | lite. `standard` measured best per credit: `super` bills ~6x the input
+    # words and invents events that were not in the source.
     stealthgpt_model: str = Field(default="standard", alias="STEALTHGPT_MODEL")
-    # High | Medium | Low. How hard it rewrites — the knob that trades detectability for voice.
-    stealthgpt_mode: str = Field(default="High", alias="STEALTHGPT_MODE")
+    # High | Medium | Low. Default Low on measured evidence, not on the name: on a real 1479-word
+    # blog post Low scored 93 against High's 83, kept all 7 markdown headings against High's 6, and
+    # lost no dates where High dropped the two the article was about. Same cost either way.
+    stealthgpt_mode: str = Field(default="Low", alias="STEALTHGPT_MODE")
+    # text | markdown. markdown is not cosmetic: the same mode in `text` dropped 2 of 7 headings
+    # and scored 7 points lower for the same money.
+    stealthgpt_output_format: str = Field(default="markdown", alias="STEALTHGPT_OUTPUT_FORMAT")
+    # Run the pass automatically on non-fiction (blog / newsletter / social). Fiction is NOT
+    # humanized: measured on a real scene, both modes destroyed the researched period vocabulary
+    # (maize -> corn, packed earth -> flat stone) that a chapter's research pass exists to get
+    # right. A caller may still opt a single request out with `humanize: false`.
+    humanize_non_fiction: bool = Field(default=True, alias="HUMANIZE_NON_FICTION")
     # Hard ceiling on BILLED words for a single humanize pass. Measured against the live API on
     # 2026-10-17: a 29-word passage billed 60 words on `standard` and 195 on `super`, i.e. roughly
     # 2x and 6x the input. The account is `billingMode: payg` with no prepaid credit buffer, so

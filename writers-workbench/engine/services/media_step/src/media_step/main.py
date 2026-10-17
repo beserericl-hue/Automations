@@ -24,8 +24,10 @@ from writer_engine.prompt_store import compose_craft_system, seed_default_prompt
 from writer_engine.rate_limit.provider_budget import call_provider
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
 from writer_engine.step_service import build_step_app
+from writer_engine.telemetry.logging import get_logger
 
 STEP_NAME = "media"
+logger = get_logger(STEP_NAME)
 seed_default_prompts()
 
 _KIEAI_CREATE = "https://api.kie.ai/api/v1/playground/createTask"
@@ -300,6 +302,58 @@ async def _persist_social_posts(payload: dict, posts: dict) -> dict | None:
         return {"persisted": False, "error": str(exc)[:200]}
 
 
+# Published limits, so a humanized post that cannot be posted is never kept. Generous where the
+# platform is generous — the cap exists to catch a runaway rewrite, not to re-impose house style.
+_PLATFORM_LIMITS = {
+    "twitter": 280,
+    "x": 280,
+    "bluesky": 300,
+    "mastodon": 500,
+    "threads": 500,
+    "instagram": 2200,
+    "linkedin": 3000,
+    "facebook": 5000,
+}
+
+
+async def _humanize_posts(posts: dict[str, str], payload: dict) -> tuple[dict[str, str], dict | None]:
+    """Humanize each social post, keeping the original where the rewrite would not be publishable."""
+    from writer_engine.humanize import extract_protected_terms, humanize_draft
+
+    out: dict[str, str] = {}
+    report: dict = {"platforms": {}}
+    ran = False
+    for platform, text in posts.items():
+        original = str(text or "")
+        if not original.strip():
+            out[platform] = original
+            continue
+        rewritten, one = await humanize_draft(
+            original,
+            content_type=f"social:{platform}",
+            payload=payload,
+            protect=extract_protected_terms(original),
+        )
+        if one is None:
+            out[platform] = original
+            continue
+        ran = True
+        limit = _PLATFORM_LIMITS.get(platform.lower())
+        if limit and len(rewritten) > limit:
+            logger.warning(
+                "humanize.social.too_long",
+                platform=platform,
+                chars=len(rewritten),
+                limit=limit,
+            )
+            one["rejected_for_length"] = {"chars": len(rewritten), "limit": limit}
+            out[platform] = original
+        else:
+            out[platform] = rewritten
+        report["platforms"][platform] = one
+    return out, (report if ran else None)
+
+
 async def _op_social_posts(payload: dict) -> dict:
     platforms = list(payload.get("platforms") or ["twitter", "linkedin"])
     summary = str(payload.get("summary") or payload.get("title") or "").strip()
@@ -330,8 +384,17 @@ async def _op_social_posts(payload: dict) -> dict:
                 '"Write a LinkedIn post for The Last Signal introducing our newsletter."'
             ),
         }
+    # E6: humanize each post individually, with a hard character cap per platform.
+    #
+    # Two reasons this is not just a call to humanize_draft on the joined text. A platform limit is
+    # a publish blocker, not a style preference: a rewrite that pushes a tweet past 280 characters
+    # cannot be posted at all, so it is rejected and the original kept. And a post is SHORT, which
+    # is the exact condition under which this model behaved worst in testing — on a 29-word passage
+    # it replaced a character's name with a pronoun, where at 1431 words it kept every name. So the
+    # per-post protect list is extracted from the post itself and the result is length-checked.
+    posts, humanize_report = await _humanize_posts(posts, payload)
     persisted = await _persist_social_posts(payload, posts)
-    return {**posts, "persist": persisted}
+    return {**posts, "humanize": humanize_report, "persist": persisted}
 
 
 async def _op_scrape_url(payload: dict) -> dict:

@@ -15,6 +15,7 @@ from typing import Any
 from uuid import uuid4
 
 from writer_engine import outline_keys
+from writer_engine.humanize import humanize_draft
 from writer_engine.library_helpers import optional_int
 from writer_engine.llm import ProviderNotRegistered, complete_structured, get_router
 from writer_engine.prompt_store import compose_craft_system, seed_default_prompts
@@ -2544,19 +2545,23 @@ async def _op_blog(payload: dict) -> dict:
     except Exception:
         pass
     body = _strip_em_dashes(body)
+    # E6: humanize NON-FICTION before it is persisted, so what is stored is what would publish.
+    # Blog and newsletter only — never a chapter or a short story. See writer_engine.humanize.
+    body, humanize_report = await humanize_draft(body, content_type="blog_post", payload=payload)
     persist = await _persist_simple(
         payload,
         title=title,
         content_type="blog_post",
         content_text=body,
         genre_slug=genre_slug,
-        metadata=meta,
+        metadata={**meta, **({"humanize": humanize_report} if humanize_report else {})},
     )
     return {
         "written": True,
         "title": title,
         "content_text": body,
         "word_count": len(body.split()),
+        "humanize": humanize_report,
         "persist": persist,
     }
 
@@ -2627,12 +2632,15 @@ async def _op_newsletter(payload: dict) -> dict:
     if data.get("outro"):
         parts.append(str(data["outro"]))
     body = _strip_em_dashes("\n\n".join(p for p in parts if p).strip() or resp.text.strip())
+    body, humanize_report = await humanize_draft(body, content_type="newsletter", payload=payload)
     meta = {
         "subject_line": subject_line,
         "pre_header": data.get("pre_header"),
         "send_date": send_date,
         "section_count": len(sections),
     }
+    if humanize_report:
+        meta["humanize"] = humanize_report
     persist = await _persist_simple(
         payload,
         title=title,
@@ -2648,6 +2656,7 @@ async def _op_newsletter(payload: dict) -> dict:
         "content_text": body,
         "word_count": len(body.split()),
         "section_count": len(sections),
+        "humanize": humanize_report,
         "persist": persist,
     }
 
@@ -2718,6 +2727,11 @@ async def _op_short_story(payload: dict) -> dict:
     except ProviderNotRegistered:
         return {"written": False, "reason": "no provider"}
     body = _strip_em_dashes(_strip_scaffolding(resp.text.strip()))
+    # NOT humanized, deliberately. A short story is fiction, and the measurement that settled this
+    # (2026-10-17, a real 1431-word scene) showed both StealthGPT modes destroying the researched
+    # period vocabulary a scene is grounded in: maize -> corn, packed earth -> flat stone, with
+    # clay jar / thatch / sleeping mat / stars simply gone. Blog and newsletter are humanized; this
+    # is not. If that ever changes it needs a protect list built from the project's canon.
     persist = await _persist_simple(
         payload,
         title=title,
