@@ -1241,3 +1241,54 @@ nonsense; the attributions are now reported with no verdict attached.
 
 **Held off during this work, as asked:** `ALERT_EMAIL` is cleared on both DEV engine services, and
 every harness payload sets `notify: False`.
+
+## [2026-10-17] E6 humanizer | wired for non-fiction, excluded from fiction, both decisions measured
+
+Key live on `writer-engine-runtime` as `STEALTHGPT_API_KEY`. Two shared artifacts hold the full
+side-by-side copies: the fiction evaluation and the blog evaluation.
+
+**The API, corrected from the earlier note.** `howLikelyToBeDetected` is a human-likeness score and
+**higher is better** — the opposite of what the name suggests, and the opposite of what I first
+told the user. That inverts the ranking: `Low` beats `High`. `tone` and `writingMode` are
+generation-only, so they are not levers on `stealthify`. `rephrase:false` is not a score-only mode:
+it returned 126 unrelated words and billed 1,557 for them. Billing runs ~2x the input words on
+`standard` and ~6x on `super`, which also invents events that were not in the source.
+
+**Fiction: excluded.** On a real 1431-word scene of The Burial Mound (ch 40), both modes kept every
+character NAME and destroyed the researched period vocabulary: `packed earth` → `flat stone` in a
+1210 CE village, `maize` → `corn` (a colonial word in a pre-contact scene), and `clay jar`,
+`thatch`, `sleeping mat`, `stars`, `river` simply gone. `Low` also broke blocking — "She did not
+rise" followed two paragraphs later by "She propped herself up on her elbows". The engine spends a
+research call per chapter to get those words right and scores itself on `period_language_ok` (0.91);
+the pass undoes exactly that. `mode=Medium` scored BEST of all five settings (94) and rewrote 31
+paragraphs into 7 — the highest-scoring output was the least usable, and nothing in the score said so.
+
+**Non-fiction: wired.** On a real 1479-word blog post, `Low`+`standard`+`markdown` scored 93, kept
+all 7 markdown headings and lost no dates. `High` lost the two dates the article was about (1185 and
+1300 BCE) plus three ethnonyms. `text` format lost 2 of 7 headings and scored 7 points lower for the
+same money — `outputFormat` had been hardcoded to `text`, so markdown was unreachable. Caveat that
+stands even on the best setting: it rewrites headings including the H1, so it runs BEFORE first
+publish and never on a published post.
+
+**Guards, all shipped:** chunk on scene breaks (the separator is never sent to the provider);
+re-strip banned dashes after the rewrite; `terms_lost` (a protected term present in the input and
+missing from the output); `structure_collapsed` (under 70% of the paragraphs survive); per-platform
+character caps for social posts, because a limit is a publish blocker not a preference; retry then
+keep the original per chunk; and `HUMANIZE_MAX_WORDS_PER_RUN`, since the account is pay-as-you-go
+with no credit buffer and a 96-chapter novel is ~1.35M billed words.
+
+**Found by verifying the wiring live rather than trusting it.** The first real blog generation
+humanized ONE of eight chunks and billed 2,796 words, because the protect extractor flagged any
+capitalised word that never appeared lower-cased — which on Follett prose means `Wood`, `Textiles`,
+`Grain`, `Organic`, `Lead`, plus bold labels `Books`, `Discussion`, `Share`. The missing condition
+was that a real proper noun appears mid-sentence at least once. After the fix: 3 of 7 chunks
+humanized, 38 protected terms instead of 55, and **every remaining rejection genuine** —
+`terms_lost:Roman`, `terms_lost:Campanian,Roman`, and two real paragraph collapses.
+
+**Economics to be aware of:** a rejection still bills. The current blog pass pays for all chunks and
+applies to roughly half, so ~2x input words for partial application. Worth revisiting if the
+rejection rate stays near 50%.
+
+**Still open:** the fiction path would need `protect` built from the project's canon (roster + bible
++ the chapter's research terms) before it could be reconsidered; invented additions are not
+detectable by a term check at all; the `lite` model is untested.
