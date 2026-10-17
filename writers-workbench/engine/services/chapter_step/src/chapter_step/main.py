@@ -14,6 +14,7 @@ import unicodedata
 from typing import Any
 from uuid import uuid4
 
+from writer_engine import outline_keys
 from writer_engine.library_helpers import optional_int
 from writer_engine.llm import ProviderNotRegistered, complete_structured, get_router
 from writer_engine.prompt_store import compose_craft_system, seed_default_prompts
@@ -260,27 +261,29 @@ def _compact_outline_view(outline: dict[str, Any], chapter_number: int) -> str:
     for ch in chapters:
         if not isinstance(ch, dict):
             continue
-        num = ch.get("chapter_number")
-        if str(num) == str(chapter_number):
+        # Via writer_engine.outline_keys, because the data holds TWO outline shapes and this used to
+        # read only `chapter_number`. For the ten n8n-shaped projects (which key on `number`) focal
+        # stayed None, so the prompt contained no THIS CHAPTER block at all — no beat, no brief, no
+        # bridge from the prior chapter — and every index line rendered as "None. Title".
+        num = outline_keys.chapter_number(ch)
+        if outline_keys.matches(ch, chapter_number):
             focal = ch
         index.append(
-            f"  {num}. {ch.get('title', '')}"
+            f"  {num if num is not None else '?'}. {ch.get('title', '')}"
             f"{' [' + str(ch.get('act')) + ']' if ch.get('act') else ''}"
             f"{' (POV ' + str(ch.get('pov_character')) + ')' if ch.get('pov_character') else ''}"
         )
     if focal is not None:
         lines.append("\nTHIS CHAPTER (write this one):")
-        for k in (
-            "chapter_number",
-            "title",
-            "act",
-            "arc_point",
-            "pov_character",
-            "bridge_from_prior",
-            "beat",
-        ):
+        lines.append(f"  chapter_number: {outline_keys.chapter_number(focal)}")
+        if focal.get("title"):
+            lines.append(f"  title: {focal['title']}")
+        for k in outline_keys.CONTEXT_KEYS:
             if focal.get(k):
                 lines.append(f"  {k}: {focal[k]}")
+        body = outline_keys.chapter_body(focal)
+        if body:
+            lines.append(f"  beat: {body}")
     if index:
         lines.append("\nFULL CHAPTER INDEX (for arc context — titles only):")
         lines.extend(index)

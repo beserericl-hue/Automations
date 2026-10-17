@@ -145,6 +145,27 @@ class ProviderBudget:
         except Exception:
             return None
 
+    async def _usage(self, client: redis.Redis, provider: str, model: str, kind: str) -> int | None:
+        """Window usage, or None when Redis could not answer.
+
+        Guarding the COMMAND and not just the connection is the whole point. redis-py connects
+        lazily, so an unreachable Redis does not fail when the client is created — it fails on the
+        first command. The original version only caught the acquisition failure, so a Redis outage
+        made this gate RAISE instead of fail open, and the raise propagated through call_provider
+        into embeddings / firecrawl / kieai. Found by running the real retrieval path on a machine
+        with no Redis; the test that was supposed to cover it only faked a failing ``get_redis``.
+        """
+        try:
+            return await _window.current(client, self._key(provider, model, kind))
+        except Exception as exc:
+            logger.warning(
+                "provider_budget.unavailable",
+                provider=provider,
+                model=model,
+                error=f"{type(exc).__name__}: {str(exc)[:120]}",
+            )
+            return None
+
     def _key(self, provider: str, model: str, kind: str) -> str:
         # Keyed per model as well as per provider: gemini-flash and gemini-pro have different
         # ceilings in every published tier, so one shared window would gate the wrong thing.
@@ -177,10 +198,15 @@ class ProviderBudget:
         deadline = start + max_wait_s
         stalled = False
         while True:
-            req_used = await _window.current(client, self._key(provider, model, "requests"))
-            tok_used = (
-                await _window.current(client, self._key(provider, model, "tokens")) if limits.tpm > 0 else 0
-            )
+            req_used = await self._usage(client, provider, model, "requests")
+            if req_used is None:
+                return True  # fail open: a bookkeeping outage must not block the call
+            tok_used = 0
+            if limits.tpm > 0:
+                counted = await self._usage(client, provider, model, "tokens")
+                if counted is None:
+                    return True
+                tok_used = counted
             req_ok = limits.rpm <= 0 or req_used + 1 <= limits.rpm
             tok_ok = limits.tpm <= 0 or tok_used + tokens <= limits.tpm
             if req_ok and tok_ok:
@@ -232,10 +258,18 @@ class ProviderBudget:
         if client is None:
             return
         token = _window.new_token()
-        await _window.record(client, self._key(provider, model, "requests"), 1, token=token)
-        if limits.tpm > 0:
-            total = max(0, input_tokens) + max(0, output_tokens)
-            await _window.record(client, self._key(provider, model, "tokens"), total, token=token)
+        try:
+            await _window.record(client, self._key(provider, model, "requests"), 1, token=token)
+            if limits.tpm > 0:
+                total = max(0, input_tokens) + max(0, output_tokens)
+                await _window.record(client, self._key(provider, model, "tokens"), total, token=token)
+        except Exception as exc:
+            # Losing a usage record under-counts the window; raising would fail the user's call.
+            logger.warning(
+                "provider_budget.record_failed",
+                provider=provider,
+                error=f"{type(exc).__name__}: {str(exc)[:120]}",
+            )
 
     async def snapshot(self, provider: str, model: str) -> dict[str, int]:
         """Current window usage, for /metrics and admin."""
@@ -243,8 +277,8 @@ class ProviderBudget:
         if client is None:
             return {"requests": 0, "tokens": 0}
         return {
-            "requests": await _window.current(client, self._key(provider, model, "requests")),
-            "tokens": await _window.current(client, self._key(provider, model, "tokens")),
+            "requests": await self._usage(client, provider, model, "requests") or 0,
+            "tokens": await self._usage(client, provider, model, "tokens") or 0,
         }
 
     def with_limits(self, **per_provider: ProviderLimits) -> ProviderBudget:

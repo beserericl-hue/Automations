@@ -128,7 +128,9 @@ async def test_an_ungated_provider_skips_redis_entirely() -> None:
 
 
 @pytest.mark.asyncio
-async def test_the_gate_fails_open_when_redis_is_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_the_gate_fails_open_when_the_client_cannot_be_built(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """A rate gate that fails closed takes the engine down harder than the 429s it prevents."""
 
     async def _boom() -> Any:
@@ -137,6 +139,70 @@ async def test_the_gate_fails_open_when_redis_is_unreachable(monkeypatch: pytest
     monkeypatch.setattr("writer_engine.redis_client.client.get_redis", _boom)
     budget = ProviderBudget(limits={"gemini": ProviderLimits(rpm=1)})
     assert await budget.wait_for_capacity(provider="gemini", model="m", max_wait_s=0.0)
+
+
+class _CommandsFail:
+    """A client that is built fine and fails on every COMMAND.
+
+    This is what an unreachable Redis actually looks like: redis-py connects lazily, so nothing
+    fails until the first command. The test above — faking a failing ``get_redis`` — only covered
+    acquisition, and the gate RAISED on the command path. Found by running the real canon-retrieval
+    path on a machine with no Redis, where the ConnectionError came out through call_provider into
+    embeddings.
+    """
+
+    def __getattr__(self, _name: str) -> Any:
+        async def _fail(*_a: Any, **_k: Any) -> Any:
+            raise ConnectionError("Connect call failed")
+
+        return _fail
+
+
+@pytest.mark.asyncio
+async def test_the_gate_fails_open_when_commands_fail() -> None:
+    budget = ProviderBudget(
+        redis_client=_CommandsFail(),  # type: ignore[arg-type]
+        limits={"gemini": ProviderLimits(rpm=1, tpm=10)},
+    )
+    assert await budget.wait_for_capacity(provider="gemini", model="m", max_wait_s=0.0) is True
+    await budget.record_usage(provider="gemini", model="m", input_tokens=5)  # must not raise
+    assert await budget.snapshot("gemini", "m") == {"requests": 0, "tokens": 0}
+
+
+@pytest.mark.asyncio
+async def test_call_provider_still_calls_through_when_redis_commands_fail() -> None:
+    """The path that actually broke: embeddings / firecrawl / kieai go through call_provider, which
+    has no router above it to contain a raise."""
+    budget = ProviderBudget(
+        redis_client=_CommandsFail(),  # type: ignore[arg-type]
+        limits={"openai": ProviderLimits(rpm=1, tpm=10)},
+    )
+    calls: list[int] = []
+
+    async def _work() -> str:
+        calls.append(1)
+        return "embedded"
+
+    out = await call_provider("openai", _work, model="emb", input_tokens=9999, budget=budget)
+    assert out == "embedded"
+    assert len(calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_the_anthropic_budget_also_fails_open_on_command_errors() -> None:
+    """Same lazy-connection trap; the router contains a raise there, snapshot() does not."""
+    from writer_engine.rate_limit import AnthropicBudget
+
+    budget = AnthropicBudget(redis_client=_CommandsFail())  # type: ignore[arg-type]
+    await budget.wait_for_capacity(
+        model="claude-sonnet-4-6", input_tokens=10, output_tokens=10, max_wait_s=0.0
+    )
+    await budget.record_usage(model="claude-sonnet-4-6", input_tokens=1, output_tokens=1)
+    assert await budget.snapshot("claude-sonnet-4-6") == {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "requests": 0,
+    }
 
 
 # --- the facade the router uses ----------------------------------------------------------------

@@ -103,7 +103,18 @@ class AnthropicBudget:
         return f"{self._prefix}:{model}:{kind}"
 
     async def _current(self, client: redis.Redis, model: str, kind: str) -> int:
-        return await _window.current(client, self._key(model, kind))
+        """Window usage, or 0 when Redis cannot answer.
+
+        Same lazy-connection trap as ProviderBudget._usage: redis-py fails on the first COMMAND, not
+        when the client is built, so an unguarded read turns a Redis outage into a raise. Reporting
+        0 means the budget believes there is headroom and lets the call through — the provider's own
+        429 handling is the backstop, and that is the right failure direction for a rate gate.
+        """
+        try:
+            return await _window.current(client, self._key(model, kind))
+        except Exception as exc:
+            logger.warning("budget.unavailable", model=model, error=f"{type(exc).__name__}: {str(exc)[:120]}")
+            return 0
 
     async def wait_for_capacity(
         self,
@@ -188,10 +199,15 @@ class AnthropicBudget:
         if client is None:
             return
         token = _window.new_token()
-        # Even when one number is 0 we still want the request to count toward RPM.
-        await _window.record(client, self._key(model, "input"), input_tokens, token=token)
-        await _window.record(client, self._key(model, "output"), output_tokens, token=token)
-        await _window.record(client, self._key(model, "requests"), 1, token=token)
+        try:
+            # Even when one number is 0 we still want the request to count toward RPM.
+            await _window.record(client, self._key(model, "input"), input_tokens, token=token)
+            await _window.record(client, self._key(model, "output"), output_tokens, token=token)
+            await _window.record(client, self._key(model, "requests"), 1, token=token)
+        except Exception as exc:
+            logger.warning(
+                "budget.record_failed", model=model, error=f"{type(exc).__name__}: {str(exc)[:120]}"
+            )
 
     async def snapshot(self, model: str) -> dict[str, int]:
         """Return current sliding-window usage for the model. Used by /metrics + admin."""

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from writer_engine import outline_keys
 from writer_engine.config import get_settings
 from writer_engine.rate_limit.provider_budget import call_provider
 from writer_engine.telemetry.logging import get_logger
@@ -235,16 +236,20 @@ def build_canon_chunks(outline: dict[str, Any], bible_rows: list[dict[str, Any]]
     for ch in outline.get("chapters") or []:
         if not isinstance(ch, dict):
             continue
-        num = ch.get("number")
+        # Via writer_engine.outline_keys: this read only `number`, so for the sixteen engine-shaped
+        # projects (which key on `chapter_number`) EVERY chapter was skipped — no chapter_brief and
+        # no sub_chapter chunks were ever built, which is why only n8n-shaped projects had any rows
+        # in writing_embeddings_v2 at all.
+        num = outline_keys.chapter_number(ch)
         if num is None:
             continue
         title = str(ch.get("title") or "").strip()
         body = "\n".join(
             part
             for part in (
-                str(ch.get("summary") or "").strip(),
-                str(ch.get("beat") or "").strip(),
+                outline_keys.chapter_body(ch),
                 str(ch.get("arc_notes") or "").strip(),
+                str(ch.get("bridge_from_prior") or "").strip(),
             )
             if part
         )
@@ -255,11 +260,7 @@ def build_canon_chunks(outline: dict[str, Any], bible_rows: list[dict[str, Any]]
         # sub_chapter is the LARGEST doc_type n8n produced (126 of 169 rows on one DEV project), and
         # the richest per-scene canon there is. Omitting it would make a reindex destructive: the
         # delete-then-insert would drop every sub_chapter row and never regenerate it.
-        plan = ch.get("chapter_outline")
-        subs = (plan or {}).get("sub_chapters") if isinstance(plan, dict) else None
-        for sub in subs or []:
-            if not isinstance(sub, dict):
-                continue
+        for sub in outline_keys.sub_chapters(ch):
             s_num = sub.get("number")
             s_title = str(sub.get("title") or "").strip()
             if s_num is None:
