@@ -68,6 +68,10 @@ DEFAULT_PROVIDER_LIMITS: dict[str, ProviderLimits] = {
     "firecrawl": ProviderLimits(rpm=50),
     # Image generation: slow, expensive, and polled. Low on purpose.
     "kieai": ProviderLimits(rpm=20),
+    # Humanizer (E6). Billed per WORD with a hard 3000-word cap per request, so a single chapter is
+    # 3+ calls and a "humanize all" would be dozens. Low rpm on purpose: the cost of being throttled
+    # is a slower pass, and the cost of not being throttled is spending credits in a burst.
+    "stealthgpt": ProviderLimits(rpm=30),
 }
 
 # Anthropic is deliberately absent: it has its own per-MODEL token budget, which is strictly more

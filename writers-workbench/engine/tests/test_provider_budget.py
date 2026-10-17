@@ -32,7 +32,14 @@ from writer_engine.rate_limit.provider_budget import (
 
 def test_every_provider_the_engine_actually_calls_has_a_limit() -> None:
     """A provider missing here is a provider with no gate — which is where B8 started."""
-    assert set(DEFAULT_PROVIDER_LIMITS) == {"gemini", "perplexity", "openai", "firecrawl", "kieai"}
+    assert set(DEFAULT_PROVIDER_LIMITS) == {
+        "gemini",
+        "perplexity",
+        "openai",
+        "firecrawl",
+        "kieai",
+        "stealthgpt",
+    }
 
 
 def test_anthropic_is_excluded_on_purpose() -> None:
