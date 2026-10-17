@@ -182,6 +182,17 @@ async def _op_lifecycle(payload: dict) -> dict:
     meta = dict(row.get("metadata") or {})
     if action == "publish":
         updates["published_at"] = datetime.now(UTC).isoformat()
+        # The scheduler (writer_engine.publisher) publishes through this same op rather than
+        # re-implementing the snapshot/flip/email, and marks the row so a reader can tell a
+        # scheduled publish from a manual one. n8n's `17 Cron: Scheduled Publisher` set the same
+        # flag — but it also DELETED metadata.schedule_date, which erased the only record of what
+        # the user had asked for and whether it went out on time. Keep it.
+        if payload.get("auto_published"):
+            meta["auto_published"] = True
+            meta["auto_published_at"] = str(payload.get("auto_published_at") or datetime.now(UTC).isoformat())
+            if payload.get("scheduled_for"):
+                meta["scheduled_for"] = str(payload["scheduled_for"])
+            updates["metadata"] = meta
     if action == "delete":
         updates["deleted_at"] = datetime.now(UTC).isoformat()
     if action == "undelete":

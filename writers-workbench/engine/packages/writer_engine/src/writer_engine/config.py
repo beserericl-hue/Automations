@@ -229,6 +229,10 @@ class EngineSettings(BaseSettings):
     # A11's cadence cron on the same internal timer. Both were external-cron-only, which meant DEV
     # had no scheduler at all once n8n was off — the newsletter would simply never go out.
     cadence_poll_seconds: float = Field(default=900.0, alias="CADENCE_POLL_SECONDS")
+    # Scheduled-content publisher. n8n's `17 Cron: Scheduled Publisher` ran hourly; 15 minutes means
+    # a post scheduled for 09:00 goes out by 09:15 rather than by 10:00, and the query is one
+    # indexed read of the `scheduled` rows.
+    publisher_poll_seconds: float = Field(default=900.0, alias="PUBLISHER_POLL_SECONDS")
 
     # Observability
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")

@@ -717,6 +717,70 @@ def build_app() -> FastAPI:
             feed_id=(request.query_params.get("feed_id") or "").strip(),
         )
 
+    async def _publisher_tick() -> dict[str, Any]:
+        """Publish any content whose scheduled time has arrived (Gate 4).
+
+        The engine and the Workbench could both SCHEDULE content and neither ever published it — the
+        only thing that did was n8n's hourly `17 Cron: Scheduled Publisher`. Without this, "n8n off"
+        leaves every scheduled post at `status='scheduled'` forever, with no error anywhere.
+
+        Each due row goes through `library.lifecycle` with `action=publish`, which already owns the
+        version snapshot, the status flip and the user's email. One publish path, not two.
+        """
+        from writer_engine.publisher import find_due, publish_payload
+
+        try:
+            due, unreadable = await find_due()
+        except Exception as exc:
+            logger.warning("cron.publisher.query_failed", error=f"{type(exc).__name__}: {exc}"[:160])
+            return {"published": 0, "error": f"{type(exc).__name__}: {exc}"[:160]}
+
+        if not due:
+            return {"published": 0, "unreadable": len(unreadable)}
+
+        enqueued: list[str] = []
+        failed: list[dict[str, Any]] = []
+        for item in due:
+            body = publish_payload(item)
+            try:
+                if app.state.arq_pool is not None:
+                    await app.state.arq_pool.enqueue_job(
+                        "run_write_tool_job", "library", body, _queue_name=queue_for("library", "lifecycle")
+                    )
+                else:
+                    url = resolve_step_url("library", get_settings())
+                    if url is None:
+                        raise RuntimeError("no library step url")
+                    await run_step_via_http(
+                        StepRef(name="library", url=url),
+                        execution_id=uuid4(),
+                        payload=body,
+                        timeout_s=120.0,
+                    )
+                enqueued.append(item.content_id)
+            except Exception as exc:
+                # One unpublishable item must not strand the rest of the day's schedule.
+                failed.append({"content_id": item.content_id, "error": f"{type(exc).__name__}: {exc}"[:140]})
+        logger.info(
+            "cron.publisher",
+            due=len(due),
+            published=len(enqueued),
+            failed=len(failed),
+            unreadable=len(unreadable),
+        )
+        return {
+            "published": len(enqueued),
+            "content_ids": enqueued,
+            "failed": failed,
+            "unreadable": len(unreadable),
+        }
+
+    @app.post("/cron/publish-scheduled")
+    async def cron_publish_scheduled(request: Request) -> dict[str, Any]:
+        """Publish due scheduled content. Auth: ``X-Cron-Secret``. Also on the internal timer."""
+        _require_cron_secret(request)
+        return await _publisher_tick()
+
     @app.get("/admin/scheduler", dependencies=[Depends(require_admin_token)])
     async def admin_scheduler() -> dict[str, Any]:
         """Is the engine's internal clock running, and did its last tick work? (E1)
@@ -743,6 +807,11 @@ def build_app() -> FastAPI:
             name="newsletter-cadence",
             interval_s=settings_for_jobs.cadence_poll_seconds,
             run=_cadence_tick,
+        ),
+        CronJob(
+            name="publish-scheduled",
+            interval_s=settings_for_jobs.publisher_poll_seconds,
+            run=_publisher_tick,
         ),
     ]
 
