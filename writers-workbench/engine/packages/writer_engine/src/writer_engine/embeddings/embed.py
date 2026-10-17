@@ -7,6 +7,7 @@ services that flip the flag on.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from writer_engine import outline_keys
@@ -397,3 +398,129 @@ async def index_project_canon(*, user_id: str, project_id: str) -> int:
     await client.table(EMBEDDINGS_TABLE).insert(payload).execute()
     logger.info("embeddings.indexed", project_id=str(project_id), chunks=len(payload))
     return len(payload)
+
+
+# --- J3: the written prose, not just the plan --------------------------------------------------
+#
+# `build_canon_chunks` indexes the outline and the bible, so retrieval returns what a chapter was
+# SUPPOSED to contain and never what it said. Measured on The Burial Mound: chapter 50 was written
+# knowing chapter 49's one-line brief, not its prose. Cross-chapter continuity rested entirely on
+# the outline plus `bridge_from_prior`, which held for 96 chapters of an unusually detailed outline
+# and would not hold for a thin one. This is the substance of I3.
+#
+# Three decisions:
+#
+# * **One chunk per SCENE, not per chapter.** A 7k-word chapter embedded as a single vector averages
+#   everything in it and retrieves nothing specific. Scenes are ~1.4k words and the `---` separators
+#   now exist (A13). Chapters written before A13 have none, so those fall back to word windows.
+# * **Indexed incrementally, after a chapter persists.** `index_project_canon` runs on every outline
+#   save; re-embedding a whole novel each time would be wasteful and slow. A chapter's prose is
+#   re-indexed only when that chapter is written.
+# * **Scoped deletes.** The prose refresh deletes only `ch_<n>_s*` for the one chapter, so it cannot
+#   touch the outline canon or another chapter's scenes.
+
+PROSE_DOC_TYPE = "chapter_prose"
+
+# Fallback window for pre-A13 chapters with no scene separators. 400 words is small enough that an
+# embedding still means something and large enough to carry a scene's worth of context.
+PROSE_WINDOW_WORDS = 400
+
+_SCENE_SPLIT_RE = re.compile(r"\n\s*-{3,}\s*\n")
+
+
+def build_prose_chunks(
+    *, chapter_number: int, title: str, text: str, window_words: int = PROSE_WINDOW_WORDS
+) -> list[CanonChunk]:
+    """Scene-level chunks for one written chapter."""
+    body = (text or "").strip()
+    if not body:
+        return []
+    scenes = [s.strip() for s in _SCENE_SPLIT_RE.split(body) if s.strip()]
+    if len(scenes) <= 1:
+        # Pre-A13 chapter: no separators, so fall back to paragraph-aligned word windows rather
+        # than embedding the whole chapter as one averaged vector.
+        scenes = []
+        current: list[str] = []
+        count = 0
+        for para in re.split(r"\n\s*\n", body):
+            words = len(para.split())
+            if current and count + words > window_words:
+                scenes.append("\n\n".join(current))
+                current, count = [], 0
+            current.append(para.strip())
+            count += words
+        if current:
+            scenes.append("\n\n".join(current))
+
+    label = str(title or "").strip()
+    out: list[CanonChunk] = []
+    for i, scene in enumerate(scenes, 1):
+        head = f"Ch {chapter_number}" + (f" — {label}" if label else "")
+        chunk = _chunk(
+            PROSE_DOC_TYPE,
+            f"ch_{chapter_number}_s{i}",
+            f"{head} (scene {i})",
+            f"From chapter {chapter_number}" + (f', "{label}"' if label else "") + f", scene {i}:\n{scene}",
+        )
+        if chunk:
+            out.append(chunk)
+    return out
+
+
+async def index_chapter_prose(
+    *, user_id: str, project_id: str, chapter_number: int, title: str, text: str
+) -> int:
+    """Index one written chapter's prose as retrievable canon. Returns the chunk count.
+
+    Best-effort and never raises: a chapter that is written and persisted must not fail because its
+    vectors could not be built.
+    """
+    if not embeddings_enabled():
+        return 0
+    chunks = build_prose_chunks(chapter_number=chapter_number, title=title, text=text)
+    if not chunks:
+        return 0
+    try:
+        vectors = await embed_texts([c["content"] for c in chunks])
+        if len(vectors) != len(chunks):
+            logger.warning("embeddings.prose_vector_count_mismatch", chunks=len(chunks), vectors=len(vectors))
+            return 0
+
+        from writer_engine.supabase.client import get_supabase_admin
+
+        client = await get_supabase_admin()
+        # Scoped to this chapter's scenes only — never the outline canon, never another chapter.
+        await (
+            client.table(EMBEDDINGS_TABLE)
+            .delete()
+            .eq("user_id", user_id)
+            .eq("project_id", str(project_id))
+            .eq("doc_type", PROSE_DOC_TYPE)
+            .like("doc_id", f"ch_{chapter_number}_s%")
+            .execute()
+        )
+        rows = [
+            {
+                "user_id": user_id,
+                "project_id": str(project_id),
+                "doc_type": c["doc_type"],
+                "doc_id": c["doc_id"],
+                "doc_title": c["doc_title"],
+                "content": c["content"],
+                "embedding": vec,
+            }
+            for c, vec in zip(chunks, vectors, strict=False)
+        ]
+        await client.table(EMBEDDINGS_TABLE).insert(rows).execute()
+        logger.info(
+            "embeddings.prose_indexed", project_id=str(project_id), chapter=chapter_number, scenes=len(rows)
+        )
+        return len(rows)
+    except Exception as exc:
+        logger.warning(
+            "embeddings.prose_index_failed",
+            project_id=str(project_id),
+            chapter=chapter_number,
+            error=f"{type(exc).__name__}: {str(exc)[:160]}",
+        )
+        return 0

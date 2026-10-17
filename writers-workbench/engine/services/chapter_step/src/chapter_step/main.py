@@ -1584,6 +1584,24 @@ async def _persist_chapter_if_requested(
     except Exception as exc:
         logger.exception("chapter.persist.failed", chapter=chapter_number, project=str(project_id))
         return {"persisted": False, "error": str(exc)[:200]}
+    # J3: index this chapter's PROSE as retrievable canon, so the NEXT chapter can be grounded in
+    # what was actually written rather than only in the outline's one-line brief. Scene-level, and
+    # scoped to this chapter — see writer_engine.embeddings.index_chapter_prose. Best-effort: a
+    # chapter that is written and persisted must never fail because its vectors did not build.
+    prose_indexed = 0
+    try:
+        from writer_engine.embeddings import index_chapter_prose
+
+        prose_indexed = await index_chapter_prose(
+            user_id=str(user_id),
+            project_id=str(project_id),
+            chapter_number=chapter_number,
+            title=chapter_title,
+            text=clean_text,
+        )
+    except Exception as exc:
+        logger.warning("chapter.prose_index_failed", chapter=chapter_number, error=str(exc)[:160])
+
     # Bible extraction/persist is a SEPARATE best-effort step — a failure here must NOT mask the
     # chapter persist that already succeeded above.
     bible_info: dict = {"bible_entries": 0}
@@ -1670,7 +1688,7 @@ async def _persist_chapter_if_requested(
         bible_written=bible_info["bible_entries"],
         research=bool(research_used),
     )
-    return {"persisted": True, "content_id": content_id, **bible_info}
+    return {"persisted": True, "content_id": content_id, "prose_chunks": prose_indexed, **bible_info}
 
 
 _DIM_TO_SEEDS = {
