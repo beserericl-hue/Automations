@@ -12,6 +12,7 @@ exception on the failure path and becoming a second outage.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import pytest
@@ -19,6 +20,16 @@ import pytest
 from writer_engine import alerting
 from writer_engine.alerting import LEVEL_CRITICAL, LEVEL_WARNING, Alert, clear_alert, send_alert
 from writer_engine.config import get_settings
+
+
+@pytest.fixture(autouse=True)
+def _clear_local_debounce() -> Any:
+    """The per-process debounce is module state; without this, test order decides outcomes."""
+    from writer_engine import alerting as alerting_mod
+
+    alerting_mod._local_last_sent.clear()
+    yield
+    alerting_mod._local_last_sent.clear()
 
 
 @pytest.fixture
@@ -154,7 +165,11 @@ async def test_it_still_alerts_when_redis_is_the_thing_that_is_down(
     """The debounce lives in Redis, and Redis is the most likely subject of an alert.
 
     Failing open here means a possible duplicate email. Failing closed means the one outage we have
-    actually had goes unreported again.
+    actually had goes unreported again — so the FIRST report must get through.
+
+    This test originally asserted that BOTH consecutive sends went out, on the reasoning that no
+    debounce was available. That reasoning was wrong in production: the watchdog ticks every 60s, so
+    "no debounce" meant an email a minute for the whole outage. Fails open, bounded locally.
     """
 
     async def _no_redis() -> Any:
@@ -162,8 +177,8 @@ async def test_it_still_alerts_when_redis_is_the_thing_that_is_down(
 
     monkeypatch.setattr("writer_engine.redis_client.client.get_redis", _no_redis)
     assert await send_alert(_alert(), repeat_after_s=600) is True
-    assert await send_alert(_alert(), repeat_after_s=600) is True  # no debounce available
-    assert len(sent) == 2
+    assert await send_alert(_alert(), repeat_after_s=600) is False  # bounded by the local window
+    assert len(sent) == 1
 
 
 @pytest.mark.asyncio
@@ -226,3 +241,59 @@ def test_the_alert_level_constants_are_what_the_subject_uses() -> None:
     """A typo'd level would still render, just uselessly ("[LEVEL_CRITICAL] ...")."""
     assert alerting.LEVEL_CRITICAL == "critical"
     assert alerting.LEVEL_WARNING == "warning"
+
+
+# --- the flood (2026-10-17) --------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_a_redis_outage_does_not_email_every_tick(
+    sent: list[dict[str, Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The failure this was written for.
+
+    DEV's old Redis was retired out from under the engine. The watchdog correctly noticed, and
+    because the debounce lives in Redis the fail-open path had no window at all — so it emailed once
+    per tick, per instance, for as long as the outage lasted. Failing open is still right; it just
+    has to be bounded by a process-local window.
+    """
+
+    async def _no_redis() -> Any:
+        raise ConnectionError("Name or service not known")
+
+    monkeypatch.setattr("writer_engine.redis_client.client.get_redis", _no_redis)
+    for _ in range(10):  # ten watchdog ticks during one outage
+        await send_alert(_alert(key="redis-down"), repeat_after_s=600)
+    assert len(sent) == 1
+
+
+@pytest.mark.asyncio
+async def test_the_local_window_still_expires(
+    sent: list[dict[str, Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bounded is not silent: a continuing outage is still worth repeating eventually."""
+
+    async def _no_redis() -> Any:
+        raise ConnectionError("down")
+
+    monkeypatch.setattr("writer_engine.redis_client.client.get_redis", _no_redis)
+    await send_alert(_alert(key="redis-down"), repeat_after_s=0.01)
+    await asyncio.sleep(0.02)
+    await send_alert(_alert(key="redis-down"), repeat_after_s=0.01)
+    assert len(sent) == 2
+
+
+@pytest.mark.asyncio
+async def test_clear_alert_clears_the_local_window_too(
+    sent: list[dict[str, Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Recovery clears the condition; a relapse must not be suppressed by a stale local window."""
+
+    async def _no_redis() -> Any:
+        raise ConnectionError("down")
+
+    monkeypatch.setattr("writer_engine.redis_client.client.get_redis", _no_redis)
+    await send_alert(_alert(key="redis-down"), repeat_after_s=600)
+    await clear_alert("redis-down")
+    await send_alert(_alert(key="redis-down"), repeat_after_s=600)
+    assert len(sent) == 2

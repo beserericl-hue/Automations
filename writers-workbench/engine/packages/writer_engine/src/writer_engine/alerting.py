@@ -12,8 +12,11 @@ Scope, deliberately narrow:
   Redis is down is a monitor people filter into a folder.
 * It alerts on **recovery** too, so an inbox tells the whole story without anyone logging in.
 * The debounce state lives in Redis so N engine instances send ONE email, not N. When Redis is the
-  thing that is down, the debounce degrades to per-process and the recipient may get one mail per
-  instance — the right failure direction for the one outage that matters most.
+  thing that is down the debounce degrades to a PER-PROCESS window: the recipient may get one mail
+  per instance per window, which is the right failure direction for the one outage that matters
+  most, and is bounded. An earlier version failed open with no window at all, and on 2026-10-17 —
+  when DEV's old Redis was retired out from under the engine — that meant one email per watchdog
+  tick for as long as the outage lasted.
 
 What this CANNOT catch is the engine being entirely dead, because the watchdog is inside it. That
 needs an external uptime check against ``/admin/health``; see docs. This covers the failure mode we
@@ -35,6 +38,13 @@ logger = get_logger("alerting")
 
 # One Redis key per alert key, holding the last-sent timestamp.
 _PREFIX = "engine:alert:last-sent"
+
+# Process-local backstop for when Redis cannot answer. Shared debounce lives in Redis so N instances
+# send one email; but Redis is the single most likely SUBJECT of an alert, and with only the
+# fail-open path a Redis outage produced one email per watchdog tick, per instance, indefinitely —
+# observed on 2026-10-17 when DEV's old Redis was retired and the engine could not resolve it. The
+# fail-open behaviour is still right (a duplicate beats a silent outage); it just has to be bounded.
+_local_last_sent: dict[str, float] = {}
 
 LEVEL_WARNING = "warning"
 LEVEL_CRITICAL = "critical"
@@ -60,6 +70,16 @@ def _instance() -> str:
         return "unknown"
 
 
+def _local_allows(key: str, repeat_after_s: float) -> bool:
+    """Per-process debounce. Claims the window as a side effect when it allows a send."""
+    now = time.time()
+    last = _local_last_sent.get(key)
+    if last is not None and now - last < repeat_after_s:
+        return False
+    _local_last_sent[key] = now
+    return True
+
+
 async def _should_send(key: str, repeat_after_s: float) -> bool:
     """True when this condition has not been reported within ``repeat_after_s``.
 
@@ -73,12 +93,19 @@ async def _should_send(key: str, repeat_after_s: float) -> bool:
         claimed: Any = client.set(
             f"{_PREFIX}:{key}", str(time.time()), ex=max(1, int(repeat_after_s)), nx=True
         )
-        return bool(await claimed)
+        allowed = bool(await claimed)
+        if allowed:
+            # Keep the local clock in step with the shared one, so falling back mid-outage does not
+            # immediately re-send something Redis already claimed.
+            _local_last_sent[key] = time.time()
+        return allowed
     except Exception:
-        # Redis unreachable. That is itself usually WHY we are alerting, so send: a duplicate email
-        # is a nuisance, a suppressed one is the nine-day outage again.
+        # Redis unreachable — which is itself usually WHY we are alerting, so this still fails OPEN:
+        # a duplicate email is a nuisance, a suppressed one is the nine-day outage again. But it
+        # falls back to the PROCESS-LOCAL window rather than to no window at all, because
+        # unbounded fail-open means one email per tick for as long as the outage lasts.
         logger.warning("alerting.debounce_unavailable", key=key)
-        return True
+        return _local_allows(key, repeat_after_s)
 
 
 def _render(alert: Alert) -> tuple[str, str]:
@@ -152,7 +179,12 @@ async def send_alert(alert: Alert, *, repeat_after_s: float | None = None, force
 
 
 async def clear_alert(key: str) -> None:
-    """Forget a condition's debounce, so its next occurrence alerts immediately."""
+    """Forget a condition's debounce, so its next occurrence alerts immediately.
+
+    Clears BOTH stores. Clearing only Redis would leave the process-local window in place, which is
+    exactly the state a recovery-then-relapse hits.
+    """
+    _local_last_sent.pop(key, None)
     try:
         from writer_engine.redis_client.client import get_redis
 

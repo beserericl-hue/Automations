@@ -21,6 +21,9 @@ users is useless on its own: 60s of running is healthy, 60s of waiting for a slo
 problem, and they are the same number end to end. Each job is therefore timed in three parts —
 enqueue, first seen in_progress, complete.
 
+EMAIL. Every job sets ``notify: False``. Without it the engine mails the user per successful job,
+which is how the first 20-user run put 46 "your chapter is ready" messages in a real inbox.
+
 COST. Every op here is a real LLM call against the configured account. The default profile uses the
 cheap interactive ops (a Q/A on a short chapter) precisely so 20 users can be run repeatedly for
 pennies. ``--heavy N`` adds N real chapter writes, which cost real money and can each take tens of
@@ -196,7 +199,15 @@ def _plan(users: int, ops: int, heavy: int, user_id: str) -> list[JobRun]:
 
 
 def _payload(run: JobRun, user_id: str) -> dict[str, Any]:
-    base: dict[str, Any] = {"op": run.op, "user_id": user_id, "chapter_number": 1}
+    # notify=False is NOT optional here. The engine emails the user on every successful write-tool
+    # job (CR-009), so the first 20-user run sent 46 "your chapter is ready" mails to a real inbox.
+    # send_task_completion_email already honours this flag; the harness simply never set it.
+    base: dict[str, Any] = {
+        "op": run.op,
+        "user_id": user_id,
+        "chapter_number": 1,
+        "notify": False,
+    }
     if run.op in {"qa", "scan-drift"}:
         base["chapter_text"] = SAMPLE_CHAPTER
     if run.op == "scan-drift":
