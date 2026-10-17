@@ -177,10 +177,14 @@ def chunk_text(text: str, *, max_words: int = CHUNK_WORDS) -> list[str]:
     return chunks
 
 
-def names_present(text: str, names: Iterable[str]) -> set[str]:
-    """Which of ``names`` appear in ``text``, matched whole-word and case-sensitively."""
+def terms_present(text: str, terms: Iterable[str]) -> set[str]:
+    """Which of ``terms`` appear in ``text``, matched whole-word and case-sensitively.
+
+    Multi-word phrases work: "packed earth" is as much a protected term as "Sokan", and in a
+    researched historical novel it matters more often.
+    """
     found = set()
-    for name in names:
+    for name in terms:
         bare = str(name).strip()
         if bare and re.search(rf"\b{re.escape(bare)}\b", text):
             found.add(bare)
@@ -202,18 +206,22 @@ def judge_rewrite(
 
     Both checks come from measuring the live API on a real 1431-word scene of The Burial Mound:
 
-    * **names_lost.** On a 29-word passage, mode=High replaced the character name "Tayak" with
-      "He". At scene length it did not, but a humanizer that CAN drop a proper noun will eventually
-      do it to a chapter, and a lost name degrades the roster, the drift detector and the bible
-      extractor all at once. Cheap to check, so it is checked.
+    * **terms_lost.** Any protected term present in the input and missing from the rewrite. Names
+      are the obvious case — on a 29-word passage mode=High replaced "Tayak" with "He" — but the
+      measured damage on a real 1431-word scene was to the RESEARCHED VOCABULARY, which both modes
+      destroyed while leaving every name intact: "packed earth" became "flat stone", "maize" became
+      "corn", and "clay jar", "thatch", "sleeping mat", "stars" and "river" simply vanished. The
+      engine spends a research call per chapter to get those words right and scores itself on
+      `period_language_ok`; a pass that replaces them with generic or anachronistic substitutes is
+      undoing the work. So the caller should protect the project's vocabulary, not just its cast.
     * **structure_collapsed.** mode=Medium scored best of all (94) and rewrote 31 paragraphs into
       SEVEN. Paragraphing is craft, not formatting — the Follett seeds ask for scene construction
       and a turn every few pages — so a rewrite that reads as a wall of text is not an improvement
       whatever it scores.
     """
-    lost = names_present(original, protect) - names_present(rewritten, protect)
+    lost = terms_present(original, protect) - terms_present(rewritten, protect)
     if lost:
-        return f"names_lost:{','.join(sorted(lost))}"
+        return f"terms_lost:{','.join(sorted(lost))}"
     before, after = _paragraphs(original), _paragraphs(rewritten)
     if before > 2 and after < before * min_paragraph_ratio:
         return f"structure_collapsed:{before}->{after}"
@@ -402,6 +410,6 @@ __all__ = [
     "enabled",
     "humanize_text",
     "judge_rewrite",
-    "names_present",
     "strip_banned_dashes",
+    "terms_present",
 ]

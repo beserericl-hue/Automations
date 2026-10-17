@@ -376,7 +376,7 @@ async def test_the_metered_charge_is_recorded(key: None, monkeypatch: pytest.Mon
 def test_a_rewrite_that_drops_a_protected_name_is_rejected() -> None:
     original = "Tayak counted three guards along the parapet. He turned back into the pines."
     rewritten = "He counted three men on the parapet. He went back into the pines."
-    assert judge_rewrite(original, rewritten, protect=["Tayak"]).startswith("names_lost:Tayak")
+    assert judge_rewrite(original, rewritten, protect=["Tayak"]).startswith("terms_lost:Tayak")
 
 
 def test_a_rewrite_that_keeps_the_name_passes() -> None:
@@ -410,9 +410,26 @@ def test_short_text_is_not_judged_on_structure() -> None:
     assert judge_rewrite("One.\n\nTwo.", "Just one now.") == ""
 
 
-def test_names_present_matches_whole_words() -> None:
-    assert hz.names_present("Sokan waited.", ["Sokan"]) == {"Sokan"}
-    assert hz.names_present("Sokanish is a word.", ["Sokan"]) == set()
+def test_terms_present_matches_whole_words_and_phrases() -> None:
+    assert hz.terms_present("Sokan waited.", ["Sokan"]) == {"Sokan"}
+    assert hz.terms_present("Sokanish is a word.", ["Sokan"]) == set()
+    # Multi-word vocabulary is the case that actually caught the drift on a real scene.
+    assert hz.terms_present("claws on the packed earth", ["packed earth"]) == {"packed earth"}
+    assert hz.terms_present("paws on the flat stone", ["packed earth"]) == set()
+
+
+def test_researched_vocabulary_is_protectable_not_just_names() -> None:
+    """Measured on a real scene: both modes kept every NAME and destroyed the period vocabulary.
+
+    "packed earth" -> "flat stone", "maize" -> "corn", and "thatch" / "clay jar" / "sleeping mat"
+    simply gone. The engine spends a research call per chapter getting those words right.
+    """
+    original = "She heard its claws on the packed earth. The maize was in. " + ("word " * 60)
+    rewritten = "She heard paws on the flat stone. The corn was in. " + ("word " * 60)
+    assert judge_rewrite(original, rewritten, protect=["Sokan"]) == ""  # names-only misses it
+    verdict = judge_rewrite(original, rewritten, protect=["maize", "packed earth"])
+    assert verdict.startswith("terms_lost:")
+    assert "maize" in verdict and "packed earth" in verdict
 
 
 @pytest.mark.asyncio
@@ -434,11 +451,11 @@ async def test_a_rejected_chunk_keeps_the_original_and_records_why(
 
     assert out.humanized_chunks == 0
     assert out.failed_chunks == [0]
-    assert out.rejected[0].startswith("names_lost:Tayak")
+    assert out.rejected[0].startswith("terms_lost:Tayak")
     assert "Tayak" in out.text  # the original survived
     # Still billed — a rejection is not a refund, and the report must not hide the spend.
     assert out.charged_credits == 100
-    assert out.as_report()["rejected"] == {0: "names_lost:Tayak"}
+    assert out.as_report()["rejected"] == {0: "terms_lost:Tayak"}
 
 
 @pytest.mark.asyncio
