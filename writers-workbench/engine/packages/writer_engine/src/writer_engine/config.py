@@ -59,6 +59,16 @@ class EngineSettings(BaseSettings):
     kieai_api_key: str = Field(default="", alias="KIEAI_API_KEY")
     firecrawl_api_key: str = Field(default="", alias="FIRECRAWL_API_KEY")
 
+    # Humanizer (E6). StealthGPT REST: POST https://www.stealthgpt.ai/api/stealthify with an
+    # `api-token` header, max 3000 words per request. Empty = the humanize pass is OFF, which is the
+    # default everywhere: it is a paid per-word service, and on fiction a strong setting can flatten
+    # literary voice, so it must never run unless someone asked for it.
+    stealthgpt_api_key: str = Field(default="", alias="STEALTHGPT_API_KEY")
+    # super | standard | lite. The API requires the field; `standard` is what the n8n sub defaults to.
+    stealthgpt_model: str = Field(default="standard", alias="STEALTHGPT_MODEL")
+    # High | Medium | Low. How hard it rewrites — the knob that trades detectability for voice.
+    stealthgpt_mode: str = Field(default="High", alias="STEALTHGPT_MODE")
+
     # Delivery
     postal_api_key: str = Field(default="", alias="POSTAL_API_KEY")
     postal_api_url: str = Field(default="", alias="POSTAL_API_URL")

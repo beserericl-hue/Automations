@@ -38,6 +38,9 @@ for _isolated_key in (
     #   WORKBENCH_API_URL /  -> gather/notify reach the live DEV Workbench
     #   INGESTION_SECRET
     "KIEAI_API_KEY",
+    # Same reason as KIEAI: StealthGPT bills per word and returns `wordsSpent`/`remainingCredits`,
+    # so a test that reached it would quietly spend the account's credits.
+    "STEALTHGPT_API_KEY",
     "ELEVENLABS_API_KEY",
     "ELEVENLABS_AGENT_ID",
     "WORKBENCH_API_URL",
