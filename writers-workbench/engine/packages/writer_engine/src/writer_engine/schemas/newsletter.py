@@ -89,6 +89,33 @@ class PickedStories(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _unwrap_self_named_envelope(cls, data: Any) -> Any:
+        """Unwrap a response the model has nested under its own schema name.
+
+        Observed on the first newsletter run driven by the engine's own cadence scheduler
+        (2026-10-17): the picker returned ``{"PickedStories": {"top_selected_stories": [...]}}`` and
+        validation failed with "top_selected_stories: Field required". The whole edition's selection
+        was lost to an extra layer of braces — the model had done the editorial work correctly.
+
+        ``SubjectLineProposal`` already unwraps a ``primary`` envelope for the same reason, and
+        ``ChapterCraftQa`` unwraps a ``scores`` one. This is the third shape of the same problem, so
+        it is handled the same way: accept what the model actually sends.
+        """
+        if not isinstance(data, dict) or "top_selected_stories" in data:
+            return data
+        # A single key whose value is the real object — whatever that key is called.
+        if len(data) == 1:
+            inner = next(iter(data.values()))
+            if isinstance(inner, dict) and "top_selected_stories" in inner:
+                return inner
+        # Or the list itself under a plausible alias, with no envelope.
+        for alias in ("stories", "selected_stories", "top_stories", "picks"):
+            if isinstance(data.get(alias), list):
+                return {**data, "top_selected_stories": data[alias]}
+        return data
+
 
 class SubjectLineProposal(BaseModel):
     """Output of ``subject-svc`` — mirrors n8n ``subject_line_parser``."""
