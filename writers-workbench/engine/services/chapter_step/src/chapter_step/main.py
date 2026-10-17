@@ -898,6 +898,101 @@ def _build_drift_system() -> str:
     )
 
 
+# --- A7: drop the drift findings that are not findings -----------------------------------------
+#
+# Measured across the Burial Mound run (300 telemetry rows, 325 character_drift findings): the
+# detector files three kinds of non-finding, and each one costs real money, because `aligned` is
+# False whenever either list is non-empty and that triggers the QA-cycle-2 streamed revision of the
+# whole chapter — the same pass the vault flagged as a scene-break risk.
+#
+#   1. SELF-CANCELLING. The model puts an item in the list and then says there is no problem:
+#      "Roster notes Marcus 'drinks too much coffee'; the chapter is consistent with this, no issue
+#      — flagging only to confirm no drift here." / "No character has been renamed, regendered, or
+#      given a contradictory trait." It is using the array as a notes field.
+#   2. DICT-SHAPED. The schema says list[str], and the model sometimes returns
+#      {'character': 'Waya', 'inconsistency': '…'}, which reaches the UI and the bible as a Python
+#      dict repr.
+#   3. Empty / whitespace entries.
+#
+# Deliberately NOT filtered: anything that reads as a real contradiction. The run contains findings
+# worth keeping — a chapter dating a panel to 1963 "when she was nineteen" against a roster age of
+# 82 in 2024, and an attorney the outline names Lester Pruitt appearing as Hendricks — and a
+# phrase-based filter must not reach those.
+
+_NON_FINDING_RE = re.compile(
+    r"\b(?:"
+    r"no drift"
+    r"|no issue"
+    r"|not drift"
+    r"|no inconsistenc(?:y|ies)"
+    r"|no character has been"
+    r"|fully consistent"
+    r"|is consistent with this"
+    r"|flagging only to confirm"
+    r"|correctly identifies"
+    r"|consistent with (?:her|his|their|its) roster"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _finding_text(item: Any) -> str:
+    """Normalise one finding to a string, flattening the dict shape the model sometimes returns."""
+    if isinstance(item, dict):
+        who = str(item.get("character") or item.get("name") or "").strip()
+        what = str(
+            item.get("inconsistency") or item.get("detail") or item.get("issue") or item.get("drift") or ""
+        ).strip()
+        if who and what:
+            return f"{who}: {what}"
+        return what or who
+    return str(item or "").strip()
+
+
+def _clean_findings(items: Any) -> list[str]:
+    out: list[str] = []
+    for item in items or []:
+        text = _finding_text(item)
+        if not text:
+            continue
+        if _NON_FINDING_RE.search(text):
+            logger.info("drift.non_finding_dropped", finding=text[:120])
+            continue
+        out.append(text)
+    return out
+
+
+def clean_drift(drift: DriftReport | None) -> DriftReport | None:
+    """Strip non-findings and recompute ``aligned`` from what is actually left.
+
+    Recomputing matters more than the tidying: a chapter whose only "drift" was the model confirming
+    there is no drift would otherwise be rewritten end to end for nothing.
+    """
+    if drift is None:
+        return None
+    story = _clean_findings(drift.story_drift)
+    character = _clean_findings(drift.character_drift)
+    dropped = (len(drift.story_drift) - len(story)) + (len(drift.character_drift) - len(character))
+    aligned = not story and not character
+    if dropped or aligned != drift.aligned:
+        logger.info(
+            "drift.cleaned",
+            dropped=dropped,
+            story=len(story),
+            character=len(character),
+            aligned_before=drift.aligned,
+            aligned_after=aligned,
+        )
+    return drift.model_copy(
+        update={
+            "story_drift": story,
+            "character_drift": character,
+            "research_gaps": _clean_findings(drift.research_gaps),
+            "aligned": aligned,
+        }
+    )
+
+
 async def _detect_drift(
     text: str, *, outline: dict[str, Any], chapter_number: int, roster_text: str, period: str, model: str
 ) -> DriftReport | None:
@@ -925,7 +1020,7 @@ async def _detect_drift(
                 schema=DriftReport,
                 max_tokens=16384,
             )
-            return drift
+            return clean_drift(drift)
         except ProviderNotRegistered:
             return DriftReport()
         except ValueError:

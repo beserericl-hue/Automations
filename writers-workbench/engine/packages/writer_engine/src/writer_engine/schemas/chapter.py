@@ -302,14 +302,22 @@ class DriftReport(BaseModel):
                     if isinstance(x, str):
                         s = x
                     elif isinstance(x, dict):
-                        s = str(
-                            x.get("item")
+                        # The shape the detector actually returns in the field is
+                        # {"character": …, "inconsistency": …} — measured in live chapter_qa_v2
+                        # rows, where it was missing from this list and so fell through to
+                        # `str(x)`, putting a Python dict repr in front of the user and into the
+                        # story bible. Combined as "who: what" rather than dropping either half.
+                        who = str(x.get("character") or x.get("name") or "").strip()
+                        what = str(
+                            x.get("inconsistency")
+                            or x.get("item")
                             or x.get("issue")
                             or x.get("detail")
                             or x.get("problem")
                             or x.get("description")
-                            or x
-                        )
+                            or ""
+                        ).strip()
+                        s = f"{who}: {what}" if who and what else (what or who or str(x))
                     else:
                         s = str(x)
                     if s.strip():
