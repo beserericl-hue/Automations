@@ -220,3 +220,34 @@ class TestSynthesisGuard:
     async def test_nothing_to_synthesize_is_reported(self) -> None:
         report, error = await runner.synthesize("panel", {})
         assert report is None and "no member lens" in error
+
+
+class TestTruncationGuards:
+    """The `guardrails` lens failed on a real chapter with a JSON truncation at 4,096 output tokens.
+
+    Its prompt is 19,347 characters — five times the next largest lens — and it asks for findings
+    across three severity tiers plus watch-items plus a summary. So the default lens, the one that
+    gates publication, could not run on the drafts it most needs to. Third truncation-class failure
+    of the same day (the story outline at 32,768, the ingestion relevance verdict at 1,024), so the
+    remedy is the same: more room AND a bound on the thing that grows.
+    """
+
+    def test_the_contract_caps_the_findings(self) -> None:
+        assert f"at most {runner.MAX_FINDINGS} findings" in runner._OUTPUT_CONTRACT
+        assert runner.MAX_FINDINGS <= 20  # more than an author acts on in one pass
+
+    def test_the_contract_explains_why_brevity_matters(self) -> None:
+        """A bare "be brief" is ignored; naming the consequence is not."""
+        assert "truncated" in runner._OUTPUT_CONTRACT
+
+    def test_the_ceiling_is_above_what_truncated(self) -> None:
+        assert runner.LENS_MAX_TOKENS > 4096
+
+    def test_the_largest_lens_prompt_fits_well_inside_the_input_budget(self) -> None:
+        """The guardrails prompt plus a full-length draft must still be a sane request."""
+        from writer_engine.review import lenses
+
+        largest = max(len(lenses.lens_prompt(n)) for n in lenses.SINGLE_LENSES)
+        assert largest > 15_000, "guardrails is expected to be the big one"
+        # prompt + draft cap, in characters, well under a 200k-token context
+        assert (largest + runner.MAX_DRAFT_CHARS) < 200_000

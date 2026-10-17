@@ -40,12 +40,29 @@ STATUS_PASS = "PASS"
 STATUS_REVIEW = "NEEDS_REVIEW"
 STATUS_ERROR = "ERROR"
 
+MAX_FINDINGS = 12
+"""Cap on the findings one lens may return.
+
+Not an arbitrary tidiness rule. The ``guardrails`` prompt is 19,347 characters — five times the next
+largest lens — and asks for findings across three severity tiers plus watch-items plus a summary.
+At 4,096 output tokens it truncated mid-JSON on a real chapter and the lens reported itself as
+failed, which is a lens that cannot run on the drafts it most needs to. Twelve findings is more than
+any author acts on in one pass."""
+
+LENS_MAX_TOKENS = 8192
+"""Output ceiling per lens. 4,096 truncated ``guardrails``; the third truncation-class failure of the
+day, after the story outline at 32,768 and the ingestion relevance verdict at 1,024. The pattern is
+the same every time, so the remedy is too: give it room AND bound the thing that grows."""
+
 _OUTPUT_CONTRACT = (
     "\n\n---\n\nReturn ONLY this JSON object:\n"
     '{"findings": [{"severity": "high|medium|low", "title": "<=70 chars naming the problem", '
     '"detail": "what is wrong and the specific fix, 1-3 sentences", '
     '"quote": "<=160 chars quoted verbatim from the draft, or empty"}], '
     '"summary": "one sentence on the draft as a whole"}\n'
+    f"Return at most {MAX_FINDINGS} findings, the most important first. Keep each `detail` to three "
+    "sentences and each `quote` short — a long reply gets truncated mid-JSON and the whole review is "
+    "lost.\n"
     "Return an empty findings array when the draft genuinely passes this lens. Do not invent "
     "findings to fill the list, and do not include a finding you cannot point at in the text.\n"
 )
@@ -161,7 +178,7 @@ async def run_lens(
             ),
             prompt=f"{prompt}{_draft_block(draft, title=title, context=context)}{_OUTPUT_CONTRACT}",
             schema=LensReport,
-            max_tokens=4096,
+            max_tokens=LENS_MAX_TOKENS,
             temperature=0.2,
         )
     except Exception as exc:
@@ -227,7 +244,7 @@ async def synthesize(
                 f"REVIEWER OUTPUTS:\n\n{transcript}{_OUTPUT_CONTRACT}"
             ),
             schema=LensReport,
-            max_tokens=4096,
+            max_tokens=LENS_MAX_TOKENS,
             temperature=0.3,
         )
     except Exception as exc:
@@ -302,7 +319,9 @@ async def review_draft(
 
 
 __all__ = [
+    "LENS_MAX_TOKENS",
     "MAX_DRAFT_CHARS",
+    "MAX_FINDINGS",
     "SEVERITIES",
     "STATUS_ERROR",
     "STATUS_PASS",
