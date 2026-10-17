@@ -416,7 +416,7 @@ A13 is the one regression it found so far. Re-run `recorded` once a fresh captur
 |---|---|---|
 | **B4** | ✅ | Two queues (`engine-heavy` 8 slots / `engine-interactive` 24 slots), one arq worker each. Routed by `(tool, op)` — the spread *within* a tool is the problem: `chapter.write` is the longest job and `chapter.qa` one of the shortest. Process table 3 → 4. |
 | **B5** | ✅ | Per-queue `job_timeout` (5400s / 600s) + a capped Redis DLQ at `GET /admin/dlq`. |
-| **B6** | 🟡 | Run ledger (`engine_job_runs`, migration **028**) claims a `run_id` before work and short-circuits a completed run. **Code deployed and fail-open; 028 NOT APPLIED — blocked on the DEV pooler DSN.** |
+| **B6** | ✅ | Run ledger (`engine_job_runs`, migration **028**) claims a `run_id` before work and short-circuits a completed run. **028 APPLIED to DEV 2026-10-17** and verified live: the same `run_id` submitted twice produced one ledger row (`attempts 1`, `status complete`) and an `idempotency.replay` — the step did not run again. |
 | **B8** | ✅ | Per-provider RPM/TPM budgets for gemini / perplexity / openai / firecrawl / kieai, plus 429 retries where there were none. |
 | **B13** | ✅ | Decision: keep Railway Redis, make failure loud. Watchdog + email alerting + HITL gates readable from Postgres. |
 | **C1** | ✅ | `GET /admin/dashboard` — readiness, per-queue depth/running/waiting, recent dead letters. |
@@ -466,9 +466,9 @@ process is killed — the restart policy is what shrinks that window.
 
 #### Still open from Gate 2
 
-* **Migration 028** needs applying to DEV (pooler DSN). Until then B6 logs
-  `idempotency.claim_unavailable` on every job and falls open — observed 100+ times under load, so
-  the fail-open path is itself well tested.
+* ~~Migration 028~~ — **applied 2026-10-17.** The DSN was already on the Workbench service as
+  `DATABASE_URL`; I had been asking for something I could read myself. Verified live: a duplicate
+  `run_id` replays instead of re-running.
 * **An external uptime check** on `/admin/health`. The watchdog lives inside the engine and
   therefore cannot report the engine being entirely dead.
 
