@@ -216,6 +216,38 @@ async def _load_project_anchor(payload: dict) -> tuple[int, str]:
     return target, synopsis
 
 
+OUTLINE_FLOOR_TOKENS = 32_768
+"""What the ceiling used to be, unconditionally. Kept as the floor so a short outline is unaffected."""
+
+OUTLINE_CEILING_TOKENS = 64_000
+"""The model's own output ceiling. Nothing is gained by asking for more than it can emit."""
+
+OUTLINE_TOKENS_PER_CHAPTER = 520
+"""Measured, not guessed. A 96-chapter run with 3-5 sentence beats truncated at exactly 32,768
+output tokens having emitted 119,838 characters of JSON — about 72 chapters — so a chapter of this
+richness costs roughly 450 output tokens. 520 is that plus margin, because beat length is the one
+thing a user's requirements can legitimately inflate."""
+
+OUTLINE_PREAMBLE_TOKENS = 6_000
+"""Title, premise, themes, dramatic question, wow factor and the character list, before any chapter."""
+
+
+def _outline_max_tokens(target_chapters: int) -> int:
+    """Output ceiling for a story outline, scaled to the chapter count.
+
+    This was a hard-coded 32,768 whose own comment said "a 50-70 chapter Follett-scale outline needs
+    >16k tokens" — true, and nobody had asked for 96. A 96-chapter outline truncated mid-JSON after
+    eleven minutes and $0.51, failed `json.loads`, and went to the dead-letter queue: the model had
+    emitted a perfectly good outline and been cut off three quarters of the way through.
+
+    Truncation is the worst failure shape available here, because the cost is already paid when it
+    is detected. So the ceiling is derived from the thing that drives the length.
+    """
+    chapters = max(0, int(target_chapters or 0))
+    want = OUTLINE_PREAMBLE_TOKENS + chapters * OUTLINE_TOKENS_PER_CHAPTER
+    return max(OUTLINE_FLOOR_TOKENS, min(OUTLINE_CEILING_TOKENS, want))
+
+
 async def _op_story(payload: dict) -> dict:
     genre = str(payload.get("genre") or payload.get("genre_slug") or "")
     arc = str(payload.get("story_arc") or payload.get("story_arc_name") or "")
@@ -241,9 +273,9 @@ async def _op_story(payload: dict) -> dict:
             system=_build_story_system(genre, arc, title, target_chapters, locked_synopsis, arc_text),
             prompt=f"{title_line}PROJECT REQUIREMENTS:\n{requirements}\n\nGenerate the full outline.",
             schema=StoryOutline,
-            # A 50-70 chapter Follett-scale outline needs >16k tokens; STREAM it so it neither
-            # truncates mid-JSON nor trips the non-streaming 10-min guard.
-            max_tokens=32768,
+            # Scaled to the chapter count, and STREAMED so a long generation neither truncates
+            # mid-JSON nor trips the non-streaming 10-min guard. See `_outline_max_tokens`.
+            max_tokens=_outline_max_tokens(target_chapters),
             stream=True,
         )
     except ProviderNotRegistered:
