@@ -226,3 +226,28 @@ async def test_unparseable_entries_are_skipped_not_fatal(fake_redis: Any) -> Non
     await fake_redis.lpush(DLQ_KEY, "not json")
     entries = await read_dead_letters()
     assert [e["error"] for e in entries] == ["real"]
+
+
+def test_every_classified_op_can_actually_be_dialled() -> None:
+    """A queued job has to reach a step.
+
+    Found in production: E1's scheduler enqueued ``run_write_tool_job("ingestion", …)`` and the
+    worker answered ``UNKNOWN_TOOL: ingestion``, because ``resolve_step_url`` consulted
+    ``WRITE_TOOL_URLS`` (what the HUB may route to) rather than ``ALL_STEP_URLS`` (what the WORKER
+    can dial). The job then "completed" carrying an error payload, so nothing crashed and nothing
+    alerted — the only symptom was that ``content_ingestion_v2`` stayed empty.
+
+    Classifying an op in ``queues.py`` is a promise that the engine will run it, so that promise is
+    checked here rather than discovered by a silent no-op on a timer.
+    """
+    from orchestrator.write_tools import resolve_step_url
+    from writer_engine.config import get_settings
+
+    settings = get_settings()
+    tools = {tool for tool, _op in (queues.HEAVY_OPS | queues.INTERACTIVE_OPS)}
+    unreachable = sorted(t for t in tools if resolve_step_url(t, settings) is None)
+    assert not unreachable, (
+        f"these tools are classified in queues.py but the worker cannot dial them, so every job "
+        f"for them returns UNKNOWN_TOOL and 'completes' with an error payload: {unreachable}. "
+        f"Add the step to write_tools.ALL_STEP_URLS."
+    )

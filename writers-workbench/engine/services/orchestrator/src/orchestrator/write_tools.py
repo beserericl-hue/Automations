@@ -59,7 +59,18 @@ WORKER_STEP_TIMEOUT_S = 5460.0
 
 
 def resolve_step_url(tool: str, settings: Any) -> str | None:
-    getter = WRITE_TOOL_URLS.get(tool)
+    """Where to POST a job for ``tool``. ``None`` when nothing serves that name.
+
+    Resolves over ``ALL_STEP_URLS``, not ``WRITE_TOOL_URLS``. The two dicts answer different
+    questions: ``WRITE_TOOL_URLS`` is what the **hub** may route a user's message to, while this is
+    what the **worker** can dial — and the worker runs jobs for steps the hub never picks.
+
+    Found in production: E1's scheduler enqueues ``run_write_tool_job("ingestion", …)``, and because
+    ingestion is not a hub-routable write tool the worker answered ``UNKNOWN_TOOL: ingestion`` and
+    the job "completed" with an error payload. Nothing crashed, so the only symptom was that the
+    corpus stayed empty. ``tests/test_queues.py`` now asserts every classified op resolves a URL.
+    """
+    getter = ALL_STEP_URLS.get(tool)
     return getter(settings) if getter else None
 
 
