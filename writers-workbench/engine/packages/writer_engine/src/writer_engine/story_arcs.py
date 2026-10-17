@@ -10,6 +10,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from writer_engine.telemetry.logging import get_logger
+
+logger = get_logger("story_arcs")
+
 
 async def load_story_arc(client: Any, name: str | None) -> tuple[str, str]:
     """Resolve an arc name to ``(canonical_name, prompt_text)`` via a case-insensitive match on
@@ -29,8 +33,10 @@ async def load_story_arc(client: Any, name: str | None) -> tuple[str, str]:
         if rows:
             r = rows[0]
             return (r.get("name") or term, str(r.get("prompt_text") or r.get("description") or ""))
-    except Exception:
-        pass
+    except Exception as exc:
+        # C4: was `pass`. Falling back to the raw term is correct, but silently doing so hides a
+        # misconfigured table from anyone wondering why the arc prompt is empty.
+        logger.warning("story_arcs.lookup_failed", term=term, error=f"{type(exc).__name__}: {str(exc)[:120]}")
     return (term, "")
 
 
@@ -49,7 +55,8 @@ async def list_story_arcs(client: Any, user_id: str | None = None) -> list[dict]
             .execute()
         )
         rows = getattr(resp, "data", None) or []
-    except Exception:
+    except Exception as exc:
+        logger.warning("story_arcs.list_failed", error=f"{type(exc).__name__}: {str(exc)[:120]}")
         return []
     out: list[dict] = []
     for r in rows:

@@ -80,3 +80,18 @@ def test_a_dash_adjacent_to_a_separator_is_still_cleaned() -> None:
     assert _EM not in out
     assert "--" not in out.replace("---", "")
     assert out.count("---") == 1
+
+
+def test_a_break_the_writer_adds_inside_a_sub_chapter_is_kept() -> None:
+    """Verified live on 2026-10-17: a real 5-sub-chapter write produced 5 breaks, not 4.
+
+    The join contributes N-1; the sixth segment was the writer splitting one sub-chapter into two
+    scenes of 501 and 1062 words, which is exactly what follett_seeds.scene.bme_check asks for. So
+    the live criterion is "at least N-1 breaks and no artifact", not "exactly N-1" — the structural
+    floor is the guarantee, and additional scene construction on top of it is the point.
+    """
+    joined = SCENE_BREAK.join(["one", "two", "three"])
+    with_extra = joined.replace("two", "two part one" + SCENE_BREAK + "two part two")
+    out = _strip_em_dashes(with_extra)
+    assert out.count("---") == 3  # 2 from the join, 1 from the writer
+    assert ", -" not in out

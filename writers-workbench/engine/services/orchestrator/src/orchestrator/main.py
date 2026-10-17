@@ -17,6 +17,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi import status as http_status
 
 from writer_engine.auth import require_admin_token, require_service_secret
+from writer_engine.cadence import INTERVAL_DAYS, is_due
 from writer_engine.config import get_settings
 from writer_engine.health import (
     probe_arq_worker,
@@ -552,10 +553,13 @@ def build_app() -> FastAPI:
 
         # "Due" is derived from cadence + the last send, mirroring the WW computeDueEditions path
         # (server/src/routes/newsletter-edition-extras.ts). newsletter_editions_v2 has no
-        # next_scheduled_send_at/send_time/timezone columns — the only cadence columns are
-        # `cadence` and `cadence_send_time`. Compute the interval here instead of an absent column.
-        interval_days = {"daily": 1, "weekly": 7, "biweekly": 14, "monthly": 30}
+        # next_scheduled_send_at/timezone columns — the only cadence columns are `cadence` and
+        # `cadence_send_time`. A11: the decision now lives in writer_engine.cadence, which anchors
+        # the due moment to the SEND TIME rather than adding seconds to the last send. The old
+        # arithmetic ignored cadence_send_time completely, so a 09:00 weekly edition drifted later
+        # every week and could go out at 00:05.
         now = datetime.now(UTC)
+        zone = get_settings().newsletter_timezone
         resp = await (
             client.table("newsletter_editions_v2")
             .select("id,user_id,cadence,cadence_send_time,created_at")
@@ -567,8 +571,7 @@ def build_app() -> FastAPI:
 
         due_editions: list[dict[str, Any]] = []
         for ed in editions:
-            days = interval_days.get(str(ed.get("cadence") or ""))
-            if not days:
+            if str(ed.get("cadence") or "").strip().lower() not in INTERVAL_DAYS:
                 continue
             last = await (
                 client.table("newsletter_sends_v2")
@@ -581,13 +584,17 @@ def build_app() -> FastAPI:
             )
             last_rows = list(getattr(last, "data", None) or [])
             baseline_iso = last_rows[0]["created_at"] if last_rows else ed.get("created_at")
-            try:
-                baseline = datetime.fromisoformat(str(baseline_iso).replace("Z", "+00:00"))
-            except (ValueError, TypeError):
+            due, reason = is_due(
+                cadence=str(ed.get("cadence") or ""),
+                baseline=baseline_iso,
+                send_time=ed.get("cadence_send_time"),
+                timezone=zone,
+                now=now,
+            )
+            if due:
                 due_editions.append(ed)
-                continue
-            if (now - baseline).total_seconds() / 86400.0 >= days:
-                due_editions.append(ed)
+            else:
+                logger.info("cron.cadence.not_due", edition=str(ed.get("id")), reason=reason)
 
         enqueued: list[str] = []
         skipped: list[dict[str, Any]] = []

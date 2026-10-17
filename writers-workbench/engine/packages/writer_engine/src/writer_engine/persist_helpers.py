@@ -14,6 +14,10 @@ import contextlib
 from typing import Any
 from uuid import uuid4
 
+from writer_engine.telemetry.logging import get_logger
+
+logger = get_logger("persist_helpers")
+
 
 async def _rows(resp: Any) -> list[dict]:
     return list(getattr(resp, "data", None) or [])
@@ -172,8 +176,14 @@ async def persist_canon(client: Any, *, project_id: str, user_id: str, outline: 
             await client.table("story_bible_v2").update(row).eq("id", rows[0]["id"]).execute()
         else:
             await client.table("story_bible_v2").insert(row).execute()
-    except Exception:
-        pass
+    except Exception as exc:
+        # C4: was `pass`. The Series Bible entry is the project's synopsis + target chapter count,
+        # so losing it silently means a later chapter is written without the canon it should have.
+        logger.warning(
+            "persist.canon_failed",
+            project_id=str(project_id),
+            error=f"{type(exc).__name__}: {str(exc)[:160]}",
+        )
 
 
 async def persist_chapter(
@@ -288,6 +298,7 @@ async def persist_bible(
     cast rather than accreting possessives/fragments that poison the writer's roster.
     """
     count = 0
+    failures: list[str] = []
     for e in entries:
         name = e.get("name")
         if not name:
@@ -319,8 +330,19 @@ async def persist_bible(
             else:
                 await client.table("story_bible_v2").insert(row).execute()
             count += 1
-        except Exception:
+        except Exception as exc:
+            # C4: was a bare `continue`, so 0 persisted entries looked the same as 50 failures.
+            # Counted and summarised once rather than logged per row — a chapter can emit dozens.
+            failures.append(f"{name}: {type(exc).__name__}")
             continue
+    if failures:
+        logger.warning(
+            "persist.bible_entries_failed",
+            project_id=str(project_id),
+            failed=len(failures),
+            persisted=count,
+            sample=failures[:3],
+        )
     return count
 
 

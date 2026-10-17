@@ -208,6 +208,11 @@ class EngineSettings(BaseSettings):
     # outage is reported within about a minute rather than when someone next uses the product.
     watchdog_interval_seconds: float = Field(default=60.0, alias="WATCHDOG_INTERVAL_SECONDS")
 
+    # A11: the zone `newsletter_editions_v2.cadence_send_time` is interpreted in. The table has no
+    # per-edition timezone column, so this is one global interpretation — set it to the operator's
+    # own zone or a stored "09:00" means 09:00 UTC, which is 05:00 in New York.
+    newsletter_timezone: str = Field(default="UTC", alias="NEWSLETTER_TIMEZONE")
+
     # Observability
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     metrics_port: int = Field(default=9090, alias="METRICS_PORT")

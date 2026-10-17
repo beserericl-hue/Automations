@@ -9,6 +9,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from threading import RLock
 
+from writer_engine.telemetry.logging import get_logger
+
+logger = get_logger("prompt_store")
+
 
 class PromptStore:
     def __init__(self, defaults: Mapping[str, str] | None = None) -> None:
@@ -42,12 +46,18 @@ class PromptStore:
         """Pull overrides from Supabase ``app_config`` keyed ``prompts.*`` and return the count loaded."""
         try:
             from writer_engine.supabase.client import get_supabase_admin
-        except Exception:
+        except Exception as exc:  # pragma: no cover - import failure is environmental
+            logger.warning("prompt_store.reload_unavailable", error=f"{type(exc).__name__}: {exc}"[:160])
             return 0
         try:
             client = await get_supabase_admin()
             resp = await client.table("app_config_v2").select("key,value").like("key", "prompts.%").execute()
-        except Exception:
+        except Exception as exc:
+            # C4: this used to return 0 silently, so `/admin/reload-prompts` answered "loaded: 0"
+            # with no reason and the engine went on serving the previous prompts. A reload that
+            # cannot reach Supabase is indistinguishable from one that found no overrides unless
+            # it says so.
+            logger.warning("prompt_store.reload_failed", error=f"{type(exc).__name__}: {str(exc)[:160]}")
             return 0
         rows = getattr(resp, "data", None) or []
         with self._lock:
