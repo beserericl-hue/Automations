@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 import os
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from typing import Any
 
 import pytest
@@ -86,8 +86,12 @@ class FakeQuery:
         self.db = db
         self.table_name = table
         self.filters: list[tuple[str, Any]] = []
+        # E1's ingestion store filters with in_/is_/neq as well as eq, and a predicate list is the
+        # only way to express those without rewriting `filters` (which other tests read).
+        self.predicates: list[Callable[[dict[str, Any]], bool]] = []
         self._op = ""
         self._payload: Any = None
+        self._conflict: str = ""
         self._order: tuple[str, bool] | None = None
         self._limit: int | None = None
 
@@ -106,11 +110,39 @@ class FakeQuery:
         self._payload = payload
         return self
 
+    def upsert(self, payload: Any, on_conflict: str = "") -> FakeQuery:
+        self._op = "upsert"
+        self._payload = payload
+        self._conflict = on_conflict
+        return self
+
     def eq(self, col: str, val: Any) -> FakeQuery:
         self.filters.append((col, val))
         return self
 
-    def order(self, col: str, desc: bool = False) -> FakeQuery:
+    def neq(self, col: str, val: Any) -> FakeQuery:
+        self.predicates.append(lambda r, c=col, v=val: r.get(c) != v)
+        return self
+
+    def in_(self, col: str, values: Any) -> FakeQuery:
+        wanted = set(values or [])
+        self.predicates.append(lambda r, c=col, w=wanted: r.get(c) in w)
+        return self
+
+    def is_(self, col: str, val: Any) -> FakeQuery:
+        # PostgREST spells IS NULL as `.is_(col, "null")`.
+        if str(val).lower() == "null":
+            self.predicates.append(lambda r, c=col: r.get(c) is None)
+        else:
+            self.filters.append((col, val))
+        return self
+
+    def like(self, col: str, pattern: str) -> FakeQuery:
+        prefix = str(pattern).rstrip("%")
+        self.predicates.append(lambda r, c=col, p=prefix: str(r.get(c) or "").startswith(p))
+        return self
+
+    def order(self, col: str, desc: bool = False, nullsfirst: bool = False) -> FakeQuery:
         self._order = (col, desc)
         return self
 
@@ -121,7 +153,11 @@ class FakeQuery:
     # -- execution
     def _matching(self) -> list[dict[str, Any]]:
         rows = self.db.tables.setdefault(self.table_name, [])
-        return [r for r in rows if all(r.get(c) == v for c, v in self.filters)]
+        return [
+            r
+            for r in rows
+            if all(r.get(c) == v for c, v in self.filters) and all(p(r) for p in self.predicates)
+        ]
 
     async def execute(self) -> FakeResp:
         rows = self.db.tables.setdefault(self.table_name, [])
@@ -154,7 +190,55 @@ class FakeQuery:
             for r in touched:
                 r.update(self._payload)
             return FakeResp([copy.deepcopy(r) for r in touched])
+        if self._op == "upsert":
+            items = self._payload if isinstance(self._payload, list) else [self._payload]
+            key = self._conflict or self.db.primary_keys.get(self.table_name) or "id"
+            made = []
+            for item in items:
+                existing = next((r for r in rows if r.get(key) == item.get(key)), None)
+                if existing is not None:
+                    existing.update(item)
+                    made.append(copy.deepcopy(existing))
+                else:
+                    rows.append({**item})
+                    made.append(copy.deepcopy(rows[-1]))
+            return FakeResp(made)
         raise AssertionError(f"unsupported op {self._op!r}")
+
+
+class FakeBucket:
+    """Enough of ``client.storage.from_(bucket)`` to assert what landed where (E1).
+
+    The ingestion store writes two blobs then a row and deletes the blobs if the row fails, so a
+    test needs to see the bucket's contents — not just that upload was called.
+    """
+
+    def __init__(self, db: FakeSupabase, bucket: str) -> None:
+        self.db = db
+        self.bucket = bucket
+
+    async def upload(self, path: str, content: bytes, file_options: dict[str, str] | None = None) -> Any:
+        if path in self.db.fail_uploads:
+            raise RuntimeError(f"storage upload failed: {path}")
+        self.db.objects[(self.bucket, path)] = (content, dict(file_options or {}))
+        return {"path": path}
+
+    async def remove(self, paths: list[str]) -> Any:
+        for path in paths:
+            self.db.objects.pop((self.bucket, path), None)
+        return [{"name": p} for p in paths]
+
+    async def download(self, path: str) -> bytes | None:
+        found = self.db.objects.get((self.bucket, path))
+        return found[0] if found else None
+
+
+class FakeStorage:
+    def __init__(self, db: FakeSupabase) -> None:
+        self.db = db
+
+    def from_(self, bucket: str) -> FakeBucket:
+        return FakeBucket(self.db, bucket)
 
 
 class FakeSupabase:
@@ -162,12 +246,19 @@ class FakeSupabase:
         self.tables: dict[str, list[dict[str, Any]]] = {}
         # Only the ledger has a real primary key that must conflict.
         self.primary_keys: dict[str, str] = {LEDGER_TABLE: "run_id"}
+        # (bucket, path) -> (bytes, file_options)
+        self.objects: dict[tuple[str, str], tuple[bytes, dict[str, str]]] = {}
+        self.fail_uploads: set[str] = set()
+        self.storage = FakeStorage(self)
 
     def table(self, name: str) -> FakeQuery:
         return FakeQuery(self, name)
 
     def count(self, name: str) -> int:
         return len(self.tables.get(name, []))
+
+    def paths(self, bucket: str) -> set[str]:
+        return {p for b, p in self.objects if b == bucket}
 
 
 @pytest.fixture

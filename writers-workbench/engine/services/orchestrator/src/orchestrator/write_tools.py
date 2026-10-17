@@ -34,6 +34,8 @@ NEWSLETTER_STEP_URLS: dict[str, Callable[[Any], str]] = {
     "render": lambda s: s.render_step_url,
     "persist": lambda s: s.persist_step_url,
     "deliver": lambda s: s.deliver_step_url,
+    # E1: not hub-routable either — the scheduler and /cron/ingestion dial it.
+    "ingestion": lambda s: s.ingestion_step_url,
 }
 
 # Every step service the orchestrator can dial — the set /admin/health probes (B2). Keep in sync when

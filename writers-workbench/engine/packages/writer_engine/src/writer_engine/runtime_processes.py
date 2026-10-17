@@ -61,6 +61,8 @@ STEP_NAMES: tuple[str, ...] = (
     "story_bible",
     "approval",
     "notify",
+    # Content ingestion (E1) — the feed poller that fills content_ingestion_v2.
+    "ingestion",
 )
 
 # All steps share one port now; they are told apart by mount path.

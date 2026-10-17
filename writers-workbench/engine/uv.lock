@@ -17,6 +17,7 @@ members = [
     "gateway",
     "gather-step",
     "image-step",
+    "ingestion-step",
     "library-retrieve-step",
     "library-step",
     "media-step",
@@ -1133,6 +1134,23 @@ wheels = [
 name = "image-step"
 version = "0.1.0"
 source = { editable = "services/image_step" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "uvicorn", extra = ["standard"] },
+    { name = "writer-engine" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.115.0" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.30.0" },
+    { name = "writer-engine", editable = "packages/writer_engine" },
+]
+
+[[package]]
+name = "ingestion-step"
+version = "0.1.0"
+source = { editable = "services/ingestion_step" }
 dependencies = [
     { name = "fastapi" },
     { name = "uvicorn", extra = ["standard"] },

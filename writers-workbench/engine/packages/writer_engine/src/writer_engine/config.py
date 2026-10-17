@@ -196,6 +196,7 @@ class EngineSettings(BaseSettings):
     story_bible_step_url: str = Field(default="http://localhost:8025", alias="STORY_BIBLE_STEP_URL")
     approval_step_url: str = Field(default="http://localhost:8026", alias="APPROVAL_STEP_URL")
     notify_step_url: str = Field(default="http://localhost:8027", alias="NOTIFY_STEP_URL")
+    ingestion_step_url: str = Field(default="http://localhost:8028", alias="INGESTION_STEP_URL")
 
     # Alerting (C2). Empty recipient = log only, which is what the engine did for its whole life:
     # the 2026-05-19 Redis outage ran nine days because nothing ever told anyone.
@@ -212,6 +213,22 @@ class EngineSettings(BaseSettings):
     # per-edition timezone column, so this is one global interpretation — set it to the operator's
     # own zone or a stored "09:00" means 09:00 UTC, which is 05:00 in New York.
     newsletter_timezone: str = Field(default="UTC", alias="NEWSLETTER_TIMEZONE")
+
+    # E1 — content ingestion. The engine now owns the feed poller that n8n used to run, so these
+    # replace what used to be a schedule-trigger interval on a canvas.
+    #
+    # 30 minutes matches the cadence the n8n multi-user cron ran at. It is not the fetch interval:
+    # each feed row carries its own `fetch_interval_minutes` (180 or 240 on DEV) and the tick only
+    # picks up the ones whose interval has elapsed, so a shorter tick costs one cheap query.
+    ingestion_poll_seconds: float = Field(default=1800.0, alias="INGESTION_POLL_SECONDS")
+    # Per-feed item ceiling for one run. Each item can cost a Firecrawl scrape plus two LLM calls,
+    # so this is the knob that bounds a tick's spend when an aggregator feed has a busy day.
+    ingestion_max_items_per_feed: int = Field(default=25, alias="INGESTION_MAX_ITEMS_PER_FEED")
+    # How many due feeds one tick claims. 100 covers the 32 live rows with room for growth.
+    ingestion_feed_limit: int = Field(default=100, alias="INGESTION_FEED_LIMIT")
+    # A11's cadence cron on the same internal timer. Both were external-cron-only, which meant DEV
+    # had no scheduler at all once n8n was off — the newsletter would simply never go out.
+    cadence_poll_seconds: float = Field(default=900.0, alias="CADENCE_POLL_SECONDS")
 
     # Observability
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")

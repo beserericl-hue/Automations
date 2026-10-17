@@ -95,6 +95,10 @@ HEAVY_OPS: frozenset[tuple[str, str]] = frozenset(
         ("brainstorm", "edit-outline"),  # re-emits the whole StoryOutline at 32768
         ("research", "run"),
         ("media", "cover-art"),  # KIE.AI createTask -> poll recordInfo, 180s ceiling of its own
+        # E1: one tick walks every due feed, and each item can cost a Firecrawl scrape plus two LLM
+        # calls. Nobody is waiting on it, and it must not hold an interactive slot.
+        ("ingestion", "run"),
+        ("ingestion", "feed"),
     }
 )
 

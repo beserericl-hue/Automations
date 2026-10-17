@@ -39,6 +39,7 @@ from deliver_step.main import app as deliver_app
 from fastapi import Depends, FastAPI, Request
 from gather_step.main import app as gather_app
 from image_step.main import app as image_app
+from ingestion_step.main import app as ingestion_app
 from library_step.main import app as library_app
 from media_step.main import app as media_app
 from notify_step.main import app as notify_app
@@ -86,6 +87,8 @@ STEP_APPS: dict[str, FastAPI] = {
     "story_bible": story_bible_app,
     "approval": approval_app,
     "notify": notify_app,
+    # Content ingestion (E1) — the only writer of content_ingestion_v2 now that n8n is off.
+    "ingestion": ingestion_app,
 }
 
 

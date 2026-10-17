@@ -51,8 +51,8 @@ def test_health_probes_every_registered_step(client: TestClient) -> None:
     r = client.get("/admin/health")
     probed = {k for k in r.json()["checks"] if k.startswith("step:")}
     assert probed == {f"step:{name}" for name in ALL_STEP_URLS}
-    # The 8 write tools + 10 newsletter steps + library_retrieve.
-    assert len(probed) == 19
+    # The 8 write tools + 10 newsletter steps + library_retrieve + ingestion (E1).
+    assert len(probed) == 20
 
 
 def test_health_200_when_all_steps_healthy(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -30,6 +30,7 @@ members = [
     "services/story_bible_step",
     "services/approval_step",
     "services/notify_step",
+    "services/ingestion_step",
 ]
 
 [tool.uv.sources]

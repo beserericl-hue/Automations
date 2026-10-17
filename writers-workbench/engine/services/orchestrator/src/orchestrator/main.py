@@ -37,6 +37,10 @@ from writer_engine.queues import (
     read_dead_letters,
 )
 from writer_engine.redis_client.client import close_redis
+from writer_engine.scheduler import Job as CronJob
+from writer_engine.scheduler import Scheduler
+from writer_engine.scheduler import start as scheduler_start
+from writer_engine.scheduler import stop as scheduler_stop
 from writer_engine.state_machine.durable import RedisSagaRepo
 from writer_engine.state_machine.orchestrator import InMemoryStateStore
 from writer_engine.state_machine.saga import StepRef, run_step_via_http
@@ -122,9 +126,22 @@ async def lifespan(app: FastAPI) -> Any:
         )
         app.state.watchdog_task = watchdog_start(dog)
 
+    # E1: the engine's own clock. Ingestion and the newsletter cadence were both driven by n8n
+    # schedule triggers, so without this "n8n off" would mean the corpus stops being refilled and
+    # no edition is ever generated — silently, in both cases. `create_app` builds the job list;
+    # jobs whose interval is 0 are dropped by the Scheduler, and an empty list means no task.
+    app.state.scheduler = None
+    app.state.scheduler_task = None
+    jobs = list(getattr(app.state, "cron_jobs", []) or [])
+    scheduler = Scheduler(jobs)
+    if scheduler.jobs:
+        app.state.scheduler = scheduler
+        app.state.scheduler_task = scheduler_start(scheduler)
+
     try:
         yield
     finally:
+        await scheduler_stop(getattr(app.state, "scheduler_task", None))
         await watchdog_stop(getattr(app.state, "watchdog_task", None))
         if getattr(app.state, "arq_pool", None) is not None:
             await app.state.arq_pool.close()
@@ -529,11 +546,7 @@ def build_app() -> FastAPI:
             ) from exc
         return state.model_dump(mode="json")
 
-    @app.post("/cron/newsletter-cadence")
-    async def cron_cadence(request: Request) -> dict[str, Any]:
-        """Cadence cron — find editions whose ``next_scheduled_send_at <= now()`` and enqueue a generate per
-        edition. Auth: ``X-Cron-Secret`` header (separate from the service-shared-secret because cron triggers
-        live on a different schedule — Railway cron, cron-job.org, etc.)."""
+    def _require_cron_secret(request: Request) -> None:
         from fastapi import HTTPException
         from fastapi import status as http_status
 
@@ -542,6 +555,14 @@ def build_app() -> FastAPI:
         if not provided or provided != expected:
             raise HTTPException(http_status.HTTP_401_UNAUTHORIZED, detail="missing or invalid X-Cron-Secret")
 
+    async def _cadence_tick() -> dict[str, Any]:
+        """The cadence cron's body, callable without an HTTP request.
+
+        Split out so the internal scheduler can run it (E1): until now the only thing that ever
+        called ``/cron/newsletter-cadence`` was an n8n schedule trigger, so turning n8n off would
+        have stopped the newsletter from ever being generated — with no error, because an endpoint
+        nobody calls looks exactly like an endpoint with nothing to do.
+        """
         from datetime import UTC, datetime
 
         from writer_engine.supabase.client import get_supabase_admin
@@ -628,6 +649,102 @@ def build_app() -> FastAPI:
             "execution_ids": enqueued,
             "errors": skipped,
         }
+
+    @app.post("/cron/newsletter-cadence")
+    async def cron_cadence(request: Request) -> dict[str, Any]:
+        """Cadence cron — find editions whose interval has elapsed and enqueue a generate per edition.
+
+        Auth: ``X-Cron-Secret`` (separate from the service-shared-secret because cron triggers live
+        on a different schedule). The engine now also runs this on its own timer — see
+        ``CADENCE_POLL_SECONDS`` — so this route is the manual kick, not the only driver.
+        """
+        _require_cron_secret(request)
+        return await _cadence_tick()
+
+    async def _ingestion_tick(max_items: int | None = None, feed_id: str = "") -> dict[str, Any]:
+        """Enqueue one ingestion run on the heavy queue (E1).
+
+        Enqueued rather than run inline: a tick walks every due feed and each item can cost a
+        Firecrawl scrape plus two LLM calls, which has no business happening inside the process that
+        serves the API. Going through arq also gives it the DLQ, the retry policy and the run ledger
+        that every other engine job has.
+
+        Falls back to running in-process when there is no arq pool — the same fallback the saga
+        driver uses, so a Redis-less local stack still ingests.
+        """
+        body: dict[str, Any] = {"op": "feed" if feed_id else "run"}
+        if feed_id:
+            body["feed_id"] = feed_id
+        if max_items:
+            body["max_items"] = int(max_items)
+        body["limit"] = get_settings().ingestion_feed_limit
+
+        if app.state.arq_pool is not None:
+            job = await app.state.arq_pool.enqueue_job(
+                "run_write_tool_job", "ingestion", body, _queue_name=queue_for("ingestion", body["op"])
+            )
+            return {"enqueued": True, "job_id": getattr(job, "job_id", None), "body": body}
+
+        from writer_engine.ingestion import ingest_due_feeds, ingest_feed
+        from writer_engine.ingestion.store import get_feed
+
+        if feed_id:
+            feed = await get_feed(feed_id)
+            results = [await ingest_feed(feed, max_items=max_items)] if feed else []
+        else:
+            results = await ingest_due_feeds(limit=body["limit"], max_items=max_items)
+        return {
+            "enqueued": False,
+            "feeds": len(results),
+            "items_uploaded": sum(r.items_uploaded for r in results),
+            "errors": [{"feed": r.feed_name, "error": r.error} for r in results if r.error],
+        }
+
+    @app.post("/cron/ingestion")
+    async def cron_ingestion(request: Request) -> dict[str, Any]:
+        """Ingestion cron — poll the feed list and fill ``content_ingestion_v2`` (E1).
+
+        The engine's replacement for ``AI News Data Ingestion V2`` and ``DEV - Newsletter Ingestion
+        (Multi-User Cron)``. Auth: ``X-Cron-Secret``, same as the cadence cron.
+
+        Optional query params: ``feed_id`` to re-run one feed regardless of its interval, and
+        ``max_items`` to cap the per-feed item count for a cheap smoke test.
+        """
+        _require_cron_secret(request)
+        raw_max = request.query_params.get("max_items") or ""
+        return await _ingestion_tick(
+            max_items=int(raw_max) if raw_max.isdigit() else None,
+            feed_id=(request.query_params.get("feed_id") or "").strip(),
+        )
+
+    @app.get("/admin/scheduler", dependencies=[Depends(require_admin_token)])
+    async def admin_scheduler() -> dict[str, Any]:
+        """Is the engine's internal clock running, and did its last tick work? (E1)
+
+        Worth an endpoint of its own: a scheduler that silently stopped looks identical to one with
+        nothing to do, which is exactly how the n8n multi-user cron "succeeded" every 30 minutes for
+        months while uploading nothing.
+        """
+        scheduler: Scheduler | None = getattr(app.state, "scheduler", None)
+        if scheduler is None:
+            return {"running": False, "reason": "no scheduled jobs enabled", "jobs": []}
+        return {"running": True, **scheduler.status()}
+
+    # Read by `lifespan`, which starts them once the app is up. Defined here because both jobs close
+    # over `app.state` (the arq pool) and over the cadence body above.
+    settings_for_jobs = get_settings()
+    app.state.cron_jobs = [
+        CronJob(
+            name="ingestion",
+            interval_s=settings_for_jobs.ingestion_poll_seconds,
+            run=_ingestion_tick,
+        ),
+        CronJob(
+            name="newsletter-cadence",
+            interval_s=settings_for_jobs.cadence_poll_seconds,
+            run=_cadence_tick,
+        ),
+    ]
 
     @app.get(
         "/pipelines/newsletter/executions/{execution_id}/review/{stage}",

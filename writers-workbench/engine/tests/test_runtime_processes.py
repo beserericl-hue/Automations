@@ -25,7 +25,7 @@ from writer_engine.runtime_processes import (
     step_url_env,
 )
 
-EXPECTED_STEPS = 19  # 8 hub-routable write tools + 10 newsletter saga steps + library_retrieve
+EXPECTED_STEPS = 20  # 8 hub-routable write tools + 10 newsletter saga steps + library_retrieve + ingestion
 
 
 # --- the three registries agree ---------------------------------------------------------------
