@@ -1148,3 +1148,96 @@ concern.
 
 **Still open:** apply migration 028 to DEV (needs the pooler DSN), and add an external uptime check
 on `/admin/health` — the watchdog is inside the engine and cannot report the engine being dead.
+
+## [2026-10-17] HA Redis cutover + story-memory audit | four real defects found by running it
+
+**DEV Redis is now HA** (HAProxy in front of five nodes). Verified the topology directly rather
+than trusting variable names, because the answer decided whether arq works at all: `redis_mode
+standalone`, `role master` with 4 replicas at lag 0-1, `aof_enabled 1`, failover detection ~1.5-3s,
+30m idle timeout. **Redis Cluster would have broken us** — our pipelines touch several unrelated
+keys with no hash tags and would have failed CROSSSLOT. Standalone behind a proxy needs no code
+change; tested a multi-key MULTI/EXEC against it to be sure.
+
+**The engine was pointing at a Redis that no longer exists.** `writer-engine-runtime` and
+`writer-engine-gateway` still had `REDIS_URL=redis.railway.internal`, which no longer resolves,
+while `WritersWorkbench` had already moved — so the engine was in a restart loop returning 502.
+Both repointed. Nothing to drain (the old instance is gone), and open HITL gates survive it anyway
+now that they are readable from Postgres. `REDIS_CONNECT_TIMEOUT_S` 10 → 15, because HAProxy's own
+backend connect timeout is 10s and a client that gives up at 10 abandons the failover it is waiting
+for.
+
+**Load tests re-run on HA:** 10 users 20/20 ok (45.6s); 20 users + 6 heavy **46/46 ok** (87.8s, vs
+93.6s pre-HA). Enqueue p50 rose 0.17s → 0.39s, which is the HAProxy hop. No dead letters, no
+timeouts. Gate 2's numbers hold on the new topology.
+
+**The email flood had two causes, both mine.** (1) The load harness never set `notify: False`, and
+the engine emails the user on every successful write-tool job (CR-009) — so the first 20-user run
+sent 46 "your chapter is ready" messages. (2) The alert debounce lives in Redis, and Redis is the
+most likely SUBJECT of an alert; the fail-open path had no window at all, so with the watchdog
+ticking every 60s a Redis outage emailed once a minute per instance. Failing open is still right —
+a duplicate beats a silent outage — but it now falls back to a process-local window. That fix
+contradicted one of my own tests, which asserted both sends should go out "because no debounce is
+available"; the reasoning read fine and was wrong in production.
+
+### The story-memory audit (asked: does memory survive being split across processes?)
+
+Measured rather than reasoned about, with the database held as a control and verified byte-identical
+afterwards (`scripts/story_composition_check.py`, read-only).
+
+**What a chapter actually receives**, confirmed by calling the same loaders the chapter step calls:
+title · premise · story_arc_name · dramatic_question · the focal chapter's full entry (act,
+arc_point, pov_character, **bridge_from_prior**, beat) · a titles-only index of every chapter · the
+19-character roster with roles (7.2k chars) · beat-specific research grounding · the craft seeds and
+genre block · and within a chapter, the prior sub-chapter's last 800 words.
+
+**What it does NOT receive: the prose of any previous chapter.** Cross-chapter continuity rests
+entirely on the outline and on `bridge_from_prior`. On The Burial Mound that is enough — a
+7-generation name chain (Yanu → Saya → Matta → Tessa → Ida → June) stays in consistent order across
+chapters 19-88 of a 96-chapter, 668k-word novel. On a thinner outline it would not be.
+
+**DEFECT 1 — two outline shapes, and each reader understood only one.** Across 26 projects with
+outlines: 16 are engine-shaped (`chapter_number`, `beat`, `bridge_from_prior`) and 10 are n8n-shaped
+(`number`, `brief`). `_compact_outline_view` keyed on `chapter_number`; `build_canon_chunks` keyed
+on `number`. Both failures are silent empty strings. An n8n-shaped project got **no "THIS CHAPTER"
+block at all** — no beat, no brief, no bridge — and an index rendering "None. Title" on every line.
+An engine-shaped project got **no chapter_brief and no sub_chapter canon chunks**. The data
+confirms it: of 26 projects, the only three with rows in `writing_embeddings_v2` are n8n-shaped.
+Both readers now go through `writer_engine.outline_keys`.
+
+**DEFECT 2 — nothing indexes canon for an existing project.** `index_project_canon` only fires on a
+brainstorm outline save, so The Burial Mound had **zero** indexed canon and `_canon_grounding`
+returned "" for all 96 chapters. After the shape fix, indexing The Signal Beneath produced 111
+chunks (10 chapter_brief + 25 sub_chapter, both previously impossible), and retrieval on chapter 6's
+beat returned its own Ch 6 brief at 0.880 plus the two characters named in that beat. Still open:
+a backfill for the other projects, and prose never enters the index at all.
+
+**DEFECT 3 — the em-dash backstop was deleting A13's scene breaks.** Live chapter 6: 5 sub-chapters,
+0 scene breaks, and 5 instances of the literal text ", -" mid-prose. `_strip_em_dashes` ran on the
+line after `SCENE_BREAK.join` and its `--` branch matched the first two hyphens of `---`, eating the
+newlines with it. A13 flagged the drift-correct pass as the residual risk; the real culprit fires on
+every chapter regardless of drift (that run had craft_passes=0, zero drift). Fenced the branch with
+lookarounds. No data repair needed — nothing has been persisted since A13 shipped.
+
+**DEFECT 4 — ProviderBudget did not fail open.** It claimed to, and was tested to, but only guarded
+the CONNECTION; redis-py connects lazily, so an unreachable Redis fails on the first COMMAND, which
+raised straight through `call_provider` into embeddings, firecrawl and kieai. Found by running the
+real retrieval path on a machine with no Redis. The test that was meant to cover it faked a failing
+`get_redis`, so it only exercised acquisition.
+
+**The live composition itself was good.** Chapter 6, 7311 words, 5 sub-chapters: `aligned=True`,
+zero story drift, zero character drift, `outline_follows_guide` 1.00, craft dimensions 0.80-0.93,
+14 research gaps woven. `bridge_from_prior` said "the morning after arrival, Mara confronts Senn
+privately, she has spent the night deciding" and the chapter opens on exactly that — the candle
+burned to a nub after midnight, Mara awake on the cot. Every established entity carried across
+(Senn 33 mentions, Dani 20, Harrow 14, Millhaven 5).
+
+**My own measurement was wrong twice, and both corrections matter.** The first version of the
+checker flagged 12 "re-introductions of an established character" on The Burial Mound as evidence of
+memory loss. Reading the sentences showed all 12 are the book's own device — a told-story chain
+reciting "before Matta there was a woman named Tessa". The phrasing is correct prose for that book.
+It also keyed on `number`, so its "stored title != outline title: 0" was a vacuous pass on every
+engine-shaped project. A detector that cannot tell a device from a defect produces confident
+nonsense; the attributions are now reported with no verdict attached.
+
+**Held off during this work, as asked:** `ALERT_EMAIL` is cleared on both DEV engine services, and
+every harness payload sets `notify: False`.
