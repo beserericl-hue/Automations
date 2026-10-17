@@ -59,6 +59,7 @@ from __future__ import annotations
 
 import contextlib
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -78,6 +79,10 @@ CHUNK_WORDS = 2800
 # Below this a "chunk" is a fragment — a line of dialogue, a scene-break remnant — and humanizing it
 # costs credits for no benefit while risking a rewrite that reads nothing like its neighbours.
 MIN_WORDS = 20
+
+# A rewrite keeping fewer than this share of the original's paragraphs is rejected. 0.7 allows the
+# odd merge (mode=Low kept 30 of 31) while catching a collapse (mode=Medium: 31 -> 7).
+MIN_PARAGRAPH_RATIO = 0.7
 
 # The separator A13 joins sub-chapters with. Imported as a literal rather than from chapter_step,
 # which is a service and must not become a dependency of the shared package.
@@ -104,6 +109,9 @@ class HumanizeResult:
     stopped_at_budget: bool = False
     """True when the per-run word ceiling halted the pass. The remaining chunks keep their original
     text, exactly like a failed chunk."""
+    rejected: dict[int, str] = field(default_factory=dict)
+    """chunk index -> why its rewrite was thrown away (names_lost / structure_collapsed). Measured
+    rejections, not provider errors: the call succeeded and the OUTPUT was unacceptable."""
     skipped: str = ""
     """Why nothing happened, when nothing happened (not configured / empty input)."""
 
@@ -127,6 +135,7 @@ class HumanizeResult:
             "remaining_credits": self.remaining_credits,
             "detectability": self.detectability,
             "stopped_at_budget": self.stopped_at_budget,
+            "rejected": self.rejected,
             "skipped": self.skipped or None,
         }
 
@@ -168,6 +177,49 @@ def chunk_text(text: str, *, max_words: int = CHUNK_WORDS) -> list[str]:
     return chunks
 
 
+def names_present(text: str, names: Iterable[str]) -> set[str]:
+    """Which of ``names`` appear in ``text``, matched whole-word and case-sensitively."""
+    found = set()
+    for name in names:
+        bare = str(name).strip()
+        if bare and re.search(rf"\b{re.escape(bare)}\b", text):
+            found.add(bare)
+    return found
+
+
+def _paragraphs(text: str) -> int:
+    return len([p for p in _PARA_SPLIT.split(text.strip()) if p.strip()])
+
+
+def judge_rewrite(
+    original: str,
+    rewritten: str,
+    *,
+    protect: Iterable[str] = (),
+    min_paragraph_ratio: float = MIN_PARAGRAPH_RATIO,
+) -> str:
+    """ "" if the rewrite is acceptable, else a short reason to reject it.
+
+    Both checks come from measuring the live API on a real 1431-word scene of The Burial Mound:
+
+    * **names_lost.** On a 29-word passage, mode=High replaced the character name "Tayak" with
+      "He". At scene length it did not, but a humanizer that CAN drop a proper noun will eventually
+      do it to a chapter, and a lost name degrades the roster, the drift detector and the bible
+      extractor all at once. Cheap to check, so it is checked.
+    * **structure_collapsed.** mode=Medium scored best of all (94) and rewrote 31 paragraphs into
+      SEVEN. Paragraphing is craft, not formatting — the Follett seeds ask for scene construction
+      and a turn every few pages — so a rewrite that reads as a wall of text is not an improvement
+      whatever it scores.
+    """
+    lost = names_present(original, protect) - names_present(rewritten, protect)
+    if lost:
+        return f"names_lost:{','.join(sorted(lost))}"
+    before, after = _paragraphs(original), _paragraphs(rewritten)
+    if before > 2 and after < before * min_paragraph_ratio:
+        return f"structure_collapsed:{before}->{after}"
+    return ""
+
+
 def _scene_count(text: str) -> int:
     return len([s for s in _SCENE_SPLIT.split(text) if s.strip()])
 
@@ -197,6 +249,7 @@ async def humanize_text(
     *,
     model: str | None = None,
     mode: str | None = None,
+    protect: Iterable[str] = (),
     timeout_s: float = 180.0,
 ) -> HumanizeResult:
     """Humanize ``text``, preserving its scene structure and the dash ban.
@@ -270,6 +323,20 @@ async def humanize_text(
             pieces.append(chunk)
             continue
 
+        verdict = judge_rewrite(chunk, result, protect=protect)
+        if verdict:
+            # The call succeeded and we pay for it either way; the OUTPUT is what failed. Keeping
+            # the original is the only safe move, and recording why is what makes the setting
+            # tunable instead of mysterious.
+            logger.warning("humanize.rejected", chunk=i, of=len(chunks), reason=verdict)
+            out.rejected[i] = verdict
+            out.failed_chunks.append(i)
+            out.words_spent += int(payload.get("wordsSpent") or 0)
+            with contextlib.suppress(TypeError, ValueError):
+                out.charged_credits += int(payload.get("meteredChargedCredits") or 0)
+            pieces.append(chunk)
+            continue
+
         pieces.append(result)
         out.humanized_chunks += 1
         out.words_spent += int(payload.get("wordsSpent") or 0)
@@ -327,11 +394,14 @@ def strip_banned_dashes(text: str) -> str:
 __all__ = [
     "CHUNK_WORDS",
     "ENDPOINT",
+    "MIN_PARAGRAPH_RATIO",
     "MIN_WORDS",
     "SCENE_BREAK",
     "HumanizeResult",
     "chunk_text",
     "enabled",
     "humanize_text",
+    "judge_rewrite",
+    "names_present",
     "strip_banned_dashes",
 ]

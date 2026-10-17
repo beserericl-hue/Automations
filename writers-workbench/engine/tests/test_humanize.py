@@ -19,6 +19,7 @@ import pytest
 
 from writer_engine import humanize as hz
 from writer_engine.config import get_settings
+from writer_engine.humanize import judge_rewrite
 
 SCENE = hz.SCENE_BREAK
 
@@ -363,3 +364,90 @@ async def test_the_metered_charge_is_recorded(key: None, monkeypatch: pytest.Mon
     out = await hz.humanize_text(SCENE.join([_para(100, "a"), _para(100, "b")]))
     assert out.charged_credits == 120
     assert out.as_report()["charged_credits"] == 120
+
+
+# --- acceptance checks on the OUTPUT -----------------------------------------------------------
+#
+# Both checks come from measuring the live API on a real 1431-word scene of The Burial Mound:
+# mode=High replaced the character name "Tayak" with "He" on a short passage, and mode=Medium —
+# which scored BEST of all five settings at 94 — rewrote 31 paragraphs into 7.
+
+
+def test_a_rewrite_that_drops_a_protected_name_is_rejected() -> None:
+    original = "Tayak counted three guards along the parapet. He turned back into the pines."
+    rewritten = "He counted three men on the parapet. He went back into the pines."
+    assert judge_rewrite(original, rewritten, protect=["Tayak"]).startswith("names_lost:Tayak")
+
+
+def test_a_rewrite_that_keeps_the_name_passes() -> None:
+    original = "Tayak counted three guards along the parapet."
+    rewritten = "Tayak counted three guards on the wall."
+    assert judge_rewrite(original, rewritten, protect=["Tayak"]) == ""
+
+
+def test_only_names_actually_in_the_original_are_required() -> None:
+    """A roster is project-wide; a scene that never mentions Kimi must not be rejected for it."""
+    assert judge_rewrite("Tayak walked.", "Tayak strolled.", protect=["Tayak", "Kimi", "Nora"]) == ""
+
+
+def test_a_structural_collapse_is_rejected() -> None:
+    """mode=Medium scored 94 and turned 31 paragraphs into 7. Paragraphing is craft."""
+    original = "\n\n".join(f"Paragraph {i} with some words in it." for i in range(10))
+    collapsed = "All ten paragraphs mashed into one block of text with no breaks at all."
+    assert judge_rewrite(original, collapsed).startswith("structure_collapsed:10->1")
+
+
+def test_one_merged_paragraph_is_tolerated() -> None:
+    """mode=Low kept 30 of 31. Rejecting that would reject the setting we actually want."""
+    original = "\n\n".join(f"Paragraph {i} with some words." for i in range(31))
+    merged = "\n\n".join(f"Paragraph {i} with some words." for i in range(30))
+    assert judge_rewrite(original, merged) == ""
+
+
+def test_short_text_is_not_judged_on_structure() -> None:
+    """A one or two paragraph chunk has no structure to collapse."""
+    assert judge_rewrite("One para.", "A single rewritten para.") == ""
+    assert judge_rewrite("One.\n\nTwo.", "Just one now.") == ""
+
+
+def test_names_present_matches_whole_words() -> None:
+    assert hz.names_present("Sokan waited.", ["Sokan"]) == {"Sokan"}
+    assert hz.names_present("Sokanish is a word.", ["Sokan"]) == set()
+
+
+@pytest.mark.asyncio
+async def test_a_rejected_chunk_keeps_the_original_and_records_why(
+    key: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The call succeeded and is billed; the OUTPUT is what failed. Keep the original, say why."""
+
+    async def _drops_the_name(chunk: str, **kw: Any) -> dict[str, Any]:
+        return {
+            "result": chunk.replace("Tayak", "He"),
+            "wordsSpent": 100,
+            "meteredChargedCredits": 100,
+        }
+
+    monkeypatch.setattr(hz, "_stealthify", _drops_the_name)
+    original = "Tayak " + _para(100, "walked")
+    out = await hz.humanize_text(original, protect=["Tayak"])
+
+    assert out.humanized_chunks == 0
+    assert out.failed_chunks == [0]
+    assert out.rejected[0].startswith("names_lost:Tayak")
+    assert "Tayak" in out.text  # the original survived
+    # Still billed — a rejection is not a refund, and the report must not hide the spend.
+    assert out.charged_credits == 100
+    assert out.as_report()["rejected"] == {0: "names_lost:Tayak"}
+
+
+@pytest.mark.asyncio
+async def test_an_acceptable_rewrite_is_kept(key: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _keeps_the_name(chunk: str, **kw: Any) -> dict[str, Any]:
+        return {"result": chunk.replace("walked", "strode"), "wordsSpent": 100}
+
+    monkeypatch.setattr(hz, "_stealthify", _keeps_the_name)
+    out = await hz.humanize_text("Tayak " + _para(100, "walked"), protect=["Tayak"])
+    assert out.humanized_chunks == 1
+    assert out.rejected == {}
+    assert "strode" in out.text
