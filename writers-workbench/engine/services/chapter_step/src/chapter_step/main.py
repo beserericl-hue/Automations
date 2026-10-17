@@ -2181,6 +2181,107 @@ async def _op_qa(payload: dict) -> dict:
     }
 
 
+async def _persist_review_report(payload: dict, report: dict) -> dict | None:
+    """Persist a review under the chapter's ``metadata.review_report``. Best-effort.
+
+    Its **own** key, not ``metadata.qa_report``. The Q/A panel reads ``qa_report`` and
+    ``POST /api/content/:id/rewrite-to-fix-qa`` turns its ``NEEDS_REVIEW`` rows into a
+    ``chapter.repair``. Merging a critique lens into that would let "Hemingway thinks paragraph two
+    is wordy" trigger an automated rewrite of a chapter that passes every rubric the product
+    promises. The rows are in the same shape deliberately, so the panel can render them — the
+    decision to act on them stays the user's.
+    """
+    from writer_engine.config import get_settings
+
+    project_id = payload.get("project_id")
+    chn = payload.get("chapter_number")
+    settings = get_settings()
+    if not (
+        project_id and chn not in (None, "") and settings.supabase_url and settings.supabase_service_role_key
+    ):
+        return None
+    try:
+        cnum = _coerce_chapter_number(chn, 0)
+        from datetime import UTC, datetime
+
+        from writer_engine.supabase.client import get_supabase_admin
+
+        client = await get_supabase_admin()
+        cur = await (
+            client.table("published_content_v2")
+            .select("id,metadata")
+            .eq("project_id", str(project_id))
+            .eq("content_type", "chapter")
+            .eq("chapter_number", cnum)
+            .limit(1)
+            .execute()
+        )
+        rows = getattr(cur, "data", None) or []
+        if not rows:
+            return {"persisted": False, "error": f"no chapter {cnum} row to attach the review to"}
+        meta = dict(rows[0].get("metadata") or {})
+        meta["review_report"] = report
+        await (
+            client.table("published_content_v2")
+            .update({"metadata": meta, "updated_at": datetime.now(UTC).isoformat()})
+            .eq("id", rows[0]["id"])
+            .execute()
+        )
+        return {"persisted": True, "checks": len(report.get("checks") or [])}
+    except Exception as exc:
+        # C4: a review that could not be saved must say so — the user is looking at findings that
+        # will be gone on reload otherwise.
+        logger.warning("review.persist_failed", error=str(exc)[:200])
+        return {"persisted": False, "error": str(exc)[:200]}
+
+
+async def _op_review(payload: dict) -> dict:
+    """E7 — run named editorial review lenses over a chapter.
+
+    ``chapter.qa`` answers "does this meet the rubric". This answers "what would Hemingway cut, and
+    where does the scene stand and explain instead of walking and talking" — critique, from a voice
+    the user picked. See ``writer_engine.review``.
+
+    Payload: ``lenses`` (names, or ``panel`` / ``debate``), plus the usual chapter reference
+    (``project_id`` or ``project_title`` + ``chapter_number``) or inline ``chapter_text``.
+    """
+    from writer_engine.review import lenses as lens_mod
+    from writer_engine.review import review_draft
+
+    await _resolve_project_for_payload(payload, create=False)
+    text = str(payload.get("chapter_text") or payload.get("content_text") or "")
+    project_id = payload.get("project_id")
+    chapter_number = payload.get("chapter_number")
+    if not text and project_id and chapter_number not in (None, ""):
+        ch_n = optional_int(chapter_number)
+        text = await _load_persisted_chapter(str(project_id), ch_n) if ch_n is not None else ""
+
+    raw = payload.get("lenses") or payload.get("lens") or None
+    requested = [raw] if isinstance(raw, str) else list(raw) if raw else None
+    try:
+        singles, orchestrators = lens_mod.expand(requested)
+    except lens_mod.UnknownLens as exc:
+        return {
+            "error": f"unknown review lens {exc}",
+            "available_lenses": list(lens_mod.ALL_LENSES),
+        }
+
+    report = await review_draft(
+        text,
+        requested=requested,
+        title=str(payload.get("title") or payload.get("project_title") or ""),
+        context=str(payload.get("context") or payload.get("notes") or ""),
+    )
+    persisted = await _persist_review_report(payload, report) if text else None
+    return {
+        "chapter_number": chapter_number,
+        "lenses": list(singles) + list(orchestrators),
+        "review_report": report,
+        "finding_count": report.get("finding_count", 0),
+        "persist": persisted,
+    }
+
+
 async def _op_scan_drift(payload: dict) -> dict:
     """Standalone QA cycle 1 — detect drift of a chapter vs its outline beat + arc + roster."""
     from writer_engine.config import get_settings
@@ -2868,6 +2969,7 @@ OPS = {
     "rewrite": _op_rewrite,
     "repair": _op_repair,
     "qa": _op_qa,
+    "review": _op_review,
     "scan-drift": _op_scan_drift,
     "evaluate-genre": _op_evaluate_genre,
     "extract-bible": _op_extract_bible,

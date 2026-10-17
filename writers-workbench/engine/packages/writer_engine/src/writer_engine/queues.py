@@ -99,6 +99,13 @@ HEAVY_OPS: frozenset[tuple[str, str]] = frozenset(
         # calls. Nobody is waiting on it, and it must not hold an interactive slot.
         ("ingestion", "run"),
         ("ingestion", "feed"),
+        # E7: one review lens is one chapter-sized Anthropic call (~12s measured on haiku), and a
+        # `panel` is four lenses plus a synthesis — serially, on the account-wide TPM that B9 showed
+        # is the binding constraint. Under the B11 load conditions that can run past the interactive
+        # 600s ceiling. It is also already the heavy pattern: the op persists its report to
+        # `metadata.review_report` and the UI polls /api/jobs/engine/:id rather than holding a
+        # request open.
+        ("chapter", "review"),
     }
 )
 
