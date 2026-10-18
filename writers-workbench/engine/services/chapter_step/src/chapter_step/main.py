@@ -437,6 +437,7 @@ async def _persist_chapter_outline(
     R111/R118). Snapshots the prior outline to outline_versions_v2 first when one exists, so a re-plan
     is reversible. Best-effort."""
     from writer_engine.config import get_settings
+    from writer_engine.persist_helpers import touch
 
     settings = get_settings()
     if not (settings.supabase_url and settings.supabase_service_role_key):
@@ -497,7 +498,12 @@ async def _persist_chapter_outline(
         if not found:
             return {"persisted": False, "reason": f"chapter {chapter_number} not in outline"}
         outline["chapters"] = chapters
-        await client.table("writing_projects_v2").update({"outline": outline}).eq("id", project_id).execute()
+        await (
+            client.table("writing_projects_v2")
+            .update({"outline": outline, **touch()})
+            .eq("id", project_id)
+            .execute()
+        )
         return {"persisted": True, "chapter_number": chapter_number}
     except Exception as exc:
         logger.warning("plan.persist_failed", error=str(exc)[:200])
@@ -2103,6 +2109,7 @@ async def _persist_qa_artifacts(
     it) and any character-name drift into the project's ``outline._character_drift_scan`` (so the
     AnnotationsPanel surfaces it with a one-click fix). Best-effort; never breaks the QA op."""
     from writer_engine.config import get_settings
+    from writer_engine.persist_helpers import touch
 
     project_id = payload.get("project_id")
     chn = payload.get("chapter_number")
@@ -2164,7 +2171,7 @@ async def _persist_qa_artifacts(
             outline["_character_drift_scan"] = {"characters": list(merged.values())}
             await (
                 client.table("writing_projects_v2")
-                .update({"outline": outline})
+                .update({"outline": outline, **touch()})
                 .eq("id", str(project_id))
                 .execute()
             )

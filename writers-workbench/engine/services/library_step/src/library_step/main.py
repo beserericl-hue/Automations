@@ -835,6 +835,8 @@ async def _op_revert(payload: dict) -> dict:
     """Revert an outline (writing_projects_v2.outline) or a chapter (published_content_v2.content_text)
     to a prior version (E2E-2). Snapshots the CURRENT state before overwriting. A missing version or
     project leaves everything unmodified and returns an informative error (R90/R91)."""
+    from writer_engine.persist_helpers import touch
+
     client = await _supabase_or_none()
     if client is None:
         return {"reverted": False, "error_message": "supabase not configured"}
@@ -914,7 +916,7 @@ async def _op_revert(payload: dict) -> dict:
     chapter_count = len(target_outline.get("chapters") or [])
     await (
         client.table("writing_projects_v2")
-        .update({"outline": target_outline, "chapter_count": chapter_count})
+        .update({"outline": target_outline, "chapter_count": chapter_count, **touch()})
         .eq("id", project_id)
         .execute()
     )

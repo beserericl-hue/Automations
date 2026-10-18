@@ -152,6 +152,97 @@ class TestStaleness:
         assert got is not None and got.tzinfo is not None
 
 
+class TestNewestInput:
+    """The probe must read the canon's actual INPUTS, because `writing_projects_v2.updated_at` does
+    not move. On The Ossuary it still equalled `created_at` (2026-10-17T20:00:47) after eight outline
+    versions, the newest at 2026-10-18T12:07 — so a probe trusting that column called the project
+    fresh while the index was missing all 96 research chunks and 76 of 77 bible entries."""
+
+    PID = "a1bfb2cf-2949-4d29-80d2-e8b785c6bdae"
+
+    def _db(self, fake, *, project_updated, versions=(), bible=()):
+        fake.tables["writing_projects_v2"] = [{"id": self.PID, "updated_at": project_updated}]
+        fake.tables["outline_versions_v2"] = [{"project_id": self.PID, "created_at": ts} for ts in versions]
+        fake.tables["story_bible_v2"] = [
+            {"project_id": self.PID, "updated_at": ts, "created_at": ts, "deleted_at": None} for ts in bible
+        ]
+        return fake
+
+    def test_the_ossuary_numbers_an_untouched_updated_at_loses_to_the_outline_version(
+        self, fake_supabase
+    ) -> None:
+        db = self._db(
+            fake_supabase,
+            project_updated="2026-10-17T20:00:47.156739+00:00",
+            versions=["2026-10-17T20:54:07+00:00", "2026-10-18T12:07:19.269115+00:00"],
+        )
+        ts, which = asyncio.run(E._newest_input_ts(db, project_id=self.PID))
+        assert which == "outline_versions_v2"
+        assert ts is not None and ts.isoformat().startswith("2026-10-18T12:07")
+
+    def test_a_bible_written_after_the_last_outline_write_counts(self, fake_supabase) -> None:
+        """Bible entries are the other half of the canon and arrive without an outline write."""
+        db = self._db(
+            fake_supabase,
+            project_updated="2026-10-17T20:00:47+00:00",
+            versions=["2026-10-17T20:54:07+00:00"],
+            bible=["2026-10-18T12:06:34.458486+00:00"],
+        )
+        ts, which = asyncio.run(E._newest_input_ts(db, project_id=self.PID))
+        assert which == "story_bible_v2"
+        assert ts is not None and ts.isoformat().startswith("2026-10-18T12:06")
+
+    def test_project_updated_at_still_wins_when_it_is_the_newest(self, fake_supabase) -> None:
+        db = self._db(
+            fake_supabase,
+            project_updated="2026-10-18T18:00:00+00:00",
+            versions=["2026-10-18T12:07:19+00:00"],
+        )
+        _ts, which = asyncio.run(E._newest_input_ts(db, project_id=self.PID))
+        assert which == "project.updated_at"
+
+    def test_a_missing_project_is_reported_not_raised(self, fake_supabase) -> None:
+        fake_supabase.tables["writing_projects_v2"] = []
+        ts, which = asyncio.run(E._newest_input_ts(fake_supabase, project_id=self.PID))
+        assert ts is None and which == "project not found"
+
+
+class TestOutlineWritesSayTheyHappened:
+    def test_persist_outline_bumps_updated_at(self, fake_supabase) -> None:
+        from writer_engine.persist_helpers import persist_outline
+
+        fake_supabase.tables["writing_projects_v2"] = [
+            {"id": "p1", "outline": {"chapters": []}, "updated_at": "2026-01-01T00:00:00+00:00"}
+        ]
+        asyncio.run(
+            persist_outline(
+                fake_supabase,
+                project_id="p1",
+                user_id="u1",
+                outline={"chapters": [{"chapter_number": 1, "title": "t", "beat": "b"}]},
+            )
+        )
+        row = fake_supabase.tables["writing_projects_v2"][0]
+        assert row["updated_at"] != "2026-01-01T00:00:00+00:00"
+        assert E._parse_ts(row["updated_at"]) is not None
+
+    def test_every_outline_write_in_the_engine_touches_updated_at(self) -> None:
+        """A write that changes the canon and leaves `updated_at` alone is invisible to the
+        freshness probe's cheapest signal."""
+        import pathlib
+        import re
+
+        root = pathlib.Path(__file__).resolve().parents[1]
+        offenders = []
+        for path in list((root / "services").rglob("main.py")) + list((root / "packages").rglob("*.py")):
+            if "/tests/" in str(path):
+                continue
+            for m in re.finditer(r"\.update\(\{[^}]*\"outline\"[^}]*\}\)", path.read_text()):
+                if "touch()" not in m.group(0) and "updated_at" not in m.group(0):
+                    offenders.append(f"{path.relative_to(root)}: {m.group(0)[:70]}")
+        assert not offenders, offenders
+
+
 class TestProseIsNotCollateral:
     def test_the_canon_reindex_excludes_prose_from_its_delete(self) -> None:
         """Source-level check: both the delete and the coverage count must filter out the prose doc

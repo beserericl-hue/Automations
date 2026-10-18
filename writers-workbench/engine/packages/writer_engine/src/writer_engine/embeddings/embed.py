@@ -657,35 +657,97 @@ async def index_chapter_prose(
 # So the engine detects staleness from the data instead of trusting that it was told.
 
 
-async def canon_staleness(*, user_id: str, project_id: str) -> dict[str, Any]:
-    """Is this project's canon older than its outline?
+async def _newest_input_ts(client: Any, *, project_id: str) -> tuple[datetime | None, str]:
+    """When was the canon's newest INPUT written? Returns ``(timestamp, which)``.
 
-    Returns ``{stale, project_updated_at, canon_indexed_at, canon_rows, reason}``. Never raises:
-    an unanswerable question reports ``stale=False`` with a reason, because blocking a chapter write
-    on a freshness probe would be a worse failure than writing against slightly old canon.
+    The canon is built from two things: the project's outline and its story bible. So staleness is
+    "newest input is newer than newest canon row", and the inputs have to be read directly.
+
+    ``writing_projects_v2.updated_at`` alone is not enough, and on DEV it is actively misleading:
+    nothing bumps it. On The Ossuary it still equalled ``created_at`` (2026-10-17T20:00:47) after
+    eight outline versions, the last at 2026-10-18T12:07 — so a probe trusting that column reported
+    "fresh" while the index was missing all 96 research chunks and 76 of 77 bible entries. Measured
+    2026-10-18. ``persist_outline`` now sets ``updated_at`` too, but this probe must still work for
+    the rows it already missed and for writes the engine does not make.
+    """
+    candidates: list[tuple[datetime, str]] = []
+
+    proj = _rows(
+        await client.table("writing_projects_v2")
+        .select("updated_at")
+        .eq("id", str(project_id))
+        .limit(1)
+        .execute()
+    )
+    if not proj:
+        return None, "project not found"
+    pu = _parse_ts(proj[0].get("updated_at"))
+    if pu:
+        candidates.append((pu, "project.updated_at"))
+
+    # Each outline write snapshots the PRIOR outline here, so the newest version row dates the
+    # newest write. This is the signal that actually moves.
+    versions = _rows(
+        await client.table("outline_versions_v2")
+        .select("created_at")
+        .eq("project_id", str(project_id))
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if versions:
+        ov = _parse_ts(versions[0].get("created_at"))
+        if ov:
+            candidates.append((ov, "outline_versions_v2"))
+
+    # The other half of the canon. Bible entries are written by their own steps, with no outline
+    # write to accompany them.
+    bible = _rows(
+        await client.table("story_bible_v2")
+        .select("updated_at, created_at")
+        .eq("project_id", str(project_id))
+        .is_("deleted_at", "null")
+        .order("updated_at", desc=True, nullsfirst=False)
+        .limit(1)
+        .execute()
+    )
+    if bible:
+        bt = _parse_ts(bible[0].get("updated_at")) or _parse_ts(bible[0].get("created_at"))
+        if bt:
+            candidates.append((bt, "story_bible_v2"))
+
+    if not candidates:
+        return None, "no readable input timestamp"
+    newest_ts, which = max(candidates, key=lambda c: c[0])
+    return newest_ts, which
+
+
+async def canon_staleness(*, user_id: str, project_id: str) -> dict[str, Any]:
+    """Is this project's canon older than its outline or its bible?
+
+    Returns ``{stale, project_updated_at, input_source, canon_indexed_at, canon_rows, reason}``.
+    Never raises: an unanswerable question reports ``stale=False`` with a reason, because blocking a
+    chapter write on a freshness probe would be a worse failure than writing against slightly old
+    canon.
     """
     from writer_engine.supabase.client import get_supabase_admin
 
     out: dict[str, Any] = {
         "stale": False,
         "project_updated_at": None,
+        "input_source": "",
         "canon_indexed_at": None,
         "canon_rows": 0,
         "reason": "",
     }
     try:
         client = await get_supabase_admin()
-        proj = _rows(
-            await client.table("writing_projects_v2")
-            .select("updated_at")
-            .eq("id", str(project_id))
-            .limit(1)
-            .execute()
-        )
-        if not proj:
-            out["reason"] = "project not found"
+        newest_input, which = await _newest_input_ts(client, project_id=str(project_id))
+        out["input_source"] = which
+        if newest_input is None:
+            out["reason"] = which
             return out
-        out["project_updated_at"] = proj[0].get("updated_at")
+        out["project_updated_at"] = newest_input.isoformat()
 
         newest = _rows(
             await client.table(EMBEDDINGS_TABLE)
@@ -723,7 +785,9 @@ async def canon_staleness(*, user_id: str, project_id: str) -> dict[str, Any]:
     # finishes seconds after the outline write that triggered it must not read as stale.
     if pu > ci + timedelta(seconds=CANON_STALE_GRACE_S):
         out["stale"] = True
-        out["reason"] = f"outline changed {int((pu - ci).total_seconds())}s after the last reindex"
+        out["reason"] = (
+            f"{out['input_source']} changed {int((pu - ci).total_seconds())}s after the last reindex"
+        )
     else:
         out["reason"] = "fresh"
     return out

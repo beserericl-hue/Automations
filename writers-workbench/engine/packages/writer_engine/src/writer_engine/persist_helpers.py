@@ -11,6 +11,7 @@ right account in the UI. No base-table schema changes — only inserts/updates.
 from __future__ import annotations
 
 import contextlib
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -21,6 +22,18 @@ logger = get_logger("persist_helpers")
 
 async def _rows(resp: Any) -> list[dict]:
     return list(getattr(resp, "data", None) or [])
+
+
+def touch() -> dict[str, str]:
+    """``{"updated_at": <now>}``, to merge into any writing_projects_v2 update.
+
+    Nothing bumps ``writing_projects_v2.updated_at`` — no trigger, and none of the writers set it.
+    On The Ossuary it still equalled ``created_at`` after eight outline versions, which made the
+    canon freshness probe report "fresh" against an index that was missing every research chunk.
+    Measured 2026-10-18. The probe no longer trusts this column alone, but a row that changed should
+    say so.
+    """
+    return {"updated_at": datetime.now(UTC).isoformat()}
 
 
 async def create_project(
@@ -136,7 +149,7 @@ async def persist_outline(
     chapter_count = len(outline.get("chapters") or [])
     await (
         client.table("writing_projects_v2")
-        .update({"outline": outline, "chapter_count": chapter_count, "status": "outlined"})
+        .update({"outline": outline, "chapter_count": chapter_count, "status": "outlined", **touch()})
         .eq("id", project_id)
         .execute()
     )
