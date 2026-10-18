@@ -18,9 +18,11 @@ describe('UserSettings', () => {
     expect(screen.getByText('Email Delivery')).toBeInTheDocument();
   });
 
-  it('shows password change section', () => {
+  it('offers no password to change, and says why', () => {
     renderWithProviders(<UserSettings />);
-    expect(screen.getByText('Change Password')).toBeInTheDocument();
+    expect(screen.queryByText('Change Password')).not.toBeInTheDocument();
+    expect(screen.getByText('Sign-in')).toBeInTheDocument();
+    expect(screen.getByText(/no password/i)).toBeInTheDocument();
   });
 
   it('shows save button', () => {

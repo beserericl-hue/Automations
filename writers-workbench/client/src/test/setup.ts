@@ -51,11 +51,13 @@ vi.mock('../config/supabase', () => {
       auth: {
         getSession: () => Promise.resolve({ data: { session: null } }),
         onAuthStateChange: () => ({ data: { subscription: { unsubscribe: vi.fn() } } }),
-        signInWithPassword: vi.fn(),
-        signUp: vi.fn(),
+        // Passwordless: the app signs in by handing a server-minted session to
+        // setSession. signInWithPassword/signUp/resetPasswordForEmail are gone
+        // from the product, so they are gone from the mock too — leaving them
+        // here would let a reintroduced password path pass its tests.
+        setSession: vi.fn(() => Promise.resolve({ data: { session: null }, error: null })),
         signInWithOAuth: vi.fn(),
         signOut: vi.fn(),
-        resetPasswordForEmail: vi.fn(),
         updateUser: vi.fn(),
       },
     },

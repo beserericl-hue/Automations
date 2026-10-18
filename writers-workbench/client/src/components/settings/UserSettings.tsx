@@ -7,7 +7,6 @@ import { useUser } from '../../contexts/UserContext';
 import { useTheme } from '../../hooks/useTheme';
 import { useToast } from '../../contexts/ToastContext';
 import { resetTutorial } from '../onboarding/OnboardingTutorial';
-import PasswordInput from '../shared/PasswordInput';
 
 export default function UserSettings() {
   const { user } = useAuth();
@@ -23,8 +22,6 @@ export default function UserSettings() {
   const [saving, setSaving] = useState(false);
 
   // Password change
-  const [newPassword, setNewPassword] = useState('');
-  const [passwordError, setPasswordError] = useState('');
 
   // Account deletion
   const [showDeleteSection, setShowDeleteSection] = useState(false);
@@ -132,15 +129,6 @@ export default function UserSettings() {
     }
   };
 
-  const changePassword = async () => {
-    setPasswordError('');
-    if (newPassword.length < 8) { setPasswordError('Password must be at least 8 characters'); return; }
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) { setPasswordError(error.message); return; }
-    setNewPassword('');
-    addToast('Password updated', 'success');
-  };
-
   return (
     <div className="space-y-8 max-w-xl">
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
@@ -199,21 +187,15 @@ export default function UserSettings() {
         </Field>
       </Section>
 
-      {/* Password */}
-      <Section title="Change Password">
-        <Field label="New Password">
-          <PasswordInput
-            autoComplete="new-password"
-            value={newPassword}
-            onChange={e => setNewPassword(e.target.value)}
-            className={inputClass}
-            placeholder="Min 8 characters"
-          />
-        </Field>
-        {passwordError && <p className="text-sm text-red-600">{passwordError}</p>}
-        <button onClick={changePassword} className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400">
-          Update Password
-        </button>
+      {/* Sign-in. There is nothing to change here any more: the account has no
+          password, and the email below IS the sign-in handle. Kept as a visible
+          section rather than removed silently, so a user looking for "change my
+          password" finds out why there isn't one. */}
+      <Section title="Sign-in">
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          This account has no password. You sign in with <strong>{profile?.email || email}</strong> and a
+          6-digit code emailed to you each time. Change the email above to change where that code goes.
+        </p>
       </Section>
 
       {/* Replay Tutorial */}

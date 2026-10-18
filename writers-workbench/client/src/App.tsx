@@ -6,9 +6,6 @@ import { ToastProvider } from './contexts/ToastContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import { lazyRetry } from './lib/lazyRetry';
 import LoginPage from './components/auth/LoginPage';
-import SignupPage from './components/auth/SignupPage';
-import ForgotPasswordPage from './components/auth/ForgotPasswordPage';
-import ResetPasswordPage from './components/auth/ResetPasswordPage';
 import OnboardingPage from './components/auth/OnboardingPage';
 import AuthGuard from './components/auth/AuthGuard';
 import AppShell from './components/layout/AppShell';
@@ -66,9 +63,13 @@ export default function App() {
       <UserProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          {/* Passwordless: signing in and signing up are the same two steps, so
+              /signup and the password-recovery routes all land on the one page.
+              They stay as redirects rather than 404s because they are in users'
+              bookmarks, in old emails, and in the marketing site's links. */}
+          <Route path="/signup" element={<Navigate to="/login" replace />} />
+          <Route path="/forgot-password" element={<Navigate to="/login" replace />} />
+          <Route path="/reset-password" element={<Navigate to="/login" replace />} />
           <Route path="/onboarding" element={<OnboardingPage />} />
           <Route
             path="/*"

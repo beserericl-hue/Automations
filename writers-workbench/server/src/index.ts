@@ -15,6 +15,7 @@ import { exportRouter } from './routes/export.js';
 import { adminRouter } from './routes/admin.js';
 import { brainstormRouter } from './routes/brainstorm.js';
 import { accountRouter } from './routes/account.js';
+import { authRouter } from './routes/auth.js';
 import { sessionRouter, pushSseEvent } from './routes/session.js';
 import { imagesRouter } from './routes/images.js';
 import { emailRouter } from './routes/email.js';
@@ -142,6 +143,19 @@ const generalLimiter = rateLimit({
   message: { error: 'Too many requests, please try again later' },
 });
 
+// Passwordless login. Tighter than everything else because these two endpoints
+// are the only unauthenticated write path in the app: /otp/request sends mail and
+// /otp/verify guesses at credentials. 10/min per IP leaves room for a mistyped
+// address and a resend while making bulk guessing pointless; the per-email and
+// per-IP hourly caps inside the route are the real limits.
+const authLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: { code: 'RATE_LIMITED', message: 'Too many sign-in attempts. Wait a minute and try again.' } },
+});
+
 const brainstormLimiter = rateLimit({
   windowMs: 60_000,
   max: 5,
@@ -169,6 +183,8 @@ app.get('/api/docs.json', (_req, res) => res.json(swaggerSpec));
 
 // API routes
 app.use('/api/health', healthRouter);
+// Public by design — a user has no session until these succeed.
+app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/export', exportRouter);
 app.use('/api/admin', adminRouter);
