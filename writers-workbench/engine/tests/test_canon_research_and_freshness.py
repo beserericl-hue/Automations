@@ -298,37 +298,56 @@ class TestTheWriterUsesTheStoredStudy:
         return _stored_research
 
     def test_the_chapters_own_facts_and_sources_are_handed_over(self) -> None:
-        text, topics = self._stored()(_outline_with_research(), 39)
+        text, topics, n = self._stored()(_outline_with_research(), 39)
         assert "innermost palisade" in text
         assert "Ferguson & Stewart 1940" in text
         assert "SOURCES:" in text
         assert topics, "no topic labels, so QA cannot report what was grounded"
+        assert n == 2
 
     def test_cautions_survive_into_the_prompt(self) -> None:
-        text, _ = self._stored()(_outline_with_research(), 39)
+        text, _topics, _n = self._stored()(_outline_with_research(), 39)
         assert "**Caution**" in text
         assert "17th-century tribute" in text
 
-    def test_a_chapter_without_a_study_falls_back(self) -> None:
-        """Returning "" is the signal to make the live Perplexity pass."""
-        assert self._stored()(_outline_with_research(), 40) == ("", [])
+    def test_a_chapter_without_a_study_hands_over_nothing(self) -> None:
+        assert self._stored()(_outline_with_research(), 40) == ("", [], 0)
 
-    def test_a_stub_study_falls_back(self) -> None:
-        o = {"chapters": [{"chapter_number": 1, "research": {"facts": [{"fact": "one"}]}}]}
-        assert self._stored()(o, 1) == ("", [])
+    def test_a_one_fact_study_is_still_handed_over(self) -> None:
+        """Measured on The Ossuary: **52 of 96** chapters carry exactly one fact. Discarding it to
+        make a Perplexity call would lose the only cited material those chapters have — the caller
+        tops it up instead, which is what the returned count is for."""
+        from chapter_step.main import _MIN_STORED_FACTS
+
+        o = {"chapters": [{"chapter_number": 1, "research": {"facts": [{"fact": "one", "source": "s"}]}}]}
+        text, _topics, n = self._stored()(o, 1)
+        assert "one" in text
+        assert n == 1
+        assert n < _MIN_STORED_FACTS  # so the caller tops it up
 
     def test_malformed_research_does_not_raise(self) -> None:
-        for bad in (None, "text", [], {"facts": "not a list"}, {"facts": [None, 3]}):
+        for bad in (None, "text", [], {"facts": "not a list"}, {"facts": [None, 3]}, {"facts": []}):
             o = {"chapters": [{"chapter_number": 1, "research": bad}]}
-            assert self._stored()(o, 1) == ("", []), bad
+            assert self._stored()(o, 1) == ("", [], 0), bad
 
-    def test_the_live_pass_is_skipped_when_a_study_exists(self) -> None:
-        """Source-level: the write path must consult the stored study BEFORE awaiting Perplexity."""
+    def test_a_thin_study_is_topped_up_not_replaced(self) -> None:
+        """Source-level: the write path must keep the stored block when it also runs the live pass,
+        and label the two so the model can tell cited material from a live search."""
         import inspect
 
         from chapter_step import main as M
 
         src = inspect.getsource(M)
-        i_stored = src.index("research_facts, research_gaps_filled = _stored_research(")
-        i_live = src.index("research_facts, research_gaps_filled = await _chapter_research(")
+        i_stored = src.index("stored, stored_topics, n_facts = _stored_research(")
+        i_live = src.index("live, live_topics = await _chapter_research(")
         assert i_stored < i_live, "the live research pass still runs first"
+        assert "FROM THIS PROJECT'S CHAPTER-BY-CHAPTER STUDY (cited):" in src
+        assert "ADDITIONAL PERIOD RESEARCH:" in src
+
+    def test_a_sufficient_study_skips_the_live_pass(self) -> None:
+        import inspect
+
+        from chapter_step import main as M
+
+        src = inspect.getsource(M)
+        assert "if stored and n_facts >= _MIN_STORED_FACTS:" in src

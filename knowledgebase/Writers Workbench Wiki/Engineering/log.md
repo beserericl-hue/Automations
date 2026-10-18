@@ -1454,8 +1454,39 @@ The live reindex is the evidence for all of it: 119 vectors → 290, of which **
   all steps share one process, so the semaphore is a real per-container cap. A test fails if a worker
   starts calling an LLM or a step is peeled back out.
 
-**Still open:** the 22-project canon backfill (J1), a second replica (B7), the B9 quality
-comparison, and a new **K6** — the research `period` label is wrong on some chapters (`Period: 2011`
-on prehistoric eras), which is a data defect but one that reaches the prompt.
+**Two things the live numbers corrected, both mine.**
+
+- I recorded the research `period` label as wrong on chapters 15, 25 and 30 (`Period: 2011` against
+  archaeological facts). Auditing all 96 showed the opposite: those are the **modern frame**
+  chapters — The Commingling Problem, The Survey, Winifred — so 2011 is right. All 18 "suspect"
+  labels are the present-day and recognition-era chapters. No defect.
+- The study is thinner than "149 facts" suggests: **52 of 96 chapters carry exactly one fact**
+  (1.55 average). My first version of the write-path rule required two and otherwise fell back to
+  Perplexity — which would have discarded the only cited, reviewed material those 52 chapters have.
+  A thin study is now **topped up, not replaced**, with the stored and live blocks labelled
+  separately (**K6**).
+
+**And one the platform corrected.** Railway's `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` defaults to
+**0** — SIGTERM, then immediate SIGKILL — so the drain I had just written was dead code on the only
+platform this runs on. Set to 60 on both DEV engine services and written into CLAUDE.md, because a
+PROD cutover that misses it keeps the hard-kill behaviour while the code claims otherwise. The
+supervisor's child wait was also 25s against a worker told to spend up to 30s finishing a job, so it
+would have SIGKILLed a worker doing exactly what the drain asked; now 40s.
+
+**The drain then confirmed live on DEV**, from the outgoing container's own logs:
+
+```
+17:55:03 supervisor.signalled    signal=SIGTERM
+17:55:03 drain.begin             path=/tmp/engine-draining
+17:55:08 Setting allow_pick_jobs to `False`      (both workers, exactly 5s later)
+17:55:08 shutdown on SIGTERM ... 0 to be completed
+17:55:08 shutdown on SIGTERM, wait complete ... 0 ongoing to cancel
+```
+
+The flag precedes the signal, the 5s readiness hold is real, and the workers stopped picking up work
+and awaited their in-flight jobs rather than having them cancelled.
+
+**Still open:** the 22-project canon backfill (J1), a second replica actually running (B7), the B9
+quality comparison before the default moves, and re-running the study for the 52 thin chapters (K6).
 
 Updated: [[remaining-work-inventory]].

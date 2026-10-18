@@ -1166,11 +1166,18 @@ def _research_focus(ctx: dict[str, Any]) -> str:
 
 
 _MIN_STORED_FACTS = 2
-"""Below this, the stored block is a stub and the live pass is still worth making."""
+"""At or above this, the stored study stands alone. Below it the study is kept AND topped up with a
+live pass, rather than discarded — measured on The Ossuary, where **52 of 96** chapters carry exactly
+one fact (149 facts over 96 chapters is an average of 1.55, not a thick study per chapter). Throwing
+that fact away to make a Perplexity call would lose the only cited, reviewed material those chapters
+have."""
 
 
-def _stored_research(outline: dict[str, Any], chapter_number: int) -> tuple[str, list[str]]:
-    """The chapter's OWN stored research study, formatted as a grounding block. ``("", [])`` if none.
+def _stored_research(outline: dict[str, Any], chapter_number: int) -> tuple[str, list[str], int]:
+    """The chapter's OWN stored research study as a grounding block, plus its fact count.
+
+    ``("", [], 0)`` when the chapter carries no usable research. The count is what the caller uses to
+    decide whether the study is sufficient on its own.
 
     A chapter-by-chapter study attached to the outline is better grounding than a live Perplexity
     pass: it is broader (university papers, historical societies, archaeological site reports), it
@@ -1190,13 +1197,13 @@ def _stored_research(outline: dict[str, Any], chapter_number: int) -> tuple[str,
         entry = chapters[chapter_number]
     research = (entry or {}).get("research")
     if not isinstance(research, dict):
-        return "", []
+        return "", [], 0
 
     facts = [f for f in (research.get("facts") or []) if isinstance(f, dict) and f.get("fact")]
     colour = [str(c).strip() for c in (research.get("local_color") or []) if str(c).strip()]
     flags = [str(f).strip() for f in (research.get("flags") or []) if str(f).strip()]
-    if len(facts) < _MIN_STORED_FACTS:
-        return "", []
+    if not facts:
+        return "", [], 0
 
     lines: list[str] = []
     period = str(research.get("period") or "").strip()
@@ -1221,7 +1228,7 @@ def _stored_research(outline: dict[str, Any], chapter_number: int) -> tuple[str,
     if sources:
         lines.append("\nSOURCES: " + "; ".join(sources[:12]))
     text = "\n".join(lines)
-    return text, _facts_topics(text)
+    return text, _facts_topics(text), len(facts)
 
 
 async def _chapter_research(beat: str, *, period: str, title: str, focus: str = "") -> tuple[str, list[str]]:
@@ -1563,17 +1570,34 @@ async def _op_write(payload: dict) -> dict:
             # The chapter's own stored study wins over a live pass: broader sourcing, already
             # reviewed, and addressed by chapter number rather than hoped for from a similarity
             # search. Perplexity is the fallback for chapters that carry no study.
-            research_facts, research_gaps_filled = _stored_research(ctx["outline"], req.chapter_number)
-            if research_facts:
+            stored, stored_topics, n_facts = _stored_research(ctx["outline"], req.chapter_number)
+            if stored and n_facts >= _MIN_STORED_FACTS:
+                research_facts, research_gaps_filled = stored, stored_topics
                 logger.info(
                     "chapter.research.stored",
                     chapter=req.chapter_number,
-                    chars=len(research_facts),
-                    topics=len(research_gaps_filled),
+                    facts=n_facts,
+                    chars=len(stored),
                 )
             else:
-                research_facts, research_gaps_filled = await _chapter_research(
+                live, live_topics = await _chapter_research(
                     beat, period=period, title=ctx["title"], focus=_research_focus(ctx)
+                )
+                # A thin study is topped up, never replaced: its facts are cited and reviewed, and
+                # on The Ossuary 52 of 96 chapters have exactly one. Labelled so the model can tell
+                # attributed material from a live search.
+                blocks = []
+                if stored:
+                    blocks.append("FROM THIS PROJECT'S CHAPTER-BY-CHAPTER STUDY (cited):\n" + stored)
+                if live:
+                    blocks.append("ADDITIONAL PERIOD RESEARCH:\n" + live)
+                research_facts = "\n\n".join(blocks)
+                research_gaps_filled = stored_topics + live_topics
+                logger.info(
+                    "chapter.research.mixed",
+                    chapter=req.chapter_number,
+                    stored_facts=n_facts,
+                    live_chars=len(live),
                 )
             # Use a pre-made chapter outline if the caller supplied one (the explicit outline ->
             # chapter-outline -> narrative flow); else auto-load the chapter outline saved by
