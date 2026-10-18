@@ -31,6 +31,7 @@ import json
 import re
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlparse
 from xml.etree import ElementTree
 
 import httpx
@@ -338,6 +339,38 @@ def is_scrapeable_destination(url: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
+def is_reddit_feed(url: str) -> bool:
+    """Is this URL one of Reddit's own feeds (rather than an rss.app mirror of one)?"""
+    host = urlparse(str(url or "")).netloc.lower()
+    return host.endswith("reddit.com")
+
+
+def _mark_reddit_rss_self_posts(items: list[FeedItem], *, feed_url: str) -> list[FeedItem]:
+    """Treat a Reddit Atom entry that carries a body as the self post it is.
+
+    Reddit 403s its own ``/.json`` listing from datacenter IPs — measured on all four
+    wasteland-wire subreddit rows — but serves ``/.rss`` from the same address. Those four feeds
+    were therefore recorded as dead when the endpoint, not the feed, was the problem.
+
+    Pointing them at ``/.rss`` fetches, but on its own it ingests almost nothing: the Atom path
+    never sets ``is_self_post``, a Reddit self post is well under
+    ``pipeline.INLINE_BODY_MIN_WORDS``, and reddit.com is on the unscrapeable list — so every
+    self post fell through to "skipped, unscrapeable". Measured on r/apocalypse: 25 items
+    fetched, 24 skipped, 1 kept.
+
+    Reddit's Atom ``<content>`` IS the post body for a self post (for a link post it is a short
+    "submitted by" stub with the outbound link), so an entry with a body on a Reddit feed is
+    exactly the case the pipeline already handles directly and without a relevance gate.
+    """
+    if not is_reddit_feed(feed_url):
+        return items
+    for item in items:
+        if item.has_body and not is_scrapeable_destination(item.url):
+            item.is_self_post = True
+            item.item_type = REDDIT_POST
+    return items
+
+
 async def fetch_feed(
     url: str, *, url_type: str = "rss", client: httpx.AsyncClient | None = None
 ) -> list[FeedItem]:
@@ -375,7 +408,8 @@ async def fetch_feed(
         return parse_reddit_listing(payload)
 
     if kind == "xml":
-        return parse_rss_xml(body)
+        items = parse_rss_xml(body)
+        return _mark_reddit_rss_self_posts(items, feed_url=url)
 
     logger.warning("ingestion.feed_unknown_format", url=url[:120], head=body[:80])
     return []

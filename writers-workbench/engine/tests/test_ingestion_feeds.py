@@ -363,3 +363,59 @@ class TestCodeElementStripping:
 
     def test_a_script_free_body_is_unchanged(self) -> None:
         assert feeds.strip_code_elements("<p>Just prose.</p>") == "<p>Just prose.</p>"
+
+
+class TestRedditRssSelfPosts:
+    """Reddit 403s its own `/.json` listing from a datacenter IP but serves `/.rss` from the same
+    address, so all four wasteland-wire subreddit rows were recorded as dead feeds when the endpoint
+    was the problem. Switching them to `/.rss` fetches — but without this marking, 24 of 25 items
+    were skipped as unscrapeable, because the Atom path never set `is_self_post`, a self post is far
+    under INLINE_BODY_MIN_WORDS, and reddit.com is on the unscrapeable list. Measured live."""
+
+    ATOM = """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <title>And if biblical apocalypse was about the end of the dragon age</title>
+    <link href="https://www.reddit.com/r/apocalypse/comments/abc123/and_if/"/>
+    <content type="html">&lt;div&gt;The flood narrative reads differently if you take the serpents literally.&lt;/div&gt;</content>
+    <published>2026-09-10T12:00:00+00:00</published>
+    <author><name>/u/someone</name></author>
+  </entry>
+  <entry>
+    <title>A link post to an outside article</title>
+    <link href="https://example.com/an-article"/>
+    <content type="html">&lt;a href="https://example.com/an-article"&gt;[link]&lt;/a&gt; submitted by /u/someone&lt;/a&gt;</content>
+    <published>2026-09-10T13:00:00+00:00</published>
+  </entry>
+</feed>"""
+
+    def test_a_reddit_atom_entry_with_a_body_is_a_self_post(self) -> None:
+        items = feeds._mark_reddit_rss_self_posts(
+            feeds.parse_rss_xml(self.ATOM), feed_url="https://www.reddit.com/r/apocalypse/.rss"
+        )
+        selfpost = items[0]
+        assert selfpost.is_self_post is True
+        assert selfpost.item_type == feeds.REDDIT_POST
+        assert "serpents literally" in selfpost.body_text
+
+    def test_a_link_post_is_left_alone_so_it_still_gets_scraped(self) -> None:
+        """Its destination is scrapeable and its body is a stub, so marking it a self post would
+        ingest the stub instead of the article."""
+        items = feeds._mark_reddit_rss_self_posts(
+            feeds.parse_rss_xml(self.ATOM), feed_url="https://www.reddit.com/r/apocalypse/.rss"
+        )
+        assert items[1].is_self_post is False
+
+    def test_a_non_reddit_feed_is_untouched(self) -> None:
+        """Clarkesworld and Medium syndicate full bodies too; they must keep going down the normal
+        inline-body path, which applies the relevance gate."""
+        items = feeds._mark_reddit_rss_self_posts(
+            feeds.parse_rss_xml(self.ATOM), feed_url="https://clarkesworldmagazine.com/feed/"
+        )
+        assert [i.is_self_post for i in items] == [False, False]
+
+    def test_an_rss_app_mirror_is_not_a_reddit_feed(self) -> None:
+        """rss.app's subreddit mirrors carry link posts and no bodies; they are handled by the JSON
+        path and must not be swept in by host matching."""
+        assert feeds.is_reddit_feed("https://rss.app/feeds/v1.1/upLgfm9lv7RXwzes.json") is False
+        assert feeds.is_reddit_feed("https://www.reddit.com/r/apocalypse/.rss") is True
