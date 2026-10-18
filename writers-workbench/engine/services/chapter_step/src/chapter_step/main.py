@@ -1109,6 +1109,65 @@ def _research_focus(ctx: dict[str, Any]) -> str:
     return "\n".join(parts)
 
 
+_MIN_STORED_FACTS = 2
+"""Below this, the stored block is a stub and the live pass is still worth making."""
+
+
+def _stored_research(outline: dict[str, Any], chapter_number: int) -> tuple[str, list[str]]:
+    """The chapter's OWN stored research study, formatted as a grounding block. ``("", [])`` if none.
+
+    A chapter-by-chapter study attached to the outline is better grounding than a live Perplexity
+    pass: it is broader (university papers, historical societies, archaeological site reports), it
+    was reviewed, it carries its sources, and it is the same text the Workbench shows the author. It
+    is also addressed by chapter number rather than retrieved by similarity — a vector search over a
+    96-chapter project is not guaranteed to return THIS chapter's facts, and on The Ossuary it
+    returned chapters 26, 31, 47 and 61 for one query. Where a study exists, it IS the factual basis;
+    Perplexity stays as the fallback for chapters that have none.
+    """
+    chapters = (outline or {}).get("chapters") or []
+    entry: dict[str, Any] | None = None
+    for ch in chapters:
+        if isinstance(ch, dict) and str(ch.get("chapter_number")) == str(chapter_number):
+            entry = ch
+            break
+    if entry is None and 0 <= chapter_number < len(chapters) and isinstance(chapters[chapter_number], dict):
+        entry = chapters[chapter_number]
+    research = (entry or {}).get("research")
+    if not isinstance(research, dict):
+        return "", []
+
+    facts = [f for f in (research.get("facts") or []) if isinstance(f, dict) and f.get("fact")]
+    colour = [str(c).strip() for c in (research.get("local_color") or []) if str(c).strip()]
+    flags = [str(f).strip() for f in (research.get("flags") or []) if str(f).strip()]
+    if len(facts) < _MIN_STORED_FACTS:
+        return "", []
+
+    lines: list[str] = []
+    period = str(research.get("period") or "").strip()
+    if period:
+        lines.append(f"PERIOD: {period}")
+    sources: list[str] = []
+    for fact in facts:
+        text = str(fact.get("fact")).strip()
+        source = str(fact.get("source") or "").strip()
+        # Bulleted with a bold lead so _facts_topics can label what was grounded, as it does for
+        # the Perplexity block.
+        topic = str(fact.get("topic") or text.split(".")[0])[:70]
+        lines.append(f"- **{topic}**: {text}" + (f" [{source}]" if source else ""))
+        if source and source not in sources:
+            sources.append(source)
+    for c in colour:
+        lines.append(f"- **Local colour**: {c}")
+    # Flags are the places the record does NOT support the outline. A writer who cannot see them
+    # dramatises the invention as if it were attested.
+    for f in flags:
+        lines.append(f"- **Caution**: {f}")
+    if sources:
+        lines.append("\nSOURCES: " + "; ".join(sources[:12]))
+    text = "\n".join(lines)
+    return text, _facts_topics(text)
+
+
 async def _chapter_research(beat: str, *, period: str, title: str, focus: str = "") -> tuple[str, list[str]]:
     """Pre-write research grounding (Perplexity): given the chapter's planned beat, fetch SPECIFIC
     period facts / local color / material culture / real events to weave into the scene as it is
@@ -1444,9 +1503,21 @@ async def _op_write(payload: dict) -> dict:
             # the prose is grounded as it's written (woven in, lengthening the chapter) rather than
             # bolted on by a post-hoc rewrite that tends to shorten it.
             beat = _chapter_outline_beat(ctx["outline"], req.chapter_number)
-            research_facts, research_gaps_filled = await _chapter_research(
-                beat, period=period, title=ctx["title"], focus=_research_focus(ctx)
-            )
+            # The chapter's own stored study wins over a live pass: broader sourcing, already
+            # reviewed, and addressed by chapter number rather than hoped for from a similarity
+            # search. Perplexity is the fallback for chapters that carry no study.
+            research_facts, research_gaps_filled = _stored_research(ctx["outline"], req.chapter_number)
+            if research_facts:
+                logger.info(
+                    "chapter.research.stored",
+                    chapter=req.chapter_number,
+                    chars=len(research_facts),
+                    topics=len(research_gaps_filled),
+                )
+            else:
+                research_facts, research_gaps_filled = await _chapter_research(
+                    beat, period=period, title=ctx["title"], focus=_research_focus(ctx)
+                )
             # Use a pre-made chapter outline if the caller supplied one (the explicit outline ->
             # chapter-outline -> narrative flow); else auto-load the chapter outline saved by
             # chapter.plan (E2E-4 R114/R115); else plan it now.

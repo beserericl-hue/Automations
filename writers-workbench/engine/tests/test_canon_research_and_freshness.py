@@ -283,3 +283,52 @@ class TestCountsAreNotPageLengths:
         for fn in (E.index_project_canon, E.canon_staleness):
             src = inspect.getsource(fn)
             assert "count=_EXACT" in src, f"{fn.__name__} still counts by page length"
+
+
+class TestTheWriterUsesTheStoredStudy:
+    """Making the facts retrievable is not the same as making them reach the chapter. A vector
+    search over 96 research chunks is not guaranteed to return THIS chapter's facts — on The Ossuary
+    the query "palisade post molds" returned chapters 26, 31, 47 and 61. The stored study is
+    addressed by chapter number instead."""
+
+    @staticmethod
+    def _stored():
+        from chapter_step.main import _stored_research
+
+        return _stored_research
+
+    def test_the_chapters_own_facts_and_sources_are_handed_over(self) -> None:
+        text, topics = self._stored()(_outline_with_research(), 39)
+        assert "innermost palisade" in text
+        assert "Ferguson & Stewart 1940" in text
+        assert "SOURCES:" in text
+        assert topics, "no topic labels, so QA cannot report what was grounded"
+
+    def test_cautions_survive_into_the_prompt(self) -> None:
+        text, _ = self._stored()(_outline_with_research(), 39)
+        assert "**Caution**" in text
+        assert "17th-century tribute" in text
+
+    def test_a_chapter_without_a_study_falls_back(self) -> None:
+        """Returning "" is the signal to make the live Perplexity pass."""
+        assert self._stored()(_outline_with_research(), 40) == ("", [])
+
+    def test_a_stub_study_falls_back(self) -> None:
+        o = {"chapters": [{"chapter_number": 1, "research": {"facts": [{"fact": "one"}]}}]}
+        assert self._stored()(o, 1) == ("", [])
+
+    def test_malformed_research_does_not_raise(self) -> None:
+        for bad in (None, "text", [], {"facts": "not a list"}, {"facts": [None, 3]}):
+            o = {"chapters": [{"chapter_number": 1, "research": bad}]}
+            assert self._stored()(o, 1) == ("", []), bad
+
+    def test_the_live_pass_is_skipped_when_a_study_exists(self) -> None:
+        """Source-level: the write path must consult the stored study BEFORE awaiting Perplexity."""
+        import inspect
+
+        from chapter_step import main as M
+
+        src = inspect.getsource(M)
+        i_stored = src.index("research_facts, research_gaps_filled = _stored_research(")
+        i_live = src.index("research_facts, research_gaps_filled = await _chapter_research(")
+        assert i_stored < i_live, "the live research pass still runs first"
