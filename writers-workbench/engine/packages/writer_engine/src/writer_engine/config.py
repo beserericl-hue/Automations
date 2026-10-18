@@ -58,6 +58,13 @@ class EngineSettings(BaseSettings):
     # Image / scrape
     kieai_api_key: str = Field(default="", alias="KIEAI_API_KEY")
     firecrawl_api_key: str = Field(default="", alias="FIRECRAWL_API_KEY")
+    # Scraping can be switched off without removing the key. Set false on DEV 2026-10-18: the
+    # Firecrawl account is out of credits, so every scrape answered 402 and 62 of 72 items on the
+    # first live tick were lost to a billing state. Off, the pipeline ingests what the feeds already
+    # syndicate (Medium, Clarkesworld, Escape Pod, Strange Horizons, reddit self posts) and records
+    # the rest as deferred rather than failed — so the number does not lie about why they are not
+    # there. Turn it back on when the account is topped up or a substitute scraper is wired in.
+    firecrawl_enabled: bool = Field(default=True, alias="FIRECRAWL_ENABLED")
 
     # Humanizer (E6). StealthGPT REST: POST https://www.stealthgpt.ai/api/stealthify with an
     # `api-token` header, max 3000 words per request. Empty = the humanize pass is OFF, which is the

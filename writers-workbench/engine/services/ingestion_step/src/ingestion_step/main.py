@@ -40,6 +40,9 @@ def _totals(results: list[Any]) -> dict[str, Any]:
         "items_skipped_irrelevant": sum(r.items_skipped_irrelevant for r in results),
         "items_skipped_unkeyable": sum(r.items_skipped_unkeyable for r in results),
         "items_skipped_unscrapeable": sum(r.items_skipped_unscrapeable for r in results),
+        # Separate from unscrapeable: these are items we DID want and chose not to fetch because no
+        # scraper is switched on. They are recoverable by re-running once one is.
+        "items_deferred_no_scraper": sum(r.items_deferred_no_scraper for r in results),
         "items_failed": sum(r.items_failed for r in results),
         "feeds_with_errors": [{"feed": r.feed_name, "error": r.error} for r in results if r.error],
         "feeds_detail": [r.as_dict() for r in results],

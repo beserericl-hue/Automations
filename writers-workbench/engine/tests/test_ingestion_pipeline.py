@@ -83,6 +83,9 @@ def wired(monkeypatch: pytest.MonkeyPatch, fake_supabase: FakeSupabase) -> FakeS
     async def _external(scraped: enrich.Scraped) -> list[str]:
         return ["https://openai.com/announcement"]
 
+    # The suite runs with FIRECRAWL_API_KEY cleared (conftest), and the pipeline now asks whether a
+    # scraper is available BEFORE reaching for one — so a stubbed `scrape` is not enough on its own.
+    monkeypatch.setattr(pipeline.enrich, "scraper_available", lambda: True)
     monkeypatch.setattr(pipeline.enrich, "scrape", _scrape)
     monkeypatch.setattr(pipeline.enrich, "judge_relevance", _judge)
     monkeypatch.setattr(pipeline.enrich, "extract_external_sources", _external)
@@ -518,3 +521,66 @@ class TestLabelOrdering:
                 now=NOW,
             )
         assert wired.tables[store.TABLE][0]["source_name"] == "reddit-artificial"
+
+
+class TestNoScraperConfigured:
+    """Firecrawl is excluded on DEV until the account is topped up or a substitute is wired in. The
+    point of this block is that "we are not scraping today" must not be recorded as "this
+    destination cannot be read": on the first live tick, 62 of 72 items were lost to a 402 and the
+    counters called them unscrapeable, which reads as a feed problem."""
+
+    @pytest.mark.asyncio
+    async def test_items_needing_a_scrape_are_deferred_not_called_unscrapeable(
+        self, wired: FakeSupabase, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(pipeline.enrich, "scraper_available", lambda: False)
+        called: list[str] = []
+
+        async def _never(url: str, *, client: object = None) -> enrich.Scraped:
+            called.append(url)
+            return enrich.Scraped(markdown="should not happen")
+
+        monkeypatch.setattr(pipeline.enrich, "scrape", _never)
+
+        body = _json_feed(_item(1, content_text="short teaser"), _item(2, content_text="also short"))
+        async with _client_serving(body) as client:
+            result = await pipeline.ingest_feed(_feed(), client=client, now=NOW)
+
+        assert called == [], "no scrape should be attempted when no scraper is available"
+        assert result.items_deferred_no_scraper == 2
+        assert result.items_skipped_unscrapeable == 0
+        assert result.items_uploaded == 0
+        assert result.error is None, "a missing scraper is not a feed error"
+
+    @pytest.mark.asyncio
+    async def test_feeds_that_carry_their_own_body_still_ingest(
+        self, wired: FakeSupabase, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """This is what keeps ingestion useful with the scraper off: Medium, Clarkesworld, Escape
+        Pod and Strange Horizons syndicate the whole piece, and reddit self posts are their body."""
+        monkeypatch.setattr(pipeline.enrich, "scraper_available", lambda: False)
+        whole = " ".join(["word"] * (pipeline.INLINE_BODY_MIN_WORDS + 10))
+        async with _client_serving(_json_feed(_item(1, content_text=whole))) as client:
+            result = await pipeline.ingest_feed(_feed(), client=client, now=NOW)
+        assert result.items_uploaded == 1
+        assert result.items_deferred_no_scraper == 0
+
+    def test_the_switch_and_the_missing_key_mean_the_same_thing(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from writer_engine.config import get_settings
+
+        monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test-key")
+        monkeypatch.setenv("FIRECRAWL_ENABLED", "true")
+        get_settings.cache_clear()
+        assert enrich.scraper_available() is True
+
+        monkeypatch.setenv("FIRECRAWL_ENABLED", "false")
+        get_settings.cache_clear()
+        assert enrich.scraper_available() is False
+
+        monkeypatch.setenv("FIRECRAWL_ENABLED", "true")
+        monkeypatch.setenv("FIRECRAWL_API_KEY", "")
+        get_settings.cache_clear()
+        assert enrich.scraper_available() is False
+        get_settings.cache_clear()

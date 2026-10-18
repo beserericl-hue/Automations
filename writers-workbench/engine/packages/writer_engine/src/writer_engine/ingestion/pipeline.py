@@ -62,6 +62,11 @@ class FeedRunResult:
     items_skipped_unkeyable: int = 0
     items_skipped_irrelevant: int = 0
     items_skipped_unscrapeable: int = 0
+    items_deferred_no_scraper: int = 0
+    """Items that need a scrape while no scraper is available. Counted apart from
+    `items_skipped_unscrapeable` on purpose: one means the destination cannot be read, the other
+    means we are not reading anything today. Reporting a billing state as a bad destination is how
+    62 lost items looked like a feed problem."""
     items_failed: int = 0
     error: str | None = None
     uploaded_keys: list[str] = field(default_factory=list)
@@ -193,6 +198,12 @@ async def _ingest_item(
 
     if not feeds.is_scrapeable_destination(item.url):
         result.items_skipped_unscrapeable += 1
+        return
+
+    if not enrich.scraper_available():
+        # Deferred, not failed, and not an error log per item: with 25 items a feed that would
+        # produce 25 identical ERROR lines teaches people to ignore the log.
+        result.items_deferred_no_scraper += 1
         return
 
     scraped = await enrich.scrape(item.url, client=client)
@@ -358,6 +369,7 @@ async def ingest_feed(
         irrelevant=result.items_skipped_irrelevant,
         unkeyable=result.items_skipped_unkeyable,
         unscrapeable=result.items_skipped_unscrapeable,
+        deferred_no_scraper=result.items_deferred_no_scraper,
         failed=result.items_failed,
     )
     return result

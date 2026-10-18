@@ -190,6 +190,17 @@ class Scraped:
         return not self.error and bool(self.markdown.strip())
 
 
+def scraper_available() -> bool:
+    """Is a scraper configured AND switched on?
+
+    Asked by the pipeline BEFORE it reaches for one, so a run with no scraper reports its items as
+    deferred instead of attempting 62 calls that will all answer 402 and then calling them
+    unscrapeable. `FIRECRAWL_ENABLED=false` is the switch; a missing key means the same thing.
+    """
+    settings = get_settings()
+    return bool(settings.firecrawl_enabled and settings.firecrawl_api_key)
+
+
 async def scrape(url: str, *, client: httpx.AsyncClient | None = None) -> Scraped:
     """Firecrawl the article. Never raises — a failed scrape is one skipped item.
 
@@ -200,6 +211,8 @@ async def scrape(url: str, *, client: httpx.AsyncClient | None = None) -> Scrape
     settings = get_settings()
     if not settings.firecrawl_api_key:
         return Scraped(error="firecrawl_not_configured")
+    if not settings.firecrawl_enabled:
+        return Scraped(error="firecrawl_disabled")
 
     owned = client is None
     http = client or httpx.AsyncClient(timeout=SCRAPE_TIMEOUT_S)
