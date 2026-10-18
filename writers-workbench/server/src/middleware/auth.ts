@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
+import { ensureTrialSubscription } from '../services/credits.js';
 import { logger } from '../lib/logger.js';
 
 // Sprint 8: extended auth context. Legacy fields (userId, authUid, userRole) stay
@@ -117,6 +118,23 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       tier = Array.isArray(subscription.tier) ? subscription.tier[0] ?? null : subscription.tier;
     }
 
+    // I8: no subscription row at all. This was reachable simply by closing the tab on the
+    // "choose your plan" step, and the consequence was that `requireCredits` read null as zero and
+    // answered 402 to every chat, export and chapter request — for an account that had done nothing
+    // wrong and was given no way to find out what was missing.
+    //
+    // Provisioning happens here rather than in the onboarding flow because here is the one place
+    // every authenticated path passes through, so no future route can reintroduce the hole. It runs
+    // once per user: the next request finds the row and this branch is skipped.
+    let creditsRemaining = subscription?.credits_remaining ?? null;
+    if (!subscription) {
+      const provisioned = await ensureTrialSubscription(realUserId);
+      if (provisioned) {
+        tier = provisioned.tier;
+        creditsRemaining = provisioned.credits_remaining;
+      }
+    }
+
     req.authUid = authUser.id;
     req.realUserId = realUserId;
     req.userId = realUserId;
@@ -124,7 +142,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     req.effectiveRole = effectiveRole;
     req.accountStatus = accountStatus;
     req.subscriptionTier = tier;
-    req.creditsRemaining = subscription?.credits_remaining ?? null;
+    req.creditsRemaining = creditsRemaining;
     req.isImpersonating = false;
 
     // ===== Impersonation: superuser-only =====

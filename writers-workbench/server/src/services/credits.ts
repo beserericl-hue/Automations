@@ -22,7 +22,11 @@ export type CreditTransactionType =
   | 'usage'
   | 'admin_adjustment'
   | 'purchase'
-  | 'refund';
+  | 'refund'
+  // The automatic trial provisioned on a first authenticated request with no
+  // subscription (migration 031). Deliberately its own type: it is not a monthly
+  // reset, nobody adjusted it, and nobody paid for it.
+  | 'trial_grant';
 
 export interface DeductCreditsResult {
   ok: true;
@@ -233,5 +237,111 @@ export async function adjustCreditsAdmin(
     ok: true,
     balance_after: newRemaining,
     transaction_id: txErr ? 'unknown' : (tx.id as string),
+  };
+}
+
+/**
+ * The shape `requireAuth` needs back after provisioning, so it can fill in the request context
+ * without a second round trip.
+ */
+export interface ProvisionedSubscription {
+  credits_remaining: number;
+  tier: {
+    id: string;
+    name: string;
+    display_name: string;
+    features: Record<string, unknown>;
+    monthly_credits: number;
+    credit_purchase_price_cents: number;
+  };
+}
+
+/**
+ * Give a user the trial subscription if they have none.
+ *
+ * I8: a user who created a profile and then closed the tab on the "choose your plan" step ended up
+ * with no `user_subscriptions` row at all. `requireAuth` then reported `creditsRemaining = null`,
+ * `requireCredits` read that as 0, and **every chat, export and chapter request answered 402** —
+ * for an account that had done nothing wrong and had no way to tell what was missing. The tier
+ * step was the only thing that ever created the row, and it was skippable.
+ *
+ * So the row is no longer the tier step's responsibility. Anyone who reaches an authenticated
+ * request without a subscription gets the trial tier, which exists for exactly this purpose
+ * (30 days, 200 credits on DEV). Choosing a plan later overwrites it through the normal
+ * `/account/subscribe` path, because that upserts on `user_id`.
+ *
+ * Idempotent and safe to race: the upsert is keyed on `user_id`, so two simultaneous first requests
+ * produce one row. Returns null when there is no trial tier configured or the write fails — the
+ * caller then behaves exactly as it did before, rather than failing the request.
+ */
+export async function ensureTrialSubscription(userId: string): Promise<ProvisionedSubscription | null> {
+  const supabase = getSupabaseAdmin();
+
+  // The trial tier is the one with trial_days > 0. Picked by that rather than by name so renaming
+  // the tier in the dashboard cannot silently disable this.
+  const { data: tier, error: tierErr } = await supabase
+    .from('subscription_tiers')
+    .select('id, name, display_name, features, monthly_credits, credit_purchase_price_cents, trial_days')
+    .gt('trial_days', 0)
+    .eq('active', true)
+    .order('sort_order', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (tierErr || !tier) {
+    logger.warn({ err: tierErr, userId }, 'ensureTrialSubscription: no trial tier configured');
+    return null;
+  }
+
+  const now = new Date();
+  const trialEnd = new Date(now.getTime() + (tier.trial_days as number) * 24 * 3600 * 1000);
+
+  const { error: upsertErr } = await supabase.from('user_subscriptions').upsert(
+    {
+      user_id: userId,
+      tier_id: tier.id,
+      status: 'active',
+      billing_cycle: 'none',
+      current_period_start: now.toISOString(),
+      current_period_end: trialEnd.toISOString(),
+      trial_start: now.toISOString(),
+      trial_end: trialEnd.toISOString(),
+      credits_remaining: tier.monthly_credits,
+      credits_used_this_period: 0,
+      auto_renew: false,
+    },
+    { onConflict: 'user_id' },
+  );
+
+  if (upsertErr) {
+    logger.error({ err: upsertErr, userId }, 'ensureTrialSubscription: upsert failed');
+    return null;
+  }
+
+  // Record it, so a balance that appeared on its own is explicable from the ledger rather than
+  // looking like a bug or a grant nobody remembers making.
+  await supabase.from('credit_transactions').insert({
+    user_id: userId,
+    amount: tier.monthly_credits,
+    balance_after: tier.monthly_credits,
+    transaction_type: 'trial_grant' satisfies CreditTransactionType,
+    description: `Automatic ${tier.display_name} (${tier.trial_days} days)`,
+  });
+
+  logger.info(
+    { userId, tier: tier.name, credits: tier.monthly_credits },
+    'ensureTrialSubscription: provisioned',
+  );
+
+  return {
+    credits_remaining: tier.monthly_credits as number,
+    tier: {
+      id: tier.id as string,
+      name: tier.name as string,
+      display_name: tier.display_name as string,
+      features: (tier.features ?? {}) as Record<string, unknown>,
+      monthly_credits: tier.monthly_credits as number,
+      credit_purchase_price_cents: tier.credit_purchase_price_cents as number,
+    },
   };
 }

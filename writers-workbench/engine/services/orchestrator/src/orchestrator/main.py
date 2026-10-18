@@ -57,6 +57,7 @@ from writer_engine.telemetry.metrics import HTTP_LATENCY, HTTP_REQUESTS, metrics
 from writer_engine.watchdog import Watchdog
 from writer_engine.watchdog import start as watchdog_start
 from writer_engine.watchdog import stop as watchdog_stop
+from writer_engine.workbench_cron import run_lifecycle
 
 from .library_orch import LibraryRetrieveOrchestrator
 from .newsletter_orch import NewsletterOrchestrator, resolution_hook_installed
@@ -870,6 +871,11 @@ def build_app() -> FastAPI:
             name="queue-metrics",
             interval_s=settings_for_jobs.queue_metrics_poll_seconds,
             run=_queue_metrics_tick,
+        ),
+        CronJob(
+            name="workbench-lifecycle",
+            interval_s=settings_for_jobs.workbench_lifecycle_poll_seconds,
+            run=run_lifecycle,
         ),
     ]
 

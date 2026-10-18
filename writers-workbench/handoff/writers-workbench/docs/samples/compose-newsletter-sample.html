@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The Workbench — Compose Newsletter (Sample)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: { extend: { colors: {
+    brand: { 50:'#f0f7ff',100:'#e0effe',200:'#bae0fd',300:'#7cc8fc',400:'#36adf8',500:'#0c93e9',600:'#0074c7',700:'#015da1',800:'#064f85',900:'#0b426e',950:'#082b4c' }
+  }, fontFamily: { sans:['Inter','ui-sans-serif','system-ui'], serif:['"Playfair Display"','Georgia','serif'], mono:['"JetBrains Mono"','ui-monospace'] } } }
+};
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  body{font-family:'Inter',system-ui,sans-serif}
+  .log-line::before{content:'› ';opacity:.45}
+  .pulse-dot{animation:pulse 1.6s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  [data-screen-label]{scroll-margin-top:16px}
+</style>
+</head>
+<body class="bg-gray-50 text-gray-900" data-screen-label="Compose Newsletter — Execution Tracker">
+
+<div class="flex min-h-screen">
+
+  <!-- ───────────── SIDEBAR ───────────── -->
+  <aside class="w-60 shrink-0 bg-white border-r border-gray-200 flex flex-col">
+    <div class="px-5 py-4 border-b border-gray-200 flex items-center gap-2">
+      <div class="w-7 h-7 rounded-md bg-brand-600 flex items-center justify-center text-white font-bold text-sm">W</div>
+      <div class="font-semibold text-gray-900 tracking-tight">Writers Workbench</div>
+    </div>
+    <nav class="p-3 text-sm flex-1">
+      <div class="px-2 pt-2 pb-1 text-[11px] uppercase tracking-wider text-gray-400 font-semibold">Workspace</div>
+      <a class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-gray-700 hover:bg-gray-100">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg> Dashboard</a>
+      <a class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-gray-700 hover:bg-gray-100">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16v4H4zM4 10h16v4H4zM4 16h10v4H4z"/></svg> Content library</a>
+      <a class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-gray-700 hover:bg-gray-100">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 12a9 9 0 11-4.65-7.86L21 3v6h-6"/></svg> Chat with Eve</a>
+
+      <div class="px-2 pt-5 pb-1 text-[11px] uppercase tracking-wider text-gray-400 font-semibold">Newsletter</div>
+      <a class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-gray-700 hover:bg-gray-100">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3h18v18H3z M3 9h18"/></svg> Home</a>
+      <a class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-gray-700 hover:bg-gray-100">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 4v16M4 12h16"/></svg> Generate</a>
+      <a class="flex items-center justify-between px-3 py-1.5 rounded-md bg-brand-50 text-brand-700 font-medium">
+        <span class="flex items-center gap-2.5">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          Active run
+        </span>
+        <span class="pulse-dot w-1.5 h-1.5 rounded-full bg-brand-600"></span>
+      </a>
+      <a class="flex items-center justify-between px-3 py-1.5 rounded-md text-gray-700 hover:bg-gray-100">
+        <span class="flex items-center gap-2.5">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 7h14M5 12h14M5 17h10"/></svg>
+          Pending approvals
+        </span>
+        <span class="text-[10px] font-semibold bg-brand-600 text-white rounded-full px-1.5 py-0.5">1</span>
+      </a>
+      <a class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-gray-700 hover:bg-gray-100">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16v16H4z M4 8h16"/></svg> Sends</a>
+      <a class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-gray-700 hover:bg-gray-100">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg> Ingestion</a>
+    </nav>
+    <div class="p-3 border-t border-gray-200 flex items-center gap-2 text-sm">
+      <div class="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center font-semibold text-gray-600">E</div>
+      <div class="min-w-0">
+        <div class="font-medium truncate">Ericl Hue</div>
+        <div class="text-xs text-gray-500 truncate">+1 410 591 4612</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ───────────── MAIN ───────────── -->
+  <main class="flex-1 min-w-0">
+
+    <!-- Page header -->
+    <header class="px-10 py-6 border-b border-gray-200 bg-white">
+      <div class="flex items-start justify-between gap-6">
+        <div>
+          <div class="text-xs text-gray-500 mb-1">
+            <a href="#" class="hover:text-gray-700">Newsletter</a>
+            <span class="mx-1.5 text-gray-300">/</span>
+            <a href="#" class="hover:text-gray-700">Executions</a>
+            <span class="mx-1.5 text-gray-300">/</span>
+            <span class="text-gray-700 font-mono">e_2486</span>
+          </div>
+          <h1 class="text-2xl font-semibold tracking-tight text-gray-900">Active run</h1>
+          <div class="mt-1 flex items-center gap-3 text-sm text-gray-500">
+            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-brand-200 bg-brand-50 text-brand-800 text-xs font-medium">
+              <span class="w-1.5 h-1.5 rounded-full bg-brand-600"></span>
+              The Workbench · AI News
+            </span>
+            <span>· Issue #43</span>
+            <span>· Send date <span class="text-gray-700 font-medium">Fri, Apr 24, 2026</span></span>
+            <span>· Started <span class="text-gray-700 font-medium">2 min ago</span></span>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="text-sm font-medium px-3 py-1.5 rounded-md border border-gray-300 bg-white hover:bg-gray-50">View in n8n</button>
+          <button class="text-sm font-medium px-3 py-1.5 rounded-md border border-red-200 bg-white text-red-700 hover:bg-red-50">Cancel run</button>
+        </div>
+      </div>
+
+      <!-- Stage strip (9 stages, matches spec §4.1 + sprint S3 emit nodes) -->
+      <div class="mt-6">
+        <ol class="flex items-stretch gap-0 text-[11px] font-medium overflow-hidden rounded-md border border-gray-200">
+          <!-- 1. done -->
+          <li class="flex-1 min-w-0 px-2.5 py-2 bg-green-50 border-r border-gray-200 flex items-center gap-2 text-green-800">
+            <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+            <div class="min-w-0">
+              <div class="truncate">Gathering</div>
+              <div class="text-[10px] text-green-700/70">1m 26s</div>
+            </div>
+          </li>
+          <!-- 2. done -->
+          <li class="flex-1 min-w-0 px-2.5 py-2 bg-green-50 border-r border-gray-200 flex items-center gap-2 text-green-800">
+            <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+            <div class="min-w-0">
+              <div class="truncate">Selecting</div>
+              <div class="text-[10px] text-green-700/70">48s</div>
+            </div>
+          </li>
+          <!-- 3. active -->
+          <li class="flex-[1.25] min-w-0 px-2.5 py-2 bg-brand-50 border-r border-gray-200 flex items-center gap-2 text-brand-800" aria-current="step">
+            <span class="pulse-dot w-2 h-2 rounded-full bg-brand-600 shrink-0"></span>
+            <div class="min-w-0">
+              <div class="truncate font-semibold">Stories approval</div>
+              <div class="text-[10px] text-brand-700/80">Awaiting you</div>
+            </div>
+          </li>
+          <!-- 4-9 pending -->
+          <li class="flex-1 min-w-0 px-2.5 py-2 border-r border-gray-200 flex items-center gap-2 text-gray-400">
+            <span class="w-2 h-2 rounded-full border border-gray-300 shrink-0"></span>
+            <div class="min-w-0"><div class="truncate">Stories approved</div></div>
+          </li>
+          <li class="flex-1 min-w-0 px-2.5 py-2 border-r border-gray-200 flex items-center gap-2 text-gray-400">
+            <span class="w-2 h-2 rounded-full border border-gray-300 shrink-0"></span>
+            <div class="min-w-0"><div class="truncate">Subject approval</div></div>
+          </li>
+          <li class="flex-1 min-w-0 px-2.5 py-2 border-r border-gray-200 flex items-center gap-2 text-gray-400">
+            <span class="w-2 h-2 rounded-full border border-gray-300 shrink-0"></span>
+            <div class="min-w-0"><div class="truncate">Subject approved</div></div>
+          </li>
+          <li class="flex-1 min-w-0 px-2.5 py-2 border-r border-gray-200 flex items-center gap-2 text-gray-400">
+            <span class="w-2 h-2 rounded-full border border-gray-300 shrink-0"></span>
+            <div class="min-w-0">
+              <div class="truncate">Writing segments</div>
+              <div class="text-[10px] text-gray-400">0 / 7</div>
+            </div>
+          </li>
+          <li class="flex-1 min-w-0 px-2.5 py-2 border-r border-gray-200 flex items-center gap-2 text-gray-400">
+            <span class="w-2 h-2 rounded-full border border-gray-300 shrink-0"></span>
+            <div class="min-w-0"><div class="truncate">Segments done</div></div>
+          </li>
+          <li class="flex-1 min-w-0 px-2.5 py-2 flex items-center gap-2 text-gray-400">
+            <span class="w-2 h-2 rounded-full border border-gray-300 shrink-0"></span>
+            <div class="min-w-0"><div class="truncate">Saved</div></div>
+          </li>
+        </ol>
+        <div class="mt-2 flex items-center gap-4 text-[11px] text-gray-500">
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-green-500"></span>done</span>
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-brand-500"></span>active</span>
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm border border-gray-300"></span>pending</span>
+          <span class="ml-auto font-mono">9 stages · emitted from n8n via <span class="text-gray-700">X-Callback-Secret</span></span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Body: 2 columns -->
+    <div class="px-10 py-6 grid grid-cols-1 lg:grid-cols-[1fr_520px] gap-6">
+
+      <!-- Live log -->
+      <section class="bg-white border border-gray-200 rounded-lg overflow-hidden flex flex-col min-h-[560px]">
+        <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6l4 4-4 4M10 18h10"/></svg>
+            <h2 class="text-sm font-semibold text-gray-900">Live log</h2>
+            <span class="text-xs text-gray-500 font-mono">execution: e_2486</span>
+          </div>
+          <div class="flex items-center gap-3 text-xs text-gray-500">
+            <label class="flex items-center gap-1.5"><input type="checkbox" class="rounded" checked> Auto-scroll</label>
+            <button class="hover:text-gray-700">Copy</button>
+          </div>
+        </div>
+        <div class="bg-gray-950 text-gray-100 font-mono text-[12px] leading-5 p-4 flex-1 overflow-auto">
+          <div class="log-line text-gray-400"><span class="text-gray-500">14:52:03</span>  stage <span class="text-brand-300">gathering</span> · reading content_ingestion_v2</div>
+          <div class="log-line text-gray-400"><span class="text-gray-500">14:52:04</span>  prefix=2026-04-23 · fetched 42 rows</div>
+          <div class="log-line text-gray-400"><span class="text-gray-500">14:52:19</span>  splitting to stream · chunk_size=1</div>
+          <div class="log-line text-gray-400"><span class="text-gray-500">14:53:29</span>  stage <span class="text-brand-300">gathering</span> ✓ <span class="text-gray-500">(1m 26s)</span></div>
+          <div class="log-line text-gray-400"><span class="text-gray-500">14:53:30</span>  stage <span class="text-brand-300">selecting_stories</span> · prompting claude-sonnet-4-5</div>
+          <div class="log-line text-gray-400"><span class="text-gray-500">14:53:51</span>  model responded · 7 stories selected from 42 candidates</div>
+          <div class="log-line text-gray-400"><span class="text-gray-500">14:54:01</span>  parsing structured output · ok</div>
+          <div class="log-line text-gray-400"><span class="text-gray-500">14:54:18</span>  stage <span class="text-brand-300">selecting_stories</span> ✓ <span class="text-gray-500">(48s)</span></div>
+          <div class="log-line text-gray-400"><span class="text-gray-500">14:54:19</span>  stage <span class="text-brand-300">awaiting_stories_approval</span> · approval created</div>
+          <div class="log-line text-gray-400"><span class="text-gray-500">14:54:19</span>  token=f4d3&#8230;b21 · expires in 48h</div>
+          <div class="log-line text-gray-400"><span class="text-gray-500">14:54:20</span>  email sent via Postal · msg=&lt;19c.&#8230;@postal&gt;</div>
+          <div class="log-line text-brand-300"><span class="text-gray-500">14:54:20</span>  <span class="animate-pulse">▌</span> waiting on you …</div>
+        </div>
+        <div class="px-4 py-2 border-t border-gray-200 bg-gray-50 text-xs text-gray-500 flex items-center justify-between">
+          <span>12 events · last 2s ago</span>
+          <span class="inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> SSE connected</span>
+        </div>
+      </section>
+
+      <!-- Awaiting your action -->
+      <section class="bg-white border border-brand-200 rounded-lg overflow-hidden shadow-sm">
+        <div class="px-5 py-3 bg-brand-50 border-b border-brand-200 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-brand-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 6v6l3 2"/><circle cx="12" cy="12" r="9"/></svg>
+            <h2 class="text-sm font-semibold text-brand-900">Awaiting your action · Stories approval</h2>
+          </div>
+          <span class="text-[11px] font-mono text-brand-700/80">expires in 47h 52m</span>
+        </div>
+
+        <div class="px-5 py-4 border-b border-gray-100">
+          <p class="text-sm text-gray-600">Eve picked <span class="font-semibold text-gray-900">7 stories</span> from <span class="font-semibold text-gray-900">42 candidates</span>. Approve the shortlist or revise with feedback.</p>
+        </div>
+
+        <!-- Story cards -->
+        <ul class="divide-y divide-gray-100 max-h-[380px] overflow-auto">
+
+          <li class="px-5 py-3.5 hover:bg-gray-50/70">
+            <div class="flex items-start gap-3">
+              <div class="text-xs font-mono text-gray-400 w-6 pt-0.5 text-right">01</div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-semibold text-gray-900 leading-snug">OpenAI drops a privacy-focused model, and the trade-off is real</div>
+                <div class="text-xs text-gray-600 mt-1 leading-relaxed">A quiet release tuned for local inference + strict data boundaries. Pays ~12% on reasoning benchmarks for the privacy guarantees.</div>
+                <div class="flex items-center gap-2 mt-2 text-[11px] text-gray-500">
+                  <span class="px-1.5 py-0.5 rounded bg-gray-100 font-medium">lead</span>
+                  <span>openai.com · techcrunch.com · 2 more</span>
+                </div>
+              </div>
+            </div>
+          </li>
+
+          <li class="px-5 py-3.5 hover:bg-gray-50/70">
+            <div class="flex items-start gap-3">
+              <div class="text-xs font-mono text-gray-400 w-6 pt-0.5 text-right">02</div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-semibold text-gray-900 leading-snug">Karpathy: a 1.8B model can match a 1.8T giant on practical tasks</div>
+                <div class="text-xs text-gray-600 mt-1 leading-relaxed">X thread on small models and data curation. Technical but approachable.</div>
+                <div class="flex items-center gap-2 mt-2 text-[11px] text-gray-500"><span>x.com/karpathy · 2 more</span></div>
+              </div>
+            </div>
+          </li>
+
+          <li class="px-5 py-3.5 hover:bg-gray-50/70">
+            <div class="flex items-start gap-3">
+              <div class="text-xs font-mono text-gray-400 w-6 pt-0.5 text-right">03</div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-semibold text-gray-900 leading-snug">Nvidia Inception opens 80 frontier models to builders — no cost</div>
+                <div class="text-xs text-gray-600 mt-1 leading-relaxed">Includes Llama, Mistral, DeepSeek and 77 others. Ten-minute signup.</div>
+                <div class="flex items-center gap-2 mt-2 text-[11px] text-gray-500">
+                  <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">sponsor-adjacent</span>
+                  <span>nvidia.com · 1 more</span>
+                </div>
+              </div>
+            </div>
+          </li>
+
+          <li class="px-5 py-3.5 hover:bg-gray-50/70">
+            <div class="flex items-start gap-3">
+              <div class="text-xs font-mono text-gray-400 w-6 pt-0.5 text-right">04</div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-semibold text-gray-900 leading-snug">Anthropic publishes a new post-training recipe</div>
+                <div class="text-xs text-gray-600 mt-1 leading-relaxed">Paper + code. Long but worth the time for builders shipping evals.</div>
+                <div class="flex items-center gap-2 mt-2 text-[11px] text-gray-500"><span>anthropic.com</span></div>
+              </div>
+            </div>
+          </li>
+
+          <li class="px-5 py-3.5 hover:bg-gray-50/70">
+            <div class="flex items-start gap-3">
+              <div class="text-xs font-mono text-gray-400 w-6 pt-0.5 text-right">05</div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-semibold text-gray-900 leading-snug">How a solo dev shipped a $30k/mo writing tool</div>
+                <div class="text-xs text-gray-600 mt-1 leading-relaxed">IndieHackers deep dive. Revenue breakdown, cost structure, three failed prototypes first.</div>
+                <div class="flex items-center gap-2 mt-2 text-[11px] text-gray-500"><span>indiehackers.com · reddit.com/r/SaaS</span></div>
+              </div>
+            </div>
+          </li>
+
+          <li class="px-5 py-3.5 hover:bg-gray-50/70">
+            <div class="flex items-start gap-3">
+              <div class="text-xs font-mono text-gray-400 w-6 pt-0.5 text-right">06</div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-semibold text-gray-900 leading-snug">The case against RAG for most internal search</div>
+                <div class="text-xs text-gray-600 mt-1 leading-relaxed">Substack essay arguing long-context + structured retrieval beats vector DBs for the majority of enterprise use cases.</div>
+                <div class="flex items-center gap-2 mt-2 text-[11px] text-gray-500"><span>substack.com · hn.algolia.com</span></div>
+              </div>
+            </div>
+          </li>
+
+          <li class="px-5 py-3.5 hover:bg-gray-50/70">
+            <div class="flex items-start gap-3">
+              <div class="text-xs font-mono text-gray-400 w-6 pt-0.5 text-right">07</div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-semibold text-gray-900 leading-snug">Postal v3.3 ships native DKIM rotation</div>
+                <div class="text-xs text-gray-600 mt-1 leading-relaxed">Small ops win for self-hosters. Rotates keys without delivery drops.</div>
+                <div class="flex items-center gap-2 mt-2 text-[11px] text-gray-500"><span>postalserver.io</span></div>
+              </div>
+            </div>
+          </li>
+        </ul>
+
+        <!-- Decision form -->
+        <div class="px-5 py-4 border-t border-gray-200 bg-gray-50">
+          <div class="flex items-center gap-4 text-sm font-medium mb-3">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="decision" class="text-brand-600" checked>
+              Approve shortlist
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer text-gray-600">
+              <input type="radio" name="decision" class="text-brand-600">
+              Revise with feedback
+            </label>
+          </div>
+          <textarea disabled rows="2" placeholder="Feedback (only needed on Revise) — e.g. 'Drop the Nvidia sponsor-adjacent piece; swap in the Redis-vs-pgvector benchmark from this morning.'"
+            class="w-full text-sm px-3 py-2 rounded-md border border-gray-300 bg-white placeholder-gray-400 focus:ring-1 focus:ring-brand-500 focus:border-brand-500 resize-none"></textarea>
+          <div class="mt-3 flex items-center justify-between">
+            <div class="text-xs text-gray-500">Approving advances the run to <span class="text-gray-700 font-medium">Subject line</span>.</div>
+            <div class="flex items-center gap-2">
+              <button class="text-sm font-medium px-3 py-1.5 rounded-md border border-gray-300 bg-white hover:bg-gray-50">Preview shortlist</button>
+              <button class="text-sm font-semibold px-3.5 py-1.5 rounded-md bg-brand-600 text-white hover:bg-brand-700">
+                Approve shortlist →
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Footer raw events -->
+    <div class="px-10 pb-10">
+      <details class="bg-white border border-gray-200 rounded-lg">
+        <summary class="cursor-pointer px-4 py-3 text-sm font-medium text-gray-700 flex items-center gap-2">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 9l4 4 4-4"/></svg>
+          Raw events  <span class="text-xs text-gray-500 font-normal">12 · SSE channel <span class="font-mono">user:+14105914612</span></span>
+        </summary>
+        <pre class="text-[11px] font-mono leading-5 bg-gray-50 border-t border-gray-200 p-4 overflow-auto text-gray-700">{"event":"newsletter.stage","data":{"executionId":"e_2486","editionId":"ai-news","stage":"gathering","correlationId":"c_9a7e","ts":"2026-04-23T14:52:03Z"}}
+{"event":"newsletter.stage","data":{"executionId":"e_2486","editionId":"ai-news","stage":"selecting_stories","detail":"picked 7 stories","ts":"2026-04-23T14:53:30Z"}}
+{"event":"newsletter.stage","data":{"executionId":"e_2486","editionId":"ai-news","stage":"awaiting_stories_approval","detail":"approval token f4d3...b21","ts":"2026-04-23T14:54:19Z"}}
+{"event":"newsletter.approval.created","data":{"token":"f4d3...b21","stage":"stories","expires_at":"2026-04-25T14:54:19Z"}}
+{"event":"newsletter.stage","data":{"executionId":"e_2486","stage":"stories_approved","detail":"writing subject line","ts":"..."}}
+{"event":"newsletter.stage","data":{"executionId":"e_2486","stage":"awaiting_subject_approval","ts":"..."}}
+{"event":"newsletter.stage","data":{"executionId":"e_2486","stage":"subject_approved","ts":"..."}}
+{"event":"newsletter.stage","data":{"executionId":"e_2486","stage":"writing_segment","detail":"segment 1/7","ts":"..."}}
+{"event":"newsletter.stage","data":{"executionId":"e_2486","stage":"segments_done","detail":"assembling final","ts":"..."}}
+{"event":"newsletter.stage","data":{"executionId":"e_2486","stage":"saved","detail":"issue #43 scheduled 2026-04-24T13:00:00Z","ts":"..."}}</pre>
+      </details>
+    </div>
+
+  </main>
+</div>
+
+</body>
+</html>

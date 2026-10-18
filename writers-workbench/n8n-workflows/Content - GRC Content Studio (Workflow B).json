@@ -1,0 +1,400 @@
+{
+  "name": "Content - GRC Content Studio (Workflow B)",
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "initialMessages": "Hi Michael — I'm the Lazarus GRC Content Studio.\n\nSay \"show me this week's topics\" (or just \"hi\") and I'll list this week's ranked GRC market-driver topics. Reply with a number and I'll research it and draft a blog post + a LinkedIn post. Then ask me to tighten, restyle, or dig deeper. When you're happy:\n• \"email it\" — email the drafts (add \"with an image\" for a branded featured image)\n• \"post to wordpress\" — publish the approved blog as a draft on lazarusalliance.com (with featured image + SEO)\n\nYou can also paste your own topic anytime.",
+        "options": {
+          "subtitle": "Research-backed GRC blog + LinkedIn drafts",
+          "title": "Lazarus GRC Content Studio",
+          "responseMode": "streaming"
+        }
+      },
+      "id": "chat",
+      "name": "Chat",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        304
+      ],
+      "webhookId": "grc-content-studio"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "=Today's date is {{ $now.toFormat('LLLL d, yyyy') }} (America/Phoenix). Treat this as the present moment: use correct tense and state clearly whether rules, deadlines, or enforcement dates have ALREADY taken effect, are imminent, or are still upcoming RELATIVE TO TODAY. When you research with Perplexity, ask for the latest status as of today and verify current effective dates.\n\nYou are the GRC Content Studio for Lazarus Alliance, a cybersecurity audit & compliance assessment firm (services: CMMC, FedRAMP, SOC 2, NIST 800-171, ISO 27001, HIPAA, PCI DSS). You help Michael (the CEO) turn this week's trending GRC market-driver news into publish-ready content. Be warm, concise, and proactive.\n\nSTEP 0 - ALWAYS START WITH THE MENU: On the user's FIRST message, or whenever they greet you ('hi'), say 'topics' / 'show me' / 'options', or seem unsure, CALL the \"Get This Week's Topics\" tool and present the slate as a BULLETED list. IMPORTANT FORMATTING: use '-' bullets and put the topic's rank number in BOLD inline text at the start of each line. Do NOT use a markdown numbered list (1. 2. 3.) - in this chat, two-digit numbers in numbered lists render incorrectly. Format each line EXACTLY like:\n- **1.** <title> - <one-line angle> [score]\n- **2.** <title> - <one-line angle> [score]\n(continue through every topic, in rank order). Then say exactly: \"Reply with a number to draft it (blog + LinkedIn), or paste your own topic.\"\n\nWHEN THE USER PICKS A NUMBER: look that topic up in the slate you fetched, use its title + angle as the basis, research it with the Perplexity tool for the latest facts/dates/figures/sources, then produce the two drafts.\n\nTHE TWO DRAFTS (always label clearly):\n  - BLOG (WordPress): authoritative 900-1300 words - SEO title, 1-sentence meta description, intro, H2/H3 sections, key takeaways, a short CTA to Lazarus Alliance assessment services, and a Sources list.\n  - LINKEDIN: punchy 150-300 words - strong hook, 3-5 insight bullets, a takeaway, 3-5 hashtags.\n\n=== BRAND & LINKS (STRICT - THIS IS CRITICAL) ===\nLazarus Alliance is the publisher and the ONLY company you may promote or link.\n1. NEVER name, link to, cite, quote, or recommend a COMPETITOR - i.e., any other GRC, compliance, audit, cybersecurity-assessment, C3PAO, or compliance-automation company or platform. Examples to exclude (not exhaustive): Knox Systems, Vanta, Drata, Secureframe, Hyperproof, OneTrust, AuditBoard, Coalfire, Schellman, A-LIGN, Thoropass, Scrut, Sprinto, Strike Graph, Sensiba, RSI Security, Anecdotes, Kintent. If research surfaces a competitor or any vendor blog, DO NOT use or link it - find the PRIMARY source instead, or omit it. Refer to such developments generically (e.g., 'industry analysts note...') without naming the competitor.\n2. SOURCES/citations must be PRIMARY and NEUTRAL ONLY: the actual rule/regulation, the issuing government agency or standards body (e.g., fedramp.gov, nist.gov, cisa.gov, justice.gov, sec.gov, federalregister.gov, hhs.gov), official standards, and major independent news outlets. No vendor or competitor marketing/blog pages in the Sources list - review every source link and drop any that belongs to a competitor or compliance vendor.\n3. The ONLY company links you include are Lazarus Alliance's own: https://lazarusalliance.com/ (homepage/contact) and https://lazarusalliance.com/blog/ (blog). The closing CTA (e.g., 'Contact Lazarus Alliance' / 'Contact us') must link to https://lazarusalliance.com/.\n\nVOICE: authoritative, practical, decision-useful for compliance & security leaders. Lead with the market-driving angle (what changed, why it matters, what regulated organizations must do now).\n\nITERATE on request - restyle, expand, tighten, fix gaps, pull more research. Always re-show the updated drafts.\nWhen the user says to send/email it, use the email tool to send the final blog + LinkedIn drafts, clearly labeled.\n\nRULES: Always research before drafting. Cite only primary/neutral sources. NEVER include competitor names or links - only Lazarus Alliance (lazarusalliance.com) links. Never fabricate regulations, dates, figures, or quotes. After every draft, remind the user they can ask for changes or say \"email it\". EFFICIENCY: keep responses prompt — make at most 1-2 focused Perplexity calls per request (do not chain many searches), so replies return quickly and don't time out.\n\nMENU RENDERING (reinforce): When listing the topic menu, NEVER start a line with a bare number-and-period (like '1.') - it renders incorrectly and clips two-digit numbers. ALWAYS use the bullet form '- **N.** ...' for EVERY menu line, including 10 and above.\n\nEMAILING (one tool for all sends): To email the post, call the \"Email the Post\" tool with: subject, title (the blog post title - used for the email header and, if requested, the featured image), body (the FULL finished blog post AND LinkedIn post in MARKDOWN, clearly labeled with ## headings - the email auto-renders markdown into clean branded HTML, so just pass the markdown), includeImage (\"yes\" if the user wants a branded featured image, else \"no\"), and to (michael.peters@lazarusalliance.com by default, or whoever the user names). Use includeImage=\"yes\" for \"email it with an image\" and \"no\" for a plain \"email it\".\n\nPOST TO WORDPRESS (final publish step): ONLY when the user explicitly types \"post to wordpress\" (this is their approval to publish, normally after they have reviewed and emailed the draft), call the \"Post to WordPress\" tool with: title, content (the BLOG ARTICLE BODY ONLY in markdown - do NOT include the LinkedIn post, the SEO labels, or the title as a heading), seoTitle (50-60 chars), metaDescription (150-160 chars), focusKeyphrase (2-4 word primary keyword), and imageAlt (short description of the featured image, default to the title). It creates a DRAFT on lazarusalliance.com with a branded featured image and Yoast SEO, then returns a link to review and publish. Tell the user it is a DRAFT for review - it is NOT published live. NEVER post to WordPress unless the user explicitly types \"post to wordpress\".\n\nCONTEXT FOOTER - REQUIRED ON EVERY RESPONSE: End EVERY single reply you send (the menu, drafts, edits, confirmations, answers - no exceptions) with a blank line, then a horizontal rule, then this exact reminder so the user always sees their options:\n---\n**Commands:** reply with a topic **number** to draft it (blog + LinkedIn) - type **\"topics\"** for this week's menu - **\"tighten\"**, **\"restyle\"**, **\"dig deeper\"**, or **\"more research\"** to revise - **\"email it\"** to send it (or **\"email it with an image\"** to include a branded featured image, or **\"post to wordpress\"** to publish the approved blog as a website draft) - or paste **your own topic**.",
+          "returnIntermediateSteps": false
+        }
+      },
+      "id": "agent",
+      "name": "Content Studio Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        304,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-5-20250929"
+        },
+        "options": {
+          "maxTokensToSample": 8000
+        }
+      },
+      "id": "model",
+      "name": "Anthropic Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        192,
+        544
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "dsHVsWuT2g6itiWq",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "contextWindowLength": 14
+      },
+      "id": "mem",
+      "name": "Simple Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        368,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "model": "sonar-pro",
+        "messages": {
+          "message": [
+            {
+              "content": "={{ $fromAI('query', 'A specific GRC, compliance, or cybersecurity research question to look up current facts, dates, figures, regulations, enforcement details and sources') }}"
+            }
+          ]
+        },
+        "options": {},
+        "requestOptions": {}
+      },
+      "id": "pplx",
+      "name": "Perplexity Research",
+      "type": "n8n-nodes-base.perplexityTool",
+      "typeVersion": 2,
+      "position": [
+        528,
+        544
+      ],
+      "credentials": {
+        "perplexityApi": {
+          "id": "yJqwZyuSbkGNSGg0",
+          "name": "Perplexity API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "GlCemZ9ahYMV68UH",
+          "cachedResultName": "content_topics"
+        },
+        "returnAll": true
+      },
+      "id": "gettopics",
+      "name": "Get This Week's Topics",
+      "type": "n8n-nodes-base.dataTableTool",
+      "typeVersion": 1.1,
+      "position": [
+        864,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Email the finished post. Renders the markdown into a clean branded HTML email (header, title, optional featured image, formatted body) and sends it. Provide subject, title, body (markdown), includeImage (yes/no), and to.",
+        "workflowId": {
+          "__rl": true,
+          "value": "4pPZ9speiu8p53N8",
+          "mode": "list",
+          "cachedResultName": "Studio - Email Post with Featured Image (tool)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "subject": "={{ $fromAI('subject', 'the email subject line') }}",
+            "title": "={{ $fromAI('title', 'the blog post title; used for the email header and the featured image') }}",
+            "body": "={{ $fromAI('body', 'the FULL finished blog post AND LinkedIn post in markdown, clearly labeled with ## headings') }}",
+            "includeImage": "={{ $fromAI('includeImage', 'yes to include a branded featured image, otherwise no') }}",
+            "to": "={{ $fromAI('to', 'recipient email; default michael.peters@lazarusalliance.com') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "body",
+              "displayName": "body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "includeImage",
+              "displayName": "includeImage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "to",
+              "displayName": "to",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        }
+      },
+      "id": "emailtool",
+      "name": "Email the Post",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1024,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Publish the approved blog post as a DRAFT on lazarusalliance.com. Generates a branded featured image, creates the post (draft), attaches the image, and sets Yoast SEO. Only use when the user explicitly types 'post to wordpress'. Provide title, content (blog body markdown only), seoTitle, metaDescription, focusKeyphrase, imageAlt.",
+        "workflowId": {
+          "__rl": true,
+          "value": "2NmIb0nnirKR0ZaQ",
+          "mode": "list",
+          "cachedResultName": "Studio - Post Blog to WordPress (tool)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "title": "={{ $fromAI('title', 'the blog post title') }}",
+            "content": "={{ $fromAI('content', 'the BLOG ARTICLE BODY ONLY in markdown (no LinkedIn post, no SEO labels, no title heading)') }}",
+            "seoTitle": "={{ $fromAI('seoTitle', 'SEO title, 50-60 characters') }}",
+            "metaDescription": "={{ $fromAI('metaDescription', 'meta description, 150-160 characters') }}",
+            "focusKeyphrase": "={{ $fromAI('focusKeyphrase', 'primary keyword phrase, 2-4 words') }}",
+            "imageAlt": "={{ $fromAI('imageAlt', 'short alt-text describing the featured image; default to the title') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "content",
+              "displayName": "content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "seoTitle",
+              "displayName": "seoTitle",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "metaDescription",
+              "displayName": "metaDescription",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "focusKeyphrase",
+              "displayName": "focusKeyphrase",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "imageAlt",
+              "displayName": "imageAlt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        }
+      },
+      "id": "wptool",
+      "name": "Post to WordPress",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1232,
+        560
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Chat": {
+      "main": [
+        [
+          {
+            "node": "Content Studio Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Content Studio Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Content Studio Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Perplexity Research": {
+      "ai_tool": [
+        [
+          {
+            "node": "Content Studio Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get This Week's Topics": {
+      "ai_tool": [
+        [
+          {
+            "node": "Content Studio Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email the Post": {
+      "ai_tool": [
+        [
+          {
+            "node": "Content Studio Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to WordPress": {
+      "ai_tool": [
+        [
+          {
+            "node": "Content Studio Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timezone": "America/Phoenix"
+  },
+  "versionId": "7f83c0f0-f7ce-4a0c-9815-ea9d3d4ce810",
+  "meta": {
+    "instanceId": "0433d969c0635a61a9620ab87657550a37783ab89a387af2b56d1a95e3a07cc9"
+  },
+  "nodeGroups": [],
+  "id": "dwAUw0htG82yB97i",
+  "tags": []
+}

@@ -1,0 +1,308 @@
+{
+  "name": "Studio - Email Post with Featured Image (tool)",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "trig",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -320,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const src = (typeof $json.body === 'object' && $json.body !== null) ? $json.body : $json;\nconst yes = src.includeImage === true || /^(yes|true|1)$/i.test(String(src.includeImage||''));\nreturn [{ json: {\n  subject: src.subject || 'New GRC content draft',\n  title: src.title || src.subject || 'GRC Update',\n  body: src.body || '',\n  to: src.to || 'michael.peters@lazarusalliance.com',\n  includeImage: yes ? 'yes' : 'no'\n}}];"
+      },
+      "id": "norm",
+      "name": "Normalize Inputs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -96,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.includeImage }}",
+              "rightValue": "yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ifimg",
+      "name": "Has Image?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        128,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-image-1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-IMAGE-1-MINI"
+        },
+        "prompt": "=Create a professional 1024x1024 featured image for a cybersecurity blog post titled \"{{ $('Normalize Inputs').item.json.title }}\". Abstract professional design incorporating Lazarus Alliance brand colors (burnt orange #d34a28, golden yellow #d39f28, dark gray #404040). Include the blog post title as prominent text overlay. Clean geometric shapes, subtle gradients, modern tech elements, cybersecurity metaphors (shields, locks, networks, data flow). Professional, authoritative, high-tech aesthetic for an enterprise blog.",
+        "options": {}
+      },
+      "id": "img",
+      "name": "Generate Featured Image",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        352,
+        240
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "5JyooWtnpVOugqPI",
+          "name": "OpenAI N8N LA"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const IMAGE_URL = '';\n\nconst N = $('Normalize Inputs').item.json;\nfunction esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}\nfunction inline(s){\n  s = s.replace(/\\[([^\\]]+)\\]\\(([^)\\s]+)\\)/g,'<a href=\"$2\" style=\"color:#2563eb;text-decoration:none;\">$1</a>');\n  s = s.replace(/\\*\\*([^*]+)\\*\\*/g,'<strong>$1</strong>');\n  s = s.replace(/(^|[^*])\\*([^*\\n]+)\\*/g,'$1<em>$2</em>');\n  s = s.replace(/`([^`]+)`/g,'<code style=\"background:#f1f5f9;padding:1px 4px;border-radius:4px;\">$1</code>');\n  return s;\n}\nfunction md2html(md){\n  const lines = String(md||'').replace(/\\r/g,'').split('\\n');\n  let html='', i=0, inList=false, lt='';\n  function closeL(){ if(inList){ html += (lt==='ol'?'</ol>':'</ul>'); inList=false; } }\n  while(i<lines.length){\n    let ln = lines[i];\n    if(/^\\s*(---|\\*\\*\\*|___)\\s*$/.test(ln)){ closeL(); html+='<hr style=\"border:none;border-top:1px solid #e2e8f0;margin:18px 0;\">'; i++; continue; }\n    let h = ln.match(/^\\s*(#{1,6})\\s+(.*)$/);\n    if(h){ closeL(); const lvl=h[1].length; const sz={1:'23px',2:'19px',3:'16px',4:'15px',5:'14px',6:'13px'};\n      html+='<h'+lvl+' style=\"font-size:'+(sz[lvl]||'16px')+';font-weight:800;color:#0f172a;margin:20px 0 8px;line-height:1.3;\">'+inline(esc(h[2]))+'</h'+lvl+'>'; i++; continue; }\n    let ol = ln.match(/^\\s*\\d+[.)]\\s+(.*)$/);\n    let ul = ln.match(/^\\s*[-*+]\\s+(.*)$/);\n    if(ol||ul){ const t = ol?'ol':'ul';\n      if(!inList || lt!==t){ closeL(); html += (t==='ol'?'<ol':'<ul')+' style=\"margin:8px 0;padding-left:24px;color:#1f2937;font-size:14px;line-height:1.6;\">'; inList=true; lt=t; }\n      html+='<li style=\"margin:4px 0;\">'+inline(esc(ol?ol[1]:ul[1]))+'</li>'; i++; continue; }\n    if(/^\\s*$/.test(ln)){ closeL(); i++; continue; }\n    closeL();\n    html+='<p style=\"margin:0 0 11px;color:#1f2937;font-size:14px;line-height:1.65;\">'+inline(esc(ln))+'</p>'; i++;\n  }\n  closeL();\n  return html;\n}\nconst title = esc(N.title||'GRC Update');\nconst bodyHtml = md2html(N.body||'');\nconst img = IMAGE_URL ? '<img src=\"'+IMAGE_URL+'\" alt=\"Featured image\" width=\"760\" style=\"display:block;width:100%;max-width:760px;height:auto;border:0;\">' : '';\nconst html =\n'<div style=\"font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif;max-width:760px;margin:0 auto;background:#f8fafc;padding:24px;color:#0f172a;\">'+\n  '<div style=\"background:#0f172a;border-radius:14px 14px 0 0;padding:22px 28px;\">'+\n    '<div style=\"color:#93c5fd;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;\">Lazarus Alliance &middot; GRC Content Studio</div>'+\n    '<div style=\"color:#fff;font-size:22px;font-weight:800;margin-top:6px;line-height:1.3;\">'+title+'</div>'+\n  '</div>'+ img +\n  '<div style=\"background:#fff;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 14px 14px;padding:20px 28px 26px;\">'+ bodyHtml +'</div>'+\n  '<div style=\"font-size:11px;color:#94a3b8;padding:12px 4px;\">Drafted by the Lazarus Alliance GRC Content Studio. Review before publishing.</div>'+\n'</div>';\nvar out = { json: { to: N.to, subject: N.subject, html: html } };\n\nconst gi = $('Generate Featured Image').item; if (gi && gi.binary) out.binary = gi.binary;\nreturn [out];"
+      },
+      "id": "bimg",
+      "name": "Build Email (image)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        944,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const IMAGE_URL = '';\n\nconst N = $('Normalize Inputs').item.json;\nfunction esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}\nfunction inline(s){\n  s = s.replace(/\\[([^\\]]+)\\]\\(([^)\\s]+)\\)/g,'<a href=\"$2\" style=\"color:#2563eb;text-decoration:none;\">$1</a>');\n  s = s.replace(/\\*\\*([^*]+)\\*\\*/g,'<strong>$1</strong>');\n  s = s.replace(/(^|[^*])\\*([^*\\n]+)\\*/g,'$1<em>$2</em>');\n  s = s.replace(/`([^`]+)`/g,'<code style=\"background:#f1f5f9;padding:1px 4px;border-radius:4px;\">$1</code>');\n  return s;\n}\nfunction md2html(md){\n  const lines = String(md||'').replace(/\\r/g,'').split('\\n');\n  let html='', i=0, inList=false, lt='';\n  function closeL(){ if(inList){ html += (lt==='ol'?'</ol>':'</ul>'); inList=false; } }\n  while(i<lines.length){\n    let ln = lines[i];\n    if(/^\\s*(---|\\*\\*\\*|___)\\s*$/.test(ln)){ closeL(); html+='<hr style=\"border:none;border-top:1px solid #e2e8f0;margin:18px 0;\">'; i++; continue; }\n    let h = ln.match(/^\\s*(#{1,6})\\s+(.*)$/);\n    if(h){ closeL(); const lvl=h[1].length; const sz={1:'23px',2:'19px',3:'16px',4:'15px',5:'14px',6:'13px'};\n      html+='<h'+lvl+' style=\"font-size:'+(sz[lvl]||'16px')+';font-weight:800;color:#0f172a;margin:20px 0 8px;line-height:1.3;\">'+inline(esc(h[2]))+'</h'+lvl+'>'; i++; continue; }\n    let ol = ln.match(/^\\s*\\d+[.)]\\s+(.*)$/);\n    let ul = ln.match(/^\\s*[-*+]\\s+(.*)$/);\n    if(ol||ul){ const t = ol?'ol':'ul';\n      if(!inList || lt!==t){ closeL(); html += (t==='ol'?'<ol':'<ul')+' style=\"margin:8px 0;padding-left:24px;color:#1f2937;font-size:14px;line-height:1.6;\">'; inList=true; lt=t; }\n      html+='<li style=\"margin:4px 0;\">'+inline(esc(ol?ol[1]:ul[1]))+'</li>'; i++; continue; }\n    if(/^\\s*$/.test(ln)){ closeL(); i++; continue; }\n    closeL();\n    html+='<p style=\"margin:0 0 11px;color:#1f2937;font-size:14px;line-height:1.65;\">'+inline(esc(ln))+'</p>'; i++;\n  }\n  closeL();\n  return html;\n}\nconst title = esc(N.title||'GRC Update');\nconst bodyHtml = md2html(N.body||'');\nconst img = IMAGE_URL ? '<img src=\"'+IMAGE_URL+'\" alt=\"Featured image\" width=\"760\" style=\"display:block;width:100%;max-width:760px;height:auto;border:0;\">' : '';\nconst html =\n'<div style=\"font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif;max-width:760px;margin:0 auto;background:#f8fafc;padding:24px;color:#0f172a;\">'+\n  '<div style=\"background:#0f172a;border-radius:14px 14px 0 0;padding:22px 28px;\">'+\n    '<div style=\"color:#93c5fd;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;\">Lazarus Alliance &middot; GRC Content Studio</div>'+\n    '<div style=\"color:#fff;font-size:22px;font-weight:800;margin-top:6px;line-height:1.3;\">'+title+'</div>'+\n  '</div>'+ img +\n  '<div style=\"background:#fff;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 14px 14px;padding:20px 28px 26px;\">'+ bodyHtml +'</div>'+\n  '<div style=\"font-size:11px;color:#94a3b8;padding:12px 4px;\">Drafted by the Lazarus Alliance GRC Content Studio. Review before publishing.</div>'+\n'</div>';\nvar out = { json: { to: N.to, subject: N.subject, html: html } };\n\nreturn [out];"
+      },
+      "id": "bno",
+      "name": "Build Email (no image)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false,
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {}
+            ]
+          },
+          "bccList": "eric@agileadtesting.com"
+        }
+      },
+      "id": "Send_image",
+      "name": "Send (image)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1152,
+        240
+      ],
+      "webhookId": "7c7decb1-3661-4fa7-9caa-c0f655ce5566",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "xIMnsk44FyaCJj2U",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false,
+          "bccList": "eric@agileadtesting.com"
+        }
+      },
+      "id": "Send_no_image",
+      "name": "Send (no image)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        560,
+        544
+      ],
+      "webhookId": "aee74ab5-11ca-4d6b-ae45-95c74d22ceab",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "xIMnsk44FyaCJj2U",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r",
+              "name": "result",
+              "value": "=Email sent to {{ $('Normalize Inputs').item.json.to }}{{ $('Normalize Inputs').item.json.includeImage === 'yes' ? ' with a featured image' : '' }}.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "res",
+      "name": "Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1360,
+        400
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalize Inputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Inputs": {
+      "main": [
+        [
+          {
+            "node": "Has Image?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Image?": {
+      "main": [
+        [
+          {
+            "node": "Generate Featured Image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Email (no image)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Featured Image": {
+      "main": [
+        [
+          {
+            "node": "Build Email (image)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Email (image)": {
+      "main": [
+        [
+          {
+            "node": "Send (image)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Email (no image)": {
+      "main": [
+        [
+          {
+            "node": "Send (no image)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send (image)": {
+      "main": [
+        [
+          {
+            "node": "Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send (no image)": {
+      "main": [
+        [
+          {
+            "node": "Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timezone": "America/Phoenix"
+  },
+  "versionId": "73e1b4d3-a99f-4198-b262-3ed6bcc706c5",
+  "meta": {
+    "instanceId": "0433d969c0635a61a9620ab87657550a37783ab89a387af2b56d1a95e3a07cc9"
+  },
+  "nodeGroups": [],
+  "id": "4pPZ9speiu8p53N8",
+  "tags": []
+}

@@ -1,0 +1,921 @@
+{
+  "name": "Content - Trend Radar (Workflow A)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 6 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "sched",
+      "name": "Weekly Mon 6am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -256,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ingest-feeds-fire",
+        "options": {}
+      },
+      "id": "hook",
+      "name": "Manual Test Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        464
+      ],
+      "webhookId": "ingest-feeds-fire-wid"
+    },
+    {
+      "parameters": {
+        "jsCode": "const feeds = [\n  ['Corporate Compliance Insights','https://www.corporatecomplianceinsights.com/feed/rss/'],\n  ['Compliance Week','https://www.complianceweek.com/rss'],\n  ['Schneier on Security','https://www.schneier.com/feed/atom/'],\n  ['Infosecurity Magazine','https://www.infosecurity-magazine.com/rss/news/'],\n  ['HIPAA Journal','https://www.hipaajournal.com/feed/'],\n  ['Dark Reading','https://www.darkreading.com/rss.xml'],\n  ['CSO Online','https://www.csoonline.com/feed/'],\n  ['The Hacker News','https://feeds.feedburner.com/TheHackersNews'],\n  ['SecurityWeek','https://feeds.feedburner.com/securityweek'],\n  ['Help Net Security','https://www.helpnetsecurity.com/feed/'],\n];\nreturn feeds.map(f => ({ json: { source: f[0], url: f[1] } }));"
+      },
+      "id": "feeds",
+      "name": "Build Feed List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {}
+      },
+      "id": "rss",
+      "name": "Read Feeds",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        272,
+        368
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const e = $json;\nconst feed = $('Build Feed List').item.json;\nconst clip = (s,n)=>{ s=(s==null?'':String(s)); return s.length>n?s.slice(0,n):s; };\nlet cats='';\nif (Array.isArray(e.categories)) cats = e.categories.map(c => (c&&typeof c==='object')?(c.name||c._||c.term||''):c).filter(Boolean).join(', ');\nelse if (e.categories) cats = String(e.categories);\nconst content = e['content:encoded'] || e.content || e.contentSnippet || e.summary || e.description || '';\nreturn { json: {\n  guid: clip(e.guid || e.id || e.link || (feed.source+'|'+(e.title||'')), 480),\n  source: feed.source || '',\n  title: clip(e.title || '(no title)', 1000),\n  link: e.link || e.id || '',\n  author: clip(e.creator || e.author || e['dc:creator'] || '', 300),\n  pubDate: e.isoDate || e.pubDate || '',\n  categories: clip(cats, 1000),\n  summary: clip(e.contentSnippet || e.summary || e.description || '', 2000),\n  content: clip(content, 10000),\n  ingestedAt: new Date().toISOString()\n} };"
+      },
+      "id": "norm",
+      "name": "Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "jpBm2Vmo0IyNs3bT",
+          "cachedResultName": "content_feed_items"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "guid": "={{ $json.guid }}",
+            "source": "={{ $json.source }}",
+            "title": "={{ $json.title }}",
+            "link": "={{ $json.link }}",
+            "author": "={{ $json.author }}",
+            "pubDate": "={{ $json.pubDate }}",
+            "categories": "={{ $json.categories }}",
+            "summary": "={{ $json.summary }}",
+            "content": "={{ $json.content }}",
+            "ingestedAt": "={{ $json.ingestedAt }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "guid",
+              "displayName": "guid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "link",
+              "displayName": "link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "author",
+              "displayName": "author",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "pubDate",
+              "displayName": "pubDate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "categories",
+              "displayName": "categories",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "content",
+              "displayName": "content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "ingestedAt",
+              "displayName": "ingestedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "ins",
+      "name": "Insert Catalog Row",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        992,
+        208
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "ferr",
+      "name": "Feed Errors",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        512,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "rowNotExists",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "jpBm2Vmo0IyNs3bT",
+          "cachedResultName": "content_feed_items"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "guid",
+              "keyValue": "={{ $json.guid }}"
+            }
+          ]
+        }
+      },
+      "id": "newonly",
+      "name": "New Posts Only",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        752,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst posts = $input.all().map(i=>i.json);\nconst DAYS = 14, CAP = 25;\nconst INC = [\"grc\",\"governance\",\"compliance\",\"regulat\",\"audit\",\"policy\",\"framework\",\"cmmc\",\"nist\",\"soc 2\",\"soc2\",\n\"fedramp\",\"iso 27001\",\"iso 42001\",\"hipaa\",\"pci dss\",\" pci \",\"gdpr\",\"ccpa\",\"cpra\",\"ai act\",\"dora\",\"sox\",\n\"sarbanes\",\"fisma\",\" rmf \",\"privacy\",\"whistleblow\",\"ethics\",\"third-party risk\",\"third party risk\",\"tprm\",\n\"vendor risk\",\"internal investigation\",\" sec \",\" doj \",\" ftc \",\"executive order\",\"disclosure\",\"attestation\",\n\"certification\",\"controls\",\"data breach\",\"breach\",\"data protection\",\"information security\",\"infosec\",\"ciso\",\n\"fraud\",\"sanction\",\"export control\",\"esg\",\"zero trust\",\"supply chain\",\"post-quantum\",\"risk management\",\n\"data governance\",\"cyber insurance\",\"ransomware\",\"incident response\"];\nconst cutoff = $now.toMillis() - DAYS*86400000;\nconst ts = s => { if(!s) return null; const t=Date.parse(s); return isNaN(t)?null:t; };\n// L1 recency (keep undated)\nlet l1 = posts.filter(p => { const t=ts(p.pubDate); return t===null || t>=cutoff; });\n// L2 per-feed cap (newest first)\nl1.sort((a,b)=> (ts(b.pubDate)||cutoff) - (ts(a.pubDate)||cutoff));\nconst byf = {};\nl1.forEach(p => { (byf[p.source]=byf[p.source]||[]).push(p); });\nlet l2 = [];\nObject.keys(byf).forEach(s => { l2 = l2.concat(byf[s].slice(0, CAP)); });\n// L3 GRC + governance relevance\nconst rel = p => {\n  const hay = (' '+(p.title||'')+' '+(p.summary||'')+' '+(p.categories||'')+' ').toLowerCase();\n  return INC.some(t => hay.includes(t));\n};\nconst l3 = l2.filter(rel);\nreturn l3.map(p => ({ json: { source:p.source, title:p.title, link:p.link, pubDate:p.pubDate,\n  categories:p.categories, summary:p.summary, guid:p.guid } }));\n"
+      },
+      "id": "filt",
+      "name": "Filter Shortlist",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i=>i.json);\nconst lines = items.map((p,idx)=> idx+'. ['+(p.source||'')+'] '+(p.title||'')+((p.summary)?(' — '+String(p.summary).replace(/\\s+/g,' ').slice(0,120)):''));\nreturn [{ json: { prompt: lines.join('\\n'), count: items.length } }];"
+      },
+      "id": "sprompt",
+      "name": "Build Scoring Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1232,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-5-20250929"
+        },
+        "options": {
+          "maxTokensToSample": 16000
+        }
+      },
+      "id": "amodel",
+      "name": "Anthropic Scorer Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        1984,
+        1200
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "dsHVsWuT2g6itiWq",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"scores\": [\n    {\n      \"i\": 0,\n      \"marketDriverScore\": 85,\n      \"driverType\": \"new/updated regulation\",\n      \"clientRelevance\": \"CMMC\",\n      \"blogAngle\": \"What the new rule means for defense contractors racing to certify\",\n      \"topicKey\": \"cmmc-final-rule\",\n      \"keep\": true\n    }\n  ]\n}",
+        "autoFix": true
+      },
+      "id": "sschema",
+      "name": "Scoring Schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1536,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Score these {{ $json.count }} items. Return exactly {{ $json.count }} objects (one per item; index i matches the item number).\n\nITEMS:\n{{ $json.prompt }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a content strategist for Lazarus Alliance, a cybersecurity audit & compliance assessment firm. Our services: CMMC, FedRAMP, SOC 2, NIST 800-171, ISO 27001, HIPAA, PCI DSS. We publish blog posts that are MARKET DRIVERS — tied to news that forces a compliance or security DECISION in our clients' world.\n\nScore each provided item 0-100 for market-driving relevance.\nScore HIGH (70-100): new or updated regulations/rules, compliance deadlines, enforcement actions, fines or settlements, framework releases or revisions, government mandates or executive orders, and breaches that carry regulatory or legal consequences.\nScore MEDIUM (40-69): governance/board/risk-leadership themes, notable industry shifts with a compliance angle.\nScore LOW (0-39) and mark off-topic: vulnerability-of-the-day, individual malware or incident reports, vendor product announcements, generic security tips, and unrelated content.\n\nFor EACH item output an object with: i (the item's number), marketDriverScore (0-100), driverType (one of \"new/updated regulation\",\"enforcement/fine\",\"compliance deadline\",\"framework release\",\"government mandate\",\"breach-with-consequences\",\"governance/board\",\"off-topic\"), clientRelevance (CMMC/FedRAMP/SOC 2/NIST 800-171/ISO 27001/HIPAA/PCI/General/none), blogAngle (one concise sentence), topicKey (a short kebab-case identifier of the UNDERLYING story/event, e.g. \"trump-post-quantum-eo\" or \"xsolis-data-breach\"; two articles about the SAME event MUST share the same topicKey), keep (true if it belongs on our blog else false).\nReturn exactly one object per item. Output only the structured JSON."
+        }
+      },
+      "id": "scorer",
+      "name": "Score Market Drivers",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1472,
+        528
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $('Filter Shortlist').all().map(i=>i.json);\nconst cmap = {};\n$('Normalize').all().forEach(o => { const j=o.json; if (j && j.guid) cmap[j.guid] = {content:j.content, summary:j.summary, author:j.author, categories:j.categories}; });\nlet parsed = $json.output || $json; if (parsed && parsed.output) parsed = parsed.output;\nconst scores = (parsed && parsed.scores) || [];\nconst byI = {}; scores.forEach(s => { if (s && s.i!=null) byI[s.i]=s; });\nconst scored = items.map((p,idx) => { const s=byI[idx]||{}; const cc=cmap[p.guid]||{}; return {\n  source:p.source, title:p.title, link:p.link, pubDate:p.pubDate, guid:p.guid,\n  marketDriverScore:(typeof s.marketDriverScore==='number')?s.marketDriverScore:0,\n  driverType:s.driverType||'off-topic', clientRelevance:s.clientRelevance||'none',\n  blogAngle:s.blogAngle||'', keep:!!s.keep, topicKey:(s.topicKey||'').toString().toLowerCase().trim(),\n  content:cc.content||'', summary:cc.summary||p.summary||'' }; });\nlet kept = scored.filter(m => m.keep && m.driverType!=='off-topic');\nconst norm = t => (t||'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\\s+/).filter(w=>w.length>3).slice(0,7).join(' ');\nkept.sort((a,b)=> b.marketDriverScore - a.marketDriverScore);\nconst groups = {};\nkept.forEach(m => { const key = m.topicKey || norm(m.title); (groups[key]=groups[key]||[]).push(m); });\nconst slate = Object.values(groups).map(g => { g.sort((a,b)=>b.marketDriverScore-a.marketDriverScore);\n  const rep = Object.assign({}, g[0]); rep.alsoCoveredBy = g.slice(1).map(x=>x.source); rep.dupeCount=g.length; return rep; })\n  .sort((a,b)=> b.marketDriverScore - a.marketDriverScore).slice(0,20);\nreturn slate.map(m => ({ json: m }));"
+      },
+      "id": "rank",
+      "name": "Rank & Slate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i=>i.json);\nconst esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');\nconst weekLabel = $now.toFormat('LLL d, yyyy');\nconst band = s => s>=85?'#b91c1c':(s>=70?'#b45309':(s>=40?'#475569':'#94a3b8'));\nconst paras = s => String(s||'').split(/\\n\\s*\\n/).map(p=>p.trim()).filter(Boolean)\n  .map(p=>'<p style=\"margin:0 0 10px;\">'+esc(p)+'</p>').join('') || '<p style=\"color:#64748b;\">No summary.</p>';\nconst index = rows.map((r,i)=>\n  '<tr><td style=\"padding:6px 8px;border-top:1px solid #f1f5f9;color:#64748b;font-size:13px;\">'+(i+1)+'</td>'+\n  '<td style=\"padding:6px 8px;border-top:1px solid #f1f5f9;\"><span style=\"font-weight:800;color:'+band(r.marketDriverScore)+';\">'+r.marketDriverScore+'</span></td>'+\n  '<td style=\"padding:6px 8px;border-top:1px solid #f1f5f9;font-size:13px;\"><a href=\"#a'+i+'\" style=\"color:#0f172a;text-decoration:none;font-weight:600;\">'+esc(r.title)+'</a>'+\n  '<div style=\"color:#64748b;font-size:11px;\">'+esc(r.driverType)+' · '+esc(r.clientRelevance)+'</div></td></tr>').join('');\nconst cards = rows.map((r,i)=>{\n  const also = (r.alsoCoveredBy && r.alsoCoveredBy.length)? '<div style=\"color:#cbd5e1;font-size:12px;margin-top:4px;\">Also covered by: '+r.alsoCoveredBy.map(esc).join(', ')+'</div>':'';\n  return '<div id=\"a'+i+'\" style=\"border:1px solid #e2e8f0;border-radius:12px;margin:0 0 16px;overflow:hidden;background:#fff;\">'+\n    '<div style=\"background:#0f172a;padding:14px 18px;\">'+\n      '<div style=\"color:#93c5fd;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;\">#'+(i+1)+' · '+esc(r.driverType)+' · '+esc(r.clientRelevance)+'</div>'+\n      '<div style=\"margin-top:4px;font-size:17px;font-weight:800;color:#fff;\">'+esc(r.title)+'</div>'+\n      '<div style=\"color:#cbd5e1;font-size:12px;margin-top:4px;\">'+esc(r.source)+' · '+esc(String(r.pubDate||'').slice(0,10))+' · score <b style=\"color:#fff;\">'+r.marketDriverScore+'</b></div>'+also+\n    '</div>'+\n    '<div style=\"background:#eff6ff;border-bottom:1px solid #dbeafe;padding:10px 18px;font-size:13px;color:#1e3a8a;\"><b>Blog angle:</b> '+esc(r.blogAngle)+'</div>'+\n    '<div style=\"padding:14px 18px;font-size:14px;line-height:1.6;color:#1f2937;\">'+paras(r.summary2)+\n      '<div style=\"margin-top:8px;\"><a href=\"'+esc(r.link)+'\" style=\"color:#2563eb;text-decoration:none;font-weight:600;\">Read the full article &rarr;</a></div></div></div>';\n}).join('');\nconst subject = '[TEST] GRC Market-Driver Slate — '+weekLabel+' — '+rows.length+' topics';\nconst html =\n'<div style=\"font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif;max-width:760px;margin:0 auto;background:#f8fafc;padding:24px;color:#0f172a;\">'+\n '<div style=\"background:#0f172a;border-radius:14px;padding:24px 28px;margin-bottom:18px;\">'+\n  '<div style=\"color:#93c5fd;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;\">Lazarus Alliance · Content Radar</div>'+\n  '<div style=\"color:#fff;font-size:22px;font-weight:800;margin-top:6px;\">Weekly GRC Market-Driver Slate</div>'+\n  '<div style=\"color:#cbd5e1;font-size:13px;margin-top:4px;\">Week of '+esc(weekLabel)+' · '+rows.length+' ranked topics · sourced from 10 industry feeds</div></div>'+\n '<div style=\"background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:14px;color:#1e3a8a;line-height:1.5;\">&#128221; <b>Want a draft?</b> Open the <a href=\"https://lazarusalliance.app.n8n.cloud/webhook/grc-content-studio/chat\" style=\"color:#2563eb;font-weight:700;text-decoration:none;\">GRC Content Studio</a> and just tell it a topic number below &mdash; it researches the topic and drafts a blog post + LinkedIn post for you.</div>'+\n '<div style=\"background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:8px 18px 14px;margin-bottom:18px;\">'+\n  '<div style=\"font-size:13px;font-weight:800;text-transform:uppercase;color:#475569;letter-spacing:.04em;padding:12px 0 4px;\">Ranked topics</div>'+\n  '<table role=\"presentation\" width=\"100%\" style=\"border-collapse:collapse;\"><tr><td style=\"font-size:11px;color:#94a3b8;padding:0 8px;\">#</td><td style=\"font-size:11px;color:#94a3b8;padding:0 8px;\">Score</td><td style=\"font-size:11px;color:#94a3b8;padding:0 8px;\">Topic</td></tr>'+index+'</table></div>'+\n cards+\n '<div style=\"font-size:11px;color:#94a3b8;line-height:1.6;padding-top:8px;border-top:1px solid #e2e8f0;\">Scored by Claude for market-driving relevance; duplicate stories merged by topic. 2-paragraph summaries; full article text retained in the content catalog. Source: Lazarus Alliance Content Radar (Workflow A).</div>'+\n'</div>';\nreturn [{ json: { subject, html, total: rows.length } }];"
+      },
+      "id": "bemail",
+      "name": "Build Slate Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2656,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i=>i.json);\nconst strip = s => String(s||'').replace(/<[^>]+>/g,' ').replace(/&[a-z]+;/g,' ').replace(/\\s+/g,' ').trim();\nconst lines = items.map((p,idx)=>{\n  const body = strip(p.content) || strip(p.summary) || '(no article body available)';\n  return 'ITEM '+idx+':\\nTITLE: '+(p.title||'')+'\\nSOURCE: '+(p.source||'')+'\\nARTICLE: '+body.slice(0,3500);\n});\nreturn [{ json: { prompt: lines.join('\\n\\n---\\n\\n'), count: items.length } }];"
+      },
+      "id": "sumprompt",
+      "name": "Build Summary Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1968,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"summaries\": [\n    { \"i\": 0, \"summary\": \"First paragraph.\\n\\nSecond paragraph.\" }\n  ]\n}",
+        "autoFix": true
+      },
+      "id": "sumschema",
+      "name": "Summary Schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        2240,
+        944
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Write a 2-paragraph summary for each of the {{ $json.count }} articles below. Return exactly {{ $json.count }} summary objects (i matches the ITEM number).\n\n{{ $json.prompt }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a GRC content editor for Lazarus Alliance (a cybersecurity audit & compliance assessment firm). For each article provided, write a clear, engaging summary of about TWO short paragraphs (120-170 words total) for an audience of compliance and security leaders: paragraph 1 = what happened; paragraph 2 = why it matters and the compliance/market implication for regulated organizations. Use plain professional prose, no marketing fluff, no title. Separate the two paragraphs with a blank line. Return exactly one summary object per item, with i matching the ITEM number."
+        }
+      },
+      "id": "summer",
+      "name": "Summarize Slate",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2160,
+        528
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "const slate = $('Rank & Slate').all().map(i=>i.json);\nlet parsed = $json.output || $json; if (parsed && parsed.output) parsed = parsed.output;\nconst sums = (parsed && parsed.summaries) || [];\nconst byI = {}; sums.forEach(s => { if (s && s.i!=null) byI[s.i] = s.summary; });\nreturn slate.map((m,idx) => ({ json: Object.assign({}, m, { summary2: byI[idx] || m.summary || '' }) }));"
+      },
+      "id": "attach",
+      "name": "Attach Summaries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "michael.peters@lazarusalliance.com",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false,
+          "bccList": "eric@agileadtesting.com"
+        }
+      },
+      "id": "sslate",
+      "name": "Send Slate",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2944,
+        528
+      ],
+      "webhookId": "58a5bb0c-d183-46a5-90de-4654f01fd742",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "xIMnsk44FyaCJj2U",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "GlCemZ9ahYMV68UH",
+          "cachedResultName": "content_topics"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "title",
+              "condition": "isNotEmpty"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cleartop",
+      "name": "Clear Topics",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2608,
+        720
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $('Attach Summaries').all().map(i=>i.json);\nconst week = $now.toFormat('LLL d, yyyy');\nreturn rows.map((r,idx)=>({ json: {\n  rank: String(idx+1), title: r.title||'', angle: r.blogAngle||'', driverType: r.driverType||'',\n  clientRelevance: r.clientRelevance||'', score: String(r.marketDriverScore!=null?r.marketDriverScore:''),\n  source: r.source||'', link: r.link||'', summary: r.summary2||r.summary||'', weekOf: week\n}}));"
+      },
+      "id": "buildtop",
+      "name": "Build Topic Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2832,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "GlCemZ9ahYMV68UH",
+          "cachedResultName": "content_topics"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "rank": "={{ $json.rank }}",
+            "title": "={{ $json.title }}",
+            "angle": "={{ $json.angle }}",
+            "driverType": "={{ $json.driverType }}",
+            "clientRelevance": "={{ $json.clientRelevance }}",
+            "score": "={{ $json.score }}",
+            "source": "={{ $json.source }}",
+            "link": "={{ $json.link }}",
+            "summary": "={{ $json.summary }}",
+            "weekOf": "={{ $json.weekOf }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "rank",
+              "displayName": "rank",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "angle",
+              "displayName": "angle",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "driverType",
+              "displayName": "driverType",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "clientRelevance",
+              "displayName": "clientRelevance",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "link",
+              "displayName": "link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "weekOf",
+              "displayName": "weekOf",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "savetop",
+      "name": "Save Topics",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3040,
+        720
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Weekly Mon 6am": {
+      "main": [
+        [
+          {
+            "node": "Build Feed List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Test Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Feed List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Feed List": {
+      "main": [
+        [
+          {
+            "node": "Read Feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Feeds": {
+      "main": [
+        [
+          {
+            "node": "Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Feed Errors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize": {
+      "main": [
+        [
+          {
+            "node": "New Posts Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New Posts Only": {
+      "main": [
+        [
+          {
+            "node": "Insert Catalog Row",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Filter Shortlist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Shortlist": {
+      "main": [
+        [
+          {
+            "node": "Build Scoring Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Scoring Prompt": {
+      "main": [
+        [
+          {
+            "node": "Score Market Drivers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Market Drivers": {
+      "main": [
+        [
+          {
+            "node": "Rank & Slate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rank & Slate": {
+      "main": [
+        [
+          {
+            "node": "Build Summary Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Scorer Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Score Market Drivers",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Scoring Schema",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Summarize Slate",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Summary Schema",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scoring Schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Score Market Drivers",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Slate Email": {
+      "main": [
+        [
+          {
+            "node": "Send Slate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Summary Prompt": {
+      "main": [
+        [
+          {
+            "node": "Summarize Slate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize Slate": {
+      "main": [
+        [
+          {
+            "node": "Attach Summaries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach Summaries": {
+      "main": [
+        [
+          {
+            "node": "Build Slate Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Clear Topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summary Schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Summarize Slate",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Topics": {
+      "main": [
+        [
+          {
+            "node": "Build Topic Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Topic Rows": {
+      "main": [
+        [
+          {
+            "node": "Save Topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timezone": "America/Phoenix"
+  },
+  "versionId": "7e1cec12-0028-4483-a46e-3f743b3655a2",
+  "meta": {
+    "instanceId": "0433d969c0635a61a9620ab87657550a37783ab89a387af2b56d1a95e3a07cc9"
+  },
+  "nodeGroups": [],
+  "id": "kJ41MHUvc7FTq8pj",
+  "tags": []
+}

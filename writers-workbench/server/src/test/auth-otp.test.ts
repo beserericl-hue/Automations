@@ -89,7 +89,8 @@ function tableBuilder(table: string) {
   if (table !== 'user_login_tokens_v2' && table !== 'users_v2') {
     throw new Error(`Unexpected table: ${table}`);
   }
-  const rows = () => (table === 'user_login_tokens_v2' ? state.tokens : state.users) as Record<string, unknown>[];
+  const rows = () =>
+    (table === 'user_login_tokens_v2' ? state.tokens : state.users) as unknown as Record<string, unknown>[];
 
   const filters: { col: string; val: unknown; op: 'eq' | 'ilike' | 'gte' | 'isNull' }[] = [];
   let headCount = false;

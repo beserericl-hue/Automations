@@ -125,9 +125,8 @@ creditsRouter.get('/transactions', async (req: Request, res: Response) => {
  *     tags: [Credits]
  *     summary: Purchase additional credits at the current tier's per-credit price
  *     description: |
- *       Records a credit purchase intent. Actual payment processing is deferred
- *       to Sprint 9 (Stripe). This endpoint updates the balance and creates a
- *       credit_transactions row with type='purchase'.
+ *       Requires a configured payment provider. Until one is wired up this returns
+ *       503 PAYMENTS_NOT_CONFIGURED and grants nothing — see the note in the handler.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -143,7 +142,49 @@ creditsRouter.get('/transactions', async (req: Request, res: Response) => {
  *       200:
  *         description: Purchase recorded; new balance returned
  */
+/**
+ * Is there a payment provider behind this endpoint at all?
+ *
+ * Until Sprint 9 this route took an `amount`, added that many credits to the caller's balance and
+ * wrote a `credit_transactions` row of type 'purchase' — with **no payment of any kind**. Any
+ * authenticated user could grant themselves unlimited credits by calling their own API, and the
+ * ledger would record it as a purchase. The docstring said payment was "deferred"; the endpoint was
+ * live regardless.
+ *
+ * It now fails closed. Legitimate grants still have a path: `adjustCreditsAdmin` behind
+ * `/api/admin`, which is admin-gated and records who did it.
+ */
+function paymentsConfigured(): boolean {
+  return Boolean((process.env.STRIPE_SECRET_KEY || '').trim());
+}
+
 creditsRouter.post('/purchase', validateBody(CreditPurchaseSchema), async (req: Request, res: Response) => {
+  if (!paymentsConfigured()) {
+    logger.warn({ userId: req.userId }, 'credits/purchase refused: no payment provider configured');
+    res.status(503).json({
+      success: false,
+      error: {
+        code: 'PAYMENTS_NOT_CONFIGURED',
+        message:
+          'Credit purchases are not available yet. Your plan\'s monthly credits still apply, and an administrator can add credits to your account.',
+      },
+    });
+    return;
+  }
+  // Reaching here means STRIPE_SECRET_KEY is set, which is the signal that the charge path below
+  // has been implemented. It has NOT been: do not add credits on the strength of a configured key.
+  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+    logger.error({ userId: req.userId }, 'credits/purchase: stripe key present but no charge flow');
+    res.status(503).json({
+      success: false,
+      error: {
+        code: 'PAYMENTS_NOT_CONFIGURED',
+        message: 'Credit purchases are not available yet.',
+      },
+    });
+    return;
+  }
+
   const { amount } = req.body as { amount: number };
   const tier = req.subscriptionTier;
   if (!tier) {
