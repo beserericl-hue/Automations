@@ -53,11 +53,22 @@ class QueueProfile:
     job_timeout: int
     max_tries: int
     keep_result: int
+    drain_wait_s: int = 0
+    """How long a SIGTERM'd worker keeps working its in-flight jobs before cancelling them (B7).
+
+    Sized to the queue rather than to its longest job. The platform's shutdown grace period is
+    seconds-to-minutes, so a wait matching the 5400s heavy ceiling would be theatre; what it buys is
+    that work ALREADY close to done finishes instead of being thrown away, and anything longer is
+    re-queued for the next instance."""
 
 
 # heavy: few slots, long ceiling. The ceiling stays 90 min because a 10-concurrent batch shares one
 # account's output-TPM, which genuinely stretches a single chapter well past 30 minutes.
-HEAVY = QueueProfile(name=QUEUE_HEAVY, max_jobs=8, job_timeout=5400, max_tries=2, keep_result=7200)
+# `drain_wait_s` is 30 here, not 5400: a chapter write cannot be finished inside any platform grace
+# period, so the wait only covers a job in its last seconds. The rest are cancelled and re-queued.
+HEAVY = QueueProfile(
+    name=QUEUE_HEAVY, max_jobs=8, job_timeout=5400, max_tries=2, keep_result=7200, drain_wait_s=30
+)
 # interactive: more slots, short ceiling. A user is waiting on these, so a wedged job frees its slot
 # in minutes rather than occupying it for an hour and a half. max_tries=1 because a retry the user is
 # actively waiting through is worse than a prompt error.
@@ -68,8 +79,17 @@ HEAVY = QueueProfile(name=QUEUE_HEAVY, max_jobs=8, job_timeout=5400, max_tries=2
 # minutes for an output-token grant and only then start. A 180s ceiling would kill those jobs
 # precisely when the system is busy — the opposite of the intent. 600s leaves the full budget wait
 # plus a generation pass, and is still 9x tighter than the one-size-fits-all 5400.
+#
+# `drain_wait_s` is 20: these ops take ~120s but a user is sitting in front of them, and
+# `max_tries=1` means a cancelled one is NOT retried — it is simply lost. So the wait exists to save
+# the ones about to return, and is kept short because the platform will not wait long either.
 INTERACTIVE = QueueProfile(
-    name=QUEUE_INTERACTIVE, max_jobs=24, job_timeout=600, max_tries=1, keep_result=3600
+    name=QUEUE_INTERACTIVE,
+    max_jobs=24,
+    job_timeout=600,
+    max_tries=1,
+    keep_result=3600,
+    drain_wait_s=20,
 )
 
 PROFILES: dict[str, QueueProfile] = {p.name: p for p in (HEAVY, INTERACTIVE)}

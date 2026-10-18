@@ -275,6 +275,18 @@ def fake_supabase() -> FakeSupabase:
 
 
 @pytest.fixture(autouse=True)
+def _isolated_drain_flag(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Point the B7 drain flag at this test's tmp_path.
+
+    The flag is a file, by design (it must be readable by three processes in one container and
+    invisible to every other instance). Without this, a test that drains leaves a real
+    `/tmp/engine-draining` behind and every later readiness test in the session returns 503 —
+    which is exactly what happened the first time these tests ran together.
+    """
+    monkeypatch.setenv("DRAIN_FLAG_PATH", str(tmp_path / "engine-draining"))
+
+
+@pytest.fixture(autouse=True)
 def _no_progress_publish(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[dict[str, Any]]]:
     """Replace publish_progress with an in-memory recorder so tests don't need real Redis.
 

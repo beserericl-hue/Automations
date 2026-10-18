@@ -22,6 +22,7 @@ check, not a 500 on the health endpoint itself.
 from __future__ import annotations
 
 import asyncio
+import time as _time
 from dataclasses import dataclass
 from typing import Any
 
@@ -139,6 +140,30 @@ async def probe_arq_worker(
         )
 
 
+DRAIN_CHECK = "drain"
+"""The check name a draining instance fails. `summarise` reports those as `draining` rather than
+`unhealthy`, because the two call for opposite responses: withdraw this instance from the load
+balancer, do NOT restart it."""
+
+
+async def probe_drain(*, required: bool = True) -> CheckResult:
+    """Fail while this instance is shutting down (B7).
+
+    Required on purpose: the whole point is that readiness goes 503 so the load balancer stops
+    routing here *before* the processes are torn down. Liveness (`/admin/health`) stays 200 — the
+    process is fine, and a restart is the wrong remedy for a planned shutdown.
+    """
+    from writer_engine.drain import draining_since, is_draining
+
+    if not is_draining():
+        return CheckResult(name=DRAIN_CHECK, ok=True, required=required)
+    since = draining_since()
+    detail = "draining"
+    if since is not None:
+        detail = f"draining for {max(0.0, _time.time() - since):.0f}s"
+    return CheckResult(name=DRAIN_CHECK, ok=False, detail=detail, required=required)
+
+
 async def run_checks(probes: list[Any]) -> list[CheckResult]:
     """Await every probe concurrently; a probe that raises becomes a failed required check."""
     results = await asyncio.gather(*probes, return_exceptions=True)
@@ -154,12 +179,17 @@ async def run_checks(probes: list[Any]) -> list[CheckResult]:
 def summarise(service: str, checks: list[CheckResult]) -> tuple[dict[str, Any], bool]:
     """Build the response body and decide whether the endpoint should return 200 or 503.
 
-    ``status`` is ``ok`` when everything passed, ``degraded`` when only optional checks failed, and
-    ``unhealthy`` when a required check failed. Only ``unhealthy`` should map to 503.
+    ``status`` is ``ok`` when everything passed, ``degraded`` when only optional checks failed,
+    ``draining`` when this instance is shutting down (B7), and ``unhealthy`` when any other required
+    check failed. Everything except ``ok``/``degraded`` maps to 503.
     """
     failed_required = [c.name for c in checks if c.required and not c.ok]
     failed_optional = [c.name for c in checks if not c.required and not c.ok]
-    if failed_required:
+    if DRAIN_CHECK in failed_required:
+        # A planned shutdown, not a fault. Reported distinctly so the watchdog does not page
+        # CRITICAL on every deploy and an operator does not go looking for a broken dependency.
+        status = "draining"
+    elif failed_required:
         status = "unhealthy"
     elif failed_optional:
         status = "degraded"

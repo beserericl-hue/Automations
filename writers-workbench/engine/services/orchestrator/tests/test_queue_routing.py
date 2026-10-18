@@ -9,6 +9,7 @@ The two failure modes these pin down:
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Iterator
 from typing import Any
 
@@ -62,6 +63,42 @@ def client() -> Iterator[TestClient]:
         yield c
     finally:
         orch_main.app.state.arq_pool = previous
+
+
+def _fake_redis(
+    client: TestClient,
+    depths: dict[str, int],
+    *,
+    ongoing: dict[str, int] | None = None,
+    oldest_age_s: float = 5.0,
+) -> None:
+    """Give the app's arq pool the three reads the queue sampler makes: ZCARD, GET (the worker
+    heartbeat) and ZRANGE WITHSCORES (the oldest item's eligible-at score)."""
+    import time as _time
+
+    ongoing = ongoing or {}
+
+    async def _zcard(key: str) -> int:
+        return depths.get(key, 0)
+
+    async def _get(key: str) -> bytes | None:
+        for queue, n in ongoing.items():
+            if key.endswith(queue):
+                return (
+                    f"Oct-18 17:00:00 j_complete=9 j_failed=0 j_retried=0 j_ongoing={n} "
+                    f"queued={depths.get(queue, 0)}"
+                ).encode()
+        return None
+
+    async def _zrange(key: str, start: int, stop: int, withscores: bool = False) -> list[Any]:
+        if not depths.get(key):
+            return []
+        return [(b"job-1", (_time.time() - oldest_age_s) * 1000)]
+
+    pool = client.app.state.arq_pool  # type: ignore[attr-defined]
+    pool.zcard = _zcard
+    pool.get = _get
+    pool.zrange = _zrange
 
 
 def _run(client: TestClient, tool: str, body: dict[str, Any]) -> dict[str, Any]:
@@ -263,7 +300,9 @@ def test_dashboard_separates_running_from_waiting(
     """arq keeps a RUNNING job in the queue's sorted set.
 
     Counting the set alone would report busy-but-fine as backed-up, which is the one distinction
-    the number exists to make.
+    the number exists to make. The split comes from the worker's own heartbeat (`j_ongoing`) rather
+    than from a status call per job — B12 made that per-job loop the dashboard's cost driver, so a
+    500-deep queue cost 500 round trips to render.
     """
 
     async def _ready() -> tuple[dict[str, Any], bool]:
@@ -272,24 +311,9 @@ def test_dashboard_separates_running_from_waiting(
     async def _dlq(limit: int = 10) -> list[dict[str, Any]]:
         return []
 
-    class _Def:
-        def __init__(self, job_id: str) -> None:
-            self.job_id = job_id
-
-    async def _queued_jobs(*, queue_name: str) -> list[Any]:
-        return [_Def("running-1"), _Def("waiting-1"), _Def("waiting-2")] if queue_name == QUEUE_HEAVY else []
-
-    class _Job:
-        def __init__(self, job_id: str, *, redis: Any = None, _queue_name: str = "") -> None:
-            self.job_id = job_id
-
-        async def status(self) -> JobStatus:
-            return JobStatus.in_progress if self.job_id.startswith("running") else JobStatus.queued
-
     monkeypatch.setattr(orch_main, "_readiness_with_verdict", _ready)
     monkeypatch.setattr(orch_main, "read_dead_letters", _dlq)
-    monkeypatch.setattr(orch_main, "Job", _Job)
-    client.app.state.arq_pool.queued_jobs = _queued_jobs  # type: ignore[attr-defined]
+    _fake_redis(client, {QUEUE_HEAVY: 3}, ongoing={QUEUE_HEAVY: 1})
 
     heavy = client.get("/admin/dashboard", headers=ADMIN).json()["queues"][QUEUE_HEAVY]
     assert heavy["depth"] == 3
@@ -324,13 +348,54 @@ def test_dashboard_survives_an_unreachable_queue(client: TestClient, monkeypatch
     async def _dlq(limit: int = 10) -> list[dict[str, Any]]:
         return []
 
-    async def _boom(*, queue_name: str) -> list[Any]:
+    async def _boom(*_a: Any, **_k: Any) -> Any:
         raise ConnectionError("redis down")
 
     monkeypatch.setattr(orch_main, "_readiness_with_verdict", _ready)
     monkeypatch.setattr(orch_main, "read_dead_letters", _dlq)
-    client.app.state.arq_pool.queued_jobs = _boom  # type: ignore[attr-defined]
+    client.app.state.arq_pool.zcard = _boom  # type: ignore[attr-defined]
+    client.app.state.arq_pool.get = _boom  # type: ignore[attr-defined]
 
     r = client.get("/admin/dashboard", headers=ADMIN)
     assert r.status_code == 200
     assert "ConnectionError" in r.json()["queues"][QUEUE_HEAVY]["error"]
+
+
+# --- B12: the queue endpoint and its gauges ----------------------------------------------------
+
+
+def test_admin_queues_reports_depth_and_a_verdict(client: TestClient) -> None:
+    _fake_redis(client, {QUEUE_HEAVY: 40}, ongoing={QUEUE_HEAVY: 8}, oldest_age_s=900)
+    body = client.get("/admin/queues", headers=ADMIN).json()
+    heavy = next(q for q in body["queues"] if q["queue"] == QUEUE_HEAVY)
+    assert (heavy["depth"], heavy["running"], heavy["waiting"]) == (40, 8, 32)
+    # A full heavy queue is bounded by account-wide output TPM, not by this instance (B9), so the
+    # verdict must NOT be "add a replica".
+    assert body["verdict"] == "tpm_bound"
+    assert body["thresholds"]["heavy_wait_tpm_bound_s"] > 0
+
+
+def test_admin_queues_needs_the_admin_token(client: TestClient) -> None:
+    assert client.get("/admin/queues").status_code in (401, 403)
+
+
+def test_the_sampler_tick_publishes_the_gauges(client: TestClient) -> None:
+    """The gauges are set on a timer, so /metrics stays a cheap read with no Redis hop in it."""
+    from prometheus_client import REGISTRY
+
+    from writer_engine.queue_metrics import sample_all
+
+    _fake_redis(client, {QUEUE_INTERACTIVE: 9}, ongoing={QUEUE_INTERACTIVE: 4}, oldest_age_s=12)
+
+    async def _go() -> None:
+        await sample_all(
+            client.app.state.arq_pool,  # type: ignore[attr-defined]
+            health_key_for=lambda q: f"engine:arq:health-check:{q}",
+        )
+
+    asyncio.run(_go())
+    labels = {"queue": QUEUE_INTERACTIVE}
+    assert REGISTRY.get_sample_value("engine_queue_depth", labels) == 9
+    assert REGISTRY.get_sample_value("engine_queue_running", labels) == 4
+    assert REGISTRY.get_sample_value("engine_queue_waiting", labels) == 5
+    assert REGISTRY.get_sample_value("engine_queue_oldest_wait_seconds", labels) >= 11

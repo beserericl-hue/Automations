@@ -110,6 +110,12 @@ class EngineSettings(BaseSettings):
     model_default: str = Field(default="claude-sonnet-4-6", alias="MODEL_DEFAULT")
     model_cheap: str = Field(default="claude-haiku-4-5-20251001", alias="MODEL_CHEAP")
     model_premium: str = Field(default="claude-opus-4-8", alias="MODEL_PREMIUM")
+    # What `llm_strategy: tier-default` resolves to for a chapter write (B9). `sonnet` keeps the
+    # validated baseline; `hybrid-draft-polish` drafts on Haiku and runs the plan / drift-correction
+    # / craft passes on Sonnet, which moves the bulk of the output tokens off the Sonnet TPM pool
+    # that bounds throughput at ~5 chapters/min. An env var and not a code default, so the lever can
+    # be pulled (and measured, and reverted) without a deploy.
+    chapter_llm_strategy: str = Field(default="sonnet", alias="CHAPTER_LLM_STRATEGY")
 
     # Required when ANTHROPIC_API_KEY is an ACCOUNT-level key (prefix sk-ant-usr-) rather than a
     # workspace-scoped one (sk-ant-api03-). Anthropic rejects every Messages call made with an
@@ -233,6 +239,10 @@ class EngineSettings(BaseSettings):
     # a post scheduled for 09:00 goes out by 09:15 rather than by 10:00, and the query is one
     # indexed read of the `scheduled` rows.
     publisher_poll_seconds: float = Field(default=900.0, alias="PUBLISHER_POLL_SECONDS")
+    # Queue-depth sampler (B12). 30s because the gauges exist to drive a scaling decision, and a
+    # sample slower than the thing it measures cannot: an interactive job's whole budget wait is
+    # 300s. Three Redis round trips per queue, so the cost of this cadence is negligible.
+    queue_metrics_poll_seconds: float = Field(default=30.0, alias="QUEUE_METRICS_POLL_SECONDS")
 
     # Observability
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")

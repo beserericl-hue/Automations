@@ -30,6 +30,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from writer_engine.alerting import LEVEL_CRITICAL, LEVEL_WARNING, Alert, clear_alert, send_alert
+from writer_engine.drain import is_draining
 from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("watchdog")
@@ -67,6 +68,12 @@ class Watchdog:
 
     async def tick(self) -> dict[str, Any]:
         """One evaluation. Returns the body it evaluated, for logging and tests."""
+        if is_draining():
+            # B7: a draining instance is being taken out of service on purpose. Its steps will stop
+            # answering and its readiness is already 503 — alerting on that would page CRITICAL on
+            # every deploy, which is how an inbox gets ignored.
+            logger.info("watchdog.skipped_draining")
+            return {"status": "draining", "checks": {}}
         body = await self._evaluate()
         checks = body.get("checks") or {}
         now_failing = {name for name, c in checks.items() if not (c or {}).get("ok", True)}

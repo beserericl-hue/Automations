@@ -12,7 +12,6 @@ from uuid import UUID, uuid4
 
 import httpx
 from arq import create_pool
-from arq.jobs import Job
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi import status as http_status
 
@@ -21,11 +20,20 @@ from writer_engine.cadence import INTERVAL_DAYS, is_due
 from writer_engine.config import get_settings
 from writer_engine.health import (
     probe_arq_worker,
+    probe_drain,
     probe_http,
     probe_redis,
     probe_supabase,
     run_checks,
     summarise,
+)
+from writer_engine.queue_metrics import (
+    HEAVY_WAIT_TPM_BOUND_S,
+    INTERACTIVE_WAIT_SCALE_OUT_S,
+    SATURATION_SCALE_OUT,
+    SCALE_IN_SATURATION,
+    sample_all,
+    scaling_advice,
 )
 from writer_engine.queues import (
     ALL_QUEUES,
@@ -88,6 +96,9 @@ async def _readiness_with_verdict() -> tuple[dict[str, Any], bool]:
         for queue in ALL_QUEUES
     ]
     probes.append(probe_supabase(required=False))
+    # B7: last, and required — while this instance is draining, readiness must be 503 so the load
+    # balancer stops routing here before the processes are torn down.
+    probes.append(probe_drain(required=True))
     checks = await run_checks(probes)
     return summarise(SERVICE, checks)
 
@@ -271,8 +282,6 @@ def build_app() -> FastAPI:
 
         Admin-token gated: queue contents and job arguments name users and projects.
         """
-        from arq.jobs import JobStatus
-
         body, servable = await _readiness_with_verdict()
         out: dict[str, Any] = {
             "status": body.get("status"),
@@ -281,6 +290,15 @@ def build_app() -> FastAPI:
         }
 
         queues: dict[str, Any] = {}
+        # B12: this used to ask Redis for the status of EVERY queued job to tell running from
+        # waiting — one round trip per job, so the cost of rendering this page grew with the backlog
+        # it exists to diagnose. A 500-deep queue cost 500 round trips. The sampler gets the same
+        # split from the worker's own heartbeat in three round trips per queue, flat.
+        samples = {}
+        if app.state.arq_pool is not None:
+            samples = {
+                s.queue: s for s in await sample_all(app.state.arq_pool, health_key_for=_health_key_for)
+            }
         for name in POLL_QUEUES:
             profile = profile_for(name)
             entry: dict[str, Any] = {
@@ -290,31 +308,23 @@ def build_app() -> FastAPI:
             }
             if name == QUEUE_LEGACY:
                 # Pre-split queue: shown only so a non-zero depth after a deploy is visible while
-                # it drains. Nothing is ever enqueued here.
+                # it drains. Nothing is ever enqueued here, and no worker reads it, so it has no
+                # heartbeat to sample — depth alone is the whole question.
                 entry = {"legacy": True}
-            if app.state.arq_pool is not None:
-                try:
-                    jobs = await app.state.arq_pool.queued_jobs(queue_name=name)
-                    # arq keeps a job in the queue's sorted set while it runs, so "queued" alone
-                    # would count running work as waiting — which is the difference between
-                    # "backed up" and "busy".
-                    running = 0
-                    waiting = 0
-                    for job in jobs:
-                        status = await Job(
-                            job.job_id or "", redis=app.state.arq_pool, _queue_name=name
-                        ).status()
-                        if status == JobStatus.in_progress:
-                            running += 1
-                        else:
-                            waiting += 1
-                    entry["running"] = running
-                    entry["waiting"] = waiting
-                    entry["depth"] = len(jobs)
-                except Exception as exc:
-                    entry["error"] = f"{type(exc).__name__}: {str(exc)[:120]}"
+                if app.state.arq_pool is not None:
+                    try:
+                        entry["depth"] = int(await app.state.arq_pool.zcard(name) or 0)
+                    except Exception as exc:
+                        entry["error"] = f"{type(exc).__name__}: {str(exc)[:120]}"
+            elif name in samples:
+                sample = samples[name].as_dict()
+                sample.pop("queue", None)
+                sample.pop("max_jobs", None)
+                entry.update(sample)
             queues[name] = entry
         out["queues"] = queues
+        if samples:
+            out["capacity"] = scaling_advice(list(samples.values()))["verdict"]
 
         entries = await read_dead_letters(limit=10)
         out["dead_letters"] = {"recent": entries, "shown": len(entries)}
@@ -350,6 +360,8 @@ def build_app() -> FastAPI:
         would be a guess dressed as a fact. Only ``queued``/``deferred`` are derived from a specific
         queue's sorted set and can be attributed.
         """
+        # Imported here, not at module scope: the queue-routing tests substitute `arq.jobs.Job`,
+        # which a module-level `from arq.jobs import Job` would have bound past.
         from arq.jobs import Job, JobStatus
 
         attributable = {JobStatus.queued, JobStatus.deferred}
@@ -781,6 +793,47 @@ def build_app() -> FastAPI:
         _require_cron_secret(request)
         return await _publisher_tick()
 
+    def _health_key_for(queue: str) -> str:
+        return f"{ARQ_HEALTH_CHECK_KEY}:{queue}"
+
+    async def _queue_metrics_tick() -> dict[str, Any]:
+        """Sample queue depth into the Prometheus gauges (B12).
+
+        On the internal timer rather than computed at scrape time so the numbers exist whether or
+        not anyone is scraping, and so `/metrics` stays a cheap read with no Redis hop in it.
+        """
+        pool = getattr(app.state, "arq_pool", None)
+        if pool is None:
+            return {"sampled": 0, "reason": "no arq pool"}
+        samples = await sample_all(pool, health_key_for=_health_key_for)
+        advice = scaling_advice(samples)
+        if advice["verdict"] in {"scale_out", "tpm_bound"}:
+            # Worth a log line: these are the two states where someone should act, and the reason
+            # says which lever (a replica vs the Anthropic tier / model mix).
+            logger.warning("queues.capacity", verdict=advice["verdict"], reason=advice["reason"][:300])
+        return {"sampled": len(samples), "verdict": advice["verdict"]}
+
+    @app.get("/admin/queues", dependencies=[Depends(require_admin_token)])
+    async def admin_queues() -> dict[str, Any]:
+        """Queue depth, saturation, oldest wait, and what to do about it (B12).
+
+        Three Redis round trips per queue, so it is safe to poll — unlike `/admin/dashboard`, which
+        asks for the status of every queued job individually.
+        """
+        pool = getattr(app.state, "arq_pool", None)
+        if pool is None:
+            return {"verdict": "unknown", "reason": "no arq pool", "queues": []}
+        samples = await sample_all(pool, health_key_for=_health_key_for)
+        return {
+            **scaling_advice(samples),
+            "thresholds": {
+                "saturation_scale_out": SATURATION_SCALE_OUT,
+                "interactive_wait_scale_out_s": INTERACTIVE_WAIT_SCALE_OUT_S,
+                "heavy_wait_tpm_bound_s": HEAVY_WAIT_TPM_BOUND_S,
+                "scale_in_saturation": SCALE_IN_SATURATION,
+            },
+        }
+
     @app.get("/admin/scheduler", dependencies=[Depends(require_admin_token)])
     async def admin_scheduler() -> dict[str, Any]:
         """Is the engine's internal clock running, and did its last tick work? (E1)
@@ -812,6 +865,11 @@ def build_app() -> FastAPI:
             name="publish-scheduled",
             interval_s=settings_for_jobs.publisher_poll_seconds,
             run=_publisher_tick,
+        ),
+        CronJob(
+            name="queue-metrics",
+            interval_s=settings_for_jobs.queue_metrics_poll_seconds,
+            run=_queue_metrics_tick,
         ),
     ]
 

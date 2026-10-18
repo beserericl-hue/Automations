@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import re
 import unicodedata
-from typing import Any
+from typing import Any, NamedTuple
 from uuid import uuid4
 
 from writer_engine import outline_keys
@@ -39,6 +39,64 @@ from writer_engine.telemetry.logging import get_logger
 STEP_NAME = "chapter"
 logger = get_logger(STEP_NAME)
 seed_default_prompts()
+
+
+class ModelPlan(NamedTuple):
+    """Which model writes, and which model fixes (B9).
+
+    ``draft`` carries almost all of the output tokens — a chapter is 5 sub-chapters of 2-3k words —
+    while ``polish`` runs the short, quality-critical passes: the sub-chapter plan, the drift
+    correction, the craft revision. Splitting them is the only TPM lever available without changing
+    accounts, because Anthropic's output-token limits are **per model family**: Haiku's budget is not
+    Sonnet's. The Burial Mound run was bounded at ~5 chapters/min by Sonnet's 90k output TPM alone,
+    with Haiku's entire budget sitting unused next to it.
+    """
+
+    draft: str
+    polish: str
+
+
+def model_plan(strategy: str, settings: Any) -> ModelPlan:
+    """Resolve an ``llm_strategy`` to a (draft, polish) pair.
+
+    ``hybrid-draft-polish`` was in the public schema and in the inventory as B9's named lever, and
+    was **never implemented**: the resolver was a two-entry dict for haiku/sonnet, so every hybrid
+    request fell through to Sonnet-for-everything and the lever silently did nothing. Found
+    2026-10-18.
+
+    ``CHAPTER_LLM_STRATEGY`` sets what ``tier-default`` means, so turning the lever on account-wide
+    is an env change rather than a deploy.
+    """
+    wanted = (strategy or "").strip() or "tier-default"
+    if wanted == "tier-default":
+        wanted = (getattr(settings, "chapter_llm_strategy", "") or "sonnet").strip()
+    cheap, strong = settings.model_cheap, settings.model_default
+    plans = {
+        "sonnet": ModelPlan(strong, strong),
+        "haiku": ModelPlan(cheap, cheap),
+        # Draft cheap, fix well. Both hybrid names resolve here: `hybrid-smart` was equally
+        # unimplemented and plainly meant the same split.
+        "hybrid-draft-polish": ModelPlan(cheap, strong),
+        "hybrid-smart": ModelPlan(cheap, strong),
+    }
+    plan = plans.get(wanted)
+    if plan is None:
+        # Previously silent. An unknown strategy that quietly means "Sonnet" is how a cost lever
+        # gets reported as enabled while nothing changed.
+        logger.warning("chapter.unknown_llm_strategy", strategy=wanted, using="sonnet")
+        return ModelPlan(strong, strong)
+    return plan
+
+
+def _polish_model(payload: dict[str, Any], settings: Any) -> str:
+    """The model for a corrective or planning op (plan, revise, repair, expand, line-edit).
+
+    All of these are short-output, quality-critical passes, so they take the plan's `polish` slot —
+    which for every non-hybrid strategy is the same model these ops already used. Routed through
+    `model_plan` rather than a local dict so a hybrid strategy cannot silently mean "Sonnet for
+    everything" here while it means something else in the write path.
+    """
+    return model_plan(str(payload.get("llm_strategy") or ""), settings).polish
 
 
 def _coerce_int(value: Any, default: int) -> int:
@@ -549,9 +607,7 @@ async def _op_plan(payload: dict) -> dict:
     )
     ctx = await _load_context(str(req.project_id), payload)
     settings = get_settings()
-    model = {"haiku": settings.model_cheap, "sonnet": settings.model_default}.get(
-        str(payload.get("llm_strategy") or ""), settings.model_default
-    )
+    model = _polish_model(payload, settings)
     n_sub = max(3, min(int(req.sub_chapter_count_override or 5), 7))
 
     # Dual-arc (E2E-4): the book arc grounds connects_to_book_arc; an optional per-chapter arc override
@@ -1483,9 +1539,10 @@ async def _op_write(payload: dict) -> dict:
     system = _build_write_system(genre_slug=ctx["genre_slug"], outline=ctx["outline"], revision=revision)
     header = _chapter_header(ctx, roster, req)
     settings = get_settings()
-    model = {"haiku": settings.model_cheap, "sonnet": settings.model_default}.get(
-        req.llm_strategy, settings.model_default
-    )
+    plan = model_plan(req.llm_strategy, settings)
+    # `model` stays the name the rest of this function uses for the DRAFT model, which is where the
+    # output tokens are. The short corrective passes take plan.polish.
+    model = plan.draft
     period = str(payload.get("period") or "contemporary")
     # Sub-chapter fan-out (F1-1): a chapter is written as N sub-chapters (~2-3k words each) for depth,
     # so a full chapter reaches n8n-scale length. Default 5; 1 = single-call (short) path.
@@ -1525,7 +1582,7 @@ async def _op_write(payload: dict) -> dict:
             if not provided:
                 saved = _saved_sub_chapters(ctx.get("outline") or {}, req.chapter_number)
                 provided = [SubChapterBrief.model_validate(s) for s in saved] if saved else []
-            briefs = provided or await _plan_subchapters(ctx, req, n_sub, model)
+            briefs = provided or await _plan_subchapters(ctx, req, n_sub, plan.polish)
             sub_briefs = briefs
             # Prompt caching: the craft system + chapter context + research grounding are identical
             # across all sub-chapters, so fold them into ONE cached system prefix (cache-write on the
@@ -1582,7 +1639,7 @@ async def _op_write(payload: dict) -> dict:
                 req=req,
                 roster_text=roster_text,
                 period=period,
-                model=model,
+                model=plan.polish,
             )
             final_qa = await _score_chapter(text, period, roster_text)
             sub_count = len(briefs)
@@ -1607,7 +1664,11 @@ async def _op_write(payload: dict) -> dict:
                 if not low:
                     break
                 text = await _revise_chapter(
-                    text, low_dims=low, findings=qa.findings, model=model, genre_slug=ctx["genre_slug"]
+                    text,
+                    low_dims=low,
+                    findings=qa.findings,
+                    model=plan.polish,
+                    genre_slug=ctx["genre_slug"],
                 )
                 passes += 1
                 final_qa = None
@@ -2477,9 +2538,7 @@ async def _op_rewrite(payload: dict) -> dict:
     )
     roster_text = _roster_text(ctx.get("roster") or [])
     settings = get_settings()
-    model = {"haiku": settings.model_cheap, "sonnet": settings.model_default}.get(
-        str(payload.get("llm_strategy") or ""), settings.model_default
-    )
+    model = _polish_model(payload, settings)
     allow_shorten = bool(payload.get("allow_shorten"))
     router = get_router(service=STEP_NAME)
     try:
@@ -2567,9 +2626,7 @@ async def _op_repair(payload: dict) -> dict:
         or "contemporary"
     )
     settings = get_settings()
-    model = {"haiku": settings.model_cheap, "sonnet": settings.model_default}.get(
-        str(payload.get("llm_strategy") or ""), settings.model_default
-    )
+    model = _polish_model(payload, settings)
     req = WriteChapterRequest.model_validate(
         {
             "project_id": project_id or "00000000-0000-0000-0000-000000000000",
@@ -2841,9 +2898,7 @@ async def _op_blog(payload: dict) -> dict:
         if topic
         else ("", [])
     )
-    model = {"haiku": settings.model_cheap, "sonnet": settings.model_default}.get(
-        str(payload.get("llm_strategy") or ""), settings.model_default
-    )
+    model = _polish_model(payload, settings)
     system = (
         f"You are a world-class blogger specializing in {genre_name}.\n\n## Genre Guidelines\n{guidelines}\n\n"
         f"## Writing Prime Directive\n{_PRIME_DIRECTIVE}\n\n## Requirements\n- Attention-grabbing headline\n"
@@ -2918,9 +2973,7 @@ async def _op_newsletter(payload: dict) -> dict:
         if topic
         else ("", [])
     )
-    model = {"haiku": settings.model_cheap, "sonnet": settings.model_default}.get(
-        str(payload.get("llm_strategy") or ""), settings.model_default
-    )
+    model = _polish_model(payload, settings)
     system = (
         f"You are an expert newsletter writer specializing in {genre_name}.\n\n## Genre Guidelines\n"
         f"{guidelines}\n\n## Writing Prime Directive\n{_PRIME_DIRECTIVE}\n\n## Requirements\n"
@@ -3031,9 +3084,7 @@ async def _op_short_story(payload: dict) -> dict:
             f"{c.get('beat') or c.get('brief', '')}"
             for i, c in enumerate(outline["chapters"], 1)
         )
-    model = {"haiku": settings.model_cheap, "sonnet": settings.model_default}.get(
-        str(payload.get("llm_strategy") or ""), settings.model_default
-    )
+    model = _polish_model(payload, settings)
     system = (
         f"You are a world-class {genre_name} author.\n\n## Genre Guidelines\n{guidelines}\n\n"
         f"## Writing Prime Directive\n{_PRIME_DIRECTIVE}\n\n"

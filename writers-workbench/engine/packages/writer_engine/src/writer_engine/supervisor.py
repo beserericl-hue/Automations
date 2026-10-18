@@ -34,6 +34,7 @@ import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
+from writer_engine.drain import DRAIN_READINESS_DELAY_S, begin_drain, clear_drain
 from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("supervisor")
@@ -103,6 +104,7 @@ class Supervisor:
         max_restarts: int = DEFAULT_MAX_RESTARTS,
         restart_window_s: float = DEFAULT_RESTART_WINDOW_S,
         restart_delay_s: float = DEFAULT_RESTART_DELAY_S,
+        readiness_delay_s: float = DRAIN_READINESS_DELAY_S,
     ) -> None:
         if not processes:
             raise ValueError("Supervisor needs at least one process")
@@ -112,6 +114,7 @@ class Supervisor:
         self._max_restarts = max_restarts
         self._restart_window_s = restart_window_s
         self._restart_delay_s = restart_delay_s
+        self._readiness_delay_s = readiness_delay_s
         self._children: list[_Child] = []
         self._signalled: int | None = None
 
@@ -119,13 +122,16 @@ class Supervisor:
 
     def start(self) -> None:
         """Spawn every child. On a spawn failure, stop whatever already started and re-raise."""
+        # A leftover drain flag would make this container come up permanently not-ready and never
+        # take traffic again (B7). Clear it before anything reads it.
+        clear_drain()
         for spec in self._specs:
             env = {**os.environ, **spec.env}
             try:
                 popen = subprocess.Popen(list(spec.argv), env=env)
             except Exception:
                 logger.error("supervisor.spawn_failed", name=spec.name, argv=list(spec.argv))
-                self.shutdown(reason=f"spawn of {spec.name} failed")
+                self.shutdown(reason=f"spawn of {spec.name} failed", flip_readiness=False)
                 raise
             self._children.append(_Child(spec=spec, popen=popen))
             logger.info("supervisor.started", name=spec.name, pid=popen.pid)
@@ -165,7 +171,7 @@ class Supervisor:
                 if self._may_restart(dead):
                     self._restart(dead)
                     continue
-                self.shutdown(reason=f"{dead.spec.name} exited (rc={rc})")
+                self.shutdown(reason=f"{dead.spec.name} exited (rc={rc})", flip_readiness=False)
                 return 1
 
             time.sleep(self._poll_interval_s)
@@ -201,7 +207,7 @@ class Supervisor:
         except Exception:
             # Cannot respawn: fall back to the old behaviour rather than pretending it is alive.
             logger.error("supervisor.restart_failed", name=child.spec.name)
-            self.shutdown(reason=f"restart of {child.spec.name} failed")
+            self.shutdown(reason=f"restart of {child.spec.name} failed", flip_readiness=False)
             raise
         child.restarts.append(time.monotonic())
         logger.warning(
@@ -218,15 +224,30 @@ class Supervisor:
                 return child
         return None
 
-    def shutdown(self, *, reason: str) -> None:
-        """SIGTERM every live child, wait up to the drain timeout, then SIGKILL the remainder.
+    def shutdown(self, *, reason: str, flip_readiness: bool = True) -> None:
+        """Drain, then SIGTERM every live child, wait the drain timeout, then SIGKILL the remainder.
 
-        The drain timeout is NOT long enough to finish a chapter write (arq's job_timeout is 90 min);
-        it only avoids killing processes mid-syscall on a routine redeploy. Real graceful drain needs
-        the readiness flip tracked as B7.
+        B7's sequence. The readiness flip comes FIRST and is given time to be observed, so the load
+        balancer stops routing here before anything is torn down; without it a drain is a shutdown
+        that is still accepting work, which is worse than a hard kill.
+
+        The drain timeout is NOT long enough to finish a chapter write (arq's job_timeout is 90
+        minutes, and the platform's own grace period is seconds-to-minutes). It does not need to be:
+        interactive work finishes, and a cancelled heavy job is re-queued by arq for the next
+        instance, which is safe because B6's run ledger makes a replayed run_id return the recorded
+        result instead of re-running. ``flip_readiness=False`` is for the failure paths — a spawn
+        that failed or a child that died takes the container down, and there is nothing to drain.
         """
         live = [c for c in self._children if c.popen.poll() is None]
         logger.info("supervisor.shutdown", reason=reason, live=len(live))
+        if flip_readiness and live:
+            if begin_drain(reason=reason):
+                # Hold the flip long enough for at least one readiness probe to fail. The arq
+                # workers also see the SIGTERM below and stop picking up new jobs, so this window
+                # is when in-flight interactive work gets to finish.
+                time.sleep(self._readiness_delay_s)
+            else:
+                logger.warning("supervisor.drain_not_announced", reason=reason)
         for child in live:
             with _suppress_process_errors():
                 child.popen.terminate()

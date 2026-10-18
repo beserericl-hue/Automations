@@ -298,6 +298,16 @@ def _build_worker_settings(profile: QueueProfile) -> type:
         # running job is cancelled at its next await. Aborted jobs are NOT retried. Repairs snapshot
         # content_versions_v2, so a mid-flight cancel leaves the DB consistent.
         allow_abort_jobs = True
+        # B7: on SIGTERM, stop picking up new jobs and give the ones in flight this long to finish,
+        # instead of cancelling them the moment the signal lands. arq switches to
+        # `handle_sig_wait_for_completion` as soon as this is non-zero.
+        #
+        # Sized to the queue, not to the longest job: a 5400s wait would be theatre, because the
+        # platform SIGKILLs long before that. Interactive work actually completes inside its window;
+        # a heavy job that does not is cancelled and re-queued by arq (`retry_jobs`), which is only
+        # safe because B6's run ledger makes the replay return the recorded result rather than
+        # writing the chapter a second time.
+        job_completion_wait = profile.drain_wait_s
 
     _Settings.__name__ = f"WorkerSettings_{profile.name.replace('-', '_')}"
     return _Settings
