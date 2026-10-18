@@ -36,6 +36,27 @@ def _rows(resp: Any) -> list[dict[str, Any]]:
     return [row for row in data if isinstance(row, dict)]
 
 
+# postgrest's `CountMethod` enum is a str enum, but importing it here would make `postgrest` a
+# module-level dependency of a module that deliberately imports its Supabase client lazily.
+_EXACT: Any = "exact"
+
+
+async def _count(query: Any) -> int:
+    """Exact row count for a query built with ``count="exact"``.
+
+    ``len(_rows(...))`` is not a count: PostgREST caps a response at 1,000 rows, so it silently
+    plateaus — The Burial Mound's 1,117 canon rows read as 1,000. The coverage guard below compares
+    that number against a fresh chunk count, so a capped read makes the guard too lenient on
+    precisely the large projects it exists to protect. Falls back to the page length when the server
+    (or a stub) returns no count.
+    """
+    resp = await query.execute()
+    total = getattr(resp, "count", None)
+    if isinstance(total, int):
+        return total
+    return len(_rows(resp))
+
+
 def embeddings_enabled() -> bool:
     """True when the Python embeddings path is turned on. Callers fall through to n8n when False."""
     return bool(get_settings().enable_python_embeddings)
@@ -441,15 +462,14 @@ async def index_project_canon(*, user_id: str, project_id: str) -> int:
     # comparison locked reindexing out of the project it was built for: The Burial Mound carries
     # 2,996 vectors of which 1,879 are prose, so a canon reindex producing ~1,100 chunks read as a
     # 63% coverage DROP and raised RuntimeError. Measured 2026-10-18.
-    existing_resp = (
-        await client.table(EMBEDDINGS_TABLE)
-        .select("id")
+    existing = await _count(
+        client.table(EMBEDDINGS_TABLE)
+        .select("id", count=_EXACT)
         .eq("user_id", user_id)
         .eq("project_id", str(project_id))
         .neq("doc_type", PROSE_DOC_TYPE)
-        .execute()
+        .limit(1)
     )
-    existing = len(_rows(existing_resp))
     if existing and len(chunks) < existing * MIN_REINDEX_COVERAGE:
         logger.error(
             "embeddings.index_refused_coverage_drop",
@@ -677,15 +697,14 @@ async def canon_staleness(*, user_id: str, project_id: str) -> dict[str, Any]:
             .limit(1)
             .execute()
         )
-        count_rows = _rows(
-            await client.table(EMBEDDINGS_TABLE)
-            .select("id")
+        out["canon_rows"] = await _count(
+            client.table(EMBEDDINGS_TABLE)
+            .select("id", count=_EXACT)
             .eq("user_id", user_id)
             .eq("project_id", str(project_id))
             .neq("doc_type", PROSE_DOC_TYPE)
-            .execute()
+            .limit(1)
         )
-        out["canon_rows"] = len(count_rows)
         if not newest:
             out["stale"] = True
             out["reason"] = "no canon indexed for this project"

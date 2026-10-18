@@ -75,8 +75,10 @@ LEDGER_TABLE = "engine_job_runs"
 
 
 class FakeResp:
-    def __init__(self, data: list[dict[str, Any]]) -> None:
+    def __init__(self, data: list[dict[str, Any]], count: int | None = None) -> None:
         self.data = data
+        # PostgREST only populates `.count` when the request asked for it (`count="exact"`).
+        self.count = count
 
 
 class FakeQuery:
@@ -94,10 +96,14 @@ class FakeQuery:
         self._conflict: str = ""
         self._order: tuple[str, bool] | None = None
         self._limit: int | None = None
+        self._count = False
 
     # -- builders
     def select(self, *_a: Any, **_k: Any) -> FakeQuery:
         self._op = "select"
+        # `count="exact"` asks for the total BEFORE limit/offset, which is the only way to count
+        # past PostgREST's 1,000-row response cap.
+        self._count = bool(_k.get("count"))
         return self
 
     def insert(self, payload: Any) -> FakeQuery:
@@ -163,12 +169,13 @@ class FakeQuery:
         rows = self.db.tables.setdefault(self.table_name, [])
         if self._op == "select":
             out = self._matching()
+            total = len(out)
             if self._order:
                 col, desc = self._order
                 out = sorted(out, key=lambda r: (r.get(col) is None, r.get(col)), reverse=desc)
             if self._limit is not None:
                 out = out[: self._limit]
-            return FakeResp([copy.deepcopy(r) for r in out])
+            return FakeResp([copy.deepcopy(r) for r in out], count=total if self._count else None)
         if self._op == "insert":
             items = self._payload if isinstance(self._payload, list) else [self._payload]
             made = []

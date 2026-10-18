@@ -14,9 +14,22 @@ Three defects, all measured on live DEV projects 2026-10-18:
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
+from typing import Any
 
 from writer_engine.embeddings import embed as E
+
+
+class _Query:
+    """A query builder whose execute() hands back one canned response."""
+
+    def __init__(self, resp: Any) -> None:
+        self._resp = resp
+
+    async def execute(self) -> Any:
+        return self._resp
 
 
 def _outline_with_research():
@@ -157,3 +170,25 @@ class TestProseIsNotCollateral:
         canon = total - prose
         assert canon / total < E.MIN_REINDEX_COVERAGE  # the bug
         assert canon / canon >= E.MIN_REINDEX_COVERAGE  # the fix: compare canon to canon
+
+
+class TestCountsAreNotPageLengths:
+    """PostgREST caps a response at 1,000 rows, so `len(rows)` is not a count. The Burial Mound's
+    1,117 canon rows read as exactly 1,000 — which makes the coverage guard compare a fresh chunk
+    count against a number that plateaued."""
+
+    def test_count_prefers_the_servers_total_over_the_page(self) -> None:
+        # the capped page, plus the total the server actually counted
+        resp = SimpleNamespace(data=[{"id": n} for n in range(1000)], count=1117)
+        assert asyncio.run(E._count(_Query(resp))) == 1117
+
+    def test_count_falls_back_to_the_page_when_none_was_requested(self) -> None:
+        resp = SimpleNamespace(data=[{"id": 1}, {"id": 2}], count=None)
+        assert asyncio.run(E._count(_Query(resp))) == 2
+
+    def test_both_row_counts_ask_the_server_to_count(self) -> None:
+        import inspect
+
+        for fn in (E.index_project_canon, E.canon_staleness):
+            src = inspect.getsource(fn)
+            assert "count=_EXACT" in src, f"{fn.__name__} still counts by page length"
