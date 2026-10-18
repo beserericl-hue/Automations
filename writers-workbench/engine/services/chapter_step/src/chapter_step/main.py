@@ -1963,6 +1963,9 @@ def _build_qa_system() -> str:
         "should be verified by research, OR any scene where a researched period detail (a tool, food, "
         "ritual, price, word) would deepen it. This drives 'add research if needed'.\n"
         "For every score under 0.8, add a finding {dimension, problem, fix}. "
+        f"List AT MOST {QA_MAX_FINDINGS} findings and at most {QA_MAX_FINDINGS} research_gaps, each "
+        "one sentence: a longer answer gets truncated at the output ceiling and then parses as "
+        "nothing at all, which loses every score.\n"
         "Return strict JSON matching ChapterCraftQa (include character_consistency and research_gaps)."
     )
 
@@ -1995,12 +1998,31 @@ QA_DIMS = (
 CRAFT_THRESHOLD = 0.8
 
 
+QA_MAX_FINDINGS = 10
+"""Cap on findings AND research_gaps the QA may return.
+
+Unbounded, a verbose reviewer writes past the output ceiling, the JSON arrives truncated, nothing
+parses, and ALL EIGHT scores are lost — which is how a real chapter came back with
+`craft_qa: null` while `chapter.review` read the same text without trouble. Same failure as the
+96-chapter outline and the guardrails lens: an output ceiling set for the typical case, discovered
+only after the money was spent."""
+
+QA_MAX_TEXT_CHARS = 60_000
+"""About 10k words. A chapter is ~7k words, but an expanded or repaired one can be far longer, and
+a prompt that grows without limit eventually pushes the answer into the ceiling above. Matches
+review.runner.MAX_DRAFT_CHARS."""
+
+QA_MAX_TOKENS = 12_288
+
+
 async def _score_chapter(text: str, period: str, roster_text: str = "") -> ChapterCraftQa | None:
     """Run the craft-QA over a chapter (incl. character-consistency vs the roster). None when no
-    provider OR the QA JSON can't be parsed.
+    provider OR the QA JSON could not be parsed even on a second, stricter attempt.
 
     A QA parse failure must NOT lose the drafted chapter — the caller treats None as "couldn't
-    score" (skip the revision) rather than erroring the whole write.
+    score" (skip the revision) rather than erroring the whole write. What it must ALSO not do is
+    disappear: this returned None silently, so a chapter with `craft_qa: null` gave no way to find
+    out why, and the only clue was that the same chapter scored fine through `chapter.review`.
     """
     from writer_engine.config import get_settings
 
@@ -2008,20 +2030,47 @@ async def _score_chapter(text: str, period: str, roster_text: str = "") -> Chapt
     roster_block = (
         f"CHARACTER ROSTER (check consistency against this):\n{roster_text}\n\n" if roster_text else ""
     )
-    try:
-        qa, _resp = await complete_structured(
-            router,
-            provider="anthropic",
-            model=get_settings().model_default,
-            system=_build_qa_system(),
-            prompt=f"PERIOD: {period}\n\n{roster_block}CHAPTER:\n{text}",
-            schema=ChapterCraftQa,
-        )
-        return qa
-    except ProviderNotRegistered:
-        return _fixture_qa()
-    except ValueError:
-        return None  # QA JSON failed schema — don't lose the chapter
+    body = text if len(text) <= QA_MAX_TEXT_CHARS else text[:QA_MAX_TEXT_CHARS]
+    if len(body) < len(text):
+        logger.info("chapter.qa.text_truncated", sent=len(body), total=len(text))
+
+    # Attempt 1 as before; attempt 2 adds an explicit shape reminder and nothing else. A single
+    # retry is worth it because the common failure is a model wrapping JSON in prose or running
+    # long, both of which a reminder fixes — and the alternative is throwing away eight scores.
+    attempts = (
+        _build_qa_system(),
+        _build_qa_system()
+        + "\n\nYour previous answer could not be parsed. Reply with ONE JSON object and no prose, "
+        "no markdown fence, and no commentary. Keep every string short.",
+    )
+    for i, system in enumerate(attempts):
+        try:
+            qa, _resp = await complete_structured(
+                router,
+                provider="anthropic",
+                model=get_settings().model_default,
+                system=system,
+                prompt=f"PERIOD: {period}\n\n{roster_block}CHAPTER:\n{body}",
+                schema=ChapterCraftQa,
+                max_tokens=QA_MAX_TOKENS,
+            )
+            if i:
+                logger.info("chapter.qa.recovered_on_retry")
+            return qa
+        except ProviderNotRegistered:
+            return _fixture_qa()
+        except ValueError as exc:
+            # Logged at WARNING on the first try and ERROR on the last, because by then the chapter
+            # really does ship with no scores and somebody has to know that happened.
+            log = logger.warning if i < len(attempts) - 1 else logger.error
+            log(
+                "chapter.qa.unparseable",
+                attempt=i + 1,
+                of=len(attempts),
+                chars=len(body),
+                error=str(exc)[:300],
+            )
+    return None
 
 
 def _low_dims(qa: ChapterCraftQa, threshold: float = CRAFT_THRESHOLD) -> list[str]:
