@@ -209,7 +209,15 @@ async def test_index_embeds_before_deleting(monkeypatch: pytest.MonkeyPatch) -> 
         def is_(self, *_a: object, **_k: object) -> _Q:
             return self
 
+        def neq(self, *_a: object, **_k: object) -> _Q:
+            # The canon reindex narrows away chapter_prose on both the coverage count and the
+            # delete, so the two indexes cannot clear each other's rows.
+            return self
+
         def limit(self, *_a: object) -> _Q:
+            return self
+
+        def order(self, *_a: object, **_k: object) -> _Q:
             return self
 
         def delete(self) -> _Q:
@@ -340,7 +348,15 @@ async def test_reindex_refuses_a_large_coverage_drop(monkeypatch: pytest.MonkeyP
         def is_(self, *_a: object, **_k: object) -> _Q:
             return self
 
+        def neq(self, *_a: object, **_k: object) -> _Q:
+            # The canon reindex narrows away chapter_prose on both the coverage count and the
+            # delete, so the two indexes cannot clear each other's rows.
+            return self
+
         def limit(self, *_a: object) -> _Q:
+            return self
+
+        def order(self, *_a: object, **_k: object) -> _Q:
             return self
 
         def delete(self) -> _Q:

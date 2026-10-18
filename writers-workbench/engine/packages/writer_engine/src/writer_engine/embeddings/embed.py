@@ -8,6 +8,7 @@ services that flip the flag on.
 from __future__ import annotations
 
 import re
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from writer_engine import outline_keys
@@ -188,7 +189,23 @@ async def re_embed_project(*, user_id: str, project_id: str) -> int:
 # rather than a legitimate shrink. See the guard in index_project_canon.
 MIN_REINDEX_COVERAGE = 0.6
 
+CANON_STALE_GRACE_S = 120
+"""Seconds an outline may be newer than its canon before the canon counts as stale. Covers the
+indexer's own runtime plus clock skew between the app and Postgres."""
+
 CanonChunk = dict[str, Any]
+
+
+def _parse_ts(value: object) -> datetime | None:
+    """Parse a PostgREST timestamp. None when it cannot be read."""
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
 
 def _chunk(doc_type: str, doc_id: str, doc_title: str, content: str) -> CanonChunk | None:
@@ -198,6 +215,70 @@ def _chunk(doc_type: str, doc_id: str, doc_title: str, content: str) -> CanonChu
         if body
         else None
     )
+
+
+RESEARCH_DOC_TYPE = "chapter_research"
+"""Per-chapter research: the cited facts and local colour attached to a chapter's outline entry.
+
+Its own doc type rather than extra text on ``chapter_brief``, for three reasons:
+
+* **A brief and a fact answer different queries.** The brief is what the chapter is *supposed* to
+  do; the research is what is *true* about the period and the object. Retrieval should be able to
+  return one without the other, and a 4,000-character research block appended to a 300-character
+  brief would swamp it in every similarity search.
+* **It is separately refreshable.** Research is re-run far more often than an outline is rewritten.
+* **It is attributable.** Each fact carries its source, so what the model is handed can be traced
+  back to a citation rather than blended into the plan.
+
+Found on The Ossuary, 2026-10-18: 149 cited facts were attached to the outline by a chapter-by-
+chapter research study and were invisible to ``chapter.write``, because ``build_canon_chunks`` read
+only ``beat``/``arc_notes``/``bridge_from_prior``. The study was in the product and not in the prose.
+"""
+
+_MAX_RESEARCH_FACTS = 12
+"""Cap per chapter, so one richly-researched chapter cannot dominate retrieval for the whole book."""
+
+
+def _research_chunk(ch: dict[str, Any], num: int, title: str) -> CanonChunk | None:
+    """The ``chapter_research`` chunk for one chapter, or None when it carries no research.
+
+    Facts keep their sources inline: the writer is told *that* a number is attested and *where*,
+    which is what stops a researched detail being quietly rounded off in the prose.
+    """
+    research = ch.get("research")
+    if not isinstance(research, dict):
+        return None
+
+    parts: list[str] = []
+    period = str(research.get("period") or "").strip()
+    if period:
+        parts.append(f"Period: {period}")
+
+    facts = [f for f in (research.get("facts") or []) if isinstance(f, dict)]
+    for fact in facts[:_MAX_RESEARCH_FACTS]:
+        text = str(fact.get("fact") or "").strip()
+        if not text:
+            continue
+        source = str(fact.get("source") or "").strip()
+        parts.append(f"FACT: {text}" + (f" [{source}]" if source else ""))
+
+    for colour in (research.get("local_color") or [])[:_MAX_RESEARCH_FACTS]:
+        text = str(colour or "").strip()
+        if text:
+            parts.append(f"LOCAL COLOUR: {text}")
+
+    # Flags are deliberately INCLUDED. They are the places the research contradicts the outline or
+    # marks something as invention, and a writer who cannot see them will confidently dramatise a
+    # pre-contact epidemic the record does not support.
+    for flag in (research.get("flags") or [])[:_MAX_RESEARCH_FACTS]:
+        text = str(flag or "").strip()
+        if text:
+            parts.append(f"CAUTION: {text}")
+
+    if not parts:
+        return None
+    heading = f"Ch {num} research — {title}" if title else f"Ch {num} research"
+    return _chunk(RESEARCH_DOC_TYPE, f"ch_{num}_research", heading, "\n".join(parts))
 
 
 def build_canon_chunks(outline: dict[str, Any], bible_rows: list[dict[str, Any]]) -> list[CanonChunk]:
@@ -257,6 +338,7 @@ def build_canon_chunks(outline: dict[str, Any], bible_rows: list[dict[str, Any]]
         chunks.append(
             _chunk("chapter_brief", f"ch_{num}", f"Ch {num} — {title}" if title else f"Ch {num}", body)
         )
+        chunks.append(_research_chunk(ch, num, title))
 
         # sub_chapter is the LARGEST doc_type n8n produced (126 of 169 rows on one DEV project), and
         # the richest per-scene canon there is. Omitting it would make a reindex destructive: the
@@ -353,11 +435,18 @@ async def index_project_canon(*, user_id: str, project_id: str) -> int:
     # a doc_type would WIPE that canon. (Caught for real: the first version of build_canon_chunks
     # omitted sub_chapter, the largest doc_type — 126 of 169 rows on one project — so a reindex would
     # have destroyed ~75% of it.) Refuse to replace a materially larger existing set.
+    #
+    # Counted over the CANON doc types only. `chapter_prose` is written by index_chapter_prose, not
+    # by this chunker, so including it compares apples to oranges — and after J1's backfill that
+    # comparison locked reindexing out of the project it was built for: The Burial Mound carries
+    # 2,996 vectors of which 1,879 are prose, so a canon reindex producing ~1,100 chunks read as a
+    # 63% coverage DROP and raised RuntimeError. Measured 2026-10-18.
     existing_resp = (
         await client.table(EMBEDDINGS_TABLE)
         .select("id")
         .eq("user_id", user_id)
         .eq("project_id", str(project_id))
+        .neq("doc_type", PROSE_DOC_TYPE)
         .execute()
     )
     existing = len(_rows(existing_resp))
@@ -375,11 +464,17 @@ async def index_project_canon(*, user_id: str, project_id: str) -> int:
             "covers every doc_type before forcing this."
         )
 
+    # Scoped to the CANON doc types. Without the `neq`, this delete took the project's
+    # `chapter_prose` rows with it — so a canon reindex silently destroyed J3's prose index (1,879
+    # chunks on The Burial Mound) and it only came back one chapter at a time, as each was next
+    # written. The two indexes have different owners and different lifecycles; neither may clear the
+    # other's rows.
     await (
         client.table(EMBEDDINGS_TABLE)
         .delete()
         .eq("user_id", user_id)
         .eq("project_id", str(project_id))
+        .neq("doc_type", PROSE_DOC_TYPE)
         .execute()
     )
     payload = [
@@ -524,3 +619,120 @@ async def index_chapter_prose(
             error=f"{type(exc).__name__}: {str(exc)[:160]}",
         )
         return 0
+
+
+# --- canon freshness ----------------------------------------------------------------------------
+#
+# `index_project_canon` only ever ran from a brainstorm outline SAVE (`_REINDEX_OPS` in
+# brainstorm_step: story / short-story / edit-outline / revise-outline). Anything else that changes
+# an outline leaves the vectors behind, and retrieval then serves a plan that no longer exists.
+#
+# Measured on The Ossuary, 2026-10-18: the outline was edited four times in one session — factual
+# corrections, place names, and 149 research facts — by writes that did not go through a brainstorm
+# op. None of it re-embedded. The project kept serving 97 `chapter_brief` vectors built before every
+# one of those edits.
+#
+# A trigger on every write path cannot fix this on its own, because an outline can legitimately be
+# changed by something that is not an engine op at all (a migration, an admin fix, a direct edit).
+# So the engine detects staleness from the data instead of trusting that it was told.
+
+
+async def canon_staleness(*, user_id: str, project_id: str) -> dict[str, Any]:
+    """Is this project's canon older than its outline?
+
+    Returns ``{stale, project_updated_at, canon_indexed_at, canon_rows, reason}``. Never raises:
+    an unanswerable question reports ``stale=False`` with a reason, because blocking a chapter write
+    on a freshness probe would be a worse failure than writing against slightly old canon.
+    """
+    from writer_engine.supabase.client import get_supabase_admin
+
+    out: dict[str, Any] = {
+        "stale": False,
+        "project_updated_at": None,
+        "canon_indexed_at": None,
+        "canon_rows": 0,
+        "reason": "",
+    }
+    try:
+        client = await get_supabase_admin()
+        proj = _rows(
+            await client.table("writing_projects_v2")
+            .select("updated_at")
+            .eq("id", str(project_id))
+            .limit(1)
+            .execute()
+        )
+        if not proj:
+            out["reason"] = "project not found"
+            return out
+        out["project_updated_at"] = proj[0].get("updated_at")
+
+        newest = _rows(
+            await client.table(EMBEDDINGS_TABLE)
+            .select("created_at")
+            .eq("user_id", user_id)
+            .eq("project_id", str(project_id))
+            .neq("doc_type", PROSE_DOC_TYPE)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        count_rows = _rows(
+            await client.table(EMBEDDINGS_TABLE)
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("project_id", str(project_id))
+            .neq("doc_type", PROSE_DOC_TYPE)
+            .execute()
+        )
+        out["canon_rows"] = len(count_rows)
+        if not newest:
+            out["stale"] = True
+            out["reason"] = "no canon indexed for this project"
+            return out
+        out["canon_indexed_at"] = newest[0].get("created_at")
+    except Exception as exc:
+        out["reason"] = f"freshness probe failed: {type(exc).__name__}"
+        return out
+
+    pu = _parse_ts(out["project_updated_at"])
+    ci = _parse_ts(out["canon_indexed_at"])
+    if pu is None or ci is None:
+        out["reason"] = "unreadable timestamp"
+        return out
+    # A grace window, because the indexer itself touches nothing but takes time: a reindex that
+    # finishes seconds after the outline write that triggered it must not read as stale.
+    if pu > ci + timedelta(seconds=CANON_STALE_GRACE_S):
+        out["stale"] = True
+        out["reason"] = f"outline changed {int((pu - ci).total_seconds())}s after the last reindex"
+    else:
+        out["reason"] = "fresh"
+    return out
+
+
+async def reindex_if_stale(*, user_id: str, project_id: str) -> dict[str, Any]:
+    """Reindex a project's canon when its outline is newer than its vectors.
+
+    Best-effort in both directions: it never raises, and it reports what it decided so a caller can
+    log it. Cheap enough to be worth doing on the write path — a 96-chapter project is a few cents
+    of text-embedding-3-small — and the alternative is prose written against a superseded plan.
+    """
+    state = await canon_staleness(user_id=user_id, project_id=project_id)
+    if not state["stale"]:
+        return {"reindexed": False, **state}
+    try:
+        chunks = await index_project_canon(user_id=user_id, project_id=project_id)
+    except Exception as exc:
+        logger.warning(
+            "embeddings.stale_reindex_failed",
+            project_id=str(project_id),
+            error=f"{type(exc).__name__}: {exc}"[:200],
+        )
+        return {"reindexed": False, "error": f"{type(exc).__name__}: {exc}"[:200], **state}
+    logger.info(
+        "embeddings.stale_reindex",
+        project_id=str(project_id),
+        chunks=chunks,
+        reason=state["reason"],
+    )
+    return {"reindexed": True, "chunks": chunks, **state}

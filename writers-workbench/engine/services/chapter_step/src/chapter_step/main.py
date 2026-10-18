@@ -709,6 +709,41 @@ def _subchapter_plan_text(briefs: list[SubChapterBrief]) -> str:
     )
 
 
+_canon_refreshed: set[str] = set()
+"""Projects already checked for canon staleness in this process. The probe is two cheap queries,
+but a 96-chapter write fans out across many sub-chapters and there is no reason to ask per-beat."""
+
+
+async def _refresh_stale_canon(ctx: dict[str, Any], *, user_id: str) -> None:
+    """Reindex this project's canon before retrieving from it, if the outline has moved on.
+
+    `index_project_canon` only ever ran from a brainstorm outline save, so any other write — an
+    admin fix, a migration, a direct edit, a research study attached to the outline — left the
+    vectors describing a plan that no longer existed. Retrieval then grounded the prose in a
+    superseded outline and nothing anywhere said so.
+
+    Checked once per project per process, and entirely best-effort: a chapter write must not fail
+    because a freshness probe did.
+    """
+    project_id = str(ctx.get("project_id") or "")
+    if not project_id or project_id in _canon_refreshed:
+        return
+    _canon_refreshed.add(project_id)
+    try:
+        from writer_engine.embeddings import reindex_if_stale
+
+        state = await reindex_if_stale(user_id=str(user_id), project_id=project_id)
+        if state.get("reindexed"):
+            logger.info(
+                "chapter.canon_reindexed",
+                project_id=project_id,
+                chunks=state.get("chunks"),
+                reason=state.get("reason"),
+            )
+    except Exception as exc:
+        logger.warning("chapter.canon_refresh_failed", error=f"{type(exc).__name__}: {exc}"[:160])
+
+
 async def _canon_grounding(ctx: dict[str, Any], beat: str, *, user_id: str | None) -> str:
     """Retrieve this project's own canon from the vector store to ground the chapter (A3).
 
@@ -727,6 +762,7 @@ async def _canon_grounding(ctx: dict[str, Any], beat: str, *, user_id: str | Non
 
         if not embeddings_enabled():
             return ""
+        await _refresh_stale_canon(ctx, user_id=user_id)
         rows = await match_project_canon(
             query=beat,
             user_id=str(user_id),
