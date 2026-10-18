@@ -15,8 +15,14 @@ drain the fleet.
 the load balancer; `/admin/health` keeps returning 200 because the process is fine and a restart
 would be the wrong remedy. Conflating the two is how a drain becomes a crash loop.
 
-**What a drain can and cannot save.** The platform's own grace period bounds everything here, and it
-is seconds-to-minutes, not the 90 minutes a chapter write may legitimately take. So:
+**The platform has to allow the drain to happen at all.** Railway sends SIGTERM and, by default,
+gives the container **0 seconds** before SIGKILL — so every line of this module is dead code unless
+`RAILWAY_DEPLOYMENT_DRAINING_SECONDS` is set on the service. It is 60 on the DEV engine services
+(covering DRAIN_READINESS_DELAY_S + DEFAULT_DRAIN_TIMEOUT_S = 45s, with margin); a PROD cutover has
+to set it too, or PROD keeps the hard-kill behaviour while the code claims otherwise.
+
+**What a drain can and cannot save.** The platform's grace period bounds everything here, and it is
+seconds-to-minutes, not the 90 minutes a chapter write may legitimately take. So:
 
 * interactive work (≤600s ceiling, usually ~120s) genuinely finishes;
 * heavy work in flight is cancelled, and arq re-queues it (``retry_jobs``) for the next instance to

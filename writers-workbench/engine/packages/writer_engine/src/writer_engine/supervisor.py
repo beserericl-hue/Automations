@@ -39,7 +39,15 @@ from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("supervisor")
 
-DEFAULT_DRAIN_TIMEOUT_S = 25.0
+# How long to wait for children to exit after their SIGTERM. Must exceed the longest
+# `QueueProfile.drain_wait_s` (heavy: 30s) or the supervisor SIGKILLs an arq worker that is still
+# finishing the job it was told to finish — a drain that cancels the work it was draining.
+#
+# The whole sequence is therefore DRAIN_READINESS_DELAY_S (5) + this (40) = 45s worst case, and the
+# PLATFORM has to allow it: Railway's `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` defaults to **0**, i.e.
+# SIGKILL immediately after SIGTERM, which makes every line of the drain dead code. It is set to 60
+# on the DEV services; a PROD cutover must set it too.
+DEFAULT_DRAIN_TIMEOUT_S = 40.0
 DEFAULT_POLL_INTERVAL_S = 0.5
 
 # Restart budget. Measured need, not a guess: during the B11 load test at 20 users the heavy arq

@@ -1391,3 +1391,71 @@ automation.
   because they were run before the outline existed; re-running them now would yield true scene seeds.
 
 Created: [[parallel-content-system-separation]]. Updated: [[index]].
+
+## [2026-10-18] build | memory between chapters, and the three scaling levers that did nothing
+
+Two items were asked for — the per-chapter research being unreachable, and nothing triggering a
+reindex — and checking the indexer before making reindexes more frequent turned one bug into five.
+Then four scaling items (**B3**, **B7**, **B9**, **B12**), two of which turned out to be the same
+category of defect: a feature that existed on paper and did nothing in practice.
+
+**The memory work (K1–K5, all verified on live DEV).**
+
+- **K1 — 149 cited facts were in the product and invisible to the writer.** A chapter-by-chapter
+  study was attached to The Ossuary's outline; `build_canon_chunks` read `beat`/`arc_notes`/
+  `bridge_from_prior` and never the `research` field, while `chapter.write` ran its own live
+  Perplexity pass. Fixed with a `chapter_research` doc type (own lifecycle, sources inline, `flags`
+  carried as `CAUTION:` lines). **And then a second fix, because the first was not enough:** the
+  write path now reads the chapter's own study **by chapter number** rather than hoping a similarity
+  search over 96 research chunks returns it — the query "palisade post molds" returned the studies
+  for chapters 26, 31, 47 and 61. Perplexity is now the fallback, not the source.
+- **K2 — the canon reindex deleted the prose index.** The delete was scoped to
+  `(user_id, project_id)` with no doc_type filter, so it took `chapter_prose` with it: 1,879 chunks
+  on The Burial Mound, returning one chapter at a time as each was next written.
+- **K3 — and the guard that was supposed to prevent exactly this locked the project out.** Prose
+  counted toward `existing`, so The Burial Mound's ratio read 1,117/2,996 = 0.373, below
+  `MIN_REINDEX_COVERAGE`, and the guard raised `RuntimeError` and refused to reindex at all. J1's
+  backfill was locked out of the project it was built for.
+- **K4 — the freshness probe I wrote that morning read a column nothing writes.**
+  `writing_projects_v2.updated_at` has no trigger and no writer sets it: on The Ossuary it still
+  equalled `created_at` after eight outline versions. It would have reported "fresh" forever. The
+  probe now asks the canon's actual inputs — the newest of `project.updated_at`,
+  `outline_versions_v2.created_at` and `story_bible_v2` — and the four engine outline writes set
+  `updated_at`, with a test that walks the tree.
+- **K5 — `len(rows)` is not a count.** PostgREST caps a response at 1,000, so the coverage number
+  plateaued: 1,117 canon rows read as exactly 1,000. Third time this cap has bitten in two days.
+
+The live reindex is the evidence for all of it: 119 vectors → 290, of which **96 new
+`chapter_research`**, bible entries **1 → 77** (the stale index was missing 76), and the 13
+`chapter_prose` rows preserved. Retrieval now returns the facts at 0.52–0.65 similarity against a
+0.35 threshold.
+
+**The scaling work.**
+
+- **B12 — queue metrics with a policy.** `queue_metrics.py` samples each queue in three Redis round
+  trips, publishes five gauges from a 30s tick, and serves `/admin/queues`. The policy is the
+  substance: heavy-queue depth reads `tpm_bound` (a replica shares the same account budget and
+  writes no faster), interactive saturation **with a waiting queue** reads `scale_out`, and
+  saturation alone reads `hold` — 24/24 slots clearing in seconds is a queue doing its job. Also
+  fixed `/admin/dashboard`, which asked Redis for the status of every queued job: one round trip
+  per job, so it cost more the worse the backlog it exists to diagnose.
+- **B7 — graceful drain.** Flag → readiness 503 → in-flight work finishes → terminate. `/admin/ready`
+  reports `draining`, not `unhealthy`, because the remedies are opposite and the watchdog pages
+  CRITICAL on the latter; the watchdog also skips its ticks while draining. arq workers carry
+  `job_completion_wait`. Still open: a second replica has never run.
+- **B9 — the named TPM lever did nothing.** `hybrid-draft-polish` was in the public schema and
+  recorded here as the fix, and the resolver was a two-entry dict for haiku/sonnet, so every hybrid
+  request fell through to Sonnet-for-everything. `model_plan()` now returns a (draft, polish) pair:
+  the sub-chapter fan-out drafts on Haiku, the plan / drift correction / craft revision stay on
+  Sonnet. Output TPM is per model family, which is the whole point — the Burial Mound run sat at
+  Sonnet's 90k with Haiku's budget idle. `CHAPTER_LLM_STRATEGY` makes it an env flip. The default
+  stays `sonnet` until the quality comparison runs.
+- **B3 — resolved by B10, now pinned.** Verified by inspection: only step modules build a router and
+  all steps share one process, so the semaphore is a real per-container cap. A test fails if a worker
+  starts calling an LLM or a step is peeled back out.
+
+**Still open:** the 22-project canon backfill (J1), a second replica (B7), the B9 quality
+comparison, and a new **K6** — the research `period` label is wrong on some chapters (`Period: 2011`
+on prehistoric eras), which is a data defect but one that reaches the prompt.
+
+Updated: [[remaining-work-inventory]].

@@ -185,3 +185,21 @@ class TestWorkerWaitsForItsJobs:
 
         assert WorkerSettingsHeavy.job_completion_wait == HEAVY.drain_wait_s  # type: ignore[attr-defined]
         assert WorkerSettingsInteractive.job_completion_wait == INTERACTIVE.drain_wait_s  # type: ignore[attr-defined]
+
+
+class TestTheWindowIsCoherent:
+    """The numbers have to fit inside each other, or the drain cancels the work it is draining."""
+
+    def test_the_supervisor_waits_longer_than_the_slowest_worker(self) -> None:
+        from writer_engine.supervisor import DEFAULT_DRAIN_TIMEOUT_S
+
+        assert max(HEAVY.drain_wait_s, INTERACTIVE.drain_wait_s) < DEFAULT_DRAIN_TIMEOUT_S
+
+    def test_the_whole_sequence_fits_in_the_platform_grace_period_we_set(self) -> None:
+        """Railway's `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` defaults to **0** — SIGKILL immediately
+        after SIGTERM — so the drain is dead code unless the service sets it. It is 60 on DEV; this
+        pins that 60 is actually enough for the sequence the code asks for."""
+        from writer_engine.drain import DRAIN_READINESS_DELAY_S
+        from writer_engine.supervisor import DEFAULT_DRAIN_TIMEOUT_S
+
+        assert DRAIN_READINESS_DELAY_S + DEFAULT_DRAIN_TIMEOUT_S <= 60

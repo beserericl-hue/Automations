@@ -45,6 +45,7 @@ Some env vars are tier-specific and easy to miss when configuring a Railway serv
 - `NODE_ENV` — `production` on prod, `development` on dev. The `/api/health` `environment` field is derived from this; if both services report the same value you cannot tell deploys apart.
 - `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` / `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` — the dev service hits DEV Supabase, prod hits PROD. Keys must match their URL or auth fails with misleading errors.
 - `VITE_N8N_WEBHOOK_URL` / `N8N_BRAINSTORM_WEBHOOK_URL` — dev uses `_dev` webhook suffix (calls DEV hub + DEV tool workflows); prod uses `_v2` (calls PROD hub + PROD tool workflows). Mismatch causes dev writes to land in PROD Supabase via the wrong tier.
+- `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` — **required on both engine services (`writer-engine-runtime`, `writer-engine-gateway`) for the graceful drain to run at all.** Railway's default is **0**: it sends SIGTERM and SIGKILLs immediately, so the engine's drain (readiness flip → finish in-flight work → terminate, `writer_engine/drain.py`) is dead code without it and a deploy mid-chapter still kills the job. Set to `60` on DEV 2026-10-18, which covers the sequence the code asks for (5s readiness hold + 40s child wait). **A PROD cutover must set it too** — otherwise PROD keeps the hard-kill behaviour while the code and the docs claim otherwise.
 
 ## Git Branching
 
@@ -67,3 +68,21 @@ Summary:
 - Promotion DEV → PROD happens at release time via `scripts/promote-dev-to-prod.sh` (to be added in a future sprint).
 - Hotfixes may be applied directly to PROD, then mirrored back to DEV.
 - Dev Workbench → `/webhook/author_request_dev`; production → `/webhook/author_request_v2`.
+
+<!-- operator-stack:skill-map start. Written by the Operator Stack installer; edit outside these lines. -->
+## Operator Stack: which skill for which job
+
+Before any marketing job in this project, load the installed skill below that fits it, and say which one you used. If none fits or you are unsure, load operator-start.
+
+| The job | Skill to use |
+|---|---|
+| Write or rewrite an ad, a page, an email, a post or a product description | direct-response-copy |
+| Check or polish copy I already have; "it sounds like AI" | copy-chief |
+| Can we say this? Where is the proof for this claim? | claims-compliance-guard |
+| Final check before something goes live | launch-readiness-preflight |
+| What only we can say; positioning; brand voice | brand-positioning |
+| Research my market; build the evidence for my copy and ads | feed-the-machine |
+| Map the path from first click to paid, and brief each page | funnel-architect |
+| Remember this; save what we decided | project-memory-manager |
+| The business interview, a setup check, or not sure where to start | operator-start |
+<!-- operator-stack:skill-map end -->
