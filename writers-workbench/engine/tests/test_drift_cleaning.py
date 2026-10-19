@@ -136,3 +136,75 @@ def test_a_clean_report_is_left_alone() -> None:
 def test_none_stays_none() -> None:
     """A parse failure must keep returning None — the chapter is never lost to QA."""
     assert clean_drift(None) is None
+
+
+class TestTheAdditiveRuleReachesStoryDrift:
+    """Re-measured 2026-10-19 against the 96 stored Burial Mound reports: 85 surviving drift
+    findings, of which **16** were of the form "the outline beat does not include X" where X was
+    consistent with the beat. Each one set `aligned=False` and triggered a full streamed rewrite of
+    the chapter for nothing.
+
+    The carve-out for additive detail existed for character_drift only, so any scene, prop or name
+    the outline had not enumerated read as story drift — including a chapter flagged for naming the
+    thread a quilter uses ("Aurifil, 50-weight"), which is exactly the period detail the research
+    seeds ask for."""
+
+    @staticmethod
+    def _system() -> str:
+        from chapter_step.main import _build_drift_system
+
+        return _build_drift_system()
+
+    def test_the_prompt_says_a_beat_is_a_plan_not_a_shot_list(self) -> None:
+        system = self._system()
+        assert "NOT A SHOT LIST" in system
+
+    def test_the_prompt_names_the_additive_cases_that_must_not_be_flagged(self) -> None:
+        system = self._system().lower()
+        for phrase in ("researched prop", "sets up something later", "normal craft"):
+            assert phrase in system, phrase
+
+    def test_the_prompt_still_requires_real_departures_to_be_flagged(self) -> None:
+        """The fix must not talk the reviewer out of reporting genuine drift."""
+        system = self._system().lower()
+        for phrase in ("contradicts the beat", "drops something the beat requires", "breaks continuity"):
+            assert phrase in system, phrase
+
+    def test_the_prompt_forbids_using_the_arrays_as_a_notes_field(self) -> None:
+        system = self._system().lower()
+        assert "it is not a finding" in system
+
+
+class TestTheFilterDoesNotReachRealContradictions:
+    """The obvious next regex pattern was the hedge "is consistent with". It is not added, and this
+    is why: of the five surviving findings that contain it, one is a genuine period contradiction —
+    and losing that to catch four cheap false positives is the wrong trade."""
+
+    GENUINE = (
+        "Roster gives Matta's era as '1740s' and his age as '50s'; the chapter is set in 1738 and "
+        "presents him as a man who has worn English shoes for eleven years and bought a second"
+    )
+    ALSO_GENUINE = (
+        "Pell's wife is named Nima in the roster; she does not appear in the chapter, which is "
+        "consistent with the scene's scope, but a fire-circle character named 'Sena' sits to"
+    )
+
+    def test_a_period_contradiction_survives_the_filter(self) -> None:
+        from chapter_step.main import _clean_findings
+
+        assert _clean_findings([self.GENUINE]) == [self.GENUINE]
+
+    def test_a_name_confusion_survives_the_filter(self) -> None:
+        from chapter_step.main import _clean_findings
+
+        assert _clean_findings([self.ALSO_GENUINE]) == [self.ALSO_GENUINE]
+
+    def test_the_self_cancelling_shapes_are_still_dropped(self) -> None:
+        """The class the filter DOES own, taken verbatim from the stored reports."""
+        from chapter_step.main import _clean_findings
+
+        confirmed_non_finding = (
+            "Roster notes Marcus 'drinks too much coffee and not enough water'; the chapter is "
+            "consistent with this, no issue — flagging only to confirm no drift here."
+        )
+        assert _clean_findings([confirmed_non_finding]) == []

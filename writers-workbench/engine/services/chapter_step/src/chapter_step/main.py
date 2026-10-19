@@ -971,6 +971,18 @@ def _build_drift_system() -> str:
         "- story_drift: concrete ways the chapter departs from the planned beat or the arc — a beat "
         "that's missing/changed, an event that contradicts the arc, a continuity break, a chapter that "
         "doesn't advance the through-line. Each item names the deviation specifically.\n"
+        "  AN OUTLINE BEAT IS A PLAN, NOT A SHOT LIST. The same additive rule as for characters "
+        "applies here: material the beat simply does not enumerate — an added exchange, a scene that "
+        "sets up something later, a researched prop, a specific place or object name — is normal "
+        "craft, and the craft guides above actively ASK for it. Flag it ONLY when it contradicts the "
+        "beat, drops something the beat requires, breaks continuity, or pulls the chapter off the "
+        "arc. Measured on a 96-chapter run: 16 of 85 drift findings were of the form 'the outline "
+        "beat does not include X' where X was consistent with the beat — including a chapter being "
+        "flagged for naming the thread a quilter uses, which is precisely the period detail the "
+        "research seeds call for. Each one of those triggered a full chapter rewrite for nothing.\n"
+        "  If you find yourself writing that your own finding is 'consistent', 'acceptable', "
+        "'appropriate to the scene' or 'normal', then it is not a finding: leave it out. Do not use "
+        "these arrays as a notes field.\n"
         "- character_drift: ONLY genuine inconsistencies of an ESTABLISHED roster character — a roster "
         "character renamed, or given a changed age/trait/role/relationship, an out-of-character action, "
         "a voice that doesn't match, or a fact that contradicts the roster/bible. Name the character "
@@ -1016,6 +1028,18 @@ def _build_drift_system() -> str:
 # worth keeping — a chapter dating a panel to 1963 "when she was nineteen" against a roster age of
 # 82 in 2024, and an attorney the outline names Lester Pruitt appearing as Hendricks — and a
 # phrase-based filter must not reach those.
+#
+# And NOT extended to the hedging phrase "is consistent with", which was the obvious next pattern.
+# Re-measured 2026-10-19 against the stored reports: five surviving findings contain it, and one of
+# them is this —
+#
+#   "Roster gives Matta's era as '1740s' and his age as '50s'; the chapter is set in 1738 and
+#    presents him as a man who has worn English shoes for eleven years..."
+#
+# — a genuine period contradiction, and one of the best findings in the set. The remaining
+# over-flagging is a JUDGEMENT problem, not a phrasing problem, so it is addressed in the drift
+# prompt (an outline beat is a plan, not a shot list) rather than here. A regex that reached the
+# Matta finding would trade a cheap false positive for an expensive false negative.
 
 _NON_FINDING_RE = re.compile(
     r"\b(?:"
