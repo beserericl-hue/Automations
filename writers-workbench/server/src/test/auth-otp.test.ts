@@ -538,3 +538,74 @@ describe('POST /auth/otp/verify', () => {
     });
   });
 });
+
+describe('profile resolution (the collision found by signing in for real)', () => {
+  it('never stamps an auth uid onto a second profile that shares the email', async () => {
+    await withServer(async (base) => {
+      // Live DEV state: the phone-first flow created one profile per phone number, and two of them
+      // carry the same email. One already holds the auth identity.
+      state.users.push(
+        { user_id: '+14105914612', email: 'eric@agileadtesting.com', supabase_auth_uid: 'auth-eric@agileadtesting.com' },
+        { user_id: '+14435012219', email: 'eric@agileadtesting.com', supabase_auth_uid: null },
+      );
+
+      await post(base, '/otp/request', { email: 'eric@agileadtesting.com' });
+      const code = codeFromEmail();
+      const { status, body } = await post(base, '/otp/verify', { email: 'eric@agileadtesting.com', code });
+
+      expect(status).toBe(200);
+      expect(body.needs_onboarding).toBe(false);
+      // The second row must be left alone. Stamping it produced two rows with one auth uid, and
+      // requireAuth's .single() then answered "User profile not found" — a successful login that
+      // could not call a single authenticated route.
+      expect(state.users[1]!.supabase_auth_uid).toBeNull();
+      expect(state.users.filter((u) => u.supabase_auth_uid === 'auth-eric@agileadtesting.com')).toHaveLength(1);
+    });
+  });
+
+  it('refuses to guess between two unlinked profiles with the same email', async () => {
+    await withServer(async (base) => {
+      state.users.push(
+        { user_id: '+14105914612', email: 'twin@example.com', supabase_auth_uid: null },
+        { user_id: '+14435012219', email: 'twin@example.com', supabase_auth_uid: null },
+      );
+
+      await post(base, '/otp/request', { email: 'twin@example.com' });
+      const code = codeFromEmail();
+      const { status, body } = await post(base, '/otp/verify', { email: 'twin@example.com', code });
+
+      // The login still succeeds — the email WAS proved — but no profile is bound, because binding
+      // the wrong one would attach an account to someone else's history.
+      expect(status).toBe(200);
+      expect(body.needs_onboarding).toBe(true);
+      expect(state.users.every((u) => u.supabase_auth_uid === null)).toBe(true);
+    });
+  });
+
+  it('links the single unclaimed profile', async () => {
+    await withServer(async (base) => {
+      state.users.push({ user_id: '+17063338699', email: 'solo@example.com', supabase_auth_uid: null });
+      await post(base, '/otp/request', { email: 'solo@example.com' });
+      const code = codeFromEmail();
+      const { body } = await post(base, '/otp/verify', { email: 'solo@example.com', code });
+      expect(body.needs_onboarding).toBe(false);
+      expect(state.users[0]!.supabase_auth_uid).toBe('auth-solo@example.com');
+    });
+  });
+
+  it('recognises its own profile on the second sign-in without writing again', async () => {
+    await withServer(async (base) => {
+      state.users.push({
+        user_id: '+17063338699',
+        email: 'solo@example.com',
+        supabase_auth_uid: 'auth-solo@example.com',
+        updated_at: 'untouched',
+      });
+      await post(base, '/otp/request', { email: 'solo@example.com' });
+      const code = codeFromEmail();
+      const { body } = await post(base, '/otp/verify', { email: 'solo@example.com', code });
+      expect(body.needs_onboarding).toBe(false);
+      expect(state.users[0]!.updated_at).toBe('untouched');
+    });
+  });
+});

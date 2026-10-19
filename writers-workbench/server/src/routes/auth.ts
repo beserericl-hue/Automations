@@ -298,6 +298,86 @@ async function mintSession(
 }
 
 /**
+ * Which `users_v2` profile does this verified email belong to, and link it if needed.
+ *
+ * Returns the profile's `user_id`, or null when there is no profile yet (the caller then sends the
+ * client to onboarding). Never links ambiguously, for a reason learned the hard way:
+ *
+ * The first version of this matched the email with `.ilike(...).limit(1)` and wrote the session's
+ * auth uid onto whatever row came back. On live DEV **two** profiles carry eric@agileadtesting.com
+ * — the phone-first flow created one per phone number — so it stamped the uid onto the second row
+ * while the first already held it. `requireAuth` looks the profile up by `supabase_auth_uid` with
+ * `.single()`, which then matched two rows and answered "User profile not found": a successful
+ * login that could not then call a single authenticated route. Caught by signing in for real.
+ *
+ * So the order of questions matters:
+ *
+ *   1. Does a row ALREADY hold this auth uid? Then that is the profile, full stop. No write, and no
+ *      opinion about how many rows share the email.
+ *   2. Otherwise, is there exactly ONE unclaimed row for this email? Then link it.
+ *   3. Otherwise refuse to guess, and say so loudly. Several unclaimed profiles with the same email
+ *      is a data problem a person has to resolve; picking one would silently bind an account to the
+ *      wrong history.
+ */
+async function resolveProfile(email: string, authUid: string): Promise<string | null> {
+  const supabase = getSupabaseAdmin();
+
+  if (authUid) {
+    const { data: owned } = await supabase
+      .from('users_v2')
+      .select('user_id')
+      .eq('supabase_auth_uid', authUid)
+      .limit(2);
+    if (owned?.length === 1) return owned[0]!.user_id as string;
+    if ((owned?.length ?? 0) > 1) {
+      // Pre-existing data damage: two profiles already claim one identity. Report it rather than
+      // pick, because requireAuth cannot resolve it either.
+      logger.error(
+        { email, userIds: owned!.map((r) => r.user_id) },
+        'otp.verify: several profiles share one auth uid — login will fail until this is resolved',
+      );
+      return null;
+    }
+  }
+
+  const { data: candidates } = await supabase
+    .from('users_v2')
+    .select('user_id, supabase_auth_uid')
+    .ilike('email', email)
+    .limit(10);
+
+  const unclaimed = (candidates ?? []).filter((r) => !r.supabase_auth_uid);
+  if (unclaimed.length > 1) {
+    logger.error(
+      { email, userIds: unclaimed.map((r) => r.user_id) },
+      'otp.verify: several unlinked profiles share this email — refusing to guess which one',
+    );
+    return null;
+  }
+  if (unclaimed.length === 0) {
+    if ((candidates ?? []).length > 0) {
+      logger.warn({ email }, 'otp.verify: profiles exist for this email but belong to another identity');
+    }
+    return null;
+  }
+
+  const target = unclaimed[0]!;
+  if (!authUid) return target.user_id as string;
+
+  const { error: linkError } = await supabase
+    .from('users_v2')
+    .update({ supabase_auth_uid: authUid, updated_at: new Date().toISOString() })
+    .eq('user_id', target.user_id)
+    .is('supabase_auth_uid', null); // lost race = somebody else linked it; harmless
+  if (linkError) {
+    logger.error({ err: linkError, email }, 'otp.verify profile link failed');
+    return null;
+  }
+  logger.info({ email, userId: target.user_id }, 'otp.verify linked existing profile');
+  return target.user_id as string;
+}
+
+/**
  * @openapi
  * /auth/otp/verify:
  *   post:
@@ -400,32 +480,9 @@ router.post('/otp/verify', async (req: Request, res: Response) => {
       return;
     }
 
-    // Link the auth identity to an existing profile when one matches this email and
-    // has not been linked yet. Two of the three DEV accounts were in exactly this
-    // state: a `users_v2` row created by an admin or by the old phone-first flow,
-    // with `supabase_auth_uid` still null, so logging in would have stranded the
-    // user in onboarding and then collided on the phone number's unique index.
-    const { data: profile } = await supabase
-      .from('users_v2')
-      .select('user_id, supabase_auth_uid')
-      .ilike('email', email)
-      .limit(1)
-      .maybeSingle();
+    const linkedUserId = await resolveProfile(email, session.auth_uid);
 
-    let linkedUserId: string | null = null;
-    if (profile) {
-      linkedUserId = profile.user_id as string;
-      if (!profile.supabase_auth_uid && session.auth_uid) {
-        const { error: linkError } = await supabase
-          .from('users_v2')
-          .update({ supabase_auth_uid: session.auth_uid, updated_at: new Date().toISOString() })
-          .eq('user_id', profile.user_id);
-        if (linkError) logger.error({ err: linkError, email }, 'otp.verify profile link failed');
-        else logger.info({ email, userId: profile.user_id }, 'otp.verify linked existing profile');
-      }
-    }
-
-    logger.info({ email, hasProfile: Boolean(profile) }, 'otp.verify success');
+    logger.info({ email, userId: linkedUserId }, 'otp.verify success');
     res.json({
       success: true,
       access_token: session.access_token,
