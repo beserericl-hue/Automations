@@ -38,6 +38,9 @@ from writer_engine.state_machine.hitl import ApprovalDecision, create_approval
 from writer_engine.state_machine.progress import emit_progress
 from writer_engine.state_machine.saga import StepRef, run_step_via_http
 from writer_engine.state_machine.workbench_callback import notify_workbench_stage
+from writer_engine.telemetry.logging import get_logger
+
+logger = get_logger("newsletter_saga")
 
 DEFAULT_PORTS = {
     "gather": 8010,
@@ -269,7 +272,17 @@ class NewsletterSagaDriver:
                 scraped = (
                     [] if scrape_out.status is StepStatus.ERROR else (scrape_out.payload.get("scraped") or [])
                 )
-            except Exception:
+            except Exception as exc:
+                # C4: this was a bare `scraped = []`, so a scrape step that threw produced an
+                # edition built from headlines alone and looked exactly like a story with no
+                # external links. The send still goes out — one story's sources are not worth
+                # failing an edition over — but it no longer goes out quietly.
+                logger.warning(
+                    "saga.scrape_failed",
+                    execution_id=str(execution_id),
+                    urls=len(story.external_source_links or []),
+                    error=f"{type(exc).__name__}: {exc}"[:160],
+                )
                 scraped = []
             # Image + segment are LLM-backed and routinely exceed the 60s default; give them headroom so
             # a normal-latency generation isn't misread as a timeout — a raised timeout here aborts the

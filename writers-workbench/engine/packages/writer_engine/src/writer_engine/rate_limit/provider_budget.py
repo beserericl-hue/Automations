@@ -42,6 +42,36 @@ if TYPE_CHECKING:
 
 logger = get_logger("rate_limit.provider_budget")
 
+_UNGATED_WARN_INTERVAL_S = 60.0
+"""How often to repeat the "budgets are not being enforced" warning.
+
+Once per call would be thousands of identical lines a minute during a Redis blip, which is its own
+kind of silence."""
+
+_last_ungated_warning = 0.0
+
+
+def _warn_ungated(where: str, error: str = "") -> None:
+    """Say out loud that rate limiting is OFF.
+
+    C4: `_client()` returned None on any Redis failure and the caller then returned True, so a Redis
+    blip silently removed EVERY provider budget — the engine would hammer providers into 429s, or
+    spend without a cap, with nothing in the logs to say the guard had gone. Redis died unnoticed
+    for nine days in May; this is the same shape of failure one layer down.
+    """
+    global _last_ungated_warning
+    now = time.time()
+    if now - _last_ungated_warning < _UNGATED_WARN_INTERVAL_S:
+        return
+    _last_ungated_warning = now
+    logger.warning(
+        "rate_limit.unenforced",
+        where=where,
+        error=error[:160],
+        consequence="provider rate limits are NOT being applied while Redis is unreachable",
+    )
+
+
 _POLL_INTERVAL_S = 0.5
 
 T = TypeVar("T")
@@ -146,7 +176,9 @@ class ProviderBudget:
             return self._redis
         try:
             return await _redis_module.get_redis()
-        except Exception:
+        except Exception as exc:
+            # NOT silent: callers treat None as "no budget to check" and proceed.
+            _warn_ungated("provider_budget", f"{type(exc).__name__}: {exc}")
             return None
 
     async def _usage(self, client: redis.Redis, provider: str, model: str, kind: str) -> int | None:
