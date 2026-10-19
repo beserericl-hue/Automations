@@ -33,6 +33,7 @@ from writer_engine.queue_metrics import (
     INTERACTIVE_WAIT_SCALE_OUT_S,
     SATURATION_SCALE_OUT,
     SCALE_IN_SATURATION,
+    budget_stalls,
     sample_all,
     scaling_advice,
 )
@@ -329,7 +330,9 @@ def build_app() -> FastAPI:
             queues[name] = entry
         out["queues"] = queues
         if samples:
-            out["capacity"] = scaling_advice(list(samples.values()))["verdict"]
+            out["capacity"] = scaling_advice(
+                list(samples.values()), stalls=await budget_stalls(app.state.arq_pool)
+            )["verdict"]
 
         entries = await read_dead_letters(limit=10)
         out["dead_letters"] = {"recent": entries, "shown": len(entries)}
@@ -811,7 +814,7 @@ def build_app() -> FastAPI:
         if pool is None:
             return {"sampled": 0, "reason": "no arq pool"}
         samples = await sample_all(pool, health_key_for=_health_key_for)
-        advice = scaling_advice(samples)
+        advice = scaling_advice(samples, stalls=await budget_stalls(pool))
         verdict = str(advice["verdict"])
         reason = str(advice["reason"])
         if verdict in {"scale_out", "tpm_bound"}:
@@ -855,8 +858,12 @@ def build_app() -> FastAPI:
         if pool is None:
             return {"verdict": "unknown", "reason": "no arq pool", "queues": []}
         samples = await sample_all(pool, health_key_for=_health_key_for)
+        stalls = await budget_stalls(pool)
         return {
-            **scaling_advice(samples),
+            **scaling_advice(samples, stalls=stalls),
+            # Surfaced so the verdict can be checked rather than trusted: `tpm_bound` requires a
+            # non-zero stall count, and a deep queue with zero stalls is backlog, not throttling.
+            "budget_stalls_last_minute": stalls,
             "thresholds": {
                 "saturation_scale_out": SATURATION_SCALE_OUT,
                 "interactive_wait_scale_out_s": INTERACTIVE_WAIT_SCALE_OUT_S,

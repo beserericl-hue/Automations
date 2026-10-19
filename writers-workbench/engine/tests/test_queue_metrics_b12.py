@@ -136,18 +136,36 @@ def _s(queue: str, **kw: Any) -> Q.QueueSample:
     return Q.QueueSample(**base)
 
 
+def _full_heavy() -> list[Q.QueueSample]:
+    """Eight of eight slots busy, 32 waiting, the oldest queued 15 minutes."""
+    return [
+        _s(QUEUE_HEAVY, depth=40, running=8, waiting=32, saturation=1.0, oldest_wait_s=900),
+        _s(QUEUE_INTERACTIVE),
+    ]
+
+
 class TestPolicy:
-    def test_a_full_heavy_queue_is_tpm_bound_not_a_reason_to_add_an_instance(self) -> None:
-        """The whole point of the policy. A 96-chapter batch fills the heavy queue for hours by
-        design; a second instance shares the same account-wide output TPM and writes no faster."""
-        advice = Q.scaling_advice(
-            [
-                _s(QUEUE_HEAVY, depth=40, running=8, waiting=32, saturation=1.0, oldest_wait_s=900),
-                _s(QUEUE_INTERACTIVE),
-            ]
-        )
+    def test_a_full_heavy_queue_with_token_pressure_is_tpm_bound(self) -> None:
+        """A second instance shares the same account-wide output budget and writes no faster — but
+        only when the budget is actually the thing holding work up."""
+        advice = Q.scaling_advice(_full_heavy(), stalls=17)
         assert advice["verdict"] == "tpm_bound"
-        assert "TPM" in advice["reason"]
+        assert "output budget" in advice["reason"]
+        assert "17 call" in advice["reason"]
+
+    def test_the_same_queue_with_no_token_pressure_is_merely_backlog(self) -> None:
+        """Measured during a 96-chapter run: 89 jobs queued for 8 slots, oldest wait 429s, and ZERO
+        budget stalls. The old rule called that `tpm_bound` and would have sent somebody to buy a
+        higher Anthropic tier for a queue that was simply deep. Queue age under a bulk submission is
+        depth, not throttling."""
+        advice = Q.scaling_advice(_full_heavy(), stalls=0)
+        assert advice["verdict"] == "backlog"
+        assert "NO call waited for token capacity" in advice["reason"]
+        assert "depth, not throttling" in advice["reason"]
+
+    def test_backlog_names_the_slot_count_so_the_lever_is_obvious(self) -> None:
+        advice = Q.scaling_advice(_full_heavy(), stalls=0)
+        assert "8 slots" in advice["reason"]
 
     def test_queued_interactive_work_is_a_reason_to_add_an_instance(self) -> None:
         advice = Q.scaling_advice(
@@ -201,3 +219,48 @@ class TestPolicy:
     def test_every_sample_is_reported_even_when_it_failed(self) -> None:
         advice = Q.scaling_advice([_s(QUEUE_HEAVY), _s(QUEUE_INTERACTIVE, error="boom")])
         assert len(advice["queues"]) == 2
+
+
+class TestTheWindowSurvivesEitherDecoding:
+    """`window.current` did `m.rsplit(":", 1)` on whatever Redis returned.
+
+    `get_redis()` sets `decode_responses=True`, so members arrive as str in this engine and it
+    worked. A client built without that keyword returns bytes, `bytes.rsplit(":")` raises TypeError,
+    and the old `except (ValueError, AttributeError)` did not catch it — so one missing keyword
+    argument in some future caller would have produced a budget that reads zero usage and therefore
+    never limits anything. Found by a test fake that returned bytes, which is what a raw client does.
+    """
+
+    @staticmethod
+    def _client(members: list[Any]) -> Any:
+        class _C:
+            async def zremrangebyscore(self, *_a: Any) -> int:
+                return 0
+
+            async def zrangebyscore(self, *_a: Any) -> list[Any]:
+                return members
+
+        return _C()
+
+    def test_str_members_are_counted(self) -> None:
+        from writer_engine.rate_limit import window
+
+        got = asyncio.run(window.current(self._client(["a:3", "b:4"]), "k"))
+        assert got == 7
+
+    def test_bytes_members_are_counted_too(self) -> None:
+        from writer_engine.rate_limit import window
+
+        got = asyncio.run(window.current(self._client([b"a:3", b"b:4"]), "k"))
+        assert got == 7
+
+    def test_a_junk_member_is_skipped_not_fatal(self) -> None:
+        from writer_engine.rate_limit import window
+
+        got = asyncio.run(window.current(self._client(["a:3", "nonsense", b"c:2", None]), "k"))
+        assert got == 5
+
+    def test_stalls_in_window_reads_the_same_way(self) -> None:
+        from writer_engine.rate_limit import window
+
+        assert asyncio.run(window.stalls_in_window(self._client([b"x:1", "y:1"]))) == 2

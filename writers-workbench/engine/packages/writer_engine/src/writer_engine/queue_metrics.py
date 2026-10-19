@@ -60,6 +60,11 @@ QUEUE_SATURATION = Gauge(
     "Running / max_jobs for the queue's worker. 1.0 means every slot is busy.",
     labelnames=("queue",),
 )
+BUDGET_STALLS = Gauge(
+    "engine_llm_budget_stalls",
+    "LLM calls that had to wait for token capacity in the last minute (0 = the token budget is not "
+    "the constraint).",
+)
 QUEUE_OLDEST_WAIT = Gauge(
     "engine_queue_oldest_wait_seconds",
     "Age of the oldest item in the queue, by its arq score (eligible-at time).",
@@ -165,11 +170,28 @@ def publish(sample: QueueSample) -> None:
         QUEUE_OLDEST_WAIT.labels(queue=sample.queue).set(sample.oldest_wait_s)
 
 
+async def budget_stalls(redis: Any) -> int:
+    """How many LLM calls actually had to wait for token capacity in the last minute.
+
+    THE signal that separates "the account's token budget is the ceiling" from "somebody queued 96
+    jobs into 8 slots". Written by the budgets themselves (`window.record_stall`) because they live
+    in another process, so a per-process Prometheus counter could not answer it.
+    """
+    try:
+        from writer_engine.rate_limit import window
+
+        return int(await window.stalls_in_window(redis))
+    except Exception:
+        return 0
+
+
 async def sample_all(redis: Any, *, health_key_for: Any) -> list[QueueSample]:
     """Sample every live queue and publish the gauges. ``health_key_for(queue) -> str``."""
     samples = [await sample_queue(redis, q, health_key=health_key_for(q)) for q in ALL_QUEUES]
     for s in samples:
         publish(s)
+    stalls = await budget_stalls(redis)
+    BUDGET_STALLS.set(stalls)
     return samples
 
 
@@ -191,13 +213,20 @@ SCALE_IN_SATURATION = 0.25
 """Sustained headroom. Deliberately far below SCALE_OUT so the two cannot oscillate."""
 
 
-def scaling_advice(samples: list[QueueSample]) -> dict[str, Any]:
+def scaling_advice(samples: list[QueueSample], *, stalls: int = 0) -> dict[str, Any]:
     """Turn samples into one verdict with a reason, for an operator or an autoscaler.
 
     Verdicts: ``scale_out`` (add a runtime replica — B7's drain must land first), ``tpm_bound``
     (adding replicas will not help; the levers are the Anthropic tier, a cheaper model mix per B9's
-    `hybrid-draft-polish`, or BYOK), ``hold``, ``scale_in``, and ``unknown`` when no worker heartbeat
-    was readable.
+    `hybrid-draft-polish`, or BYOK), ``backlog`` (the queue is simply deeper than its slots — the
+    work is arriving faster than it can be done, and nothing is throttling), ``hold``, ``scale_in``,
+    and ``unknown`` when no worker heartbeat was readable.
+
+    ``stalls`` is how many LLM calls actually waited for token capacity in the last minute, and
+    ``tpm_bound`` now REQUIRES it to be non-zero. Measured during a 96-chapter run: 89 jobs queued
+    for 8 slots, oldest wait 429s, and zero stalls — the old rule read queue age as token pressure
+    and would have sent somebody to buy a higher Anthropic tier for a queue that was merely deep.
+    Queue age under a bulk submission is depth, not throttling.
     """
     usable = [s for s in samples if not s.error and s.running is not None]
     if not usable:
@@ -214,11 +243,21 @@ def scaling_advice(samples: list[QueueSample]) -> dict[str, Any]:
         if s.queue == QUEUE_HEAVY:
             # Depth here is expected and fine: the heavy queue exists to absorb a 96-chapter batch.
             if waited >= HEAVY_WAIT_TPM_BOUND_S and (s.saturation or 0) >= SATURATION_SCALE_OUT:
-                verdict = "tpm_bound"
-                reasons.append(
-                    f"{s.queue}: {s.waiting} waiting, oldest {waited:.0f}s, every slot busy — "
-                    "bounded by account-wide output TPM, not by this instance (B9)"
-                )
+                if stalls > 0:
+                    verdict = "tpm_bound"
+                    reasons.append(
+                        f"{s.queue}: {s.waiting} waiting, oldest {waited:.0f}s, every slot busy, and "
+                        f"{stalls} call(s) waited for token capacity in the last minute — bounded by "
+                        "the account's output budget, so another replica shares the same ceiling (B9)"
+                    )
+                else:
+                    verdict = "backlog"
+                    reasons.append(
+                        f"{s.queue}: {s.waiting} waiting, oldest {waited:.0f}s, every slot busy, and "
+                        "NO call waited for token capacity — this is depth, not throttling. The work "
+                        f"is arriving faster than {s.max_jobs} slots can finish it; the levers are "
+                        "more slots, more instances, or simply waiting"
+                    )
         elif (s.saturation or 0) >= SATURATION_SCALE_OUT and waited >= INTERACTIVE_WAIT_SCALE_OUT_S:
             verdict = "scale_out"
             reasons.append(

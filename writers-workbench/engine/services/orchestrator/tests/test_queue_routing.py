@@ -71,6 +71,7 @@ def _fake_redis(
     *,
     ongoing: dict[str, int] | None = None,
     oldest_age_s: float = 5.0,
+    stalls: int = 0,
 ) -> None:
     """Give the app's arq pool the three reads the queue sampler makes: ZCARD, GET (the worker
     heartbeat) and ZRANGE WITHSCORES (the oldest item's eligible-at score)."""
@@ -95,10 +96,22 @@ def _fake_redis(
             return []
         return [(b"job-1", (_time.time() - oldest_age_s) * 1000)]
 
+    # The budget-stall window (window.STALL_KEY) is read with zremrangebyscore + zrangebyscore.
+    # `stalls` members mean that many LLM calls actually waited for token capacity; the default of
+    # none is what distinguishes plain backlog from a real token ceiling.
+    async def _zremrangebyscore(_key: str, _lo: Any, _hi: Any) -> int:
+        return 0
+
+    async def _zrangebyscore(_key: str, _lo: Any, _hi: Any) -> list[str]:
+        # str, not bytes: get_redis() sets decode_responses=True, so this matches production.
+        return [f"t{i}:1" for i in range(stalls)]
+
     pool = client.app.state.arq_pool  # type: ignore[attr-defined]
     pool.zcard = _zcard
     pool.get = _get
     pool.zrange = _zrange
+    pool.zremrangebyscore = _zremrangebyscore
+    pool.zrangebyscore = _zrangebyscore
 
 
 def _run(client: TestClient, tool: str, body: dict[str, Any]) -> dict[str, Any]:
@@ -371,7 +384,11 @@ def test_admin_queues_reports_depth_and_a_verdict(client: TestClient) -> None:
     assert (heavy["depth"], heavy["running"], heavy["waiting"]) == (40, 8, 32)
     # A full heavy queue is bounded by account-wide output TPM, not by this instance (B9), so the
     # verdict must NOT be "add a replica".
-    assert body["verdict"] == "tpm_bound"
+    # No call waited for token capacity, so a deep queue is backlog — NOT a reason to go and buy a
+    # higher Anthropic tier. Measured for real during the 96-chapter run: 89 waiting, 429s oldest,
+    # zero stalls.
+    assert body["verdict"] == "backlog"
+    assert body["budget_stalls_last_minute"] == 0
     assert body["thresholds"]["heavy_wait_tpm_bound_s"] > 0
 
 
@@ -421,8 +438,9 @@ def test_a_capacity_verdict_sends_one_debounced_alert(
 
     monkeypatch.setattr(orch_main, "send_alert", _send)
     monkeypatch.setattr(orch_main, "clear_alert", _clear)
-    # A full heavy queue whose oldest job has waited 15 minutes: TPM-bound, per B9.
-    _fake_redis(client, {QUEUE_HEAVY: 40}, ongoing={QUEUE_HEAVY: 8}, oldest_age_s=900)
+    # A full heavy queue whose oldest job has waited 15 minutes AND whose calls are waiting on the
+    # token budget: that is the TPM ceiling, and a replica would share it.
+    _fake_redis(client, {QUEUE_HEAVY: 40}, ongoing={QUEUE_HEAVY: 8}, oldest_age_s=900, stalls=17)
 
     async def _go() -> dict[str, Any]:
         for job in client.app.state.cron_jobs:  # type: ignore[attr-defined]

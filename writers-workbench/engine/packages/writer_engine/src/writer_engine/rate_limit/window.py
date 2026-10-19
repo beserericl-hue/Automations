@@ -40,9 +40,16 @@ async def current(client: redis.Redis, key: str) -> int:
     total = 0
     for m in members:
         try:
-            _, count = m.rsplit(":", 1)
+            # Decoded here rather than assuming the client does it. `get_redis()` sets
+            # decode_responses=True, so members arrive as str in this engine — but a client
+            # constructed without it returns bytes, and `bytes.rsplit(":")` raises TypeError, which
+            # the old `except (ValueError, AttributeError)` did not catch. The effect would have
+            # been a budget that always reads zero usage and therefore never limits anything, from
+            # one keyword argument in a caller nobody would think to check.
+            text = m.decode("utf-8", "replace") if isinstance(m, bytes | bytearray) else str(m)
+            _, count = text.rsplit(":", 1)
             total += int(count)
-        except (ValueError, AttributeError):
+        except Exception:
             # A member written by an older/other format is ignored rather than crashing the gate:
             # over-counting or under-counting by one entry is survivable, refusing to answer is not.
             continue
@@ -64,3 +71,33 @@ def new_token() -> str:
 
 
 __all__ = ["WINDOW_S", "current", "new_token", "record"]
+
+STALL_KEY = "engine:budget:stalls"
+"""Where a budget records that a call ACTUALLY had to wait for capacity.
+
+Cross-process on purpose. The budgets live in the steps process; the queue sampler that has to
+explain a backlog lives in the orchestrator. Prometheus counters are per-process, so they cannot
+answer "is the account's token budget the thing holding this up?" from the other side — and without
+an answer the sampler was guessing from queue age, which under a bulk submission is just depth.
+
+Measured 2026-10-19 during a 96-chapter run: 89 jobs queued for 8 slots, oldest wait 429s, and
+**zero** budget stalls. The verdict said "bounded by account-wide output TPM" and would have sent
+somebody to buy a higher Anthropic tier for a queue that was simply deep.
+"""
+
+
+async def record_stall(client: redis.Redis, provider: str, model: str) -> None:
+    """Note one stalled call. Best-effort: a telemetry write must not fail a generation."""
+    try:
+        await record(client, f"{STALL_KEY}:{provider}", 1)
+        await record(client, STALL_KEY, 1)
+    except Exception:  # pragma: no cover - never worth failing a call over
+        return
+
+
+async def stalls_in_window(client: redis.Redis, provider: str = "") -> int:
+    """How many calls had to wait for token capacity in the last window. 0 when nothing stalled."""
+    try:
+        return await current(client, f"{STALL_KEY}:{provider}" if provider else STALL_KEY)
+    except Exception:
+        return 0

@@ -256,6 +256,9 @@ class ProviderBudget:
                 return True
             if not stalled:
                 stalled = True
+                # Recorded in Redis as well as logged: the queue sampler runs in another process and
+                # needs this to tell token pressure from plain backlog (window.STALL_KEY).
+                await _window.record_stall(client, provider, model)
                 logger.info(
                     "provider_budget.stall",
                     provider=provider,

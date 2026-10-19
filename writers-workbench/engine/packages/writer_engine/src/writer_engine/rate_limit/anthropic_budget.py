@@ -189,6 +189,9 @@ class AnthropicBudget:
             if not stalled:
                 # First time we couldn't proceed: log WHICH limit is the bottleneck under load.
                 stalled = True
+                # Also recorded in Redis: the queue sampler runs in another process and needs this
+                # to tell token pressure from plain backlog (window.STALL_KEY).
+                await _window.record_stall(client, "anthropic", model)
                 logger.info(
                     "budget.stall",
                     model=model,
