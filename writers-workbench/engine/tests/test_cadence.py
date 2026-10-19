@@ -15,16 +15,18 @@ one configured zone and "weekly" keeps the baseline's weekday by construction.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time
 from zoneinfo import ZoneInfo
 
 import pytest
 
 from writer_engine.cadence import (
+    DEFAULT_SEND_TIME,
     INTERVAL_DAYS,
     is_due,
     next_due_at,
     parse_baseline,
+    parse_schedule,
     parse_send_time,
     resolve_zone,
 )
@@ -146,3 +148,73 @@ def test_every_supported_cadence_becomes_due_after_its_interval(cadence: str) ->
     assert due_at is not None
     assert (due_at.date() - baseline.date()).days == INTERVAL_DAYS[cadence]
     assert is_due(cadence=cadence, baseline=baseline, send_time="09:00", now=due_at)[0] is True
+
+
+class TestWeekdayInSendTime:
+    """The edition editor's `cadence_send_time` box is free text and its own placeholder reads
+    "09:00 fri". That string matched none of the accepted formats, so the parser warned and returned
+    MIDNIGHT: a user who typed exactly what the UI suggested lost the weekday AND had their 09:00
+    moved to 00:00. The scheduling UI was not merely ignoring a field — it was moving the send."""
+
+    def test_the_placeholder_the_ui_suggests_now_works(self) -> None:
+        at, weekday = parse_schedule("09:00 fri")
+        assert at == time(9, 0)
+        assert weekday == 4
+
+    def test_either_order_and_long_names(self) -> None:
+        assert parse_schedule("fri 09:00") == (time(9, 0), 4)
+        assert parse_schedule("Friday 9") == (time(9, 0), 4)
+        assert parse_schedule("Tuesday, 17:30") == (time(17, 30), 1)
+
+    def test_a_bare_time_still_has_no_weekday(self) -> None:
+        assert parse_schedule("09:00") == (time(9, 0), None)
+
+    def test_a_bare_weekday_uses_the_default_time(self) -> None:
+        assert parse_schedule("sat") == (DEFAULT_SEND_TIME, 5)
+
+    def test_a_recognised_time_survives_an_unrecognised_neighbour(self) -> None:
+        """The specific regression: junk beside the time must not discard the time."""
+        at, weekday = parse_schedule("09:00 friady")
+        assert at == time(9, 0)
+        assert weekday is None
+
+    def test_junk_alone_still_falls_back(self) -> None:
+        assert parse_schedule("whenever") == (DEFAULT_SEND_TIME, None)
+        assert parse_schedule("") == (DEFAULT_SEND_TIME, None)
+        assert parse_schedule(None) == (DEFAULT_SEND_TIME, None)
+
+    def test_parse_send_time_still_answers_for_old_callers(self) -> None:
+        assert parse_send_time("09:00 fri") == time(9, 0)
+
+    def test_a_weekly_friday_edition_lands_on_friday(self) -> None:
+        # Baseline Wednesday 2026-10-14; the weekly interval lands on Wednesday the 21st...
+        baseline = datetime(2026, 10, 14, 12, 0, tzinfo=UTC)
+        due = next_due_at(cadence="weekly", baseline=baseline, send_time="09:00 fri")
+        assert due is not None
+        # ...and is carried on to Friday the 23rd at 09:00 instead of sending on the Wednesday.
+        assert (due.year, due.month, due.day) == (2026, 10, 23)
+        assert due.weekday() == 4
+        assert (due.hour, due.minute) == (9, 0)
+
+    def test_it_never_moves_the_send_earlier(self) -> None:
+        """Early is the direction that reaches subscribers before the operator expects it."""
+        baseline = datetime(2026, 10, 14, 12, 0, tzinfo=UTC)
+        interval_only = next_due_at(cadence="weekly", baseline=baseline, send_time="09:00")
+        with_weekday = next_due_at(cadence="weekly", baseline=baseline, send_time="09:00 mon")
+        assert interval_only is not None and with_weekday is not None
+        assert with_weekday >= interval_only
+
+    def test_a_weekday_matching_the_interval_day_does_not_add_a_week(self) -> None:
+        baseline = datetime(2026, 10, 14, 12, 0, tzinfo=UTC)  # Wednesday
+        due = next_due_at(cadence="weekly", baseline=baseline, send_time="09:00 wed")
+        assert due is not None and (due.year, due.month, due.day) == (2026, 10, 21)
+
+    def test_is_due_respects_the_weekday(self) -> None:
+        baseline = datetime(2026, 10, 14, 12, 0, tzinfo=UTC)
+        on_wednesday = datetime(2026, 10, 21, 10, 0, tzinfo=UTC)  # interval elapsed, not Friday yet
+        due, reason = is_due(cadence="weekly", baseline=baseline, send_time="09:00 fri", now=on_wednesday)
+        assert due is False and "not due until" in reason
+
+        on_friday = datetime(2026, 10, 23, 9, 1, tzinfo=UTC)
+        due2, _ = is_due(cadence="weekly", baseline=baseline, send_time="09:00 fri", now=on_friday)
+        assert due2 is True

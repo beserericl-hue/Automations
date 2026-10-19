@@ -25,6 +25,13 @@ to the operator's own zone to make the stored times mean what the UI implies.
 WEEKDAY. "Weekly" keeps the weekday of the baseline, because a 7-day interval from a date-anchored
 baseline lands on the same weekday by construction. That is the behaviour a user expects from
 "weekly" and it is why the drift above mattered.
+
+A weekday can also be stated explicitly, because the UI asks for one: the edition editor's
+``cadence_send_time`` field is a free-text box whose own placeholder reads **"09:00 fri"**. Until now
+that string matched none of the accepted formats, so ``parse_send_time`` logged a warning and
+returned MIDNIGHT — a user who typed exactly what the placeholder suggested lost the weekday *and*
+had their 09:00 moved to 00:00. The parser now reads an optional trailing (or leading) weekday and
+the due moment lands on it.
 """
 
 from __future__ import annotations
@@ -55,24 +62,78 @@ def resolve_zone(name: str | None) -> ZoneInfo:
         return ZoneInfo("UTC")
 
 
-def parse_send_time(value: object) -> time:
-    """Parse ``cadence_send_time``. It is stored as a string like "09:00" (measured on DEV).
+WEEKDAYS: dict[str, int] = {
+    "mon": 0,
+    "monday": 0,
+    "tue": 1,
+    "tues": 1,
+    "tuesday": 1,
+    "wed": 2,
+    "weds": 2,
+    "wednesday": 2,
+    "thu": 3,
+    "thur": 3,
+    "thurs": 3,
+    "thursday": 3,
+    "fri": 4,
+    "friday": 4,
+    "sat": 5,
+    "saturday": 5,
+    "sun": 6,
+    "sunday": 6,
+}
+"""Accepted weekday spellings for ``cadence_send_time``, matching Python's Monday=0."""
 
-    Tolerates "09:00:00", a ``time`` object, and junk — junk falls back to midnight, because
-    refusing to send a newsletter over an unparseable minute field is the wrong trade.
+
+def parse_schedule(value: object) -> tuple[time, int | None]:
+    """Parse ``cadence_send_time`` into ``(time_of_day, weekday_or_None)``.
+
+    Accepts "09:00", "09:00:00", "9", a ``time`` object, and — because the UI's own placeholder says
+    so — a weekday alongside the time in either order: "09:00 fri", "fri 09:00", "Friday 9".
+    A bare weekday ("fri") means that day at the default time.
+
+    Junk still falls back to the default rather than raising: refusing to send a newsletter over an
+    unparseable minute field is the wrong trade. But a RECOGNISED time is never discarded because
+    something unrecognised sat next to it, which is the bug this replaces.
     """
     if isinstance(value, time):
-        return value
+        return value, None
     text = str(value or "").strip()
     if not text:
-        return DEFAULT_SEND_TIME
-    for fmt in ("%H:%M:%S", "%H:%M", "%H"):
-        try:
-            return datetime.strptime(text, fmt).time()
-        except ValueError:
+        return DEFAULT_SEND_TIME, None
+
+    weekday: int | None = None
+    time_of_day: time | None = None
+    unknown: list[str] = []
+    for token in text.replace(",", " ").split():
+        key = token.strip().lower()
+        if key in WEEKDAYS:
+            weekday = WEEKDAYS[key]
             continue
-    logger.warning("cadence.bad_send_time", value=text[:32])
-    return DEFAULT_SEND_TIME
+        parsed = None
+        for fmt in ("%H:%M:%S", "%H:%M", "%H"):
+            try:
+                parsed = datetime.strptime(key, fmt).time()
+                break
+            except ValueError:
+                continue
+        if parsed is not None:
+            time_of_day = parsed
+        else:
+            unknown.append(token[:16])
+
+    if unknown:
+        # Still warned, because a typo'd weekday ("friady") should be visible — but it no longer
+        # costs the user the time they typed correctly.
+        logger.warning("cadence.bad_send_time", value=text[:32], unparsed=unknown[:3])
+    if time_of_day is None and weekday is None:
+        return DEFAULT_SEND_TIME, None
+    return (time_of_day or DEFAULT_SEND_TIME), weekday
+
+
+def parse_send_time(value: object) -> time:
+    """Just the time of day. Kept for callers that do not care about the weekday."""
+    return parse_schedule(value)[0]
 
 
 def parse_baseline(value: object) -> datetime | None:
@@ -105,9 +166,16 @@ def next_due_at(
     if not days:
         return None
     zone = resolve_zone(timezone)
+    at, weekday = parse_schedule(send_time)
     local_baseline_date: date = baseline.astimezone(zone).date()
     due_date = local_baseline_date + timedelta(days=days)
-    return datetime.combine(due_date, parse_send_time(send_time), tzinfo=zone)
+    if weekday is not None:
+        # Land on the requested weekday at or after the interval. Never earlier: a "weekly, Friday"
+        # edition whose interval lands on a Wednesday waits until Friday rather than going out two
+        # days early, because early is the direction that reaches subscribers before the operator
+        # expects it.
+        due_date += timedelta(days=(weekday - due_date.weekday()) % 7)
+    return datetime.combine(due_date, at, tzinfo=zone)
 
 
 def is_due(
@@ -144,9 +212,11 @@ def is_due(
 __all__ = [
     "DEFAULT_SEND_TIME",
     "INTERVAL_DAYS",
+    "WEEKDAYS",
     "is_due",
     "next_due_at",
     "parse_baseline",
+    "parse_schedule",
     "parse_send_time",
     "resolve_zone",
 ]
