@@ -1259,6 +1259,40 @@ def _stored_research(outline: dict[str, Any], chapter_number: int) -> tuple[str,
     return text, _facts_topics(text), len(facts)
 
 
+def chapter_period(outline: dict[str, Any], chapter_number: int, fallback: str = "") -> str:
+    """The era this chapter is set in, taken from the chapter's own outline entry.
+
+    Every caller used to have to supply `period` and nothing derived it, so a payload without one
+    wrote the chapter as ``"contemporary"`` — while the information sat in the outline all along.
+    On The Ossuary that is catastrophic and silent: all 96 chapters carry a period
+    (`ca. 10,500 BCE` … `March 2011`), the book spans twelve thousand years, and `period` drives the
+    period-language craft seeds, the research query, and the QA's `period_language_ok` score. A
+    batch that forgot to pass it would render the whole deep-time half in modern idiom and still
+    report success.
+
+    An explicit payload value always wins — a caller rewriting one chapter in a different era is
+    doing it on purpose.
+    """
+    if fallback.strip():
+        return fallback.strip()
+    chapters = (outline or {}).get("chapters") or []
+    entry: dict[str, Any] | None = None
+    for ch in chapters:
+        if isinstance(ch, dict) and str(ch.get("chapter_number")) == str(chapter_number):
+            entry = ch
+            break
+    if entry is None and 0 <= chapter_number < len(chapters) and isinstance(chapters[chapter_number], dict):
+        entry = chapters[chapter_number]
+    research = (entry or {}).get("research")
+    if isinstance(research, dict):
+        period = str(research.get("period") or "").strip()
+        if period:
+            return period
+    # `period` also appears on some outlines at the top level (older shapes).
+    top = str((outline or {}).get("period") or "").strip()
+    return top or "contemporary"
+
+
 async def _chapter_research(beat: str, *, period: str, title: str, focus: str = "") -> tuple[str, list[str]]:
     """Pre-write research grounding (Perplexity): given the chapter's planned beat, fetch SPECIFIC
     period facts / local color / material culture / real events to weave into the scene as it is
@@ -1578,7 +1612,7 @@ async def _op_write(payload: dict) -> dict:
     # `model` stays the name the rest of this function uses for the DRAFT model, which is where the
     # output tokens are. The short corrective passes take plan.polish.
     model = plan.draft
-    period = str(payload.get("period") or "contemporary")
+    period = chapter_period(ctx["outline"], req.chapter_number, str(payload.get("period") or ""))
     # Sub-chapter fan-out (F1-1): a chapter is written as N sub-chapters (~2-3k words each) for depth,
     # so a full chapter reaches n8n-scale length. Default 5; 1 = single-call (short) path.
     n_sub = max(1, min(int(req.sub_chapter_count_override or 5), 6))
@@ -2453,6 +2487,7 @@ async def _op_qa(payload: dict) -> dict:
     project_id = payload.get("project_id")
     chapter_number = payload.get("chapter_number")
     beat = ""
+    ctx: dict[str, Any] = {}
     if (not chapter_text or not roster) and project_id and chapter_number not in (None, ""):
         ctx = await _load_context(str(project_id), payload)
         roster = roster or ctx.get("roster") or []
@@ -2464,7 +2499,13 @@ async def _op_qa(payload: dict) -> dict:
             beat = _chapter_outline_beat(ctx.get("outline") or {}, ch_n)
         if not chapter_text:
             chapter_text = await _load_persisted_chapter(str(project_id), ch_n) if ch_n is not None else ""
-    period = str(payload.get("period") or "contemporary")
+    # Same reason as the write path: `period_language_ok` is scored against the era, and defaulting
+    # a 10,500 BCE chapter to "contemporary" marks correct period language as wrong.
+    period = chapter_period(
+        ctx.get("outline") or payload.get("outline") or {},
+        optional_int(chapter_number) or 0,
+        str(payload.get("period") or ""),
+    )
     roster_text = _roster_text(roster) if roster else ""
     name_check = _character_name_consistency(chapter_text, roster) if roster else None
     qa = await _score_chapter(chapter_text, period, roster_text, beat=beat)
@@ -2599,7 +2640,7 @@ async def _op_scan_drift(payload: dict) -> dict:
     outline = payload.get("outline") or {}
     chapter_number = _coerce_chapter_number(payload.get("chapter_number"), 0)
     roster_text = _roster_text(payload.get("roster") or []) if payload.get("roster") else "(none)"
-    period = str(payload.get("period") or "contemporary")
+    period = chapter_period(outline, chapter_number, str(payload.get("period") or ""))
     drift = await _detect_drift(
         text,
         outline=outline,
@@ -2754,11 +2795,15 @@ async def _op_repair(payload: dict) -> dict:
         else _apply_ctx_overrides({"genre_slug": "", "title": "", "outline": {}, "roster": []}, payload)
     )
     roster_text = _roster_text(ctx.get("roster") or [])
-    period = str(
-        payload.get("period")
-        or _outline_chapter_act(ctx.get("outline") or {}, chapter_number)
-        or "contemporary"
+    # The chapter's own research period first; the act label is only a proxy for an era and was
+    # standing in for one here.
+    period = chapter_period(
+        ctx.get("outline") or {},
+        chapter_number,
+        str(payload.get("period") or ""),
     )
+    if period == "contemporary":
+        period = _outline_chapter_act(ctx.get("outline") or {}, chapter_number) or period
     settings = get_settings()
     model = _polish_model(payload, settings)
     req = WriteChapterRequest.model_validate(
