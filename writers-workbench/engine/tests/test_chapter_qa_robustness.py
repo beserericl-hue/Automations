@@ -132,3 +132,61 @@ class TestNoProviderStillYieldsAFixture:
         _stub_structured(monkeypatch, [ProviderNotRegistered("anthropic")])
         out = asyncio.run(M._score_chapter("chapter", "1850"))
         assert out is not None, "the fixture path must still answer when no key is configured"
+
+
+class TestUnassessableDimensionsAreNotZero:
+    """Found by running the B9 comparison. Three dimensions came back 0.0 in BOTH runs of the same
+    chapter — character_follows_guide, outline_follows_guide and character_consistency — and neither
+    was a quality judgement:
+
+    * `_score_chapter` never sent the planned beat, so `outline_follows_guide` was unanswerable by
+      construction and the model scored it 0.0 rather than null;
+    * The Ossuary spans 12,000 years, so chapter 2's protagonist (Strikes-Twice) is in none of the
+      six roster entries. A roster that does not mention this era's cast is not evidence the chapter
+      got them wrong.
+
+    0.0 means "does this badly"; null means "nothing to judge against", and the schema already
+    coerces null to 1.0 (not flagged). Scoring the gap as 0.0 dragged a sound chapter to a mean of
+    0.458 and invites craft revisions aimed at nothing."""
+
+    def test_the_prompt_demands_null_rather_than_zero(self) -> None:
+        system = M._build_qa_system()
+        assert "MUST BE null, NOT 0.0" in system
+
+    def test_the_prompt_names_both_unassessable_cases(self) -> None:
+        system = M._build_qa_system()
+        assert "no PLANNED BEAT was supplied" in system
+        assert "not in the CHARACTER ROSTER" in system
+
+    def test_the_beat_is_sent_when_the_caller_knows_it(
+        self, monkeypatch: pytest.MonkeyPatch, logged: _Recorder
+    ) -> None:
+        calls = _stub_structured(monkeypatch, [ChapterCraftQa()])
+        asyncio.run(M._score_chapter("prose", "ca. 10,500 BCE", "roster", beat="He knaps a biface."))
+        assert "PLANNED BEAT FOR THIS CHAPTER:" in calls[0]["prompt"]
+        assert "He knaps a biface." in calls[0]["prompt"]
+
+    def test_no_beat_block_is_sent_when_there_is_no_beat(
+        self, monkeypatch: pytest.MonkeyPatch, logged: _Recorder
+    ) -> None:
+        """An empty heading would invite the model to score against nothing, which is the bug."""
+        calls = _stub_structured(monkeypatch, [ChapterCraftQa()])
+        asyncio.run(M._score_chapter("prose", "1850", "roster", beat="   "))
+        assert "PLANNED BEAT" not in calls[0]["prompt"]
+
+    def test_the_write_and_qa_paths_both_pass_a_beat(self) -> None:
+        """A parameter nothing supplies is the same as no parameter."""
+        import inspect
+
+        src = inspect.getsource(M)
+        assert src.count("beat=_chapter_outline_beat(") >= 2
+        assert "beat=beat)" in src
+
+    def test_a_null_dimension_still_coerces_to_not_flagged(self) -> None:
+        """The schema's existing contract, which is what makes null the right answer."""
+        qa = ChapterCraftQa.model_validate(
+            {"outline_follows_guide": None, "character_consistency": None, "prose_transparent": 0.8}
+        )
+        assert qa.outline_follows_guide == 1.0
+        assert qa.character_consistency == 1.0
+        assert qa.prose_transparent == 0.8

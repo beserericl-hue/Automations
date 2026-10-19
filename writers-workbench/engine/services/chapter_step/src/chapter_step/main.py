@@ -1693,7 +1693,7 @@ async def _op_write(payload: dict) -> dict:
                 period=period,
                 model=plan.polish,
             )
-            final_qa = await _score_chapter(text, period, roster_text)
+            final_qa = await _score_chapter(text, period, roster_text, beat=beat)
             sub_count = len(briefs)
         else:
             resp = await router.complete(
@@ -1708,7 +1708,12 @@ async def _op_write(payload: dict) -> dict:
             final_qa = None
             max_passes = int(payload.get("max_craft_passes", 1))
             while passes < max_passes:
-                qa = await _score_chapter(text, period, _roster_text(roster))
+                qa = await _score_chapter(
+                    text,
+                    period,
+                    _roster_text(roster),
+                    beat=_chapter_outline_beat(ctx["outline"], req.chapter_number),
+                )
                 if qa is None:
                     break
                 final_qa = qa
@@ -1725,7 +1730,12 @@ async def _op_write(payload: dict) -> dict:
                 passes += 1
                 final_qa = None
             if max_passes > 0 and final_qa is None:
-                final_qa = await _score_chapter(text, period, _roster_text(roster))
+                final_qa = await _score_chapter(
+                    text,
+                    period,
+                    _roster_text(roster),
+                    beat=_chapter_outline_beat(ctx["outline"], req.chapter_number),
+                )
             sub_count = 1
         scores = (
             {k: v for k, v in final_qa.model_dump(mode="json").items() if k in QA_DIMS} if final_qa else None
@@ -1990,6 +2000,17 @@ def _build_qa_system() -> str:
         "- research_gaps: list short phrases for any historical/period fact the chapter ASSERTS that "
         "should be verified by research, OR any scene where a researched period detail (a tool, food, "
         "ritual, price, word) would deepen it. This drives 'add research if needed'.\n"
+        "A DIMENSION YOU CANNOT ASSESS MUST BE null, NOT 0.0. 0.0 means 'the chapter does this "
+        "badly'; null means 'there is nothing here to judge it against', and the two are opposite "
+        "verdicts. Two cases arise constantly and were both being scored 0.0:\n"
+        "  * no PLANNED BEAT was supplied -> outline_follows_guide must be null. You cannot measure "
+        "a chapter against an outline you were not given.\n"
+        "  * the chapter's people are not in the CHARACTER ROSTER at all -> character_follows_guide "
+        "and character_consistency must be null. A book spanning many eras has a different cast in "
+        "each one, and a roster that does not mention this chapter's characters is not evidence that "
+        "the chapter got them wrong. Measured on a 12,000-year project: its chapter 2 protagonist is "
+        "in none of the 6 roster entries, and all three of these dimensions came back 0.0 — dragging "
+        "a sound chapter to a mean of 0.458 and inviting revisions aimed at nothing.\n"
         "For every score under 0.8, add a finding {dimension, problem, fix}. "
         f"List AT MOST {QA_MAX_FINDINGS} findings and at most {QA_MAX_FINDINGS} research_gaps, each "
         "one sentence: a longer answer gets truncated at the output ceiling and then parses as "
@@ -2043,7 +2064,9 @@ review.runner.MAX_DRAFT_CHARS."""
 QA_MAX_TOKENS = 12_288
 
 
-async def _score_chapter(text: str, period: str, roster_text: str = "") -> ChapterCraftQa | None:
+async def _score_chapter(
+    text: str, period: str, roster_text: str = "", beat: str = ""
+) -> ChapterCraftQa | None:
     """Run the craft-QA over a chapter (incl. character-consistency vs the roster). None when no
     provider OR the QA JSON could not be parsed even on a second, stricter attempt.
 
@@ -2058,6 +2081,10 @@ async def _score_chapter(text: str, period: str, roster_text: str = "") -> Chapt
     roster_block = (
         f"CHARACTER ROSTER (check consistency against this):\n{roster_text}\n\n" if roster_text else ""
     )
+    # The beat was never sent, so `outline_follows_guide` was unanswerable by construction and the
+    # model scored it 0.0 anyway — the dimension that exists to catch outline drift was being
+    # decided blind. Callers that know the chapter pass it now.
+    beat_block = f"PLANNED BEAT FOR THIS CHAPTER:\n{beat}\n\n" if beat.strip() else ""
     body = text if len(text) <= QA_MAX_TEXT_CHARS else text[:QA_MAX_TEXT_CHARS]
     if len(body) < len(text):
         logger.info("chapter.qa.text_truncated", sent=len(body), total=len(text))
@@ -2078,7 +2105,7 @@ async def _score_chapter(text: str, period: str, roster_text: str = "") -> Chapt
                 provider="anthropic",
                 model=get_settings().model_default,
                 system=system,
-                prompt=f"PERIOD: {period}\n\n{roster_block}CHAPTER:\n{body}",
+                prompt=f"PERIOD: {period}\n\n{beat_block}{roster_block}CHAPTER:\n{body}",
                 schema=ChapterCraftQa,
                 max_tokens=QA_MAX_TOKENS,
             )
@@ -2425,16 +2452,22 @@ async def _op_qa(payload: dict) -> dict:
     roster = payload.get("roster") or []
     project_id = payload.get("project_id")
     chapter_number = payload.get("chapter_number")
+    beat = ""
     if (not chapter_text or not roster) and project_id and chapter_number not in (None, ""):
         ctx = await _load_context(str(project_id), payload)
         roster = roster or ctx.get("roster") or []
+        ch_n = optional_int(chapter_number)
+        if ch_n is not None:
+            # Without this the QA scores `outline_follows_guide` against an outline it was never
+            # given, and the model answers 0.0 rather than null — the dimension that exists to catch
+            # outline drift, decided blind.
+            beat = _chapter_outline_beat(ctx.get("outline") or {}, ch_n)
         if not chapter_text:
-            ch_n = optional_int(chapter_number)
             chapter_text = await _load_persisted_chapter(str(project_id), ch_n) if ch_n is not None else ""
     period = str(payload.get("period") or "contemporary")
     roster_text = _roster_text(roster) if roster else ""
     name_check = _character_name_consistency(chapter_text, roster) if roster else None
-    qa = await _score_chapter(chapter_text, period, roster_text)
+    qa = await _score_chapter(chapter_text, period, roster_text, beat=beat)
     if qa is None:
         return {
             "chapter_id": payload.get("chapter_id"),
