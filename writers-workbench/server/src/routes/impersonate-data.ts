@@ -213,8 +213,45 @@ impersonateDataRouter.get('/content/:id', async (req: Request, res: Response) =>
 impersonateDataRouter.get('/research', async (req: Request, res: Response) => {
   const userId = targetUserId(req);
   const limit = Math.min(500, Math.max(1, parseInt(typeof req.query.limit === 'string' ? req.query.limit : '50', 10) || 50));
+  const projectId = typeof req.query.project_id === 'string' ? req.query.project_id.trim() : '';
+  const supabase = getSupabaseAdmin();
 
-  const { data, error } = await getSupabaseAdmin()
+  // `project_id` was accepted and then IGNORED, so a superuser opening a project's Research tab saw
+  // the user's ENTIRE research library rather than that project's reports — the very thing the
+  // research_report_projects_v2 link table (CR-006) was added to fix, still broken on this path.
+  // ProjectDetail.tsx has been sending the parameter all along.
+  if (projectId) {
+    const { data: links, error: linkError } = await supabase
+      .from('research_report_projects_v2')
+      .select('report_id')
+      .eq('project_id', projectId)
+      .limit(limit);
+    if (linkError) {
+      res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: linkError.message } });
+      return;
+    }
+    const ids = (links ?? []).map((l) => (l as { report_id: string }).report_id);
+    if (ids.length === 0) {
+      res.json({ success: true, data: [] });
+      return;
+    }
+    const { data, error } = await supabase
+      .from('research_reports_v2')
+      .select('*')
+      .eq('user_id', userId)   // still scoped to the impersonated user, not just to the project
+      .in('id', ids)
+      .is('deleted_at', null)
+      .order('updated_at', { ascending: false })
+      .limit(limit);
+    if (error) {
+      res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: error.message } });
+      return;
+    }
+    res.json({ success: true, data: data ?? [] });
+    return;
+  }
+
+  const { data, error } = await supabase
     .from('research_reports_v2')
     .select('*')
     .eq('user_id', userId)

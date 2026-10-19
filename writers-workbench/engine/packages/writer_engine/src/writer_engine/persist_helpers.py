@@ -365,7 +365,8 @@ async def persist_research(
     """Insert a research report (W5) and, when a project is given, link it to that project via the
     research_report_projects_v2 meta table (CR-006) so the UI research tab can filter by project.
     research_reports_v2 itself is a base table with no project_id column, so the link lives in the
-    meta table (the topic prefix is kept too, for human-readable traceability)."""
+    meta table. The caller passes the topic as the user should READ it: the project id belongs in the
+    link row, not in the title."""
     resp = await (
         client.table("research_reports_v2")
         .insert(

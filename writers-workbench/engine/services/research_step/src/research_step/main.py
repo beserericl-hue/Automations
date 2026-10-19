@@ -143,12 +143,16 @@ async def _persist_research_if_requested(payload: dict, topic: str, report: str,
         from writer_engine.supabase.client import get_supabase_admin
 
         client = await get_supabase_admin()
-        labelled = f"[project {project_id}] {topic}" if project_id else topic
+        # The topic is the report's TITLE in the user's Research list, so it carries no project id.
+        # It used to be prefixed "[project <uuid>] ..." for traceability, which put 46 characters of
+        # raw UUID in front of every title the user reads — and the association already lives in
+        # research_report_projects_v2 (CR-006), which is what both the project tab and the admin view
+        # actually query. Nothing parses the prefix.
         rid = await persist_research(
             client,
             project_id=str(project_id) if project_id else None,
             user_id=str(user_id),
-            topic=labelled,
+            topic=topic,
             content=report,
             genre_slug=genre,
         )
