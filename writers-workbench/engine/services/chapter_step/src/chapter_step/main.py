@@ -869,6 +869,40 @@ def _cached_write_system(base_system: str, header: str, grounding: str, canon: s
     return "\n\n".join(parts)
 
 
+PRIOR_CHAPTER_TAIL_WORDS = 800
+"""How much of the previous chapter's ending to hand the next chapter's opening.
+
+The same 800 words already used BETWEEN sub-chapters. The number is not arbitrary: it is long enough
+to carry where everyone is standing, who last spoke and in what weather, and short enough that it
+never crowds the beat it is meant to serve.
+"""
+
+
+async def _prior_chapter_tail(project_id: str, chapter_number: int) -> str:
+    """The closing words of the preceding chapter, or "" when there is none (I3).
+
+    `prior_tail` chains sub-chapters inside one chapter and started EMPTY for sub-chapter 1, so a
+    chapter's opening never saw how the previous chapter actually ended — only what
+    `bridge_from_prior` said it would. On a detailed 96-chapter outline that held; on a thin one, or
+    wherever the previous chapter drifted from its plan, the seam shows.
+
+    Returns "" silently when the previous chapter is not written yet, which is the normal case in a
+    concurrent batch: 8 chapters are in flight at once and chapter N may well start before N-1
+    finishes. The outline's bridge then carries the connection exactly as it did before, so this can
+    only add continuity, never withhold it.
+    """
+    if chapter_number <= 0:
+        return ""
+    try:
+        text = await _load_persisted_chapter(project_id, chapter_number - 1)
+    except Exception as exc:
+        logger.warning("chapter.prior_tail_failed", chapter=chapter_number, error=str(exc)[:160])
+        return ""
+    if not text.strip():
+        return ""
+    return " ".join(text.split()[-PRIOR_CHAPTER_TAIL_WORDS:])
+
+
 async def _write_subchapter(
     *,
     system: str,
@@ -1701,7 +1735,16 @@ async def _op_write(payload: dict) -> dict:
                 cache_write = sum(cw for _t, _cr, cw in results)
             else:
                 sub_texts = []
-                prior_tail = ""
+                # I3: open on the previous chapter's actual ending rather than on nothing. Empty
+                # when that chapter is not written yet (the normal case in a concurrent batch), in
+                # which case the outline's bridge_from_prior carries the join as before.
+                prior_tail = await _prior_chapter_tail(str(req.project_id), req.chapter_number)
+                if prior_tail:
+                    logger.info(
+                        "chapter.prior_chapter_tail",
+                        chapter=req.chapter_number,
+                        words=len(prior_tail.split()),
+                    )
                 for i, brief in enumerate(briefs):
                     t, cr, cw = await _write_subchapter(
                         system=cached_system,
