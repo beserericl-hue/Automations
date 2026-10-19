@@ -351,3 +351,60 @@ class TestTheWriterUsesTheStoredStudy:
 
         src = inspect.getsource(M)
         assert "if stored and n_facts >= _MIN_STORED_FACTS:" in src
+
+
+class TestTheStoredBlockDoesNotRepeatItself:
+    """Seen in a live chapter write: with no explicit `topic`, the formatter synthesised one from the
+    fact's first sentence and then printed the whole fact after it —
+
+        - **Clovis and post-Clovis point production ran a staged sequence: select **: Clovis and
+          post-Clovis point production ran a staged sequence: select blank, percussion-thin...
+
+    paying input tokens to say everything twice, in the block that goes into every sub-chapter's
+    cached prompt."""
+
+    def test_a_fact_with_no_topic_appears_once(self) -> None:
+        from chapter_step.main import _stored_research
+
+        fact = "Clovis point production ran a staged sequence: select blank, percussion-thin, then flute."
+        o = {
+            "chapters": [
+                {
+                    "chapter_number": 1,
+                    "research": {
+                        "facts": [
+                            {"fact": fact, "source": "Bradley 2010"},
+                            {"fact": "Chert was heat-treated before flaking.", "source": "SF 1963"},
+                        ]
+                    },
+                }
+            ]
+        }
+        text, _topics, n = _stored_research(o, 1)
+        assert n == 2
+        assert text.count("staged sequence") == 1, text
+        assert "Bradley 2010" in text
+
+    def test_an_explicit_topic_is_still_used_as_the_lead(self) -> None:
+        from chapter_step.main import _stored_research
+
+        o = {
+            "chapters": [
+                {
+                    "chapter_number": 1,
+                    "research": {
+                        "facts": [
+                            {
+                                "topic": "Point production",
+                                "fact": "Staged: blank, thin, flute.",
+                                "source": "B",
+                            },
+                            {"fact": "Chert was heat-treated.", "source": "S"},
+                        ]
+                    },
+                }
+            ]
+        }
+        text, _topics, _n = _stored_research(o, 1)
+        assert "- **Point production**: Staged" in text
+        assert text.count("Staged: blank") == 1

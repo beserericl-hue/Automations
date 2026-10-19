@@ -1237,10 +1237,14 @@ def _stored_research(outline: dict[str, Any], chapter_number: int) -> tuple[str,
     for fact in facts:
         text = str(fact.get("fact")).strip()
         source = str(fact.get("source") or "").strip()
-        # Bulleted with a bold lead so _facts_topics can label what was grounded, as it does for
-        # the Perplexity block.
-        topic = str(fact.get("topic") or text.split(".")[0])[:70]
-        lines.append(f"- **{topic}**: {text}" + (f" [{source}]" if source else ""))
+        # A bold lead only when the study actually supplies a topic. Synthesising one from the first
+        # sentence duplicated the fact in the prompt — "- **Clovis and post-Clovis point production
+        # ran a staged sequence: select **: Clovis and post-Clovis point production ran a staged
+        # sequence: select blank, percussion-thin..." — seen on a live chapter write. Paying input
+        # tokens to say everything twice, and _facts_topics reads the plain bullet perfectly well.
+        topic = str(fact.get("topic") or "").strip()[:70]
+        lead = f"- **{topic}**: " if topic else "- "
+        lines.append(f"{lead}{text}" + (f" [{source}]" if source else ""))
         if source and source not in sources:
             sources.append(source)
     for c in colour:
