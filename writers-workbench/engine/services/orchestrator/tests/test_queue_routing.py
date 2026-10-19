@@ -399,3 +399,72 @@ def test_the_sampler_tick_publishes_the_gauges(client: TestClient) -> None:
     assert REGISTRY.get_sample_value("engine_queue_running", labels) == 4
     assert REGISTRY.get_sample_value("engine_queue_waiting", labels) == 5
     assert REGISTRY.get_sample_value("engine_queue_oldest_wait_seconds", labels) >= 11
+
+
+# --- C2: the capacity verdict reaches a person, not just a log line ----------------------------
+
+
+def test_a_capacity_verdict_sends_one_debounced_alert(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Queue depth was measured (B12) and then only logged. A log line nobody reads is the same
+    failure as the 2026-05 Redis outage: the system knew, and nobody was told."""
+    sent: list[Any] = []
+    cleared: list[str] = []
+
+    async def _send(alert: Any, **_kw: Any) -> bool:
+        sent.append(alert)
+        return True
+
+    async def _clear(key: str) -> None:
+        cleared.append(key)
+
+    monkeypatch.setattr(orch_main, "send_alert", _send)
+    monkeypatch.setattr(orch_main, "clear_alert", _clear)
+    # A full heavy queue whose oldest job has waited 15 minutes: TPM-bound, per B9.
+    _fake_redis(client, {QUEUE_HEAVY: 40}, ongoing={QUEUE_HEAVY: 8}, oldest_age_s=900)
+
+    async def _go() -> dict[str, Any]:
+        for job in client.app.state.cron_jobs:  # type: ignore[attr-defined]
+            if job.name == "queue-metrics":
+                return await job.run()
+        raise AssertionError("the queue-metrics job is not registered")
+
+    out = asyncio.run(_go())
+    assert out["verdict"] == "tpm_bound"
+    assert len(sent) == 1
+    # The lever must be named: a replica would NOT help here.
+    assert "token budget" in sent[0].title
+    assert sent[0].level == "warning"  # nothing is broken; work is queueing
+    assert sent[0].key.endswith("tpm_bound")
+
+
+def test_a_healthy_queue_clears_the_alert_instead_of_sending_one(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Clearing matters as much as sending: without it, the debounce window opened by one episode
+    swallows the next one."""
+    sent: list[Any] = []
+    cleared: list[str] = []
+
+    async def _send(alert: Any, **_kw: Any) -> bool:
+        sent.append(alert)
+        return True
+
+    async def _clear(key: str) -> None:
+        cleared.append(key)
+
+    monkeypatch.setattr(orch_main, "send_alert", _send)
+    monkeypatch.setattr(orch_main, "clear_alert", _clear)
+    _fake_redis(client, {QUEUE_HEAVY: 0}, ongoing={QUEUE_HEAVY: 0})
+
+    async def _go() -> dict[str, Any]:
+        for job in client.app.state.cron_jobs:  # type: ignore[attr-defined]
+            if job.name == "queue-metrics":
+                return await job.run()
+        raise AssertionError("the queue-metrics job is not registered")
+
+    asyncio.run(_go())
+    assert sent == []
+    assert any(k.endswith("scale_out") for k in cleared)
+    assert any(k.endswith("tpm_bound") for k in cleared)

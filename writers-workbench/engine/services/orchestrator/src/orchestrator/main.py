@@ -15,6 +15,7 @@ from arq import create_pool
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi import status as http_status
 
+from writer_engine.alerting import LEVEL_WARNING, Alert, clear_alert, send_alert
 from writer_engine.auth import require_admin_token, require_service_secret
 from writer_engine.cadence import INTERVAL_DAYS, is_due
 from writer_engine.config import get_settings
@@ -68,6 +69,9 @@ from .write_tools import ALL_STEP_URLS, is_async, resolve_step_url
 # When set, the durable saga driver enqueues advance via this arq pool. Tests set it to None and drive
 # advance() directly so they don't need a live Redis + arq worker.
 _arq_pool = None
+
+KEY_QUEUE_CAPACITY = "queue-capacity"
+"""Alert-key prefix for the queue-depth verdicts (C2)."""
 
 SERVICE = "orchestrator"
 logger = get_logger(SERVICE)
@@ -808,11 +812,37 @@ def build_app() -> FastAPI:
             return {"sampled": 0, "reason": "no arq pool"}
         samples = await sample_all(pool, health_key_for=_health_key_for)
         advice = scaling_advice(samples)
-        if advice["verdict"] in {"scale_out", "tpm_bound"}:
-            # Worth a log line: these are the two states where someone should act, and the reason
-            # says which lever (a replica vs the Anthropic tier / model mix).
-            logger.warning("queues.capacity", verdict=advice["verdict"], reason=advice["reason"][:300])
-        return {"sampled": len(samples), "verdict": advice["verdict"]}
+        verdict = str(advice["verdict"])
+        reason = str(advice["reason"])
+        if verdict in {"scale_out", "tpm_bound"}:
+            # C2: these are the two states where somebody has to act, and until now they reached
+            # only a log line — which is the same as reaching nobody. The alert names WHICH lever,
+            # because the verdicts call for opposite responses: another replica for queued
+            # interactive work, the Anthropic tier or the model mix when the account's output budget
+            # is the ceiling (B9). Debounced in Redis by key like every other alert, so an hour of
+            # backlog is one email rather than 120.
+            await send_alert(
+                Alert(
+                    key=f"{KEY_QUEUE_CAPACITY}:{verdict}",
+                    # WARNING, not CRITICAL: nothing is broken, work is queueing. Paging someone out
+                    # of bed for a queue that is doing its job is how alerts get ignored.
+                    level=LEVEL_WARNING,
+                    title=(
+                        "interactive work is queueing — consider another instance"
+                        if verdict == "scale_out"
+                        else "throughput is bounded by the Anthropic token budget, not by capacity"
+                    ),
+                    detail=reason[:400],
+                    context={"service": SERVICE, "verdict": verdict},
+                )
+            )
+            logger.warning("queues.capacity", verdict=verdict, reason=reason[:300])
+        else:
+            # Clear both, so the next genuine episode is reported at once instead of being swallowed
+            # by the debounce window the previous one opened.
+            for stale in ("scale_out", "tpm_bound"):
+                await clear_alert(f"{KEY_QUEUE_CAPACITY}:{stale}")
+        return {"sampled": len(samples), "verdict": verdict}
 
     @app.get("/admin/queues", dependencies=[Depends(require_admin_token)])
     async def admin_queues() -> dict[str, Any]:
