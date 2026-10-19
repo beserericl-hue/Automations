@@ -1,0 +1,53 @@
+{
+  "id": "R04",
+  "title": "Story Bible \u2014 Read (Empty)",
+  "route": "`story_bible.list` (info) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=story_bible.list got=story_bible.list OK",
+    "entries=None found=False"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Get the story bible for project \"Regression Test Project\""
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "data",
+        "assistant_message": "",
+        "tool": "story_bible",
+        "op": "list",
+        "data": {
+          "execution_id": "c159e1d4-8103-4462-afd3-7df91e97969a",
+          "step_name": "story_bible",
+          "status": "ok",
+          "payload": {
+            "op": "list",
+            "result": {
+              "entries": [],
+              "found": false,
+              "message": "No project matching 'Regression Test Project' found."
+            }
+          },
+          "error": null,
+          "next_stage": null
+        },
+        "job_id": null,
+        "status": null,
+        "jobs": null,
+        "error": null
+      },
+      "job_result": null,
+      "resolved_prompt": "Get the story bible for project \"Regression Test Project\""
+    }
+  ],
+  "expected": [
+    "routes to `story_bible.list`, kind=data",
+    "Returns empty result or \"no entries found\" (project doesn't exist yet)",
+    "No errors \u2014 confirms DEV Supabase connection works",
+    "Response correctly scoped to user_id \"+14105914612\""
+  ]
+}

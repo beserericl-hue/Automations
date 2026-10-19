@@ -59,7 +59,7 @@ DEV was created via:
  +17063338699 | user        | (none)        -- Horace (test user; no subscription row)
 ```
 
-Same emails + passwords as PROD (user choice). `E2E_TEST_PASSWORD=Fr332bafami!y` works on both tiers.
+Same emails as PROD (user choice). **Passwords no longer exist**: sign-in is an emailed 6-digit code (migration 030), DEV's auth passwords were rotated to random values on 2026-10-19, and `E2E_TEST_PASSWORD` is ignored — `e2e/auth.setup.ts` mints a session with `generate_link` + `verify`. See [[credentials-map]].
 
 ## Eric's DEV subscription
 

@@ -1,0 +1,117 @@
+{
+  "test": {
+    "id": "R120",
+    "title": "\u2014 Kish\u014dtenketsu Chapter Arc (No Conflict Structure)",
+    "source": "chat",
+    "prompt": "Create a chapter outline for Chapter 4 of \"The Signal Beneath\" using Kish\u014dtenketsu.\n  This should be a quieter chapter \u2014 the protagonist reaches the coast and\n  observes the submerged station from the shore. No combat, no confrontation.\n  Focus on contrast and reflection.",
+    "route": "chapter.plan` (task)",
+    "prerequisite": "R110; \"Kish\u014dtenketsu\" in `story_arcs_v2`; no outline for Ch4",
+    "expected": [
+      "routes `chapter.plan`, `chapter_story_arc`=\"Kish\u014dtenketsu\"; completed",
+      "arc_beat values = Ki/Sh\u014d/Ten/Ketsu; no forced conflict beats; Ten = contrast/revelation (not combat); connects_to_book_arc still references Hero's Journey Ch4 stage; Kish\u014dtenketsu prompt loaded; CR-009 email"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Planning chapter 4 for \"The Signal Beneath\" using Kish\u014dtenketsu. I'll let you know when the outline is ready.",
+    "tool": "chapter",
+    "op": "plan",
+    "data": null,
+    "job_id": "50950e0c801f466d996d4e3c1c87837f",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "50950e0c801f466d996d4e3c1c87837f",
+    "status": "complete",
+    "result": {
+      "execution_id": "a1afd359-41ad-4575-a088-3d1eda86d47d",
+      "step_name": "chapter",
+      "status": "ok",
+      "payload": {
+        "op": "plan",
+        "result": {
+          "chapter_number": 4,
+          "chapter_story_arc": "Kish\u014dtenketsu",
+          "book_arc": "",
+          "sub_chapter_briefs": [
+            {
+              "number": 1,
+              "title": "The Shape of the Morning",
+              "beat": "POV character moves through an established morning routine \u2014 a specific sequence of small acts (window, kettle, threshold) that reveals the texture of their ordinary life without urgency or problem.",
+              "pov_character": "",
+              "brief": "POV character moves through an established morning routine \u2014 a specific sequence of small acts (window, kettle, threshold) that reveals the texture of their ordinary life without urgency or problem.",
+              "arc_beat": "Ki \u2014 Introduction: invite the reader into the world through sensory presence; no conflict, pure atmosphere.",
+              "characters": [],
+              "setting": "The POV character's home, early morning.",
+              "emotional_tone": "Quiet, grounded, unhurried \u2014 the feeling of a life that has settled into its own rhythm.",
+              "connects_to_book_arc": "Establishes the baseline state of the POV character's world before any disruption; anchors the reader in the book's central emotional register."
+            },
+            {
+              "number": 2,
+              "title": "What the Day Holds",
+              "beat": "The POV character moves outward \u2014 into a street, a workplace, a shared space \u2014 and the world grows more specific: a recurring face, a small exchange, a detail noticed but not yet understood.",
+              "pov_character": "",
+              "brief": "The POV character moves outward \u2014 into a street, a workplace, a shared space \u2014 and the world grows more specific: a recurring face, a small exchange, a detail noticed but not yet understood.",
+              "arc_beat": "Sh\u014d \u2014 Development: widen the lens; deepen texture through repetition and layered observation rather than new plot.",
+              "characters": [],
+              "setting": "A public or semi-public space the POV character frequents \u2014 street, market, office, caf\u00e9.",
+              "emotional_tone": "Gently curious, observational \u2014 the world is familiar but not yet fully legible.",
+              "connects_to_book_arc": "Deepens the reader's understanding of the POV character's place in the world; plants at least one image or detail that will be recalled in the Ten and Ketsu acts."
+            },
+            {
+              "number": 3,
+              "title": "The Same as Always",
+              "beat": "A routine interaction or task unfolds \u2014 something the POV character has done many times \u2014 but this time a small, specific detail is slightly different: a word used, an object out of place, a silence where there is usually sound.",
+              "pov_character": "",
+              "brief": "A routine interaction or task unfolds \u2014 something the POV character has done many times \u2014 but this time a small, specific detail is slightly different: a word used, an object out of place, a silence where there is usually sound.",
+              "arc_beat": "Sh\u014d \u2014 Development (continued): the widening lens catches a hairline crack in the ordinary; not a problem, just a texture shift.",
+              "characters": [],
+              "setting": "Continuous from sub-chapter 2, or a closely adjacent space.",
+              "emotional_tone": "Still calm, but with a faint undercurrent \u2014 the reader senses something without being able to name it.",
+              "connects_to_book_arc": "Introduces the small story turn that will escalate: a detail noticed but not acted on (a lie, a misplaced object, an overheard fragment) \u2014 START of the escalating thread. Reappearance with greater pressure: Chapter 7. Explosion: Chapter 12."
+            },
+            {
+              "number": 4,
+              "title": "The Corner Turned",
+              "beat": "A single unexpected thing arrives \u2014 not a crisis, but a reframing: a stranger's remark, a letter, a memory triggered by an object, a view seen from a new angle \u2014 that re-contextualises everything the reader has witnessed in this chapter.",
+              "pov_character": "",
+              "brief": "A single unexpected thing arrives \u2014 not a crisis, but a reframing: a stranger's remark, a letter, a memory triggered by an object, a view seen from a new angle \u2014 that re-contextualises everything the reader has witnessed in this chapter.",
+              "arc_beat": "Ten \u2014 Twist/Turn: one quiet revelation that reframes Ki and Sh\u014d without destroying them; the surprise should feel like finding something beautiful around a corner.",
+              "characters": [],
+              "setting": "The same world, but a slightly different vantage point \u2014 a back room, a window seat, an unexpected detour.",
+              "emotional_tone": "A soft inhale \u2014 wonder, mild disorientation, the pleasure of seeing something familiar made strange.",
+              "connects_to_book_arc": "The Ten revelation shifts the reader's understanding of the POV character's role in the book-level arc; raises the new dramatic question that propels the reader into Chapter 5."
+            },
+            {
+              "number": 5,
+              "title": "The Long Exhale",
+              "beat": "The POV character returns to a gesture or image from sub-chapter 1 \u2014 the window, the kettle, the threshold \u2014 but it is held differently now; the chapter closes on that image without explanation, letting the resonance do the work.",
+              "pov_character": "",
+              "brief": "The POV character returns to a gesture or image from sub-chapter 1 \u2014 the window, the kettle, the threshold \u2014 but it is held differently now; the chapter closes on that image without explanation, letting the resonance do the work.",
+              "arc_beat": "Ketsu \u2014 Conclusion/Resolution: echo the Ki opening image in a new light; end with restraint \u2014 a gesture, a silence, not a summary.",
+              "characters": [],
+              "setting": "Back at or near the POV character's home, or a space that mirrors the opening.",
+              "emotional_tone": "A long exhale \u2014 not resolution, but resonance; the reader feels the chapter's meaning without being told it.",
+              "connects_to_book_arc": "Closes the chapter's emotional loop while leaving the escalating story turn from sub-chapter 3 unresolved and quietly present; the final image plants a seed for the book's larger Ten act later."
+            }
+          ],
+          "count": 5,
+          "persist": null,
+          "token_usage": {
+            "calls": 1,
+            "input_tokens": 48,
+            "output_tokens": 1196,
+            "cache_read_tokens": 0,
+            "cache_write_tokens": 2980,
+            "total_tokens": 4224,
+            "cost_usd": 0.029259
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

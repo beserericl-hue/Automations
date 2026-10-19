@@ -1,0 +1,75 @@
+{
+  "id": "R06",
+  "title": "Write Blog Post (post-apocalyptic)",
+  "route": "`chapter.blog` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=chapter.blog got=chapter.blog OK",
+    "job=complete",
+    "blog_post recent=1 word_count=1293 persist=True"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Write a blog post for the post-apocalyptic genre. Topic: \"Why Post-Apocalyptic Fiction Matters More Than Ever in 2026\". Genre slug: post-apocalyptic. Keywords: post-apocalyptic books, climate fiction, survival stories, dystopian novels. Target length: 1500 words."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Queuing your blog post \u2014 I'll let you know when it's ready.",
+        "tool": "chapter",
+        "op": "blog",
+        "data": null,
+        "job_id": "b135d6bcd8a344cc9fe1eb8341bf3f7c",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "b135d6bcd8a344cc9fe1eb8341bf3f7c",
+        "status": "complete",
+        "result": {
+          "execution_id": "ca047695-f73e-43e5-8635-f28f6b2c85e9",
+          "step_name": "chapter",
+          "status": "ok",
+          "payload": {
+            "op": "blog",
+            "result": {
+              "written": true,
+              "title": "The World Is Already Ending: Why Post-Apocalyptic Fiction Hits Different in 2026",
+              "content_text": "# The World Is Already Ending: Why Post-Apocalyptic Fiction Hits Different in 2026\n\nPick up any post-apocalyptic novel published in the last two years and you'll notice something strange: it doesn't feel like fiction. The flooded coastlines, the failed power grids, the communities rationing water, these aren't imaginative leaps anymore. They're Tuesday.\n\nThat's not a coincidence. Post-apocalyptic books have always reflected what we fear most. In 2026, what we fear most is already happening. That changes everything about how we read these stories, and why we keep reaching for them., -\n\n## We're Not Reading About the Future Anymore\n\nFor decades, the genre worked as a warning system. *This is what could happen if we don't change course.* The apocalypse was always over the horizon, something to prevent.\n\nThat framing is harder to maintain now. Megafires have displaced hundreds of thousands. Coastal cities are spending billions on seawalls that may not hold. Extreme heat events are killing people in regions that never needed air conditioning. The disaster isn't approaching. It's ongoing.\n\nThis shifts what readers bring to survival stories. When you read *The Road* in 2006, McCarthy's burned-out landscape felt like a nightmare. When you read it now, or pick up a newer climate fiction title, you're reading it with the smoke still in your memory. The emotional register changes completely.\n\nPost-apocalyptic fiction in 2026 functions less as prophecy and more as a processing tool. It gives shape and narrative to a creeping dread that otherwise has no clear beginning, no obvious villain, and no guaranteed ending., -\n\n## Grimdark Is Losing Ground to Something More Useful\n\nFor a long time, the genre defaulted to bleakness. Lone survivors. Brutal hierarchies. The strong taking from the weak. That template made for compelling drama, but critics and readers are increasingly asking: what does it actually teach us?\n\nThe conversation has shifted. Online book communities in 2026 actively debate the difference between stories that wallow in collapse and stories that think seriously about recovery. Recommendation threads on forums like Reddit's r/Fantasy regularly flag which post-apocalyptic books focus on societal re-formation rather than just the immediate disaster. Readers want the long aftermath, not just the bang.\n\nThis appetite has pushed writers toward something different. New speculative fiction increasingly centers mutual aid, collective decision-making, and the unglamorous work of rebuilding. These aren't utopian fantasies, the hardship is still there. But the survival strategies are communal rather than individualist. The heroes aren't lone wolves; they're the people who figure out how to share a water filtration system.\n\nSolarpunk has become a useful reference point here, even for writers who don't fully adopt its aesthetic. The movement imagines communities responding to climate disruption through cooperative structures and low-carbon technology, agrivoltaic farms, guerrilla wetlands, solar-powered communal food storage. These aren't sci-fi inventions; they're real experiments happening right now. Fiction that engages with this material feels grounded in a way that pure grimdark no longer does., -\n\n## The Psychology of Survivors Is the Real Subject\n\nStrip away the ruined cities and the resource scarcity, and the best post-apocalyptic books are really about one thing: how people rebuild trust after systems fail.\n\nThat's not an abstract question in 2026. Political institutions are fragile in ways that would have seemed paranoid to describe ten years ago. Pandemic-era social fractures haven't fully healed. Economic precarity is widespread and persistent. A lot of people already know what it feels like to lose faith in structures they once assumed were permanent.\n\nPost-apocalyptic fiction gives that feeling a container. It externalizes the anxiety into a world where the breakdown is visible and total, rather than slow and ambiguous. And then, crucially, it asks what comes next. How do people renegotiate ethics when governance collapses? How do communities form identity without the institutions that used to define it? How do you grieve a world that no longer exists while still living in its ruins?\n\nThese are the questions that make survival stories worth reading. Not the action sequences or the scavenging logistics, but the human architecture people build when everything else has fallen.\n\nAcademic work in 2026 is catching up to this. Conferences and calls for papers are now explicitly framing apocalypse as a cultural lens, a way of examining what societies believe about progress, collapse, and renewal. Scholars are less interested in the apocalypse as an ending and more interested in what visions of reconstruction reveal about what we value., -\n\n## The Genre Is Everywhere, and That's Not Trivial\n\nPost-apocalyptic properties dominate streaming. Short-form video is full of fan edits, aesthetic breakdowns, and meme cycles built around dystopian franchises. The genre isn't a niche taste, it's ambient culture.\n\nThis ubiquity matters. When millions of people are regularly engaging with survival narratives, even casually, those narratives shape how people think about real-world crisis. The stories we tell about collapse influence the options we imagine for response.\n\nThat's why the shift away from pure nihilism in post-apocalyptic books is significant beyond literary taste. Fiction that shows communities surviving through cooperation rather than domination plants a different set of assumptions than fiction that treats brutality as the only honest response to catastrophe. What we normalize in stories, we begin to expect, or accept, in reality.\n\nThis isn't an argument for propaganda or forced optimism. The best climate fiction and survival stories earn their hope through specificity and difficulty. But there's a meaningful difference between a narrative that concludes that people are irredeemably selfish and one that concludes that building something new is hard but possible., -\n\n## What to Read Right Now\n\nIf you want to engage seriously with where the genre is in 2026, here are some starting points:\n\n**For climate fiction grounded in real science:** Kim Stanley Robinson's work remains essential. *The Ministry for the Future* isn't strictly post-apocalyptic, but it's indispensable context for understanding how fiction is grappling with climate systems.\n\n**For survival stories that center community:** Becky Chambers' *Monk and Robot* novellas imagine a post-scarcity world negotiating what labor and purpose mean after collapse. Quiet, but quietly radical.\n\n**For the bleaker tradition, done well:** Cormac McCarthy's *The Road* still holds up as a study in grief and parental love under total loss. Read it knowing the conversation has moved on from its conclusions, but it remains a benchmark.\n\n**For solarpunk-adjacent optimism:** Look for anthologies like *Multispecies Cities* and newer short fiction collections explicitly tagged as solarpunk. The short story form suits the genre's emphasis on specific communities over sweeping narratives.\n\n**For dystopian novels with political teeth:** Octavia Butler's *Parable of the Sower* and *Parable of the Talents* are increasingly read as realist fiction. If you haven't read them, start there.\n\n**On screen:** *Station Eleven* (HBO) remains the clearest example of post-apocalyptic storytelling that prioritizes art, memory, and human connection over violence. It's a useful counterpoint to the grimdark default., -\n\n## The Genre as Mirror\n\nPost-apocalyptic fiction matters in 2026 for a simple reason: it's one of the few narrative spaces where we're allowed to think seriously about what happens after things break. Not before, after.\n\nWe spend a lot of cultural energy on prevention, on warning, on the politics of avoiding disaster. That's necessary. But we also need stories that sit with the question: if the worst happens, or is already happening, what do we build? Who do we become? What do we owe each other?\n\nThose aren't comfortable questions. Good post-apocalyptic books don't make them comfortable. But they make them thinkable, which is its own form of preparation., -\n\n**What's the post-apocalyptic book or film that's stayed with you longest, and what did it change about how you think about the future? Drop your answer in the comments, I'm building a reading list and want to know what's resonating with people right now.**",
+              "word_count": 1293,
+              "persist": {
+                "persisted": true,
+                "content_id": "f3b2ddec-a012-4207-8f2a-2223e6b6f876"
+              },
+              "token_usage": {
+                "calls": 2,
+                "input_tokens": 1933,
+                "output_tokens": 3144,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+                "total_tokens": 5077,
+                "cost_usd": 0.052959
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Write a blog post for the post-apocalyptic genre. Topic: \"Why Post-Apocalyptic Fiction Matters More Than Ever in 2026\". Genre slug: post-apocalyptic. Keywords: post-apocalyptic books, climate fiction, survival stories, dystopian novels. Target length: 1500 words."
+    }
+  ],
+  "expected": [
+    "routes to `chapter.blog`, kind=queued; job reaches status=complete",
+    "Blog post written in post-apocalyptic tone (gritty, visceral)",
+    "**Writing Prime Directive:** No cliches (revolutionize, game-changing, unleash, delve). Plain language. Short paragraphs. Shows, doesn't tell.",
+    "Cover art generated (ruins, decay, atmospheric) via `media.cover-art`",
+    "Email arrives with blog content",
+    "Draft row inserted into `published_content_v2` (content_type=blog_post, status=draft, user_id=\"+14105914612\")",
+    "CR-009 task-completion email received"
+  ]
+}

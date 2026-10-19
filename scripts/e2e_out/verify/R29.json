@@ -1,0 +1,50 @@
+{
+  "id": "R29",
+  "title": "Get Specific Version",
+  "route": "`library.versions` (info) \u00b7 impl: built (E2E-2)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.versions got=library.versions OK",
+    "count=None versions=0"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Get version 1 of [content_id from R23]"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "data",
+        "assistant_message": "",
+        "tool": "library",
+        "op": "versions",
+        "data": {
+          "execution_id": "1cb9b958-fead-4b86-a59b-f62001aa1836",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "versions",
+            "result": {
+              "error": "content_id required for content version history",
+              "versions": []
+            }
+          },
+          "error": null,
+          "next_stage": null
+        },
+        "job_id": null,
+        "status": null,
+        "jobs": null,
+        "error": null
+      },
+      "job_result": null,
+      "resolved_prompt": "Get version 1 of The Last Pharaoh's Scribe \u2014 Chapter 1"
+    }
+  ],
+  "expected": [
+    "routes to `library.versions`, kind=data",
+    "Returns full content_text from version 1; includes version_number, changed_by, change_note"
+  ]
+}

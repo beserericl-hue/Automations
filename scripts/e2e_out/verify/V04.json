@@ -1,0 +1,72 @@
+{
+  "id": "V04",
+  "title": "Voice \u2014 Write Blog Post",
+  "route": "`chapter.blog` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=chapter.blog got=chapter.blog OK",
+    "job=complete",
+    "blog_post recent=5 word_count=1387 persist=True"
+  ],
+  "steps": [
+    [
+      "voice",
+      "Write a blog post about how AI is changing marketing in twenty twenty six genre slug ai marketing keywords AI tools marketing automation target about fifteen hundred words"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "response": "Queuing your blog post about AI in marketing. I'll let you know when it's ready.",
+        "kind": "queued",
+        "tool": "chapter",
+        "op": "blog",
+        "job_id": "82f4866674bd4f848afbe1c563f68497",
+        "status": "queued"
+      },
+      "job_result": {
+        "job_id": "82f4866674bd4f848afbe1c563f68497",
+        "status": "complete",
+        "result": {
+          "execution_id": "beaa00a8-0b32-41d2-af11-1085ed3ac2a1",
+          "step_name": "chapter",
+          "status": "ok",
+          "payload": {
+            "op": "blog",
+            "result": {
+              "written": true,
+              "title": "AI Is Running Marketing Now. Here's What That Actually Looks Like in 2026.",
+              "content_text": "# AI Is Running Marketing Now. Here's What That Actually Looks Like in 2026.\n\nA marketing team of twelve people is managing 400 active campaign variants across six channels. No one wrote most of them. No one manually scheduled them. An AI system built them from a single brief, tested them against live data, and reallocated budget to the winners overnight. The humans showed up in the morning, reviewed the dashboard, and made three strategic calls. That's a Tuesday in 2026.\n\nThis isn't a prediction anymore. It's the operating reality for a growing number of marketing teams. AI tools and marketing automation have moved from \"nice to have\" to the actual infrastructure that campaigns run on. If you work in marketing and haven't felt this shift yet, you will soon.\n\nHere's what's changed, what it means for the work, and what you should be paying attention to., -\n\n## AI Is the Orchestration Layer, Not a Single Tool\n\nFor years, marketers talked about their \"tech stack\" as a collection of separate tools, one for email, one for ads, one for analytics, one for CRM. In 2026, that model is collapsing.\n\nThe dominant pattern now is a central AI platform that pulls from all of those sources at once. It ingests CRM data, product catalogs, ad platform signals, and web analytics, then makes near-real-time decisions about where to spend, who to target, and which creative to show. It doesn't wait for a weekly planning meeting.\n\nThink of it less like a tool and more like an operating system. The individual applications still exist, but the AI layer sits above them, coordinating decisions across all of them simultaneously.\n\nThis changes what marketing managers actually do. Less time building reports and more time setting goals, reviewing model recommendations, and deciding when to override the machine., -\n\n## Search Has Changed More Than Most People Realize\n\nClassic SEO, write a blog post, rank for a keyword, get a click, still exists. But it's no longer the whole game.\n\nIn 2026, a large share of search happens inside AI interfaces: ChatGPT Search, Perplexity, Google AI Overviews, Copilot. These systems don't just answer questions. They take actions. A user asks \"what's the best project management tool for a ten-person team\" and the AI doesn't just list options, it can start a free trial, book a demo, or complete a purchase without the user ever visiting a website.\n\nMarketers now talk about **Answer Engine Optimization (AEO)** and **Generative Engine Optimization (GEO)** alongside traditional SEO. The goal isn't just to rank, it's to be the answer the AI gives, and to appear in the action flow when a user is ready to buy.\n\nThat requires a different kind of content. Structured pages. Clear schemas. Comparison tables. Concrete proof points like case studies and verified reviews. AI systems need to be able to extract your value proposition cleanly and quote it confidently. If your site is vague or poorly organized, the AI skips you.\n\nBrowser-layer AI makes this even more pressing. Chrome, with Gemini integrated, can now summarize your page for a user before they've scrolled past the fold. What does that summary say about you? That's the new first impression., -\n\n## Personalization at Scale Is No Longer Impressive, It's Expected\n\nFive years ago, getting a product recommendation email that actually matched your browsing history felt clever. In 2026, consumers expect every touchpoint to reflect what they've already told a brand, explicitly or through behavior.\n\nAI-driven marketing automation systems now maintain continuously updating customer profiles. They track predicted intent, lifetime value scores, and churn probability. They adjust email send times, discount levels, and upsell suggestions per individual, not per segment. A segment of one is no longer a marketing clich\u00e9; it's technically achievable at scale.\n\nWhat fuels this is first-party and zero-party data. With third-party cookies gone and privacy regulations tightening, brands have shifted hard toward data they actually own: loyalty program behavior, quiz results, logged-in browsing, explicit preference settings. That data feeds the AI, which generates personalized content and offers without a human writing each one.\n\nThe risk is obvious. Consumers are fine with relevance. They're not fine with feeling surveilled. Brands that get this wrong, that personalize too aggressively or too opaquely, are seeing real trust damage. The technical capability to personalize everything doesn't mean you should., -\n\n## Agentic AI: When the System Sets Its Own To-Do List\n\nThe most significant shift in 2026 isn't AI generating content. It's AI taking initiative.\n\n\"Agentic AI\" refers to systems that can receive a business goal and work out the steps to achieve it without being told what to do at each stage. You tell the system: grow trial signups by 20% this quarter. It plans a multi-channel campaign, identifies audience segments, generates creative variants, runs tests, monitors performance, and reallocates budget, all autonomously.\n\nThe insight-to-action cycle that used to take weeks now takes hours. A campaign that underperforms on Tuesday afternoon gets revised by Tuesday evening.\n\nThis is powerful and genuinely unsettling in equal measure. Marketing teams are wrestling with real governance questions: How much do you let the system run? Who's accountable when an autonomous campaign says something off-brand or legally problematic? What does human oversight actually mean when the machine is moving faster than any human can review?\n\nThese aren't hypothetical concerns. They're showing up in marketing team meetings right now., -\n\n## What Marketers Actually Do Now\n\nThe job hasn't disappeared. It's changed shape.\n\nMany marketing organizations have reorganized into cross-functional pods, small teams built around an AI insights dashboard, with people covering strategy, data, creative, and martech. The work is faster and more reactive. It's also more interpretive. Someone has to decide what the model's recommendation actually means for the brand's long-term positioning.\n\nDay-to-day tasks in 2026 include writing prompts for AI systems, configuring agents, reviewing generated creative for brand consistency and legal compliance, and reading AI-generated attribution reports to make budget calls. Classic skills, copywriting, visual design, media buying, still matter, but they're applied differently. You're guiding and correcting AI output more than producing from scratch.\n\nThe marketers doing well are the ones who stayed sharp on strategy and brand thinking while learning enough about how these systems work to supervise them effectively. The ones struggling are those who either ignored the tools entirely or handed everything over to them without maintaining critical judgment.\n\nThere's also a real conversation happening about transparency. Consumers increasingly want to know when content is AI-generated. Regulators are starting to require disclosure in some contexts. Brands that built governance frameworks early are in a better position than those scrambling to catch up., -\n\n## What to Read and Watch\n\nIf this territory interests you, here are a few places to go deeper:\n\n**Books:**\n- *Prediction Machines* by Ajay Agrawal, Joshua Gans, and Avi Goldfarb, a clear-headed look at how AI changes decision-making in business, including marketing.\n- *Competing in the Age of AI* by Marco Iansiti and Karim Lakhani, covers how AI becomes the operating core of organizations, which maps directly to what's happening in marketing teams right now.\n\n**Films and Series:**\n- *The Social Dilemma* (Netflix, 2020), still the best accessible treatment of how behavioral data and algorithmic personalization shape what people see and buy. The 2026 marketing landscape is this, accelerated.\n- *Ex Machina* (2014), not about marketing, but it asks the right questions about what it means to trust a system that's optimizing toward a goal you set.\n\n**For ongoing reading:** Improvado's marketing trends blog and Deloitte Digital's 2026 marketing trends report both have solid, grounded analysis without the hype., -\n\n## The Question Worth Sitting With\n\nMarketing in 2026 is faster, more personalized, and more automated than most people predicted even three years ago. The AI tools and marketing automation systems running campaigns today would have looked like science fiction in 2021.\n\nBut speed and scale aren't the same as effectiveness. And effectiveness isn't the same as trust.\n\nThe brands pulling ahead aren't just the ones with the best AI stack. They're the ones who've figured out what only humans should decide, and they're holding that line.\n\n**Discussion prompt:** Where do you think the line should be between autonomous AI decision-making and human oversight in a marketing campaign? And who in your organization is actually drawing that line right now?",
+              "word_count": 1387,
+              "persist": {
+                "persisted": true,
+                "content_id": "a8dd1fd8-888f-4298-9a0c-3664245d2d41"
+              },
+              "token_usage": {
+                "calls": 2,
+                "input_tokens": 2706,
+                "output_tokens": 4046,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+                "total_tokens": 6752,
+                "cost_usd": 0.068808
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Write a blog post about how AI is changing marketing in twenty twenty six genre slug ai marketing keywords AI tools marketing automation target about fifteen hundred words"
+    }
+  ],
+  "expected": [
+    "flat `{response, kind=\"queued\"}`",
+    "routes `chapter.blog`",
+    "maps \"ai marketing\"\u2192`ai-marketing`",
+    "~1500 words",
+    "Prime Directive",
+    "`published_content_v2` draft",
+    "CR-009 email"
+  ]
+}

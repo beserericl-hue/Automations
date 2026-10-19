@@ -1,0 +1,74 @@
+# Full E2E verify — 71 tests — start 2026-07-01T19:36:30.170088+00:00
+[1/71] R03 PASS :: Email Report :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=Regression Test: Email Report err=None
+[2/71] R04 PASS :: Story Bible — Read (Empty) :: route exp=story_bible.list got=story_bible.list OK | entries=None found=False
+[3/71] R05 PASS :: Centralized Email Config (app_config) :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=R05: Centralized Email Config Test err=None
+[4/71] R20 PASS :: List Drafts :: route exp=library.list-outlines got=library.retrieve MISMATCH | items=50 found=True
+[5/71] R21 PASS :: List Drafts — Filter by Type :: route exp=library.list-outlines got=library.retrieve MISMATCH | items=10 found=True
+[6/71] R22 FAIL :: Approve Draft :: route exp=library.lifecycle got=library.lifecycle OK | status=None matched=False error=No content matching '[exact title from R20]' found — nothing
+[7/71] R23 FAIL :: Publish Content :: route exp=library.lifecycle got=library.lifecycle OK | status=None matched=False error=No content matching '[same title from R22]' found — nothing 
+[8/71] R24 PASS :: List Published :: route exp=library.list-outlines got=library.retrieve MISMATCH | items=4 found=True
+[9/71] R25 FAIL :: Reject Draft :: route exp=library.lifecycle got=library.lifecycle OK | status=None matched=False error=No content matching '[different title from R20]' found — not
+[10/71] R26 FAIL :: Schedule Publishing :: route exp=library.lifecycle got=library.lifecycle OK | status=None matched=None error=Please name the content to schedule (I won't guess which ite
+[11/71] R27 PASS :: List Scheduled Content :: route exp=library.list-outlines got=library.retrieve MISMATCH | items=0 found=False
+[12/71] R28 PASS :: Version History on Approve/Publish :: route exp=library.versions got=library.versions OK | count=None versions=0
+[13/71] R29 PASS :: Get Specific Version :: route exp=library.versions got=library.versions OK | count=None versions=0
+[14/71] R32 PASS :: Story Bible — Read After Chapter :: route exp=story_bible.list got=story_bible.list OK | entries=6 found=True
+[15/71] R33 PASS :: List Research Reports :: route exp=library.list-outlines got=library.retrieve MISMATCH | items=2 found=True
+[16/71] R34 PASS :: Get Research Report :: route exp=library.retrieve got=library.retrieve OK | items=17 found=True
+[17/71] R35 FAIL :: Update Research Report :: route exp=library.lifecycle got=library.lifecycle OK | status=None matched=False error=No content matching 'Post-Apocalyptic Fiction Trends 2026' f
+[18/71] R36 PASS :: Retrieve Content — Search by Title :: route exp=library.retrieve got=library.retrieve OK | items=3 found=True
+[19/71] R37 FAIL :: Retrieve Content — Not Found :: route exp=library.retrieve got=library.retrieve OK | items=3 found=True
+[20/71] R42 FAIL :: Cron Auto-Publish (Scheduled Publisher) :: route exp=library.lifecycle got=reply MISMATCH | status=None matched=None error=None
+[21/71] R53 PASS :: List Story Arcs :: route exp=library.retrieve got=library.retrieve OK | items=8 found=True
+[22/71] R70 PASS :: Retrieve Outline — The Accord :: route exp=library.retrieve got=library.retrieve OK | items=0 found=False
+[23/71] R74 PASS :: Retrieve Outline — The Correction :: route exp=library.retrieve got=library.retrieve OK | items=0 found=False
+[24/71] R77 PASS :: Retrieve Outline — The Optimization :: route exp=library.retrieve got=library.retrieve OK | items=0 found=False
+[25/71] R80 PASS :: Retrieve Outline — The Consulship of Gaius Varro :: route exp=library.retrieve got=library.retrieve OK | items=1 found=True
+[26/71] R82 PASS :: List All Outlines :: route exp=library.list-outlines got=library.list-outlines OK | items=18 found=None
+[27/71] R83 PARTIAL :: List Outlines — Alternate Phrasing :: route exp=library.list-outlines got=reply MISMATCH | items=None found=None
+[28/71] R84 PASS :: Outline Version History — The Accord :: route exp=library.versions got=library.versions OK | count=0 versions=0
+[29/71] R85 PASS :: Outline Version History — The Correction :: route exp=library.versions got=library.versions OK | count=0 versions=0
+[30/71] R86 PASS :: Outline Version History — No Revisions :: route exp=library.versions got=library.versions OK | count=0 versions=0
+[31/71] R87 PASS :: Revert Outline — The Accord to Version 1 :: route exp=library.revert got=library.revert OK | job=complete | reverted=False
+[32/71] R88 PASS :: Verify Revert — Retrieve Reverted Outline :: route exp=library.retrieve got=library.retrieve OK | items=0 found=False
+[33/71] R89 FAIL :: Revert Outline — The Optimization to Pre-Epilogue  :: route exp=library.versions got=library.revert MISMATCH | job=complete | reverted=False
+[34/71] R90 PASS :: Revert Outline — Invalid Version Number :: route exp=library.revert got=library.revert OK | job=complete | reverted=False
+[35/71] R91 PASS :: Revert Outline — Project Not Found :: route exp=library.revert got=library.revert OK | job=complete | reverted=False
+[36/71] R93 PASS :: Verify Version History After Multiple Revisions :: route exp=library.versions got=library.versions OK | count=0 versions=0
+[37/71] R94 FAIL :: Delete a Draft :: route exp=library.lifecycle got=library.lifecycle OK | job=complete | status=None matched=False error=No content matching 'The Forgotten Engineers of Rome' found 
+[38/71] R95 FAIL :: Delete Published Item — Error :: route exp=library.lifecycle got=library.lifecycle OK | job=complete | status=None matched=False error=No content matching 'Why Post-Apocalyptic Fiction Matters Mo
+[39/71] R96 PASS :: List Deleted Items :: route exp=library.lifecycle got=library.lifecycle OK | status=2 matched=None error=None
+[40/71] R97 PASS :: List Deleted — Filter by Type :: route exp=library.lifecycle got=library.lifecycle OK | status=0 matched=None error=None
+[41/71] R98 FAIL :: Undelete Content :: route exp=library.lifecycle got=library.lifecycle OK | job=complete | status=None matched=False error=No content matching 'The Forgotten Engineers of Rome' found 
+[42/71] R99 PASS :: Verify Undelete — Item Returns to Drafts :: route exp=library.list-outlines got=library.retrieve MISMATCH | items=50 found=True
+[43/71] R100 PASS :: Email Outline :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=The Seed Vault — Outline err=None
+[44/71] R101 PASS :: Email Short Story :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=A disillusioned Roman soldier discovers err=None
+[45/71] R102 FAIL :: Email Research Report :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=False to=None subject=None err=Couldn't find research_report matching 'Post-Apocalyptic Fictio
+[46/71] R103 PASS :: Email Chapter :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=Chapter 1 — The Last Garden err=None
+[47/71] R104 PASS :: Email Newsletter :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=Revolutions That Remade the World err=None
+[48/71] R105 PASS :: Email Content Not Found :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=False to=None subject=None err=Couldn't find short_story matching 'A Story That Definitely Doe
+[49/71] V03 FAIL :: Voice — Email Report :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=False to=None subject=None err=Couldn't find research_report matching 'that research'. No emai
+[50/71] V13 PASS :: Voice — List Drafts :: route exp=library.list-outlines got=library.retrieve MISMATCH | items=50 found=True
+[51/71] V15 FAIL :: Voice — Reject Draft :: route exp=library.lifecycle got=library.lifecycle OK | status=None matched=False error=No content matching 'different title from V13' found — nothi
+[52/71] V16 FAIL :: Voice — Schedule Content :: route exp=library.lifecycle got=library.lifecycle OK | status=None matched=False error=No content matching 'title from V13' found — nothing was cha
+[53/71] V17 PASS :: Voice — List Scheduled :: route exp=library.list-outlines got=library.retrieve MISMATCH | items=0 found=False
+[54/71] V18 PASS :: Voice — Story Bible :: route exp=story_bible.list got=story_bible.list OK | entries=12 found=True
+[55/71] V21 PASS :: Voice — List Research Reports :: route exp=library.list-outlines got=library.retrieve MISMATCH | items=4 found=True
+[56/71] V23 PASS :: Voice — Retrieve Content (No Callback) :: route exp=library.retrieve got=library.retrieve OK | items=3 found=True
+[57/71] V24 PASS :: Voice — Retrieve Research Report (No Callback) :: route exp=library.retrieve got=library.retrieve OK | items=17 found=True
+[58/71] V25 FAIL :: Voice — Retrieve Draft Story (No Callback) :: route exp=library.retrieve got=chapter.short-story MISMATCH | job=complete | short_story recent=0 word_count=2320 persist=True
+[59/71] V26 PASS :: Voice — Retrieve & Callback — Review Mode :: route exp=notify.eve-callback got=notify.eve-callback OK | job=complete | kind=queued invoked=True found=None
+[60/71] V27 PASS :: Voice — Retrieve & Callback — Brainstorm Mode :: route exp=notify.eve-callback got=notify.eve-callback OK | job=complete | kind=queued invoked=True found=None
+[61/71] V28 PASS :: Voice — Callback Review with Editorial Feedback :: route exp=notify.eve-callback got=library.retrieve MISMATCH | items=1 found=True
+[62/71] V30 PASS :: Voice — Content Not Found :: route exp=notify.eve-callback got=notify.eve-callback OK | job=complete | kind=queued invoked=True found=None
+[63/71] V32 PASS :: Voice — Centralized Email Verification :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=V32 Email Config Test err=None
+[64/71] V33 FAIL :: Voice — Delete Draft :: route exp=library.lifecycle got=library.lifecycle OK | job=complete | status=None matched=False error=No content matching 'The Forgotten Engineers of Rome' found 
+[65/71] V34 FAIL :: Voice — Delete Published Error :: route exp=library.lifecycle got=library.lifecycle OK | job=complete | status=None matched=False error=No content matching 'post apocalyptic fiction' found — nothi
+[66/71] V35 PASS :: Voice — List Deleted (Trash) :: route exp=library.lifecycle got=library.lifecycle OK | status=2 matched=None error=None
+[67/71] V36 FAIL :: Voice — Undelete :: route exp=library.lifecycle got=library.lifecycle OK | job=complete | status=None matched=False error=No content matching 'The Forgotten Engineers of Rome' found 
+[68/71] V37 PASS :: Voice — Email Outline :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=The Seed Vault — Outline err=None
+[69/71] V38 PASS :: Voice — Email Short Story :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=A disillusioned Roman soldier discovers err=None
+[70/71] V39 FAIL :: Voice — Email Research Report :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=False to=None subject=None err=Couldn't find research_report matching 'post apocalyptic fictio
+[71/71] V40 PASS :: Voice — Email Chapter :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=Chapter 1 — The Last Garden err=None
+
+DONE 2026-07-01T19:43:16.502626+00:00 :: {'PASS': 50, 'FAIL': 20, 'PARTIAL': 1}

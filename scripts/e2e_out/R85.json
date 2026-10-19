@@ -1,0 +1,40 @@
+{
+  "test": {
+    "id": "R85",
+    "title": "Outline Version History \u2014 The Correction",
+    "source": "chat",
+    "prompt": "Show outline version history for \"The Correction\"",
+    "route": "library.versions` (info: list)",
+    "prerequisite": "R75",
+    "expected": [
+      "routes to `library.versions` (list, outline), kind=data; ilike match; \u22651 entry (pre-revision 10-ch, no prologue); chapter count accurate"
+    ]
+  },
+  "response": {
+    "kind": "data",
+    "assistant_message": "",
+    "tool": "library",
+    "op": "versions",
+    "data": {
+      "execution_id": "de56fce2-226a-476e-a63d-2acd2c7419ac",
+      "step_name": "library",
+      "status": "ok",
+      "payload": {
+        "op": "versions",
+        "result": {
+          "scope": "outline",
+          "project_id": "d503b5ce-489d-4f87-92df-3cfac2eb3f4b",
+          "versions": [],
+          "count": 0
+        }
+      },
+      "error": null,
+      "next_stage": null
+    },
+    "job_id": null,
+    "status": null,
+    "jobs": null,
+    "error": null
+  },
+  "job_result": null
+}

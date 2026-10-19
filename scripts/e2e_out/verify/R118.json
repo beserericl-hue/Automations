@@ -1,0 +1,144 @@
+{
+  "id": "R118",
+  "title": "Revise Chapter Outline",
+  "route": "`brainstorm.revise-outline` or `chapter.plan` re-run (task) \u00b7 impl: built (E2E-4)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=brainstorm.revise-outline got=chapter.plan MISMATCH",
+    "job=complete",
+    "sub_chapters=5 arc=The Hero's Journey"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Revise the chapter outline for Chapter 1 of \"The Signal Beneath.\"\n  Make sub-chapter 2 focus more on the protagonist's internal conflict about\n  whether to trust the warlord. Add a scene where she finds her dead partner's\n  journal in the radio station."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Queuing the revision for Chapter 1's outline in \"The Signal Beneath.\" I'll let you know when it's ready.",
+        "tool": "chapter",
+        "op": "plan",
+        "data": null,
+        "job_id": "cf529eabffcf4cd19e242b7914e2646d",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "cf529eabffcf4cd19e242b7914e2646d",
+        "status": "complete",
+        "result": {
+          "execution_id": "775a26cd-1d2a-409b-a7f9-52c1b252b285",
+          "step_name": "chapter",
+          "status": "ok",
+          "payload": {
+            "op": "plan",
+            "result": {
+              "chapter_number": 1,
+              "chapter_story_arc": "The Hero's Journey",
+              "book_arc": "The Hero's Journey",
+              "sub_chapter_briefs": [
+                {
+                  "number": 1,
+                  "title": "2 A.M. on 7.850",
+                  "beat": "Mara is at her receiver in the pre-dawn dark, running her nightly scan of dead frequencies, when a repeating pattern surfaces on 7.850 MHz \u2014 a frequency she has logged as silent for six years. She freezes, hand on the tuning dial, and listens.",
+                  "pov_character": "",
+                  "brief": "Mara is at her receiver in the pre-dawn dark, running her nightly scan of dead frequencies, when a repeating pattern surfaces on 7.850 MHz \u2014 a frequency she has logged as silent for six years. She freezes, hand on the tuning dial, and listens.",
+                  "arc_beat": "Stage 2 \u2014 Call to Adventure: the signal arrives, undeniable and impossible",
+                  "characters": [
+                    "Mara Voss"
+                  ],
+                  "setting": "Mara's fortified farmhouse \u2014 the radio room, a converted pantry lined with salvaged equipment, logbooks stacked on shelves, a single oil lamp",
+                  "emotional_tone": "Hyper-alert stillness; the particular silence of someone who has stopped breathing without noticing",
+                  "connects_to_book_arc": "Delivers the inciting disruption of Stage 2 \u2014 the Call to Adventure arrives not as drama but as a faint, repeating tone on a frequency that should be dead, establishing the novel's central mystery and Mara's unique capacity to receive it"
+                },
+                {
+                  "number": 2,
+                  "title": "Signal Architecture",
+                  "beat": "Mara works through the night with graph paper and a mechanical pencil, mapping the signal's timing intervals, carrier stability, and modulation signature. Each technical conclusion tightens the knot in her chest: the carrier is too stable for atmospheric artifact, the repetition too precise for noise, the power too consistent for a battery rig. Someone has a grid. She writes it all in her private shorthand logbook.",
+                  "pov_character": "",
+                  "brief": "Mara works through the night with graph paper and a mechanical pencil, mapping the signal's timing intervals, carrier stability, and modulation signature. Each technical conclusion tightens the knot in her chest: the carrier is too stable for atmospheric artifact, the repetition too precise for noise, the power too consistent for a battery rig. Someone has a grid. She writes it all in her private shorthand logbook.",
+                  "arc_beat": "Stage 2 \u2014 Call to Adventure: the hero confirms the call is real and understands its full weight",
+                  "characters": [
+                    "Mara Voss"
+                  ],
+                  "setting": "Mara's radio room, deepening into the small hours \u2014 the oil lamp burning lower, her breath visible in the cold",
+                  "emotional_tone": "Methodical excitement curdling into dread as each technical finding removes another innocent explanation",
+                  "connects_to_book_arc": "Establishes Mara's signal-processing expertise as her heroic gift and grounds the novel's central premise in technical credibility; her logbook entry is the first instance of the ESCALATING THREAD \u2014 the written record that will draw the Reclamation Authority to her in later chapters"
+                },
+                {
+                  "number": 3,
+                  "title": "What the Logbook Knows",
+                  "beat": "Mara reads back what she has written and understands the danger with full clarity: a live grid 300\u2013400 miles west means someone powerful enough to be a target, and anyone who knows about it becomes a target too. She tears the pages from the logbook, holds them over the lamp flame, and burns them. She watches the ash. Then she picks up the pencil and rewrites every word from memory \u2014 faster, neater, more complete.",
+                  "pov_character": "",
+                  "brief": "Mara reads back what she has written and understands the danger with full clarity: a live grid 300\u2013400 miles west means someone powerful enough to be a target, and anyone who knows about it becomes a target too. She tears the pages from the logbook, holds them over the lamp flame, and burns them. She watches the ash. Then she picks up the pencil and rewrites every word from memory \u2014 faster, neater, more complete.",
+                  "arc_beat": "Stage 3 \u2014 Refusal of the Call: Mara destroys the evidence in fear, then immediately reverses herself, dramatizing the refusal and its failure in a single scene",
+                  "characters": [
+                    "Mara Voss"
+                  ],
+                  "setting": "Mara's radio room \u2014 the lamp guttering, ash on the floor, the logbook open to a fresh page",
+                  "emotional_tone": "Fear giving way to compulsion; the specific self-knowledge of someone who understands their own weakness and acts on it anyway",
+                  "connects_to_book_arc": "Dramatizes Stage 3's refusal as a gesture that collapses under the weight of who Mara is \u2014 she cannot unknow a signal; the rewritten logbook is the ESCALATING THREAD's second beat: the record now exists again, more complete than before, and will eventually be found"
+                },
+                {
+                  "number": 4,
+                  "title": "Dani's Frequency",
+                  "beat": "In the grey pre-dawn, Mara stops writing and sits with the logbook in her lap. Her mind goes to Dani \u2014 not the memory of his death but the memory of teaching him to read signal patterns on a Sunday afternoon, his finger tracing the waveform on a screen. She thinks: he would have heard it too. She thinks: he would have gone. She closes the logbook and does not sleep.",
+                  "pov_character": "",
+                  "brief": "In the grey pre-dawn, Mara stops writing and sits with the logbook in her lap. Her mind goes to Dani \u2014 not the memory of his death but the memory of teaching him to read signal patterns on a Sunday afternoon, his finger tracing the waveform on a screen. She thinks: he would have heard it too. She thinks: he would have gone. She closes the logbook and does not sleep.",
+                  "arc_beat": "Stage 3 \u2014 Refusal of the Call: the emotional underpinning of the refusal is revealed \u2014 it is not fear of the Reclamation Authority but fear of what going will cost, rooted in what staying cost her before",
+                  "characters": [
+                    "Mara Voss"
+                  ],
+                  "setting": "Mara's radio room into the kitchen \u2014 she moves to the window, watching the dead suburb go grey with early light",
+                  "emotional_tone": "Grief worn smooth by seven years of handling; the quiet devastation of a person who has learned to carry loss without putting it down",
+                  "connects_to_book_arc": "Plants the wound that the Hero's Journey will require Mara to confront \u2014 her guilt over Dani's death, her fear of choosing the signal over the people near her again; this is the interior stakes beneath the external quest"
+                },
+                {
+                  "number": 5,
+                  "title": "The Knock",
+                  "beat": "At first light, a knock at the farmhouse door \u2014 Tom\u00e1s Reyes, on his courier route, stopping as he sometimes does to trade news for a meal. Mara lets him in, feeds him, says nothing about the signal. He notices the fresh ash on the floor near the lamp. He notices her hands are not still. He asks what she heard. She tells him it was nothing. He sits down, pours himself more water, and says he has time.",
+                  "pov_character": "",
+                  "brief": "At first light, a knock at the farmhouse door \u2014 Tom\u00e1s Reyes, on his courier route, stopping as he sometimes does to trade news for a meal. Mara lets him in, feeds him, says nothing about the signal. He notices the fresh ash on the floor near the lamp. He notices her hands are not still. He asks what she heard. She tells him it was nothing. He sits down, pours himself more water, and says he has time.",
+                  "arc_beat": "Stage 2 \u2014 Call to Adventure / bridge to Stage 4: the ally arrives at the moment of the call, creating the condition for the mentor-figure encounter in Chapter 2",
+                  "characters": [
+                    "Mara Voss",
+                    "Tom\u00e1s Reyes"
+                  ],
+                  "setting": "Mara's farmhouse kitchen \u2014 morning light through boarded windows, two tin cups on a salvaged table",
+                  "emotional_tone": "Tension beneath ordinary hospitality; the specific discomfort of a secret in a small room with a perceptive person",
+                  "connects_to_book_arc": "Ends Chapter 1 on the hook that opens Chapter 2 \u2014 Tom\u00e1s is present, he has noticed, and Mara's refusal to speak is already failing; his recognition of the encryption pattern in the next chapter will transform the Call to Adventure into an irreversible commitment"
+                }
+              ],
+              "count": 5,
+              "persist": {
+                "persisted": true,
+                "chapter_number": 1
+              },
+              "token_usage": {
+                "calls": 1,
+                "input_tokens": 1750,
+                "output_tokens": 1615,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 6788,
+                "total_tokens": 10153,
+                "cost_usd": 0.05493
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Revise the chapter outline for Chapter 1 of \"The Signal Beneath.\"\n  Make sub-chapter 2 focus more on the protagonist's internal conflict about\n  whether to trust the warlord. Add a scene where she finds her dead partner's\n  journal in the radio station."
+    }
+  ],
+  "expected": [
+    "routes revise (revise-outline or chapter.plan w/ instructions), kind=queued; completed",
+    "prior Ch1 chapter outline snapshotted (content_versions_v2 or outline_versions_v2) before overwrite",
+    "sub-chapter 2 emphasizes internal conflict; new sub-chapter for the journal scene; other sub-chapters preserved; names match book outline; saved to outline; CR-009 email"
+  ]
+}

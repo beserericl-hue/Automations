@@ -1,0 +1,76 @@
+{
+  "id": "R85",
+  "title": "Outline Version History \u2014 The Correction",
+  "route": "`library.versions` (info: list) \u00b7 impl: built (E2E-2)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.versions got=library.versions OK",
+    "count=4 versions=4"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Show outline version history for \"The Correction\""
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "data",
+        "assistant_message": "",
+        "tool": "library",
+        "op": "versions",
+        "data": {
+          "execution_id": "492f38f3-35ee-4f3d-98ed-ffd9baf6184e",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "versions",
+            "result": {
+              "scope": "outline",
+              "project_id": "d503b5ce-489d-4f87-92df-3cfac2eb3f4b",
+              "versions": [
+                {
+                  "version_number": 1,
+                  "created_at": "2026-07-01T21:35:41.644375+00:00",
+                  "revision_note": "pre-revision snapshot",
+                  "chapter_count": 10
+                },
+                {
+                  "version_number": 2,
+                  "created_at": "2026-07-01T21:35:41.720755+00:00",
+                  "revision_note": "Auto-snapshot before outline change",
+                  "chapter_count": 10
+                },
+                {
+                  "version_number": 3,
+                  "created_at": "2026-07-01T22:30:37.520486+00:00",
+                  "revision_note": "pre-revision snapshot",
+                  "chapter_count": 11
+                },
+                {
+                  "version_number": 4,
+                  "created_at": "2026-07-01T22:30:37.601598+00:00",
+                  "revision_note": "Auto-snapshot before outline change",
+                  "chapter_count": 11
+                }
+              ],
+              "count": 4
+            }
+          },
+          "error": null,
+          "next_stage": null
+        },
+        "job_id": null,
+        "status": null,
+        "jobs": null,
+        "error": null
+      },
+      "job_result": null,
+      "resolved_prompt": "Show outline version history for \"The Correction\""
+    }
+  ],
+  "expected": [
+    "routes to `library.versions` (list, outline), kind=data; ilike match; \u22651 entry (pre-revision 10-ch, no prologue); chapter count accurate"
+  ]
+}

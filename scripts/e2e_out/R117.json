@@ -1,0 +1,41 @@
+{
+  "test": {
+    "id": "R117",
+    "title": "\u2014 Write Chapter for Book Without Book Outline (Should Fail Gracefully)",
+    "source": "chat",
+    "prompt": "Write Chapter 1 of \"A Book That Does Not Exist Yet\"",
+    "route": "library.retrieve` (info) \u2192 graceful failure",
+    "prerequisite": "\"A Book That Does Not Exist Yet\" not in `writing_projects_v2`",
+    "expected": [
+      "project-existence check finds nothing \u2192 kind=data (inline error), NOT queued",
+      "message: no book outline exists; suggests brainstorm.story first; chapter.write/plan NOT called; no `published_content_v2` row; no crash/5xx"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing Chapter 1 of \"A Book That Does Not Exist Yet\" \u2014 I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "write",
+    "data": null,
+    "job_id": "03deb048512244d888de09423e17aaf5",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "03deb048512244d888de09423e17aaf5",
+    "status": "complete",
+    "result": {
+      "execution_id": "66324847-1d7f-41b7-8213-967f58ef25a3",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValidationError",
+        "message": "1 validation error for WriteChapterRequest\nproject_id\n  Field required [type=missing, input_value={'project_title': 'A Book...t': True, 'async': True}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

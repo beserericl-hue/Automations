@@ -1,0 +1,65 @@
+{
+  "id": "R86",
+  "title": "Outline Version History \u2014 No Revisions",
+  "route": "`library.versions` (info: list) \u00b7 impl: built (E2E-2)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.versions got=library.versions OK",
+    "count=2 versions=2"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Show outline version history for \"Signal from the Deep\""
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "data",
+        "assistant_message": "",
+        "tool": "library",
+        "op": "versions",
+        "data": {
+          "execution_id": "0415672a-1257-4695-89bf-2dee147372c5",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "versions",
+            "result": {
+              "scope": "outline",
+              "project_id": "11baad09-556a-446d-a52c-8dbae9f9045f",
+              "versions": [
+                {
+                  "version_number": 1,
+                  "created_at": "2026-07-01T21:30:44.844038+00:00",
+                  "revision_note": "pre-revision snapshot",
+                  "chapter_count": 5
+                },
+                {
+                  "version_number": 2,
+                  "created_at": "2026-07-01T21:30:44.93662+00:00",
+                  "revision_note": "Auto-snapshot before outline change",
+                  "chapter_count": 5
+                }
+              ],
+              "count": 2
+            }
+          },
+          "error": null,
+          "next_stage": null
+        },
+        "job_id": null,
+        "status": null,
+        "jobs": null,
+        "error": null
+      },
+      "job_result": null,
+      "resolved_prompt": "Show outline version history for \"Signal from the Deep\""
+    }
+  ],
+  "expected": [
+    "routes to `library.versions` (list, outline), kind=data; zero rows in `outline_versions_v2`",
+    "empty list or \"No version history found\"; no unhandled error / 500"
+  ]
+}

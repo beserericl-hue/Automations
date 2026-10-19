@@ -1,0 +1,82 @@
+{
+  "id": "R96",
+  "title": "List Deleted Items",
+  "route": "`library.lifecycle` (list_deleted) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.lifecycle got=library.lifecycle OK",
+    "status=4 matched=None error=None"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Show my deleted content"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "data",
+        "assistant_message": "",
+        "tool": "library",
+        "op": "lifecycle",
+        "data": {
+          "execution_id": "250d741c-f54b-4cc6-a26d-994ecf975dc0",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "lifecycle",
+            "result": {
+              "items": [
+                {
+                  "id": "4325073c-ba25-47b9-b0f7-f62b0abaaf57",
+                  "title": "Newsletter",
+                  "status": "deleted",
+                  "content_type": "newsletter",
+                  "chapter_number": null,
+                  "updated_at": "2026-06-21T21:02:15.842732+00:00"
+                },
+                {
+                  "id": "39896269-c101-4837-9158-1bcdbd3c3ce2",
+                  "title": "Why Post-Apocalyptic Fiction Matters More Than Ever in 2026",
+                  "status": "deleted",
+                  "content_type": "blog_post",
+                  "chapter_number": null,
+                  "updated_at": "2026-07-01T19:52:24.235361+00:00"
+                },
+                {
+                  "id": "8cb603b0-7af1-43bb-b1f3-a9cb14c928f6",
+                  "title": "Why Post-Apocalyptic Fiction Matters More Than Ever in 2026",
+                  "status": "deleted",
+                  "content_type": "blog_post",
+                  "chapter_number": null,
+                  "updated_at": "2026-07-01T19:53:11.360135+00:00"
+                },
+                {
+                  "id": "0272ea75-7aa8-4cda-b298-4942f208fb26",
+                  "title": "Why Post-Apocalyptic Fiction Matters More Than Ever in 2026",
+                  "status": "deleted",
+                  "content_type": "blog_post",
+                  "chapter_number": null,
+                  "updated_at": "2026-07-01T23:09:19.401933+00:00"
+                }
+              ],
+              "count": 4
+            }
+          },
+          "error": null,
+          "next_stage": null
+        },
+        "job_id": null,
+        "status": null,
+        "jobs": null,
+        "error": null
+      },
+      "job_result": null,
+      "resolved_prompt": "Show my deleted content"
+    }
+  ],
+  "expected": [
+    "routes to `library.lifecycle` (list_deleted), kind=data; queries status='deleted'; includes \"The Forgotten Engineers of Rome\"; up to 20 items"
+  ]
+}

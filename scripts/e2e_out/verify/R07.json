@@ -1,0 +1,77 @@
+{
+  "id": "R07",
+  "title": "Write Newsletter (political-scifi)",
+  "route": "`chapter.newsletter` (task) \u00b7 impl: built (E2E-3)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=chapter.newsletter got=chapter.newsletter OK",
+    "job=complete",
+    "newsletter recent=1 word_count=1056 persist=True"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Write a newsletter for the political-scifi genre. Topic: \"Power Structures in Space: How Sci-Fi Predicts Real-World Politics\". Genre slug: political-scifi. Date: 2026-03-10."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Queuing newsletter generation. I'll let you know when it's ready.",
+        "tool": "chapter",
+        "op": "newsletter",
+        "data": null,
+        "job_id": "3208f0f0634d4c98802ed17d21da5e56",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "3208f0f0634d4c98802ed17d21da5e56",
+        "status": "complete",
+        "result": {
+          "execution_id": "9a7766e4-e250-461a-bc32-3c2db7b997e5",
+          "step_name": "chapter",
+          "status": "ok",
+          "payload": {
+            "op": "newsletter",
+            "result": {
+              "written": true,
+              "title": "Power Structures in Space: How Sci-Fi Predicts Real-World Politics",
+              "subject_line": "Who Controls the Sky Controls Everything",
+              "content_text": "_Sci-fi saw orbital power politics coming. Real governments are catching up._\n\nA satellite goes dark over the South China Sea. Three governments issue contradictory statements within the hour. By the time the press conference starts, social media has already decided who's responsible.\n\nThis isn't a scene from a novel. It's the texture of 2026.\n\nScience fiction writers have been building this world for decades, not as prophecy, but as diagnosis. Herbert understood that whoever controls the resource controls the politics. Le Guin knew that the map of power is always drawn by the powerful. Corey showed us that space doesn't dissolve old grievances; it amplifies them.\n\nThe question worth asking now isn't whether sci-fi predicted our moment. It's whether we've been paying attention to what it said to do next.\n\n## The Belt Was Always About Infrastructure\n\nIn The Expanse, the Belters don't lack courage or numbers. They lack air. Water. The supply chain. Every political crisis in that series traces back to who controls the logistics, not who has the better argument.\n\nLook at the real 2026 map of orbital power. GPS is military infrastructure. Starlink terminals are battlefield hardware. Undersea cables carry 95% of global internet traffic, and the companies that own them hold leverage that no treaty fully addresses.\n\nWhen a launch contract gets pulled over export controls, or when a government quietly revokes a satellite operator's license, that's not a footnote. That's the chokepoint. That's the Belt.\n\nThe language has updated, 'dual-use technology,' 'platform governance,' 'public-private partnership', but the structure is identical. Control the network, and you don't need to control the territory.\n\n## The Spice Is Semiconductor Fab Capacity\n\nHerbert's Arrakis works because the resource is both essential and geographically fixed. You can't synthesize the spice. You can only fight over who extracts it.\n\nReplace melange with advanced semiconductors, rare-earth processing, or orbital launch slots, and the logic holds exactly.\n\nRight now, three or four nations control the majority of satellite launch capacity. A handful of facilities manufacture the chips that guidance systems depend on. Anti-satellite weapons, kinetic, electronic, cyber, are proliferating faster than any arms control framework can track.\n\nThe political sci-fi coming out in 2026 reflects this directly. Titles flagged by readers at https://www.reddit.com/r/printSF/comments/1q55jkq/the_best_new_or_most-high-profile-science-fiction/ and reviewed at https://www.metastellar.com/nonfiction/reviews/most-anticipated-sci-fi-books-of-2026/ increasingly frame space not as frontier but as contested supply chain, a place where procurement decisions and tariff schedules are as consequential as any battle.\n\nThe spice metaphor isn't poetic anymore. It's a procurement briefing.\n\n## Institutions Lie in the Same Way Everywhere\n\nIn Foundation, the Empire maintains the fiction of stability long after the underlying math has failed. Officials keep issuing statements. The bureaucracy keeps processing forms. The collapse is visible to anyone who looks at the numbers, but looking at the numbers is politically inconvenient.\n\nWatch a space agency press conference in 2026. The gap between the polished statement and the chaotic room behind the camera is the same gap Asimov was describing.\n\nModern political power is staged. Press stakeouts, moderated panels, carefully framed social clips, these are the performance layer. Behind the glass-walled conference rooms and the badge-checked corridors, decisions get made on encrypted Signal threads and in thirty-second video calls before anyone has read the underlying report.\n\nSci-fi that works politically, Le Guin's Ekumen dispatches, the memos in Orwell's ministries, understands that the document trail and the actual decision are rarely the same document. That gap is where the story lives.\n\n## Surveillance Is the Consent You Already Gave\n\nOrwell got the surveillance state right but got the mechanism wrong. It wasn't imposed by force. People opted in, feature by feature, for convenience.\n\nLocation tracking for traffic updates. Facial recognition for faster boarding. Data brokers packaging behavioral profiles that governments can license without a warrant.\n\nIn orbital politics, this dynamic scales up. Satellite imagery is now commercially available at resolutions that were classified five years ago. A private company can watch a military installation, a protest, or a harvest in near real time and sell that data to whoever pays.\n\nThe political question isn't whether this capability exists. It's who gets to use it, under what rules, reviewed by whom. Right now the answer is: unclear, contested, and changing faster than any regulatory body can follow.\n\nThe sci-fi that resonates on this, and several 2026 releases catalogued at https://lithub.com/26-sci-fi-and-fantasy-books-to-look-forward-to-in-2026/ and https://everybookadoorway.com/unmissable-fantasy-and-scifi-of-2026/ lean into it, doesn't frame surveillance as a villain's tool. It frames it as infrastructure that everyone built together, for reasons that seemed reasonable at the time.\n\n## No Clear Villains. Only Competing Pressures.\n\nThis is where political sci-fi at its best diverges from the thriller genre. The thriller needs a bad actor. Political sci-fi needs a system.\n\nThe Expanse's Earth government isn't evil. It's trying to manage a population it can no longer fully employ, using tools it built for a different century. Mars isn't evil either. It's a society that survived by enforcing discipline and now can't stop enforcing it. The Belt isn't a victim class waiting for rescue. It's a fractured coalition with its own internal hierarchies and betrayals.\n\nEvery faction has a legitimate grievance. Every faction's solution creates the next faction's grievance.\n\nThat's the structure of real space politics in 2026. The nation investing in anti-satellite capability is responding to a surveillance it considers hostile. The company launching commercial imaging satellites is responding to investor pressure and a permissive regulatory environment that governments created. The government that created that environment was responding to lobbying from an industry it needed for strategic reasons.\n\nThe chain of incentives is coherent all the way down. That's what makes it hard. That's what makes it worth writing about.\n\nThe most useful thing political sci-fi does isn't predict. It slows you down long enough to see the system you're inside.\n\nThe orbital politics unfolding right now, over launch licenses, satellite surveillance, anti-satellite proliferation, and the blurring line between commercial and military space, is moving faster than most public debate can track. The frameworks for thinking about it exist. Herbert built one. Le Guin built another. Corey built a third.\n\nSo here's the question worth sitting with: Which faction in the current orbital order do you think has the most legitimate grievance, and what does that faction's solution cost everyone else?\n\nReply with your answer. Or start a thread. The best political fiction always begins as an argument.",
+              "word_count": 1056,
+              "section_count": 5,
+              "persist": {
+                "persisted": true,
+                "content_id": "7a7289de-22b0-4bd3-b6b6-627a12691577"
+              },
+              "token_usage": {
+                "calls": 2,
+                "input_tokens": 1650,
+                "output_tokens": 2507,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+                "total_tokens": 4157,
+                "cost_usd": 0.042555
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Write a newsletter for the political-scifi genre. Topic: \"Power Structures in Space: How Sci-Fi Predicts Real-World Politics\". Genre slug: political-scifi. Date: 2026-03-10."
+    }
+  ],
+  "expected": [
+    "routes to newsletter durable saga, kind=queued; job reaches status=complete",
+    "Newsletter uses political-scifi tone (cerebral, tense, morally ambiguous)",
+    "**Writing Prime Directive:** No filler words, no hype, concrete examples",
+    "Has subject_line, pre_header, intro, sections, outro structure",
+    "Email arrives with newsletter content",
+    "Draft row in `published_content_v2` (content_type=newsletter, user_id=\"+14105914612\")",
+    "CR-009 task-completion email received"
+  ]
+}

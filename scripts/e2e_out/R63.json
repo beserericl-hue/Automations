@@ -1,0 +1,42 @@
+{
+  "test": {
+    "id": "R63",
+    "title": "Write Chapter 1 from Freytags Pyramid Outline (Political Sci-Fi)",
+    "source": "chat",
+    "prompt": "Write chapter 1 of \"The Accord\". Genre slug: political-scifi. Chapter number: 1.",
+    "route": "chapter.write` (task)",
+    "prerequisite": "R55",
+    "expected": [
+      "routes to `chapter.write`, kind=queued; complete; auto-loads 10-ch outline",
+      "Ch1 covers Freytag Introduction; fatal flaw planted; characters match R55",
+      "`published_content_v2` chapter row; `story_bible_v2` entries; `content_versions_v2` snapshot; Prime Directive; CR-009 email"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing chapter 1 of \"The Accord\" \u2014 I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "write",
+    "data": null,
+    "job_id": "11866d3db04846fb96fd96a9cf53f0c7",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "11866d3db04846fb96fd96a9cf53f0c7",
+    "status": "complete",
+    "result": {
+      "execution_id": "b8318b2e-84cb-4c4e-808b-a2c4cb5e5850",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValidationError",
+        "message": "1 validation error for WriteChapterRequest\nproject_id\n  Field required [type=missing, input_value={'project_title': 'The Ac...t': True, 'async': True}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

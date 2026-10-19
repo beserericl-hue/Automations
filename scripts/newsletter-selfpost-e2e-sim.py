@@ -35,7 +35,7 @@ PG_ENV = {
     "PGPORT": "5432",
     "PGUSER": "postgres.gvbvwcnmjkdpclcisqrr",
     "PGDATABASE": "postgres",
-    "PGPASSWORD": "Fr332bafami!y",
+    "PGPASSWORD": "<rotated 2026-10-19 — see credentials-map.md>",
 }
 import os
 PSQL = "/usr/local/opt/postgresql@17/bin/psql"

@@ -1,0 +1,133 @@
+{
+  "id": "R57",
+  "title": "Brainstorm Short Story \u2014 Freytags Pyramid (Historical Time Travel)",
+  "route": "`brainstorm.story`/`brainstorm.short-story` (task) \u00b7 impl: built \u00b7 arc fidelity: built (E2E-4)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=brainstorm.story got=brainstorm.short-story MISMATCH",
+    "job=complete",
+    "outline title='The Witness' chapters=5 persisted=True projects_recent=3"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Brainstorm a short story using Freytags Pyramid about a historian who travels to 1692 Salem to observe the witch trials, but accidentally provides testimony that condemns an innocent woman. Genre: historical-time-travel. Title: The Witness. 5 sections. Themes: guilt, the observer effect, whether the past can be repaired."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Queuing short story brainstorm for 'The Witness' \u2014 I'll let you know when it's ready.",
+        "tool": "brainstorm",
+        "op": "short-story",
+        "data": null,
+        "job_id": "df63adfd243544dfbd1dc5e1bf4a527f",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "df63adfd243544dfbd1dc5e1bf4a527f",
+        "status": "complete",
+        "result": {
+          "execution_id": "1d1f7989-df4e-4f2a-b814-915f94cfe3e3",
+          "step_name": "brainstorm",
+          "status": "ok",
+          "payload": {
+            "op": "short-story",
+            "result": {
+              "outline": {
+                "title": "The Witness",
+                "premise": "Dr. Eleanor Voss, a twenty-first-century historian specializing in colonial New England, travels to Salem in the autumn of 1692 armed with a temporal observation device and strict orders never to interfere. When she is dragged before the court as a suspicious stranger and forced to answer questions about a woman she has studied for years \u2014 Martha Corey \u2014 her carefully hedged words are twisted by the magistrates into damning testimony. Martha is condemned. Eleanor must decide whether to violate every protocol she has sworn to uphold in order to undo what her presence has caused, knowing that any intervention may shatter the historical record she has devoted her life to preserving.",
+                "themes": [
+                  "The observer effect: the impossibility of witnessing history without altering it",
+                  "Guilt and moral responsibility when harm is caused by silence or misdirection",
+                  "The ethics of preservation versus intervention \u2014 whose past is it to protect?",
+                  "The illusion of objectivity in the face of human suffering"
+                ],
+                "story_arc_name": "",
+                "dramatic_question": "",
+                "wow_factor": "",
+                "characters": [
+                  {
+                    "name": "Dr. Eleanor Voss",
+                    "role": "Protagonist \u2014 time-traveling historian",
+                    "arc": "Begins as a detached academic who believes observation is a neutral act, and ends as a woman who accepts that her presence in history made her a participant, not a spectator, and that the cost of that truth is her career and her certainty."
+                  },
+                  {
+                    "name": "Martha Corey",
+                    "role": "The condemned \u2014 historical figure and moral anchor",
+                    "arc": "Moves from defiant, clear-eyed innocence before the court to a broken resignation after Eleanor's testimony tips the scales, becoming the human face of what Eleanor's interference costs."
+                  },
+                  {
+                    "name": "Magistrate John Hathorne",
+                    "role": "Antagonist \u2014 presiding judge of the Salem court",
+                    "arc": "Remains static in his certainty, serving as the immovable machinery of historical injustice that Eleanor cannot dismantle without destroying everything around it."
+                  },
+                  {
+                    "name": "Gideon Marsh",
+                    "role": "Supporting \u2014 a Salem farmer who shelters Eleanor and suspects she is not what she claims",
+                    "arc": "Shifts from wary suspicion of Eleanor to quiet complicity in her attempt to recant, ultimately choosing mercy over self-preservation at great personal risk."
+                  },
+                  {
+                    "name": "Dr. Phillip Anand",
+                    "role": "Supporting \u2014 Eleanor's supervisor at the Institute for Temporal Studies, present only through recorded briefing logs",
+                    "arc": "Represents the institutional voice of non-interference whose authority Eleanor internalizes and then consciously rejects."
+                  }
+                ],
+                "chapters": [
+                  {
+                    "chapter_number": 1,
+                    "title": "The Careful Eye",
+                    "beat": "Eleanor arrives in Salem in October 1692, cloaked in period dress and armed with her observation protocols, confident that her expertise and discipline will let her watch the final weeks of the witch trials without leaving a trace.",
+                    "arc_notes": "Exposition \u2014 establishes Eleanor's identity as a rigorous, emotionally armored academic, introduces the world of Salem at the height of its hysteria, plants the central tension between her scholarly detachment and the raw human suffering she is observing at close range, and seeds her specific fascination with Martha Corey, whose case Eleanor has written about as a clear miscarriage of justice."
+                  },
+                  {
+                    "chapter_number": 2,
+                    "title": "The Stranger in the Meeting House",
+                    "beat": "Eleanor is seized by constables who find her lurking near the courthouse, brought before Magistrate Hathorne as a suspicious outsider, and \u2014 under escalating and terrifying pressure \u2014 gives answers about Martha Corey that she believes are neutral but that Hathorne immediately weaponizes as corroboration of witchcraft.",
+                    "arc_notes": "Rising Action \u2014 Eleanor's careful detachment collapses the moment she is made a participant rather than an observer; her academic knowledge of the trial's language and theology, meant to help her blend in, instead gives her testimony an eerie authority that the court finds compelling; Gideon Marsh watches from the gallery and begins to suspect she is hiding something profound; the stakes become irreversible when Hathorne records Eleanor's words in the official ledger."
+                  },
+                  {
+                    "chapter_number": 3,
+                    "title": "The Ledger and the Rope",
+                    "beat": "Martha Corey is formally condemned, and Eleanor \u2014 standing in the crowd outside the courthouse \u2014 locks eyes with Martha through the prison cart's slats and understands with absolute certainty that her testimony was the tipping point that sealed this innocent woman's death.",
+                    "arc_notes": "Climax \u2014 the apex of Freytag's Pyramid; Eleanor has achieved the terrible opposite of her goal, transforming from silent witness into the instrument of the very injustice she came to document; the historical record she revered now contains her own name as a witness against Martha Corey; the first crack appears when Eleanor, in violation of every protocol, decides she cannot leave without attempting to recant \u2014 the goal of pure observation is reached and simultaneously destroyed."
+                  },
+                  {
+                    "chapter_number": 4,
+                    "title": "What the Record Holds",
+                    "beat": "Eleanor, aided by Gideon Marsh who risks his own safety to help her, attempts to appear before a court clerk to formally recant her testimony, but discovers that Hathorne has already sealed the record and that any recantation will only draw more suspicion onto Gideon and accelerate rather than prevent Martha's execution.",
+                    "arc_notes": "Falling Action \u2014 the consequences of the climax ripple outward; Eleanor's intervention, meant to repair the damage, threatens to cause additional harm; Gideon's complicity puts him in danger, forcing Eleanor to confront that every action she takes in this time and place carries weight she cannot calculate; she is forced to activate her recall device and return to the present without having undone what she did, carrying the full moral weight of Martha's condemnation."
+                  },
+                  {
+                    "chapter_number": 5,
+                    "title": "The Name in the Margin",
+                    "beat": "Back in the present, Eleanor discovers that the historical record now contains a previously unknown witness \u2014 herself, listed under a colonial alias \u2014 and that her Institute's protocols require her to file a full disclosure that will end her career; she writes the report anyway, and then writes Martha Corey's name at the top of a blank page, beginning a different kind of document entirely.",
+                    "arc_notes": "Resolution \u2014 the catastrophe and survival-with-consequence; Eleanor's professional life is effectively over, the past cannot be repaired, and Martha Corey died as history always recorded she would \u2014 but now Eleanor knows she was part of why; the resolution delivers on the premise's central question by answering that the past cannot be fixed but must be honestly witnessed, and that the historian who believed objectivity was a form of innocence has learned it was always a form of evasion."
+                  }
+                ],
+                "form": "short_story"
+              },
+              "persist": {
+                "persisted": true,
+                "project_id": "e611b196-2cf0-485b-927f-57fc94df7193",
+                "created_project": false
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Brainstorm a short story using Freytags Pyramid about a historian who travels to 1692 Salem to observe the witch trials, but accidentally provides testimony that condemns an innocent woman. Genre: historical-time-travel. Title: The Witness. 5 sections. Themes: guilt, the observer effect, whether the past can be repaired."
+    }
+  ],
+  "expected": [
+    "routes to `brainstorm.story`, kind=queued; complete; `story_arc=\"Freytags Pyramid\"`",
+    "`writing_projects_v2` \"The Witness\" with 5 sections; Introduction = ordinary world + time travel",
+    "Climax = research goal achieved AND false testimony occurs; Falling = cascade/worse; Catastrophe = irreversibility",
+    "Salem details; fatal flaw in Section 1; arc_notes Freytag terminology; CR-009 email \"The Witness\""
+  ]
+}

@@ -1,0 +1,131 @@
+{
+  "test": {
+    "id": "R118",
+    "title": "\u2014 Revise Chapter Outline",
+    "source": "chat",
+    "prompt": "Revise the chapter outline for Chapter 1 of \"The Signal Beneath.\"\n  Make sub-chapter 2 focus more on the protagonist's internal conflict about\n  whether to trust the warlord. Add a scene where she finds her dead partner's\n  journal in the radio station.",
+    "route": "brainstorm.revise-outline` or `chapter.plan` re-run (task)",
+    "prerequisite": "R112",
+    "expected": [
+      "routes revise (revise-outline or chapter.plan w/ instructions), kind=queued; completed",
+      "prior Ch1 chapter outline snapshotted (content_versions_v2 or outline_versions_v2) before overwrite",
+      "sub-chapter 2 emphasizes internal conflict; new sub-chapter for the journal scene; other sub-chapters preserved; names match book outline; saved to outline; CR-009 email"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing the revision of the chapter outline for Chapter 1 of \"The Signal Beneath.\" I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "plan",
+    "data": null,
+    "job_id": "cc67414d3cd042a09edc3b1e66cac743",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "cc67414d3cd042a09edc3b1e66cac743",
+    "status": "complete",
+    "result": {
+      "execution_id": "60b02739-9a84-491e-92a4-9eb4bf95e4ce",
+      "step_name": "chapter",
+      "status": "ok",
+      "payload": {
+        "op": "plan",
+        "result": {
+          "chapter_number": 1,
+          "chapter_story_arc": "",
+          "book_arc": "",
+          "sub_chapter_briefs": [
+            {
+              "number": 1,
+              "title": "The World Before",
+              "beat": "POV character moves through their ordinary routine, revealing what they love and what quietly unsettles them \u2014 a specific object, habit, or relationship signals the life they are about to lose.",
+              "pov_character": "",
+              "brief": "POV character moves through their ordinary routine, revealing what they love and what quietly unsettles them \u2014 a specific object, habit, or relationship signals the life they are about to lose.",
+              "arc_beat": "Ordinary World \u2014 establish stakes before disruption",
+              "characters": [
+                "POV Character"
+              ],
+              "setting": "Familiar home or workplace environment, daytime",
+              "emotional_tone": "Deceptive calm with an undercurrent of unease",
+              "connects_to_book_arc": "Anchors the reader in the status quo so every later disruption registers as loss; plants the detail that will be paid off at the climax."
+            },
+            {
+              "number": 2,
+              "title": "The Fault Line",
+              "beat": "A small but specific problem surfaces \u2014 a letter arrives, a conversation goes wrong, a number does not add up \u2014 something the POV character chooses to minimise rather than confront. ESCALATION SEED: this minimised problem starts small here, must reappear with greater pressure at the midpoint, and explodes at the climax.",
+              "pov_character": "",
+              "brief": "A small but specific problem surfaces \u2014 a letter arrives, a conversation goes wrong, a number does not add up \u2014 something the POV character chooses to minimise rather than confront. ESCALATION SEED: this minimised problem starts small here, must reappear with greater pressure at the midpoint, and explodes at the climax.",
+              "arc_beat": "Inciting Disturbance \u2014 the first crack in the ordinary world",
+              "characters": [
+                "POV Character",
+                "Antagonist or Confidant"
+              ],
+              "setting": "Same familiar environment, a slightly more private or pressured corner of it",
+              "emotional_tone": "Mild alarm shading into rationalisation",
+              "connects_to_book_arc": "Introduces the central dramatic question of the novel in miniature; the reader senses the protagonist is already making the wrong choice."
+            },
+            {
+              "number": 3,
+              "title": "The Offer or the Order",
+              "beat": "An external force \u2014 a person, an institution, a deadline \u2014 presents the POV character with a demand or opportunity they cannot ignore. They must make a visible, consequential decision before the scene ends.",
+              "pov_character": "",
+              "brief": "An external force \u2014 a person, an institution, a deadline \u2014 presents the POV character with a demand or opportunity they cannot ignore. They must make a visible, consequential decision before the scene ends.",
+              "arc_beat": "Call to Action \u2014 protagonist is pulled out of equilibrium",
+              "characters": [
+                "POV Character",
+                "Catalyst Figure"
+              ],
+              "setting": "A threshold space \u2014 doorway, office, street corner \u2014 signalling transition",
+              "emotional_tone": "Tension between desire and dread",
+              "connects_to_book_arc": "Locks the protagonist into the plot engine; refusal is no longer a safe option, establishing the book's central conflict."
+            },
+            {
+              "number": 4,
+              "title": "The First Cost",
+              "beat": "Accepting (or refusing) the demand immediately costs the POV character something concrete \u2014 a relationship strains, a resource is spent, a door closes. The cost is small enough to seem manageable but large enough to be felt.",
+              "pov_character": "",
+              "brief": "Accepting (or refusing) the demand immediately costs the POV character something concrete \u2014 a relationship strains, a resource is spent, a door closes. The cost is small enough to seem manageable but large enough to be felt.",
+              "arc_beat": "Crossing the Threshold \u2014 no clean return to the ordinary world",
+              "characters": [
+                "POV Character",
+                "Antagonist or Confidant"
+              ],
+              "setting": "A new or altered environment that reflects the changed situation",
+              "emotional_tone": "Resolve mixed with quiet grief",
+              "connects_to_book_arc": "Demonstrates that the world of the novel operates on real consequences; raises the reader's anxiety about what larger costs are coming."
+            },
+            {
+              "number": 5,
+              "title": "The New Question",
+              "beat": "The chapter closes not on resolution but on a sharp new question: the POV character discovers or realises something that reframes everything just established \u2014 a detail noticed too late, a lie half-glimpsed, a threat made visible for the first time. The reader is propelled forward.",
+              "pov_character": "",
+              "brief": "The chapter closes not on resolution but on a sharp new question: the POV character discovers or realises something that reframes everything just established \u2014 a detail noticed too late, a lie half-glimpsed, a threat made visible for the first time. The reader is propelled forward.",
+              "arc_beat": "End-of-Act-One Hook \u2014 dramatic question crystallises",
+              "characters": [
+                "POV Character"
+              ],
+              "setting": "End-of-day or transitional moment \u2014 dusk, a closing door, an empty room",
+              "emotional_tone": "Dread sharpened into urgency",
+              "connects_to_book_arc": "States the book's central dramatic question explicitly through action or image, not exposition; every subsequent chapter is the answer to what is posed here."
+            }
+          ],
+          "count": 5,
+          "persist": null,
+          "token_usage": {
+            "calls": 1,
+            "input_tokens": 48,
+            "output_tokens": 999,
+            "cache_read_tokens": 1032,
+            "cache_write_tokens": 0,
+            "total_tokens": 2079,
+            "cost_usd": 0.015439
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

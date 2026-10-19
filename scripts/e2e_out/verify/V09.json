@@ -1,0 +1,55 @@
+{
+  "id": "V09",
+  "title": "Voice \u2014 Social Media (LinkedIn)",
+  "route": "`media.social-posts` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=media.social-posts got=media.social-posts OK",
+    "job=complete",
+    "platforms=['linkedin']"
+  ],
+  "steps": [
+    [
+      "voice",
+      "Repurpose that blog post about AI marketing into LinkedIn posts"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "response": "Got it \u2014 I've started on that. It runs in the background and I'll let you know when it's ready.",
+        "kind": "queued",
+        "tool": "media",
+        "op": "social-posts",
+        "job_id": "2cb40bc88d9642f48430581e7cb79a48",
+        "status": "queued"
+      },
+      "job_result": {
+        "job_id": "2cb40bc88d9642f48430581e7cb79a48",
+        "status": "complete",
+        "result": {
+          "execution_id": "61c4daea-9c84-4aab-a49b-a8840be023c8",
+          "step_name": "media",
+          "status": "ok",
+          "payload": {
+            "op": "social-posts",
+            "result": {
+              "linkedin": "Just finished a manuscript that taught me something about storytelling: emotion drives plot, not the other way around. Readers don't care about your prose\u2014they care about whether they're living inside your character's skin. If you're writing anything that matters, ask yourself: does the reader *feel* what's at stake? Everything else is decoration. #Writing #Storytelling"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Repurpose that blog post about AI marketing into LinkedIn posts"
+    }
+  ],
+  "expected": [
+    "flat `{response, kind=\"queued\"}`",
+    "routes `media.social-posts`",
+    "platform=linkedin",
+    "resolves \"that blog post\" from context",
+    "LinkedIn-format",
+    "CR-009 email"
+  ]
+}

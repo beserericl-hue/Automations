@@ -1,0 +1,70 @@
+{
+  "id": "V36",
+  "title": "Voice \u2014 Undelete",
+  "route": "`library.lifecycle` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.lifecycle got=library.lifecycle OK",
+    "job=complete",
+    "seed=fbe02f83 status=draft want=draft prestate=deleted"
+  ],
+  "steps": [
+    [
+      "voice",
+      "Undelete The Forgotten Engineers of Rome put it back in drafts"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "response": "Undeleting 'E2E Lifecycle V36 2e405d76' and restoring it to drafts.",
+        "kind": "queued",
+        "tool": "library",
+        "op": "lifecycle",
+        "job_id": "505de5da2b9c49308551583797f19631",
+        "status": "queued"
+      },
+      "job_result": {
+        "job_id": "505de5da2b9c49308551583797f19631",
+        "status": "complete",
+        "result": {
+          "execution_id": "219219ea-4071-4c4d-b8d5-83e8c6d9667f",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "lifecycle",
+            "result": {
+              "id": "fbe02f83-9977-49f7-80e7-5538c43a6c63",
+              "user_id": "+14105914612",
+              "title": "E2E Lifecycle V36 2e405d76",
+              "content_type": "chapter",
+              "genre_slug": "post-apocalyptic",
+              "content_text": "Disposable lifecycle fixture for V36. Disposable lifecycle fixture for V36. Disposable lifecycle fixture for V36. Disposable lifecycle fixture for V36. Disposable lifecycle fixture for V36. Disposable lifecycle fixture for V36. Disposable lifecycle fixture for V36. Disposable lifecycle fixture for V36. Disposable lifecycle fixture for V36. Disposable lifecycle fixture for V36. Disposable lifecycle fixture for V36. Disposable lifecycle fixture for V36. ",
+              "storage_path": null,
+              "cover_image_path": null,
+              "status": "draft",
+              "project_id": null,
+              "chapter_number": null,
+              "metadata": {},
+              "created_at": "2026-07-02T12:34:45.842899+00:00",
+              "updated_at": "2026-07-02T12:34:48.824581+00:00",
+              "published_at": null,
+              "deleted_at": null
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Undelete E2E Lifecycle V36 2e405d76 put it back in drafts"
+    }
+  ],
+  "expected": [
+    "flat `{response, kind=\"queued\"}`",
+    "op=undelete",
+    "complete",
+    "status deleted\u2192draft",
+    "maps \"put it back in drafts\"\u2192draft",
+    "email"
+  ]
+}

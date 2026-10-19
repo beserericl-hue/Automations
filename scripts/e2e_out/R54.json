@@ -1,0 +1,117 @@
+{
+  "test": {
+    "id": "R54",
+    "title": "Brainstorm Short Story \u2014 Freytags Pyramid (Post-Apocalyptic)",
+    "source": "chat",
+    "prompt": "Brainstorm a short story using Freytags Pyramid about a plague doctor in the ruins of Manhattan who discovers that the disease wiping out survivors is man-made, and the cure lies in the hands of the people who created it. Genre: post-apocalyptic. Title: The Inoculator. Sections: 5. Themes: trust, complicity, the cost of survival.",
+    "route": "brainstorm.story`/`brainstorm.short-story` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `brainstorm.story`, kind=queued; job_id; complete",
+      "`story_arc=\"Freytags Pyramid\"` passed; arc prompt loaded from `story_arcs` table",
+      "`writing_projects_v2` row \"The Inoculator\" with outline; arc_notes name all 5 Freytag beats",
+      "Climax = midpoint apex (goal achieved + crack appears), NOT final confrontation",
+      "Falling Action shows descent; final section = catastrophe/survival-with-consequence",
+      "Characters have roles; arc_notes use Freytag terminology; CR-009 email subject contains \"The Inoculator\""
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing a short story brainstorm for 'The Inoculator' \u2014 I'll let you know when it's ready.",
+    "tool": "brainstorm",
+    "op": "short-story",
+    "data": null,
+    "job_id": "c16751793015444685216befc4dc8bf3",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "c16751793015444685216befc4dc8bf3",
+    "status": "complete",
+    "result": {
+      "execution_id": "063bfe9f-2465-42d4-8847-e574970e8142",
+      "step_name": "brainstorm",
+      "status": "ok",
+      "payload": {
+        "op": "short-story",
+        "result": {
+          "outline": {
+            "title": "The Inoculator",
+            "premise": "In the ruins of Manhattan, a plague doctor named Sable Voss moves through quarantine zones administering what she believes are life-saving inoculations to the dwindling survivor population. When she discovers that the pathogen decimating the city was engineered \u2014 and that her own syringes may be delivering a second, slower poison \u2014 she must confront the architects of the plague: a shadow collective called the Covenant who believe controlled die-off is the only path to civilizational rebirth. To save the survivors, Sable must bargain with the people who built the disease, and reckon with how deeply she has already served their agenda.",
+            "themes": [
+              "Complicity and the danger of unexamined obedience",
+              "Trust as both survival tool and vulnerability",
+              "The moral cost of survival \u2014 what we become to endure",
+              "Manufactured hope as a weapon of control"
+            ],
+            "story_arc_name": "",
+            "dramatic_question": "",
+            "wow_factor": "",
+            "characters": [
+              {
+                "name": "Sable Voss",
+                "role": "Protagonist \u2014 plague doctor and field inoculator",
+                "arc": "Begins as a dutiful healer who trusts her orders, and ends as a woman who must weaponize the Covenant's own cure against them, accepting that her hands were never clean."
+              },
+              {
+                "name": "Dren Achebe",
+                "role": "Survivor and Sable's reluctant guide through the outer boroughs",
+                "arc": "Starts as a cynical scavenger who trusts no one, and dies protecting Sable after she earns the one thing he stopped believing in \u2014 someone worth trusting."
+              },
+              {
+                "name": "Director Maren Sol\u00eds",
+                "role": "Leader of the Covenant and Sable's former mentor",
+                "arc": "Revealed as the architect of the plague, she offers Sable the cure as a partnership, and is destroyed \u2014 not by violence but by Sable's public exposure of her design."
+              },
+              {
+                "name": "The Covenant",
+                "role": "Shadow collective of scientists and former government officials",
+                "arc": "Function as a monolithic antagonist whose internal logic is chillingly coherent, collapsing when their secrecy is stripped away."
+              }
+            ],
+            "chapters": [
+              {
+                "chapter_number": 1,
+                "title": "The Round",
+                "beat": "Sable completes her daily inoculation route through a quarantine zone in lower Manhattan, moving among the sick with practiced efficiency, believing she is the last line between the survivors and extinction.",
+                "arc_notes": "Exposition \u2014 establishes the ruined world, Sable's role and identity as healer, her trust in her orders, and the texture of daily survival; plants unease when a child she inoculated yesterday is found dead with no plague symptoms."
+              },
+              {
+                "chapter_number": 2,
+                "title": "What the Vials Know",
+                "beat": "Dren, a scavenger who has been tracking Sable's route, forces her at knifepoint into a basement lab where a dead biochemist's notes reveal that the pathogen has a synthetic marker \u2014 it was designed, not evolved \u2014 and that the inoculation serum contains a secondary compound with no medical justification.",
+                "arc_notes": "Rising Action \u2014 escalates stakes by shattering Sable's foundational belief in her mission; the discovery of the synthetic marker tightens her options and forces an alliance with Dren; every assumption she has built her survival on is now suspect."
+              },
+              {
+                "chapter_number": 3,
+                "title": "The Covenant's Offer",
+                "beat": "Sable infiltrates the Covenant's fortified medical tower and confronts Director Sol\u00eds, who confirms everything \u2014 the plague is engineered, the inoculations are a population-management tool \u2014 and offers Sable a place at the table, presenting the true cure as proof of good faith and framing mass die-off as necessary mathematics.",
+                "arc_notes": "Climax \u2014 the apex of Freytag's Pyramid; Sable reaches the truth she sought and is offered complicity as its price; she takes the cure from Sol\u00eds's hand, and in doing so crosses a threshold \u2014 she now holds the power to save or to continue serving the Covenant's design; the first crack appears when she sees Dren has been captured outside."
+              },
+              {
+                "chapter_number": 4,
+                "title": "The Cost of the Vial",
+                "beat": "Sable escapes with the cure formula but cannot save Dren before Covenant soldiers kill him; alone in the ruins, she synthesizes doses from the dead biochemist's lab and begins distributing the true cure \u2014 but each survivor she saves is a person the Covenant will now mark as a loose end, and she knows she has started a war she cannot finish.",
+                "arc_notes": "Falling Action \u2014 consequence of the climax ripples outward; Dren's death makes the moral weight of Sable's choice irreversible and personal; her act of distribution is simultaneously heroic and a death sentence for those she saves; transformation is made visible \u2014 she is no longer a healer following orders but a woman who has chosen her own complicity and is now trying to undo it."
+              },
+              {
+                "chapter_number": 5,
+                "title": "Inoculation",
+                "beat": "Sable broadcasts the Covenant's full design \u2014 the engineered plague, the false inoculations, Sol\u00eds's identity \u2014 over every surviving radio frequency in the city, then walks back into the quarantine zones with the last of the true cure, knowing the Covenant will come for her and that the exposure is the only medicine that cannot be recalled.",
+                "arc_notes": "Resolution \u2014 closes the dramatic question of whether Sable will serve the system or break it; Sol\u00eds is destroyed by transparency rather than violence; Sable's arc completes as she accepts that she cannot undo what her hands have done but can choose what they do next; the ending is neither triumphant nor tragic but earned \u2014 a woman who was a tool becoming the inoculation against the people who made her one."
+              }
+            ],
+            "form": "short_story"
+          },
+          "persist": {
+            "persisted": false,
+            "reason": "persist requested but project_id/user_id missing"
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

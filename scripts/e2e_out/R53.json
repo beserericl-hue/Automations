@@ -1,0 +1,26 @@
+{
+  "test": {
+    "id": "R53",
+    "title": "List Story Arcs",
+    "source": "chat",
+    "prompt": "List the story arcs",
+    "route": "library.retrieve` (info)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `library.retrieve`, kind=data; lists **Freytags Pyramid** and **Three-Act Structure** with descriptions",
+      "does NOT invoke `brainstorm.story` or any task tool; returned inline"
+    ]
+  },
+  "response": {
+    "kind": "reply",
+    "assistant_message": "Common story arcs include: The Hero's Journey, Rags to Riches, The Quest, Voyage and Return, Comedy, Tragedy, and Rebirth. Is there a specific type of story arc you'd like to know more about, or are you looking for the story arc of a particular project?",
+    "tool": null,
+    "op": null,
+    "data": null,
+    "job_id": null,
+    "status": null,
+    "jobs": null,
+    "error": null
+  },
+  "job_result": null
+}

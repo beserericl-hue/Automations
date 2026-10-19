@@ -1,0 +1,504 @@
+{
+  "id": "V11",
+  "title": "Voice \u2014 Brainstorm Story",
+  "route": "`brainstorm.story` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=brainstorm.story got=library.retrieve MISMATCH",
+    "items=50 found=True"
+  ],
+  "steps": [
+    [
+      "voice",
+      "Brainstorm a new story called The Clockwork Rebellion its about sentient clockwork automatons in Victorian London who organize a labor revolution genre post apocalyptic eight chapters themes are freedom versus control and what makes someone human"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "response": "Here's what I found.",
+        "kind": "data",
+        "tool": "library",
+        "op": "retrieve",
+        "data": {
+          "execution_id": "61254135-7a54-485e-9a65-f8cc6427089c",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "retrieve",
+            "result": {
+              "items": [
+                {
+                  "id": "1352744e-4b8d-44b2-8ae2-31f8b68b9334",
+                  "title": "Prologue: The Pomerium",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "c2929621-03f5-4ad9-96a6-d72a03684c44",
+                  "chapter_number": 0,
+                  "created_at": "2026-07-01T23:06:19.952335+00:00"
+                },
+                {
+                  "id": "169e106e-b23d-4882-8881-d9fcd7b20ead",
+                  "title": "The Optimization \u2014 Chapter 999",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "2701d335-d6af-411c-aeb8-4105132f890f",
+                  "chapter_number": 999,
+                  "created_at": "2026-07-01T23:01:27.271933+00:00"
+                },
+                {
+                  "id": "6d241b28-8b0c-4b06-b5aa-fd14c2dc36a3",
+                  "title": "Prologue A: The Crescent Mark (Oxford, 1214)",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "d503b5ce-489d-4f87-92df-3cfac2eb3f4b",
+                  "chapter_number": 0,
+                  "created_at": "2026-07-01T22:41:00.363652+00:00"
+                },
+                {
+                  "id": "a3ef0c87-5302-43bf-83a3-e88bbe2e5469",
+                  "title": "The Accord \u2014 Chapter 999",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "7976c085-41d3-46c6-9444-77b75bbdc289",
+                  "chapter_number": 999,
+                  "created_at": "2026-07-01T22:27:40.859661+00:00"
+                },
+                {
+                  "id": "a50b5d98-9e35-4a0e-b3ea-91aeb5eecaf2",
+                  "title": "Prologue: The Signal (Reykjavik, 14 November 2019)",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "7976c085-41d3-46c6-9444-77b75bbdc289",
+                  "chapter_number": 0,
+                  "created_at": "2026-07-01T22:18:58.766354+00:00"
+                },
+                {
+                  "id": "da21f27b-e3e7-41b6-9b2d-a12690e36918",
+                  "title": "The Overflow Collection",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "d503b5ce-489d-4f87-92df-3cfac2eb3f4b",
+                  "chapter_number": 1,
+                  "created_at": "2026-07-01T22:09:33.864955+00:00"
+                },
+                {
+                  "id": "08987e1c-200f-450c-a516-a6f64d50a4c0",
+                  "title": "The Beautiful Machine",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "2701d335-d6af-411c-aeb8-4105132f890f",
+                  "chapter_number": 1,
+                  "created_at": "2026-07-01T21:59:45.600492+00:00"
+                },
+                {
+                  "id": "3c1e9323-8f95-41e3-a3c1-9a67629b1af5",
+                  "title": "The Ambush at Narvik",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "43fe34a5-fe18-47ba-bf7f-7ff40b9a4d00",
+                  "chapter_number": 2,
+                  "created_at": "2026-07-01T21:08:58.620212+00:00"
+                },
+                {
+                  "id": "f8d687c2-ba44-4626-8791-ba3a46f49369",
+                  "title": "The Last Pharaoh's Scribe \u2014 Chapter 1",
+                  "status": "rejected",
+                  "content_type": "chapter",
+                  "project_id": "050f757d-d102-4951-8706-dd511e883dec",
+                  "chapter_number": 1,
+                  "created_at": "2026-07-01T20:31:07.648331+00:00"
+                },
+                {
+                  "id": "e779fe6d-a82d-4922-9f1d-8f4b7a6d9f73",
+                  "title": "Epilogue: What the Ground Keeps",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 95,
+                  "created_at": "2026-06-06T22:53:17.913334+00:00"
+                },
+                {
+                  "id": "bc81deb7-84c2-4886-88e5-cfe271b4783b",
+                  "title": "The Federal Petition [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 91,
+                  "created_at": "2026-06-06T22:51:58.392072+00:00"
+                },
+                {
+                  "id": "acdd411d-ecc9-402f-b0d6-750a9a3ec4c2",
+                  "title": "Marcus's Redemption [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 83,
+                  "created_at": "2026-06-06T22:51:54.275424+00:00"
+                },
+                {
+                  "id": "290fc866-90bd-4393-a3e3-4198dbba25ca",
+                  "title": "The Site, One Year Later [Present \u2014 2025]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 94,
+                  "created_at": "2026-06-06T22:50:59.47364+00:00"
+                },
+                {
+                  "id": "d9725f07-45f0-4f7a-9905-a0556952bbca",
+                  "title": "What It Costs Slade [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 86,
+                  "created_at": "2026-06-06T22:48:17.883191+00:00"
+                },
+                {
+                  "id": "e83b4fcd-25c2-4ced-8b20-6d5f38a87c65",
+                  "title": "Nora's Quilt, Finished [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 93,
+                  "created_at": "2026-06-06T22:47:37.199583+00:00"
+                },
+                {
+                  "id": "8e5765c6-d6a3-4df5-b786-632f3a763a1c",
+                  "title": "Kimi's Archive, Continued [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 88,
+                  "created_at": "2026-06-06T22:47:03.806043+00:00"
+                },
+                {
+                  "id": "88bb3756-f347-483f-8563-579b2cc1f80c",
+                  "title": "The Mound, Closed [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 90,
+                  "created_at": "2026-06-06T22:46:44.847056+00:00"
+                },
+                {
+                  "id": "6854fc3e-335a-4aab-aacb-4ea647d3dd56",
+                  "title": "Voss's Footnote [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 92,
+                  "created_at": "2026-06-06T22:46:36.888639+00:00"
+                },
+                {
+                  "id": "10b6e941-4e54-428d-8580-7e3110e5542c",
+                  "title": "What It Costs Nora [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 87,
+                  "created_at": "2026-06-06T22:46:27.808548+00:00"
+                },
+                {
+                  "id": "2e03fea9-36b3-40b5-8513-2bcc89b785e2",
+                  "title": "Wren's Report [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 89,
+                  "created_at": "2026-06-06T22:44:02.377308+00:00"
+                },
+                {
+                  "id": "69d60ede-95c2-49be-aa8a-a0176c88db6a",
+                  "title": "What It Costs Tayak [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 85,
+                  "created_at": "2026-06-06T22:43:36.30496+00:00"
+                },
+                {
+                  "id": "56bab296-a20f-426d-b0f1-7ec717476cc9",
+                  "title": "Elena Slade [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 82,
+                  "created_at": "2026-06-06T22:40:41.127729+00:00"
+                },
+                {
+                  "id": "525be91d-50b9-41af-ad7f-53adddd3e0cd",
+                  "title": "Kimi's Archive [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 79,
+                  "created_at": "2026-06-06T22:39:35.829033+00:00"
+                },
+                {
+                  "id": "07b7f325-0799-42c4-bfcb-615afd2cec40",
+                  "title": "The Commission Rules [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 84,
+                  "created_at": "2026-06-06T22:38:28.382733+00:00"
+                },
+                {
+                  "id": "b51b45a7-f0e1-460e-872b-384c8e718e4d",
+                  "title": "The Hearing [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 80,
+                  "created_at": "2026-06-06T22:38:17.85961+00:00"
+                },
+                {
+                  "id": "34ce0818-ce43-4fa2-acf5-fa7266ea6b53",
+                  "title": "The Thirty-Day Clock [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 70,
+                  "created_at": "2026-06-06T22:36:01.3773+00:00"
+                },
+                {
+                  "id": "114423c7-e584-4c47-8e5a-22d17a4c544c",
+                  "title": "The Decision [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 76,
+                  "created_at": "2026-06-06T22:35:30.046566+00:00"
+                },
+                {
+                  "id": "009b961e-eba4-4350-82cd-99104b1910b7",
+                  "title": "Nora Testifies [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 81,
+                  "created_at": "2026-06-06T22:34:35.158701+00:00"
+                },
+                {
+                  "id": "16ee8388-2991-44cb-a2f0-0b0d6e4e4fc2",
+                  "title": "Slade Reads the Report [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 77,
+                  "created_at": "2026-06-06T22:34:27.51438+00:00"
+                },
+                {
+                  "id": "be60f3d2-a8fd-4eb6-9478-239c9984860f",
+                  "title": "Voss Reads the Report [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 78,
+                  "created_at": "2026-06-06T22:31:35.4232+00:00"
+                },
+                {
+                  "id": "8294aa45-bbbe-4396-bdd4-f09b188038c3",
+                  "title": "Yanu's Name Lives [Past \u2014 circa 60 BC]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 75,
+                  "created_at": "2026-06-06T22:30:29.608767+00:00"
+                },
+                {
+                  "id": "17cea08a-200c-4fda-b565-2025f3d404ab",
+                  "title": "The Name [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 74,
+                  "created_at": "2026-06-06T22:29:56.25283+00:00"
+                },
+                {
+                  "id": "34292c75-6159-4679-a63f-44d1e36e6198",
+                  "title": "Wren's Restitution [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 72,
+                  "created_at": "2026-06-06T22:28:45.493958+00:00"
+                },
+                {
+                  "id": "52cfdbea-5e31-4236-a10e-105c46e38b08",
+                  "title": "Stratum Seven: The Deepest Layer [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 73,
+                  "created_at": "2026-06-06T22:27:16.458245+00:00"
+                },
+                {
+                  "id": "a359af54-de02-4f2f-b8ee-65c1cc8086e6",
+                  "title": "Taya [Past \u2014 circa 100 BC]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 63,
+                  "created_at": "2026-06-06T22:26:02.16798+00:00"
+                },
+                {
+                  "id": "21570acb-9e3c-44e5-beca-af97ee378761",
+                  "title": "Ranu's Story [Past \u2014 circa 80 BC]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 71,
+                  "created_at": "2026-06-06T22:25:18.422257+00:00"
+                },
+                {
+                  "id": "5d73f32f-b0d6-4aa4-aeb1-35d5fd90f6da",
+                  "title": "Yanu Goes to the Earth [Past \u2014 circa 99 BC]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 67,
+                  "created_at": "2026-06-06T22:22:28.573895+00:00"
+                },
+                {
+                  "id": "774d7239-ff8c-4d6b-845c-bdb826da1ceb",
+                  "title": "Marcus Stays [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 68,
+                  "created_at": "2026-06-06T22:21:47.125375+00:00"
+                },
+                {
+                  "id": "a0d2beff-0352-46e8-a86d-539bfbc0efbe",
+                  "title": "Yanu After [Past \u2014 circa 98\u201380 BC]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 69,
+                  "created_at": "2026-06-06T22:19:13.484246+00:00"
+                },
+                {
+                  "id": "2c2dcbe8-6804-4ac2-99f0-0fbc3e0c6bd8",
+                  "title": "Slade's Daughter [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 66,
+                  "created_at": "2026-06-06T22:18:59.48589+00:00"
+                },
+                {
+                  "id": "3726a0f4-f8c8-4353-b8de-830e5e7de86b",
+                  "title": "The Affidavit [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 62,
+                  "created_at": "2026-06-06T22:17:58.144463+00:00"
+                },
+                {
+                  "id": "3dde7834-a718-42a4-a12e-f1f1e0e65953",
+                  "title": "Ranu Tries to Tell the Story [Past \u2014 circa 99 BC]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 65,
+                  "created_at": "2026-06-06T22:15:46.459069+00:00"
+                },
+                {
+                  "id": "d7bd61c6-6952-41e7-9d6f-b0d07f85df51",
+                  "title": "Nora's Decision [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 60,
+                  "created_at": "2026-06-06T22:15:16.102841+00:00"
+                },
+                {
+                  "id": "bbef9035-72f0-4764-94c4-b1ad3bca72c8",
+                  "title": "Voss Recants [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 64,
+                  "created_at": "2026-06-06T22:15:09.074406+00:00"
+                },
+                {
+                  "id": "48b6faf4-ce00-4de3-becd-ed5b3c906b37",
+                  "title": "Yanu's World [Past \u2014 circa 100 BC]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 61,
+                  "created_at": "2026-06-06T22:13:53.99283+00:00"
+                },
+                {
+                  "id": "a2b94a91-cd90-464c-9e40-09eb3d4dc415",
+                  "title": "The State Responds [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 59,
+                  "created_at": "2026-06-06T22:12:05.064574+00:00"
+                },
+                {
+                  "id": "f83e8a2f-d36e-406f-ab7b-04fcb444f5fc",
+                  "title": "Pell's Grief [Past \u2014 circa 526 CE]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 58,
+                  "created_at": "2026-06-06T22:11:11.72508+00:00"
+                },
+                {
+                  "id": "d7907a85-0c53-4037-b53e-1de51472992f",
+                  "title": "The Mound Rises [Past \u2014 circa 510\u2013525 CE]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 56,
+                  "created_at": "2026-06-06T22:08:39.965226+00:00"
+                },
+                {
+                  "id": "cd49f7a3-54d4-442a-8cbc-6c761c1a7d83",
+                  "title": "The Press Conference [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 57,
+                  "created_at": "2026-06-06T22:08:33.376599+00:00"
+                },
+                {
+                  "id": "5fc03491-d411-4736-9f0b-40903bd8d008",
+                  "title": "Stratum Six: The Antler Figure [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 55,
+                  "created_at": "2026-06-06T22:08:29.804846+00:00"
+                }
+              ],
+              "count": 50,
+              "found": true,
+              "search_term": null
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "job_result": null,
+      "resolved_prompt": "Brainstorm a new story called The Clockwork Rebellion its about sentient clockwork automatons in Victorian London who organize a labor revolution genre post apocalyptic eight chapters themes are freedom versus control and what makes someone human"
+    }
+  ],
+  "expected": [
+    "flat `{response, kind=\"queued\"}`",
+    "routes `brainstorm.story`",
+    "maps \"post apocalyptic\"\u2192`post-apocalyptic`",
+    "8 chapters",
+    "themes present",
+    "`writing_projects_v2` row",
+    "CR-009 email"
+  ]
+}

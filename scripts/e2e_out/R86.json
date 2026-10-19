@@ -1,0 +1,41 @@
+{
+  "test": {
+    "id": "R86",
+    "title": "Outline Version History \u2014 No Revisions",
+    "source": "chat",
+    "prompt": "Show outline version history for \"Signal from the Deep\"",
+    "route": "library.versions` (info: list)",
+    "prerequisite": "R58",
+    "expected": [
+      "routes to `library.versions` (list, outline), kind=data; zero rows in `outline_versions_v2`",
+      "empty list or \"No version history found\"; no unhandled error / 500"
+    ]
+  },
+  "response": {
+    "kind": "data",
+    "assistant_message": "",
+    "tool": "library",
+    "op": "versions",
+    "data": {
+      "execution_id": "6e7c5e70-c067-416d-a06a-706018f5ea3f",
+      "step_name": "library",
+      "status": "ok",
+      "payload": {
+        "op": "versions",
+        "result": {
+          "scope": "outline",
+          "project_id": "11baad09-556a-446d-a52c-8dbae9f9045f",
+          "versions": [],
+          "count": 0
+        }
+      },
+      "error": null,
+      "next_stage": null
+    },
+    "job_id": null,
+    "status": null,
+    "jobs": null,
+    "error": null
+  },
+  "job_result": null
+}

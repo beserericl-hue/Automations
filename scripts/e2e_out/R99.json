@@ -1,0 +1,25 @@
+{
+  "test": {
+    "id": "R99",
+    "title": "Verify Undelete \u2014 Item Returns to Drafts",
+    "source": "chat",
+    "prompt": "List my drafts",
+    "route": "library.list-outlines` / `library.retrieve` (info)",
+    "prerequisite": "R98",
+    "expected": [
+      "routes to library listing (status=draft), kind=data; \"The Forgotten Engineers of Rome\" present with status=draft"
+    ]
+  },
+  "response": {
+    "kind": "reply",
+    "assistant_message": "How can I help with your writing?",
+    "tool": null,
+    "op": null,
+    "data": null,
+    "job_id": null,
+    "status": null,
+    "jobs": null,
+    "error": null
+  },
+  "job_result": null
+}

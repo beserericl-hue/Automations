@@ -1,0 +1,4 @@
+# Only writers-workbench/ is the Railway build root; exclude everything else
+# at the repo root so `railway up` uploads a small archive.
+/*
+!/writers-workbench

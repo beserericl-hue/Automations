@@ -1,0 +1,48 @@
+{
+  "test": {
+    "id": "V07",
+    "title": "Voice \u2014 Generate Cover Art",
+    "source": "voice",
+    "prompt": "Generate cover art for a post apocalyptic story called The Last Signal show a figure on a rooftop with a radio antenna surrounded by flooded city at sunset",
+    "route": "media.cover-art` (task)",
+    "prerequisite": "",
+    "expected": [
+      "flat `{response, kind=\"queued\"}`",
+      "routes `media.cover-art`",
+      "`post-apocalyptic`, title \"The Last Signal\"",
+      "prompt incorporates rooftop/antenna/flooded city/sunset",
+      "image artifact returned",
+      "CR-009 email"
+    ]
+  },
+  "response": {
+    "response": "Generating cover art for 'The Last Signal'. I'll let you know when it's ready.",
+    "kind": "queued",
+    "tool": "media",
+    "op": "cover-art",
+    "job_id": "d58986d0485440608ded70d3a2a67713",
+    "status": "queued"
+  },
+  "job_result": {
+    "job_id": "d58986d0485440608ded70d3a2a67713",
+    "status": "complete",
+    "result": {
+      "execution_id": "75af6df7-3cea-4c11-90c2-1beba522437f",
+      "step_name": "media",
+      "status": "ok",
+      "payload": {
+        "op": "cover-art",
+        "result": {
+          "image_url": "https://gvbvwcnmjkdpclcisqrr.supabase.co/storage/v1/object/public/cover-images/+14105914612/20260621204708_untitled.png",
+          "storage_path": "+14105914612/20260621204708_untitled.png",
+          "provider": "kieai",
+          "persisted": true,
+          "db_recorded": true,
+          "prompt": "Professional book cover illustration for the novel \"Untitled\". evocative, atmospheric, high detail, dramatic lighting, portrait orientation, no text, no lettering, no title overlay"
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

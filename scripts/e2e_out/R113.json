@@ -1,0 +1,117 @@
+{
+  "test": {
+    "id": "R113",
+    "title": "\u2014 Brainstorm Chapter Outline with Different Story Arc",
+    "source": "chat",
+    "prompt": "Create a chapter outline for Chapter 2 of \"The Signal Beneath\" using the Fichtean Curve",
+    "route": "chapter.plan` (task)",
+    "prerequisite": "R110; \"Fichtean Curve\" in `story_arcs_v2`",
+    "expected": [
+      "routes `chapter.plan`, `chapter_story_arc`=\"Fichtean Curve\"; completed",
+      "chapter_story_arc distinct from book's Hero's Journey; arc_beat = Fichtean stages; connects_to_book_arc still references Hero's Journey Ch2 stage; both arc prompt_texts loaded; no cross-contamination; CR-009 email"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Planning chapter 2 for \"The Signal Beneath\" using the Fichtean Curve. I'll let you know when the outline is ready.",
+    "tool": "chapter",
+    "op": "plan",
+    "data": null,
+    "job_id": "0b956cc447434e21a6507aca3745689d",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "0b956cc447434e21a6507aca3745689d",
+    "status": "complete",
+    "result": {
+      "execution_id": "5d8bdad2-1afd-4570-8acd-6df530b79a5e",
+      "step_name": "chapter",
+      "status": "ok",
+      "payload": {
+        "op": "plan",
+        "result": {
+          "chapter_number": 2,
+          "chapter_story_arc": "Fichtean Curve",
+          "book_arc": "",
+          "sub_chapter_briefs": [
+            {
+              "number": 1,
+              "title": "Already in Motion",
+              "beat": "POV character is mid-action in a situation already under pressure \u2014 no warm-up, no setup. A specific, concrete problem is already happening. The reader is dropped in without orientation.",
+              "pov_character": "",
+              "brief": "POV character is mid-action in a situation already under pressure \u2014 no warm-up, no setup. A specific, concrete problem is already happening. The reader is dropped in without orientation.",
+              "arc_beat": "Opening in medias res \u2014 drop into existing tension; no backstory, no scene-setting",
+              "characters": [],
+              "setting": "TBD \u2014 to be specified when character roster and outline are populated",
+              "emotional_tone": "Disoriented urgency; the reader feels the ground moving before they know where they are",
+              "connects_to_book_arc": "Establishes the chapter's central pressure and signals the book-level conflict is already in motion \u2014 no grace period for the protagonist"
+            },
+            {
+              "number": 2,
+              "title": "The First Thing That Goes Wrong",
+              "beat": "The protagonist's first major obstacle lands \u2014 something that raises the stakes beyond the opening tension and forces a decision with real consequences. A point of no return is crossed.",
+              "pov_character": "",
+              "brief": "The protagonist's first major obstacle lands \u2014 something that raises the stakes beyond the opening tension and forces a decision with real consequences. A point of no return is crossed.",
+              "arc_beat": "First Crisis \u2014 initial escalation; forces an active decision; normal is no longer available",
+              "characters": [],
+              "setting": "TBD",
+              "emotional_tone": "Shock sharpening into resolve; the protagonist commits to a course of action they cannot walk back",
+              "connects_to_book_arc": "Locks the protagonist into the book's central conflict \u2014 the first crisis is the moment the larger story becomes unavoidable"
+            },
+            {
+              "number": 3,
+              "title": "A Moment to Breathe (But Not to Rest)",
+              "beat": "A brief exhale after the first crisis. The protagonist has survived or adapted. One piece of backstory surfaces through action or dialogue. A detail is planted here that will matter at the climax. ESCALATION SEED: a small lie, hidden weakness, or misplaced trust is introduced here \u2014 small enough to seem inconsequential, large enough to detonate later.",
+              "pov_character": "",
+              "brief": "A brief exhale after the first crisis. The protagonist has survived or adapted. One piece of backstory surfaces through action or dialogue. A detail is planted here that will matter at the climax. ESCALATION SEED: a small lie, hidden weakness, or misplaced trust is introduced here \u2014 small enough to seem inconsequential, large enough to detonate later.",
+              "arc_beat": "Mini-resolution after First Crisis \u2014 brief recovery; reveal backstory in motion; plant escalation seed",
+              "characters": [],
+              "setting": "TBD",
+              "emotional_tone": "Cautious relief undercut by unease; the reader senses the pause is borrowed time",
+              "connects_to_book_arc": "Deepens the protagonist's relationship to the book's central stakes; the planted detail or lie will reappear with greater pressure in a later chapter and explode at the book's turning point"
+            },
+            {
+              "number": 4,
+              "title": "Worse Than the First",
+              "beat": "The second crisis hits harder and more personally than the first. Something the protagonist thought was settled is undone. A plan fails, a resource disappears, or a trust breaks. The protagonist is forced to confront something internal \u2014 not just external danger.",
+              "pov_character": "",
+              "brief": "The second crisis hits harder and more personally than the first. Something the protagonist thought was settled is undone. A plan fails, a resource disappears, or a trust breaks. The protagonist is forced to confront something internal \u2014 not just external danger.",
+              "arc_beat": "Second Crisis \u2014 more personal, more costly; something breaks; protagonist confronts themselves",
+              "characters": [],
+              "setting": "TBD",
+              "emotional_tone": "Desperation edged with self-doubt; the emotional cost is now higher than the physical one",
+              "connects_to_book_arc": "Raises the book-level stakes by making the protagonist's internal flaw or fear visible \u2014 the book arc cannot resolve until this wound is addressed"
+            },
+            {
+              "number": 5,
+              "title": "The Darkest Point",
+              "beat": "The third and most devastating crisis collapses everything the protagonist has been working toward. Their greatest fear is realized or their last resource is gone. The chapter ends not with resolution but with a new, urgent question that propels the reader into Chapter 3 \u2014 the chapter closes mid-motion.",
+              "pov_character": "",
+              "brief": "The third and most devastating crisis collapses everything the protagonist has been working toward. Their greatest fear is realized or their last resource is gone. The chapter ends not with resolution but with a new, urgent question that propels the reader into Chapter 3 \u2014 the chapter closes mid-motion.",
+              "arc_beat": "Third Crisis into Climax \u2014 breaking point; everything collapses; chapter ends on an unresolved question that opens Chapter 3",
+              "characters": [],
+              "setting": "TBD",
+              "emotional_tone": "Bleak momentum; not despair but the cold clarity of someone who has run out of options and must act anyway",
+              "connects_to_book_arc": "The chapter's third crisis is the book arc's first major escalation \u2014 what breaks here cannot be repaired without confronting the book's central conflict at full force"
+            }
+          ],
+          "count": 5,
+          "persist": null,
+          "token_usage": {
+            "calls": 1,
+            "input_tokens": 48,
+            "output_tokens": 1347,
+            "cache_read_tokens": 0,
+            "cache_write_tokens": 4069,
+            "total_tokens": 5464,
+            "cost_usd": 0.035608
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

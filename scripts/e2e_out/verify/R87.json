@@ -1,0 +1,60 @@
+{
+  "id": "R87",
+  "title": "Revert Outline \u2014 The Accord to Version 1",
+  "route": "`library.revert` (task: outline) \u00b7 impl: built (E2E-2)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.revert got=library.revert OK",
+    "job=complete",
+    "reverted=True"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Revert the outline for \"The Accord\" to version 1"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Reverting the outline for \"The Accord\" to version 1. I'll let you know when it's done.",
+        "tool": "library",
+        "op": "revert",
+        "data": null,
+        "job_id": "e939bcbb4fde4d2d923ea1e4c1696b86",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "e939bcbb4fde4d2d923ea1e4c1696b86",
+        "status": "complete",
+        "result": {
+          "execution_id": "8b1d876a-1735-47e0-8244-08e121b8bc8a",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "revert",
+            "result": {
+              "reverted": true,
+              "scope": "outline",
+              "project_id": "7976c085-41d3-46c6-9444-77b75bbdc289",
+              "title": "The Accord",
+              "version": 1,
+              "chapter_count": 10
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Revert the outline for \"The Accord\" to version 1"
+    }
+  ],
+  "expected": [
+    "routes to `library.revert` (outline, version 1), kind=queued; job_id; complete",
+    "current outline snapshotted to `outline_versions_v2` before overwrite; v1 content loaded; `writing_projects_v2.outline` updated",
+    "reverted = original 10 chapters, no Prologue(0)/Epilogue(11); Freytag intact; confirmation names title + version"
+  ]
+}

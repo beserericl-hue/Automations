@@ -1,0 +1,63 @@
+{
+  "test": {
+    "id": "V35",
+    "title": "Voice \u2014 List Deleted (Trash)",
+    "source": "voice",
+    "prompt": "Show me my trash",
+    "route": "library.lifecycle` (info)",
+    "prerequisite": "",
+    "expected": [
+      "flat `{response, kind=\"data\"}`",
+      "maps \"trash\"\u2192list_deleted",
+      "inline list",
+      "user-scoped",
+      "title + content_type"
+    ]
+  },
+  "response": {
+    "response": "Here's what I found.",
+    "kind": "data",
+    "tool": "library",
+    "op": "lifecycle",
+    "data": {
+      "execution_id": "6d854d26-2867-4514-8c3a-50fa9c24ff99",
+      "step_name": "library",
+      "status": "ok",
+      "payload": {
+        "op": "lifecycle",
+        "result": {
+          "items": [
+            {
+              "id": "67b034d9-ece4-4bb0-ad2d-7d0f036c4d9e",
+              "title": "Newsletter",
+              "status": "deleted",
+              "content_type": "newsletter",
+              "chapter_number": null,
+              "updated_at": "2026-06-21T20:21:38.412686+00:00"
+            },
+            {
+              "id": "4325073c-ba25-47b9-b0f7-f62b0abaaf57",
+              "title": "Newsletter",
+              "status": "deleted",
+              "content_type": "newsletter",
+              "chapter_number": null,
+              "updated_at": "2026-06-21T21:02:15.842732+00:00"
+            },
+            {
+              "id": "0272ea75-7aa8-4cda-b298-4942f208fb26",
+              "title": "Why Post-Apocalyptic Fiction Matters More Than Ever in 2026",
+              "status": "deleted",
+              "content_type": "blog_post",
+              "chapter_number": null,
+              "updated_at": "2026-06-21T21:02:25.99146+00:00"
+            }
+          ],
+          "count": 3
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  },
+  "job_result": null
+}

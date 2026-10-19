@@ -1,0 +1,98 @@
+{
+  "test": {
+    "id": "R58",
+    "title": "Brainstorm Short Story \u2014 Three-Act Structure (Post-Apocalyptic)",
+    "source": "chat",
+    "prompt": "Brainstorm a short story using the Three-Act Structure about a radio operator in a flooded world who picks up a signal from a city that was supposed to be underwater. Genre: post-apocalyptic. Title: Signal from the Deep. 5 sections. Themes: hope vs. delusion, isolation, the pull of the impossible.",
+    "route": "brainstorm.story`/`brainstorm.short-story` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `brainstorm.story`, kind=queued; complete; `story_arc=\"Three-Act Structure\"`",
+      "`writing_projects_v2` \"Signal from the Deep\" with 5 sections; arc_notes reference 3-act beats",
+      "S1 Setup (~25%, the signal); S2-3 Confrontation (~50%, midpoint setback \u2260 climax); S4-5 Resolution (pre-climax false resolution \u2192 climax \u2192 denouement)",
+      "arc_notes Three-Act terminology; CR-009 email \"Signal from the Deep\""
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing short story brainstorm for 'Signal from the Deep' \u2014 I'll let you know when it's ready.",
+    "tool": "brainstorm",
+    "op": "short-story",
+    "data": null,
+    "job_id": "2cdc06583f684ab1af91871200e1b598",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "2cdc06583f684ab1af91871200e1b598",
+    "status": "complete",
+    "result": {
+      "execution_id": "3f10b56c-d08b-4b6a-b155-113360cbd336",
+      "step_name": "brainstorm",
+      "status": "ok",
+      "payload": {
+        "op": "short-story",
+        "result": {
+          "outline": {
+            "title": "Signal from the Deep",
+            "premise": "In a world drowned by catastrophic sea-level rise, Mara Voss operates a salvage-rig radio station anchored above what was once the coast of New Orleans. When she intercepts a clear, repeating broadcast originating from the submerged city center \u2014 a place that has been underwater for eleven years \u2014 she must decide whether the signal is proof of impossible survival, a trap, or the last echo of a dead world playing tricks on a mind too long alone.",
+            "themes": [
+              "Hope versus delusion \u2014 the danger of wanting something to be true badly enough to believe it",
+              "Isolation and the erosion of reliable perception",
+              "The pull of the impossible as both salvation and destruction",
+              "Grief disguised as mission"
+            ],
+            "story_arc_name": "",
+            "dramatic_question": "",
+            "wow_factor": "",
+            "characters": [
+              {
+                "name": "Mara Voss",
+                "role": "Protagonist \u2014 salvage-rig radio operator",
+                "arc": "Begins as a woman who has replaced grief with routine, and ends having dived toward the impossible only to surface \u2014 changed, emptied, and finally honest about what she has been mourning all along."
+              },
+              {
+                "name": "Dex Okafor",
+                "role": "Rig mechanic and Mara's only crewmate",
+                "arc": "Starts as a pragmatic anchor to reality and ends as the casualty of Mara's obsession, whose injury forces her to confront the cost of her delusion."
+              },
+              {
+                "name": "The Voice",
+                "role": "The signal \u2014 a looping recorded broadcast from the drowned city, identity unknown",
+                "arc": "Introduced as a mystery, revealed as an eleven-year-old automated emergency beacon recorded by Mara's missing brother, transforming from a symbol of hope into a monument of grief."
+              }
+            ],
+            "chapters": [
+              {
+                "chapter_number": 1,
+                "title": "Static and Routine",
+                "beat": "Mara intercepts the impossible signal from drowned New Orleans and, against Dex's warnings, locks onto it \u2014 committing herself to finding its source.",
+                "arc_notes": "Act I \u2014 Setup: Ordinary world established on the rig; inciting incident is the signal's arrival; first plot point is Mara's decision to pursue it, crossing the threshold from passive grief into dangerous obsession."
+              },
+              {
+                "chapter_number": 2,
+                "title": "Descent",
+                "beat": "Mara and Dex dive toward the signal's coordinates and, at the midpoint of their descent, Mara reaches the source \u2014 a flooded broadcast tower still transmitting \u2014 and in the moment of triumph the signal resolves into her dead brother's recorded voice, shattering the fantasy of survivors even as the tower's collapse injures Dex and traps them both.",
+                "arc_notes": "Act II \u2014 Confrontation: Obstacles escalate through the dive; midpoint delivers the goal (signal found) fused with the first crack (it is a ghost, not a survivor); second plot point is Dex's injury and their entrapment, the lowest moment that closes Act II."
+              },
+              {
+                "chapter_number": 3,
+                "title": "Surface",
+                "beat": "Mara abandons the recording equipment she came to retrieve, uses the last of their air to pull Dex free, and surfaces into open water \u2014 carrying nothing from the deep except the knowledge of what she was really searching for.",
+                "arc_notes": "Act III \u2014 Resolution: Climax is Mara's choice to let the signal go rather than preserve it; transformation is made visible when she chooses a living person over a dead illusion; resolution closes on the rig's silence, which now feels like peace rather than emptiness."
+              }
+            ],
+            "form": "short_story"
+          },
+          "persist": {
+            "persisted": false,
+            "reason": "persist requested but project_id/user_id missing"
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

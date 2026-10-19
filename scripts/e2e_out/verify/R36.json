@@ -1,0 +1,70 @@
+{
+  "id": "R36",
+  "title": "Retrieve Content \u2014 Search by Title",
+  "route": "`library.retrieve` (info) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.retrieve got=library.retrieve OK",
+    "items=2 found=True"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Find my draft about the Titanic"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "data",
+        "assistant_message": "",
+        "tool": "library",
+        "op": "retrieve",
+        "data": {
+          "execution_id": "1f116fb3-d4db-44c5-ad94-d2bca8da80ff",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "retrieve",
+            "result": {
+              "items": [
+                {
+                  "id": "1738646d-25ec-46bf-89c5-2ffdab1ce01b",
+                  "title": "Find my draft short story about the Titanic",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T19:41:18.644437+00:00"
+                },
+                {
+                  "id": "6c3d149d-ce85-4283-8f1f-7575f4c70b98",
+                  "title": "Find my draft short story about the Titanic",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-06-21T20:59:41.575159+00:00"
+                }
+              ],
+              "count": 2,
+              "found": true,
+              "search_term": "Find my draft about the Titanic"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        },
+        "job_id": null,
+        "status": null,
+        "jobs": null,
+        "error": null
+      },
+      "job_result": null,
+      "resolved_prompt": "Find my draft about the Titanic"
+    }
+  ],
+  "expected": [
+    "routes to `library.retrieve`, kind=data; returns the R08 short story; shows title/content_type/char count; no callback"
+  ]
+}

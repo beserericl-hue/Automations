@@ -1,0 +1,43 @@
+
+=== VP01: Brainstorm 'The Last Signal' (post-apoc, Hero's Journey, 6 ch)
+    chat> Brainstorm a post-apocalyptic novel called "The Last Signal" using the Hero's Journey arc 
+    PASS :: persisted=True chapters=8 project_found=True
+    project: project_id=dd10c1c3-e025-4cd7-854d-21db32a2e4da
+
+=== VP02: Write chapter 1 of The Last Signal
+    chat> Write chapter 1 of "The Last Signal"
+    PASS :: persisted=True words=7827
+
+=== VP03: Write chapter 2 of The Last Signal
+    chat> Write chapter 2 of "The Last Signal"
+    PASS :: persisted=True words=5710
+
+=== VP04: Write chapter 3 of The Last Signal
+    chat> Write chapter 3 of "The Last Signal"
+    PASS :: persisted=True words=8284
+
+=== VP05: Approve chapter 1 of The Last Signal
+    chat> Approve chapter 1 of "The Last Signal"
+    PASS :: status=approved error=None
+
+=== VP06: Approve chapter 2 of The Last Signal
+    chat> Approve chapter 2 of "The Last Signal"
+    PASS :: status=approved error=None
+
+=== VP07: Approve chapter 3 of The Last Signal
+    chat> Approve chapter 3 of "The Last Signal"
+    PASS :: status=approved error=None
+
+=== VP08: Generate cover art for The Last Signal
+    chat> Generate cover art for "The Last Signal"
+    PASS :: image_url=https://gvbvwcnmjkdpclcisqrr.supabase.co/storage/v
+
+=== VP09: Story bible for The Last Signal (auto-populated)
+    chat> Get the story bible for "The Last Signal"
+    PASS :: entries=82 found=True
+
+=== VP10: inject drift
+    FAIL :: ch3 exists but no 'Maya Chen' occurrence to alter
+
+===== VIDEO PREP DONE :: {'PASS': 9, 'FAIL': 1} =====
+NOTE: 'The Wasteland Wire' newsletter is a Setup-Wizard (UI) flow with no chat/engine op — seed it manually per marketing-copy.md §2.

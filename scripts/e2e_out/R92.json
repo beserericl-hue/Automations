@@ -1,0 +1,45 @@
+{
+  "test": {
+    "id": "R92",
+    "title": "Outline Revision Creates Version Snapshot",
+    "source": "chat",
+    "prompt": "Revise the outline for \"The Accord\". Add a prologue set during humanity's first contact with the alien signal \u2014 a radio astronomer alone in an observatory at 3 AM hearing a pattern in the static. Keep the existing 10 chapters and Freytags Pyramid structure. Genre slug: political-scifi.",
+    "route": "brainstorm.revise-outline` (task)",
+    "prerequisite": "R87",
+    "expected": [
+      "routes to `brainstorm.revise-outline`, kind=queued; complete",
+      "current (v1) outline snapshotted to `outline_versions_v2` before save; new Prologue(0) themed radio astronomer 3AM; 10 chapters preserved; no Epilogue",
+      "`writing_projects_v2.outline` updated; PRESERVE EXISTING CHARACTERS enforced; revised-outline email sent"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing revision for the outline of \"The Accord\". I'll let you know when it's ready.",
+    "tool": "brainstorm",
+    "op": "revise-outline",
+    "data": null,
+    "job_id": "0c8fdc75c48643c1b2c38595e0340b61",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "0c8fdc75c48643c1b2c38595e0340b61",
+    "status": "complete",
+    "result": {
+      "execution_id": "7f57691f-40f1-4ca4-a514-522a4f521760",
+      "step_name": "brainstorm",
+      "status": "ok",
+      "payload": {
+        "op": "revise-outline",
+        "result": {
+          "revised": false,
+          "outline": {},
+          "error": "no outline to revise"
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

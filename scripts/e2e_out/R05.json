@@ -1,0 +1,47 @@
+{
+  "test": {
+    "id": "R05",
+    "title": "Centralized Email Config (app_config)",
+    "source": "chat",
+    "prompt": "Send me an email report with this content:\n\n  # Centralized Email Test\n\n  This test verifies that the hub reads recipient_email from the app_config table in Supabase.\n\n  Use subject line \"R05: Centralized Email Config Test\"",
+    "route": "library.email-content` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `library.email-content`, kind=queued; job reaches status=complete",
+      "Email arrives at the address stored in `app_config.recipient_email` in DEV Supabase",
+      "If `bcc_email` is set, BCC recipient also receives the email",
+      "No hardcoded email addresses used \u2014 all pulled from DEV Supabase app_config"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Sending your email report now.",
+    "tool": "library",
+    "op": "email-content",
+    "data": null,
+    "job_id": "788e096836fb47b0bb59af11c4f7b69b",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "788e096836fb47b0bb59af11c4f7b69b",
+    "status": "complete",
+    "result": {
+      "execution_id": "0e422787-44d4-48b2-8fed-9fa3cc95b52d",
+      "step_name": "library",
+      "status": "ok",
+      "payload": {
+        "op": "email-content",
+        "result": {
+          "emailed": true,
+          "to": "eric@agileadtesting.com",
+          "subject": "R05: Centralized Email Config Test",
+          "content_type": "inline"
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

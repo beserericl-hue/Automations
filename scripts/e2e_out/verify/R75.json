@@ -1,0 +1,264 @@
+{
+  "id": "R75",
+  "title": "Revise Outline \u2014 Add Prologue to The Correction",
+  "route": "`brainstorm.revise-outline` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=brainstorm.revise-outline got=brainstorm.revise-outline OK",
+    "job=complete",
+    "outline title='The Correction' chapters=13 persisted=True projects_recent=3"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Revise the outline for \"The Correction\". Add a prologue set in 2089 where the protagonist's granddaughter discovers her grandmother's hidden journal describing impossible historical events \u2014 this frames the entire story as a mystery being uncovered. Keep the existing 10 chapters and Three-Act Structure. Genre slug: historical-time-travel."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Queuing revision of the outline for \"The Correction\". I'll let you know when it's ready.",
+        "tool": "brainstorm",
+        "op": "revise-outline",
+        "data": null,
+        "job_id": "3938a9db725e41e58c39ee21eb1702a9",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "3938a9db725e41e58c39ee21eb1702a9",
+        "status": "complete",
+        "result": {
+          "execution_id": "330f08bf-5a60-43f5-8eb0-cc50b191615b",
+          "step_name": "brainstorm",
+          "status": "ok",
+          "payload": {
+            "op": "revise-outline",
+            "result": {
+              "revised": true,
+              "outline": {
+                "title": "The Correction",
+                "premise": "A disgraced medieval historian discovers a hidden cache of artifacts beneath a collapsed Oxford library wing, and each object she touches triggers an involuntary time-slip into the exact historical moment of its creation \u2014 forcing her to witness, and inadvertently alter, the events that the official historical record got catastrophically wrong. As her corrections ripple forward through time, she must decide whether to restore the true record or let the comfortable lie stand \u2014 knowing that the truth will destroy reputations, institutions, and the career of the man who ruined hers. Eighty years later, her granddaughter finds the journal Mara left behind and must decide whether the impossible account it contains is the confession of a great scholar or the delusion of a broken one \u2014 and whether it matters either way.",
+                "themes": [
+                  "The violence done by false history",
+                  "Institutional self-protection versus truth",
+                  "The cost of correction \u2014 personal, professional, moral",
+                  "Whether witnessing an injustice obligates you to act",
+                  "The past as a living force, not a dead record",
+                  "How truth survives when no one alive can verify it"
+                ],
+                "story_arc_name": "Three-Act Structure with Framing Prologue",
+                "dramatic_question": "Can disgraced historian Dr. Mara Voss use the time-slips triggered by a cache of hidden medieval artifacts to prove that Oxford's most celebrated historical narrative is a deliberate fabrication \u2014 before the university buries the artifacts, and her, forever \u2014 and will the record she leaves behind be believed by the one person who matters most?",
+                "wow_factor": "Every artifact Mara touches drops her bodily into the medieval moment of its creation, where she must navigate the actual smell, violence, and bureaucratic cruelty of the past with no preparation \u2014 and where her smallest interventions leave forensic traces that she later finds, centuries later, in the archaeological record she is excavating \u2014 and the entire story is framed by her granddaughter in 2089 reading a journal that describes events no living person can confirm, forcing the reader to decide alongside her whether to believe it.",
+                "characters": [
+                  {
+                    "name": "Dr. Mara Voss",
+                    "role": "Protagonist / POV character",
+                    "archetype": "The disgraced scholar fighting to reclaim her reputation through a discovery that is bigger than she bargained for",
+                    "description": "Forty-one years old, Oxford-trained palaeographer and medieval historian, stripped of her fellowship after her former mentor Professor Gerald Ashworth publicly accused her of fabricating a source citation. She was not entirely innocent \u2014 she had paraphrased a damaged manuscript without flagging the gap \u2014 but Ashworth's accusation was disproportionate and self-serving: the manuscript she cited would have undermined his own celebrated theory about the 1214 Oxford riots. Now she works as a contract archivist for the Bodleian's overflow collections, cataloguing objects nobody else wants. She collects antique compasses she never uses, runs obsessively every morning at 5am, and has a close friendship with a retired forensic document examiner named Philippa Crane who has no connection to academia. Her private terror is that Ashworth was not entirely wrong \u2014 that she is, at some level, the scholar he said she was. She keeps a private journal \u2014 handwritten, never digitised \u2014 which she begins filling with accounts of the time-slips the moment they start, knowing that no one will believe her and unable to stop writing anyway.",
+                    "terrified_by": "That correcting the record will require her to publicly confess her own original shortcut, destroying the vindication she has spent three years building toward",
+                    "humiliated_by": "Being proven to have made the same error twice \u2014 cutting a corner, dressing it up, and calling it scholarship",
+                    "made_happy_by": "Holding a primary source that no living person has read and knowing, with absolute certainty, what it says",
+                    "dramatic_question": "Will Mara correct the historical record \u2014 and herself \u2014 even when the truth implicates her own past dishonesty as much as it vindicates her?",
+                    "off_axis_attribute": "She is ferociously honest about other people's errors but has spent three years lying to herself about the one professional shortcut she took that gave her enemy the ammunition to destroy her"
+                  },
+                  {
+                    "name": "Professor Gerald Ashworth",
+                    "role": "Antagonist",
+                    "archetype": "The celebrated institutional scholar whose entire legacy rests on a lie he told so long ago he has almost stopped knowing it is a lie",
+                    "description": "Sixty-seven years old, Regius Professor of Medieval History, Fellow of All Souls, author of the definitive account of the 1214 Oxford student riots and their role in establishing the university's independence. His theory \u2014 that the riots were a spontaneous popular uprising \u2014 has shaped the university's self-mythology for forty years. He destroyed Mara's career not out of malice but out of panic: her citation pointed toward a document that would prove the riots were orchestrated by a single powerful cleric, not the students, and that the university's founding charter was obtained through blackmail, not earned through heroism. He has a mild tremor in his left hand that he hides at public events. He mentored Mara for six years and still, privately, considers her the best student he ever taught.",
+                    "terrified_by": "Dying with his life's work declared fraudulent and his name removed from the building that bears it",
+                    "humiliated_by": "Being shown, in public, that he knew the truth and chose the myth",
+                    "made_happy_by": "A quiet evening in his study with a glass of port and a manuscript he has not yet read",
+                    "dramatic_question": "Will Ashworth destroy the artifacts and Mara to protect his life's work, or will he find, at the last moment, that he cannot?",
+                    "off_axis_attribute": "He genuinely loves medieval history with the same passion Mara does \u2014 his corruption is not cynicism but terror, the terror of a man who built something beautiful on a cracked foundation and cannot bear to watch it fall"
+                  },
+                  {
+                    "name": "Brother Aldric of Gloucester",
+                    "role": "Historical figure / recurring presence across time-slips",
+                    "archetype": "The medieval cleric-fixer who orchestrated the 1214 riots and buried the evidence \u2014 the man whose correction Mara must witness and whose ghost haunts every artifact",
+                    "description": "A Benedictine monk and administrator at Oxford in 1214, brilliant, pragmatic, and utterly without self-pity. He appears across Mara's time-slips as a living person \u2014 sometimes aware of her presence in a way that should be impossible, sometimes not. He left the artifacts deliberately, as a confession buried for someone with the skill to find it. He had a habit of pressing his thumbnail into the wax of every seal he set, leaving a distinctive crescent mark \u2014 the forensic trace that connects every artifact in the cache.",
+                    "terrified_by": "That the lie will outlast the institution it was meant to protect and become the institution itself",
+                    "humiliated_by": "Being remembered as a saint when he knows himself to be an architect of deception",
+                    "made_happy_by": "A student who asks the question no one else dared to ask",
+                    "dramatic_question": "Was Aldric's fabrication a crime or a necessary act of preservation \u2014 and does the answer change what Mara is obligated to do?",
+                    "off_axis_attribute": "He was not corrupt for personal gain but for institutional survival \u2014 he believed, correctly, that without the university's independence, learning itself would be extinguished in England, and he made a cold calculation that one lie was worth a century of truth"
+                  },
+                  {
+                    "name": "Dr. Yusuf Okafor",
+                    "role": "Supporting protagonist / secondary POV",
+                    "archetype": "The university's head of heritage and conservation \u2014 the institutional insider who must choose between his loyalty to Oxford and his conscience",
+                    "description": "Forty-six years old, Nigerian-British, the first Black head of heritage at Oxford, acutely aware that his position is both a breakthrough and a target. He is responsible for the excavation site where the artifacts are found. He and Mara have a complicated history: he was on the disciplinary panel that upheld Ashworth's complaint against her, a vote he has regretted ever since but never acted on. He plays chess online at midnight when he cannot sleep. He has a teenage daughter, Sola, who wants to study history at Oxford and who he is terrified will one day read the transcript of the panel he sat on.",
+                    "terrified_by": "That Sola will see him clearly and find him wanting",
+                    "humiliated_by": "Being exposed as someone who voted against his own judgment to preserve his position",
+                    "made_happy_by": "A problem that has a correct answer and enough time to find it",
+                    "dramatic_question": "Will Yusuf use his institutional power to protect Mara and the artifacts, or will he protect the institution that made him?",
+                    "off_axis_attribute": "He is the most politically skilled person in the story and uses that skill, reflexively and without guilt, to manage people \u2014 until he meets a situation that cannot be managed, only chosen"
+                  },
+                  {
+                    "name": "Philippa Crane",
+                    "role": "Supporting character / Mara's ally outside academia",
+                    "archetype": "The retired forensic document examiner who has no institutional loyalty and no career left to protect",
+                    "description": "Sixty-three years old, former senior examiner at the National Archives, now retired in Jericho, Oxford. She and Mara met at a 5am running group three years ago and have been close friends since. She has no academic credentials that Oxford recognises and no interest in acquiring them. She keeps a workshop in her garden shed where she does pro bono authentication work for small museums. She has a dry, precise sense of humour and a habit of saying the most devastating thing in the room in the quietest possible voice.",
+                    "terrified_by": "Nothing, professionally \u2014 which is exactly why Mara needs her",
+                    "humiliated_by": "Being dismissed as unqualified by people who are less competent than she is",
+                    "made_happy_by": "A forgery so good it almost fooled her",
+                    "dramatic_question": "Can Philippa's forensic skills authenticate the artifacts in time to prevent Ashworth from having them reclassified and sealed?",
+                    "off_axis_attribute": "She is warm, funny, and completely without sentimentality about the past \u2014 she has spent forty years proving that documents lie, and she finds it restful rather than distressing"
+                  },
+                  {
+                    "name": "Dr. Zara Voss-Okafor",
+                    "role": "Framing narrator / 2089 POV character",
+                    "archetype": "The granddaughter who inherits a mystery she cannot verify and must decide whether to believe it",
+                    "description": "Thirty-two years old in 2089, a computational historian at the reconstituted Bodleian Digital Archive, specialising in the authentication of pre-digital personal records. She is Mara's granddaughter through Mara's son, and Yusuf Okafor's granddaughter through his daughter Sola \u2014 a family connection that makes her inheritance of this particular mystery both intimate and structurally ironic. She is precise, sceptical, and professionally committed to the idea that documents must be verified before they are believed. She found the journal in a sealed box in the archive's uncatalogued bequest collection, labelled in Mara's handwriting: 'For whoever is clever enough to find it.' She has never believed in anything she could not measure. The journal is making that position uncomfortable.",
+                    "terrified_by": "That she will authenticate the journal and no one will believe her \u2014 or worse, that she will authenticate it and everyone will, and the implications will be uncontainable",
+                    "humiliated_by": "Being the computational historian who staked her reputation on an account of time-travel",
+                    "made_happy_by": "A data set that resolves cleanly into a single, defensible conclusion",
+                    "dramatic_question": "Will Zara authenticate and publish Mara's journal \u2014 accepting that it describes impossible events \u2014 or will she protect her own reputation by burying it, and in doing so repeat the exact institutional choice that Mara spent her life fighting against?",
+                    "off_axis_attribute": "She is the most technically rigorous person in the story and uses that rigour as emotional armour \u2014 the journal is dangerous to her not because it is unbelievable but because it is, by every metric she can apply, true"
+                  }
+                ],
+                "chapters": [
+                  {
+                    "chapter_number": 0,
+                    "title": "Prologue A: The Crescent Mark (Oxford, 1214)",
+                    "act": "Act I \u2014 Timeline: 1214",
+                    "arc_point": "Ordinary World \u2014 establishing the buried secret",
+                    "pov_character": "Brother Aldric of Gloucester",
+                    "bridge_from_prior": "None \u2014 story opens here",
+                    "beat": "Aldric seals the leather satchel containing seven objects and buries it beneath the nascent university's first permanent room, pressing his thumbnail into the final wax seal in cold deliberation \u2014 the lie he has set in motion will give the university its independence, and this cache is his confession to whoever is clever enough to find it."
+                  },
+                  {
+                    "chapter_number": 1,
+                    "title": "Prologue B: The Journal (Oxford, 2089)",
+                    "act": "Act I \u2014 Timeline: 2089 framing",
+                    "arc_point": "Ordinary World \u2014 framing narrator introduced, mystery established",
+                    "pov_character": "Dr. Zara Voss-Okafor",
+                    "bridge_from_prior": "Thread: the satchel Aldric buried in Prologue A is the origin of the chain of events whose written record Zara is now holding \u2014 the buried confession has surfaced, transformed into a journal, eighty years after Mara found it",
+                    "beat": "Zara finds a sealed archival box in the Bodleian's uncatalogued bequest collection labelled in her grandmother Mara's handwriting, opens it to find a handwritten journal describing impossible events, and reads the first entry \u2014 which begins: 'Oxford, 2024. I touched the seal matrix and the room disappeared' \u2014 and must decide, as a computational historian whose entire career rests on verifiable evidence, whether to log it as a curiosity or treat it as a case."
+                  },
+                  {
+                    "chapter_number": 2,
+                    "title": "The Overflow Collection (Oxford, 2024)",
+                    "act": "Act I \u2014 Timeline: 2024",
+                    "arc_point": "Ordinary World \u2014 protagonist introduced in diminished state",
+                    "pov_character": "Mara Voss",
+                    "bridge_from_prior": "Thread: the journal entry Zara just read in chapter 1 is the account of this scene \u2014 the reader now watches the event whose written record they have already glimpsed, creating dramatic irony",
+                    "beat": "Mara catalogues forgotten objects in a damp Bodleian storeroom when a structural collapse in the adjacent library wing opens a void beneath the medieval floor; she descends alone, finds the leather satchel sealed with a crescent thumbnail mark, and when she touches the seal matrix inside, the room disappears."
+                  },
+                  {
+                    "chapter_number": 3,
+                    "title": "Oxford, 1214 (First Slip)",
+                    "act": "Act I \u2014 Timeline: 2024 / 1214",
+                    "arc_point": "Inciting Incident \u2014 first full time-slip",
+                    "pov_character": "Mara Voss",
+                    "bridge_from_prior": "Thread: the seal matrix Mara touched at the end of chapter 2 drops her into the moment of its creation \u2014 direct physical consequence of the prior scene's final action",
+                    "beat": "Mara finds herself in Oxford on the night of the riots, invisible to most but not to Aldric, who looks directly at her with recognition before she snaps back; she returns with mud on her boots, a burn on her palm, and the certainty that the riots were staged \u2014 and she photographs the satchel's contents before reporting the find to Yusuf Okafor."
+                  },
+                  {
+                    "chapter_number": 4,
+                    "title": "The Panel (Oxford, 2024)",
+                    "act": "Act I \u2014 Timeline: 2024",
+                    "arc_point": "First Plot Point \u2014 protagonist commits to the fight",
+                    "pov_character": "Yusuf Okafor",
+                    "bridge_from_prior": "Thread: Mara's report of the find to Yusuf at the end of chapter 3 is the event Yusuf must now manage \u2014 his chapter begins with her sitting across his desk",
+                    "beat": "Yusuf convenes an emergency heritage committee; Ashworth arrives uninvited and moves to have the artifacts classified as restricted university property; Yusuf casts the deciding vote to allow Mara supervised independent access for thirty days \u2014 a vote that costs him Ashworth's goodwill \u2014 and Mara, leaving the meeting, touches the torn charter through her gloves and the gloves are not enough."
+                  },
+                  {
+                    "chapter_number": 5,
+                    "title": "Seven Objects (Oxford, 2024 / 1214)",
+                    "act": "Act II \u2014 Timeline: 2024 / 1214",
+                    "arc_point": "Rising Action \u2014 early Act II complications",
+                    "pov_character": "Mara Voss",
+                    "bridge_from_prior": "Thread: the thirty-day access granted in chapter 4 is the condition under which Mara now works \u2014 she begins systematically touching each artifact",
+                    "beat": "Mara works through four of the seven objects in controlled sessions, witnessing the forging of charter signatures, the bribing of a royal clerk, and student ringleaders being paid in silver; she brings Philippa Crane in as an unofficial forensic consultant, who confirms the crescent thumbnail mark appears on all seven seals \u2014 one maker, one hand, one deliberate design \u2014 while Mara notices the slips are getting longer and harder to exit."
+                  },
+                  {
+                    "chapter_number": 6,
+                    "title": "The Paraphrase (Oxford, 2024)",
+                    "act": "Act II \u2014 Timeline: 2024",
+                    "arc_point": "Midpoint \u2014 revelation that reframes the stakes",
+                    "pov_character": "Mara Voss",
+                    "bridge_from_prior": "Thread: Philippa's forensic confirmation from chapter 5 prompts Mara to pull her original disputed citation and she finds something she had not let herself look at in three years",
+                    "beat": "Mara confronts the truth she has been avoiding \u2014 her 2021 paraphrase of the damaged manuscript was not a minor gap but three lines of inference presented as transcription \u2014 tells Philippa, who says 'So you were both wrong about each other and both right about each other \u2014 that's actually worse'; simultaneously, Ashworth contacts the university's legal team to compress the thirty days to ten."
+                  },
+                  {
+                    "chapter_number": 7,
+                    "title": "The Stained Glass (Oxford, 2024 / 1214)",
+                    "act": "Act II \u2014 Timeline: 2024 / 1214",
+                    "arc_point": "Rising Action \u2014 complications deepen, new dramatic problem",
+                    "pov_character": "Mara Voss",
+                    "bridge_from_prior": "Thread: the compressed ten-day deadline from chapter 6 forces Mara to accelerate; she touches the stained glass fragment \u2014 the sixth object \u2014 under pressure and the slip goes wrong",
+                    "beat": "The stained glass slip is different \u2014 Mara is perceived, grabbed, and interrogated by Aldric himself in medieval Latin, who asks with complete calm what she intends to do with what she has found; when she returns, four hours have passed and Yusuf has been summoned by Ashworth's legal team \u2014 the artifacts are to be sealed in six days \u2014 and Mara decides she will touch the final object regardless of what it costs her."
+                  },
+                  {
+                    "chapter_number": 8,
+                    "title": "The Letter (Oxford, 2024 / 1214)",
+                    "act": "Act II \u2014 Timeline: 2024 / 1214",
+                    "arc_point": "Second Plot Point \u2014 crisis, lowest moment",
+                    "pov_character": "Mara Voss",
+                    "bridge_from_prior": "Thread: Mara's decision at the end of chapter 7 to touch the final artifact is the action that opens chapter 8 \u2014 direct continuation",
+                    "beat": "Mara touches the folded letter and is held in 1214 for what feels like a full day \u2014 long enough to read Aldric's confession explaining that the riots were necessary, the charter obtained by blackmailing a bishop who had committed crimes against students, and the lie the only tool available to a man with no power and a just cause; she returns hospitalised, and Ashworth visits her bedside to say quietly, 'I am not a villain \u2014 I am a man who made the same calculation Aldric made.'"
+                  },
+                  {
+                    "chapter_number": 9,
+                    "title": "The Correction (Oxford, 2024)",
+                    "act": "Act III \u2014 Timeline: 2024",
+                    "arc_point": "Climax \u2014 decisive action, transformation made visible",
+                    "pov_character": "Mara Voss",
+                    "bridge_from_prior": "Thread: Ashworth's hospital confession in chapter 8 is the event Mara must now respond to \u2014 her response is the climax",
+                    "beat": "With two days remaining, Mara submits a formal paper co-authored with Philippa \u2014 including a footnote that corrects her own 2021 paraphrase error and explains exactly what she did and why it was wrong \u2014 and the paper goes live the morning of the sealing hearing; Yusuf, reading it at his desk, walks into the hearing and formally objects on heritage grounds, delaying the sealing indefinitely; Ashworth reads the self-correction footnote and says nothing for a long time."
+                  },
+                  {
+                    "chapter_number": 10,
+                    "title": "What the Record Shows (Oxford, 2024)",
+                    "act": "Act III \u2014 Timeline: 2024",
+                    "arc_point": "Resolution \u2014 consequences land across all characters",
+                    "pov_character": "Yusuf Okafor",
+                    "bridge_from_prior": "Thread: the hearing outcome from chapter 9 is the event whose consequences Yusuf now navigates \u2014 the institutional aftermath seen from inside the institution",
+                    "beat": "The academic review confirms the artifacts' authenticity; Ashworth resigns and writes in his resignation letter that the artifacts prove the founding was human rather than heroic, which is harder to celebrate and more worth celebrating; Yusuf calls his daughter Sola and confesses for the first time that he voted against Mara in 2021, and Sola says, 'I know, Dad. I read the transcript two years ago. I was waiting for you to say it.'"
+                  },
+                  {
+                    "chapter_number": 11,
+                    "title": "Epilogue A: The Thumbnail Mark (Oxford, 2025)",
+                    "act": "Act III \u2014 Timeline: 2025",
+                    "arc_point": "Resolution \u2014 emotional closure, transformation confirmed",
+                    "pov_character": "Mara Voss",
+                    "bridge_from_prior": "Thread: the academic review's conclusion from chapter 10 is the settled world Mara now inhabits \u2014 the epilogue shows her changed state",
+                    "beat": "Six months later, reinstated as a research fellow at the Bodleian's new Centre for Material History, Mara returns alone to the excavated void and finds scratched into the stone beneath where the satchel lay, in medieval Latin: 'I knew you would come. I am sorry it took so long' \u2014 and she presses her own thumbnail into the soft mortar beside the inscription, leaving a crescent mark, then writes the final entry in her journal and seals it in a box labelled in her own handwriting."
+                  },
+                  {
+                    "chapter_number": 12,
+                    "title": "Epilogue B: The Verdict (Oxford, 2089)",
+                    "act": "Act III \u2014 Timeline: 2089 framing",
+                    "arc_point": "Resolution \u2014 framing mystery resolved, dramatic question answered across time",
+                    "pov_character": "Dr. Zara Voss-Okafor",
+                    "bridge_from_prior": "Thread: the journal Mara sealed in Epilogue A is the object Zara has been reading throughout \u2014 the final entry she now reaches closes the loop opened in chapter 1",
+                    "beat": "Zara finishes the journal, runs every forensic test available to her, and finds that the physical evidence \u2014 the crescent mark in the mortar, the burn scar documented in Mara's medical records, the mud on boots logged in a 2024 evidence photograph \u2014 is consistent with every impossible claim the journal makes; she submits it for publication under the title 'The Correction: A Primary Source,' and in her editorial note writes, 'I cannot explain what my grandmother experienced. I can only confirm that she told the truth about it' \u2014 and presses her own thumbnail into the soft wax of the archival seal."
+                  }
+                ]
+              },
+              "chapters_before": 11,
+              "chapters_after": 13,
+              "characters_after": 6,
+              "persist": {
+                "persisted": true,
+                "project_id": "d503b5ce-489d-4f87-92df-3cfac2eb3f4b",
+                "created_project": false
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Revise the outline for \"The Correction\". Add a prologue set in 2089 where the protagonist's granddaughter discovers her grandmother's hidden journal describing impossible historical events \u2014 this frames the entire story as a mystery being uncovered. Keep the existing 10 chapters and Three-Act Structure. Genre slug: historical-time-travel."
+    }
+  ],
+  "expected": [
+    "routes to `brainstorm.revise-outline`, kind=queued; complete; Three-Act preserved",
+    "outline gains chapter number=0 (Prologue, 2089/journal/mystery); `outline_versions_v2` snapshot; original 10 preserved; NO Epilogue added; CR-009 email shows Prologue+10 (no Epilogue)"
+  ]
+}

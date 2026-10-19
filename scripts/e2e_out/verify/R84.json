@@ -1,0 +1,77 @@
+{
+  "id": "R84",
+  "title": "Outline Version History \u2014 The Accord",
+  "route": "`library.versions` (info: list) \u00b7 impl: built (E2E-2)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.versions got=library.versions OK",
+    "count=4 versions=4"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Show outline version history for \"The Accord\""
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "data",
+        "assistant_message": "",
+        "tool": "library",
+        "op": "versions",
+        "data": {
+          "execution_id": "09b0e805-b317-423c-ab3a-3b624b0f31ab",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "versions",
+            "result": {
+              "scope": "outline",
+              "project_id": "7976c085-41d3-46c6-9444-77b75bbdc289",
+              "versions": [
+                {
+                  "version_number": 1,
+                  "created_at": "2026-07-01T21:28:40.384081+00:00",
+                  "revision_note": "pre-revision snapshot",
+                  "chapter_count": 10
+                },
+                {
+                  "version_number": 2,
+                  "created_at": "2026-07-01T21:28:40.466912+00:00",
+                  "revision_note": "Auto-snapshot before outline change",
+                  "chapter_count": 10
+                },
+                {
+                  "version_number": 3,
+                  "created_at": "2026-07-01T22:12:31.49688+00:00",
+                  "revision_note": "pre-revision snapshot",
+                  "chapter_count": 12
+                },
+                {
+                  "version_number": 4,
+                  "created_at": "2026-07-01T22:12:31.580446+00:00",
+                  "revision_note": "Auto-snapshot before outline change",
+                  "chapter_count": 12
+                }
+              ],
+              "count": 4
+            }
+          },
+          "error": null,
+          "next_stage": null
+        },
+        "job_id": null,
+        "status": null,
+        "jobs": null,
+        "error": null
+      },
+      "job_result": null,
+      "resolved_prompt": "Show outline version history for \"The Accord\""
+    }
+  ],
+  "expected": [
+    "routes to `library.versions` (list, outline), kind=data; queries `outline_versions_v2` (case-insensitive title)",
+    "\u22651 version entry (R71 pre-revision snapshot); each entry: version_number, created_at, chapter count; chronological order"
+  ]
+}

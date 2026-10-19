@@ -1,0 +1,203 @@
+{
+  "id": "R30",
+  "title": "Brainstorm Story",
+  "route": "`brainstorm.story` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=brainstorm.story got=brainstorm.story OK",
+    "job=complete",
+    "outline title='The Seed Vault' chapters=8 persisted=True projects_recent=0"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Brainstorm a post-apocalyptic story called \"The Seed Vault\" about the last botanist on Earth protecting the Svalbard seed vault from raiders who don't understand its value. Themes: preservation, sacrifice, legacy, nature vs. human destruction. 6 chapters. Genre slug: post-apocalyptic."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Brainstorming a new post-apocalyptic story titled \"The Seed Vault\" with 6 chapters. I'll let you know when the outline is ready.",
+        "tool": "brainstorm",
+        "op": "story",
+        "data": null,
+        "job_id": "86eda8ca4e39409fa558b21855949b78",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "86eda8ca4e39409fa558b21855949b78",
+        "status": "complete",
+        "result": {
+          "execution_id": "4e952aa7-b6c7-42a1-9d9c-2a4a4ac71e27",
+          "step_name": "brainstorm",
+          "status": "ok",
+          "payload": {
+            "op": "story",
+            "result": {
+              "outline": {
+                "title": "The Seed Vault",
+                "premise": "Ten years after a engineered blight wiped out 90% of the world's crop species, a former agricultural geneticist and a hardened military escort must cross a collapsed continent to reach the Svalbard Global Seed Vault \u2014 the last known repository of viable pre-blight seeds \u2014 before a rival faction destroys it to consolidate control over the world's remaining food supply.",
+                "themes": [
+                  "The weaponization of scarcity",
+                  "What we owe the future vs. what we owe the living",
+                  "The moral cost of survival",
+                  "Knowledge as the last form of power",
+                  "Complicity and redemption"
+                ],
+                "story_arc_name": "The Threshold Journey: from the ruins of the old world to the last seed of the new",
+                "dramatic_question": "Can geneticist Mara Voss and her military escort reach the Svalbard Seed Vault and open it to all factions before the Covenant destroys it to monopolize the world's food supply forever?",
+                "wow_factor": "The novel teaches the reader, in accurate and harrowing detail, exactly how a single engineered fungal blight could be designed to destroy 90% of crop biodiversity \u2014 and how the seeds locked inside a real Arctic vault are the only thing standing between humanity and permanent subjugation by whoever controls them.",
+                "characters": [
+                  {
+                    "name": "Mara Voss",
+                    "role": "Protagonist / POV 1",
+                    "archetype": "The scientist who created the problem she must now solve",
+                    "off_axis_attribute": "She is brilliant at systems-level thinking but catastrophically bad at reading individual human loyalty \u2014 she trusts data over people and has been betrayed by both her closest colleague and her own government as a result.",
+                    "dramatic_question": "Can Mara reach the Vault and release its contents to the world without becoming the instrument of a new monopoly \u2014 and can she live with what she helped create?",
+                    "description": "Forty-one years old. Former senior geneticist at the Nordic Crop Diversity Consortium. She did not design the blight, but she published the foundational paper on targeted mycotoxin delivery that was weaponized to create it. She knows this and has never told anyone. Hobby: she keeps a handwritten seed catalog of every plant she has personally observed surviving in the wild since the Collapse \u2014 214 entries, carried in a waterproof notebook. Private worry: that the Vault's cold-storage systems have already failed and the seeds are dead. She would be humiliated by being publicly identified as the intellectual mother of the blight. She is terrified of enclosed dark spaces after being trapped in a collapsed greenhouse for three days during the Collapse. She would be happy if she could hand a living seed to a child who had never seen a vegetable grow.",
+                    "moral_complication": "Mara possesses the only known decryption key to the Vault's secondary seed manifest \u2014 a key she stole from her dead colleague. She can release ALL seeds to ALL factions, which risks the Covenant simply seizing the manifest and re-monopolizing. Or she can release only to the resistance network, which makes her the new gatekeeper \u2014 the very thing she is fighting against. Either choice has a cost she cannot undo."
+                  },
+                  {
+                    "name": "Sergeant Daan Reyes",
+                    "role": "Deuteragonist / POV 2",
+                    "archetype": "The hardened military escort who has stopped believing in causes",
+                    "off_axis_attribute": "He is physically fearless and tactically superb, but he is secretly a compulsive record-keeper \u2014 he writes down every person he has killed, their approximate age, and what they were wearing, in a small ledger. He does not know why he does this. It is the one thing that would break him if someone read it aloud.",
+                    "dramatic_question": "Will Daan choose to protect Mara's mission at the cost of the one personal loyalty he has left \u2014 his commanding officer, who turns out to be working for the Covenant?",
+                    "description": "Thirty-six years old. Former Norwegian Army Ranger, now operating under the Northern Remnant Authority. Assigned to escort Mara as a political compromise between three factions. He has a daughter, Sigrid, eight years old, living in a settlement near Troms\u00f8 \u2014 the only reason he has not deserted. He collects pre-Collapse football scarves as barter currency because they are lightweight and people will trade almost anything for a piece of the old world. He has a friend, a medic named Ola, who he meets for chess whenever their routes cross, for no plot reason at all. Private worry: that Sigrid is being raised to believe the Covenant's version of history.",
+                    "moral_complication": "Midway through the journey, Daan learns that his commanding officer, Colonel Strand, has been feeding their route to the Covenant. He can report Strand and lose his daughter's protection (Strand controls the settlement where Sigrid lives), or he can stay silent and let the Covenant close in on Mara. He chooses to warn Mara \u2014 and Strand immediately withdraws Sigrid's protected status."
+                  },
+                  {
+                    "name": "Colonel Astrid Strand",
+                    "role": "Antagonist / POV 3 (limited)",
+                    "archetype": "The pragmatist who chose the winning side and calls it realism",
+                    "off_axis_attribute": "She genuinely believes the Covenant's controlled distribution model will save more lives than open-access chaos \u2014 and she is not entirely wrong, which makes her impossible to simply hate.",
+                    "dramatic_question": "Will Strand's belief that order requires monopoly survive contact with what the Covenant actually does with the seeds once they have them?",
+                    "description": "Fifty-three years old. Decorated military commander who negotiated the Northern Remnant Authority's survival by secretly agreeing to deliver the Vault's access codes to the Covenant. She has a son, Erik, who is a Covenant logistics officer \u2014 this is not why she joined them, but it is why she stays. She is meticulous, never raises her voice, and is more frightening for it. She keeps a pre-Collapse orchid alive in her command post under a UV lamp \u2014 the only living flower in the settlement \u2014 as a private reminder of what she is supposedly protecting.",
+                    "moral_complication": "When the Covenant reveals its true plan \u2014 not controlled distribution but permanent seed-denial to non-compliant populations \u2014 Strand must decide whether to act against them or accept that she has been a useful fool. Her choice in the climax determines whether Mara lives or dies."
+                  },
+                  {
+                    "name": "Yusuf Adeyemi",
+                    "role": "Supporting / secondary POV (one chapter)",
+                    "archetype": "The resistance courier who knows too much",
+                    "off_axis_attribute": "He is ideologically committed to open-access seed distribution but has been secretly selling route intelligence to the highest bidder for six months to fund his sister's medical treatment \u2014 a betrayal he has rationalized so thoroughly he no longer recognizes it as one.",
+                    "dramatic_question": "Will Yusuf's double-dealing be exposed before he can deliver the one piece of information that could save the mission \u2014 or will his guilt destroy him first?",
+                    "description": "Twenty-nine years old. Nigerian-born, raised in the Oslo refugee settlements. Runs a network of pre-Collapse agricultural knowledge \u2014 seed-saving techniques, soil remediation, hand-pollination \u2014 distributed via printed pamphlets. He is the resistance's link to the Vault's external access protocols. He has a gift for languages and speaks seven. He is terrified of being seen as a traitor by the people he genuinely loves.",
+                    "moral_complication": "He sold Mara's original departure route to a Covenant intermediary. He did not know it would result in an ambush that killed two of her original escort team. He must decide whether to confess this to Mara \u2014 which will likely get him killed by Daan \u2014 or stay silent and hope his final act of genuine help outweighs his earlier betrayal."
+                  },
+                  {
+                    "name": "Dr. Ingrid Halvorsen",
+                    "role": "Supporting character / Mara's dead colleague (present in flashback and consequence)",
+                    "archetype": "The mentor who became a martyr",
+                    "off_axis_attribute": "She was the most ethical person Mara knew, and she died knowing Mara had stolen the decryption key from her \u2014 and she let her take it anyway, which is the thing Mara cannot forgive herself for.",
+                    "dramatic_question": "N/A \u2014 Ingrid is dead before the novel opens, but her choices drive the plot from beyond the grave.",
+                    "description": "Sixty-two at death. Director of the Svalbard Vault project. She spent the last three years of her life encoding the secondary manifest and distributing fragments of the access key to people she trusted. She trusted Mara with the master key fragment, knowing Mara's paper had been weaponized, as an act of deliberate forgiveness. Mara does not understand this until the climax."
+                  }
+                ],
+                "chapters": [
+                  {
+                    "chapter_number": 0,
+                    "title": "Prologue: What We Made",
+                    "act": "Act 1",
+                    "arc_point": "The World Before / Inciting Wound",
+                    "pov_character": "Mara Voss",
+                    "bridge_from_prior": "N/A \u2014 opening",
+                    "beat": "Mara, alone in a dead greenhouse ten years after the Collapse, reads the last entry in Ingrid's field journal \u2014 a single line: 'The key is with the one who owes the debt.' She closes the journal and begins walking north. The reader understands the world is broken and Mara carries a secret that broke it.",
+                    "arc_notes": "Threshold Journey: The Ruined World \u2014 establishes the wound, the stakes, and the protagonist's hidden guilt before the journey begins."
+                  },
+                  {
+                    "chapter_number": 1,
+                    "title": "The Escort",
+                    "act": "Act 1",
+                    "arc_point": "Call to Adventure / Departure",
+                    "pov_character": "Mara Voss (primary), Daan Reyes (secondary scene)",
+                    "bridge_from_prior": "Mara's northward walk from the Prologue brings her to the Northern Remnant Authority checkpoint where Daan is assigned.",
+                    "beat": "Scene 1: Mara is briefed by the NRA council \u2014 three factions, one escort, one window before Arctic winter closes the route. She is told Daan Reyes is her protection; she is not told he reports to Strand. Scene 2: Daan receives his orders from Strand in private \u2014 deliver Mara to the Vault, but signal Strand the moment Mara reveals the access codes. He agrees, thinking of Sigrid. Scene 3: Mara and Daan meet; their mutual distrust is immediate and specific \u2014 she sees a soldier, he sees a liability. They depart at dawn. Story turn: Mara discovers her original two-person support team has been replaced at the last minute \u2014 the substitutes are strangers. She cannot prove sabotage but the reader knows Strand arranged it.",
+                    "arc_notes": "Threshold Journey: Crossing the Threshold \u2014 the journey begins under false pretenses, with the antagonist's hand already on the scales."
+                  },
+                  {
+                    "chapter_number": 2,
+                    "title": "The Ambush at Narvik",
+                    "act": "Act 1 / Act 2 transition",
+                    "arc_point": "First Ordeal / Road of Trials begins",
+                    "pov_character": "Daan Reyes (primary), Yusuf Adeyemi (one scene \u2014 bridge POV)",
+                    "bridge_from_prior": "The substituted escort team from Chapter 1 leads the group into a Covenant ambush at the Narvik rail bridge \u2014 the route Yusuf sold.",
+                    "beat": "Scene 1: The ambush kills both substitute escorts and wounds Mara's left hand \u2014 she cannot operate fine lab equipment without it healing. Daan fights them off with brutal efficiency; Mara sees him kill three men and realizes he is not a bureaucratic assignment. Scene 2 (Yusuf POV \u2014 bridge: Yusuf is the one who sold the route and is watching from a ridge, horrified that people died): Yusuf sees the ambush he caused and makes a decision \u2014 he descends to help, carrying the external access protocol codes Mara needs. He does not confess yet. Scene 3: Daan finds a Covenant tracker beacon planted in the gear of one of the dead substitutes \u2014 proof the ambush was inside information. He does not yet know it was Yusuf. Story turn: Mara's wounded hand means she cannot operate the Vault's biometric seed-sorting equipment alone \u2014 she now needs Yusuf, a man she has just met and has no reason to trust.",
+                    "arc_notes": "Threshold Journey: First Trial \u2014 the party is reduced, the mission is complicated, and a new dependency is created that will become a moral crisis."
+                  },
+                  {
+                    "chapter_number": 3,
+                    "title": "The Long Dark",
+                    "act": "Act 2 \u2014 Midpoint",
+                    "arc_point": "Midpoint Reversal / The Mirror Moment",
+                    "pov_character": "Mara Voss (primary), Daan Reyes (one scene)",
+                    "bridge_from_prior": "Yusuf has joined the group; his knowledge of the external protocols is the thread \u2014 Mara is using his information to plan the Vault approach.",
+                    "beat": "Scene 1: Traveling through the collapsed Troms\u00f8 settlement, Mara finds a child's seed-drawing on a wall \u2014 a potato, a wheat stalk, a tomato \u2014 and breaks down. She tells Daan, for the first time, that her published paper was the intellectual foundation of the blight. This is the moral core of the novel. Scene 2: Daan's reaction is not what she expects \u2014 not rage but a terrible stillness. He tells her about his ledger. They are, both of them, people who keep accounts of what they have done. Scene 3 (Daan POV \u2014 bridge: Daan checks in with Strand via radio, per his orders, but gives her false coordinates): Daan lies to Strand for the first time, protecting Mara. He does not tell Mara he has been reporting to Strand. Scene 4: Yusuf, alone on watch, nearly confesses to Mara about the sold route \u2014 but she falls asleep before he can. He decides to wait until after the Vault. Story turn (MIDPOINT REVERSAL): Mara opens Ingrid's journal to a page she has never read \u2014 a letter addressed to her, written three years before Ingrid's death, that says: 'I know what your paper became. I also know you didn't choose it. The key is not a punishment. It is an assignment.' Mara now understands the key was given, not stolen. Everything she believed about her own guilt shifts.",
+                    "arc_notes": "Threshold Journey: The Innermost Cave / Mirror Moment \u2014 the protagonist's false belief is shattered; she moves from guilt-driven to purpose-driven, which changes the nature of the journey."
+                  },
+                  {
+                    "chapter_number": 4,
+                    "title": "The Covenant's Hand",
+                    "act": "Act 2 \u2014 Crisis escalation",
+                    "arc_point": "Ordeal / Darkest Approach",
+                    "pov_character": "Colonel Astrid Strand (primary), Daan Reyes (one scene)",
+                    "bridge_from_prior": "Daan's false coordinates from Chapter 3 have reached Strand \u2014 she knows she has been deceived and dispatches a Covenant rapid-response team. This chapter follows Strand as she acts on that information.",
+                    "beat": "Scene 1 (Strand POV): Strand receives confirmation from her Covenant handler that the plan has changed \u2014 the Vault is not to be opened and redistributed; it is to be sealed permanently under Covenant control, with access sold as political currency. She realizes she was lied to about the distribution model. Scene 2 (Strand POV): She contacts her son Erik, who is a Covenant logistics officer, and asks him directly if he knew. He did. She does not act immediately \u2014 this is her moral paralysis scene. Scene 3 (Daan POV \u2014 bridge: the Covenant rapid-response team has caught up; Daan spots them on the ridge above the group's camp): Daan wakes Mara and Yusuf at 3am. In the scramble, Yusuf confesses \u2014 he sold the original route. Daan's response is to put a knife to Yusuf's throat. Mara stops him: 'We need him alive more than we need him punished.' Story turn: Strand, alone in her command post, looks at her orchid and makes a decision \u2014 she will not stop Mara, but she will not help her either. She goes dark, cutting off the Covenant's intelligence feed. This is her first act of resistance, and it costs her nothing yet \u2014 but it sets up the climax.",
+                    "arc_notes": "Threshold Journey: Supreme Ordeal approaches \u2014 the antagonist fractures, the team fractures, and the mission's survival depends on people who have every reason to betray each other choosing not to."
+                  },
+                  {
+                    "chapter_number": 5,
+                    "title": "Svalbard",
+                    "act": "Act 3 \u2014 Climax",
+                    "arc_point": "The Climax / Seizing the Sword",
+                    "pov_character": "Mara Voss (primary)",
+                    "bridge_from_prior": "The group has evaded the Covenant team (Strand's intelligence blackout bought them 18 hours); they arrive at Longyearbyen and the Vault entrance \u2014 the thread is the 18-hour window Strand created.",
+                    "beat": "Scene 1: The Vault entrance is intact but the external power grid is dead \u2014 the cold-storage systems are running on emergency battery, estimated 72 hours remaining. The seeds are alive, barely. Mara's wounded hand makes the biometric entry agonizing; she completes it. Scene 2: Inside the Vault \u2014 Mara's claustrophobia triggers in the dark, frozen corridors. Daan stays physically close, talking her through it, and the reader understands this is the most intimate moment of the novel. Scene 3: Mara reaches the secondary manifest terminal and inserts the decryption key. She faces her moral dilemma in full: release to all factions (risk Covenant seizure) or release only to the resistance network (become the new gatekeeper). She chooses a third path she has been quietly constructing since Chapter 3 \u2014 she uploads the full manifest to Yusuf's pamphlet distribution network, which is decentralized and has no single point of seizure. It is not perfect. It is the least-bad option. Scene 4: The Covenant rapid-response team breaches the outer entrance. Daan holds the corridor alone. Scene 5 (CLIMAX): Strand arrives \u2014 not with the Covenant team but ahead of them, alone, having driven through the night. She seals the Covenant team in the outer airlock using the emergency override she was given as NRA commander. She looks at Mara through the inner door glass. She does not come in. She stays in the corridor, holding the override, until Mara finishes the upload. Story turn / resolution: The upload completes. The manifest \u2014 864,000 seed varieties, their growing conditions, their disease resistances, their nutritional profiles \u2014 is now distributed across 340 nodes of Yusuf's network, in 23 countries, in the hands of farmers, teachers, and children. The Covenant cannot un-ring this bell.",
+                    "arc_notes": "Threshold Journey: The Climax and Seizing the Sword \u2014 the dramatic question is answered; the Vault is opened not as a single act of heroism but as a distributed, irreversible gift."
+                  },
+                  {
+                    "chapter_number": 6,
+                    "title": "What It Cost",
+                    "act": "Act 3 \u2014 Resolution",
+                    "arc_point": "The Road Back / Return with the Elixir",
+                    "pov_character": "Daan Reyes (primary), Mara Voss (closing scene)",
+                    "bridge_from_prior": "The aftermath of the Vault \u2014 Strand is in Covenant custody (she surrendered herself to buy the group's exit); Daan's daughter Sigrid's protected status has been revoked; the thread is the immediate human cost of the climax.",
+                    "beat": "Scene 1 (Daan POV): Daan learns Sigrid's settlement has been seized by Covenant forces in retaliation. He has 48 hours to reach her. Mara gives him her seed notebook \u2014 214 entries, every surviving wild plant she has catalogued \u2014 as the only thing of value she owns. 'Give her something to grow,' she says. Scene 2 (Daan POV): Daan reaches Sigrid. The settlement is occupied but not destroyed \u2014 the Covenant is already fracturing as Yusuf's network distributes the manifest and local populations realize they no longer need Covenant seed-licenses. Sigrid is alive. She is holding a pamphlet with a drawing of a potato on it. Scene 3 (Mara POV \u2014 closing): Mara, alone at the Vault entrance in the Arctic light, plants one seed from her notebook in a crack in the permafrost. It is a wild barley \u2014 the oldest domesticated grain. She does not know if it will grow. She covers it with her hands for warmth. The novel ends on this image \u2014 not triumph, but the act of trying.",
+                    "arc_notes": "Threshold Journey: Return with the Elixir \u2014 the cost is named, the gift is distributed, and the protagonist's arc resolves not in victory but in the quiet, irreversible act of beginning again."
+                  },
+                  {
+                    "chapter_number": 7,
+                    "title": "Epilogue: 214 Entries",
+                    "act": "Coda",
+                    "arc_point": "Epilogue / The World After",
+                    "pov_character": "Yusuf Adeyemi",
+                    "bridge_from_prior": "The seed manifest has been distributed; Yusuf's network is the thread \u2014 this epilogue follows one pamphlet to its destination.",
+                    "beat": "One year later. Yusuf delivers a printed seed-saving guide to a farming collective in the Sahel \u2014 the 340th node of his network. A woman shows him her field: twelve rows of a grain variety that hasn't grown in this soil in eleven years. She got the seeds from a man who got them from a teacher who downloaded the manifest the night it was released. Yusuf writes down the variety name in his own notebook \u2014 the first entry. He does not know if what he did before will ever be forgiven. He plants a second row alongside the woman's twelve. The chain of consequence is complete: Mara's guilt, Ingrid's forgiveness, Daan's loyalty, Strand's last act, and Yusuf's redemption all converge in twelve rows of grain in the Sahel.",
+                    "arc_notes": "Threshold Journey: The Elixir reaches the world \u2014 the epilogue closes the moral accounts of every major character through a single concrete image, without a word of explanation."
+                  }
+                ]
+              },
+              "persist": {
+                "persisted": true,
+                "project_id": "43fe34a5-fe18-47ba-bf7f-7ff40b9a4d00",
+                "created_project": false
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Brainstorm a post-apocalyptic story called \"The Seed Vault\" about the last botanist on Earth protecting the Svalbard seed vault from raiders who don't understand its value. Themes: preservation, sacrifice, legacy, nature vs. human destruction. 6 chapters. Genre slug: post-apocalyptic."
+    }
+  ],
+  "expected": [
+    "routes to `brainstorm.story`, kind=queued; job reaches status=complete",
+    "Email with HTML outline: title, premise, themes, character profiles, 6 chapter breakdowns",
+    "**Prime Directive:** clear, direct outline language",
+    "Row created in `writing_projects_v2` with `outline` JSONB populated",
+    "CR-009 task-completion email received"
+  ]
+}

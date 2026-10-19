@@ -1,0 +1,42 @@
+{
+  "test": {
+    "id": "R115",
+    "title": "\u2014 Write Chapter 1 (After Chapter Outline Exists)",
+    "source": "chat",
+    "prompt": "Write Chapter 1 of \"The Signal Beneath\"",
+    "route": "chapter.write` (task)",
+    "prerequisite": "R110, R111, R112, R114",
+    "expected": [
+      "routes `chapter.write`, kind=queued; completed; auto-loads Ch1 sub_chapters",
+      "prose follows sub-chapter sequence in order; consistent with Prologue (story bible cross-ref); follows book Ch1 brief; arc notes reflected",
+      "`published_content_v2` row; `content_versions_v2` snapshot; 3000-5000 words; ends on hook into Ch2; CR-009 email"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing Chapter 1 of \"The Signal Beneath\" \u2014 I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "write",
+    "data": null,
+    "job_id": "07e36448e9e64979880bd69137593e47",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "07e36448e9e64979880bd69137593e47",
+    "status": "complete",
+    "result": {
+      "execution_id": "2c1c9d44-c3c1-4db1-92b3-cecfc09c78ea",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValidationError",
+        "message": "1 validation error for WriteChapterRequest\nproject_id\n  Field required [type=missing, input_value={'project_title': 'The Si...t': True, 'async': True}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

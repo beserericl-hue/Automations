@@ -1,0 +1,56 @@
+{
+  "test": {
+    "id": "R95",
+    "title": "Delete Published Item \u2014 Error",
+    "source": "chat",
+    "prompt": "Delete the published content titled \"Why Post-Apocalyptic Fiction Matters More Than Ever in 2026\"",
+    "route": "library.lifecycle` (delete)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `library.lifecycle` (delete); detects status='published' \u2192 rejects with clear error (unpublish first); status unchanged; no snapshot; no email"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Deleting the published content titled \"Why Post-Apocalyptic Fiction Matters More Than Ever in 2026\".",
+    "tool": "library",
+    "op": "lifecycle",
+    "data": null,
+    "job_id": "8c727b14cfbe464f8833c77f15572df6",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "8c727b14cfbe464f8833c77f15572df6",
+    "status": "complete",
+    "result": {
+      "execution_id": "e196c831-6563-4fd8-9116-246a4a4b4345",
+      "step_name": "library",
+      "status": "ok",
+      "payload": {
+        "op": "lifecycle",
+        "result": {
+          "id": "67b034d9-ece4-4bb0-ad2d-7d0f036c4d9e",
+          "user_id": "+14105914612",
+          "title": "Newsletter",
+          "content_type": "newsletter",
+          "genre_slug": "political-scifi",
+          "content_text": "",
+          "storage_path": "author-content/drafts/newsletter_2026-03-09_104626.md",
+          "cover_image_path": null,
+          "status": "deleted",
+          "project_id": null,
+          "chapter_number": null,
+          "metadata": {},
+          "created_at": "2026-03-09T14:46:27.230449+00:00",
+          "updated_at": "2026-06-21T20:21:38.412686+00:00",
+          "published_at": null,
+          "deleted_at": "2026-06-21T20:21:38.412704+00:00"
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

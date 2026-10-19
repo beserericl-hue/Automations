@@ -149,10 +149,10 @@ See [[releases-and-tags]] v1.1.2 section. Coded on develop, pending hotfix → P
 
 **Fix applied in-session:** admin-reset Eric's + JR's passwords via service-role:
 ```bash
-PUT /auth/v1/admin/users/{id} {"password": "Fr332bafami!y"}
+PUT /auth/v1/admin/users/{id} {"password": "<rotated 2026-10-19 — see credentials-map.md>"}
 ```
 
-Both DEV and PROD accept `Fr332bafami!y` again — same value as `E2E_TEST_PASSWORD`.
+Both DEV and PROD accept `<rotated 2026-10-19 — see credentials-map.md>` again — same value as `E2E_TEST_PASSWORD`.
 
 **Still TODO:** update Site URL + Redirect URLs allowlist on both Supabase projects:
 
@@ -168,11 +168,11 @@ DEV: `https://supabase.com/dashboard/project/gvbvwcnmjkdpclcisqrr/auth/url-confi
 
 Standalone session-during-release fix. JR's `users_v2` row had `supabase_auth_uid = NULL` from admin-create that didn't link to auth. Fix:
 
-1. `POST /auth/v1/admin/users {email:'racemert@yahoo.com', password:'Wr!ters1', email_confirm:true}` → UID `3657ca48-...`.
+1. `POST /auth/v1/admin/users {email:'racemert@yahoo.com', password:'<PROD password, treat as compromised — see credentials-map.md>', email_confirm:true}` → UID `3657ca48-...`.
 2. `PATCH /rest/v1/users_v2?user_id=eq.+17063338699` set `supabase_auth_uid = '3657ca48-...'`.
 3. Smoke test login: `POST /auth/v1/token?grant_type=password` → valid access_token.
 
-JR can sign in with `racemert@yahoo.com` / `Wr!ters1`.
+JR can sign in with `racemert@yahoo.com` / `<PROD password, treat as compromised — see credentials-map.md>`.
 
 This bug class is what v1.1.2 hotfix prevents going forward.
 

@@ -1,0 +1,45 @@
+{
+  "test": {
+    "id": "V39",
+    "title": "Voice \u2014 Email Research Report",
+    "source": "voice",
+    "prompt": "Email me that research report on post apocalyptic fiction trends",
+    "route": "library.email-content` (task)",
+    "prerequisite": "V02",
+    "expected": [
+      "flat queued",
+      "content_type=research",
+      "complete",
+      "resolves to report in `research_reports_v2`",
+      "HTML email",
+      "subject references report",
+      "BCC if configured"
+    ]
+  },
+  "response": {
+    "response": "Sending that research report to your email now.",
+    "kind": "queued",
+    "tool": "library",
+    "op": "email-content",
+    "job_id": "0fbb5bb0c3e34259aab12dc82efa3918",
+    "status": "queued"
+  },
+  "job_result": {
+    "job_id": "0fbb5bb0c3e34259aab12dc82efa3918",
+    "status": "complete",
+    "result": {
+      "execution_id": "168fc2a9-1049-4e4d-9af3-a03011eece92",
+      "step_name": "library",
+      "status": "ok",
+      "payload": {
+        "op": "email-content",
+        "result": {
+          "emailed": false,
+          "error_message": "Couldn't find research_report matching 'post apocalyptic fiction trends'. No email sent."
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

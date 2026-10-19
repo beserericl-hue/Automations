@@ -1,0 +1,56 @@
+{
+  "id": "R94",
+  "title": "Delete a Draft",
+  "route": "`library.lifecycle` (delete) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.lifecycle got=library.lifecycle OK",
+    "job=complete",
+    "status=published matched=None error=Cannot delete published content \u2014 unpublish it first."
+  ],
+  "steps": [
+    [
+      "chat",
+      "Delete the draft titled \"The Forgotten Engineers of Rome\""
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Deleting the draft titled \"The Forgotten Engineers of Rome\".",
+        "tool": "library",
+        "op": "lifecycle",
+        "data": null,
+        "job_id": "16b862267f7d43b0a4c3344f199097e8",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "16b862267f7d43b0a4c3344f199097e8",
+        "status": "complete",
+        "result": {
+          "execution_id": "0a792277-2807-4fa7-80a8-faf970bec60e",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "lifecycle",
+            "result": {
+              "error": "Cannot delete published content \u2014 unpublish it first.",
+              "id": "a47f5359-1a48-4446-aaa7-eae28dc163f3",
+              "status": "published"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Delete the draft titled \"The Forgotten Engineers of Rome\""
+    }
+  ],
+  "expected": [
+    "routes to `library.lifecycle` (delete), kind=queued; complete",
+    "`content_versions_v2` snapshot before delete (change_note \"Auto-snapshot before delete\"); status \u2192 'deleted'; deletion email; item gone from drafts; soft delete (row retained)"
+  ]
+}

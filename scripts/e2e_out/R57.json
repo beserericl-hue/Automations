@@ -1,0 +1,115 @@
+{
+  "test": {
+    "id": "R57",
+    "title": "Brainstorm Short Story \u2014 Freytags Pyramid (Historical Time Travel)",
+    "source": "chat",
+    "prompt": "Brainstorm a short story using Freytags Pyramid about a historian who travels to 1692 Salem to observe the witch trials, but accidentally provides testimony that condemns an innocent woman. Genre: historical-time-travel. Title: The Witness. 5 sections. Themes: guilt, the observer effect, whether the past can be repaired.",
+    "route": "brainstorm.story`/`brainstorm.short-story` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `brainstorm.story`, kind=queued; complete; `story_arc=\"Freytags Pyramid\"`",
+      "`writing_projects_v2` \"The Witness\" with 5 sections; Introduction = ordinary world + time travel",
+      "Climax = research goal achieved AND false testimony occurs; Falling = cascade/worse; Catastrophe = irreversibility",
+      "Salem details; fatal flaw in Section 1; arc_notes Freytag terminology; CR-009 email \"The Witness\""
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Brainstorming your short story, 'The Witness'. I'll let you know when the outline is ready.",
+    "tool": "brainstorm",
+    "op": "short-story",
+    "data": null,
+    "job_id": "abf59968014a46c0be0c0d7371ad30aa",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "abf59968014a46c0be0c0d7371ad30aa",
+    "status": "complete",
+    "result": {
+      "execution_id": "7f6bade1-3e29-4b9f-b6c9-7e174ef46974",
+      "step_name": "brainstorm",
+      "status": "ok",
+      "payload": {
+        "op": "short-story",
+        "result": {
+          "outline": {
+            "title": "The Witness",
+            "premise": "Dr. Elara Voss, a 21st-century historian specializing in the Salem witch trials, travels back to 1692 Massachusetts to observe the proceedings firsthand. Determined to remain an invisible observer, she is drawn into a confrontation in the village square and, in a moment of panicked improvisation, offers a statement that the court seizes upon as damning testimony against Martha Corey, an innocent woman already suspected by her neighbors. Trapped between the imperative not to alter history and the unbearable knowledge that her own words have sealed a woman's fate, Elara must reckon with the difference between studying atrocity and participating in it.",
+            "themes": [
+              "The moral complicity of the observer \u2014 witnessing evil without intervening is itself a form of action",
+              "The gap between historical knowledge and lived human consequence",
+              "Guilt, accountability, and the impossibility of clean hands in a corrupt system",
+              "The arrogance of detachment \u2014 how intellectual distance can become its own violence"
+            ],
+            "story_arc_name": "",
+            "dramatic_question": "",
+            "wow_factor": "",
+            "characters": [
+              {
+                "name": "Dr. Elara Voss",
+                "role": "Protagonist \u2014 a 21st-century historian and time traveler",
+                "arc": "Begins as a confident, detached academic who believes observation is neutral, and ends as a woman permanently broken open by the knowledge that her expertise made her complicit in the death she spent her career mourning."
+              },
+              {
+                "name": "Martha Corey",
+                "role": "The condemned \u2014 a plain-spoken, devout woman already viewed with suspicion by Salem village",
+                "arc": "Enters the story as a woman fighting with quiet dignity for her life, and exits it as the human cost of Elara's failure \u2014 her fate unchanged by history but now bearing Elara's fingerprints."
+              },
+              {
+                "name": "Magistrate John Hathorne",
+                "role": "Antagonist-of-system \u2014 the presiding judge who weaponizes any available testimony",
+                "arc": "Remains unchanged and unmoved, functioning as the embodiment of the institutional machinery that grinds individuals into evidence."
+              },
+              {
+                "name": "Goodwife Patience Ruck",
+                "role": "A suspicious villager who first draws Elara into the proceedings",
+                "arc": "Begins as a minor threat \u2014 a nosy neighbor who notices Elara's strangeness \u2014 and becomes the unwitting catalyst who forces Elara to speak in court."
+              }
+            ],
+            "chapters": [
+              {
+                "chapter_number": 1,
+                "title": "The Historian Arrives",
+                "beat": "Dr. Elara Voss materializes on the outskirts of Salem village in the grey dawn of October 1692, armed with period-accurate clothing, a memorized map of every documented event, and the absolute conviction that she is here only to watch.",
+                "arc_notes": "Exposition \u2014 establishes Elara's world, her intellectual confidence, her rules of non-interference, and the living, breathing reality of Salem that her academic knowledge has never fully prepared her for; plants the seed of danger in the gap between knowing history and standing inside it."
+              },
+              {
+                "chapter_number": 2,
+                "title": "The Woman in the Square",
+                "beat": "Elara slips into the village to observe Martha Corey being publicly accused, but Goodwife Patience Ruck notices Elara's strange manner and unfamiliar face, loudly demanding to know who she is and what she has seen \u2014 forcing Elara into a panicked, improvised answer that the crowd immediately treats as corroboration of Martha's guilt.",
+                "arc_notes": "Rising Action \u2014 escalates the stakes by collapsing Elara's observer status; her knowledge of Salem's social codes fails her under real pressure, and her attempt to deflect suspicion from herself inadvertently arms the accusation against Martha."
+              },
+              {
+                "chapter_number": 3,
+                "title": "The Testimony",
+                "beat": "Summoned before Magistrate Hathorne the following morning, Elara attempts to retract and soften her words, but Hathorne \u2014 skilled at bending any statement into confirmation \u2014 reads her hedging as spiritual evasion and enters her original account into the formal record as sworn testimony, sealing Martha Corey's condemnation.",
+                "arc_notes": "Climax \u2014 the irreversible apex; Elara's words are now part of the historical record she came to study, Martha's fate is locked, and Elara's identity as a detached observer is permanently destroyed; the goal of witnessing history is achieved at the cost of becoming its instrument."
+              },
+              {
+                "chapter_number": 4,
+                "title": "What the Books Never Said",
+                "beat": "Elara returns to the jail where Martha is held and stands outside the door, unable to enter and unable to leave, listening to Martha pray with a steadiness Elara cannot match \u2014 and understands for the first time that every name in her scholarship was a person who experienced exactly this weight of abandonment.",
+                "arc_notes": "Falling Action \u2014 consequence and transformation made visible; Elara's intellectual framework collapses as human reality replaces abstraction; she does not save Martha, cannot save Martha, and must carry the full moral cost of that without the shelter of academic distance."
+              },
+              {
+                "chapter_number": 5,
+                "title": "The Record",
+                "beat": "Elara returns to the 21st century, opens her own published monograph on the Salem trials to the chapter on Martha Corey, and finds a single line she had always glossed over \u2014 'testimony offered by an unknown stranger' \u2014 and realizes she has always been in the footnote, that history recorded her complicity and she had read past it for years.",
+                "arc_notes": "Resolution \u2014 closes the loop between Act I's confidence and Act V's reckoning; the dramatic question of what it costs to witness atrocity is answered not with redemption but with permanent, irrevocable accountability; Elara is visibly and irreversibly changed."
+              }
+            ],
+            "form": "short_story"
+          },
+          "persist": {
+            "persisted": false,
+            "reason": "persist requested but project_id/user_id missing"
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "test": {
+    "id": "R76",
+    "title": "Write Prologue \u2014 The Correction",
+    "source": "chat",
+    "prompt": "Write the prologue for \"The Correction\". Genre slug: historical-time-travel.",
+    "route": "chapter.write` (task)",
+    "prerequisite": "R75",
+    "expected": [
+      "routes to `chapter.write`, kind=queued; complete; chapter_number=Prologue(0); labeled \"Prologue\"",
+      "content = 2089 granddaughter + journal (matches R75); creates mystery/urgency; 1500-3000 words",
+      "`published_content_v2` row chapter_number=0; email subject \"The Correction - Prologue\"; snapshot; Prime Directive"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing the prologue for \"The Correction\" \u2014 I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "write",
+    "data": null,
+    "job_id": "e2cd8c755faf4d42a47b1288a73a0953",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "e2cd8c755faf4d42a47b1288a73a0953",
+    "status": "complete",
+    "result": {
+      "execution_id": "d6726696-8326-4f85-8313-e3f7847f61d9",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValidationError",
+        "message": "2 validation errors for WriteChapterRequest\nproject_id\n  Field required [type=missing, input_value={'project_title': 'The Co...t': True, 'async': True}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nchapter_number\n  Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='prologue', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/int_parsing",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

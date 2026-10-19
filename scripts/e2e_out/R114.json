@@ -1,0 +1,42 @@
+{
+  "test": {
+    "id": "R114",
+    "title": "\u2014 Write Prologue (After Chapter Outline Exists)",
+    "source": "chat",
+    "prompt": "Write the Prologue for \"The Signal Beneath\"",
+    "route": "chapter.write` (task)",
+    "prerequisite": "R111",
+    "expected": [
+      "routes `chapter.write`, kind=queued; completed; auto-loads sub_chapters (none passed in body)",
+      "prose follows sub-chapter sequence; scene breaks `---` between sub-chapters; names match book outline; Hero's Journey prompt injected",
+      "`published_content_v2` row (content_type=chapter, \"Prologue \u2014 The Signal Beneath\"); `content_versions_v2` snapshot; 1500-3000 words; CR-009 email"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing the Prologue for \"The Signal Beneath\" \u2014 I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "write",
+    "data": null,
+    "job_id": "809fb580580c4687a7dc53f90e4ccd65",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "809fb580580c4687a7dc53f90e4ccd65",
+    "status": "complete",
+    "result": {
+      "execution_id": "33d8fb29-b292-4aeb-9fcb-c3740e6f0529",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValidationError",
+        "message": "2 validation errors for WriteChapterRequest\nproject_id\n  Field required [type=missing, input_value={'project_title': 'The Si...t': True, 'async': True}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nchapter_number\n  Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='Prolog', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/int_parsing",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

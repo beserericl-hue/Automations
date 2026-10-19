@@ -1,0 +1,5 @@
+# Full E2E verify — 1 tests — start 2026-07-02T12:40:55.142036+00:00
+[1/1] V22 PASS :: Voice — Multi-Step Voice Workflow :: route exp=chapter.blog got=chapter.blog OK | job=complete | blog_post recent=1 word_count=1292 persist=True
+
+DONE 2026-07-02T13:05:45.906755+00:00 :: {'PASS': 1}
+V22 EXIT 0

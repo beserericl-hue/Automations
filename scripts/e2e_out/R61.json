@@ -1,0 +1,631 @@
+{
+  "test": {
+    "id": "R61",
+    "title": "Brainstorm Book \u2014 Three-Act Structure (Historical Time Travel)",
+    "source": "chat",
+    "prompt": "Help me brainstorm a book using the Three-Act Structure about a grief-stricken physicist who invents a time machine to save her daughter from a car accident, but each trip changes the present in ways that make the world progressively worse. Genre: historical-time-travel. Title: The Correction. 10 chapters. Themes: grief, the tyranny of good intentions, accepting loss, the butterfly effect.",
+    "route": "brainstorm.story`/`brainstorm.short-story` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `brainstorm.story`, kind=queued; complete; `story_arc=\"Three-Act Structure\"`",
+      "`writing_projects_v2` \"The Correction\" with 10 chapters; Ch1-2 Setup(~25%); Ch3-7 Confrontation(~50%, midpoint gut-punch); Ch8-10 Resolution(~25%)",
+      "Midpoint \u2260 climax; pre-climax false resolution; climax single moment; denouement resolves thematic question",
+      "arc_notes Three-Act throughout; 10 chapters distributed; CR-009 email \"The Correction\""
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing a new story brainstorm for 'The Correction'. I'll let you know when the outline is ready.",
+    "tool": "brainstorm",
+    "op": "story",
+    "data": null,
+    "job_id": "60f1a38d15a641c6808f925fb8a0b577",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "60f1a38d15a641c6808f925fb8a0b577",
+    "status": "complete",
+    "result": {
+      "execution_id": "15d39f3d-d1bf-4c3a-bcad-80c0fa8919ee",
+      "step_name": "brainstorm",
+      "status": "ok",
+      "payload": {
+        "op": "story",
+        "result": {
+          "outline": {
+            "title": "The Correction",
+            "premise": "A modern-day historian discovers a medieval manuscript that, when read aloud in the original Latin, sends her back in time to witness \u2014 and inadvertently alter \u2014 the events it describes. Each return trip is triggered by a different passage, each landing her deeper into the construction and political crisis of a great English cathedral in the 1140s, while in the present her colleague races to understand what is happening to her before the manuscript is destroyed by the institution that fears what it reveals.",
+            "themes": [
+              "The violence done by those who control the historical record",
+              "Whether correcting the past is ever justified",
+              "The cost of obsession on the people who love the obsessed",
+              "Institutional power versus individual conscience",
+              "What is lost when a building \u2014 or a life \u2014 is left unfinished"
+            ],
+            "story_arc_name": "Three-Act Structure",
+            "dramatic_question": "Can historian Mara Voss use the manuscript's time-travel passages to prevent the cathedral's master builder from being falsely condemned and executed \u2014 before the manuscript is destroyed in the present and she is stranded in 1146 forever?",
+            "wow_factor": "The reader experiences the construction of a 12th-century English cathedral in forensic, sensory detail \u2014 the smell of lime mortar, the geometry of flying buttresses argued over in mud \u2014 through a modern woman who knows exactly how the building should look and must watch, helpless, as political treachery ensures it will never be finished that way.",
+            "characters": [
+              {
+                "name": "Mara Voss",
+                "role": "Protagonist, POV character",
+                "archetype": "The obsessed scholar who cannot leave well enough alone",
+                "off_axis_attribute": "She is brilliant at reading dead languages but catastrophically bad at reading living people \u2014 she routinely mistakes indifference for hostility and affection for manipulation, which costs her every close relationship she has ever had.",
+                "dramatic_question": "Will Mara sacrifice her only chance to return to the present in order to save a man she has come to love across nine centuries?",
+                "description": "Mara is a 34-year-old palaeographer at the University of Durham, specialising in 12th-century ecclesiastical Latin. She is wiry, insomniac, and subsists on black coffee and the particular pleasure of being right. Her off-hours hobby is competitive long-distance swimming \u2014 the only activity that silences her mind. Her private worry is that she has spent so long studying the dead that she has become emotionally unavailable to the living. She was engaged once; he left a note that said 'you are more present in the 12th century than you are here.' She kept the note. She is humiliated by being wrong in public, terrified of being permanently alone, and made happy by the moment a damaged manuscript gives up its secret."
+              },
+              {
+                "name": "Edmund Calder",
+                "role": "Deuteragonist, POV character (present-day)",
+                "archetype": "The loyal colleague who is more capable than he is credited for",
+                "off_axis_attribute": "Edmund is methodical and careful in all things except his feelings for Mara, about which he is reckless and self-deceiving \u2014 he has spent three years telling himself his devotion is purely professional.",
+                "dramatic_question": "Will Edmund destroy the manuscript to save Mara's life, even knowing it will erase the historical truth she died to recover?",
+                "description": "Edmund is a 38-year-old archivist at Durham Cathedral Library, the kind of man who knows where every document is and is never asked his opinion of it. He restores damaged bindings as a hobby, finding the patience required meditative. He has a close friendship with a retired stonemason named Pete who has no connection to academia and whom Edmund visits every Sunday for chess. His private worry is that he has arranged his entire life around being useful to someone who does not notice him. He is humiliated by displays of emotion in professional settings, terrified of making an irreversible mistake, and made happy by the smell of old vellum and a problem that has a correct answer."
+              },
+              {
+                "name": "Brother Caelan",
+                "role": "Principal supporting character, POV character (12th century)",
+                "archetype": "The monk-chronicler who wrote the manuscript",
+                "off_axis_attribute": "Caelan is a man of deep faith who has a casual, almost cheerful willingness to lie to authority when he believes the truth serves a higher purpose \u2014 he does not experience this as a moral conflict, which makes him genuinely dangerous.",
+                "dramatic_question": "Will Caelan complete his chronicle honestly, knowing that honesty will condemn him alongside the builder he is trying to protect?",
+                "description": "Caelan is a 40-year-old Benedictine monk at the cathedral priory, assigned as the building's official recorder. He has an encyclopaedic memory for architectural detail and a gift for Latin prose that he considers a vanity he has not yet conquered. He grows herbs in the cloister garden and is privately proud of his angelica. He has a friendship with the master builder that began over a shared contempt for the Bishop's taste in window tracery. His private worry is that God can see the difference between a lie told for love and a lie told for convenience, and that Caelan himself cannot always tell which kind he is telling."
+              },
+              {
+                "name": "Aldric of Rouen",
+                "role": "Principal supporting character (12th century), the master builder",
+                "archetype": "The visionary craftsman whose genius makes him enemies",
+                "off_axis_attribute": "Aldric is physically fearless on scaffolding at any height but is paralysed by social confrontation \u2014 he cannot argue with a bishop, a lord, or even a rude apprentice without going silent and white, which his enemies read as guilt.",
+                "dramatic_question": "Will Aldric trust Mara's impossible knowledge of the future enough to act on it before it is too late?",
+                "description": "Aldric is a 45-year-old Norman master mason who came to England after working on the abbey at Caen. He speaks English with a heavy accent that the English clergy use to dismiss him. He carves small animals into the undersides of corbels where no one will ever see them \u2014 a private joke with God. He has a son, Thomas, aged 12, who is his apprentice and his only family. His private worry is that the cathedral will outlast him but will be finished wrong by someone with less vision and more political sense. He is humiliated by being called a foreigner in front of his workmen, terrified of heights only in dreams, and made happy by the moment a stone course levels true."
+              },
+              {
+                "name": "Bishop Ranulf de Glanville",
+                "role": "Antagonist (12th century)",
+                "archetype": "The politically calculating churchman who uses piety as a weapon",
+                "off_axis_attribute": "Ranulf genuinely believes in God and genuinely believes that God approves of everything Ranulf does \u2014 his faith is not a mask but a mirror, and this makes him incorruptible in the worst possible way.",
+                "dramatic_question": "Will Ranulf's need to control the cathedral's legacy lead him to destroy the one man who could make it magnificent?",
+                "description": "Ranulf is 55, a former royal clerk who purchased his bishopric during the Anarchy and has spent a decade making it worth the price. He is an excellent administrator and a mediocre theologian who compensates with ceremony. He collects illuminated psalters and has genuine aesthetic opinions, which makes his conflict with Aldric personal as well as political. His private fear, never spoken, is that the cathedral will be remembered and he will not."
+              },
+              {
+                "name": "Dr. Harriet Frome",
+                "role": "Institutional antagonist (present-day), Dean of Special Collections",
+                "archetype": "The administrator who protects the institution at the cost of the truth",
+                "off_axis_attribute": "Harriet is not corrupt \u2014 she is genuinely convinced that the manuscript's suppression is the responsible choice, and she has a point that Mara is too obsessed to acknowledge.",
+                "dramatic_question": "Will Harriet choose institutional protection or historical truth when she finally understands what the manuscript contains?",
+                "description": "Harriet is 52, a former medievalist who moved into administration after a breakdown she does not discuss. She runs Durham's Special Collections with a precision that her staff find either admirable or suffocating depending on the day. She has a daughter at university whom she calls every Sunday and a garden she tends with the same controlled intensity she brings to everything. Her private fear is that she made the wrong choice when she stopped doing research, and that suppressing this manuscript is the same choice made again."
+              },
+              {
+                "name": "Thomas, son of Aldric",
+                "role": "Supporting character (12th century)",
+                "archetype": "The child who inherits the consequences of adult choices",
+                "off_axis_attribute": "Thomas is 12 years old and already a better stonecutter than most of his father's journeymen, but he has his father's social paralysis and his mother's (dead) stubbornness, which means he will do something catastrophically brave at the worst possible moment.",
+                "dramatic_question": "Will Thomas survive his father's condemnation, and will Mara's intervention change what he becomes?",
+                "description": "Thomas is Aldric's apprentice and shadow. He has memorised every measurement of the cathedral's nave and can recite them in his sleep. He is frightened of the Bishop's steward, who once struck him for running in the cloister. He has a small carved horse his father made him that he keeps in his tunic."
+              }
+            ],
+            "chapters": [
+              {
+                "chapter_number": 0,
+                "title": "Prologue: The Chronicle of Caelan",
+                "act": "Act I",
+                "arc_point": "Ordinary World \u2014 the 12th century",
+                "pov_character": "Brother Caelan",
+                "bridge_from_prior": null,
+                "beat": "Caelan writes the final entry of his chronicle by candlelight, knowing it will be hidden before dawn; he addresses an unknown future reader directly, warning them that what follows is both true and dangerous.",
+                "arc_notes": "Ordinary World (12th century). Establishes the manuscript's existence, its stakes, and Caelan's voice. Plants the dramatic question in the reader's mind before Mara appears."
+              },
+              {
+                "chapter_number": 1,
+                "title": "The Damaged Folio",
+                "act": "Act I",
+                "arc_point": "Ordinary World \u2014 the present",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Caelan's chronicle is the manuscript Mara is about to open \u2014 the prologue's document is the inciting object.",
+                "beat": "Mara is called to Durham Cathedral Library to examine a water-damaged manuscript pulled from a sealed wall cavity during restoration work; she immediately recognises it as a 12th-century building chronicle of extraordinary detail and begins translating.",
+                "arc_notes": "Ordinary World (present). Establishes Mara's expertise, her workplace, her relationship with Edmund, and the manuscript as the story's central object."
+              },
+              {
+                "chapter_number": 2,
+                "title": "Edmund's Inventory",
+                "act": "Act I",
+                "arc_point": "Ordinary World \u2014 the present",
+                "pov_character": "Edmund Calder",
+                "bridge_from_prior": "Edmund was present when the manuscript was found and has been cataloguing it alongside Mara \u2014 his POV picks up the same object from a different angle.",
+                "beat": "Edmund catalogues the manuscript's physical condition and notices an anomaly: the vellum contains no carbon dating signature consistent with any known medieval scriptorium, and the ink formula matches nothing in the Durham archive \u2014 he flags this to Mara, who dismisses it.",
+                "arc_notes": "Ordinary World (present). Establishes Edmund's methodical nature, his unacknowledged feelings for Mara, and plants the first hint that the manuscript is not a normal document."
+              },
+              {
+                "chapter_number": 3,
+                "title": "First Translation",
+                "act": "Act I",
+                "arc_point": "Inciting Incident",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Edmund's anomaly report sends Mara back to the manuscript with new urgency \u2014 she reads aloud to test a passage he flagged.",
+                "beat": "Mara reads a Latin passage aloud in the empty archive at night and is violently displaced to the cathedral building site in 1143 \u2014 she arrives in mud, in darkness, surrounded by the smell of lime and the sound of a night watchman's bell, and has exactly until dawn to understand where she is before she is discovered.",
+                "arc_notes": "Inciting Incident. The time-travel mechanism is established. The dramatic question is activated."
+              },
+              {
+                "chapter_number": 4,
+                "title": "The Site in 1143",
+                "act": "Act I",
+                "arc_point": "Inciting Incident \u2014 immediate aftermath",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara is still in 1143 \u2014 direct continuation of the displacement.",
+                "beat": "Mara survives the night by hiding in the mason's lodge and at dawn encounters Aldric, who mistakes her for a runaway from the bishop's household; she does not correct him, and in doing so commits her first lie in the past.",
+                "arc_notes": "Inciting Incident aftermath. Establishes the 12th-century world, Aldric, and Mara's first moral compromise. She returns to the present when the passage ends \u2014 establishing the return mechanism."
+              },
+              {
+                "chapter_number": 5,
+                "title": "What She Brought Back",
+                "act": "Act I",
+                "arc_point": "First Plot Point \u2014 approach",
+                "pov_character": "Edmund Calder",
+                "bridge_from_prior": "Mara returns to the present with mud on her shoes that Edmund's chemical analysis will identify as medieval lime mortar \u2014 the physical evidence bridges the two timelines.",
+                "beat": "Edmund finds Mara unconscious in the archive, covered in 12th-century lime dust; she tells him everything and he does not believe her until his own analysis of the dust confirms it is 900 years old \u2014 his disbelief collapses into terrified acceptance.",
+                "arc_notes": "First Plot Point approach. Edmund is now complicit. The manuscript's power is confirmed by physical evidence."
+              },
+              {
+                "chapter_number": 6,
+                "title": "The Bishop's Ledger",
+                "act": "Act I",
+                "arc_point": "First Plot Point",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara's translation of the next passage \u2014 driven by what she saw in 1143 \u2014 reveals the political conspiracy against Aldric.",
+                "beat": "Mara translates a passage describing Bishop Ranulf's secret financial ledger, which records payments to a royal official to condemn Aldric on a fabricated charge of heresy; she realises the chronicle is not just a building record but a hidden accusation \u2014 and that Caelan wrote it knowing it would never be read in his lifetime.",
+                "arc_notes": "First Plot Point. The dramatic question sharpens: Mara now knows Aldric will be condemned and executed. She commits to using the manuscript to prevent it. No return to normal scholarship is possible."
+              },
+              {
+                "chapter_number": 7,
+                "title": "Ranulf's Cathedral",
+                "act": "Act I",
+                "arc_point": "First Plot Point \u2014 12th century parallel",
+                "pov_character": "Brother Caelan",
+                "bridge_from_prior": "Mara's translation of Caelan's ledger passage means the reader now understands what Caelan is recording \u2014 his POV reveals the conspiracy from the inside.",
+                "beat": "Caelan witnesses Bishop Ranulf instruct his steward to begin building a case against Aldric \u2014 the charge will be that Aldric's design incorporates pagan geometry \u2014 and Caelan records it in his chronicle while pretending to copy psalms.",
+                "arc_notes": "First Plot Point (12th century). Establishes Ranulf as antagonist, the fabricated charge, and Caelan's dangerous double life as recorder and witness."
+              },
+              {
+                "chapter_number": 8,
+                "title": "Dr. Frome's Concern",
+                "act": "Act I",
+                "arc_point": "First Plot Point \u2014 institutional threat introduced",
+                "pov_character": "Edmund Calder",
+                "bridge_from_prior": "Edmund's anomalous dating report has reached Harriet Frome through the library's standard cataloguing process \u2014 the institutional thread begins.",
+                "beat": "Harriet Frome summons Edmund and asks pointed questions about the manuscript's provenance; she reveals that the cathedral chapter has been informed of the find and that a senior church official has already requested it be placed under restricted access \u2014 Edmund lies and says the analysis is incomplete.",
+                "arc_notes": "First Plot Point \u2014 institutional antagonist introduced. The present-day threat to the manuscript is established. Edmund has now lied to protect Mara, mirroring Caelan's lie to protect Aldric."
+              },
+              {
+                "chapter_number": 9,
+                "title": "Second Passage: The Laying of the Nave",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 first wave of complications",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara reads the next passage immediately after Harriet's restriction order \u2014 urgency drives her back into the past.",
+                "beat": "Mara arrives in 1144 during the laying of the nave's foundation stones and watches Aldric work with a precision and joy that she recognises from the manuscript's measurements; she makes her first deliberate intervention \u2014 warning a journeyman about a flawed stone that the chronicle records as causing a collapse \u2014 and the collapse does not happen.",
+                "arc_notes": "Rising Action. First successful intervention. Establishes that the past can be changed and that Mara is willing to change it. New dramatic problem: if she changes events, the chronicle's accuracy changes \u2014 and she may lose her roadmap."
+              },
+              {
+                "chapter_number": 10,
+                "title": "The Altered Record",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 consequence of intervention",
+                "pov_character": "Edmund Calder",
+                "bridge_from_prior": "Mara returns and Edmund compares her account of the prevented collapse against the chronicle \u2014 the text has changed.",
+                "beat": "Edmund discovers that a passage in the manuscript has rewritten itself to reflect Mara's intervention \u2014 the collapse is no longer recorded \u2014 and he realises the manuscript is not a fixed historical document but a living record that updates with the timeline; this means every intervention Mara makes erases her evidence of what was supposed to happen.",
+                "arc_notes": "Rising Action \u2014 new dramatic problem. The manuscript as roadmap is being consumed by Mara's own actions. Edmund must now race to transcribe every passage before Mara reads it."
+              },
+              {
+                "chapter_number": 11,
+                "title": "Thomas at the Scaffold",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 12th century deepens",
+                "pov_character": "Brother Caelan",
+                "bridge_from_prior": "Caelan's chronicle records the prevented collapse \u2014 his entry now describes a mysterious woman who warned the journeyman, which Edmund has just read in the altered text.",
+                "beat": "Caelan observes the strange woman (Mara) from the cloister walk and records her in his chronicle with careful neutrality; he also records Thomas falling from a low scaffold and being caught by Aldric \u2014 a moment of father-son tenderness that Caelan notes is the only time he has seen Aldric show fear.",
+                "arc_notes": "Rising Action. Thomas is established as emotionally central. Caelan's awareness of Mara creates a new complication \u2014 he is now watching her."
+              },
+              {
+                "chapter_number": 12,
+                "title": "The Restricted Room",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 institutional pressure escalates",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Harriet's restriction order has now been formally issued \u2014 Mara arrives at the archive to find her access card blocked.",
+                "beat": "Mara discovers she has been locked out of the Special Collections room; she breaks in using Edmund's card, photographs the remaining untranslated passages, and is caught by Harriet \u2014 who gives her 48 hours to produce a formal academic report before the manuscript is transferred to the cathedral chapter's custody.",
+                "arc_notes": "Rising Action \u2014 institutional threat tightens. Mara now has a deadline. New dramatic problem: 48 hours to translate and act on all remaining passages."
+              },
+              {
+                "chapter_number": 13,
+                "title": "Aldric's Design",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 12th century, builder's vision established",
+                "pov_character": "Aldric of Rouen",
+                "bridge_from_prior": "Mara's photographs include a passage describing Aldric's original design drawings \u2014 her knowledge of those drawings is what she carries into the next visit.",
+                "beat": "Aldric shows Mara (who has returned) his parchment drawings for the cathedral's east end \u2014 a design of breathtaking ambition that includes a stone vault no English cathedral has yet attempted \u2014 and she recognises it as the design that was never built, replaced after his death by something smaller and safer.",
+                "arc_notes": "Rising Action. The cathedral's unrealised design is now the emotional heart of the story. Mara understands for the first time what will be lost if Aldric dies."
+              },
+              {
+                "chapter_number": 14,
+                "title": "The Pagan Geometry Charge",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 the fabricated case begins",
+                "pov_character": "Brother Caelan",
+                "bridge_from_prior": "Caelan records the Bishop's steward examining Aldric's drawings \u2014 the same drawings Mara just saw \u2014 and finding the 'evidence' of heresy.",
+                "beat": "The Bishop's steward confiscates Aldric's design drawings and presents them to Ranulf, who instructs a compliant theologian to annotate them with marginal notes identifying the proportional ratios as Pythagorean \u2014 therefore pagan \u2014 therefore heretical; Caelan copies the annotated drawings into his chronicle as evidence of the forgery.",
+                "arc_notes": "Rising Action. The mechanism of the false charge is made concrete. Caelan is now in active danger."
+              },
+              {
+                "chapter_number": 15,
+                "title": "Edmund's Transcription Race",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 present-day urgency",
+                "pov_character": "Edmund Calder",
+                "bridge_from_prior": "Edmund has been transcribing every passage before Mara reads them \u2014 this chapter shows the cost of that race.",
+                "beat": "Edmund works through the night transcribing the manuscript's remaining passages and discovers a passage he cannot translate \u2014 it is written in a cipher that uses the cathedral's own architectural measurements as a key \u2014 and he realises Caelan built a lock into the chronicle that only someone who had been to the building site could open.",
+                "arc_notes": "Rising Action \u2014 new dramatic problem. The cipher passage is the one that contains Caelan's direct accusation against Ranulf. Edmund cannot read it. Only Mara, who has been to the site, can."
+              },
+              {
+                "chapter_number": 16,
+                "title": "Third Passage: The Choir Walls",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 third time-travel visit",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara reads the passage that sends her to the choir wall construction \u2014 the passage Edmund has just transcribed.",
+                "beat": "Mara arrives in 1144 during the raising of the choir walls and is now recognised by Aldric, who has been watching for her return; he asks her directly who she is and where she comes from, and she tells him the partial truth \u2014 that she comes from far away and that she knows his cathedral will be magnificent \u2014 and he believes her because no one else has ever said so.",
+                "arc_notes": "Rising Action. Mara and Aldric's relationship deepens. The emotional stakes of her mission become personal. New complication: Aldric is beginning to trust her, which means her eventual disappearance will be a betrayal."
+              },
+              {
+                "chapter_number": 17,
+                "title": "What Ranulf Knows",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 antagonist's awareness",
+                "pov_character": "Brother Caelan",
+                "bridge_from_prior": "Ranulf's steward has reported the strange woman to the Bishop \u2014 Caelan overhears the report.",
+                "beat": "Ranulf is told about the woman who appears and disappears on the building site and instructs his steward to have her detained the next time she appears; Caelan, overhearing this, adds a warning to his chronicle \u2014 the first time he has written directly to the future reader rather than recording events.",
+                "arc_notes": "Rising Action. Mara is now a target in the past. Caelan's chronicle becomes a two-way communication. The stakes in 1144 escalate."
+              },
+              {
+                "chapter_number": 18,
+                "title": "The Moral Complication",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 moral crisis for Mara",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara has read Caelan's warning in the manuscript \u2014 she knows she will be detained on her next visit.",
+                "beat": "Mara realises she could prevent Aldric's condemnation most efficiently by simply stealing and destroying Ranulf's forged annotations before they are used \u2014 but doing so would require her to enter the Bishop's private chambers, which means using Thomas as a distraction in a way that puts the boy at risk; she spends the chapter deciding whether to do it.",
+                "arc_notes": "Rising Action \u2014 moral complication. The obviously effective path requires using a child as a tool. Mara cannot resolve this cleanly. This is the reader's dilemma too."
+              },
+              {
+                "chapter_number": 19,
+                "title": "Harriet's Discovery",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 institutional antagonist deepens",
+                "pov_character": "Edmund Calder",
+                "bridge_from_prior": "Harriet has been reviewing the archive's access logs and found Edmund's overnight sessions \u2014 she confronts him.",
+                "beat": "Harriet confronts Edmund with evidence of his overnight transcription work and he, under pressure, tells her the truth about the time travel; she does not believe him but she does believe that something extraordinary is happening, and she reveals that the church official requesting the manuscript's transfer is not a cathedral administrator but a Vatican archivist \u2014 someone who already knows what the manuscript contains.",
+                "arc_notes": "Rising Action \u2014 reveal about institutional antagonist. The Vatican's involvement reframes the threat: this suppression has been planned for a long time. New dramatic problem: the manuscript has been known about before."
+              },
+              {
+                "chapter_number": 20,
+                "title": "Fourth Passage: The Mason's Lodge",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 fourth time-travel visit",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara reads the next passage immediately \u2014 the Vatican revelation has made delay impossible.",
+                "beat": "Mara arrives in the mason's lodge at night and finds Caelan waiting for her \u2014 he has deduced from his own chronicle that she is the future reader he addressed in the prologue, and he confronts her with the question she has been avoiding: does she know how this ends?",
+                "arc_notes": "Rising Action. Mara and Caelan meet directly. She must decide how much to tell him. She tells him Aldric will be condemned and executed. Caelan's response is not despair but a request: take the chronicle back with you."
+              },
+              {
+                "chapter_number": 21,
+                "title": "The Chronicle's Purpose",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 Caelan's arc clarified",
+                "pov_character": "Brother Caelan",
+                "bridge_from_prior": "Caelan's meeting with Mara is recorded in his chronicle \u2014 this chapter is his immediate aftermath.",
+                "beat": "Caelan writes the most dangerous entry in his chronicle \u2014 a direct, named accusation of Bishop Ranulf, with the forged annotations described in forensic detail \u2014 and hides the completed manuscript in the wall cavity where it will remain for 900 years; he does this knowing it will be found, because Mara told him it would be.",
+                "arc_notes": "Rising Action \u2014 Caelan's arc reaches its own first plot point. He has committed to the chronicle as his weapon. The loop between past and present is now closed."
+              },
+              {
+                "chapter_number": 22,
+                "title": "The Cipher Broken",
+                "act": "Act II",
+                "arc_point": "Midpoint approach",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara returns from the lodge meeting with the architectural measurements Caelan gave her \u2014 the key to Edmund's cipher.",
+                "beat": "Mara uses the measurements from her visit to break the cipher passage Edmund could not read; it contains Caelan's direct accusation and, crucially, the location of a second document \u2014 a copy of the forged annotations with Ranulf's seal \u2014 hidden in the cathedral's fabric; this document, if it still exists, would be physical proof of the conspiracy.",
+                "arc_notes": "Midpoint approach. The dramatic question reframes: it is no longer only about saving Aldric in the past but about finding surviving physical proof in the present."
+              },
+              {
+                "chapter_number": 23,
+                "title": "Midpoint: The Hidden Document",
+                "act": "Act II",
+                "arc_point": "Midpoint \u2014 reversal",
+                "pov_character": "Edmund Calder",
+                "bridge_from_prior": "Edmund takes Mara's deciphered location and searches the cathedral fabric \u2014 the thread is the document's location.",
+                "beat": "Edmund finds the hidden document \u2014 the forged annotations with Ranulf's seal \u2014 sealed in a lead box behind a corbel carved with a small animal (Aldric's signature); the document proves the conspiracy, but when Edmund photographs it and sends the image to a trusted colleague for verification, Harriet intercepts the email and the Vatican archivist is alerted \u2014 the institutional threat becomes immediate and physical.",
+                "arc_notes": "Midpoint reversal. The proof exists and is found \u2014 but finding it triggers the final threat. The story's second half is now a race against the Vatican archivist's arrival."
+              },
+              {
+                "chapter_number": 24,
+                "title": "Ranulf's Tribunal",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 12th century crisis begins",
+                "pov_character": "Brother Caelan",
+                "bridge_from_prior": "The forged annotations Edmund found are the same ones Caelan is about to watch being used \u2014 the document bridges past and present.",
+                "beat": "Bishop Ranulf convenes a formal ecclesiastical tribunal and presents the annotated drawings as evidence of Aldric's heresy; Aldric, confronted with the forgery, goes silent and white \u2014 his social paralysis at its worst \u2014 and says nothing in his own defence; Caelan watches from the back of the chapter house and records every word.",
+                "arc_notes": "Rising Action \u2014 12th century crisis. Aldric's fatal flaw (social paralysis) is activated at the worst moment. The tribunal is the mechanism of his destruction."
+              },
+              {
+                "chapter_number": 25,
+                "title": "Fifth Passage: The Chapter House",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 fifth time-travel visit",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara reads the tribunal passage \u2014 the most urgent passage yet \u2014 and is sent directly to the chapter house.",
+                "beat": "Mara arrives at the tribunal in progress and, unable to stop herself, speaks \u2014 she addresses the chapter in Latin, claiming to be a papal legate's secretary with authority to examine the drawings; the bluff holds for ten minutes before Ranulf's steward recognises her as the woman from the building site and she is seized.",
+                "arc_notes": "Rising Action \u2014 Mara's most dangerous intervention. She is now a prisoner in 1144. New dramatic problem: she cannot return to the present while physically restrained."
+              },
+              {
+                "chapter_number": 26,
+                "title": "Thomas Acts",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 Thomas's catastrophically brave moment",
+                "pov_character": "Brother Caelan",
+                "bridge_from_prior": "Thomas was present at the tribunal and saw Mara seized \u2014 Caelan's POV picks up his response.",
+                "beat": "Thomas steals the forged annotations from the chapter house table during the confusion of Mara's seizure and runs; Caelan, watching, makes the decision to help the boy rather than record the event \u2014 he hides Thomas in the herb garden and the annotations are temporarily out of Ranulf's hands.",
+                "arc_notes": "Rising Action \u2014 Thomas's brave act changes the situation. Caelan crosses from observer to participant. The annotations are now a physical object in play."
+              },
+              {
+                "chapter_number": 27,
+                "title": "Mara in the Bishop's Custody",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 Mara imprisoned",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara is being held in the Bishop's guest house \u2014 direct continuation of her seizure.",
+                "beat": "Mara is interrogated by Ranulf, who is genuinely curious about her rather than immediately hostile \u2014 he is an intelligent man and she is an anomaly; she realises she can use his curiosity to buy time, and she tells him she is a scholar, which is true, and that she has come to study his cathedral, which is also true, and that she has no interest in his politics, which is a lie.",
+                "arc_notes": "Rising Action. Mara's interrogation scene. Ranulf is humanised without being softened. Mara's moral position becomes more complicated \u2014 she is manipulating a man who is, in this moment, treating her with courtesy."
+              },
+              {
+                "chapter_number": 28,
+                "title": "Edmund and the Vatican Archivist",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 present-day antagonist arrives",
+                "pov_character": "Edmund Calder",
+                "bridge_from_prior": "The Vatican archivist has arrived at Durham \u2014 the intercepted email is the thread.",
+                "beat": "Father Benedetto Sarra arrives at the library with a letter of authority from the Holy See and demands the manuscript; Edmund stalls by claiming Mara has the key to the secure case, which is true \u2014 Mara is in 1144 and the key is in her pocket \u2014 and Harriet, faced with the Vatican's authority, gives Edmund 12 hours before she hands over the manuscript.",
+                "arc_notes": "Rising Action \u2014 Vatican antagonist arrives. The 12-hour deadline is now the clock. Edmund must get Mara back and the manuscript published before the deadline."
+              },
+              {
+                "chapter_number": 29,
+                "title": "The Herb Garden",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 12th century, alliance forms",
+                "pov_character": "Brother Caelan",
+                "bridge_from_prior": "Thomas is hidden in Caelan's herb garden with the stolen annotations \u2014 direct continuation.",
+                "beat": "Caelan and Thomas examine the stolen annotations together and Thomas, who has memorised every measurement of the cathedral, identifies the specific proportional ratios that have been annotated as 'pagan' \u2014 and points out that the same ratios appear in the proportions of the cathedral's own altar cross, which Ranulf commissioned; the forgery contains an internal contradiction that would destroy it in any honest examination.",
+                "arc_notes": "Rising Action \u2014 new information from an existing character. Thomas's architectural knowledge becomes the key to defeating the forgery. The child saves the situation the adults created."
+              },
+              {
+                "chapter_number": 30,
+                "title": "Mara's Release",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 Mara freed",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Caelan sends a message to Mara in the guest house via a lay brother \u2014 the herb garden discovery is the thread.",
+                "beat": "Caelan arranges Mara's release by telling Ranulf that she is under the protection of the Archbishop of Canterbury \u2014 a lie, but one Ranulf cannot easily disprove \u2014 and Mara is released into Caelan's custody; she immediately goes to find Thomas and the annotations.",
+                "arc_notes": "Rising Action. Mara is freed. The alliance of Mara, Caelan, and Thomas is now complete. The annotations with the internal contradiction are their weapon."
+              },
+              {
+                "chapter_number": 31,
+                "title": "Sixth Passage: The Altar Cross",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 sixth time-travel visit, the contradiction exposed",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara reads the passage describing the altar cross \u2014 she is sent to the moment when the contradiction can be used.",
+                "beat": "Mara, Caelan, and Thomas bring the annotations and the altar cross before a small gathering of senior monks \u2014 not a formal tribunal but an informal chapter meeting \u2014 and Thomas demonstrates the identical ratios; three monks are visibly shaken, and one, the prior, asks to examine the annotations privately.",
+                "arc_notes": "Rising Action. The forgery's internal contradiction is exposed to witnesses. The prior's private examination is a new thread \u2014 he may be an ally or a danger."
+              },
+              {
+                "chapter_number": 32,
+                "title": "The Prior's Choice",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 institutional ally emerges",
+                "pov_character": "Brother Caelan",
+                "bridge_from_prior": "The prior has taken the annotations \u2014 Caelan follows him.",
+                "beat": "The prior, Prior Osbert, examines the annotations and confirms the contradiction; he tells Caelan privately that he has long suspected Ranulf of corruption but has never had evidence \u2014 and that he will present the contradiction at the formal tribunal if Caelan will provide a written account of how the annotations were produced; Caelan agrees, knowing this will expose him as a spy.",
+                "arc_notes": "Rising Action \u2014 new ally. Prior Osbert is an existing background character now given agency. Caelan's arc reaches its moral crisis: he must expose himself to save Aldric."
+              },
+              {
+                "chapter_number": 33,
+                "title": "Edmund's Gamble",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 present-day, Edmund acts alone",
+                "pov_character": "Edmund Calder",
+                "bridge_from_prior": "Edmund has been unable to reach Mara \u2014 she is still in 1144 \u2014 and the 12-hour deadline is running; he acts on the information he has.",
+                "beat": "Edmund uploads a full digital transcription of the manuscript \u2014 including the deciphered accusation and photographs of the hidden document \u2014 to three academic repositories simultaneously, making it impossible to suppress; Harriet discovers this and is furious, but the upload is irreversible; Edmund tells her: 'You can give them the manuscript. You can't give them back the truth.'",
+                "arc_notes": "Rising Action \u2014 Edmund's decisive unilateral action. The present-day suppression is defeated. But Mara is still in 1144 and the manuscript's physical destruction is still possible."
+              },
+              {
+                "chapter_number": 34,
+                "title": "Ranulf Moves",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 antagonist's counter-move",
+                "pov_character": "Brother Caelan",
+                "bridge_from_prior": "Ranulf has learned that the prior is examining the annotations \u2014 his steward reports this to him.",
+                "beat": "Ranulf, realising his case is weakening, moves the tribunal forward by two days and orders Aldric confined to the building site under guard; he also orders Caelan reassigned to a distant priory \u2014 a move that will remove the only witness before the tribunal reconvenes.",
+                "arc_notes": "Rising Action \u2014 antagonist's counter-move. The timeline accelerates. Caelan's removal is the new crisis. New dramatic problem: Caelan must give his written account before he is removed."
+              },
+              {
+                "chapter_number": 35,
+                "title": "Aldric Confined",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 builder's lowest point",
+                "pov_character": "Aldric of Rouen",
+                "bridge_from_prior": "Aldric is now under guard on the building site \u2014 direct consequence of Ranulf's order.",
+                "beat": "Aldric, confined to the site, continues working \u2014 he cannot stop \u2014 and Mara finds him measuring the east end foundations at dusk; he tells her he knows he will be condemned and that he has made peace with it, but that he cannot make peace with the cathedral being finished wrong; she tells him she will not let that happen, and she does not know if she is lying.",
+                "arc_notes": "Rising Action \u2014 Aldric's emotional lowest point. The relationship between Mara and Aldric reaches its most honest moment. Her promise is the story's emotional centre."
+              },
+              {
+                "chapter_number": 36,
+                "title": "Harriet's Reversal",
+                "act": "Act II",
+                "arc_point": "Rising Action \u2014 institutional antagonist's arc turns",
+                "pov_character": "Edmund Calder",
+                "bridge_from_prior": "Harriet has read Edmund's upload \u2014 the content of the manuscript is now the thread.",
+                "beat": "Harriet reads the full translated chronicle and the deciphered accusation and sits in silence for a long time; she then tells Edmund that she will not hand the physical manuscript to Father Sarra \u2014 she will claim it has been damaged beyond transfer \u2014 and she asks Edmund what she can do to help; her reversal is not dramatic but quiet, the decision of someone who recognises the same choice they made before and chooses differently.",
+                "arc_notes": "Rising Action \u2014 Harriet's arc turns. Her reversal is earned by her backstory (the earlier suppression she regrets). She is now an ally. The institutional threat in the present is resolved before the climax."
+              },
+              {
+                "chapter_number": 37,
+                "title": "Seventh Passage: The Night Before the Tribunal",
+                "act": "Act II",
+                "arc_point": "Second Plot Point approach",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara reads the passage describing the night before the tribunal \u2014 the most dangerous passage in the manuscript.",
+                "beat": "Mara arrives in 1144 on the night before the accelerated tribunal and finds Caelan writing his final chronicle entry by candlelight \u2014 the same scene as the prologue, now seen from inside; she realises she has arrived at the moment the chronicle ends, which means this is the last passage that can send her here; after this visit, the manuscript will have no more active passages and she cannot return.",
+                "arc_notes": "Second Plot Point approach. The mechanism of the final crisis is established: this is Mara's last visit. Everything must be resolved tonight."
+              },
+              {
+                "chapter_number": 38,
+                "title": "Caelan's Last Entry",
+                "act": "Act II",
+                "arc_point": "Second Plot Point \u2014 12th century",
+                "pov_character": "Brother Caelan",
+                "bridge_from_prior": "Caelan is writing the final entry \u2014 Mara is present in the room.",
+                "beat": "Caelan finishes his chronicle and hands it to Mara to carry back to the present; he tells her that Prior Osbert has agreed to present the contradiction at tomorrow's tribunal but that it may not be enough \u2014 Ranulf has already secured the royal official's testimony \u2014 and that the only thing that will save Aldric is if the tribunal is disrupted before the testimony is given; Caelan cannot do it because he will be removed at dawn.",
+                "arc_notes": "Second Plot Point (12th century). Caelan's arc completes. He has done everything he can. The burden passes entirely to Mara."
+              },
+              {
+                "chapter_number": 39,
+                "title": "The Second Plot Point: Mara's Choice",
+                "act": "Act II",
+                "arc_point": "Second Plot Point \u2014 protagonist's crisis",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara holds the completed chronicle \u2014 the last passage has been read \u2014 and faces the choice.",
+                "beat": "Mara realises that if she stays in 1144 through the tribunal, she will be stranded \u2014 the manuscript will have no more passages to bring her back \u2014 but if she returns to the present now, Aldric will be condemned tomorrow with no one to disrupt the tribunal; she chooses to stay, handing the chronicle to Thomas with instructions to hide it in the wall cavity, and watches the manuscript disappear from her hands as the present-day copy updates.",
+                "arc_notes": "Second Plot Point \u2014 protagonist's darkest moment. Mara has chosen to strand herself. Everything is lost in the conventional sense. The climax must now resolve both the 12th-century tribunal and the question of whether she can ever return."
+              },
+              {
+                "chapter_number": 40,
+                "title": "Edmund Loses Contact",
+                "act": "Act II",
+                "arc_point": "Second Plot Point \u2014 present-day",
+                "pov_character": "Edmund Calder",
+                "bridge_from_prior": "The manuscript's final passage has been read \u2014 Edmund watches the last active passage go blank.",
+                "beat": "Edmund watches the manuscript's final passage rewrite itself to a completed state and understands that Mara has stayed; he has no way to reach her, no way to bring her back, and the manuscript is now a closed document with no active passages; he sits in the archive and for the first time in the novel, he does nothing \u2014 because there is nothing to do.",
+                "arc_notes": "Second Plot Point (present-day). Edmund's lowest moment. His helplessness is total. The emotional weight of his unspoken love is fully visible."
+              },
+              {
+                "chapter_number": 41,
+                "title": "Dawn at the Cathedral",
+                "act": "Act III",
+                "arc_point": "Climax \u2014 approach",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara is in 1144 at dawn \u2014 direct continuation of her choice to stay.",
+                "beat": "Mara spends the night on the building site with Aldric and Thomas, watching the cathedral's east end walls rise in the early light; Aldric shows her the small animals carved under the corbels and she understands for the first time that a building is not a document \u2014 it is a body, and it carries the marks of the people who made it.",
+                "arc_notes": "Climax approach. The emotional preparation for the climax. Mara's transformation is visible: she has moved from scholar to participant."
+              },
+              {
+                "chapter_number": 42,
+                "title": "The Tribunal Reconvenes",
+                "act": "Act III",
+                "arc_point": "Climax \u2014 the tribunal",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "The tribunal is the event Mara stayed to disrupt \u2014 direct continuation.",
+                "beat": "The tribunal reconvenes in the chapter house; Prior Osbert presents the internal contradiction in the annotations; Ranulf's theologian is unable to answer it; the royal official's testimony is given but Prior Osbert challenges its admissibility on procedural grounds; the tribunal is thrown into procedural chaos \u2014 and in the chaos, Mara stands and addresses the chapter in the most precise, authoritative Latin she has ever spoken, presenting the full case against the forgery from memory.",
+                "arc_notes": "Climax \u2014 the central confrontation. Mara acts from who she has become: not a cautious scholar but a woman who has chosen this moment over her own future."
+              },
+              {
+                "chapter_number": 43,
+                "title": "Ranulf's Defeat",
+                "act": "Act III",
+                "arc_point": "Climax \u2014 resolution of the 12th-century conflict",
+                "pov_character": "Brother Caelan",
+                "bridge_from_prior": "Caelan has not been removed yet \u2014 his departure was scheduled for dawn but delayed by the tribunal's chaos; he is present.",
+                "beat": "The chapter votes to suspend the heresy charge pending a full examination of the annotations; Ranulf, faced with the chapter's open scepticism, withdraws the charge rather than risk a formal finding of forgery against him; Aldric is released from confinement; Ranulf leaves the chapter house without speaking; Caelan records every word.",
+                "arc_notes": "Climax \u2014 Ranulf's defeat. The central conflict is resolved. Aldric is saved. The cathedral will be finished as designed."
+              },
+              {
+                "chapter_number": 44,
+                "title": "The Unfinished Arch",
+                "act": "Act III",
+                "arc_point": "Climax \u2014 emotional resolution, 12th century",
+                "pov_character": "Aldric of Rouen",
+                "bridge_from_prior": "Aldric has been released \u2014 he goes immediately to the building site.",
+                "beat": "Aldric returns to the east end and places the first stone of the vault he designed \u2014 the stone vault no English cathedral has yet attempted \u2014 and Thomas works beside him; Mara watches from the cloister walk and understands that she has not corrected history, she has restored it; the cathedral will be built as it was always meant to be.",
+                "arc_notes": "Climax \u2014 emotional resolution. Aldric's arc completes. The building begins its true form. Mara's transformation is made visible through what she has enabled."
+              },
+              {
+                "chapter_number": 45,
+                "title": "The Return Passage",
+                "act": "Act III",
+                "arc_point": "Resolution \u2014 Mara's return",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thomas hid the chronicle in the wall cavity \u2014 the act of hiding it is what creates the return mechanism.",
+                "beat": "Mara finds that the chronicle, now hidden in the wall, has generated a new final passage \u2014 Caelan, who understood the mechanism better than anyone, wrote one last entry addressed to Mara specifically, containing the Latin words that will send her home; she reads it aloud and is displaced back to the present.",
+                "arc_notes": "Resolution \u2014 the return. Caelan's final gift. The loop closes. The mechanism is consistent: the chronicle always had this passage, but it could only be written after the tribunal was resolved."
+              },
+              {
+                "chapter_number": 46,
+                "title": "The Archive at Dawn",
+                "act": "Act III",
+                "arc_point": "Resolution \u2014 present-day",
+                "pov_character": "Edmund Calder",
+                "bridge_from_prior": "Mara returns to the archive \u2014 Edmund is still there.",
+                "beat": "Mara returns to the present to find Edmund asleep in the archive chair with her transcription notes spread across his lap; she wakes him and he looks at her for a long moment before saying anything; what he says is not a declaration but a question \u2014 'Did it work?' \u2014 and she tells him yes, and then she tells him she stayed, and he says he knows, and neither of them says the other thing yet.",
+                "arc_notes": "Resolution \u2014 emotional payoff for Edmund and Mara. The unspoken is acknowledged without being forced. The relationship arc is resolved with restraint."
+              },
+              {
+                "chapter_number": 47,
+                "title": "Father Sarra's Departure",
+                "act": "Act III",
+                "arc_point": "Resolution \u2014 institutional thread closed",
+                "pov_character": "Edmund Calder",
+                "bridge_from_prior": "Father Sarra is still at Durham \u2014 the Vatican thread must be closed.",
+                "beat": "Father Sarra, informed that the manuscript's full transcription is already in three academic repositories and that Harriet has certified the physical document as too fragile for transfer, departs without the manuscript; he is not defeated but contained \u2014 he tells Edmund quietly that the Church has been managing this particular truth for 900 years and is patient; Edmund replies that so is scholarship.",
+                "arc_notes": "Resolution \u2014 institutional antagonist's exit. The suppression is defeated. Father Sarra's parting line acknowledges the ongoing nature of the conflict without reopening it."
+              },
+              {
+                "chapter_number": 48,
+                "title": "Harriet's Report",
+                "act": "Act III",
+                "arc_point": "Resolution \u2014 Harriet's arc closes",
+                "pov_character": "Edmund Calder",
+                "bridge_from_prior": "Harriet has been present throughout \u2014 her arc closes here.",
+                "beat": "Harriet writes the official report on the manuscript's discovery, describing it as a significant 12th-century building chronicle with evidence of ecclesiastical corruption \u2014 accurate, measured, and published under her own name alongside Mara's; it is the first original research she has published in fourteen years; she calls her daughter that evening and talks for an hour.",
+                "arc_notes": "Resolution \u2014 Harriet's arc. She chose differently this time. The cost of her earlier suppression is acknowledged without melodrama."
+              },
+              {
+                "chapter_number": 49,
+                "title": "What the Cathedral Became",
+                "act": "Act III",
+                "arc_point": "Resolution \u2014 historical consequence revealed",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara has been researching what changed in the historical record \u2014 the thread is the altered timeline.",
+                "beat": "Mara discovers that the cathedral's east end, as it stands today, contains the stone vault Aldric designed \u2014 a vault that architectural historians have always attributed to an unknown master of the late 1140s; she finds a corbel with a small carved animal on its underside, and she knows whose hand made it, and she sits in the nave for a long time.",
+                "arc_notes": "Resolution \u2014 the historical consequence of Mara's intervention is made concrete and visible. The building is the proof. The wow factor is paid off."
+              },
+              {
+                "chapter_number": 50,
+                "title": "Epilogue: The Corbel",
+                "act": "Act III",
+                "arc_point": "Resolution \u2014 final image",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara is still in the nave \u2014 direct continuation.",
+                "beat": "Mara finds Thomas's name carved beside his father's animal \u2014 a small T, cut with a child's uncertain hand, in a place no one was ever meant to see; she photographs it and sends the image to Edmund with no caption; he replies with one word: 'Good.'",
+                "arc_notes": "Epilogue \u2014 final image. Thomas survived. The building remembers. The dramatic question is answered. The story closes on the smallest possible scale after the largest possible stakes."
+              }
+            ]
+          },
+          "persist": {
+            "persisted": false,
+            "reason": "persist requested but project_id/user_id missing"
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

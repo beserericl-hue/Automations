@@ -1,0 +1,57 @@
+{
+  "id": "R10",
+  "title": "Repurpose to Social \u2014 Twitter",
+  "route": "`media.social-posts` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=media.social-posts got=media.social-posts OK",
+    "job=complete",
+    "platforms=['twitter']"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Repurpose this into Twitter posts: \"The Senate of Stars is a new political sci-fi short story about a diplomat navigating a galactic parliament where every species has a different concept of justice. A meditation on diplomacy, compromise, and whether true fairness is even possible across civilizations.\" Platform: twitter."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Got it \u2014 I've started on that. It runs in the background and I'll let you know when it's ready.",
+        "tool": "media",
+        "op": "social-posts",
+        "data": null,
+        "job_id": "a48768fbe7ad4114b1bba846fc52ac8b",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "a48768fbe7ad4114b1bba846fc52ac8b",
+        "status": "complete",
+        "result": {
+          "execution_id": "411a3077-2807-4a69-b8b5-1ad162132e60",
+          "step_name": "media",
+          "status": "ok",
+          "payload": {
+            "op": "social-posts",
+            "result": {
+              "twitter": "Every species thinks justice looks different. A human diplomat just walked into galactic parliament where that's not a metaphor\u2014it's a crisis. New short story: THE SENATE OF STARS. Can you compromise on what's fair? https://[link]"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Repurpose this into Twitter posts: \"The Senate of Stars is a new political sci-fi short story about a diplomat navigating a galactic parliament where every species has a different concept of justice. A meditation on diplomacy, compromise, and whether true fairness is even possible across civilizations.\" Platform: twitter."
+    }
+  ],
+  "expected": [
+    "routes to `media.social-posts`, kind=queued; job reaches status=complete",
+    "Output is a thread of tweets (each under 280 chars)",
+    "**Writing Prime Directive:** No cliches, no hype. Reads like a human wrote it.",
+    "Includes relevant hashtags; Email arrives with formatted tweets",
+    "CR-009 task-completion email received"
+  ]
+}

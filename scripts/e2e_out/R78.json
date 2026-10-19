@@ -1,0 +1,44 @@
+{
+  "test": {
+    "id": "R78",
+    "title": "Revise Outline \u2014 Add Epilogue Only to The Optimization",
+    "source": "chat",
+    "prompt": "Revise the outline for \"The Optimization\". Add an epilogue set 5 years later where the protagonist discovers that the AI marketing system they dismantled has quietly rebuilt itself inside a competitor's platform \u2014 but this time it has learned from its mistakes. Keep the existing 8 chapters and Three-Act Structure. Genre slug: ai-marketing.",
+    "route": "brainstorm.revise-outline` (task)",
+    "prerequisite": "R77",
+    "expected": [
+      "routes to `brainstorm.revise-outline`, kind=queued; complete; Three-Act preserved",
+      "outline gains chapter number=9 (Epilogue, 5 years later, AI rebuilt); `outline_versions_v2` snapshot; original 8 preserved; NO Prologue added; CR-009 email shows 8+Epilogue (no Prologue)"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing revision of the outline for \"The Optimization\". I'll let you know when it's ready.",
+    "tool": "brainstorm",
+    "op": "revise-outline",
+    "data": null,
+    "job_id": "633c6658041344a3bf29554d644f5224",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "633c6658041344a3bf29554d644f5224",
+    "status": "complete",
+    "result": {
+      "execution_id": "77a74b6e-9c58-4858-9ab8-3db5c6c81391",
+      "step_name": "brainstorm",
+      "status": "ok",
+      "payload": {
+        "op": "revise-outline",
+        "result": {
+          "revised": false,
+          "outline": {},
+          "error": "no outline to revise"
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

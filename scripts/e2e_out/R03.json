@@ -1,0 +1,47 @@
+{
+  "test": {
+    "id": "R03",
+    "title": "Email Report",
+    "source": "chat",
+    "prompt": "Send me an email report with this content:\n\n  # Post-Apocalyptic Fiction Trends 2026\n\n  ## Key Findings\n  - Climate fiction is merging with post-apocalyptic themes\n  - Solarpunk counternarratives are gaining traction\n  - AI apocalypse stories have surged 300% since 2024\n\n  ## Recommended Reading\n  1. \"The Last Garden\" by Sarah Chen\n  2. \"Ash Protocol\" by Marcus Webb\n\n  Send it to eric@agileadtesting.com with subject line \"Regression Test: Email Report\"",
+    "route": "library.email-content` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `library.email-content`, kind=queued; job reaches status=complete",
+      "Email arrives at eric@agileadtesting.com",
+      "Email is formatted HTML (headings, bullet points, numbered list)",
+      "Subject line matches \"Regression Test: Email Report\""
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Sending the email report now.",
+    "tool": "library",
+    "op": "email-content",
+    "data": null,
+    "job_id": "6fa3387a8a7b433a88282799d4adf503",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "6fa3387a8a7b433a88282799d4adf503",
+    "status": "complete",
+    "result": {
+      "execution_id": "80fa1a72-b670-4ff3-898b-d2d536357687",
+      "step_name": "library",
+      "status": "ok",
+      "payload": {
+        "op": "email-content",
+        "result": {
+          "emailed": true,
+          "to": "eric@agileadtesting.com",
+          "subject": "Regression Test: Email Report",
+          "content_type": "inline"
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

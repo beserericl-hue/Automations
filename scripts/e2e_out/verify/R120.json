@@ -1,0 +1,147 @@
+{
+  "id": "R120",
+  "title": "Kish\u014dtenketsu Chapter Arc (No Conflict Structure)",
+  "route": "`chapter.plan` (task) \u00b7 impl: built (E2E-4)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=chapter.plan got=chapter.plan OK",
+    "job=complete",
+    "sub_chapters=5 arc=Kish\u014dtenketsu"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Create a chapter outline for Chapter 4 of \"The Signal Beneath\" using Kish\u014dtenketsu.\n  This should be a quieter chapter \u2014 the protagonist reaches the coast and\n  observes the submerged station from the shore. No combat, no confrontation.\n  Focus on contrast and reflection."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Planning chapter 4 for \"The Signal Beneath\" using Kish\u014dtenketsu. I'll let you know when the outline is ready.",
+        "tool": "chapter",
+        "op": "plan",
+        "data": null,
+        "job_id": "302c867adfff43e1b34503e8d1dc7c24",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "302c867adfff43e1b34503e8d1dc7c24",
+        "status": "complete",
+        "result": {
+          "execution_id": "09ab6d42-3844-4153-8c1f-54ac9e138af4",
+          "step_name": "chapter",
+          "status": "ok",
+          "payload": {
+            "op": "plan",
+            "result": {
+              "chapter_number": 4,
+              "chapter_story_arc": "Kish\u014dtenketsu",
+              "book_arc": "The Hero's Journey",
+              "sub_chapter_briefs": [
+                {
+                  "number": 1,
+                  "title": "The Station",
+                  "beat": "Mara and Tom\u00e1s arrive at the ruins of Harrow Station at dusk. Tom\u00e1s goes quiet in a way Mara has not seen before \u2014 he stops moving, stops talking, stands at the edge of the platform and looks at the scorched concrete. Mara counts the rust-stained outlines on the ground before she understands what they are.",
+                  "pov_character": "",
+                  "brief": "Mara and Tom\u00e1s arrive at the ruins of Harrow Station at dusk. Tom\u00e1s goes quiet in a way Mara has not seen before \u2014 he stops moving, stops talking, stands at the edge of the platform and looks at the scorched concrete. Mara counts the rust-stained outlines on the ground before she understands what they are.",
+                  "arc_beat": "Ki \u2014 Introduction: the ruined station is established as a place of presence and weight, not yet explained; the reader is invited in through sensory detail before meaning arrives.",
+                  "characters": [
+                    "Mara Voss",
+                    "Tom\u00e1s Reyes"
+                  ],
+                  "setting": "Harrow Station \u2014 a collapsed regional rail hub, roofless, overgrown at the edges, with a long concrete platform and the ghost of a timetable board still bolted to the far wall. Late afternoon light. Ash-coloured gravel.",
+                  "emotional_tone": "Dread held at a distance; the quiet before a story that cannot be untold.",
+                  "connects_to_book_arc": "Stage 6 \u2014 Tests, Allies, and Enemies: the special world deepens; Mara encounters a site of RA violence for the first time as physical fact rather than rumour, beginning the chapter's escalating revelation of what the Reclamation Authority is willing to do."
+                },
+                {
+                  "number": 2,
+                  "title": "Forty Names",
+                  "beat": "Tom\u00e1s tells Mara what happened at Harrow Station: forty people, a courier convoy and a small settlement that had been using the station as a waypoint, killed by an RA suppression team eighteen months ago. He was supposed to be on that convoy. He wasn't, because a broken axle delayed him by a day. He names the officer who signed the order: Aldric Senn. Mara writes the name in her logbook.",
+                  "pov_character": "",
+                  "brief": "Tom\u00e1s tells Mara what happened at Harrow Station: forty people, a courier convoy and a small settlement that had been using the station as a waypoint, killed by an RA suppression team eighteen months ago. He was supposed to be on that convoy. He wasn't, because a broken axle delayed him by a day. He names the officer who signed the order: Aldric Senn. Mara writes the name in her logbook.",
+                  "arc_beat": "Sh\u014d \u2014 Development: the station's weight is given specific human texture; Tom\u00e1s's grief, previously masked by dry humour, surfaces as something concrete and unprocessed; the name Aldric Senn is planted as a seed.",
+                  "characters": [
+                    "Mara Voss",
+                    "Tom\u00e1s Reyes"
+                  ],
+                  "setting": "The far end of the Harrow Station platform, sitting on the edge with their backs to the scorched concrete. The light failing. Tom\u00e1s's voice low and even.",
+                  "emotional_tone": "Grief spoken aloud for the first time; the particular flatness of a man recounting something he has rehearsed in silence for eighteen months.",
+                  "connects_to_book_arc": "Stage 6 \u2014 Tests, Allies, and Enemies: Mara learns the RA's capacity for lethal suppression is not abstract \u2014 it has a name, a precedent, and a personal cost to her ally; this escalates the stakes of her own journey and plants the Aldric Senn thread that will explode in Chapter 5. ESCALATING THREAD \u2014 START: Aldric Senn's name enters the story here as the officer who ordered the massacre. Reappears with pressure in Chapter 5 when Mara sees him alive in Millhaven. Explodes in Chapter 6 when Mara must decide whether to expose him, protect him, or use him."
+                },
+                {
+                  "number": 3,
+                  "title": "Fetch",
+                  "beat": "At the western edge of the station, a man named Fetch steps out of the dark with four armed people behind him. He controls the river crossing half a mile ahead \u2014 the only viable ford for thirty miles. He is not hostile in the way of someone who wants to kill; he is hostile in the way of someone who wants something. He takes their packs, their water, and their freedom of movement, and walks them to his compound.",
+                  "pov_character": "",
+                  "brief": "At the western edge of the station, a man named Fetch steps out of the dark with four armed people behind him. He controls the river crossing half a mile ahead \u2014 the only viable ford for thirty miles. He is not hostile in the way of someone who wants to kill; he is hostile in the way of someone who wants something. He takes their packs, their water, and their freedom of movement, and walks them to his compound.",
+                  "arc_beat": "Ten \u2014 Twist/Turn: the meditative weight of the station is broken not by violence but by the arrival of a new power with its own logic; Fetch reframes the station from a site of memory into a site of ongoing control; the journey's obstacle is not the RA but a local warlord with a broken machine.",
+                  "characters": [
+                    "Mara Voss",
+                    "Tom\u00e1s Reyes"
+                  ],
+                  "setting": "The western approach to Harrow Station, transitioning to Fetch's compound \u2014 a converted rail maintenance depot, corrugated iron and salvaged chain-link, lit by a single working lantern. The smell of diesel and rust.",
+                  "emotional_tone": "Controlled threat; the specific tension of being captured by someone who is not yet decided about you.",
+                  "connects_to_book_arc": "Stage 6 \u2014 Tests, Allies, and Enemies: Mara encounters a named enemy who is not the RA \u2014 the wasteland has its own power structures that predate and complicate the central conflict; Fetch is a test of Mara's practical intelligence rather than her courage."
+                },
+                {
+                  "number": 4,
+                  "title": "The Generator",
+                  "beat": "Fetch's compound runs on a diesel generator that has been silent for eleven days \u2014 a fuel injector fault Fetch's people cannot diagnose. Fetch offers passage across the ford in exchange for repair. Mara negotiates: passage for two, plus the release of the three people she can hear through the wall of the depot's back room. Fetch agrees to passage; he does not agree to the prisoners. Mara begins the repair anyway, buying time, thinking. While she works, she talks through the wall to the prisoners \u2014 a woman named Cass and two men she cannot see \u2014 and learns they are trying to reach the same signal source she is.",
+                  "pov_character": "",
+                  "brief": "Fetch's compound runs on a diesel generator that has been silent for eleven days \u2014 a fuel injector fault Fetch's people cannot diagnose. Fetch offers passage across the ford in exchange for repair. Mara negotiates: passage for two, plus the release of the three people she can hear through the wall of the depot's back room. Fetch agrees to passage; he does not agree to the prisoners. Mara begins the repair anyway, buying time, thinking. While she works, she talks through the wall to the prisoners \u2014 a woman named Cass and two men she cannot see \u2014 and learns they are trying to reach the same signal source she is.",
+                  "arc_beat": "Ketsu \u2014 Conclusion/Resolution: the repair is the scene's action, but the revelation through the wall is its meaning; the generator's restoration echoes the novel's central image of dead things made to transmit again; the prisoners confirm that the signal has been broadcasting long enough to draw others \u2014 which means it is real, it is sustained, and it is already known to people who are not the RA.",
+                  "characters": [
+                    "Mara Voss",
+                    "Tom\u00e1s Reyes"
+                  ],
+                  "setting": "The interior of the maintenance depot \u2014 oil-stained concrete floor, the generator bolted to a steel frame in the centre, a plywood partition wall with a padlocked door. Mara working by lantern light. Tom\u00e1s watching Fetch's people.",
+                  "emotional_tone": "Focused pragmatism over fear; the particular intimacy of two strangers talking through a wall in the dark; the quiet shock of confirmation.",
+                  "connects_to_book_arc": "Stage 6 \u2014 Tests, Allies, and Enemies: Mara's practical skill (the generator repair) is her currency in the special world \u2014 not weapons, not authority; the prisoners introduce a new complication: the signal community is not a secret known only to Mara and the RA, which means the race to reach it is already underway and the threat landscape is wider than she understood."
+                },
+                {
+                  "number": 5,
+                  "title": "The Ford",
+                  "beat": "The generator starts. Fetch honours the passage agreement \u2014 for Mara and Tom\u00e1s. He does not release the prisoners. Mara, at the edge of the ford in the dark, makes a decision: she tells Tom\u00e1s the frequency and the logbook cipher, in case they are separated, then goes back. She does not fight Fetch \u2014 she tells him the prisoners are more useful to him alive and moving than held, because whoever is broadcasting that signal has medicine and food and knowledge, and the prisoners know the route. Fetch, who is pragmatic before he is cruel, releases them. The five of them cross the ford together. On the far bank, the woman named Cass tells Mara the signal community is called Millhaven.",
+                  "pov_character": "",
+                  "brief": "The generator starts. Fetch honours the passage agreement \u2014 for Mara and Tom\u00e1s. He does not release the prisoners. Mara, at the edge of the ford in the dark, makes a decision: she tells Tom\u00e1s the frequency and the logbook cipher, in case they are separated, then goes back. She does not fight Fetch \u2014 she tells him the prisoners are more useful to him alive and moving than held, because whoever is broadcasting that signal has medicine and food and knowledge, and the prisoners know the route. Fetch, who is pragmatic before he is cruel, releases them. The five of them cross the ford together. On the far bank, the woman named Cass tells Mara the signal community is called Millhaven.",
+                  "arc_beat": "Ketsu \u2014 echo and resonance: the chapter closes not on triumph but on a quiet realignment; Mara did not fight, did not run, did not sacrifice \u2014 she persuaded, using the signal's value as leverage; the name Millhaven arrives like a frequency locking in; the callback to the generator (a dead thing made to work) is mirrored in the prisoners (people held still, now moving again).",
+                  "characters": [
+                    "Mara Voss",
+                    "Tom\u00e1s Reyes"
+                  ],
+                  "setting": "The river ford \u2014 shallow, fast, cold, knee-deep in the dark. The far bank: scrub grass and a dirt track heading west. The compound's single lantern visible behind them, shrinking.",
+                  "emotional_tone": "Relief cut with the knowledge that the world is more complicated than it was an hour ago; the particular feeling of a door opening onto a larger room.",
+                  "connects_to_book_arc": "Stage 6 \u2014 Tests, Allies, and Enemies: Mara passes the test not through force but through the signal's value \u2014 the signal is already her most powerful tool before she has even reached it; the chapter ends with the destination named (Millhaven), the new allies acquired (Cass and the two men), and a new question opened: if others are already trying to reach Millhaven, who else is coming \u2014 and from which direction? This propels directly into Chapter 5."
+                }
+              ],
+              "count": 5,
+              "persist": {
+                "persisted": true,
+                "chapter_number": 4
+              },
+              "token_usage": {
+                "calls": 1,
+                "input_tokens": 1874,
+                "output_tokens": 2213,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 8736,
+                "total_tokens": 12823,
+                "cost_usd": 0.071577
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Create a chapter outline for Chapter 4 of \"The Signal Beneath\" using Kish\u014dtenketsu.\n  This should be a quieter chapter \u2014 the protagonist reaches the coast and\n  observes the submerged station from the shore. No combat, no confrontation.\n  Focus on contrast and reflection."
+    }
+  ],
+  "expected": [
+    "routes `chapter.plan`, `chapter_story_arc`=\"Kish\u014dtenketsu\"; completed",
+    "arc_beat values = Ki/Sh\u014d/Ten/Ketsu; no forced conflict beats; Ten = contrast/revelation (not combat); connects_to_book_arc still references Hero's Journey Ch4 stage; Kish\u014dtenketsu prompt loaded; CR-009 email"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "test": {
+    "id": "V13",
+    "title": "Voice \u2014 List Drafts",
+    "source": "voice",
+    "prompt": "Show me my drafts",
+    "route": "library.list-outlines` (info)",
+    "prerequisite": "",
+    "expected": [
+      "flat `{response, kind=\"data\"}`",
+      "routes `library.list-outlines` (status=draft)",
+      "inline list in `response`",
+      "spoken-friendly",
+      "user-scoped"
+    ]
+  },
+  "response": {
+    "response": "How can I help with your writing?",
+    "kind": "reply"
+  },
+  "job_result": null
+}

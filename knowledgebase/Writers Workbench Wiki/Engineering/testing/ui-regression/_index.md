@@ -23,7 +23,7 @@ The engine side is covered by the [[engine-chat-e2e-suite]] (157 tests via chat 
 cd writers-workbench
 export E2E_BASE_URL='https://writersworkbench-develop.up.railway.app'
 export E2E_TEST_EMAIL='eric@agileadtesting.com'
-export E2E_TEST_PASSWORD='Fr332bafami!y'
+export E2E_TEST_PASSWORD='<rotated 2026-10-19 — see credentials-map.md>'
 export SUPABASE_URL='https://gvbvwcnmjkdpclcisqrr.supabase.co'
 export VITE_SUPABASE_ANON_KEY='<DEV anon key from Railway WritersWorkbench develop>'
 # Optional — deterministic chapter/content picking for content-detail specs:

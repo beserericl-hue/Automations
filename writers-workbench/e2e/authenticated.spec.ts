@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
  * Comprehensive E2E tests for Sprint 1 & Sprint 2 features.
  * These run in an authenticated browser context (storageState from auth.setup.ts).
  *
- * If E2E_TEST_EMAIL / E2E_TEST_PASSWORD are not set, these tests skip gracefully.
+ * If E2E_TEST_EMAIL / SUPABASE_SERVICE_ROLE_KEY are not set, these tests skip gracefully.
  */
 
 test.beforeEach(async ({ page }) => {
@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/');
   const url = page.url();
   if (url.includes('/login')) {
-    test.skip(true, 'No test credentials — set E2E_TEST_EMAIL and E2E_TEST_PASSWORD');
+    test.skip(true, 'No test credentials — set E2E_TEST_EMAIL + SUPABASE_SERVICE_ROLE_KEY (auth is passwordless)');
   }
 });
 

@@ -1,0 +1,70 @@
+{
+  "id": "V31",
+  "title": "Voice \u2014 Parallel Tasks + Callback",
+  "route": "`chapter.newsletter` + `notify.eve-callback` (multi-task fan-out) \u00b7 impl: built (E2E-3/E2E-5)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=chapter.newsletter got=queued MISMATCH",
+    "job=complete",
+    "newsletter recent=5 word_count=1056 persist=True"
+  ],
+  "steps": [
+    [
+      "voice",
+      "Write a newsletter about ancient Roman festivals for the ancient history genre and also pull up my research report about post apocalyptic trends and call me back to brainstorm"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "response": "Queuing a newsletter about ancient Roman festivals for the ancient history genre. I'll let you know when it's ready. Pulling up your research report and I'll call you back to brainstorm.",
+        "kind": "queued",
+        "job_id": "d97272a6faf1472ea49a185356bff305",
+        "status": "queued"
+      },
+      "job_result": {
+        "job_id": "d97272a6faf1472ea49a185356bff305",
+        "status": "complete",
+        "result": {
+          "execution_id": "65f7cd0d-d0ad-424c-90bb-3d565abaa09d",
+          "step_name": "chapter",
+          "status": "ok",
+          "payload": {
+            "op": "newsletter",
+            "result": {
+              "written": true,
+              "title": "Blood, Beans, and Borrowed Togas: The Roman Festival Year",
+              "subject_line": "Blood, Beans, and Borrowed Togas: The Roman Festival Year",
+              "content_text": "_From spitting black beans at midnight to masters serving slaves at dinner, Rome's calendar was anything but dull._\n\nRome ran on ritual. Every month, sometimes every week, the city stopped for the gods. These weren't quiet, private affairs. They involved animal sacrifice, public feasting, half-naked men running through February streets, and at least one night a year when a Roman father padded barefoot through a dark house spitting beans to drive off the dead. The Roman festival calendar, the feriae, was the backbone of public life. Business halted. Even slaves rested. What follows is a tour through some of the year's most vivid moments.\n\n## Why Festivals Mattered\n\nRoman public worship had a clear purpose: to secure the benevolentia and gratia of the gods, their goodwill and favor, without which the state could not function. This was not optional piety. It was civic maintenance. Festivals combined formal prayers, animal sacrifices (oxen, sheep, swine), and offerings of wine, milk, honey, and flowers, all performed in a strict, prescribed order. Get the formula wrong and the rite had to start over. The calendar divided festivals into fixed days and movable ones (conceptivae), whose dates priests announced each year, the Feriae Latinae in April and the Ambarvalia field-purification in May both fell into this category. The Kalends, the first day of every month, belonged to Juno. A public priestess called the Regina sacrorum marked it with a formal sacrifice, giving the Roman year a steady ceremonial pulse. (https://en.wikipedia.org/wiki/Roman_festivals)\n\n## Winter and the Dead: February's Strange Cluster\n\nFebruary was Rome's month of endings and purification, and it packed in several of the calendar's strangest rites. Lupercalia on February 15 honored Faunus and Juno. Priests called the Luperci sacrificed goats and a dog near the Palatine's Lupercal cave, smeared blood on the foreheads of young nobles, then wiped it away with milk-soaked wool. The youths then ran a circuit of the Palatine hill, nearly naked in the cold, striking bystanders with strips of goat hide. Women sought out the blows, the ritual was a charm for fertility and easy childbirth. (https://www.celticwebmerchant.com/en/blogs/antiquity-romans/roman-holidays)\n\nA few days later came Fornacalia, a baking festival organized by Rome's thirty curiae, its ancient civic divisions. Each curia held its own day of ritual grain-roasting; those who missed it or didn't know their curia caught the general celebration on February 17. Families brought grain or bread to be ritually offered, connecting the daily staple to divine favor through the cult of the fornax, the oven. (https://en.wikipedia.org/wiki/Roman_festivals)\n\nFeralia on February 21 closed the month with visits to family graves, where Romans left wine, bread soaked in wine, and wreaths. Then in late February, Terminalia honored Terminus, god of boundaries. Neighbors met at the stones marking their shared property lines, garlanded them, kindled fire from a household flame, sacrificed a lamb and a pig, and shared a wine feast, a ritual designed to keep land disputes from turning into feuds. Everyone wore white. Girls threw honey and cakes into the fire. (https://europe.factsanddetails.com/article/entry-378.html)\n\n## May Nights: Expelling the Restless Dead\n\nLemuria fell on May 9, 11, and 13, odd days, deliberately chosen. It addressed the lemures: wandering, potentially hostile dead who might harm their own families if not properly dismissed. The rite belonged entirely to the paterfamilias, the head of household, and it happened at midnight. He rose, washed his hands, walked barefoot through the house, and spat black beans from his mouth as he walked, throwing them over his shoulder nine times without looking back. The formula he repeated: 'With these beans I redeem myself and my family.' Then he clanged bronze vessels together and ordered the spirits out nine more times. The house had to stay silent and dark. The contrast with Rome's louder festivals is striking, this one worked through sound, repetition, and the deliberate refusal to look. (https://sarahholz.com/2020/09/05/roman-holiday-festivals-of-the-augustan-empire/)\n\n## Summer Heat and Its Gods\n\nThe Roman summer brought two festivals shaped directly by the season's dangers. Neptunalia on July 23 honored Neptune not as a sea god but as a source of relief. Romans built temporary shelters of branches near water sources and spent the day drinking and feasting in the shade, a practical acknowledgment that water was precious and the heat was real. (https://www.celticwebmerchant.com/en/blogs/antiquity-romans/roman-holidays)\n\nVulcanalia on August 23 addressed a different threat: fire. Late summer, with granaries full and workshops running, was when a stray spark could destroy months of work. Romans threw fish and small animals into fire pits, offering something to the flames to keep them from taking more. Smiths' forges carried particular religious weight that day. The logic was transactional: feed the fire so it stays contained. (https://europe.factsanddetails.com/article/entry-378.html)\n\n## Saturnalia: The Week Rome Turned Upside Down\n\nNo festival matched Saturnalia for sheer social disruption. Held in honor of Saturn in the days leading to the winter solstice, it lasted up to a week and was, by most accounts, Rome's favorite celebration. It opened with a sacrifice at Saturn's temple in the Forum and a public banquet. After that, the city let go. Gambling, drinking, noisy street merrymaking, and gift-giving took over. The pileus, the cap worn by freed slaves, became standard headwear for everyone, senators included. Masters served their slaves at table. Slaves could speak freely and gamble without punishment. The hierarchy that structured every other day of the Roman year was, briefly and officially, suspended. This wasn't chaos, it was licensed inversion, contained within the festival's boundaries. When it ended, everything snapped back. But for that week, the normal rules did not apply. (https://www.celticwebmerchant.com/en/blogs/antiquity-romans/roman-holidays)\n\nThe Roman festival year was a calendar of managed anxiety, about harvests, fire, water, the dead, property lines, and the goodwill of gods who could withdraw their favor at any moment. Each rite was a negotiation. What strikes me most is how physical it all was: cold air on bare skin in February, the smell of roasting grain, the sound of bronze clanging in a dark house at midnight, the taste of new wine in October. These weren't abstract observances. They were sensory, communal, and deeply practical. Which festival would you have wanted to attend, or avoid? Hit reply and let me know. And if you want to go deeper, W. Warde Fowler's 1899 *Roman Festivals of the Period of the Republic* is still one of the best guides to the calendar, and it's freely available at https://archive.org/details/fowler-1899-roman-festivals-republic.",
+              "word_count": 1056,
+              "section_count": 5,
+              "persist": {
+                "persisted": true,
+                "content_id": "33562d63-4b97-4737-956d-bd0aecb8b81c"
+              },
+              "token_usage": {
+                "calls": 2,
+                "input_tokens": 2885,
+                "output_tokens": 3935,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+                "total_tokens": 6820,
+                "cost_usd": 0.06768
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Write a newsletter about ancient Roman festivals for the ancient history genre and also pull up my research report about post apocalyptic trends and call me back to brainstorm"
+    }
+  ],
+  "expected": [
+    "hub detects 2 tasks",
+    "flat queued (one or two job_ids)",
+    "task1 newsletter \u2192 complete \u2192 CR-009 email",
+    "task2 `notify.eve-callback` \u2192 complete \u2192 KB load + outbound call (callback_mode=brainstorm)",
+    "both ops invoked"
+  ]
+}

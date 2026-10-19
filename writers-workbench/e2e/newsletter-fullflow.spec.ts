@@ -9,16 +9,16 @@ import { NewsletterPage } from './pages/newsletter.page';
  * 13 sections so each automated test maps to its manual counterpart.
  *
  * Authentication: uses storage state from `auth.setup.ts`, which logs
- * in with E2E_TEST_EMAIL / E2E_TEST_PASSWORD. For the deployed DEV
+ * in with E2E_TEST_EMAIL (passwordless; see e2e/auth.setup.ts). For the deployed DEV
  * environment, set E2E_BASE_URL=https://writersworkbench-develop.up.railway.app.
  *
  * Run locally:
- *   E2E_TEST_EMAIL=eric@agileadtesting.com E2E_TEST_PASSWORD=xxx \
+ *   E2E_TEST_EMAIL=eric@agileadtesting.com SUPABASE_SERVICE_ROLE_KEY=xxx \
  *     npx playwright test newsletter-fullflow.spec.ts --project=chromium
  *
  * Run against deployed DEV:
  *   E2E_BASE_URL=https://writersworkbench-develop.up.railway.app \
- *     E2E_TEST_EMAIL=... E2E_TEST_PASSWORD=... \
+ *     E2E_TEST_EMAIL=... SUPABASE_SERVICE_ROLE_KEY=xxx \
  *     SUPABASE_URL=https://gvbvwcnmjkdpclcisqrr.supabase.co \
  *     VITE_SUPABASE_ANON_KEY=sb_publishable_... \
  *     npx playwright test newsletter-fullflow.spec.ts --project=chromium
@@ -43,7 +43,7 @@ let nl: NewsletterPage;
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
   if (page.url().includes('/login')) {
-    test.skip(true, 'No test credentials — set E2E_TEST_EMAIL and E2E_TEST_PASSWORD');
+    test.skip(true, 'No test credentials — set E2E_TEST_EMAIL + SUPABASE_SERVICE_ROLE_KEY (auth is passwordless)');
   }
   nl = new NewsletterPage(page);
 });

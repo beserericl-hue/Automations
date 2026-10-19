@@ -1,0 +1,42 @@
+{
+  "test": {
+    "id": "R43",
+    "title": "Prime Directive \u2014 Blog Post",
+    "source": "chat",
+    "prompt": "Write a blog post in the ai-marketing genre. Topic: \"How AI Tools Are Changing Content Marketing\". Genre slug: ai-marketing. Keywords: AI content tools, marketing automation, generative AI. Target length: 1200 words.",
+    "route": "chapter.blog` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `chapter.blog`, kind=queued; complete",
+      "No \"revolutionize\", \"game-changing\", \"unleash\", \"delve\", \"cutting-edge\", \"leverage\"",
+      "Short paragraphs (2-4 sentences); concrete examples; human voice; no hype; CR-009 email received"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing your blog post \u2014 I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "blog",
+    "data": null,
+    "job_id": "c0ffd1cb45cc4f9cb52e313df2c1d8a4",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "c0ffd1cb45cc4f9cb52e313df2c1d8a4",
+    "status": "complete",
+    "result": {
+      "execution_id": "e2102928-036d-4a4c-98b6-63311b23362c",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValueError",
+        "message": "invalid literal for int() with base 10: '1200 words'",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

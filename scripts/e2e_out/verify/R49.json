@@ -1,0 +1,111 @@
+{
+  "id": "R49",
+  "title": "Brainstorm Uses Structure Model",
+  "route": "`brainstorm.story` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=brainstorm.story got=brainstorm.short-story MISMATCH",
+    "job=complete",
+    "outline title='The Wrong Side' chapters=3 persisted=True projects_recent=1"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Brainstorm a short story about a soldier who wakes up 100 years after a war she started, only to find the enemy she fought won and built a better world. Genre: post-apocalyptic. Title: The Wrong Side. Sections: 5"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Queuing a short story brainstorm for 'The Wrong Side'. I'll let you know when the 3-beat outline is ready.",
+        "tool": "brainstorm",
+        "op": "short-story",
+        "data": null,
+        "job_id": "0a8b89d77ea64bc28ce81a3837bca1dd",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "0a8b89d77ea64bc28ce81a3837bca1dd",
+        "status": "complete",
+        "result": {
+          "execution_id": "b6548403-cd3d-4e5e-aad0-a6a7ed9f03ef",
+          "step_name": "brainstorm",
+          "status": "ok",
+          "payload": {
+            "op": "short-story",
+            "result": {
+              "outline": {
+                "title": "The Wrong Side",
+                "premise": "Commander Sera Voss awakens from a century-long cryogenic stasis to find the war she ignited has long since ended \u2014 and the enemy she despised, the Keth Collective, won. But the world they built from the ashes is clean, fed, and at peace, forcing Sera to confront the possibility that everything she fought and killed for was not only lost, but wrong.",
+                "themes": [
+                  "The moral cost of certainty in wartime",
+                  "Redemption through humility and grief",
+                  "History written by survivors, not victors alone",
+                  "The violence of ideology versus the patience of compassion"
+                ],
+                "story_arc_name": "",
+                "dramatic_question": "",
+                "wow_factor": "",
+                "characters": [
+                  {
+                    "name": "Sera Voss",
+                    "role": "Protagonist \u2014 former Commander of the Terran Sovereignty Forces",
+                    "arc": "Moves from rigid, self-righteous soldier to a woman shattered and rebuilt by the truth of what her war actually cost."
+                  },
+                  {
+                    "name": "Davan Keth",
+                    "role": "Archivist of the New Collective, great-grandchild of Sera's primary enemy",
+                    "arc": "Begins as a cautious custodian of painful history and becomes an unlikely witness to Sera's reckoning, choosing mercy over justice."
+                  },
+                  {
+                    "name": "General Mira Voss",
+                    "role": "Sera's sister, known only through historical records \u2014 she defected to the Keth mid-war",
+                    "arc": "Present only as a ghost in the archive, her betrayal reframed as the bravest act in the conflict."
+                  }
+                ],
+                "chapters": [
+                  {
+                    "chapter_number": 1,
+                    "title": "The Sleeper and the Ash",
+                    "beat": "Sera Voss is revived from a cryo-pod buried beneath a ruined Terran bunker by Davan Keth, who found her during an excavation, and she emerges armed, disoriented, and certain the war is still being fought.",
+                    "arc_notes": "Opening \u2014 world establishment and protagonist introduction; Sera's worldview is presented as absolute and unquestioned, the post-apocalyptic landscape revealed as unexpectedly green and ordered rather than devastated."
+                  },
+                  {
+                    "chapter_number": 2,
+                    "title": "The Archive of Enemies",
+                    "beat": "Davan brings Sera to the Collective's living city and walks her through the historical archive, where she discovers her own war crimes documented in meticulous detail, and finds her sister Mira honored as a peacemaker who died trying to stop her.",
+                    "arc_notes": "Rising action \u2014 central conflict deepens as Sera's identity and moral framework collapse; the enemy is humanized and the protagonist is implicated; grief and rage compete inside her."
+                  },
+                  {
+                    "chapter_number": 3,
+                    "title": "The Wrong Side",
+                    "beat": "Sera, given the choice by the Collective's council to be tried for war crimes or to record her own testimony for the archive, chooses testimony \u2014 and in speaking the truth aloud for the first time, she becomes the last honest monument to the war she started.",
+                    "arc_notes": "Climax and resolution \u2014 Sera does not receive forgiveness or punishment but something harder: witness; the turn is her choosing truth over pride; the ending is quiet, irreversible, and earned."
+                  }
+                ],
+                "form": "short_story"
+              },
+              "persist": {
+                "persisted": true,
+                "project_id": "9bbe2fa4-8541-480c-b323-5daa5d03e01a",
+                "created_project": false
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Brainstorm a short story about a soldier who wakes up 100 years after a war she started, only to find the enemy she fought won and built a better world. Genre: post-apocalyptic. Title: The Wrong Side. Sections: 5"
+    }
+  ],
+  "expected": [
+    "routes to `brainstorm.story`, kind=queued; complete",
+    "Each section `arc_notes` names a structural beat; outline notes the model chosen",
+    "Characters have roles (Protagonist/Antagonist/Dynamic/Static); no character without a structural purpose",
+    "Row in `writing_projects_v2`; CR-009 email received"
+  ]
+}

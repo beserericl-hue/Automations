@@ -1,0 +1,310 @@
+{
+  "id": "R09",
+  "title": "Generate Cover Art (standalone)",
+  "route": "`media.cover-art` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=media.cover-art got=library.retrieve MISMATCH",
+    "items=28 found=True"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Generate cover art for a political-scifi short story called \"The Senate of Stars\". The story is about a diplomat navigating a galactic parliament where every species has a fundamentally different concept of justice. Genre slug: political-scifi. The image should show a vast circular chamber with alien delegates, lit by the light of a dying star through a massive viewport."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "data",
+        "assistant_message": "",
+        "tool": "library",
+        "op": "retrieve",
+        "data": {
+          "execution_id": "c2eb1ac8-ffd6-4f9a-97f6-5c7ae088e1f9",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "retrieve",
+            "result": {
+              "items": [
+                {
+                  "id": "f9f462d2-9adc-46ea-bf46-4d928de42331",
+                  "title": "A historian discovers that antique photographs can transport",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T20:19:09.903679+00:00"
+                },
+                {
+                  "id": "1738646d-25ec-46bf-89c5-2ffdab1ce01b",
+                  "title": "Find my draft short story about the Titanic",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T19:41:18.644437+00:00"
+                },
+                {
+                  "id": "6c3d149d-ce85-4283-8f1f-7575f4c70b98",
+                  "title": "Find my draft short story about the Titanic",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-06-21T20:59:41.575159+00:00"
+                },
+                {
+                  "id": "fc9d9bf7-c95d-4250-bb71-6f390162ee2d",
+                  "title": "The Unpublished",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-06-21T20:18:33.860702+00:00"
+                },
+                {
+                  "id": "0786347f-8a47-464e-9aa9-e45c123423a0",
+                  "title": "The Witness",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-06-21T20:16:23.933587+00:00"
+                },
+                {
+                  "id": "0e32f79f-8e2b-4804-b440-edb6be637381",
+                  "title": "The Consulship of Gaius Varro",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-06-21T20:14:40.211719+00:00"
+                },
+                {
+                  "id": "269d9660-ce3b-49e7-b910-bdc44d5d22a8",
+                  "title": "The Inoculator",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-06-21T20:12:58.537556+00:00"
+                },
+                {
+                  "id": "213e4f63-81a9-4bc6-988c-ba4d5b89ad6b",
+                  "title": "a robot learning to paint",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-06-21T19:36:31.692638+00:00"
+                },
+                {
+                  "id": "7a33f540-393f-4c78-b08a-1c7b7cd67cd8",
+                  "title": "The Witness",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-13T21:26:46.245917+00:00"
+                },
+                {
+                  "id": "a992de79-09be-42ed-b6eb-441d29f2a921",
+                  "title": "The Witness",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-13T21:22:46.921102+00:00"
+                },
+                {
+                  "id": "4a85ec11-c1fd-4621-9968-bfb48810e965",
+                  "title": "The Witness",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-13T20:52:31.568966+00:00"
+                },
+                {
+                  "id": "99d7d067-e9ee-486a-b408-e8d96df245ef",
+                  "title": "The Witness",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-13T20:48:35.744918+00:00"
+                },
+                {
+                  "id": "9232d19c-4f35-4f7e-8be0-f265f3a9d094",
+                  "title": "The Poison Crown",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-13T20:05:06.130162+00:00"
+                },
+                {
+                  "id": "e6cb81bb-60f3-48b0-b66b-1b56e4a831a5",
+                  "title": "The Poison Crown",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-13T19:59:16.847182+00:00"
+                },
+                {
+                  "id": "cd1368a5-97f1-4326-b156-79c4ddc9f818",
+                  "title": "The Weight of Knowing",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-13T01:41:49.237681+00:00"
+                },
+                {
+                  "id": "c6b29332-4f2f-4a73-a6ca-2cc238d927ae",
+                  "title": "The Weight of Knowing",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-13T01:38:38.633145+00:00"
+                },
+                {
+                  "id": "bb5ecbde-9743-4916-9e7f-99c4d58a9b2f",
+                  "title": "A historian discovers that antique",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-13T01:19:29.885516+00:00"
+                },
+                {
+                  "id": "9c644125-0c22-4c53-895f-9aae8ddd2752",
+                  "title": "A historian discovers that antique",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-13T01:16:59.739594+00:00"
+                },
+                {
+                  "id": "893125b2-5338-4f3c-bf67-6ff331e902cd",
+                  "title": "A historian discovers that antique",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-13T01:02:41.87747+00:00"
+                },
+                {
+                  "id": "fd648813-b242-4640-85ef-f28c5bdcd7f3",
+                  "title": "A historian discovers that antique",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-13T01:00:28.711572+00:00"
+                },
+                {
+                  "id": "2d819c74-4592-492d-88f3-ed6a8ad116b9",
+                  "title": "A city maintenance worker discovers",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-13T00:18:17.859428+00:00"
+                },
+                {
+                  "id": "edf1d66b-52a9-4ec7-8839-90eb3c08baa4",
+                  "title": "A city maintenance worker discovers",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-13T00:16:03.420908+00:00"
+                },
+                {
+                  "id": "a433f0f4-2bb4-4d96-8b14-5c0cdfef428e",
+                  "title": "A sanitation bot, unit 734,",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-12T22:01:17.786695+00:00"
+                },
+                {
+                  "id": "8f9e3163-ebb2-4790-916d-def0855491f2",
+                  "title": "A sanitation bot, unit 734,",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-12T21:59:19.275223+00:00"
+                },
+                {
+                  "id": "67d33a7d-3a90-418b-890f-fa95805b2868",
+                  "title": "An AI trained to write",
+                  "status": "published",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-11T00:02:41.271941+00:00"
+                },
+                {
+                  "id": "3f842c49-6a0b-4912-9ab2-a58010c347fb",
+                  "title": "A disillusioned Roman soldier discovers",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-09T17:37:39.843318+00:00"
+                },
+                {
+                  "id": "2c0bcdc3-d3e9-4f74-b102-75dc3b985eeb",
+                  "title": "A historian discovers that antique",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-09T15:26:27.106062+00:00"
+                },
+                {
+                  "id": "460c4bdb-2242-4d98-b3c5-c3caf54ec0ef",
+                  "title": "An AI trained on 50",
+                  "status": "published",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-09T13:34:09.744516+00:00"
+                }
+              ],
+              "count": 28,
+              "found": true,
+              "search_term": null
+            }
+          },
+          "error": null,
+          "next_stage": null
+        },
+        "job_id": null,
+        "status": null,
+        "jobs": null,
+        "error": null
+      },
+      "job_result": null,
+      "resolved_prompt": "Generate cover art for a political-scifi short story called \"The Senate of Stars\". The story is about a diplomat navigating a galactic parliament where every species has a fundamentally different concept of justice. Genre slug: political-scifi. The image should show a vast circular chamber with alien delegates, lit by the light of a dying star through a massive viewport."
+    }
+  ],
+  "expected": [
+    "routes to `media.cover-art`, kind=queued; job reaches status=complete",
+    "Image generated and URL returned in job result",
+    "Art style matches political-scifi guidelines (dark, imposing, cerebral)",
+    "Email arrives with image attachment",
+    "No text/words in the image",
+    "Row exists in `generated_images_v2` (user_id=\"+14105914612\")",
+    "CR-009 task-completion email received"
+  ]
+}

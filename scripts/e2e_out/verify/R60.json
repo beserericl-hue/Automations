@@ -1,0 +1,115 @@
+{
+  "id": "R60",
+  "title": "Brainstorm Short Story \u2014 Three-Act Structure (Political History)",
+  "route": "`brainstorm.story`/`brainstorm.short-story` (task) \u00b7 impl: built \u00b7 arc fidelity: built (E2E-4)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=brainstorm.story got=brainstorm.short-story MISMATCH",
+    "job=complete",
+    "outline title='The Unpublished' chapters=3 persisted=True projects_recent=3"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Brainstorm a short story using the Three-Act Structure about a journalist in 1970s Chile who uncovers evidence of CIA involvement in the upcoming coup, but no one will publish her story. Genre: political-history. Title: The Unpublished. 5 sections. Themes: truth vs. power, the cost of speaking out, complicity of silence."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Queuing a short story brainstorm for 'The Unpublished' \u2014 I'll let you know when it's ready.",
+        "tool": "brainstorm",
+        "op": "short-story",
+        "data": null,
+        "job_id": "94421cffbc8c408098f027179c5edd91",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "94421cffbc8c408098f027179c5edd91",
+        "status": "complete",
+        "result": {
+          "execution_id": "ef7de2f4-8aba-4d71-bf62-77fbc8a09dcf",
+          "step_name": "brainstorm",
+          "status": "ok",
+          "payload": {
+            "op": "short-story",
+            "result": {
+              "outline": {
+                "title": "The Unpublished",
+                "premise": "In Santiago, Chile, 1973, investigative journalist Valentina Reyes obtains classified documents proving CIA coordination with Chilean military officers planning a coup against President Allende. As she races to publish her findings, every editor she approaches either refuses out of fear or is silenced by pressure from above, forcing Valentina to confront the question of whether truth has any power when every institution meant to carry it has already chosen a side.",
+                "themes": [
+                  "Truth versus power",
+                  "The cost of speaking out",
+                  "The complicity of silence",
+                  "Institutional cowardice as a form of violence"
+                ],
+                "story_arc_name": "",
+                "dramatic_question": "",
+                "wow_factor": "",
+                "characters": [
+                  {
+                    "name": "Valentina Reyes",
+                    "role": "Protagonist \u2014 investigative journalist at a Santiago daily",
+                    "arc": "Begins believing that documented truth is its own protection and ends understanding that bearing witness is an act of survival, not triumph."
+                  },
+                  {
+                    "name": "Rodrigo Fuentes",
+                    "role": "Valentina's editor and mentor at El Clar\u00edn",
+                    "arc": "Starts as a man who taught Valentina that the press is democracy's spine and ends having proved, by his own silence, that it can also be its coffin."
+                  },
+                  {
+                    "name": "Tom\u00e1s Ibarra",
+                    "role": "Mid-level CIA liaison officer posing as a U.S. Embassy cultural attach\u00e9",
+                    "arc": "Moves from confident enforcer of institutional pressure to the face Valentina memorizes so that history will have at least one name to hold."
+                  },
+                  {
+                    "name": "Cecilia Vargas",
+                    "role": "Valentina's source \u2014 a government typist who copied the documents",
+                    "arc": "Risks everything to hand Valentina the truth and disappears before the story can protect her, becoming the story's moral weight."
+                  }
+                ],
+                "chapters": [
+                  {
+                    "chapter_number": 1,
+                    "title": "The Documents",
+                    "beat": "Valentina receives the classified papers from Cecilia and confirms their authenticity, believing she holds the story that will stop the coup.",
+                    "arc_notes": "Exposition \u2014 ordinary world established: Valentina as a tenacious journalist who still trusts the press as an instrument of democratic defense; the inciting incident is Cecilia pressing the envelope into Valentina's hands in a market stall, shattering the ordinary and committing Valentina to the journey."
+                  },
+                  {
+                    "chapter_number": 2,
+                    "title": "Every Door Closes",
+                    "beat": "Valentina takes the documents to three editors \u2014 including Rodrigo \u2014 and each refuses, citing fear, legal threat, or direct pressure from Tom\u00e1s Ibarra, until Cecilia vanishes and Valentina is left alone with evidence no one will touch.",
+                    "arc_notes": "Rising Action through to Second Plot Point \u2014 obstacles escalate from professional rejection to personal danger; the midpoint apex is Rodrigo's refusal, the moment Valentina's last trusted institution fails her and she realizes the coup is not coming but is already structurally complete; the second plot point is Cecilia's disappearance, which strips Valentina of her source, her corroboration, and her last illusion that truth carries its own shield."
+                  },
+                  {
+                    "chapter_number": 3,
+                    "title": "The Carbon Copy",
+                    "beat": "On the morning of September 11, 1973, as military jets circle Santiago, Valentina hides a carbon copy of the documents inside a wall of her apartment, choosing preservation over publication \u2014 an act of witness that costs her everything and saves nothing today.",
+                    "arc_notes": "Catastrophe \u2014 the coup succeeds; Valentina's transformation is made visible not through triumph but through the deliberate, quiet act of hiding the record for a future that may never come; survival-with-consequence: she is alive, the truth is buried in a wall, and the silence of every institution that could have stopped this is now permanent."
+                  }
+                ],
+                "form": "short_story"
+              },
+              "persist": {
+                "persisted": true,
+                "project_id": "d4cc1c32-9d22-486b-a711-8b757cb35071",
+                "created_project": false
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Brainstorm a short story using the Three-Act Structure about a journalist in 1970s Chile who uncovers evidence of CIA involvement in the upcoming coup, but no one will publish her story. Genre: political-history. Title: The Unpublished. 5 sections. Themes: truth vs. power, the cost of speaking out, complicity of silence."
+    }
+  ],
+  "expected": [
+    "routes to `brainstorm.story`, kind=queued; complete; `story_arc=\"Three-Act Structure\"`",
+    "`writing_projects_v2` \"The Unpublished\" with 5 sections; Act1 setup; Act2 \u22653 obstacles + midpoint; Act3 pre-climax \u2192 climax \u2192 denouement",
+    "1970s Chile/Pinochet context; denouement addresses truth vs power; goal clear from Act1; CR-009 email \"The Unpublished\""
+  ]
+}

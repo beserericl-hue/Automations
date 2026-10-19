@@ -1,0 +1,739 @@
+{
+  "test": {
+    "id": "R110",
+    "title": "\u2014 Brainstorm Book Outline with Story Arc",
+    "source": "chat",
+    "prompt": "Brainstorm a book using the Hero's Journey called \"The Signal Beneath.\"\n  Genre: post-apocalyptic. 8 chapters.\n  Premise: A radio operator in a collapsed coastal city intercepts a signal from\n  a submerged research station. The signal contains coordinates and a child's voice.\n  She must decide whether to investigate alone or alert the warlord who controls\n  the only working boat.\n  Themes: sacrifice, trust, the cost of knowledge.",
+    "route": "brainstorm.story` (task)",
+    "prerequisite": "\"The Hero's Journey\" arc in `story_arcs_v2`",
+    "expected": [
+      "routes `brainstorm.story`, kind=queued; job_id; status=completed",
+      "`writing_projects_v2` \"The Signal Beneath\" with `outline.story_arc_name`=\"The Hero's Journey\"; 8 chapters",
+      "each chapter `arc_notes` references Hero's Journey stages; `outline.characters` populated (name/role/arc/description)",
+      "CR-009 email with outline; no 5xx"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing the brainstorming for \"The Signal Beneath\" \u2014 I'll let you know when the outline is ready.",
+    "tool": "brainstorm",
+    "op": "story",
+    "data": null,
+    "job_id": "06cab1453e30419e96b254c7951167fd",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "06cab1453e30419e96b254c7951167fd",
+    "status": "complete",
+    "result": {
+      "execution_id": "af759130-28b4-4044-bfc1-8d3745b6703d",
+      "step_name": "brainstorm",
+      "status": "ok",
+      "payload": {
+        "op": "story",
+        "result": {
+          "outline": {
+            "title": "The Signal Beneath",
+            "premise": "Seven years after a solar electromagnetic pulse destroys global infrastructure, a former radio engineer named Mara Voss discovers a repeating signal buried in the static \u2014 a signal that appears to originate from a pre-collapse government bunker beneath the ruins of a Midwestern city. As she assembles a fractured team to reach the bunker, she uncovers that the signal is not a distress call but a countdown \u2014 and that whoever is inside has been waiting, with resources and a plan, to restart civilization on their own terms, terms that will erase the fragile communities survivors have built in the years since the collapse.",
+            "themes": [
+              "Who has the right to rebuild civilization",
+              "The tension between survival and justice",
+              "What is lost and what is preserved when systems collapse",
+              "The moral cost of hope",
+              "Memory as resistance"
+            ],
+            "story_arc_name": "The Hero's Journey",
+            "dramatic_question": "Can Mara Voss reach the bunker before the countdown ends and stop a hidden government remnant from erasing seven years of survivor-built communities in order to restart civilization on authoritarian terms?",
+            "wow_factor": "The novel teaches the reader, in accurate and procedural detail, how to decode shortwave radio signals, navigate post-collapse infrastructure, and crack Cold War-era bunker security \u2014 so that the reader feels they could actually do what Mara does, making the apocalypse feel not like fantasy but like a manual.",
+            "characters": [
+              {
+                "name": "Mara Voss",
+                "role": "Protagonist and POV anchor",
+                "archetype": "The Engineer \u2014 a technically brilliant problem-solver who fixes broken systems",
+                "off_axis_attribute": "She is catastrophically bad at letting people help her; she experiences collaboration as a form of grief because her husband died trying to assist her during the collapse, and she has unconsciously decided that keeping people at arm's length keeps them alive \u2014 a belief that is demonstrably wrong and that she will not examine until forced",
+                "dramatic_question": "Can Mara stop the bunker countdown without becoming the same kind of unilateral, ends-justify-means operator she is trying to defeat?",
+                "description": "Late 30s, former public radio engineer from Kansas City. Knows shortwave, AM, FM, and satellite uplink systems from the inside out. Keeps a handwritten frequency log she has maintained every day since the collapse \u2014 her private ritual of listening for other survivors. Hobby: hand-drawing topographic maps from memory and observation, a skill her father taught her. Private worry: she has not spoken her husband Daniel's name aloud in three years. Friend she likes for no plot reason: a teenage girl named Petra in her settlement who trades her dried apples for lessons in Morse code. Humiliated by: being wrong in public about a technical judgment, because her identity is built on being the person who understands how things work. Terrified by: arriving too late \u2014 the specific fear that she will do everything right and still fail because she was one hour slow. Made happy by: the moment a dead radio crackles to life under her hands."
+              },
+              {
+                "name": "Cael Drummond",
+                "role": "Primary ally and moral counterweight",
+                "archetype": "The Soldier \u2014 a former National Guard sergeant who knows how to move through dangerous terrain and keep people alive",
+                "off_axis_attribute": "He is a pacifist who became a soldier because he believed institutions could be reformed from within; the collapse proved him wrong about institutions but not about pacifism, and he now carries a rifle he has not fired in two years and is not sure he can fire again \u2014 a limitation that will become a crisis at the worst possible moment",
+                "dramatic_question": "Can Cael protect the people he loves without becoming the weapon the old world made him?",
+                "description": "Mid 40s, former Kansas National Guard, now a de facto security coordinator for a survivor settlement called Harrow. Reads pre-collapse military field manuals for pleasure. Cooks elaborate meals from foraged ingredients \u2014 his one vanity. Private worry: he has a daughter, Sable, in a settlement two days east, and he has not seen her in eight months because the road between them is controlled by a raider faction. Friend for no plot reason: an elderly beekeeper named Otis who trades him honey and asks nothing in return. Humiliated by: showing fear in front of people depending on him. Terrified by: being responsible for a death he could have prevented. Made happy by: a meal shared around a fire with people who are not afraid."
+              },
+              {
+                "name": "Director Harlan Vetch",
+                "role": "Primary antagonist",
+                "archetype": "The Administrator \u2014 a bureaucrat who has mistaken his own survival for a mandate",
+                "off_axis_attribute": "He is genuinely kind to the people inside the bunker \u2014 patient, fair, remembered birthdays before the collapse ended calendars \u2014 and this makes him more dangerous, not less, because his cruelty is entirely structural: he does not hate the survivors above ground, he simply does not count them as stakeholders in the future he is building",
+                "dramatic_question": "Will Vetch complete his plan and discover too late that the civilization he has preserved is one no one outside wants to live in?",
+                "description": "Early 60s, former FEMA continuity-of-government director. Has been underground for seven years with 214 people, a functioning power grid, a seed vault, a medical bay, and a plan. Keeps a meticulous journal. Plays chess against himself. Private worry: three of his original 214 have died of preventable illness because the bunker's medical supplies are running low \u2014 a fact he has not shared with his people. Humiliated by: being disobeyed by someone he trusted. Terrified by: the surface \u2014 he has not been above ground in seven years and has developed a genuine phobia he masks as administrative necessity. Made happy by: order, specifically the sound of his people following a schedule."
+              },
+              {
+                "name": "Sable Drummond",
+                "role": "Secondary POV and moral complication engine",
+                "archetype": "The Rebel \u2014 a young woman who grew up entirely in the post-collapse world and has no nostalgia for what was lost",
+                "off_axis_attribute": "She is a gifted oral historian who has been secretly recording survivor testimonies on salvaged cassette tapes \u2014 building an archive of the post-collapse world \u2014 but she is also capable of a cold, surgical ruthlessness when she believes the archive is threatened, a ruthlessness that frightens even her",
+                "dramatic_question": "Can Sable preserve the memory of the survivor world without sacrificing the people who made it?",
+                "description": "Early 20s, Cael's daughter, grew up in a settlement called Eastmarch. Has never seen a functioning city. Trades in information \u2014 she knows more about the geography and politics of the survivor communities than almost anyone. Hobby: learning pre-collapse languages from salvaged textbooks; currently working on Spanish. Private worry: she is afraid that the world she has documented will be dismissed as primitive by anyone with power, and that her archive will be used as evidence of how badly survivors need to be saved. Friend for no plot reason: a one-armed former librarian named Dex who taught her to read from salvaged books. Humiliated by: being treated as a child by people who should know better. Terrified by: erasure \u2014 the specific fear that the world she has lived in will be declared to have never mattered. Made happy by: finding a new voice for her archive."
+              },
+              {
+                "name": "Dr. Yusuf Okafor",
+                "role": "Ally and internal bunker POV",
+                "archetype": "The Doctor \u2014 the person inside the system who knows it is wrong but has not yet found the courage to say so",
+                "off_axis_attribute": "He is the bunker's chief medical officer and the person who knows Vetch's plan in the most clinical detail \u2014 and he has been complicit in it for seven years, not from cowardice but from a genuine belief that the plan was the least bad option, a belief that is now cracking under the weight of what he has seen",
+                "dramatic_question": "Can Yusuf find the courage to betray the institution that kept him alive before the countdown ends?",
+                "description": "Late 40s, former CDC epidemiologist, recruited into the bunker program six months before the collapse. Has been maintaining the bunker's medical records with obsessive precision. Reads pre-collapse novels \u2014 has read the bunker's small library three times through. Private worry: he has a sister who was above ground when the pulse hit and he does not know if she survived; he has been afraid to ask Vetch to use the bunker's radio to search for her because he fears the answer. Friend for no plot reason: a bunker technician named Priya who brings him coffee and argues with him about pre-collapse films. Humiliated by: being caught in a lie, because his entire self-image rests on being the honest one. Terrified by: the moment the plan becomes irreversible. Made happy by: a patient who recovers against the odds."
+              },
+              {
+                "name": "Tom\u00e1s Reyes",
+                "role": "Ally and navigator",
+                "archetype": "The Scout \u2014 the person who knows the dangerous terrain between here and there",
+                "off_axis_attribute": "He is a former cartographer who lost his sight in one eye during a raider attack two years ago and has compensated by developing an almost supernatural spatial memory, but he is privately terrified that his remaining eye is failing and has told no one, because if the group knows he is going blind they will leave him behind",
+                "dramatic_question": "Can Tom\u00e1s guide the team to the bunker before his failing vision makes him a liability rather than an asset?",
+                "description": "Mid 30s, former USGS cartographer, now a freelance guide who trades route knowledge for food and medicine. Carries hand-drawn maps of every road, ruin, and raider territory between the Mississippi and the Rockies. Hobby: whittling \u2014 makes small wooden figures he leaves at trail markers as a private navigation system. Private worry: the failing eye. Friend for no plot reason: a mule named Cartwright who is more reliable than most people he has worked with. Humiliated by: getting lost. Terrified by: darkness \u2014 not metaphorically, literally, because of what losing his remaining eye would mean. Made happy by: a clear horizon."
+              },
+              {
+                "name": "Petra",
+                "role": "Supporting character and emotional anchor for Mara",
+                "archetype": "The Apprentice \u2014 the young person who represents what the future could be",
+                "off_axis_attribute": "She is seventeen, fiercely intelligent, and has already decided that if Mara does not come back she will go to the bunker herself \u2014 a decision she has made with complete calm and that is not bravado but a genuine assessment of her own capabilities that may or may not be accurate",
+                "dramatic_question": "Will Petra's faith in Mara survive the revelation of what Mara is willing to do to win?",
+                "description": "Seventeen, born two years before the collapse, remembers almost nothing of the old world. Learns Morse code from Mara. Trades dried apples. Has a gift for pattern recognition that Mara has noticed and is quietly cultivating. Private worry: she is the only person in the settlement who knows Mara still talks to her dead husband on the radio at night \u2014 and she has never told anyone."
+              },
+              {
+                "name": "Commander Lena Brask",
+                "role": "Bunker antagonist and Vetch's enforcer",
+                "archetype": "The Loyalist \u2014 the person who has made the institution her entire identity",
+                "off_axis_attribute": "She was a FEMA logistics officer before the collapse and is brilliant at her job, but she has spent seven years underground developing a private theology around Vetch's plan \u2014 she believes, with genuine religious conviction, that what they are doing is not politics but salvation, and this makes her more dangerous than Vetch because she has no doubts to exploit",
+                "dramatic_question": "Will Brask's faith in the plan survive the moment she meets the people it will destroy?",
+                "description": "Late 40s, former FEMA logistics commander. Runs the bunker's security with precision and fairness by bunker standards. Has not been above ground in seven years. Keeps a list of every decision she has made and its outcome \u2014 a private accountability ledger. Private worry: she has begun to dream about the surface and wakes from the dreams ashamed."
+              }
+            ],
+            "chapters": [
+              {
+                "chapter_number": 0,
+                "title": "Prologue: The Day the Sky Went Quiet",
+                "act": "Setup",
+                "arc_point": "Ordinary World \u2014 before",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "None \u2014 opening",
+                "beat": "July 14th, seven years ago: Mara is in the Kansas City public radio tower when the solar pulse hits. Every instrument dies simultaneously. She watches the city go dark from the tower window and reaches for her husband Daniel on the radio \u2014 and gets nothing. The last sound she hears before the silence is his voice saying her name.",
+                "arc_notes": "Hero's Journey Stage 1 \u2014 Ordinary World: establishes Mara's competence, her marriage, and the specific texture of the world before the collapse; the pulse is the wound around which the entire novel orbits"
+              },
+              {
+                "chapter_number": 1,
+                "title": "The Frequency Log",
+                "act": "Act 1",
+                "arc_point": "Ordinary World \u2014 present",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Direct continuation: seven years after the prologue's pulse, Mara is still at a radio \u2014 now a salvaged shortwave rig in the settlement of Harrow",
+                "beat": "Mara maintains her daily frequency log in the settlement of Harrow, scanning static for survivor signals. She teaches Petra Morse code. The settlement's council asks her to stop using power on the radio \u2014 it is a luxury they cannot afford. Mara agrees and then does not stop.",
+                "arc_notes": "Hero's Journey Stage 1 \u2014 Ordinary World: establishes Mara's post-collapse life, her isolation, her ritual, and the community she belongs to but holds at arm's length"
+              },
+              {
+                "chapter_number": 2,
+                "title": "Static Has a Shape",
+                "act": "Act 1",
+                "arc_point": "Ordinary World \u2014 present",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Continuation of Mara's radio session from Chapter 1 \u2014 same night, same rig",
+                "beat": "At 2 a.m., scanning a dead frequency band, Mara detects a pattern in the noise \u2014 not random static but a structured pulse, repeating every 73 seconds. She records it by hand. It is unlike any survivor signal she has catalogued. She does not sleep.",
+                "arc_notes": "Hero's Journey Stage 2 \u2014 Call to Adventure: the signal arrives; the dramatic question is born"
+              },
+              {
+                "chapter_number": 3,
+                "title": "What the Pattern Says",
+                "act": "Act 1",
+                "arc_point": "Call to Adventure \u2014 decoding",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara carries the recorded pattern from Chapter 2 into daylight analysis",
+                "beat": "Mara spends two days decoding the signal using pre-collapse frequency modulation manuals she has salvaged. The pattern resolves into coordinates \u2014 a location 340 miles southwest \u2014 and a number sequence she cannot yet interpret. She tells no one except Petra, who recognizes the number sequence as a countdown format from a pre-collapse civil defense manual she found in the settlement's salvage pile.",
+                "arc_notes": "Hero's Journey Stage 2 \u2014 Call to Adventure: the signal's nature is partially revealed; the countdown element is introduced; Petra's archive knowledge becomes plot-critical"
+              },
+              {
+                "chapter_number": 4,
+                "title": "The Council Says No",
+                "act": "Act 1",
+                "arc_point": "Refusal of the Call",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara brings the decoded signal to Harrow's council \u2014 the consequence of her discovery in Chapter 3",
+                "beat": "Mara presents her findings to the settlement council. They refuse to authorize an expedition \u2014 340 miles through raider territory is a death sentence, and they need Mara's technical skills at home. Cael Drummond, the settlement's security coordinator, privately tells her she is right to be alarmed but wrong to go alone. Mara thanks him and begins packing.",
+                "arc_notes": "Hero's Journey Stage 3 \u2014 Refusal of the Call: the refusal is imposed by the community; Mara's response reveals her character \u2014 she will go anyway; Cael is introduced"
+              },
+              {
+                "chapter_number": 5,
+                "title": "Harrow's Edge",
+                "act": "Act 1",
+                "arc_point": "Refusal of the Call \u2014 consequence",
+                "pov_character": "Cael Drummond",
+                "bridge_from_prior": "Thread: Cael's private conversation with Mara in Chapter 4 \u2014 he told her she was wrong to go alone; this chapter shows him deciding he cannot let her",
+                "beat": "Cael watches Mara prepare to leave alone and makes a decision that surprises himself: he will go with her. His stated reason is security. His real reason is that the road to the bunker passes within two days of Eastmarch, where his daughter Sable lives, and he has not seen her in eight months. He tells the council he is escorting Mara on a scouting mission.",
+                "arc_notes": "Hero's Journey Stage 3 \u2014 Refusal of the Call: Cael's decision to join reframes the refusal; his personal motive (Sable) adds a thread that will complicate the journey; his lie to the council is the first moral compromise"
+              },
+              {
+                "chapter_number": 6,
+                "title": "The Guide's Price",
+                "act": "Act 1",
+                "arc_point": "Meeting the Mentor",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: Mara and Cael's departure from Harrow \u2014 they need a guide; Cael knows of Tom\u00e1s Reyes by reputation",
+                "beat": "Mara and Cael find Tom\u00e1s Reyes at a trade post one day out of Harrow. Tom\u00e1s knows the route to the coordinates \u2014 he has mapped that region and knows it includes the ruins of a pre-collapse FEMA regional hub. His price is medicine for his settlement. Mara trades her last antibiotic supply. Tom\u00e1s does not mention his failing eye.",
+                "arc_notes": "Hero's Journey Stage 4 \u2014 Meeting the Mentor: Tom\u00e1s functions as the practical mentor \u2014 the person who knows the terrain; the antibiotic trade establishes that the journey has already cost something real"
+              },
+              {
+                "chapter_number": 7,
+                "title": "What Tom\u00e1s Knows",
+                "act": "Act 1",
+                "arc_point": "Meeting the Mentor \u2014 knowledge transfer",
+                "pov_character": "Tom\u00e1s Reyes",
+                "bridge_from_prior": "Thread: Tom\u00e1s agreed to guide them in Chapter 6; this chapter shows what he knows and what he is hiding",
+                "beat": "Tom\u00e1s briefs the group on the route: three raider territories, two collapsed bridges, one stretch of chemically contaminated road from a pre-collapse industrial spill. He shows them his maps. That night, alone, he tests his remaining eye against a candle flame and notes with clinical precision that his peripheral vision has narrowed another degree. He says nothing.",
+                "arc_notes": "Hero's Journey Stage 4 \u2014 Meeting the Mentor: Tom\u00e1s's hidden failing eye is planted; the route's dangers are established; the reader now knows the guide has a secret that will become a crisis"
+              },
+              {
+                "chapter_number": 8,
+                "title": "Crossing the Flats",
+                "act": "Act 1",
+                "arc_point": "Crossing the Threshold",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: the group departs on Tom\u00e1s's mapped route \u2014 direct continuation of Chapter 7's briefing",
+                "beat": "The group crosses the boundary of Harrow's known territory into the open Midwestern plains \u2014 a landscape of rusted vehicles, collapsed overpasses, and silence. Mara realizes she has not been this far from the settlement in four years. She checks the signal on her portable receiver: still transmitting, still counting down. The countdown, she now calculates, will reach zero in nineteen days.",
+                "arc_notes": "Hero's Journey Stage 5 \u2014 Crossing the Threshold: the point of no return is crossed; the nineteen-day deadline is established, creating the novel's ticking clock"
+              },
+              {
+                "chapter_number": 9,
+                "title": "Eastmarch",
+                "act": "Act 1",
+                "arc_point": "Crossing the Threshold \u2014 detour",
+                "pov_character": "Cael Drummond",
+                "bridge_from_prior": "Thread: Cael's stated reason for the detour to Eastmarch \u2014 established in Chapter 5 \u2014 is now enacted; the group routes through Eastmarch to resupply",
+                "beat": "The group reaches Eastmarch. Cael finds Sable \u2014 alive, healthy, and furious with him for staying away. She has been running the settlement's information network and has heard rumors of unusual radio activity from the southwest. When Cael explains what Mara found, Sable insists on joining the expedition. Cael refuses. Sable comes anyway.",
+                "arc_notes": "Hero's Journey Stage 5 \u2014 Crossing the Threshold: Sable joins the group, expanding the cast and adding the archive thread; Cael's refusal and Sable's defiance establish their dynamic"
+              },
+              {
+                "chapter_number": 10,
+                "title": "The Archive",
+                "act": "Act 2A",
+                "arc_point": "Tests, Allies, and Enemies \u2014 ally introduction",
+                "pov_character": "Sable Drummond",
+                "bridge_from_prior": "Thread: Sable joined the group in Chapter 9; this chapter establishes her value and her agenda",
+                "beat": "Sable shows Mara her cassette archive \u2014 dozens of recorded testimonies from survivors across the region. She explains that she has been tracking rumors of a pre-collapse government program called ANCHOR \u2014 a continuity-of-government bunker system. The coordinates Mara decoded match one of three ANCHOR sites she has identified. Mara realizes the signal is not from a random survivor. It is from a government remnant.",
+                "arc_notes": "Hero's Journey Stage 6 \u2014 Tests, Allies, and Enemies: Sable's archive reframes the dramatic question; ANCHOR is named; the antagonist's institutional identity is revealed"
+              },
+              {
+                "chapter_number": 11,
+                "title": "Seven Levels Down",
+                "act": "Act 2A",
+                "arc_point": "Tests, Allies, and Enemies \u2014 antagonist world",
+                "pov_character": "Dr. Yusuf Okafor",
+                "bridge_from_prior": "Thread: Sable named ANCHOR in Chapter 10; this chapter enters the bunker for the first time, showing the world the signal comes from",
+                "beat": "Inside ANCHOR Bunker Seven, Dr. Yusuf Okafor completes his morning medical rounds. He notes in his private log that a fourth bunker resident has developed symptoms consistent with vitamin D deficiency \u2014 seven years without sunlight. Director Vetch holds a briefing: the countdown is on schedule. Emergence in eighteen days. Yusuf asks what happens to the surface communities. Vetch says they will be integrated. Yusuf writes one word in his log: integrated.",
+                "arc_notes": "Hero's Journey Stage 6 \u2014 Tests, Allies, and Enemies: the bunker's interior world is established; Vetch is introduced; Yusuf's moral discomfort is planted; 'integrated' is the novel's first euphemism for erasure"
+              },
+              {
+                "chapter_number": 12,
+                "title": "The Raider Road",
+                "act": "Act 2A",
+                "arc_point": "Tests, Allies, and Enemies \u2014 first obstacle",
+                "pov_character": "Tom\u00e1s Reyes",
+                "bridge_from_prior": "Thread: the group is moving southwest on Tom\u00e1s's mapped route; they are approaching the first raider territory he briefed in Chapter 7",
+                "beat": "The group encounters a raider checkpoint on the mapped road \u2014 a faction called the Tollmen who charge passage in food or labor. Tom\u00e1s's map shows an alternate route but it adds two days. Mara calculates they cannot afford two days. She negotiates passage by trading the group's remaining fuel supply. They pass. They are now on foot.",
+                "arc_notes": "Hero's Journey Stage 6 \u2014 Tests, Allies, and Enemies: first real obstacle; the fuel trade is a genuine cost; being on foot changes the journey's calculus and raises the deadline pressure"
+              },
+              {
+                "chapter_number": 13,
+                "title": "What Mara Carries",
+                "act": "Act 2A",
+                "arc_point": "Tests, Allies, and Enemies \u2014 character reveal",
+                "pov_character": "Sable Drummond",
+                "bridge_from_prior": "Thread: the group is now on foot after Chapter 12's fuel trade; forced proximity during the walk surfaces character",
+                "beat": "Walking through a ruined suburb, Sable finds a pre-collapse radio tower and asks Mara to explain how it worked. Mara does \u2014 in precise, loving detail \u2014 and Sable records it for her archive. In the process, Sable realizes Mara has not said her husband's name once. She asks. Mara walks ahead. That night, Sable hears Mara speaking quietly into the dead radio \u2014 saying Daniel's name, asking if he can hear her.",
+                "arc_notes": "Hero's Journey Stage 6 \u2014 Tests, Allies, and Enemies: Mara's grief is revealed through action, not exposition; Sable's archive instinct is shown; the emotional stakes of the journey are deepened"
+              },
+              {
+                "chapter_number": 14,
+                "title": "The Integration Plan",
+                "act": "Act 2A",
+                "arc_point": "Tests, Allies, and Enemies \u2014 antagonist deepening",
+                "pov_character": "Dr. Yusuf Okafor",
+                "bridge_from_prior": "Thread: Yusuf wrote 'integrated' in his log in Chapter 11; this chapter shows him seeking the actual definition",
+                "beat": "Yusuf accesses the ANCHOR program's classified emergence protocol \u2014 a document he has technically always had clearance for but never read. The integration plan calls for surface communities to be assessed, catalogued, and reorganized under ANCHOR administrative authority. Communities that resist will be denied access to ANCHOR's seed vault, medical supplies, and power grid. Yusuf reads the word 'denied' and understands it means starvation. He closes the document and does not sleep.",
+                "arc_notes": "Hero's Journey Stage 6 \u2014 Tests, Allies, and Enemies: the antagonist's plan is fully revealed to the reader through Yusuf; the moral stakes are made concrete \u2014 this is not abstract authoritarianism, it is a specific mechanism of coercion"
+              },
+              {
+                "chapter_number": 15,
+                "title": "The Contaminated Mile",
+                "act": "Act 2A",
+                "arc_point": "Tests, Allies, and Enemies \u2014 second obstacle",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: Tom\u00e1s briefed the contaminated road stretch in Chapter 7; the group has now reached it",
+                "beat": "The group reaches the chemically contaminated stretch Tom\u00e1s warned about \u2014 a former industrial corridor where the soil and water are toxic. Tom\u00e1s's map shows a path through but it requires precise navigation. Halfway through, Tom\u00e1s stops and admits his eye is failing \u2014 he cannot read the map markers he set two years ago. Mara takes the map and navigates them out using her topographic memory. They emerge safe. Tom\u00e1s is shaking.",
+                "arc_notes": "Hero's Journey Stage 6 \u2014 Tests, Allies, and Enemies: Tom\u00e1s's hidden failing eye becomes a crisis; Mara's topographic skill saves the group; the mentor's limitation is exposed, forcing the hero to internalize the mentor's function"
+              },
+              {
+                "chapter_number": 16,
+                "title": "What Tom\u00e1s Sees",
+                "act": "Act 2A",
+                "arc_point": "Tests, Allies, and Enemies \u2014 ally crisis",
+                "pov_character": "Tom\u00e1s Reyes",
+                "bridge_from_prior": "Thread: Tom\u00e1s's confession in Chapter 15 \u2014 this chapter is his reckoning with what he revealed",
+                "beat": "Tom\u00e1s offers to leave the group \u2014 he is a liability now. Cael says no. Sable says his spatial memory is more valuable than his eyes. Mara says nothing for a long moment, then asks him to describe the bunker's likely layout from memory. He does \u2014 in extraordinary detail, drawing from his knowledge of FEMA construction standards. Mara realizes he is still the most valuable person on the team. She tells him so. It is the first time she has said something like that to anyone in years.",
+                "arc_notes": "Hero's Journey Stage 6 \u2014 Tests, Allies, and Enemies: Tom\u00e1s is retained; Mara's acknowledgment of another person's value is a small but significant character movement; the bunker's likely layout is established for later use"
+              },
+              {
+                "chapter_number": 17,
+                "title": "Vetch's Journal",
+                "act": "Act 2A",
+                "arc_point": "Tests, Allies, and Enemies \u2014 antagonist interiority",
+                "pov_character": "Director Harlan Vetch",
+                "bridge_from_prior": "Thread: Yusuf read the integration plan in Chapter 14; Vetch's journal entry this chapter is written the same day, showing the same plan from the other side",
+                "beat": "Vetch writes in his journal: seventeen days to emergence. He describes the surface communities with genuine sympathy \u2014 people who survived against the odds, who deserve credit for their resilience. He then writes that resilience is not governance, and that what they have built is not civilization but endurance. He believes this completely. He is not lying to himself. This is the most frightening thing about him.",
+                "arc_notes": "Hero's Journey Stage 7 \u2014 Approach to the Inmost Cave: Vetch's interiority is established; his genuine belief in his own righteousness makes him a more dangerous antagonist than a cynical one; the reader is invited to understand him without agreeing with him"
+              },
+              {
+                "chapter_number": 18,
+                "title": "The Second Raider Territory",
+                "act": "Act 2A",
+                "arc_point": "Tests, Allies, and Enemies \u2014 third obstacle",
+                "pov_character": "Cael Drummond",
+                "bridge_from_prior": "Thread: Tom\u00e1s's route map from Chapter 7 identified three raider territories; the group has passed the first and the contaminated road; now the second territory",
+                "beat": "The group is captured by a raider faction called the Reapers \u2014 more organized and more violent than the Tollmen. The Reapers' leader demands the group's maps and equipment. Cael negotiates. The leader offers a deal: the group can pass if Cael fights one of the Reapers' champions. Cael agrees. He wins \u2014 and does not kill his opponent when he could. The Reapers let them pass, confused by the mercy.",
+                "arc_notes": "Hero's Journey Stage 6 \u2014 Tests, Allies, and Enemies: Cael's pacifism is tested and holds; his mercy confuses the Reapers, which is its own kind of power; the group's maps are preserved"
+              },
+              {
+                "chapter_number": 19,
+                "title": "Sable's Moral Complication",
+                "act": "Act 2A",
+                "arc_point": "Tests, Allies, and Enemies \u2014 moral complication",
+                "pov_character": "Sable Drummond",
+                "bridge_from_prior": "Thread: the group has passed through Reaper territory in Chapter 18; during the encounter, Sable learned the Reapers have a prisoner who claims to have come from the bunker",
+                "beat": "Sable interrogates the Reaper prisoner \u2014 a young man named Gil who escaped from ANCHOR Bunker Seven three months ago. He confirms the bunker is real, that Vetch is real, and that the emergence plan includes armed security teams. He also tells her something she did not expect: there are people inside the bunker who do not support the plan. He gives her a name: Dr. Yusuf Okafor. Sable faces a choice \u2014 share this with Mara immediately or use it as leverage to ensure her archive is protected in any negotiation. She waits one day before telling Mara.",
+                "arc_notes": "Hero's Journey Stage 6 \u2014 Tests, Allies, and Enemies: Yusuf is identified as a potential inside ally; Sable's one-day delay is her moral compromise \u2014 small but real; the group now has a name inside the bunker"
+              },
+              {
+                "chapter_number": 20,
+                "title": "The Name in the Bunker",
+                "act": "Act 2A",
+                "arc_point": "Tests, Allies, and Enemies \u2014 information reaches the bunker",
+                "pov_character": "Dr. Yusuf Okafor",
+                "bridge_from_prior": "Thread: Sable learned Yusuf's name from Gil in Chapter 19; this chapter shows Yusuf on the same day, unaware he has been named",
+                "beat": "Yusuf discovers that Gil \u2014 the young man who escaped three months ago \u2014 has apparently been found by a surface group. Commander Brask tells Vetch. Vetch orders the bunker's external sensors activated for the first time in two years. Yusuf realizes the group approaching the bunker is now known to Vetch. He also realizes he is the only person in the bunker who might want to warn them. He does nothing. Yet.",
+                "arc_notes": "Hero's Journey Stage 7 \u2014 Approach to the Inmost Cave: the bunker becomes aware of the approaching group; Yusuf's paralysis is his ordeal's approach; the tension between the two storylines tightens"
+              },
+              {
+                "chapter_number": 21,
+                "title": "Midpoint: The Signal Changes",
+                "act": "Act 2A",
+                "arc_point": "Midpoint Reversal",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: the group is now within radio range of the bunker; Mara has been monitoring the signal continuously",
+                "beat": "The signal changes. The countdown format shifts \u2014 the interval between pulses shortens. Mara recalculates: the countdown is not nineteen days from when she first heard it. It has been running for months. They have eleven days, not nineteen. The group is behind schedule. Simultaneously, Mara picks up a second signal \u2014 a faint, irregular transmission on a different frequency. Someone inside the bunker is trying to reach the surface. The signal is in Morse code. It spells: DO NOT COME. THEY KNOW YOU ARE HERE.",
+                "arc_notes": "Hero's Journey Stage 7 \u2014 Approach to the Inmost Cave: the midpoint reversal \u2014 the deadline is shorter than believed and the bunker knows they are coming; the second signal (Yusuf) introduces the inside ally; the dramatic question is recalibrated"
+              },
+              {
+                "chapter_number": 22,
+                "title": "Yusuf Breaks",
+                "act": "Act 2B",
+                "arc_point": "Approach to the Inmost Cave \u2014 inside ally activates",
+                "pov_character": "Dr. Yusuf Okafor",
+                "bridge_from_prior": "Thread: Yusuf decided to warn the surface group in Chapter 21 \u2014 this chapter shows him sending the Morse signal and its immediate consequences",
+                "beat": "Yusuf transmits the warning using a maintenance frequency Vetch does not monitor. Brask detects the transmission anyway \u2014 not its content, but its existence. She confronts Yusuf. He denies it. She does not believe him but cannot prove it. Vetch, informed, orders the bunker locked down and the countdown accelerated by forty-eight hours. Yusuf has nine days. The group has nine days.",
+                "arc_notes": "Hero's Journey Stage 7 \u2014 Approach to the Inmost Cave: Yusuf's first act of resistance; the lockdown and acceleration raise the stakes; the forty-eight-hour compression is a direct consequence of his action"
+              },
+              {
+                "chapter_number": 23,
+                "title": "The Warning Received",
+                "act": "Act 2B",
+                "arc_point": "Approach to the Inmost Cave \u2014 group response to warning",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: Mara received the Morse warning in Chapter 21; this chapter is her response \u2014 she decodes the full message and the group debates",
+                "beat": "Mara decodes the full Morse transmission: DO NOT COME. THEY KNOW YOU ARE HERE. EMERGENCE IN NINE DAYS. INTEGRATION MEANS CONTROL. OKAFOR. The group debates turning back. Cael argues for retreat and regrouping. Sable argues for pressing forward \u2014 her archive is the only record of what the surface communities have built, and if ANCHOR emerges unopposed, the archive becomes the only evidence they existed. Mara says nothing for a long time. Then she asks Tom\u00e1s how far to the bunker. Six days on foot, he says. They have three days of margin.",
+                "arc_notes": "Hero's Journey Stage 7 \u2014 Approach to the Inmost Cave: the group's debate makes the stakes explicit; Sable's argument for the archive reframes the mission from stopping a countdown to preserving a world; three days of margin is the novel's tightest constraint yet"
+              },
+              {
+                "chapter_number": 24,
+                "title": "What Cael Fears",
+                "act": "Act 2B",
+                "arc_point": "Approach to the Inmost Cave \u2014 character pressure",
+                "pov_character": "Cael Drummond",
+                "bridge_from_prior": "Thread: Cael argued for retreat in Chapter 23; this chapter shows him processing his own fear",
+                "beat": "Cael walks the night watch alone and examines his own argument. He realizes he argued for retreat not because it was strategically sound but because Sable is with them now and he is afraid of her dying. He has been making decisions around her safety since Eastmarch. He tells her this. Sable tells him that protecting her from the world is not the same as protecting the world for her. It is the most important thing anyone has said to him in years. He stops arguing for retreat.",
+                "arc_notes": "Hero's Journey Stage 7 \u2014 Approach to the Inmost Cave: Cael's father-daughter dynamic is resolved at the emotional level; his pacifism and his protectiveness are separated; he is now fully committed to the mission"
+              },
+              {
+                "chapter_number": 25,
+                "title": "Brask's Ledger",
+                "act": "Act 2B",
+                "arc_point": "Approach to the Inmost Cave \u2014 antagonist deepening",
+                "pov_character": "Commander Lena Brask",
+                "bridge_from_prior": "Thread: Brask confronted Yusuf in Chapter 22; this chapter shows her processing the confrontation and her own doubts",
+                "beat": "Brask reviews her accountability ledger \u2014 every decision she has made in seven years underground. She finds the entry from three years ago when she authorized the denial of surface radio contact to a survivor group that had found the bunker's outer perimeter. She wrote: CONTACT DENIED \u2014 SECURITY PROTOCOL. She now writes beneath it: THEY MAY HAVE DIED. She closes the ledger and does not change the plan. But she has written it down.",
+                "arc_notes": "Hero's Journey Stage 7 \u2014 Approach to the Inmost Cave: Brask's private doubt is established; her ledger is her conscience externalized; she is not redeemed but she is complicated; her arc toward the climax is seeded"
+              },
+              {
+                "chapter_number": 26,
+                "title": "The Third Territory",
+                "act": "Act 2B",
+                "arc_point": "Approach to the Inmost Cave \u2014 final obstacle before the bunker",
+                "pov_character": "Tom\u00e1s Reyes",
+                "bridge_from_prior": "Thread: the group is on the six-day march to the bunker; Tom\u00e1s's map shows the third raider territory ahead",
+                "beat": "The third raider territory turns out to be abandoned \u2014 the faction collapsed months ago, their territory now empty ruins. Tom\u00e1s navigates by memory and spatial instinct, his remaining eye nearly useless in the low light. He gets them through. On the other side, he can see the outline of the ruined city that sits above the bunker. He describes it to the group from memory \u2014 every street, every collapsed building, every access point \u2014 and Mara realizes he has been preparing for this moment since they left Harrow.",
+                "arc_notes": "Hero's Journey Stage 7 \u2014 Approach to the Inmost Cave: the final external obstacle is cleared; Tom\u00e1s's spatial memory delivers the group to the threshold of the bunker city; the approach is complete"
+              },
+              {
+                "chapter_number": 27,
+                "title": "The City Above",
+                "act": "Act 2B",
+                "arc_point": "Approach to the Inmost Cave \u2014 arrival at the bunker city",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: the group has arrived at the ruined city above the bunker, as described by Tom\u00e1s in Chapter 26",
+                "beat": "The group enters the ruins of what was once a mid-sized Midwestern city \u2014 Wichita, Kansas. The streets are seven years of decay: collapsed storefronts, vehicles rusted in place, a silence that is different from the open plains. Mara finds a pre-collapse radio relay station and uses it to boost her receiver. The signal is overwhelming here \u2014 she can feel it in the equipment. She also picks up Yusuf's maintenance frequency again. He is transmitting: ENTRANCE C. SUBLEVEL 2. DOOR CODE 1147. I WILL BE THERE.",
+                "arc_notes": "Hero's Journey Stage 7 \u2014 Approach to the Inmost Cave: the bunker city is established; Yusuf provides the entry point; the alliance between the surface group and the inside ally is confirmed; the inmost cave is now literally in front of them"
+              },
+              {
+                "chapter_number": 28,
+                "title": "Yusuf's Preparation",
+                "act": "Act 2B",
+                "arc_point": "Approach to the Inmost Cave \u2014 inside ally prepares",
+                "pov_character": "Dr. Yusuf Okafor",
+                "bridge_from_prior": "Thread: Yusuf transmitted the entry code in Chapter 27; this chapter shows him preparing for the consequences",
+                "beat": "Yusuf prepares a medical kit and a copy of the integration plan \u2014 the full document, not the summary. He hides both in a maintenance corridor near Entrance C. He writes a letter to his sister, not knowing if she is alive, and seals it. He places it in the kit. Then he goes to dinner with Priya and argues about pre-collapse films and laughs for the first time in weeks, because he does not know if he will be alive tomorrow.",
+                "arc_notes": "Hero's Journey Stage 7 \u2014 Approach to the Inmost Cave: Yusuf's humanity is restored before the ordeal; the integration plan document becomes a physical MacGuffin; the letter to his sister is his emotional stake"
+              },
+              {
+                "chapter_number": 29,
+                "title": "Entrance C",
+                "act": "Act 2B",
+                "arc_point": "Approach to the Inmost Cave \u2014 threshold of the bunker",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: Yusuf gave the entry code in Chapter 27; the group moves to Entrance C",
+                "beat": "The group finds Entrance C \u2014 a maintenance hatch beneath a collapsed parking structure. Mara enters the code: 1147. The door opens. The smell of recycled air and fluorescent light hits them like a physical force. Sable records the moment on her cassette recorder. Cael checks his rifle \u2014 and then puts it on his back, safety on. They descend.",
+                "arc_notes": "Hero's Journey Stage 8 \u2014 The Ordeal begins: the group enters the bunker; the threshold is crossed into the inmost cave; Cael's rifle on his back is a loaded detail"
+              },
+              {
+                "chapter_number": 30,
+                "title": "Sublevel Two",
+                "act": "Act 2B",
+                "arc_point": "The Ordeal \u2014 inside the bunker",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: the group descended into the bunker in Chapter 29; they are now navigating Sublevel 2",
+                "beat": "The group moves through Sublevel 2 \u2014 a maintenance level of pipes, conduits, and the hum of a functioning power grid. Mara touches a live electrical panel and feels something she has not felt in seven years: infrastructure. Systems that work. She is briefly, shamefully seduced by it. Yusuf finds them in the corridor. He is smaller than she imagined. He hands her the integration plan document. She reads the first page and her seduction ends.",
+                "arc_notes": "Hero's Journey Stage 8 \u2014 The Ordeal: Mara's brief seduction by functioning infrastructure is her ordeal's first beat \u2014 she must confront the appeal of what Vetch has built before she can reject it; Yusuf's document is the weapon"
+              },
+              {
+                "chapter_number": 31,
+                "title": "The Document",
+                "act": "Act 2B",
+                "arc_point": "The Ordeal \u2014 the plan revealed in full",
+                "pov_character": "Sable Drummond",
+                "bridge_from_prior": "Thread: Mara received the integration plan document in Chapter 30; Sable reads it next",
+                "beat": "Sable reads the integration plan in full. It is worse than she expected: the plan includes a media strategy \u2014 ANCHOR will broadcast on all available frequencies, presenting itself as the legitimate government, and will describe the surface communities as 'informal settlements requiring administrative support.' Her archive \u2014 the testimonies, the histories, the voices \u2014 will be reclassified as 'pre-integration oral records' and archived under ANCHOR's authority. She will not own them. She will not control them. They will be used as evidence of how much the survivors needed saving.",
+                "arc_notes": "Hero's Journey Stage 8 \u2014 The Ordeal: Sable's specific fear \u2014 erasure \u2014 is confirmed and made concrete; the integration plan is not just political, it is archival; the stakes for Sable are now as high as for Mara"
+              },
+              {
+                "chapter_number": 32,
+                "title": "Vetch and Mara",
+                "act": "Act 2B",
+                "arc_point": "The Ordeal \u2014 confrontation",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: the group is inside the bunker with the integration plan; Brask's sensors detect them on Sublevel 2 and Vetch is informed",
+                "beat": "Vetch finds them. Not with armed guards \u2014 alone, in the corridor, as if he has been expecting this. He invites Mara to his office. She goes. He shows her the bunker: the seed vault, the medical bay, the power grid, the 214 people who have survived underground for seven years. He asks her what she would have done differently. She cannot immediately answer. He offers her a role in the emergence \u2014 chief communications officer, rebuilding the radio network. It is exactly what she wants. She says nothing for a long time.",
+                "arc_notes": "Hero's Journey Stage 8 \u2014 The Ordeal: the moral complication at its peak \u2014 Vetch's offer is genuine and the role he offers Mara is her deepest desire; the reader, in her shoes, would be tempted; this is the ordeal's heart"
+              },
+              {
+                "chapter_number": 33,
+                "title": "The Cost of Yes",
+                "act": "Act 2B",
+                "arc_point": "The Ordeal \u2014 moral choice",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: Vetch's offer from Chapter 32 \u2014 Mara must respond",
+                "beat": "Mara asks Vetch one question: what happens to the communities that refuse integration? He answers honestly \u2014 they will be denied access to ANCHOR resources. She asks how long they can survive without those resources. He says: two winters, perhaps three. She understands this is a death sentence delivered at administrative distance. She tells him she needs time to think. He gives her until morning. She leaves his office and finds Sable waiting in the corridor. Sable asks: what did he offer you? Mara tells her. Sable says: and you're thinking about it. Mara says: yes.",
+                "arc_notes": "Hero's Journey Stage 8 \u2014 The Ordeal: Mara's honesty with Sable about her temptation is the ordeal's turning point; she does not lie; the reader sees her as a full person, not a hero; the choice is still unmade"
+              },
+              {
+                "chapter_number": 34,
+                "title": "Brask's Discovery",
+                "act": "Act 2B",
+                "arc_point": "The Ordeal \u2014 antagonist complication",
+                "pov_character": "Commander Lena Brask",
+                "bridge_from_prior": "Thread: Vetch met with Mara alone in Chapter 32; Brask was not informed; she discovers this through the bunker's internal logs",
+                "beat": "Brask reviews the internal security logs and discovers Vetch met with the surface group without her. She is not angry \u2014 she is afraid. She has spent seven years ensuring the plan's security and Vetch has just introduced an uncontrolled variable. She goes to Yusuf's quarters and searches them. She finds the letter to his sister. She reads it. It is not a confession \u2014 it is a love letter to someone he does not know is alive. She puts it back. She does not report Yusuf. She does not know why.",
+                "arc_notes": "Hero's Journey Stage 8 \u2014 The Ordeal: Brask's decision not to report Yusuf is her first crack; the letter humanizes him to her; her faith in the plan begins its fracture"
+              },
+              {
+                "chapter_number": 35,
+                "title": "Cael and Yusuf",
+                "act": "Act 2B",
+                "arc_point": "The Ordeal \u2014 alliance deepens",
+                "pov_character": "Cael Drummond",
+                "bridge_from_prior": "Thread: Yusuf has been with the group since Chapter 30; this chapter develops his relationship with Cael",
+                "beat": "Cael and Yusuf talk through the night in the maintenance corridor. Yusuf describes the bunker's 214 people \u2014 not as abstractions but as individuals: the teacher, the engineer, the child born underground who has never seen the sky. Cael describes Harrow, Eastmarch, the Tollmen, the Reapers \u2014 the world that has grown up above. Yusuf realizes he has been thinking of the surface as a problem to be solved. Cael realizes the bunker people are not villains. They are just people who have been underground too long.",
+                "arc_notes": "Hero's Journey Stage 8 \u2014 The Ordeal: the human cost of the plan is made visible on both sides; Yusuf's shift from complicity to resistance is grounded in this conversation; Cael's empathy is his superpower"
+              },
+              {
+                "chapter_number": 36,
+                "title": "Mara's Answer",
+                "act": "Act 2B",
+                "arc_point": "The Ordeal \u2014 moral choice resolved",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: Vetch gave Mara until morning in Chapter 33; morning has come",
+                "beat": "Mara returns to Vetch's office. She tells him no. She explains why: not because his plan is evil but because it is unilateral \u2014 he has made decisions for millions of people who were never asked. He says someone had to. She says that is the most dangerous sentence in any language. He looks at her with something like respect and then calls for Brask. Mara runs.",
+                "arc_notes": "Hero's Journey Stage 8 \u2014 The Ordeal: Mara's refusal is the ordeal's climactic beat; her argument ('the most dangerous sentence in any language') is the novel's thematic statement; the chase begins"
+              },
+              {
+                "chapter_number": 37,
+                "title": "The Lockdown",
+                "act": "Act 2B",
+                "arc_point": "The Ordeal \u2014 crisis",
+                "pov_character": "Sable Drummond",
+                "bridge_from_prior": "Thread: Mara ran from Vetch's office in Chapter 36; Brask initiates lockdown; Sable is separated from the group",
+                "beat": "The bunker goes into lockdown. Sable is separated from Mara and Cael in the confusion \u2014 she is on Sublevel 3, alone, with her cassette recorder and the integration plan document. She makes a decision: she finds the bunker's internal broadcast system and records a message \u2014 her voice, reading the integration plan aloud, with commentary. She transmits it on the bunker's internal PA. Every one of the 214 bunker residents hears it.",
+                "arc_notes": "Hero's Journey Stage 8 \u2014 The Ordeal: Sable's broadcast is the ordeal's most consequential act; it is not Mara who breaks the plan open but Sable; the archive becomes a weapon; the bunker's internal community is disrupted"
+              },
+              {
+                "chapter_number": 38,
+                "title": "214 People Listening",
+                "act": "Act 2B",
+                "arc_point": "The Ordeal \u2014 consequence of the broadcast",
+                "pov_character": "Dr. Yusuf Okafor",
+                "bridge_from_prior": "Thread: Sable's broadcast in Chapter 37 \u2014 Yusuf hears it along with everyone else",
+                "beat": "The bunker's common areas fill with people who have just heard the integration plan read aloud by a stranger's voice. Yusuf watches his colleagues \u2014 the teacher, the engineer, the child's parents \u2014 process what they have heard. Some are angry at the intrusion. Some are asking questions they have never asked before. Priya finds Yusuf and says: did you know? He says: yes. She says: for how long? He says: seven years. She walks away. He does not follow her.",
+                "arc_notes": "Hero's Journey Stage 8 \u2014 The Ordeal: the broadcast's human cost \u2014 Yusuf loses Priya's trust; the bunker community fractures; the ordeal is not just external but internal to both groups"
+              },
+              {
+                "chapter_number": 39,
+                "title": "Brask Chooses",
+                "act": "Act 2B",
+                "arc_point": "The Ordeal \u2014 antagonist fracture",
+                "pov_character": "Commander Lena Brask",
+                "bridge_from_prior": "Thread: Brask initiated lockdown in Chapter 37; the broadcast has disrupted the bunker; she must now decide how to respond",
+                "beat": "Brask has Sable in custody. She has the authority to detain the entire surface group and proceed with the countdown. She opens her accountability ledger and writes the entry: SURFACE GROUP DETAINED. COUNTDOWN PROCEEDS. She reads it back. She crosses it out. She goes to Vetch and tells him the plan cannot proceed as written \u2014 the broadcast has made it impossible to claim the surface communities consented. Vetch tells her to proceed anyway. She says no. It is the first time in seven years she has said no to him.",
+                "arc_notes": "Hero's Journey Stage 9 \u2014 Reward: Brask's refusal is the plan's first internal fracture; her arc reaches its turning point; the antagonist coalition splits; this is the reward the ordeal produces \u2014 not a physical object but a crack in the opposition"
+              },
+              {
+                "chapter_number": 40,
+                "title": "The Seed Vault Argument",
+                "act": "Act 3",
+                "arc_point": "Reward \u2014 negotiation begins",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: Brask released Sable and refused Vetch in Chapter 39; Mara is found by Brask and brought to the seed vault for a conversation",
+                "beat": "Brask takes Mara to the seed vault \u2014 the bunker's most valuable asset, the reason ANCHOR's plan has any leverage at all. She shows Mara the full inventory: 40,000 seed varieties, enough to restart global agriculture. She asks Mara what she would do with it. Mara says: give it away. Brask says: to whom? Mara says: everyone. Brask says: that is not a plan. Mara says: it is the only plan that doesn't require a gun. Brask is quiet for a long time.",
+                "arc_notes": "Hero's Journey Stage 9 \u2014 Reward: the seed vault is the novel's central physical prize; the argument between Mara and Brask is the negotiation that will determine the ending; Brask is not converted but she is listening"
+              },
+              {
+                "chapter_number": 41,
+                "title": "Vetch Alone",
+                "act": "Act 3",
+                "arc_point": "Reward \u2014 antagonist isolation",
+                "pov_character": "Director Harlan Vetch",
+                "bridge_from_prior": "Thread: Brask refused Vetch in Chapter 39 and is now negotiating with Mara; Vetch is alone for the first time in the novel",
+                "beat": "Vetch sits in his office and reviews his options. Brask has defected. Yusuf has defected. The countdown has seven days remaining. He has the security codes, the seed vault, and the power grid. He also has 214 people who heard a broadcast and are asking questions. He writes in his journal: I built this for them. All of them. They do not understand yet. He pauses. He writes: or I am wrong. He does not cross it out. He leaves it.",
+                "arc_notes": "Hero's Journey Stage 9 \u2014 Reward: Vetch's first written doubt is the reward's emotional peak; he is not redeemed but he is cracking; the 'or I am wrong' entry will matter in the climax"
+              },
+              {
+                "chapter_number": 42,
+                "title": "The Cassette Archive",
+                "act": "Act 3",
+                "arc_point": "Road Back \u2014 the archive as evidence",
+                "pov_character": "Sable Drummond",
+                "bridge_from_prior": "Thread: Sable was released by Brask in Chapter 39; she now has access to the bunker's broadcast system with Brask's tacit permission",
+                "beat": "Sable plays her cassette archive over the bunker's PA system \u2014 not the integration plan, but the testimonies: survivors describing their communities, their losses, their inventions, their children. The bunker residents listen. The teacher cries. The engineer asks Sable where the settlement with the water filtration system is located. Priya finds Yusuf and says: I'm still angry. But I'm listening. Yusuf says: that's enough.",
+                "arc_notes": "Hero's Journey Stage 10 \u2014 Road Back: the archive does what Mara's argument could not \u2014 it makes the surface communities real to the bunker residents; the road back is not a retreat but a transformation of the bunker itself"
+              },
+              {
+                "chapter_number": 43,
+                "title": "The Countdown Clock",
+                "act": "Act 3",
+                "arc_point": "Road Back \u2014 deadline pressure",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: the countdown has seven days remaining as of Chapter 41; Mara must now act on the technical problem",
+                "beat": "Mara examines the countdown system \u2014 the mechanism that will trigger ANCHOR's emergence broadcast and activate its administrative protocols automatically. It is a Cold War-era relay system, elegant and simple. She can disable it. But disabling it will also disable the bunker's power grid for forty-eight hours, potentially killing the three bunker residents already on medical support. She tells Yusuf. He says: I know. She asks: is there another way? He says: not technically. She says: then we find another way.",
+                "arc_notes": "Hero's Journey Stage 10 \u2014 Road Back: the technical problem is established with a genuine moral cost; Mara refuses the easy solution because it would kill people; this is her character arc's proof \u2014 she is not willing to win at any cost"
+              },
+              {
+                "chapter_number": 44,
+                "title": "Tom\u00e1s and the Grid",
+                "act": "Act 3",
+                "arc_point": "Road Back \u2014 technical solution",
+                "pov_character": "Tom\u00e1s Reyes",
+                "bridge_from_prior": "Thread: Mara needs a way to disable the countdown without cutting the power grid; Tom\u00e1s's knowledge of FEMA construction standards from Chapter 16 becomes relevant",
+                "beat": "Tom\u00e1s, navigating the bunker's maintenance corridors by spatial memory, locates the countdown relay's physical housing \u2014 a separate circuit from the main power grid, connected by a single junction box. He describes its location to Mara in precise detail. She finds it. The junction box is locked with a mechanical combination \u2014 a pre-collapse FEMA standard lock. Tom\u00e1s recites the default combination from memory: 7-3-1-4. It opens.",
+                "arc_notes": "Hero's Journey Stage 10 \u2014 Road Back: Tom\u00e1s's spatial memory and FEMA knowledge \u2014 established in Chapter 16 \u2014 pays off; the wow factor (procedural accuracy) is at its peak; the mentor's gift is fully internalized"
+              },
+              {
+                "chapter_number": 45,
+                "title": "Vetch's Last Move",
+                "act": "Act 3",
+                "arc_point": "Road Back \u2014 antagonist's final action",
+                "pov_character": "Director Harlan Vetch",
+                "bridge_from_prior": "Thread: Vetch has been isolated since Chapter 41; he has been watching the bunker community shift; he makes his final move",
+                "beat": "Vetch goes to the seed vault and changes the access codes \u2014 locking everyone out. He then broadcasts on the bunker's internal system: the emergence will proceed on schedule. Anyone who interferes will be denied access to the seed vault. He is not threatening violence. He is threatening the future. It is the most honest thing he has done: he is showing everyone exactly what his plan has always been.",
+                "arc_notes": "Hero's Journey Stage 10 \u2014 Road Back: Vetch's seed vault lockout is his final play; by making his coercion explicit, he loses the moral argument he has been winning; the bunker community's response will determine the climax"
+              },
+              {
+                "chapter_number": 46,
+                "title": "The Bunker Votes",
+                "act": "Act 3",
+                "arc_point": "Road Back \u2014 internal resolution",
+                "pov_character": "Dr. Yusuf Okafor",
+                "bridge_from_prior": "Thread: Vetch's broadcast in Chapter 45 forces a response from the bunker community; Yusuf organizes it",
+                "beat": "Yusuf calls an assembly \u2014 the first in seven years that Vetch did not convene. He presents the integration plan and Sable's archive. He asks for a vote: proceed with ANCHOR emergence as planned, or negotiate a new framework with the surface communities. The vote is 147 to 67 against the plan. Vetch watches from the back of the room. He does not speak. He leaves before the count is announced.",
+                "arc_notes": "Hero's Journey Stage 10 \u2014 Road Back: the bunker community's vote is the institutional resolution; Vetch's plan is defeated from within; Yusuf's arc reaches its climax \u2014 he found the courage; the 67 who voted for the plan are not erased, they are noted"
+              },
+              {
+                "chapter_number": 47,
+                "title": "Vetch and the Surface",
+                "act": "Act 3",
+                "arc_point": "Resurrection \u2014 Vetch's confrontation with what he built",
+                "pov_character": "Director Harlan Vetch",
+                "bridge_from_prior": "Thread: Vetch left the assembly in Chapter 46; Mara finds him at the bunker's surface access hatch",
+                "beat": "Mara finds Vetch at the surface hatch \u2014 the door he has not opened in seven years. He is standing in front of it, not moving. She asks if he wants to go up. He says he does not know if he can. She opens the hatch. Daylight falls into the bunker for the first time in seven years. Vetch steps into it. He stands in the ruins of Wichita and looks at the sky and says nothing for a very long time. Then he says: I thought there would be nothing left. Mara says: there is everything left. It is just not yours.",
+                "arc_notes": "Hero's Journey Stage 11 \u2014 Resurrection: Vetch's emergence is the novel's emotional climax; his phobia of the surface is confronted; Mara's line ('there is everything left \u2014 it is just not yours') is the novel's thematic resolution; Vetch is not destroyed but he is finished as an antagonist"
+              },
+              {
+                "chapter_number": 48,
+                "title": "The Countdown Ends",
+                "act": "Act 3",
+                "arc_point": "Resurrection \u2014 technical resolution",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: Mara found the junction box in Chapter 44; she now returns to disable the countdown relay",
+                "beat": "Mara returns to the junction box and disconnects the countdown relay \u2014 not to prevent emergence but to prevent the automatic administrative broadcast that would have declared ANCHOR the governing authority. The countdown reaches zero. Nothing happens. No broadcast. No declaration. Just silence, and then the hum of the power grid continuing. She sits on the floor of the maintenance corridor and laughs \u2014 not from joy but from the specific relief of a person who arrived in time.",
+                "arc_notes": "Hero's Journey Stage 11 \u2014 Resurrection: the technical resolution of the dramatic question; the countdown ends without the broadcast; Mara's laughter is her resurrection \u2014 the old Mara who was always afraid of arriving too late has survived"
+              },
+              {
+                "chapter_number": 49,
+                "title": "What Brask Writes",
+                "act": "Act 3",
+                "arc_point": "Resurrection \u2014 antagonist resolution",
+                "pov_character": "Commander Lena Brask",
+                "bridge_from_prior": "Thread: Brask's accountability ledger has been her arc's spine; this chapter is her final entry",
+                "beat": "Brask opens her accountability ledger and writes the final entry: EMERGENCE PROTOCOL SUSPENDED BY COMMUNITY VOTE. SURFACE CONTACT ESTABLISHED. SEED VAULT ACCESS TO BE RENEGOTIATED WITH SURFACE REPRESENTATIVES. She pauses. She writes: I was wrong about what we owed them. She does not cross it out. She closes the ledger and goes to find Sable \u2014 she wants to know if the archive has a record of a settlement near Atlanta, where her family was when the pulse hit.",
+                "arc_notes": "Hero's Journey Stage 11 \u2014 Resurrection: Brask's arc completes; her ledger entry is her resurrection; her search for her family mirrors Yusuf's search for his sister \u2014 the bunker people are humanized in their longing, not just their power"
+              },
+              {
+                "chapter_number": 50,
+                "title": "Sable's Archive, Expanded",
+                "act": "Act 3",
+                "arc_point": "Resurrection \u2014 archive resolution",
+                "pov_character": "Sable Drummond",
+                "bridge_from_prior": "Thread: Brask came to Sable in Chapter 49 asking about the archive; Sable's arc reaches its resolution",
+                "beat": "Sable records Brask's testimony \u2014 the first bunker resident to speak into her cassette recorder. Then Priya. Then the teacher. Then the engineer. She records for six hours. The archive grows. She realizes the archive is no longer just a record of the surface world \u2014 it is a record of both worlds, and the moment they met. She labels the new cassette: FIRST CONTACT. She puts it at the beginning of the archive, not the end.",
+                "arc_notes": "Hero's Journey Stage 11 \u2014 Resurrection: Sable's arc completes; the archive is not erased but expanded; her fear of erasure is answered not by victory but by inclusion; the archive becomes the elixir's vessel"
+              },
+              {
+                "chapter_number": 51,
+                "title": "Cael and Sable",
+                "act": "Act 3",
+                "arc_point": "Resurrection \u2014 father-daughter resolution",
+                "pov_character": "Cael Drummond",
+                "bridge_from_prior": "Thread: Cael and Sable's dynamic has been the emotional spine of his arc; this chapter resolves it",
+                "beat": "Cael finds Sable in the bunker's common area, surrounded by people listening to her archive. He watches her work \u2014 the ease with which she moves between strangers, the precision of her questions, the way she holds the recorder steady. He realizes she does not need him to protect her from the world. She is the world's protection. He sits down next to her and asks if he can be recorded. She says: I've been waiting for you to ask.",
+                "arc_notes": "Hero's Journey Stage 11 \u2014 Resurrection: Cael's arc completes; his protectiveness is transformed into pride; the father-daughter dynamic resolves in the most emotionally honest way \u2014 she was always the capable one"
+              },
+              {
+                "chapter_number": 52,
+                "title": "Yusuf's Letter",
+                "act": "Act 3",
+                "arc_point": "Resurrection \u2014 inside ally resolution",
+                "pov_character": "Dr. Yusuf Okafor",
+                "bridge_from_prior": "Thread: Yusuf's letter to his sister was planted in Chapter 28; Sable's archive has records of settlements across the region",
+                "beat": "Sable searches her archive for any record of a survivor named Amara Okafor. She finds a testimony from a settlement in Missouri \u2014 a woman who identified herself as a former CDC researcher. She plays the cassette for Yusuf. The voice is his sister's. He listens to the whole testimony without moving. At the end, Amara says: if anyone finds this, tell my brother Yusuf I am alive and I am well and I have been looking for him. Yusuf puts his face in his hands.",
+                "arc_notes": "Hero's Journey Stage 12 \u2014 Return with the Elixir: Yusuf's private fear \u2014 that his sister died \u2014 is resolved; the elixir (the archive, the connection between worlds) delivers its most personal gift; the reader has been waiting for this since Chapter 28"
+              },
+              {
+                "chapter_number": 53,
+                "title": "The Radio Network",
+                "act": "Act 3",
+                "arc_point": "Return with the Elixir \u2014 Mara's gift",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: Mara refused Vetch's offer of chief communications officer in Chapter 36; this chapter shows her building the network anyway, on her own terms",
+                "beat": "Mara uses the bunker's power grid and her own technical knowledge to begin rebuilding a radio network \u2014 not ANCHOR's broadcast system, but a two-way network connecting the bunker to the surface settlements. She trains three bunker technicians and sends the first transmission to Harrow. Petra answers. Mara says: I'm coming home. Petra says: I know. I've been listening.",
+                "arc_notes": "Hero's Journey Stage 12 \u2014 Return with the Elixir: Mara's elixir is the radio network \u2014 communication, not control; her refusal of Vetch's offer is vindicated; Petra's answer closes the loop opened in Chapter 1"
+              },
+              {
+                "chapter_number": 54,
+                "title": "The Seed Vault Agreement",
+                "act": "Act 3",
+                "arc_point": "Return with the Elixir \u2014 institutional resolution",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: the seed vault was locked by Vetch in Chapter 45; Brask agreed to renegotiate access in Chapter 49; this chapter is the negotiation",
+                "beat": "Mara, Sable, Brask, and Yusuf negotiate the seed vault agreement: the seeds will be distributed to any settlement that requests them, administered by a joint council of bunker and surface representatives. Vetch is present but does not speak. At the end, he signs the agreement. He uses his full title: Director, ANCHOR Program. Then he crosses out 'Director' and writes 'Former.' It is the most honest thing he has done.",
+                "arc_notes": "Hero's Journey Stage 12 \u2014 Return with the Elixir: the institutional resolution; the seed vault is the elixir made concrete \u2014 the gift of the journey distributed to the world; Vetch's signature is his final character beat"
+              },
+              {
+                "chapter_number": 55,
+                "title": "Tom\u00e1s Goes Home",
+                "act": "Act 3",
+                "arc_point": "Return with the Elixir \u2014 ally resolution",
+                "pov_character": "Tom\u00e1s Reyes",
+                "bridge_from_prior": "Thread: Tom\u00e1s's failing eye has been his private crisis throughout; the bunker's medical bay has an ophthalmologist",
+                "beat": "The bunker's ophthalmologist examines Tom\u00e1s's remaining eye. The diagnosis: a treatable condition \u2014 a detaching retina that can be stabilized with a procedure the bunker has the equipment to perform. Tom\u00e1s sits with this information for a day. He agrees to the procedure. When he wakes, his vision is stable. He goes to a window \u2014 the first window in the bunker, a periscope lens looking at the surface \u2014 and looks at the horizon. He can see it clearly. He starts drawing.",
+                "arc_notes": "Hero's Journey Stage 12 \u2014 Return with the Elixir: Tom\u00e1s's arc completes; the bunker's medical resources are the elixir for him personally; his drawing is the return of his gift to the world"
+              },
+              {
+                "chapter_number": 56,
+                "title": "Mara and Daniel",
+                "act": "Act 3",
+                "arc_point": "Return with the Elixir \u2014 protagonist's emotional resolution",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: Mara has not said Daniel's name aloud in three years \u2014 established in Chapter 13; this chapter is her resolution",
+                "beat": "Mara goes to the bunker's radio room alone. She tunes to the frequency she used to reach Daniel on the day of the pulse. She says his name. She says it again. She tells him what happened \u2014 the signal, the journey, the bunker, the vote, the network. She tells him she is going home. She tells him she is sorry it took her this long to say his name out loud. She turns off the radio. She does not cry. She goes to find the others.",
+                "arc_notes": "Hero's Journey Stage 12 \u2014 Return with the Elixir: Mara's grief is resolved through action, not epiphany; saying Daniel's name is the elixir she brings back to herself; the radio is the instrument of both her wound and her healing"
+              },
+              {
+                "chapter_number": 57,
+                "title": "The Road Home",
+                "act": "Act 3",
+                "arc_point": "Return with the Elixir \u2014 departure",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: the bunker business is resolved; the group prepares to return to Harrow",
+                "beat": "The group prepares to leave the bunker. Yusuf will stay \u2014 he has work to do here, and his sister is coming. Brask will stay. Vetch will stay, diminished and honest. Tom\u00e1s will guide Mara, Cael, and Sable back to Harrow. As they climb out of Entrance C into the Wichita ruins, Sable records the moment on her cassette recorder. She says: Day one of the return. Then she laughs and says: that sounds like the beginning of something. Mara says: it is.",
+                "arc_notes": "Hero's Journey Stage 12 \u2014 Return with the Elixir: the departure from the bunker is the threshold crossing in reverse; the group is changed; the world they return to is the same but they are not"
+              },
+              {
+                "chapter_number": 58,
+                "title": "Harrow",
+                "act": "Act 3",
+                "arc_point": "Return with the Elixir \u2014 homecoming",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: the group is returning to Harrow; Petra has been listening on the radio since Chapter 53",
+                "beat": "The group arrives at Harrow. Petra is at the settlement's edge, waiting. She has the frequency log \u2014 she has been maintaining it in Mara's absence, adding her own entries in a different hand. She gives it to Mara. Mara looks at the new entries: neat, precise, and already better than her own. She gives it back. She says: keep it. Petra says: I already decided to.",
+                "arc_notes": "Hero's Journey Stage 12 \u2014 Return with the Elixir: the homecoming; the frequency log passed to Petra is the elixir's transmission to the next generation; Mara's gift is not just the radio network but the apprentice who will carry it forward"
+              },
+              {
+                "chapter_number": 59,
+                "title": "The First Broadcast",
+                "act": "Act 3",
+                "arc_point": "Return with the Elixir \u2014 the elixir delivered",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: the radio network was established in Chapter 53; this chapter is its first public broadcast",
+                "beat": "From Harrow's radio tower, Mara broadcasts on the new network \u2014 a two-way frequency that reaches the bunker, Eastmarch, and three other settlements simultaneously. She does not announce a government. She does not declare authority. She says: this frequency is open. If you can hear me, you can speak. She releases the transmit key. For a moment, silence. Then voices \u2014 from Eastmarch, from a settlement she has never heard of, from the bunker, from somewhere far to the west. The static is full of people.",
+                "arc_notes": "Hero's Journey Stage 12 \u2014 Return with the Elixir: the elixir is the open frequency \u2014 communication without control; the novel's dramatic question is answered; the static that opened the novel is now full of voices"
+              },
+              {
+                "chapter_number": 60,
+                "title": "Epilogue: The Frequency Log, Year Eight",
+                "act": "Epilogue",
+                "arc_point": "Return with the Elixir \u2014 coda",
+                "pov_character": "Petra",
+                "bridge_from_prior": "Thread: Petra received the frequency log in Chapter 58; this epilogue is her entry, one year later",
+                "beat": "One year after the bunker. Petra's frequency log entry: 214 settlements now on the network. Seed distribution in progress. Yusuf's sister arrived at the bunker six weeks after the agreement \u2014 she walked the last forty miles. Tom\u00e1s has produced a new map of the entire region, the most accurate since the collapse, and is training three apprentices. Cael is home in Eastmarch. Vetch tends the seed vault and speaks to no one about governance. Mara is somewhere west, following a new signal. Petra signs the entry with her name and the date and the frequency: 7.245 MHz. She puts the log on the shelf. She goes to the radio.",
+                "arc_notes": "Hero's Journey Stage 12 \u2014 Return with the Elixir: the epilogue delivers the elixir's full distribution; every character's fate is accounted for; Mara following a new signal is the novel's final image \u2014 the journey does not end, it continues; Petra as the new POV is the passing of the torch"
+              }
+            ]
+          },
+          "persist": {
+            "persisted": false,
+            "reason": "persist requested but project_id/user_id missing"
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

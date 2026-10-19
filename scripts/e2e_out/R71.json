@@ -1,0 +1,44 @@
+{
+  "test": {
+    "id": "R71",
+    "title": "Revise Outline \u2014 Add Prologue and Epilogue to The Accord",
+    "source": "chat",
+    "prompt": "Revise the outline for \"The Accord\". Add a prologue that opens with a classified diplomatic transmission intercepted decades before the main story begins \u2014 hinting at the alien contact that will drive the political crisis. Add an epilogue set 20 years after the climax showing the long-term consequences of the accord on human civilization. Keep the existing 10 chapters and Freytags Pyramid structure. Genre slug: political-scifi.",
+    "route": "brainstorm.revise-outline` (task)",
+    "prerequisite": "R70",
+    "expected": [
+      "routes to `brainstorm.revise-outline`, kind=queued; complete; Freytag preserved",
+      "outline gains chapter number=0 (Prologue) + number=11 (Epilogue); `outline_versions_v2` snapshot of pre-revision; original 10 chapters preserved; CR-009 email shows Prologue+10+Epilogue"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing outline revision for \"The Accord\". I'll let you know when it's ready.",
+    "tool": "brainstorm",
+    "op": "revise-outline",
+    "data": null,
+    "job_id": "8ff2901d0b5d4057bae4dfc521bcf724",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "8ff2901d0b5d4057bae4dfc521bcf724",
+    "status": "complete",
+    "result": {
+      "execution_id": "64833bc9-2eb7-49de-a238-54627e75a48e",
+      "step_name": "brainstorm",
+      "status": "ok",
+      "payload": {
+        "op": "revise-outline",
+        "result": {
+          "revised": false,
+          "outline": {},
+          "error": "no outline to revise"
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

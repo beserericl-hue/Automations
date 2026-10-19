@@ -1,0 +1,130 @@
+{
+  "id": "R54",
+  "title": "Brainstorm Short Story \u2014 Freytags Pyramid (Post-Apocalyptic)",
+  "route": "`brainstorm.story`/`brainstorm.short-story` (task) \u00b7 impl: built \u00b7 arc fidelity: built (E2E-4)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=brainstorm.story got=brainstorm.short-story MISMATCH",
+    "job=complete",
+    "outline title='The Inoculator' chapters=5 persisted=True projects_recent=2"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Brainstorm a short story using Freytags Pyramid about a plague doctor in the ruins of Manhattan who discovers that the disease wiping out survivors is man-made, and the cure lies in the hands of the people who created it. Genre: post-apocalyptic. Title: The Inoculator. Sections: 5. Themes: trust, complicity, the cost of survival."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Brainstorming your short story, 'The Inoculator'. I'll let you know when the outline is ready.",
+        "tool": "brainstorm",
+        "op": "short-story",
+        "data": null,
+        "job_id": "fd4a07f89e01491ebc8857168c9d6bc5",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "fd4a07f89e01491ebc8857168c9d6bc5",
+        "status": "complete",
+        "result": {
+          "execution_id": "c80e8159-611a-44be-b714-b5b1c0839cd0",
+          "step_name": "brainstorm",
+          "status": "ok",
+          "payload": {
+            "op": "short-story",
+            "result": {
+              "outline": {
+                "title": "The Inoculator",
+                "premise": "In the ruins of post-plague Manhattan, Dr. Sable Voss moves through quarantine zones administering palliative care to the dying, believing the Hollow Fever is a natural catastrophe. When she extracts an unusual synthetic compound from a corpse's lymph nodes, she uncovers evidence that the disease was engineered \u2014 and that the only viable cure is held by the Meridian Group, the corporate enclave that designed it, now thriving behind fortified walls on the Upper East Side. To save the survivors she has sworn to protect, Sable must infiltrate the people who built the plague, bargain with the architects of mass death, and decide what she is willing to become in order to stop it.",
+                "themes": [
+                  "Complicity and the cost of knowing the truth",
+                  "The ethics of survival versus the ethics of justice",
+                  "Institutional evil disguised as salvation",
+                  "What it means to heal in a world designed to kill"
+                ],
+                "story_arc_name": "",
+                "dramatic_question": "",
+                "wow_factor": "",
+                "characters": [
+                  {
+                    "name": "Dr. Sable Voss",
+                    "role": "Protagonist \u2014 plague doctor and field medic operating in the ruins of Lower Manhattan",
+                    "arc": "Transforms from a healer who finds meaning in small mercies into a woman who must weaponize her knowledge against the very institution that gave her medical training."
+                  },
+                  {
+                    "name": "Pell",
+                    "role": "Sable's teenage runner and ward \u2014 orphaned by the Hollow Fever, he ferries medicine and information across quarantine lines",
+                    "arc": "Begins as Sable's loyal shadow and ends as the moral witness who forces her to confront whether her final choice is justice or revenge."
+                  },
+                  {
+                    "name": "Director Harlan Cose",
+                    "role": "Head of the Meridian Group's medical division \u2014 the architect of the Hollow Fever's engineered strain",
+                    "arc": "Presents himself as a pragmatist who made a terrible calculation for humanity's long-term survival, and never stops believing it."
+                  },
+                  {
+                    "name": "Maren Voss",
+                    "role": "Sable's younger sister \u2014 believed dead, discovered alive inside Meridian's walls as a compliant research subject",
+                    "arc": "Her survival is the crack in Sable's resolve and the reason the climax costs everything it does."
+                  }
+                ],
+                "chapters": [
+                  {
+                    "chapter_number": 1,
+                    "title": "The Rounds",
+                    "beat": "Sable moves through the quarantine warrens of Lower Manhattan administering morphine and false hope, a competent woman who has made peace with losing \u2014 until she cuts open a corpse and finds something inside that has no business being there.",
+                    "arc_notes": "Exposition \u2014 establishes the ruined world, Sable's role as a healer defined by pragmatic acceptance, her bond with Pell, and the normalcy of daily death; the synthetic compound in the lymph nodes plants the seed that will break everything open."
+                  },
+                  {
+                    "chapter_number": 2,
+                    "title": "Engineered",
+                    "beat": "Sable's analysis of the compound confirms it is synthetic and proprietary, leading her through black-market data brokers and dying informants to a name \u2014 the Meridian Group \u2014 and the devastating realization that the Hollow Fever was designed, deployed, and is being sustained deliberately.",
+                    "arc_notes": "Rising Action \u2014 escalates through discovery and danger as Sable pursues the truth across increasingly hostile territory; Pell is nearly killed crossing a checkpoint, raising the personal stakes; Sable's healer identity begins to fracture under the weight of what she now knows."
+                  },
+                  {
+                    "chapter_number": 3,
+                    "title": "The Garden Behind the Wall",
+                    "beat": "Sable bluffs her way inside Meridian's compound under the pretense of offering field research data, comes face to face with Director Cose \u2014 and finds Maren alive, compliant, and unwilling to leave.",
+                    "arc_notes": "Climax \u2014 the apex of the pyramid; Sable reaches her goal of locating the cure's source and simultaneously suffers the first irreversible crack: her sister's survival is conditional on Meridian's continued operation, and Cose offers Sable a place inside the wall in exchange for her silence, forcing the central moral rupture."
+                  },
+                  {
+                    "chapter_number": 4,
+                    "title": "What the Cure Costs",
+                    "beat": "Sable walks out of Meridian with a partial synthesis map she stole from Cose's lab, but without Maren \u2014 and returns to the quarantine warrens to find Pell has been taken by Meridian's enforcers as leverage; she must now choose between using the map to synthesize a crude inoculant for the survivors or trading it back to Cose to recover the people she loves.",
+                    "arc_notes": "Falling Action \u2014 consequences of the climax ripple outward; the moral weight of Sable's theft becomes visible as Meridian tightens its grip; Pell's capture forces her to confront that her choices have costs she cannot absorb alone; the transformation from healer to something harder becomes undeniable."
+                  },
+                  {
+                    "chapter_number": 5,
+                    "title": "Inoculation",
+                    "beat": "Sable releases the synthesis map to every surviving medic and scavenger network in the ruins before Meridian can stop her, rescues Pell at the cost of Maren's permanent estrangement, and watches the first crude inoculants move through the quarantine zones \u2014 knowing the Hollow Fever will slow but that Cose and Meridian still stand, and that she has saved lives while failing to deliver justice.",
+                    "arc_notes": "Catastrophe \u2014 survival with consequence; the plague's spread is blunted but not ended, Meridian is exposed but not destroyed, Maren is lost to Sable by choice rather than death, and Sable continues her rounds in the ruins \u2014 changed, harder, and carrying the knowledge that healing and justice are not the same thing."
+                  }
+                ],
+                "form": "short_story"
+              },
+              "persist": {
+                "persisted": true,
+                "project_id": "68a16d53-6cf5-4ed9-8c06-67d0fd44d0ed",
+                "created_project": true
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Brainstorm a short story using Freytags Pyramid about a plague doctor in the ruins of Manhattan who discovers that the disease wiping out survivors is man-made, and the cure lies in the hands of the people who created it. Genre: post-apocalyptic. Title: The Inoculator. Sections: 5. Themes: trust, complicity, the cost of survival."
+    }
+  ],
+  "expected": [
+    "routes to `brainstorm.story`, kind=queued; job_id; complete",
+    "`story_arc=\"Freytags Pyramid\"` passed; arc prompt loaded from `story_arcs` table",
+    "`writing_projects_v2` row \"The Inoculator\" with outline; arc_notes name all 5 Freytag beats",
+    "Climax = midpoint apex (goal achieved + crack appears), NOT final confrontation",
+    "Falling Action shows descent; final section = catastrophe/survival-with-consequence",
+    "Characters have roles; arc_notes use Freytag terminology; CR-009 email subject contains \"The Inoculator\""
+  ]
+}

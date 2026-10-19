@@ -1,0 +1,208 @@
+{
+  "id": "R88",
+  "title": "Verify Revert \u2014 Retrieve Reverted Outline",
+  "route": "`library.retrieve` (info) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.retrieve got=library.retrieve OK",
+    "items=1 found=True"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Retrieve the outline for \"The Accord\""
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "data",
+        "assistant_message": "",
+        "tool": "library",
+        "op": "retrieve",
+        "data": {
+          "execution_id": "9525af8b-6992-443c-8859-e86319f25e4c",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "retrieve",
+            "result": {
+              "items": [
+                {
+                  "id": "7976c085-41d3-46c6-9444-77b75bbdc289",
+                  "title": "The Accord",
+                  "genre_slug": "political-scifi",
+                  "status": "outlined",
+                  "outline": {
+                    "title": "The Accord",
+                    "themes": [
+                      "Complicity in systemic injustice",
+                      "The machinery of institutional power",
+                      "Moral compromise as the price of peace",
+                      "Information asymmetry in negotiations",
+                      "The corruption of noble intentions"
+                    ],
+                    "premise": "Senior diplomatic attach\u00e9 Elena Vasquez brokers a groundbreaking peace treaty between the warring colonies of Kepler-442b and Proxima Centauri b, ending a brutal eight-year conflict over rare earth mining rights. But when she discovers the treaty's classified annexes contain provisions that will systematically enslave the losing side's population under the guise of 'reparative labor obligations,' Elena must choose between preserving the peace she sacrificed everything to achieve and exposing a conspiracy that reaches the highest levels of the Colonial Administrative Council.",
+                    "chapters": [
+                      {
+                        "brief": "Elena Vasquez receives an urgent assignment to mediate peace talks between Kepler-442b and Proxima Centauri b after eight years of brutal mining wars. Administrator Chen briefs her on the 'unprecedented opportunity' while hinting at career-defining stakes. Elena accepts, driven by both ambition and genuine belief in diplomatic solutions.",
+                        "title": "The Summons",
+                        "number": 1,
+                        "arc_notes": "ACT 1 - INTRODUCTION: Establishes Elena's ordinary world as a mid-level diplomat, her fatal flaw of idealistic ambition, and introduces the inciting incident of the peace talks assignment.",
+                        "research_topics": [
+                          "Colonial resource extraction conflicts",
+                          "Diplomatic career advancement structures",
+                          "Information compartmentalization in negotiations"
+                        ]
+                      },
+                      {
+                        "brief": "Elena arrives at the neutral station to begin talks between the delegations. She meets the key players and begins to understand the complexity of the territorial dispute, the mining rights, and the human cost of the war. Initial sessions show promise despite deep mistrust between the factions.",
+                        "title": "First Contact",
+                        "number": 2,
+                        "arc_notes": "ACT 1 - INTRODUCTION continued: Completes world-building and establishes the supporting cast. Shows Elena's competence and the stakes of success or failure for millions of colonists.",
+                        "research_topics": [
+                          "Neutral venue protocols for peace negotiations",
+                          "Resource scarcity as driver of interplanetary conflict",
+                          "Cultural evolution in isolated colony populations"
+                        ]
+                      },
+                      {
+                        "brief": "Elena makes her first breakthrough by identifying shared interests between the colonies around defense against outside threats. She begins to see a path to peace but notices Administrator Chen's increasing involvement in backroom negotiations. Her mentor Dr. Okafor expresses concern about the process.",
+                        "title": "Finding Common Ground",
+                        "number": 3,
+                        "arc_notes": "ACT 2 - RISING ACTION begins: First obstacle overcome, but introduces the emerging threat of hidden agendas. Elena's success breeds overconfidence and blindness to warning signs.",
+                        "research_topics": [
+                          "Backroom diplomacy and parallel negotiation tracks",
+                          "Identification of common external threats in peace processes",
+                          "Warning signs of manipulated negotiations"
+                        ]
+                      },
+                      {
+                        "brief": "Negotiations hit a major snag over reparations and mining rights allocation. Elena proposes a controversial solution involving 'shared labor arrangements' that she doesn't fully understand but which Chen strongly encourages. Both sides accept the framework, but Elena notices troubling details in the draft language.",
+                        "title": "The Price of Progress",
+                        "number": 4,
+                        "arc_notes": "ACT 2 - RISING ACTION: Second obstacle forces Elena to make her first moral compromise. She rationalizes accepting terms she doesn't fully comprehend in service of the greater good.",
+                        "research_topics": [
+                          "Reparations frameworks in post-conflict settlements",
+                          "Legal language obfuscation in international treaties",
+                          "Labor arrangement euphemisms for forced work"
+                        ]
+                      },
+                      {
+                        "brief": "The talks gain sudden momentum as both sides seem eager to conclude. Elena is praised for her breakthrough and promised a promotion to senior ambassador. Captain Al-Rashid warns her privately about moving too fast, but Elena dismisses the concerns. Secret annexes are being prepared that Elena is told are 'routine implementation details.'",
+                        "title": "Momentum",
+                        "number": 5,
+                        "arc_notes": "ACT 2 - RISING ACTION: Elena crosses a major line by willfully ignoring warning signs in favor of personal advancement. Success seems within reach, setting up the climactic revelation.",
+                        "research_topics": [
+                          "Career incentives distorting diplomatic judgment",
+                          "Secret annexes and classified treaty provisions",
+                          "Willful blindness in institutional settings"
+                        ]
+                      },
+                      {
+                        "brief": "The treaty is signed in a triumphant ceremony. Elena achieves her greatest professional victory and is hailed as a peacemaker. But in the same hour, Dr. Okafor provides her with leaked documents revealing the true nature of the 'labor arrangements' - systematic enslavement disguised as reparations. Elena realizes she has been the perfect unwitting front for the operation.",
+                        "title": "The Signing",
+                        "number": 6,
+                        "arc_notes": "ACT 3 - CLIMAX: The midpoint where Elena achieves her goal and simultaneously discovers its hollow nature. Victory and the beginning of destruction arrive in the same moment.",
+                        "research_topics": [
+                          "Treaty signing ceremonies and their symbolic power",
+                          "Document leaks and whistleblower information",
+                          "Psychological impact of discovering complicity"
+                        ]
+                      },
+                      {
+                        "brief": "Elena confronts Administrator Chen about the leaked documents. He doesn't deny the enslavement provisions but argues they're necessary for colonial stability and Elena's reputation depends on the treaty's success. Elena tries to find a way to modify the treaty, but discovers the implementation has already begun. She realizes she's trapped by her own success.",
+                        "title": "Damage Control",
+                        "number": 7,
+                        "arc_notes": "ACT 4 - FALLING ACTION begins: Elena tries to fix the situation but only makes it worse. Chen's rational arguments show how the system has captured her completely.",
+                        "research_topics": [
+                          "Post-signature treaty modification procedures",
+                          "Institutional rationalization of human rights abuses",
+                          "Rapid implementation to prevent reversal"
+                        ]
+                      },
+                      {
+                        "brief": "Elena secretly meets with journalists to expose the truth, but Captain Al-Rashid reports her activities to Chen. Dr. Okafor is arrested on fabricated charges and dies in custody. Elena realizes that exposing the truth will destroy the peace and likely restart the war, but staying silent makes her complicit in genocide.",
+                        "title": "The Informant",
+                        "number": 8,
+                        "arc_notes": "ACT 4 - FALLING ACTION: Elena's attempts at whistleblowing accelerate her isolation and the punishment of her allies. The cost of resistance becomes brutally clear.",
+                        "research_topics": [
+                          "Whistleblower protection failures in diplomatic contexts",
+                          "Elimination of witnesses and inconvenient voices",
+                          "Moral calculus of peace versus justice"
+                        ]
+                      },
+                      {
+                        "brief": "Elena makes a final decision to go public with evidence of the enslavement provisions, knowing it will destroy her career and possibly restart the war. She releases the documents through multiple channels. Chen moves quickly to discredit her as mentally unstable and dismiss the documents as forgeries, but the truth begins to spread.",
+                        "title": "Point of No Return",
+                        "number": 9,
+                        "arc_notes": "ACT 4 - FALLING ACTION concludes: Elena's final choice between complicity and conscience. The machinery of power responds with full force to contain the revelation.",
+                        "research_topics": [
+                          "Multiple channel information release strategies",
+                          "Character assassination of whistleblowers",
+                          "Information warfare and truth suppression"
+                        ]
+                      },
+                      {
+                        "brief": "The colonial populations revolt against the treaty terms, violence resumes, and Elena is blamed for betraying the peace. She faces trial for breach of classified information while the enslavement provisions are quietly suspended but not formally revoked. Elena has prevented genocide but at the cost of renewed war and her own destruction. In her final scene, she reflects on whether the price was worth paying.",
+                        "title": "The Reckoning",
+                        "number": 10,
+                        "arc_notes": "ACT 5 - CATASTROPHE: Elena's complete downfall, but with the moral victory of preventing enslavement. A 'survival-with-consequence' ending where justice comes at enormous cost.",
+                        "research_topics": [
+                          "Public reaction to exposure of deceptive peace processes",
+                          "Legal persecution of diplomatic whistleblowers",
+                          "Long-term consequences of choosing justice over stability"
+                        ]
+                      }
+                    ],
+                    "characters": [
+                      {
+                        "arc": "Transforms from idealistic peacemaker to complicit participant to reluctant whistleblower, ultimately destroyed by her choice to expose the truth",
+                        "name": "Elena Vasquez",
+                        "role": "Protagonist",
+                        "description": "42-year-old senior diplomatic attach\u00e9 with the Colonial Administrative Council. Brilliant negotiator who believes deeply in the possibility of just peace. Haunted by early career failure in the Titan Mining Dispute."
+                      },
+                      {
+                        "arc": "Static - represents the calculated machinery of power, genuinely believes enslavement serves the greater good of colonial stability",
+                        "name": "Administrator Marcus Chen",
+                        "role": "Antagonist",
+                        "description": "Director of Colonial Affairs who orchestrates the treaty's hidden clauses. Views Elena as a useful tool whose idealism makes her the perfect unwitting front for the operation."
+                      },
+                      {
+                        "arc": "Evolves from Elena's ally to her betrayer when forced to choose between friendship and career survival",
+                        "name": "Captain Zara Al-Rashid",
+                        "role": "Dynamic Supporting",
+                        "description": "Elena's former partner and current military liaison to the peace talks. Ambitious officer who discovers the truth but chooses self-preservation over justice."
+                      },
+                      {
+                        "arc": "Represents unwavering ethical stance - consistently warns Elena about the treaty's dangers and pays the ultimate price",
+                        "name": "Dr. James Okafor",
+                        "role": "Static Moral Compass",
+                        "description": "Independent colonial rights advocate and Elena's former mentor. The only major character who sees through the conspiracy from the beginning."
+                      }
+                    ]
+                  }
+                }
+              ],
+              "count": 1,
+              "found": true,
+              "content_type": "outline",
+              "search_term": "The Accord"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        },
+        "job_id": null,
+        "status": null,
+        "jobs": null,
+        "error": null
+      },
+      "job_result": null,
+      "resolved_prompt": "Retrieve the outline for \"The Accord\""
+    }
+  ],
+  "expected": [
+    "routes to `library.retrieve`, kind=data; returns v1 content (exactly 10 chapters; no ch0/ch11); Freytag intact; briefs match original (not R71)"
+  ]
+}

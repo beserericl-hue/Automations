@@ -1,0 +1,57 @@
+{
+  "id": "R101",
+  "title": "Email Short Story",
+  "route": "`library.email-content` (task) \u00b7 impl: built (E2E-1)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.email-content got=library.email-content OK",
+    "job=complete",
+    "emailed=True to=eric@agileadtesting.com subject=A disillusioned Roman soldier discovers err=None"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Email me the short story about the Roman soldier and the Colosseum"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Sending the short story about the Roman soldier and the Colosseum to your email.",
+        "tool": "library",
+        "op": "email-content",
+        "data": null,
+        "job_id": "b28fec253dd64d5ea420c579d6a94e58",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "b28fec253dd64d5ea420c579d6a94e58",
+        "status": "complete",
+        "result": {
+          "execution_id": "deb64172-8d88-476a-839f-a89fc25d5128",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "email-content",
+            "result": {
+              "emailed": true,
+              "to": "eric@agileadtesting.com",
+              "subject": "A disillusioned Roman soldier discovers",
+              "content_type": "short_story"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Email me the short story about the Roman soldier and the Colosseum"
+    }
+  ],
+  "expected": [
+    "routes to `library.email-content` (content_type=short_story), kind=queued; complete",
+    "searches `published_content_v2` by keywords; markdown\u2192HTML; email sent; source = `published_content_v2`"
+  ]
+}

@@ -1,0 +1,562 @@
+{
+  "test": {
+    "id": "R55",
+    "title": "Brainstorm Book \u2014 Freytags Pyramid (Political Sci-Fi)",
+    "source": "chat",
+    "prompt": "Help me brainstorm a book using Freytags Pyramid about a diplomat who brokers peace between two warring colony planets, only to discover the peace treaty she negotiated will secretly enslave one side. Genre: political-scifi. Title: The Accord. 10 chapters. Themes: complicity, the machinery of power, moral compromise, the price of peace.",
+    "route": "brainstorm.story`/`brainstorm.short-story` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `brainstorm.story`, kind=queued; complete; `story_arc=\"Freytags Pyramid\"`",
+      "`writing_projects_v2` \"The Accord\" with 10 chapters mapped to 5-act pyramid",
+      "Ch1-2 Introduction; Ch3-5 Rising Action; Ch5/6 Climax (Midpoint); Ch7-8 Falling; Ch9-10 Catastrophe/Denouement",
+      "arc_notes name specific Freytag beats; protagonist fatal flaw from Act 1; CR-009 email \"The Accord\""
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing brainstorm for 'The Accord' \u2014 I'll let you know when it's ready.",
+    "tool": "brainstorm",
+    "op": "story",
+    "data": null,
+    "job_id": "3df8ec6c829d45469edf22c00560e8db",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "3df8ec6c829d45469edf22c00560e8db",
+    "status": "complete",
+    "result": {
+      "execution_id": "5bf92e08-b105-4123-9055-9b84457541b0",
+      "step_name": "brainstorm",
+      "status": "ok",
+      "payload": {
+        "op": "story",
+        "result": {
+          "outline": {
+            "title": "The Accord",
+            "premise": "In 2041, a secret international treaty\u2014the Accord\u2014promises to redistribute global AI governance from the five dominant tech superpowers to a newly formed UN body. When a junior UN policy analyst discovers that the Accord's founding text has been algorithmically altered to contain a hidden kill-switch that would give one nation unilateral control over every networked system on Earth, she has seventy-two hours before ratification to expose the conspiracy\u2014while the architects of the fraud, including her own mentor, will do anything to stop her.",
+            "themes": [
+              "The corruption of idealism by power",
+              "Loyalty versus conscience",
+              "The democratic deficit in technological governance",
+              "The cost of truth-telling in a surveillance state",
+              "Complicity and moral compromise"
+            ],
+            "story_arc_name": "Freytag's Pyramid (Five-Act Structure)",
+            "dramatic_question": "Can junior UN analyst Mara Voss expose the hidden kill-switch buried in the Accord's ratification text before the treaty is signed and one nation seizes algorithmic control of the networked world\u2014and can she do it without destroying the only person who ever believed in her?",
+            "wow_factor": "The novel teaches the reader, in accurate procedural detail, exactly how a modern international treaty can be algorithmically weaponized\u2014embedding a sovereign backdoor inside 900 pages of legalese that no human diplomat will ever read\u2014making the reader complicit in understanding how the world could actually end not with a bomb but with a clause.",
+            "characters": [
+              {
+                "name": "Mara Voss",
+                "role": "Protagonist / POV",
+                "archetype": "The idealist analyst thrust into a conspiracy she is not equipped to survive",
+                "off_axis_attribute": "She is brilliant at reading documents but catastrophically bad at reading people\u2014she trusts the written word over human testimony, which means she is the last person to suspect betrayal and the first to find it in text",
+                "dramatic_question": "Will Mara sacrifice her mentor, her career, and her safety to expose the Accord's kill-switch, or will she accept a comfortable lie to protect the person who made her?",
+                "description": "32 years old, Swiss-Kenyan, raised in Geneva by a diplomat father who died believing in multilateral institutions. Works as a Policy Verification Analyst at the UN Office of Treaty Affairs. Hobby: competitive chess, which she plays online at 2 a.m. when she cannot sleep. Private worry: that her father's faith in institutions was naive and she has inherited his blindness. Friend outside the plot: a retired CERN physicist named Odile who she meets for coffee every Thursday and who has no idea what Mara actually does. She is not brave\u2014she is stubborn, which looks like bravery from the outside.",
+                "humiliated_by": "Being proven wrong about a person she publicly defended",
+                "terrified_by": "Becoming the kind of person who knows the truth and says nothing",
+                "made_happy_by": "Finding an error in a document that everyone else missed\u2014the small, clean satisfaction of being right when the text is the only witness"
+              },
+              {
+                "name": "Director Elias Vance",
+                "role": "Antagonist / POV",
+                "archetype": "The visionary turned architect of the very corruption he once fought",
+                "off_axis_attribute": "He genuinely believes the kill-switch is necessary\u2014not for power but for stability\u2014and his certainty is so complete that he experiences his own betrayal of principle as an act of love for the world",
+                "dramatic_question": "Will Elias destroy Mara to protect the Accord he has spent twenty years building, even knowing that doing so will make him the thing he once despised?",
+                "description": "61 years old, American-British dual national, former Oxford professor of international law who became the UN's Director of Treaty Affairs. Has a degenerative eye condition that will leave him blind within three years\u2014he reads everything in 48-point font and nobody knows. Hobby: restoring antique clocks, which he does alone in his Geneva apartment. Private worry: that the world without the Accord will fracture into AI-armed nation-states within a decade and he will have been the man who could have stopped it. He mentored Mara personally, chose her for her current post, and regards her as the daughter of his intellectual life.",
+                "humiliated_by": "Being exposed as a hypocrite by someone he taught to love the truth",
+                "terrified_by": "A world in which no single stabilizing authority exists\u2014chaos dressed as freedom",
+                "made_happy_by": "The moment a treaty is signed and the room goes quiet and he knows, for one second, that something will hold"
+              },
+              {
+                "name": "Kael Oduya",
+                "role": "Secondary protagonist / POV",
+                "archetype": "The burned intelligence operative who knows too much and trusts no one",
+                "off_axis_attribute": "He is physically fearless but emotionally paralyzed by a specific, small thing: he cannot bring himself to lie to a direct question, which in his profession has nearly killed him twice",
+                "dramatic_question": "Will Kael choose to protect Mara\u2014and by extension the exposure of the Accord\u2014even though doing so will confirm the leak that ended his career and cost his partner's life?",
+                "description": "44 years old, Nigerian-British, former GCHQ signals analyst turned freelance threat-intelligence consultant. Was burned three years ago when an operation he ran in Lagos was compromised\u2014his partner died and Kael was blamed. Now works for a private firm that does treaty-compliance auditing, which is how he ends up adjacent to the Accord. Hobby: distance running\u2014he runs 15km every morning regardless of city or weather. Private worry: that his partner's death was not a leak from outside but from inside GCHQ, and that the same people are now embedded in the Accord process. He is not a hero; he is a man with a debt he cannot pay and a conscience he cannot silence.",
+                "humiliated_by": "Being used again by an institution that will discard him the moment he is inconvenient",
+                "terrified_by": "Being responsible for another person's death through his own choices",
+                "made_happy_by": "A clean signal\u2014one piece of intelligence that is unambiguously true, with no interpretation required"
+              },
+              {
+                "name": "Ambassador Shen Liwei",
+                "role": "Principal antagonist / POV",
+                "archetype": "The state actor who believes his nation's dominance is civilization's best hope",
+                "off_axis_attribute": "He is a genuinely cultured, courteous man who loves French Impressionist painting and is kind to junior staff\u2014his evil is entirely systemic, which makes it harder to hate and harder to stop",
+                "dramatic_question": "Will Shen allow the Accord to be exposed and lose everything his government has built, or will he authorize the elimination of the people who threaten it\u2014crossing a line he has spent his career avoiding?",
+                "description": "57 years old, Chinese diplomat, Special Envoy for Digital Sovereignty at the Ministry of Foreign Affairs. Has been the primary architect of the kill-switch insertion, working through three layers of cutouts so his fingerprints are never on the text. Speaks flawless French and adequate Arabic. Collects Monet prints. Has a daughter studying medicine in Edinburgh whom he has not seen in fourteen months. Private worry: that his daughter knows what he does and has chosen distance as her verdict.",
+                "humiliated_by": "Being outmaneuvered by someone he dismissed as insignificant",
+                "terrified_by": "His daughter reading about him in a history book and understanding",
+                "made_happy_by": "The moment a room of powerful people defers to him without knowing they are doing it"
+              },
+              {
+                "name": "Priya Anand",
+                "role": "Supporting / ally",
+                "archetype": "The whistleblower's reluctant accomplice who has more to lose than anyone",
+                "off_axis_attribute": "She is the most risk-averse person in the building but has a reckless streak when she believes someone is being treated unjustly\u2014she will blow up her own life for a stranger's dignity",
+                "dramatic_question": "Will Priya's loyalty to Mara survive the moment she discovers that helping Mara may destroy the career she has sacrificed everything to build?",
+                "description": "38 years old, Indian-American, Senior Cryptographic Compliance Officer at the UN. Has a husband and two children in New York whom she sees on video call every night at 8 p.m. Geneva time. She is the only person in the building who can independently verify whether the Accord's text has been algorithmically altered. Has a standing offer from a private firm in Singapore that would triple her salary. Private worry: that she has already stayed too long in a job that is slowly making her invisible.",
+                "humiliated_by": "Being made to feel that her technical expertise is only valuable when it serves someone else's agenda",
+                "terrified_by": "Her children growing up without her because she made the wrong choice at the wrong moment",
+                "made_happy_by": "Finding an elegant solution to a cryptographic problem that everyone else said was unsolvable"
+              },
+              {
+                "name": "Senator Diane Marsh",
+                "role": "Supporting antagonist / POV",
+                "archetype": "The American political operator who knows the kill-switch exists and has decided it is acceptable",
+                "off_axis_attribute": "She is a genuine democratic idealist who has convinced herself that American control of the kill-switch is the same thing as democratic control\u2014a self-deception so complete she has never examined it",
+                "dramatic_question": "Will Marsh's complicity in the Accord's fraud survive contact with the human cost of what she has enabled?",
+                "description": "55 years old, US Senator, Chair of the Senate Select Committee on Emerging Technologies. Was briefed on the kill-switch eighteen months ago by a State Department official who framed it as a 'stability mechanism.' Has been the Accord's most vocal public champion. Runs every morning, drinks too much coffee, has a chief of staff she trusts completely and who is feeding information to Shen's network. Private worry: that she is the last generation of politician who still believes in the Senate as an institution.",
+                "humiliated_by": "Being revealed as the public face of a fraud she did not fully understand",
+                "terrified_by": "The Senate floor\u2014the moment a vote goes wrong in front of cameras",
+                "made_happy_by": "A bill passing that she wrote herself, from scratch, without compromise"
+              },
+              {
+                "name": "Dr. Tom\u00e1s Reyes",
+                "role": "Supporting / moral compass",
+                "archetype": "The treaty drafter who buried the kill-switch and cannot live with it",
+                "off_axis_attribute": "He is a coward in every social situation but becomes unnervingly calm and precise under existential pressure\u2014the bigger the stakes, the steadier his hands",
+                "dramatic_question": "Will Tom\u00e1s find the courage to confirm what he did before the Accord is ratified, knowing that doing so will end his freedom and possibly his life?",
+                "description": "49 years old, Mexican-Spanish, lead technical drafter of the Accord's annexes. Was coerced into inserting the kill-switch language eighteen months ago when Shen's network threatened his sister, who lives in Shenzhen. Has been trying to find a way to signal the error without being identified as the source. Drinks heavily. Plays classical guitar badly. Has not spoken to his sister since the insertion because he cannot bear to hear her voice and know what he did for her.",
+                "humiliated_by": "Being seen as a coward by someone who needed him to be brave",
+                "terrified_by": "His sister being harmed because of something he did or failed to do",
+                "made_happy_by": "A single moment of moral clarity after months of fog"
+              }
+            ],
+            "chapters": [
+              {
+                "chapter_number": 0,
+                "title": "Prologue: The Clause",
+                "act": "I",
+                "arc_point": "Exposition \u2014 Inciting Seed",
+                "pov_character": "Dr. Tom\u00e1s Reyes",
+                "bridge_from_prior": "None \u2014 opening",
+                "beat": "Geneva, 18 months before ratification. Tom\u00e1s sits alone at 3 a.m. in the Accord drafting suite and inserts a 47-word sub-clause into Annex XII of the treaty text, his hands steady, his face blank. He closes the file, logs out, and walks to the window. Below, the lake is perfectly still. He does not go home.",
+                "arc_notes": "Freytag Act I \u2014 Exposition: plants the crime before the reader meets the detective; establishes the novel's central object (the clause) and its human cost before the plot begins"
+              },
+              {
+                "chapter_number": 1,
+                "title": "The Verification Room",
+                "act": "I",
+                "arc_point": "Exposition \u2014 World and Protagonist Established",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "The clause Tom\u00e1s inserted is now embedded in the document Mara's department is assigned to verify",
+                "beat": "Mara arrives at the UN Treaty Affairs office in Geneva for the final pre-ratification verification cycle of the Accord. She is handed a 900-page document and told she has six weeks\u2014but her supervisor quietly tells her the real deadline is 72 hours because the ratification ceremony has been moved up. Mara notes an anomaly in the document's metadata: the file was modified after the official lock date.",
+                "arc_notes": "Freytag Act I \u2014 Exposition: introduces protagonist, setting, stakes, and the first whisper of the central problem"
+              },
+              {
+                "chapter_number": 2,
+                "title": "The Director's Confidence",
+                "act": "I",
+                "arc_point": "Exposition \u2014 Mentor and World Established",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara brings the metadata anomaly to Director Vance \u2014 the thread is the anomaly itself traveling up the chain",
+                "beat": "Mara reports the metadata discrepancy to Director Elias Vance, who listens with warm attention and explains it as a routine administrative re-save during formatting. He is convincing, affectionate, and entirely wrong. Mara accepts his explanation but saves a private copy of the metadata log to her personal drive out of habit.",
+                "arc_notes": "Freytag Act I \u2014 Exposition: establishes the mentor relationship, Vance's authority, and Mara's instinct to trust text over people \u2014 the seed of her eventual betrayal"
+              },
+              {
+                "chapter_number": 3,
+                "title": "Five Flags",
+                "act": "I",
+                "arc_point": "Exposition \u2014 Political World Established",
+                "pov_character": "Ambassador Shen Liwei",
+                "bridge_from_prior": "Vance's reassurance of Mara is reported to Shen by his contact inside Treaty Affairs \u2014 the thread is the intelligence that the anomaly was noticed and suppressed",
+                "beat": "Shen receives a coded briefing in his Geneva residence: the metadata flag was raised and neutralized. He reviews the ratification timeline with his team \u2014 72 hours. He makes one phone call to Beijing and receives one instruction: hold the line. He hangs up and stands before his Monet print for a long time.",
+                "arc_notes": "Freytag Act I \u2014 Exposition: introduces the antagonist's perspective, the geopolitical stakes, and the kill-switch's true ownership"
+              },
+              {
+                "chapter_number": 4,
+                "title": "The Auditor",
+                "act": "I",
+                "arc_point": "Exposition \u2014 Secondary Protagonist Introduced",
+                "pov_character": "Kael Oduya",
+                "bridge_from_prior": "Kael's firm has been contracted to perform independent compliance auditing on the Accord \u2014 the thread is the same document Mara is verifying",
+                "beat": "Kael arrives in Geneva for what his firm describes as a routine treaty-compliance audit. He is given access to the Accord's public annexes only. Running his standard signals-intelligence cross-check, he finds that the document's cryptographic hash does not match the version published on the UN's official treaty portal three weeks ago. He files a query with the UN liaison office and receives no response.",
+                "arc_notes": "Freytag Act I \u2014 Exposition: introduces Kael, establishes his parallel discovery, and sets up the convergence with Mara"
+              },
+              {
+                "chapter_number": 5,
+                "title": "Annex XII",
+                "act": "I",
+                "arc_point": "Exposition \u2014 Inciting Incident",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara, still unsatisfied by Vance's explanation, returns to the document \u2014 the thread is her private copy of the metadata log",
+                "beat": "Working alone after hours, Mara runs a structural comparison between the Accord's current text and the version archived in the UN's treaty registry. She isolates Annex XII. The 47-word sub-clause is not in the registry version. She reads it three times. She does not yet understand what it does, but she knows it should not be there. She closes her laptop and sits in the dark.",
+                "arc_notes": "Freytag Act I \u2014 Exposition/Inciting Incident: the protagonist finds the crime; the dramatic question is fully activated"
+              },
+              {
+                "chapter_number": 6,
+                "title": "What the Clause Does",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 First Escalation",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara needs someone who can decode the legal-technical language of the sub-clause \u2014 she goes to Priya, the only person she trusts with cryptographic analysis",
+                "beat": "Mara shows Priya the isolated sub-clause without context. Priya analyzes the language and goes pale: the clause is written in standard treaty syntax but encodes a conditional override protocol \u2014 in plain terms, a kill-switch that, once the Accord is ratified, gives the holder of a specific cryptographic key unilateral authority to suspend all networked systems covered by the treaty. Priya asks whose key. Mara says she doesn't know yet.",
+                "arc_notes": "Freytag Act II \u2014 Rising Action: the nature of the threat is revealed; the stakes become concrete and catastrophic"
+              },
+              {
+                "chapter_number": 7,
+                "title": "The Key Holder",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 Investigation Begins",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Priya's analysis identified the kill-switch but not the key holder \u2014 Mara begins tracing the clause's authorship through the drafting records",
+                "beat": "Mara traces the sub-clause's insertion point through the Accord's version-control history. The authorship tag has been scrubbed, but a residual timestamp places the insertion in the drafting suite on a night when only one person had access: Dr. Tom\u00e1s Reyes. She pulls his personnel file. He is still in Geneva, preparing the ratification ceremony documents.",
+                "arc_notes": "Freytag Act II \u2014 Rising Action: the investigation has a human target; Mara must now confront a colleague"
+              },
+              {
+                "chapter_number": 8,
+                "title": "Shen's Network",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 Antagonist Tightens Control",
+                "pov_character": "Ambassador Shen Liwei",
+                "bridge_from_prior": "Shen's contact inside Treaty Affairs reports that Mara has accessed the version-control history \u2014 the thread is the surveillance of Mara's document queries",
+                "beat": "Shen is informed that Mara has pulled Reyes's personnel file. He convenes a secure call with two cutouts: one inside the UN IT infrastructure, one inside the Geneva police liaison office. He does not order anything explicit. He asks for 'friction' \u2014 delays, access revocations, a quiet word to Mara's supervisor. He ends the call and returns to his Monet.",
+                "arc_notes": "Freytag Act II \u2014 Rising Action: the antagonist activates countermeasures; the protagonist is now being hunted without knowing it"
+              },
+              {
+                "chapter_number": 9,
+                "title": "The Drafter",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 Key Witness Found",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara goes to find Reyes in person \u2014 the thread is the personnel file identifying his location in the ratification prep suite",
+                "beat": "Mara finds Tom\u00e1s in the basement document archive, alone, surrounded by printed annexes. She asks him about Annex XII. He freezes. She watches his hands. He tells her she has made a mistake and should go home. She tells him she has a copy of the metadata log and the version-control timestamp. He looks at her for a long time and then says: 'Not here. Tonight. The Caf\u00e9 du Lac. Nine o'clock.' He turns back to his documents.",
+                "arc_notes": "Freytag Act II \u2014 Rising Action: the witness is identified and a meeting is set; tension escalates as Mara moves closer to the truth"
+              },
+              {
+                "chapter_number": 10,
+                "title": "Kael's Query",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 Parallel Investigation Converges",
+                "pov_character": "Kael Oduya",
+                "bridge_from_prior": "Kael's unanswered query to the UN liaison office has been flagged by Shen's IT contact \u2014 the thread is the same surveillance net that is watching Mara",
+                "beat": "Kael receives a visit from a UN security officer who politely informs him that his audit access has been 'administratively revised' and he will now only receive documents through a new liaison. Kael recognizes the pattern \u2014 it is identical to the access-restriction sequence used against him in Lagos three years ago. He does not argue. He goes back to his hotel and begins running the hash comparison on his personal equipment.",
+                "arc_notes": "Freytag Act II \u2014 Rising Action: Kael's investigation is actively suppressed; his Lagos trauma is activated, raising his personal stakes"
+              },
+              {
+                "chapter_number": 11,
+                "title": "The Caf\u00e9 du Lac",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 Confession and Complication",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "The meeting Tom\u00e1s proposed \u2014 the thread is the appointment itself",
+                "beat": "Tom\u00e1s meets Mara at the caf\u00e9 and, in a low voice over untouched coffee, tells her everything: the coercion, his sister, the insertion, the key. The key is held by a Chinese Ministry of State Security server farm in Chengdu. He has been trying to find a way to signal the error for eighteen months. He tells her she has 68 hours before ratification. Then he tells her that Director Vance knows.",
+                "arc_notes": "Freytag Act II \u2014 Rising Action: the full conspiracy is revealed; the mentor's complicity is confirmed; the 72-hour clock is now explicit and personal"
+              },
+              {
+                "chapter_number": 12,
+                "title": "What Vance Knows",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 Mentor's Betrayal Confirmed",
+                "pov_character": "Elias Vance",
+                "bridge_from_prior": "Tom\u00e1s's revelation about Vance \u2014 the thread is Vance himself, now seen from his own perspective for the first time",
+                "beat": "Vance is in his apartment, restoring a clock mechanism, when his secure phone rings: Mara met with Reyes. He sets down the clock. He reviews what he knows: the kill-switch, Shen's assurances that it will never be used, his own calculation that a stable world with one hidden lever is better than a fractured world with none. He picks up the phone and calls Shen. He says: 'She won't stop on her own.'",
+                "arc_notes": "Freytag Act II \u2014 Rising Action: the mentor's moral compromise is fully exposed from the inside; the reader understands his reasoning and cannot entirely dismiss it \u2014 the novel's central moral dilemma is activated"
+              },
+              {
+                "chapter_number": 13,
+                "title": "Access Denied",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 Protagonist Blocked",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Vance's call to Shen triggers the IT contact's action \u2014 Mara's system access is revoked the next morning",
+                "beat": "Mara arrives at her office to find her UN network credentials suspended 'pending a routine security review.' Her supervisor, visibly uncomfortable, tells her to take the day and not to discuss active treaty documents with anyone. Mara walks out of the building with only what is on her personal drive. She calls Priya from a payphone.",
+                "arc_notes": "Freytag Act II \u2014 Rising Action: the protagonist is formally cut off from institutional resources; she must now operate outside the system she was built to serve"
+              },
+              {
+                "chapter_number": 14,
+                "title": "Priya's Choice",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 Ally Faces Moral Complication",
+                "pov_character": "Priya Anand",
+                "bridge_from_prior": "Mara's call from the payphone \u2014 the thread is the call itself and the request Mara makes",
+                "beat": "Priya receives Mara's call and listens to everything. Mara needs her to run a full cryptographic verification of the Accord's current text against the registry version \u2014 from inside the UN system, using her own credentials. Priya thinks about her children in New York, her Singapore offer, her husband's face on video call. She tells Mara she needs an hour to think. She hangs up and stares at her screen for fifty-three minutes. Then she calls back and says yes.",
+                "arc_notes": "Freytag Act II \u2014 Rising Action: the moral complication for a secondary character is fully staged; Priya's choice is costly and irreversible"
+              },
+              {
+                "chapter_number": 15,
+                "title": "The Hash",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 Evidence Secured",
+                "pov_character": "Priya Anand",
+                "bridge_from_prior": "Priya's decision to act \u2014 the thread is her running the cryptographic verification she promised",
+                "beat": "Priya runs a full cryptographic hash comparison between the Accord's ratification-ready text and the official registry archive. The hashes diverge at Annex XII, sub-clause 7(d). She exports the comparison report, signs it with her professional cryptographic key \u2014 making it legally attributable \u2014 and sends it to Mara's personal encrypted address. Then she goes to the bathroom and is sick.",
+                "arc_notes": "Freytag Act II \u2014 Rising Action: the evidence is now formally documented and attributable; the conspiracy has a paper trail; Priya has crossed a line she cannot uncross"
+              },
+              {
+                "chapter_number": 16,
+                "title": "Senator Marsh's Briefing",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 Political Complicity Revealed",
+                "pov_character": "Senator Diane Marsh",
+                "bridge_from_prior": "Shen's network alerts his Washington contact that the cryptographic report has been generated \u2014 the thread is the intelligence traveling to the political layer",
+                "beat": "Senator Marsh is in her Washington office when her chief of staff, Hendricks, brings her an urgent cable: the UN verification process has produced an anomalous cryptographic report. Marsh asks if it will affect ratification. Hendricks says not if it is contained. Marsh asks what 'contained' means. Hendricks does not answer directly. Marsh realizes, for the first time, that she does not actually know what the kill-switch does \u2014 only that it exists and that she was told it was America's.",
+                "arc_notes": "Freytag Act II \u2014 Rising Action: the political layer of the conspiracy is exposed; Marsh's self-deception begins to crack; a new dramatic problem emerges \u2014 the kill-switch may not be American at all"
+              },
+              {
+                "chapter_number": 17,
+                "title": "The Runner",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 Protagonists Converge",
+                "pov_character": "Kael Oduya",
+                "bridge_from_prior": "Kael's independent hash comparison \u2014 run on his personal equipment \u2014 produces the same divergence Priya found; the thread is the identical technical discovery",
+                "beat": "Kael's hash comparison confirms the Annex XII discrepancy. He cross-references the divergence timestamp with his Lagos case files and finds a matching operational signature \u2014 the same network fingerprint used to compromise his Lagos operation three years ago. The same people. He goes for his morning run and, on the return leg, passes a woman sitting on a bench outside the UN building holding a coffee she is not drinking. He recognizes the posture of someone who has just been locked out. He slows down.",
+                "arc_notes": "Freytag Act II \u2014 Rising Action: Kael's personal history intersects with the present conspiracy; the two protagonists are about to meet"
+              },
+              {
+                "chapter_number": 18,
+                "title": "The Bench",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 Alliance Formed",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Kael slowing down on his run \u2014 the thread is the physical encounter",
+                "beat": "Kael sits beside Mara on the bench and says, without preamble: 'Annex XII, sub-clause 7(d). The hash diverges by 47 words.' Mara stares at him. He shows her his comparison report on his phone. She shows him Priya's signed report on hers. They sit in silence for a moment. Then Mara says: 'Who are you?' He tells her. She says: 'I have 54 hours.' He says: 'Then we should walk.'",
+                "arc_notes": "Freytag Act II \u2014 Rising Action: the alliance is formed; both protagonists now have corroborating evidence; the clock is explicit"
+              },
+              {
+                "chapter_number": 19,
+                "title": "Vance's Offer",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 Antagonist Attempts Seduction",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Vance has been informed that Mara is now in contact with the external auditor \u2014 the thread is the surveillance report triggering Vance's personal intervention",
+                "beat": "Vance calls Mara's personal phone and asks her to meet him at his apartment. She goes, alone, against Kael's advice. Vance makes her coffee and tells her the truth \u2014 his version: the kill-switch is a necessary stabilization mechanism, the world is six months from AI-armed conflict between three nuclear states, and the Accord with the clause is better than no Accord at all. He offers her a promotion, a transfer to New York, and his word that the clause will never be used. He is not threatening her. He is asking her to trust him. She almost does.",
+                "arc_notes": "Freytag Act II \u2014 Rising Action: the mentor's seduction is the novel's central moral complication \u2014 the reader, in Mara's shoes, would be tempted; the dilemma is at its most acute"
+              },
+              {
+                "chapter_number": 20,
+                "title": "The Clock",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 Protagonist's Refusal",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara's meeting with Vance \u2014 the thread is her decision, made in the elevator on the way down",
+                "beat": "Mara rides the elevator down from Vance's apartment and calls Kael. She says: 'He told me everything and offered me everything. I said no.' Kael asks why. She says: 'Because he wrote it down. The clause exists. You cannot trust a man who put a kill-switch in a peace treaty and called it love for the world.' They have 48 hours. They need a journalist.",
+                "arc_notes": "Freytag Act II \u2014 Rising Action: Mara's refusal is the moral turning point of her arc; she has chosen conscience over comfort; the plot accelerates toward the climax"
+              },
+              {
+                "chapter_number": 21,
+                "title": "The Correspondent",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 Media Approach",
+                "pov_character": "Kael Oduya",
+                "bridge_from_prior": "Mara's decision to find a journalist \u2014 the thread is Kael's contact network being activated",
+                "beat": "Kael contacts a journalist he burned three years ago \u2014 Amara Diallo, a Reuters correspondent based in Geneva who covered the Lagos operation and was fed false information by GCHQ. She has every reason to distrust him. He meets her in a parking garage and gives her Priya's signed cryptographic report without context. She reads it, asks three technical questions, and says: 'If this is real, I need a second source and I need it in 24 hours.' He says he can get her Reyes.",
+                "arc_notes": "Freytag Act II \u2014 Rising Action: the media route is opened but conditional; Kael must now deliver Reyes, who is terrified and compromised"
+              },
+              {
+                "chapter_number": 22,
+                "title": "Reyes Breaks",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 Witness Secured",
+                "pov_character": "Dr. Tom\u00e1s Reyes",
+                "bridge_from_prior": "Kael's promise to deliver Reyes \u2014 the thread is Kael going to find him",
+                "beat": "Kael finds Tom\u00e1s in his hotel room, drunk, with a guitar he is not playing. Kael sits across from him and says: 'Your sister is in Edinburgh, not Shenzhen. She moved eight months ago. I checked.' Tom\u00e1s stares at him. Kael says: 'The leverage is gone. The only thing left is what you do now.' Tom\u00e1s puts down the bottle. His hands are steady. He says: 'When do I talk to the journalist?'",
+                "arc_notes": "Freytag Act II \u2014 Rising Action: the coercion that created the crime is dissolved; Reyes's arc turns; a new dramatic problem is introduced \u2014 Shen's network will know Reyes has moved"
+              },
+              {
+                "chapter_number": 23,
+                "title": "Shen's Instruction",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 Antagonist Escalates",
+                "pov_character": "Ambassador Shen Liwei",
+                "bridge_from_prior": "Shen's surveillance detects that Reyes has left his hotel with the external auditor \u2014 the thread is the movement report",
+                "beat": "Shen receives the movement report and makes a decision he has been avoiding. He calls his Geneva cutout and gives a single instruction: 'Reyes must not reach the journalist.' He hangs up. He stands at his window for a long time. He thinks about his daughter in Edinburgh. He does not call her.",
+                "arc_notes": "Freytag Act II \u2014 Rising Action: the antagonist crosses a moral line; the threat to Reyes is now physical; the stakes become life-and-death"
+              },
+              {
+                "chapter_number": 24,
+                "title": "The Intercept",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 Physical Threat Materializes",
+                "pov_character": "Kael Oduya",
+                "bridge_from_prior": "Shen's instruction to intercept Reyes \u2014 the thread is the cutout's operatives moving on Kael and Reyes",
+                "beat": "Kael and Reyes are walking to the journalist's location when Kael spots a two-person surveillance team. He recognizes the operational pattern \u2014 Lagos. He changes route, loses one tail, but the second follows. He calls Mara and gives her a code phrase they agreed on. He tells Reyes to keep walking and not to run. They make it to a tram, board it, and ride three stops before Kael is certain they are clean. His hands are shaking. He does not let Reyes see.",
+                "arc_notes": "Freytag Act II \u2014 Rising Action: physical danger enters the story; Kael's Lagos trauma is directly activated; the pace accelerates toward the midpoint crisis"
+              },
+              {
+                "chapter_number": 25,
+                "title": "Marsh Asks a Question",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 Political Layer Fractures",
+                "pov_character": "Senator Diane Marsh",
+                "bridge_from_prior": "Marsh's realization in Chapter 16 that she does not know whose kill-switch it is \u2014 the thread is her decision to find out",
+                "beat": "Marsh calls the State Department official who briefed her on the kill-switch eighteen months ago and asks directly: whose cryptographic key holds the override? The official hesitates for four seconds \u2014 Marsh counts them \u2014 and then says it is a 'multilateral consortium key.' Marsh knows this is a lie. She hangs up and calls her personal lawyer. She is beginning to understand that she has been the public face of something she did not fully authorize.",
+                "arc_notes": "Freytag Act II \u2014 Rising Action: Marsh's self-deception collapses; she becomes a potential ally or a dangerous loose end; a new dramatic problem \u2014 political defection \u2014 enters the story"
+              },
+              {
+                "chapter_number": 26,
+                "title": "The Interview",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 Evidence Delivered",
+                "pov_character": "Dr. Tom\u00e1s Reyes",
+                "bridge_from_prior": "Kael and Reyes reaching the journalist \u2014 the thread is the meeting itself",
+                "beat": "Tom\u00e1s sits across from Amara Diallo in a safe apartment and speaks for ninety minutes on the record. He names Shen's network, describes the coercion, explains the technical function of the kill-switch, and provides the version-control timestamp. Amara records everything. At the end she asks: 'Why now?' He says: 'Because my sister is safe and I have been a coward for eighteen months and I am tired.' Amara looks at him and says: 'I'll need 20 hours to verify and publish.'",
+                "arc_notes": "Freytag Act II \u2014 Rising Action: the evidence is now in journalistic hands; the 20-hour publication window creates the final countdown before ratification"
+              },
+              {
+                "chapter_number": 27,
+                "title": "Vance's Last Move",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 Mentor's Desperation",
+                "pov_character": "Elias Vance",
+                "bridge_from_prior": "Vance's surveillance network reports that Reyes has given an on-record interview \u2014 the thread is the intelligence reaching Vance",
+                "beat": "Vance learns that Reyes has spoken to Reuters. He sits in his apartment and does something he has not done in twenty years: he cries. Not for himself. For the Accord. He composes a message to Shen: 'It is over. Stand down.' Shen does not reply. Vance then does something unexpected \u2014 he calls Mara's personal phone and leaves a voicemail: 'I am sorry. The clock is in the study. It was your father's favorite kind.' He hangs up.",
+                "arc_notes": "Freytag Act II \u2014 Rising Action: Vance's arc turns; his attempt to stop Shen fails; his message to Mara is the first crack in his complicity \u2014 and a clue she will not understand until later"
+              },
+              {
+                "chapter_number": 28,
+                "title": "Midpoint: The Leak Goes Live",
+                "act": "II",
+                "arc_point": "Rising Action \u2014 Midpoint Reversal",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Amara Diallo's 20-hour verification window ends \u2014 the thread is the publication itself",
+                "beat": "Reuters publishes. The headline: 'UN Accord Contains Hidden Override Clause Granting Unilateral Network Control \u2014 Source: Treaty Drafter.' Within four minutes the story is the top item on every major news feed. Mara's phone rings continuously. She does not answer any of them except one: Priya, who says: 'My credentials have been suspended. I think they know it was me.' Mara says: 'I know. I'm sorry.' Priya says: 'Don't be. Just finish it.'",
+                "arc_notes": "Freytag Act II \u2014 Midpoint Reversal: the secret is public but the crisis is not resolved \u2014 ratification is still scheduled, Shen has not conceded, and the protagonists have lost institutional cover; the story shifts from investigation to survival"
+              },
+              {
+                "chapter_number": 29,
+                "title": "The Ratification Committee Convenes",
+                "act": "III",
+                "arc_point": "Climax \u2014 Crisis Escalates",
+                "pov_character": "Ambassador Shen Liwei",
+                "bridge_from_prior": "The Reuters publication \u2014 the thread is the global reaction forcing an emergency session of the Accord's ratification committee",
+                "beat": "The five-nation ratification committee convenes an emergency session. Shen arrives and argues, with complete composure, that the Reuters story is a disinformation operation by states hostile to the Accord, that the cryptographic report is fabricated, and that ratification must proceed on schedule to prevent the treaty's collapse. Three of the five delegations are wavering. He needs two more hours.",
+                "arc_notes": "Freytag Act III \u2014 Climax: the antagonist's final gambit; the institutional machinery is still moving toward ratification despite the exposure"
+              },
+              {
+                "chapter_number": 30,
+                "title": "Marsh Defects",
+                "act": "III",
+                "arc_point": "Climax \u2014 Political Reversal",
+                "pov_character": "Senator Diane Marsh",
+                "bridge_from_prior": "The Reuters story \u2014 the thread is Marsh reading it and recognizing the kill-switch description matches what she was told eighteen months ago",
+                "beat": "Marsh reads the Reuters story and calls the US delegation head in Geneva with one instruction: request an immediate suspension of the ratification vote pending independent technical verification. The delegation head tells her this will collapse the Accord. She says: 'Then it collapses.' She hangs up and calls a press conference for thirty minutes' time. Her chief of staff, Hendricks, tries to stop her. She fires him on the spot.",
+                "arc_notes": "Freytag Act III \u2014 Climax: the political defection that breaks the ratification majority; Marsh's arc resolves in a costly act of conscience; Hendricks's role as Shen's contact is implicitly exposed"
+              },
+              {
+                "chapter_number": 31,
+                "title": "Shen's Daughter",
+                "act": "III",
+                "arc_point": "Climax \u2014 Antagonist's Human Cost",
+                "pov_character": "Ambassador Shen Liwei",
+                "bridge_from_prior": "Marsh's press conference \u2014 the thread is the news reaching Shen in the committee room",
+                "beat": "Shen watches Marsh's press conference on a tablet in the corridor outside the committee room. His phone buzzes: his daughter, calling from Edinburgh for the first time in fourteen months. He stares at her name on the screen. The committee session is reconvening in three minutes. He lets the call go to voicemail. He straightens his jacket and walks back into the room. He will not win today. He knows it. He walks in anyway.",
+                "arc_notes": "Freytag Act III \u2014 Climax: the antagonist's human cost is made visible; his choice to continue is tragic rather than villainous \u2014 the novel's moral complexity is at its peak"
+              },
+              {
+                "chapter_number": 32,
+                "title": "The Vote",
+                "act": "III",
+                "arc_point": "Climax \u2014 Central Resolution",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "The committee reconvening \u2014 the thread is Mara watching the vote feed on Kael's laptop in a caf\u00e9 two blocks from the UN",
+                "beat": "The ratification committee votes 4-1 to suspend the Accord pending an independent technical audit. The single vote in favor of proceeding is Shen's. Mara watches the result appear on screen. She does not cheer. She puts her head down on the table and breathes. Kael puts his hand on her shoulder and says nothing. After a moment she sits up and says: 'Vance left me a voicemail. He said something about a clock.'",
+                "arc_notes": "Freytag Act III \u2014 Climax: the dramatic question is answered; ratification is suspended; the kill-switch will not be activated; the emotional resolution is deliberately muted \u2014 the cost is not yet fully visible"
+              },
+              {
+                "chapter_number": 33,
+                "title": "The Clock in the Study",
+                "act": "IV",
+                "arc_point": "Falling Action \u2014 Mentor's Confession",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Vance's voicemail \u2014 the thread is Mara going to his apartment",
+                "beat": "Mara goes to Vance's apartment. The door is unlocked. He is in the study, sitting in his chair, a half-restored clock on the desk before him. He has written a full confession \u2014 22 pages, signed, with supporting documentation \u2014 and left it on the desk beside the clock. He is alive. He looks at her when she enters and says: 'I couldn't let you carry it alone.' She picks up the confession. She does not know whether to thank him or hate him. She does both.",
+                "arc_notes": "Freytag Act IV \u2014 Falling Action: the mentor's arc resolves in confession rather than defiance; the moral cost of the relationship is made visible; Mara's emotional reckoning begins"
+              },
+              {
+                "chapter_number": 34,
+                "title": "Priya's Suspension",
+                "act": "IV",
+                "arc_point": "Falling Action \u2014 Ally's Cost",
+                "pov_character": "Priya Anand",
+                "bridge_from_prior": "The ratification suspension triggers a UN internal investigation \u2014 the thread is the investigation reaching Priya",
+                "beat": "Priya is formally suspended from the UN pending the internal investigation. She calls her husband in New York and tells him everything. He is quiet for a long time and then says: 'Come home.' She says she can't yet \u2014 she has to give a statement. He says: 'I know. Come home after.' She hangs up and accepts the Singapore firm's offer by email. Then she goes to give her statement.",
+                "arc_notes": "Freytag Act IV \u2014 Falling Action: Priya's cost is concrete and personal; her arc resolves in loss and a new beginning; the emotional stakes are distributed across the cast"
+              },
+              {
+                "chapter_number": 35,
+                "title": "Kael's Debt",
+                "act": "IV",
+                "arc_point": "Falling Action \u2014 Secondary Protagonist's Reckoning",
+                "pov_character": "Kael Oduya",
+                "bridge_from_prior": "The internal investigation also examines the external audit firm's role \u2014 the thread is Kael being called to give evidence",
+                "beat": "Kael gives his evidence to the UN investigation panel and, for the first time, names the Lagos operational signature he found in the Accord's network fingerprint. A panel member goes still. Kael says: 'The same people who burned my operation in Lagos embedded the kill-switch in the Accord. I want to know who authorized both.' The panel member says that is outside their mandate. Kael says: 'Then I'll find out myself.' He walks out into the Geneva morning and starts running.",
+                "arc_notes": "Freytag Act IV \u2014 Falling Action: Kael's personal arc is not fully resolved \u2014 the Lagos question remains open; this is deliberate, leaving him with forward momentum rather than closure"
+              },
+              {
+                "chapter_number": 36,
+                "title": "Shen's Recall",
+                "act": "IV",
+                "arc_point": "Falling Action \u2014 Antagonist's Consequence",
+                "pov_character": "Ambassador Shen Liwei",
+                "bridge_from_prior": "The ratification collapse triggers Beijing's response \u2014 the thread is the diplomatic cable recalling Shen",
+                "beat": "Shen receives a diplomatic cable recalling him to Beijing for 'consultations.' He knows what this means. He packs one bag. He takes his Monet print off the wall and leaves it leaning against the door \u2014 he cannot take it on the flight. He calls his daughter in Edinburgh. She answers. He says: 'I wanted to hear your voice.' She says: 'Papa.' He says: 'I know.' He hangs up and goes to the airport.",
+                "arc_notes": "Freytag Act IV \u2014 Falling Action: the antagonist's consequence is political exile and personal loss; the Monet left behind is the novel's most precise image of what power costs"
+              },
+              {
+                "chapter_number": 37,
+                "title": "The Audit",
+                "act": "IV",
+                "arc_point": "Falling Action \u2014 Institutional Reckoning",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "The independent technical audit mandated by the committee vote \u2014 the thread is Mara being asked to lead it",
+                "beat": "The independent audit panel asks Mara to serve as lead verification analyst. She accepts. The audit takes eleven days. The kill-switch clause is formally documented, attributed, and removed. A revised Accord \u2014 without Annex XII sub-clause 7(d) \u2014 is drafted. Mara reads the clean version three times. It is not perfect. It is better than nothing. She thinks about her father.",
+                "arc_notes": "Freytag Act IV \u2014 Falling Action: the institutional consequence of the crisis is resolved; the Accord is salvaged in amended form; Mara's arc approaches its emotional resolution"
+              },
+              {
+                "chapter_number": 38,
+                "title": "Vance's Testimony",
+                "act": "IV",
+                "arc_point": "Falling Action \u2014 Mentor's Public Cost",
+                "pov_character": "Elias Vance",
+                "bridge_from_prior": "Vance's written confession \u2014 the thread is the confession being submitted to the investigation panel and triggering a formal hearing",
+                "beat": "Vance testifies before the UN investigation panel for six hours. He is precise, complete, and without self-pity. He names every decision he made and the reasoning behind each one. At the end, the panel chair asks: 'Do you believe the Accord with the clause was better than no Accord?' Vance says: 'I did. I no longer know.' He is suspended from his post pending criminal referral to Swiss authorities. He walks out of the hearing room and does not look for Mara in the gallery. She is there.",
+                "arc_notes": "Freytag Act IV \u2014 Falling Action: Vance's public cost is complete; his intellectual honesty in testimony is his final act of integrity; Mara watching from the gallery closes their relationship without resolution \u2014 the ambiguity is the point"
+              },
+              {
+                "chapter_number": 39,
+                "title": "Reyes Goes Home",
+                "act": "IV",
+                "arc_point": "Falling Action \u2014 Witness's Resolution",
+                "pov_character": "Dr. Tom\u00e1s Reyes",
+                "bridge_from_prior": "The investigation concludes Reyes cooperated under coercion \u2014 the thread is his legal status being resolved",
+                "beat": "The investigation panel grants Tom\u00e1s immunity in exchange for his full cooperation. He books a flight to Edinburgh. On the plane he takes out his phone and calls his sister. She answers on the second ring. He says: 'I'm coming to see you.' She says: 'I know. I've been waiting.' He puts the phone in his pocket and looks out the window at the Alps below. His hands are steady.",
+                "arc_notes": "Freytag Act IV \u2014 Falling Action: Reyes's arc resolves in reunion and redemption; the coward became brave; the subplot is closed before the climax's emotional weight is fully delivered"
+              },
+              {
+                "chapter_number": 40,
+                "title": "Epilogue: The Revised Accord",
+                "act": "V",
+                "arc_point": "Resolution \u2014 Denouement",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "The revised Accord's ratification ceremony \u2014 the thread is the document Mara verified now being signed",
+                "beat": "Six weeks after the suspension, the revised Accord is ratified by all five nations. Mara sits in the gallery and watches the signatures go down. She is not on the floor \u2014 she has been offered a new post but has not yet accepted it. After the ceremony she walks to the lake and sits on the bench where she first met Kael. He is not there. She takes out her phone and plays Vance's voicemail one more time. Then she deletes it. She looks at the water. It is perfectly still.",
+                "arc_notes": "Freytag Act V \u2014 Resolution: the dramatic question is answered; the world is changed but not saved; Mara is changed but not healed; the ending mirrors the Prologue's image of the still lake \u2014 the circle is closed"
+              },
+              {
+                "chapter_number": 41,
+                "title": "Epilogue: What Remains",
+                "act": "V",
+                "arc_point": "Resolution \u2014 Character Fates",
+                "pov_character": "Narrator (close third, multiple)",
+                "bridge_from_prior": "The ratification ceremony \u2014 the thread is the aftermath reaching each character",
+                "beat": "Brief final images: Priya lands in Singapore and her children run to her at the airport. Kael is on a plane to Lagos with a folder of documents on his lap \u2014 the investigation he promised himself. Shen sits in a Beijing apartment, no Monet on the wall, his daughter's number on his phone screen, his thumb hovering. Vance, in a Swiss holding facility, is given a clock to restore \u2014 a small one, with a broken escapement. He opens the case and begins.",
+                "arc_notes": "Freytag Act V \u2014 Resolution: the multi-character ending distributes emotional weight across the full cast; each fate differs in kind; the novel ends not with triumph but with the specific, human texture of consequence"
+              }
+            ]
+          },
+          "persist": {
+            "persisted": false,
+            "reason": "persist requested but project_id/user_id missing"
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

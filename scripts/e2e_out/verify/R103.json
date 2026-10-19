@@ -1,0 +1,57 @@
+{
+  "id": "R103",
+  "title": "Email Chapter",
+  "route": "`library.email-content` (task) \u00b7 impl: built (E2E-1)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.email-content got=library.email-content OK",
+    "job=complete",
+    "emailed=True to=eric@agileadtesting.com subject=Chapter 1 \u2014 The Escort err=None"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Email me chapter 1 of \"The Seed Vault\""
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Emailing chapter 1 of \"The Seed Vault\" to you now.",
+        "tool": "library",
+        "op": "email-content",
+        "data": null,
+        "job_id": "956de47f04b0475ab3de5127d3a128d1",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "956de47f04b0475ab3de5127d3a128d1",
+        "status": "complete",
+        "result": {
+          "execution_id": "174bc960-3a8c-43dc-b702-9017e6e89215",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "email-content",
+            "result": {
+              "emailed": true,
+              "to": "eric@agileadtesting.com",
+              "subject": "Chapter 1 \u2014 The Escort",
+              "content_type": "chapter"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Email me chapter 1 of \"The Seed Vault\""
+    }
+  ],
+  "expected": [
+    "routes to `library.email-content` (content_type=chapter, chapter_number=1), kind=queued; complete",
+    "locates correct row in `published_content_v2`; markdown\u2192HTML; email sent; subject \"Chapter 1 \u2014 The Seed Vault\""
+  ]
+}

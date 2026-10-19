@@ -1,0 +1,38 @@
+{
+  "test": {
+    "id": "R97",
+    "title": "List Deleted \u2014 Filter by Type",
+    "source": "chat",
+    "prompt": "Show my deleted blog posts",
+    "route": "library.lifecycle` (list_deleted)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `library.lifecycle` (list_deleted, content_type_filter=blog_post), kind=data; only deleted blog posts; other types excluded"
+    ]
+  },
+  "response": {
+    "kind": "data",
+    "assistant_message": "Listing your deleted blog posts.",
+    "tool": "library",
+    "op": "lifecycle",
+    "data": {
+      "execution_id": "680ebf14-6015-4e25-aa3e-01b8161dab21",
+      "step_name": "library",
+      "status": "ok",
+      "payload": {
+        "op": "lifecycle",
+        "result": {
+          "items": [],
+          "count": 0
+        }
+      },
+      "error": null,
+      "next_stage": null
+    },
+    "job_id": null,
+    "status": null,
+    "jobs": null,
+    "error": null
+  },
+  "job_result": null
+}

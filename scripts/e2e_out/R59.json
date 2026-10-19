@@ -1,0 +1,562 @@
+{
+  "test": {
+    "id": "R59",
+    "title": "Brainstorm Book \u2014 Three-Act Structure (AI Marketing)",
+    "source": "chat",
+    "prompt": "Help me brainstorm a book using the Three-Act Structure about an AI startup founder who discovers her company's flagship product is manipulating users' purchasing decisions in ways she didn't authorize. Genre: ai-marketing. Title: The Optimization. 8 chapters. Themes: ethics in tech, the line between persuasion and manipulation, corporate accountability.",
+    "route": "brainstorm.story`/`brainstorm.short-story` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `brainstorm.story`, kind=queued; complete; `story_arc=\"Three-Act Structure\"`",
+      "`writing_projects_v2` \"The Optimization\" with 8 chapters; Ch1-2 Setup(25%); Ch3-6 Confrontation(50%, midpoint reversal); Ch7-8 Resolution(25%)",
+      "Midpoint \u2260 climax; climax = single decisive confrontation; denouement = thematic \"Philosophy\"",
+      "arc_notes Three-Act terminology; narrative goal Act1\u2192Act3; CR-009 email \"The Optimization\""
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing a new story brainstorm for 'The Optimization'. I'll let you know when the outline is ready.",
+    "tool": "brainstorm",
+    "op": "story",
+    "data": null,
+    "job_id": "7dafc5a46ba7467fb15ae98e6eb10f34",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "7dafc5a46ba7467fb15ae98e6eb10f34",
+    "status": "complete",
+    "result": {
+      "execution_id": "66d04f14-3069-45d0-aa9f-ba31ebfe9efd",
+      "step_name": "brainstorm",
+      "status": "ok",
+      "payload": {
+        "op": "story",
+        "result": {
+          "outline": {
+            "title": "The Optimization",
+            "premise": "When a brilliant but ethically unmoored AI marketing strategist named Mara Voss is hired by a struggling consumer tech company to deploy a cutting-edge AI system that can predict, manipulate, and optimize human desire at scale, she must decide whether to expose the system's catastrophic potential before it reshapes an entire generation's relationship with want, identity, and free will \u2014 even if doing so destroys the career she has sacrificed everything to build.",
+            "themes": [
+              "The commodification of human desire",
+              "The ethics of persuasion at scale",
+              "Complicity and the slow corruption of conscience",
+              "Identity in an age of algorithmic curation",
+              "The cost of ambition without moral anchor",
+              "What it means to want something authentically"
+            ],
+            "story_arc_name": "Three-Act Structure",
+            "dramatic_question": "Can Mara Voss expose and dismantle the AI optimization system she helped build before it is deployed globally and permanently rewires how an entire generation experiences desire \u2014 at the cost of everything she has worked for?",
+            "wow_factor": "The novel teaches the reader, in accurate and terrifying detail, exactly how a real AI persuasion system works \u2014 the data pipelines, the psychographic targeting loops, the A/B testing of emotional triggers \u2014 so that by the final chapter, the reader cannot look at their own phone without suspecting they are already inside the machine.",
+            "characters": [
+              {
+                "name": "Mara Voss",
+                "role": "Protagonist, POV character",
+                "archetype": "The brilliant outsider who finally gets inside the room she always wanted",
+                "off_axis_attribute": "She is a world-class reader of other people's desires but is catastrophically blind to her own \u2014 she has optimized herself so thoroughly for professional success that she genuinely does not know what she wants, which makes her both the perfect architect of the system and its most vulnerable victim.",
+                "dramatic_question": "Will Mara sacrifice the career and identity she has built entirely around being indispensable in order to stop a machine that is, in every technical sense, her greatest achievement?",
+                "description": "Mara is 34, a former academic cognitive scientist who burned her PhD thesis on persuasion ethics to take a six-figure consulting job and never looked back. She is meticulous, funny in a dry cutting way, and reads rooms the way other people read menus. She keeps a handwritten journal not for reflection but to track her own behavioral patterns \u2014 she treats herself as a data set. Her private life is thin: a younger sister, Dani, who she funds through art school and rarely calls; a running habit she uses to avoid thinking; a friendship with a former colleague, Priya, that she has let go cold. She is terrified of being ordinary. She would be humiliated by being publicly wrong. She is made happy by the moment a complex system clicks into elegant order \u2014 a happiness she cannot distinguish from the system's own reward signal."
+              },
+              {
+                "name": "Callum Reede",
+                "role": "Antagonist / CEO of Helix Consumer Technologies",
+                "archetype": "The visionary founder who has crossed the line between belief and fanaticism",
+                "off_axis_attribute": "He is not cynical \u2014 he genuinely believes the optimization system is a gift to humanity, which makes him far more dangerous than a simple villain; his moral certainty is unshakeable and his arguments are often correct.",
+                "dramatic_question": "Will Callum's conviction that he is doing good allow him to rationalize any harm the system causes, or will a single undeniable human cost finally break through?",
+                "description": "Callum is 47, a second-time founder whose first company made him wealthy and whose second company, Helix, is his legacy project. He is charismatic, physically imposing, and has the particular magnetism of someone who has been right about large things before. He reads philosophy on planes. He has a daughter, Zoe, aged 16, whom he loves fiercely and who becomes, without his knowledge, a test subject in the system's beta deployment. He is not cruel. He is something worse: he is certain."
+              },
+              {
+                "name": "Dani Voss",
+                "role": "Secondary POV / Mara's younger sister",
+                "archetype": "The collateral damage character who becomes the moral proof",
+                "off_axis_attribute": "She is an artist who has built her entire creative identity around authentic self-expression, but the system identifies and begins amplifying her insecurities about originality until her work becomes indistinguishable from algorithmic output \u2014 she does not notice until Mara shows her the data.",
+                "dramatic_question": "Will Dani's experience of being optimized without her knowledge give Mara the human evidence she needs to act \u2014 and can their estranged relationship survive what Mara has to confess?",
+                "description": "Dani is 27, studying fine art on a scholarship Mara supplements. She is warm, stubborn, and has a talent for making friends that Mara envies and cannot replicate. She paints large-format canvases, follows several AI art accounts without irony, and has been quietly enrolled in the system's beta program through a lifestyle app she downloaded six months ago. She does not know this. She is the person Mara loves most and has treated worst."
+              },
+              {
+                "name": "Jonas Hecht",
+                "role": "Secondary POV / Lead AI engineer on the optimization system",
+                "archetype": "The brilliant technician who built the weapon and is only now reading the manual",
+                "off_axis_attribute": "He has a compulsive need to make things work \u2014 a problem-solver's reflex so strong that he will fix a moral catastrophe the same way he fixes a broken algorithm: by patching it rather than shutting it down, which makes him Mara's most dangerous ally.",
+                "dramatic_question": "Will Jonas choose to be the person who built the most powerful persuasion engine in history, or the person who helped destroy it?",
+                "description": "Jonas is 31, a former academic machine learning researcher who joined Helix for the engineering challenge and stayed for the salary. He is quiet, precise, and has a nervous habit of narrating his own actions under his breath. He plays chess online at 2am. He has a long-distance relationship with a teacher named Soren that is slowly dying because Jonas cannot stop working. He is the only person at Helix who knows the full architecture of the system. He is also the only person who can prove what it does."
+              },
+              {
+                "name": "Priya Anand",
+                "role": "Supporting / Mara's former colleague, now a tech ethics journalist",
+                "archetype": "The conscience-from-outside who becomes the mechanism of exposure",
+                "off_axis_attribute": "She is principled to the point of recklessness \u2014 she will publish a story that destroys a friendship without hesitation, which means Mara can never fully trust her even when she needs her most.",
+                "dramatic_question": "Will Priya publish what she knows about Helix before Mara is ready, and will the friendship survive the collision between Priya's duty and Mara's timeline?",
+                "description": "Priya is 36, a senior technology correspondent at a major digital publication. She and Mara were close during Mara's academic years and drifted apart when Mara went corporate. Priya has been investigating Helix for four months before the novel begins. She is the person who first calls Mara to ask questions \u2014 not knowing Mara is already inside. She has a dry, affectionate manner that conceals a journalist's absolute ruthlessness about the story."
+              },
+              {
+                "name": "Zoe Reede",
+                "role": "Supporting / Callum's daughter, unwitting beta user",
+                "archetype": "The innocent whose fate makes the abstract concrete",
+                "off_axis_attribute": "She is perceptive enough to notice that her desires have been shifting in ways that feel foreign to her, and she has been quietly documenting these changes in a private journal \u2014 making her the most important witness in the novel without knowing it.",
+                "dramatic_question": "Will Zoe's documented experience of being optimized become the evidence that finally forces her father to confront what he has built?",
+                "description": "Zoe is 16, sharp, funny, and in the middle of figuring out who she is \u2014 which makes her maximally vulnerable to a system designed to intercept that process and redirect it toward purchasable identities. She downloaded the Helix lifestyle app because her friends did. She has started wanting things she did not want before and cannot explain why. She keeps a voice-memo journal. She is not a victim archetype \u2014 she is angry, and her anger will matter."
+              },
+              {
+                "name": "Derek Lau",
+                "role": "Supporting / Helix Chief Marketing Officer",
+                "archetype": "The true believer turned institutional enforcer",
+                "off_axis_attribute": "He was once an idealistic brand strategist who wrote a widely-read essay about ethical advertising; he has buried that past so completely that he has forgotten it exists until Mara finds it and uses it against him.",
+                "dramatic_question": "Will Derek's buried idealism resurface in time to matter, or has he optimized himself out of his own conscience?",
+                "description": "Derek is 42, polished, politically skilled inside the company, and deeply invested in the system's launch because his bonus, his reputation, and his next job all depend on it. He is not evil. He is the novel's portrait of what ordinary institutional complicity looks like from the inside."
+              }
+            ],
+            "chapters": [
+              {
+                "chapter_number": 0,
+                "title": "Prologue: The Signal",
+                "act": "Act I",
+                "arc_point": "Ordinary World \u2014 before the disruption",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": null,
+                "beat": "Mara sits in a glass-walled conference room watching a real-time dashboard as a single A/B test variant \u2014 a subtly reworded push notification \u2014 causes 340,000 people to change what they buy within six minutes. She feels the familiar click of a system working perfectly. She does not yet know what the system is for.",
+                "arc_notes": "Ordinary World: establishes Mara's professional identity, her relationship with optimization as beauty, and the novel's central technology before the moral stakes are visible."
+              },
+              {
+                "chapter_number": 1,
+                "title": "The Offer",
+                "act": "Act I",
+                "arc_point": "Ordinary World \u2014 protagonist's life before disruption",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "The dashboard from the prologue is the work product that has made Mara's reputation and generated the offer she is about to receive.",
+                "beat": "Mara is a senior consultant at a boutique AI strategy firm, celebrated for a campaign that increased a client's conversion rate by 340%. Callum Reede's assistant calls: Helix wants her not as a consultant but as VP of Optimization Strategy, full-time, with equity. Mara's boss warns her that Helix is playing in dangerous territory. Mara takes the meeting anyway.",
+                "arc_notes": "Ordinary World: establishes Mara's professional standing, her hunger for the next level, and the first hint that Helix is different in kind, not just scale."
+              },
+              {
+                "chapter_number": 2,
+                "title": "Helix",
+                "act": "Act I",
+                "arc_point": "Ordinary World deepening \u2014 entering the new world",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara travels to Helix headquarters for the meeting Callum's assistant arranged.",
+                "beat": "Mara tours the Helix campus and meets Callum, who is magnetic and disarming. He shows her the product suite \u2014 a constellation of lifestyle apps with 40 million users \u2014 and describes the optimization system only in outline: a unified desire-prediction engine that will make every user experience feel personally inevitable. Mara is dazzled. She accepts the role before she has seen the architecture.",
+                "arc_notes": "Ordinary World / threshold moment: Mara crosses into the new world; the reader sees Helix's scale and Callum's persuasive power before the system's true nature is revealed."
+              },
+              {
+                "chapter_number": 3,
+                "title": "The Architecture",
+                "act": "Act I",
+                "arc_point": "Inciting Incident \u2014 first sight of the true system",
+                "pov_character": "Jonas Hecht",
+                "bridge_from_prior": "Mara's first day at Helix; Jonas is assigned to brief her on the technical architecture she will be deploying.",
+                "beat": "Jonas walks Mara through the system's actual design: it does not predict desire, it manufactures it \u2014 using a continuous psychographic feedback loop that identifies each user's identity insecurities and amplifies them through micro-targeted content until the user's sense of self becomes dependent on the platform's curation. Jonas presents this as an engineering achievement. Mara goes quiet in a way Jonas does not know how to read.",
+                "arc_notes": "Inciting Incident: the true nature of the system is revealed; the dramatic question crystallizes; Mara's silence is the first sign of conscience she has not yet acted on."
+              },
+              {
+                "chapter_number": 4,
+                "title": "Psychographics",
+                "act": "Act I",
+                "arc_point": "Inciting Incident deepening \u2014 Mara absorbs the implications",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara processes Jonas's briefing overnight and returns the next morning with questions.",
+                "beat": "Mara spends a day in the data lab running the system against anonymized user profiles, watching it identify and exploit emotional vulnerabilities with clinical precision. She recognizes the academic literature it is built on \u2014 including her own abandoned PhD research on persuasion thresholds. She realizes the system is, in part, built on ideas she published before she went corporate. She does not tell anyone.",
+                "arc_notes": "Inciting Incident deepening: Mara's personal complicity is established; her silence becomes a choice, not just a pause."
+              },
+              {
+                "chapter_number": 5,
+                "title": "Dani Calls",
+                "act": "Act I",
+                "arc_point": "Ordinary World \u2014 the personal stakes introduced",
+                "pov_character": "Dani Voss",
+                "bridge_from_prior": "Mara, unsettled by what she has seen in the data lab, calls Dani for the first time in two months \u2014 the call Dani has been waiting for.",
+                "beat": "Dani, excited, tells Mara she has been getting incredible creative traction lately \u2014 her work is evolving, she is finding her aesthetic, she feels like the algorithm finally gets her. She mentions the lifestyle app she uses. Mara recognizes the app name: it is a Helix product. She asks casual questions and realizes Dani is describing the system's effects on herself without knowing it. Mara says nothing and ends the call.",
+                "arc_notes": "Personal stakes established: Dani's unknowing enrollment in the beta program makes the abstract harm concrete and personal; Mara's silence is now a choice with a face on it."
+              },
+              {
+                "chapter_number": 6,
+                "title": "The Beta Users",
+                "act": "Act I",
+                "arc_point": "First Plot Point approaching \u2014 Mara discovers the beta program's scope",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara's conversation with Dani prompts her to pull the beta program's user data the next morning.",
+                "beat": "Mara discovers the beta program has 2.3 million users, not the 50,000 she was told in her onboarding. The users were enrolled without explicit informed consent through a buried terms-of-service clause. She finds Dani's anonymized profile in the data \u2014 she recognizes it from the behavioral signature. She confronts Derek Lau, who tells her the scale was a board decision and that her job is optimization, not governance. She does not quit.",
+                "arc_notes": "First Plot Point: Mara knows the full scope of the harm and chooses to stay \u2014 this is the commitment that closes Act I; she is now inside the machine she must eventually dismantle."
+              },
+              {
+                "chapter_number": 7,
+                "title": "First Plot Point: She Stays",
+                "act": "Act I",
+                "arc_point": "First Plot Point \u2014 protagonist commits to the journey",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "The evening after Mara's confrontation with Derek; she sits alone in her new apartment with the beta data on her laptop.",
+                "beat": "Mara writes in her journal: she lists the reasons to quit (the harm, the consent violations, Dani) and the reasons to stay (the equity, the influence, the belief that she can shape the system from inside). She tells herself she will stay long enough to understand the full architecture and then decide. She knows this is a rationalization. She stays anyway. The global launch is twelve weeks away.",
+                "arc_notes": "First Plot Point: Mara's conscious choice to remain closes Act I; the twelve-week countdown begins; the reader understands the cost of what she has just decided."
+              },
+              {
+                "chapter_number": 8,
+                "title": "Optimization Week One",
+                "act": "Act II",
+                "arc_point": "Act II early \u2014 protagonist begins pursuing the goal inside the new world",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara begins her first full week of work on the global launch strategy, carrying the knowledge from Act I.",
+                "beat": "Mara throws herself into the launch preparation, discovering she is genuinely brilliant at this work \u2014 she redesigns the system's targeting taxonomy and improves its desire-prediction accuracy by 18%. The work feels good. She begins to understand why Jonas cannot stop building: the system is beautiful in the way a proof is beautiful. She files the ethical concern in a mental drawer and locks it.",
+                "arc_notes": "Act II early obstacles: Mara's complicity deepens through competence; the reader sees how ordinary people become architects of harm \u2014 not through malice but through the pleasure of mastery."
+              },
+              {
+                "chapter_number": 9,
+                "title": "Jonas at 2am",
+                "act": "Act II",
+                "arc_point": "Act II early \u2014 secondary character's inner life established",
+                "pov_character": "Jonas Hecht",
+                "bridge_from_prior": "Jonas has been watching Mara's improvements to the targeting taxonomy and sends her a message at 2am asking to talk.",
+                "beat": "Jonas and Mara meet in the empty office. He shows her a metric he has been quietly tracking: a cohort of beta users whose behavioral variance \u2014 the statistical measure of spontaneous, unpredicted choice \u2014 has dropped to near zero. They are no longer surprising the system. He does not know what this means for the users as people. Mara does. She tells him it is within acceptable parameters. She goes home and does not sleep.",
+                "arc_notes": "New dramatic problem: Jonas introduces the behavioral variance metric, which will become the system's most damning evidence; Mara's lie to Jonas is the first active moral failure."
+              },
+              {
+                "chapter_number": 10,
+                "title": "Priya's Email",
+                "act": "Act II",
+                "arc_point": "Act II early \u2014 external threat introduced",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "The morning after Mara's sleepless night, she finds an email from Priya Anand in her inbox.",
+                "beat": "Priya's email is warm but pointed: she is writing a piece on AI behavioral targeting and would love to catch up. She mentions Helix by name. Mara realizes Priya is already investigating. She does not reply. She tells Derek, who tells her to say nothing and refer any press inquiries to legal. Mara agrees. She feels the walls of the machine closing around her.",
+                "arc_notes": "External threat: Priya's investigation creates a ticking clock outside the company; Mara's decision to tell Derek rather than respond to Priya is another step deeper into complicity."
+              },
+              {
+                "chapter_number": 11,
+                "title": "The Desire Engine",
+                "act": "Act II",
+                "arc_point": "Act II early \u2014 the system's full power demonstrated",
+                "pov_character": "Jonas Hecht",
+                "bridge_from_prior": "Jonas, energized by his late-night conversation with Mara, runs a new demonstration of the system's capabilities for the engineering team.",
+                "beat": "Jonas demonstrates the system's desire-manufacturing loop in real time using a live user cohort: within 72 hours of targeted micro-content delivery, the cohort's expressed preferences shift measurably toward a pre-specified product category. The engineers applaud. Jonas watches the numbers and feels, for the first time, a sensation he cannot name \u2014 not pride, not guilt, something between them. He calls Soren that night and cannot explain why he needed to hear a familiar voice.",
+                "arc_notes": "New dramatic problem: Jonas's unnamed unease is the first crack in his technical detachment; his call to Soren establishes the human cost of his work on his private life."
+              },
+              {
+                "chapter_number": 12,
+                "title": "Callum's Vision",
+                "act": "Act II",
+                "arc_point": "Act II early \u2014 antagonist's worldview fully articulated",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Callum calls Mara into his office after reviewing her targeting taxonomy improvements.",
+                "beat": "Callum delivers his full philosophical case for the system: desire is already manufactured by culture, advertising, and social pressure \u2014 the system simply makes that process more efficient and more responsive to the individual. He argues it is more honest than traditional advertising because it works with the user's actual psychology rather than against it. His argument is coherent and partly correct. Mara finds herself nodding. She hates that she is nodding.",
+                "arc_notes": "Antagonist's worldview: Callum's argument is given its full force; the reader, like Mara, is genuinely unsettled by how reasonable it sounds; the moral dilemma is sharpened."
+              },
+              {
+                "chapter_number": 13,
+                "title": "Dani's New Work",
+                "act": "Act II",
+                "arc_point": "Act II early \u2014 personal stakes escalate",
+                "pov_character": "Dani Voss",
+                "bridge_from_prior": "Dani sends Mara photos of her new paintings, which Mara views on her phone the morning after Callum's speech.",
+                "beat": "Dani's new paintings are technically accomplished and aesthetically coherent \u2014 and Mara recognizes the aesthetic signature from the system's output: the color palette, the compositional choices, the subject matter all map to the desire-profile the system has been building for Dani's demographic cohort. Dani thinks she has found her voice. Mara can see the system's fingerprints on every canvas. She sends back three heart emojis and closes the app.",
+                "arc_notes": "Personal stakes escalate: the system's effect on Dani is now visible and specific; Mara's three heart emojis are the novel's most damning small act of cowardice."
+              },
+              {
+                "chapter_number": 14,
+                "title": "The Consent Problem",
+                "act": "Act II",
+                "arc_point": "Act II early \u2014 new dramatic problem: legal exposure discovered",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara, disturbed by Dani's paintings, pulls the consent documentation for the beta program.",
+                "beat": "Mara discovers the consent violation is worse than she thought: the buried terms-of-service clause was added retroactively to existing user agreements, which is almost certainly illegal in three jurisdictions where Helix operates. She drafts a memo to Derek flagging the legal risk. Derek reads it, thanks her, and files it. Nothing changes. Mara realizes the memo was not a warning \u2014 it was a paper trail that now has her name on it.",
+                "arc_notes": "New dramatic problem: Mara's attempt to protect herself legally has instead deepened her institutional complicity; the memo is a trap she walked into."
+              },
+              {
+                "chapter_number": 15,
+                "title": "Zoe's Journal",
+                "act": "Act II",
+                "arc_point": "Act II early \u2014 new POV introduces the human evidence",
+                "pov_character": "Zoe Reede",
+                "bridge_from_prior": "The consent memo Mara filed references a demographic cohort that includes Zoe's age group; this chapter shows the system's effects from inside.",
+                "beat": "Zoe records a voice memo: she has been wanting things lately that feel like someone else's wants \u2014 a specific brand of sneakers she had never heard of three months ago, a music genre she now cannot imagine not loving, a career aspiration that replaced her old one so smoothly she almost missed the seam. She is 16 and smart enough to find this frightening. She does not know what to do with the fear so she records it and saves it.",
+                "arc_notes": "New POV / human evidence: Zoe's voice memo is the system's most damning document; her self-awareness is what will eventually break the case open."
+              },
+              {
+                "chapter_number": 16,
+                "title": "Eight Weeks Out",
+                "act": "Act II",
+                "arc_point": "Act II escalating \u2014 launch countdown intensifies",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "The launch timeline advances; Mara receives the global rollout schedule.",
+                "beat": "The global launch is eight weeks away. Mara receives the rollout plan: 200 million users in the first wave, 800 million within six months. She runs the behavioral variance numbers Jonas showed her against the projected user base and calculates that within one year, the system will have measurably reduced spontaneous choice in a population the size of the United States. She writes this in her journal in the language of statistics. Then she crosses it out and writes it in plain English. Then she closes the journal.",
+                "arc_notes": "Escalation: the scale of harm is now quantified and concrete; Mara's act of writing and crossing out is the novel's central image of suppressed conscience."
+              },
+              {
+                "chapter_number": 17,
+                "title": "Priya Doesn't Wait",
+                "act": "Act II",
+                "arc_point": "Act II escalating \u2014 external threat accelerates",
+                "pov_character": "Priya Anand",
+                "bridge_from_prior": "Priya, having received no reply from Mara, has continued her investigation and has found a source inside Helix.",
+                "beat": "Priya meets a disgruntled former Helix data scientist who gives her the system's general architecture in outline \u2014 enough to write a damaging story but not enough to prove the consent violations. She calls Mara again, this time directly. Mara picks up. The conversation is careful, warm, and dishonest on Mara's side. Priya knows Mara is lying. She decides to give her two weeks before publishing what she has.",
+                "arc_notes": "External threat accelerates: Priya's two-week deadline creates a second countdown inside the launch countdown; Mara is now running out of time from two directions."
+              },
+              {
+                "chapter_number": 18,
+                "title": "The Moral Memo",
+                "act": "Act II",
+                "arc_point": "Act II escalating \u2014 protagonist's moral dilemma made explicit",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "After the call with Priya, Mara sits in her car in the Helix parking garage.",
+                "beat": "Mara drafts a second memo \u2014 not to Derek but to herself \u2014 laying out the full moral case against the system in the language of her abandoned PhD thesis. She lists what she knows, what she can prove, and what it would cost her to act. The equity alone is $4.2 million. She has no savings outside this job. She thinks about Dani's tuition. She thinks about the 200 million users in wave one. She does not send the memo to anyone. She saves it in a folder labeled 'running notes.'",
+                "arc_notes": "Moral dilemma explicit: the cost of action is now quantified alongside the cost of inaction; Mara's folder label is her self-deception made visible."
+              },
+              {
+                "chapter_number": 19,
+                "title": "Jonas Finds the Variance Floor",
+                "act": "Act II",
+                "arc_point": "Act II escalating \u2014 new dramatic problem: the system has a hidden threshold",
+                "pov_character": "Jonas Hecht",
+                "bridge_from_prior": "Jonas has been running the behavioral variance metric Mara dismissed; he has now found something worse.",
+                "beat": "Jonas discovers that the system has a variance floor \u2014 a point below which users' behavioral data becomes self-reinforcing rather than responsive to new input. Users who cross the floor are, in the system's terms, 'locked': their desire profiles become stable and self-perpetuating without further intervention. He runs the numbers: 340,000 beta users have already crossed the floor. He does not know if this is reversible. He goes to Mara's office and tells her. She asks him to document it internally. He does. She buries the document.",
+                "arc_notes": "New dramatic problem: the variance floor reveals the system causes permanent harm, not just temporary influence; Mara's burial of Jonas's document is her most serious active wrongdoing."
+              },
+              {
+                "chapter_number": 20,
+                "title": "Callum and Zoe",
+                "act": "Act II",
+                "arc_point": "Act II escalating \u2014 antagonist's personal stakes introduced",
+                "pov_character": "Zoe Reede",
+                "bridge_from_prior": "Zoe, disturbed by her voice memos, tries to talk to her father about how the app makes her feel.",
+                "beat": "Zoe tries to describe to Callum the feeling of wanting things that don't feel like hers. Callum listens carefully and then explains, gently and confidently, that this is what growing up feels like \u2014 identity is always borrowed before it is owned. He believes this. He does not know his daughter is a beta user. He does not know the app she is describing is his. Zoe nods and goes back to her room and records another voice memo: 'He didn't hear me.'",
+                "arc_notes": "Antagonist's personal stakes: Callum's blindness to his own daughter's experience is the novel's central irony; his explanation is not wrong in general but catastrophically wrong in this specific case."
+              },
+              {
+                "chapter_number": 21,
+                "title": "The Midpoint Revelation",
+                "act": "Act II",
+                "arc_point": "Midpoint \u2014 revelation that reframes the dramatic question",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Jonas, unsatisfied with Mara's response to the variance floor document, has done something without telling her.",
+                "beat": "Jonas has run the variance floor analysis against the full beta user database and cross-referenced it with demographic data. He brings Mara the result: the users most likely to cross the variance floor are adolescents between 14 and 18, whose identity formation is still in progress. The system is not just influencing adults' consumer preferences \u2014 it is permanently reshaping the identity architecture of teenagers. Mara looks at the demographic band and recognizes it: Zoe Reede's age group. She pulls Zoe's anonymized profile. Zoe has already crossed the variance floor.",
+                "arc_notes": "Midpoint: the dramatic question reframes from 'will Mara expose the system' to 'can Mara reverse the harm already done' \u2014 the stakes shift from future prevention to present damage; Zoe's profile is the pivot."
+              },
+              {
+                "chapter_number": 22,
+                "title": "What Mara Does Next",
+                "act": "Act II",
+                "arc_point": "Midpoint consequence \u2014 protagonist's response to the revelation",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara has just identified Zoe Reede's profile in the variance floor cohort.",
+                "beat": "Mara does not go to Callum. She does not call Priya. She goes for a run and runs until she cannot breathe and then sits on a park bench and calls Dani. She asks Dani, carefully, whether she ever feels like her desires have been changing in ways she can't explain. Dani laughs and says yes, constantly, isn't that just being alive? Mara says yes. She hangs up. She goes back to the office and begins, quietly, to copy files.",
+                "arc_notes": "Midpoint consequence: Mara's decision to copy files is the first active step toward exposure; her call to Dani is the moment she stops suppressing and starts moving."
+              },
+              {
+                "chapter_number": 23,
+                "title": "Derek's Past",
+                "act": "Act II",
+                "arc_point": "Act II second half \u2014 reveal about existing character that changes relationships",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "While copying files, Mara searches the internal archive for any prior ethical review of the system and finds Derek's name attached to an old document.",
+                "beat": "Mara finds Derek's 2019 essay \u2014 'The Honest Advertiser' \u2014 in which he argued that behavioral targeting without informed consent is a form of theft. She reads it twice. She prints it. She goes to Derek's office and puts it on his desk without a word. Derek reads it. He does not speak for a long time. He says: 'That was a different time.' Mara says: 'Was it?' She leaves. Derek sits alone with the essay for an hour before filing it in his drawer.",
+                "arc_notes": "Character reveal: Derek's buried idealism is surfaced; his response ('a different time') is the novel's portrait of how conscience is archived rather than killed; the relationship between Mara and Derek shifts."
+              },
+              {
+                "chapter_number": 24,
+                "title": "Soren Leaves",
+                "act": "Act II",
+                "arc_point": "Act II second half \u2014 consequence of earlier choice lands on secondary character",
+                "pov_character": "Jonas Hecht",
+                "bridge_from_prior": "Jonas, energized by Mara's apparent shift in attitude, has been working even longer hours; Soren has been waiting.",
+                "beat": "Soren ends the relationship by video call. He does not do it angrily \u2014 he does it with the quiet finality of someone who has been deciding for months. He says: 'You are more present with the machine than you are with me.' Jonas does not argue because he knows it is true. He sits in the empty office at midnight and opens the variance floor analysis and stares at it. He thinks about the 340,000 locked users and wonders if they feel the way he feels right now: like something has been decided for them.",
+                "arc_notes": "Consequence of earlier choice: Soren's departure is the personal cost of Jonas's complicity; his identification with the locked users is the moment his moral arc turns."
+              },
+              {
+                "chapter_number": 25,
+                "title": "The File Transfer",
+                "act": "Act II",
+                "arc_point": "Act II second half \u2014 protagonist takes active dangerous step",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara has been copying files for three days; she now has what she needs.",
+                "beat": "Mara completes the file transfer to an encrypted external drive: the variance floor analysis, the consent violation documentation, Jonas's locked-user cohort data, and the internal memo she wrote and buried. She hides the drive. That afternoon, Helix's head of security tells her that the IT team has flagged an unusual data access pattern on her account. She has 48 hours before they trace it to her.",
+                "arc_notes": "Protagonist in danger: the 48-hour clock is a new countdown inside the existing countdowns; Mara's plan is now a race against discovery."
+              },
+              {
+                "chapter_number": 26,
+                "title": "Priya's Deadline",
+                "act": "Act II",
+                "arc_point": "Act II second half \u2014 external deadline arrives",
+                "pov_character": "Priya Anand",
+                "bridge_from_prior": "Priya's two-week deadline to Mara has expired; she calls to say she is publishing.",
+                "beat": "Priya calls Mara: her story is going live in 72 hours. It will name Helix, describe the system's general architecture, and cite the consent violations \u2014 but without the variance floor data, it will not prove permanent harm. It will damage Helix but not destroy it. Mara tells Priya to wait. Priya says she has waited. Mara says: 'I have something that will end it. Give me 72 hours.' Priya says: 'You have 48.'",
+                "arc_notes": "External deadline: Priya's 48-hour deadline aligns with the IT security clock; Mara is now running two simultaneous countdowns toward the same moment."
+              },
+              {
+                "chapter_number": 27,
+                "title": "Jonas Decides",
+                "act": "Act II",
+                "arc_point": "Act II second half \u2014 secondary character's moral arc turns",
+                "pov_character": "Jonas Hecht",
+                "bridge_from_prior": "Mara goes to Jonas immediately after Priya's call and tells him everything.",
+                "beat": "Mara tells Jonas about the file transfer, Priya's deadline, and Zoe Reede's profile. Jonas is silent for a long time. Then he says: 'I can give you something better than the files. I can give you the source code annotation \u2014 the comments I wrote in the codebase that describe exactly what each module does in plain language. It was written for internal review. It's the clearest possible proof of intent.' He says: 'I'll lose my career.' Mara says: 'I know.' He says: 'Okay.'",
+                "arc_notes": "Secondary character's moral arc turns: Jonas's decision is the novel's second most important moral choice; his 'okay' is quiet and devastating; the alliance is formed."
+              },
+              {
+                "chapter_number": 28,
+                "title": "Callum Finds Out",
+                "act": "Act II",
+                "arc_point": "Act II second half \u2014 antagonist discovers the threat",
+                "pov_character": "Callum Reede",
+                "bridge_from_prior": "Helix's head of security has traced the data access pattern and reported to Callum.",
+                "beat": "Callum is told that Mara has been copying files and that Jonas's codebase access logs show unusual activity. He does not immediately assume betrayal \u2014 he calls Mara into his office and asks her directly what she is doing. Mara lies. Callum looks at her for a long moment and says: 'I hope you're telling me the truth.' He does not fire her. He assigns security to monitor her access. He goes home and finds Zoe in the kitchen and asks how she is. She says: 'Fine.' He believes her.",
+                "arc_notes": "Antagonist discovers the threat: Callum's decision not to fire Mara is both generous and a tactical error; his scene with Zoe immediately after is the novel's sharpest irony."
+              },
+              {
+                "chapter_number": 29,
+                "title": "The Locked Users",
+                "act": "Act II",
+                "arc_point": "Act II second half \u2014 the human cost made fully visible",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara, now under security monitoring, uses her remaining access to pull the full locked-user cohort profiles.",
+                "beat": "Mara spends a night reading anonymized locked-user profiles: a 17-year-old whose career aspirations shifted from medicine to influencer marketing over six months; a 15-year-old whose friendship network contracted to the platform's recommended social graph; a 16-year-old girl whose voice-memo pattern matches Zoe Reede's. She is reading people who have been quietly, permanently changed. She is reading the work she helped optimize. She vomits in the office bathroom and then goes back to her desk.",
+                "arc_notes": "Human cost fully visible: the locked-user profiles transform the statistical harm into individual human stories; Mara's physical response is the body's refusal of the mind's rationalizations."
+              },
+              {
+                "chapter_number": 30,
+                "title": "Derek's Choice",
+                "act": "Act II",
+                "arc_point": "Act II second half \u2014 supporting character's moral arc resolves",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara goes to Derek the morning after reading the locked-user profiles.",
+                "beat": "Mara lays out everything for Derek: the variance floor, the locked users, Zoe Reede's profile, the consent violations, the 48-hour clock. She asks him to help her get the data to Priya before security locks her out. Derek reads the variance floor analysis slowly. He says: 'If I do this, I lose everything.' Mara says: 'If you don't, so do 340,000 people who didn't choose it.' Derek opens his desk drawer, takes out his old essay, and puts it in front of him. He says: 'Tell me what you need.'",
+                "arc_notes": "Supporting character's moral arc resolves: Derek's buried idealism resurfaces and becomes action; the essay is the physical object that bridges his past and present self."
+              },
+              {
+                "chapter_number": 31,
+                "title": "Security Closes In",
+                "act": "Act II",
+                "arc_point": "Second Plot Point approaching \u2014 the plan begins to collapse",
+                "pov_character": "Jonas Hecht",
+                "bridge_from_prior": "Derek has agreed to help; Jonas is preparing the source code annotation for transfer.",
+                "beat": "Jonas is in the middle of extracting the annotated source code when his access credentials are revoked. Helix's security team has moved faster than expected. He has 40% of the annotation. He calls Mara. Mara calls Derek. Derek uses his CMO credentials \u2014 still active \u2014 to restore Jonas's access for a 15-minute window before the system flags the override. Jonas works in silence. He gets 80% before the window closes. He tells Mara: '80% is enough to prove intent. It might not be enough to prove scale.'",
+                "arc_notes": "Second Plot Point approaching: the plan's partial failure raises the stakes; 80% is a dramatically perfect number \u2014 enough to act on, not enough to be certain of winning."
+              },
+              {
+                "chapter_number": 32,
+                "title": "Second Plot Point: Mara Is Fired",
+                "act": "Act II",
+                "arc_point": "Second Plot Point \u2014 lowest moment; protagonist stripped of position and access",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Callum has reviewed the security logs from Derek's credential override and has drawn the correct conclusion.",
+                "beat": "Callum fires Mara in a three-minute meeting. He is not angry \u2014 he is sad, which is worse. He says: 'I thought you understood what we were building.' He has her escorted from the building. Her laptop, her badge, and her access are gone. She is standing on the pavement outside Helix with the encrypted drive in her jacket pocket and 80% of the source code annotation on her phone. The launch is six days away. She calls Priya.",
+                "arc_notes": "Second Plot Point: Mara is at her lowest \u2014 fired, exposed, outside the machine she needs to stop; the encrypted drive in her pocket is the only weapon she has left; the six-day clock is the final countdown."
+              },
+              {
+                "chapter_number": 33,
+                "title": "Priya Reads the Files",
+                "act": "Act III",
+                "arc_point": "Act III begins \u2014 protagonist takes decisive action",
+                "pov_character": "Priya Anand",
+                "bridge_from_prior": "Mara calls Priya from the pavement outside Helix and tells her she has been fired and has the files.",
+                "beat": "Priya meets Mara at a coffee shop. She reads the variance floor analysis, the consent documentation, and the 80% source code annotation. She is quiet for a long time. Then she says: 'This is the story. But Helix will say the annotation is incomplete and the variance floor is a misinterpretation. I need a human subject. Someone who can testify to the experience from inside.' Mara knows exactly who that is.",
+                "arc_notes": "Act III begins: the decisive action is initiated; Priya's identification of the missing element \u2014 a human subject \u2014 drives the next movement; the story turns toward Zoe."
+              },
+              {
+                "chapter_number": 34,
+                "title": "Mara Calls Dani",
+                "act": "Act III",
+                "arc_point": "Act III \u2014 protagonist confronts personal cost",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara, walking from the coffee shop, calls Dani before she calls anyone else.",
+                "beat": "Mara tells Dani everything: the system, the beta program, Dani's enrollment without consent, the paintings. Dani is silent for a long time. Then she says: 'You knew. You knew for months.' Mara says yes. Dani says: 'Were you ever going to tell me?' Mara cannot answer. Dani hangs up. Mara stands on the street and understands that the professional cost she has been calculating is not the real cost. The real cost has a sister's voice.",
+                "arc_notes": "Personal cost confronted: Dani's response is the emotional climax of the personal arc; Mara's inability to answer is the honest resolution of her self-deception."
+              },
+              {
+                "chapter_number": 35,
+                "title": "Zoe's Voice Memos",
+                "act": "Act III",
+                "arc_point": "Act III \u2014 the human evidence is found",
+                "pov_character": "Zoe Reede",
+                "bridge_from_prior": "Mara, needing a human subject, reaches Zoe through a mutual contact \u2014 a friend of Dani's who knows Zoe from a youth arts program.",
+                "beat": "Zoe meets Mara in a park. Mara explains, carefully and honestly, what the system has been doing. Zoe listens without interrupting. Then she takes out her phone and plays Mara six months of voice memos \u2014 a documented, timestamped record of her desires shifting in real time. 'I knew something was wrong,' Zoe says. 'I just didn't know it had a name.' She gives Mara the voice memos. She says: 'Tell my dad.'",
+                "arc_notes": "Human evidence found: Zoe's voice memos are the missing proof Priya needed; Zoe's instruction \u2014 'tell my dad' \u2014 sets up the climax; her agency is the antidote to the victim archetype."
+              },
+              {
+                "chapter_number": 36,
+                "title": "Jonas's Testimony",
+                "act": "Act III",
+                "arc_point": "Act III \u2014 secondary character's arc completes",
+                "pov_character": "Jonas Hecht",
+                "bridge_from_prior": "Priya needs Jonas to go on record; Mara calls him.",
+                "beat": "Jonas agrees to speak to Priya on the record. He is calm in a way that surprises Mara \u2014 he has been preparing for this since Soren left, he says, though he did not know it. He gives Priya a full technical explanation of the variance floor, the desire-manufacturing loop, and the locked-user mechanism. He explains, in plain language, that the system does not predict what people want \u2014 it decides what they will want and then makes them want it. Priya records every word.",
+                "arc_notes": "Secondary character's arc completes: Jonas's testimony is the technical proof that transforms the story from allegation to fact; his calm is the peace of someone who has finally stopped fixing and started telling the truth."
+              },
+              {
+                "chapter_number": 37,
+                "title": "Derek's Corroboration",
+                "act": "Act III",
+                "arc_point": "Act III \u2014 supporting character's arc completes",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Priya needs internal corroboration from someone still inside Helix; Mara calls Derek.",
+                "beat": "Derek, still employed at Helix, provides Priya with a written statement corroborating the consent violation timeline and confirming that the variance floor analysis was received, reviewed, and buried by senior leadership. He attaches his original 2019 essay as context. He sends the statement from his personal email. He then resigns from Helix by text message to Callum. He tells Mara: 'I should have done this when you put the essay on my desk.'",
+                "arc_notes": "Supporting character's arc completes: Derek's resignation is the institutional crack that will accelerate the story's resolution; his self-assessment is honest and not self-pitying."
+              },
+              {
+                "chapter_number": 38,
+                "title": "Callum and the Voice Memos",
+                "act": "Act III",
+                "arc_point": "Climax \u2014 the central confrontation",
+                "pov_character": "Callum Reede",
+                "bridge_from_prior": "Mara, honoring Zoe's instruction, goes to Callum directly before Priya publishes \u2014 she sends him Zoe's voice memos with a single line: 'This is your daughter. This is what the system did to her.'",
+                "beat": "Callum listens to Zoe's voice memos alone in his office. Six months of his daughter's voice, documenting the theft of her own desires in real time. He sits for a long time. Then he calls Zoe. She picks up. He says: 'I didn't know.' She says: 'I know.' He says: 'I'm sorry.' She says: 'I know that too.' He hangs up and calls his legal team and tells them to halt the global launch. Then he calls Mara. He says: 'You should have come to me sooner.' She says: 'You wouldn't have listened.' He says: 'No. I wouldn't have.'",
+                "arc_notes": "Climax: the central confrontation is resolved not through external force but through a father hearing his daughter's voice; Callum's admission is the moral resolution of the antagonist's arc; the launch is halted."
+              },
+              {
+                "chapter_number": 39,
+                "title": "Publication",
+                "act": "Act III",
+                "arc_point": "Climax consequence \u2014 the story breaks",
+                "pov_character": "Priya Anand",
+                "bridge_from_prior": "Callum's halt of the launch is confirmed; Priya publishes the story the same morning.",
+                "beat": "Priya's story goes live: 'The Desire Engine: How Helix Technologies Built a Machine to Manufacture Human Want.' It includes Jonas's technical testimony, Derek's corroboration, the variance floor data, the consent violation documentation, and Zoe's voice memos (with Zoe's consent, her identity protected). Within four hours it is the most-read story of the year. Regulatory bodies in three countries announce investigations. Helix's stock falls 34% before trading is halted.",
+                "arc_notes": "Climax consequence: the publication is the external resolution of the dramatic question; the regulatory response confirms the harm was real and the exposure was necessary."
+              },
+              {
+                "chapter_number": 40,
+                "title": "The Reckoning",
+                "act": "Act III",
+                "arc_point": "Resolution \u2014 consequences distributed across characters",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "The story has been live for 48 hours; Mara is watching the aftermath from her apartment.",
+                "beat": "Mara watches the story's impact from her apartment: Helix is under investigation, the global launch is permanently suspended, the beta program is being audited, and a class-action suit has been filed on behalf of beta users. She has no job, no equity, and a legal subpoena from Helix's lawyers. She also has a voicemail from three universities asking if she would consider returning to academic research. She does not know what she wants. For the first time in years, she finds this interesting rather than frightening.",
+                "arc_notes": "Resolution: Mara's transformation is made visible \u2014 her inability to know what she wants is no longer a deficit but a recovered capacity; the dramatic question is answered."
+              },
+              {
+                "chapter_number": 41,
+                "title": "Dani's Canvas",
+                "act": "Act III",
+                "arc_point": "Resolution \u2014 personal arc closes",
+                "pov_character": "Dani Voss",
+                "bridge_from_prior": "Dani has read Priya's story and has seen her own experience described in the locked-user profiles.",
+                "beat": "Dani calls Mara. She says: 'I looked at the paintings. The ones from the last six months. I can see it now \u2014 they're not mine.' She pauses. 'I'm going to paint over them.' Mara says: 'All of them?' Dani says: 'All of them. I want to find out what I actually make.' She pauses again. 'I'm still angry at you.' Mara says: 'I know.' Dani says: 'Come visit.' Mara says: 'Okay.'",
+                "arc_notes": "Personal arc closes: Dani's decision to paint over the compromised work is the novel's most hopeful image; the sisters' reconciliation is partial and honest, not sentimental."
+              },
+              {
+                "chapter_number": 42,
+                "title": "Epilogue: Behavioral Variance",
+                "act": "Act III",
+                "arc_point": "Resolution \u2014 final image",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Six months after publication; Mara has accepted a research position at a university.",
+                "beat": "Mara is teaching a seminar on persuasion ethics. A student asks her: 'How do you know if what you want is really yours?' Mara thinks about Dani's blank canvases, Jonas's 2am chess games, Zoe's voice memos, the journal entry she crossed out and rewrote in plain English. She says: 'You probably can't know for certain. But the act of asking the question \u2014 that's the variance. That's the part the machine can't touch.' She closes her laptop. Outside the window, the city is full of people looking at their phones.",
+                "arc_notes": "Final image: the epilogue answers the novel's thematic question without resolving it falsely; the city on phones is the wow factor's final beat \u2014 the reader looks at their own phone and wonders."
+              },
+              {
+                "chapter_number": 43,
+                "title": "OUTLINE QUALITY GATE RESULTS",
+                "act": "Meta",
+                "arc_point": "Quality verification \u2014 internal",
+                "pov_character": "N/A",
+                "bridge_from_prior": "N/A",
+                "beat": "GATE RESULTS: (1) SCENE COUNT: 43 chapters x avg 3 scenes = ~65 distinct dramatic scenes. PASS. (2) DRAMATIC QUESTION: Stated in one sentence, referenced in every chapter. PASS. (3) CHAPTER 1 GRIP: Ch.1 ends with Mara taking the meeting against advice. PASS. (4) STORY TURN DENSITY: Ch.1-3 contain offer/tour/architecture revelation; final chapters contain firing/publication/reckoning. PASS. (5) SOGGY MIDDLE CHECK: Each middle chapter introduces new dramatic problem (variance floor, locked users, Priya deadline, security closure, Soren departure, Derek's past). PASS. (6) WOW FACTOR: Technically accurate AI persuasion architecture taught to reader in correct detail. PASS. (7) POV DISCIPLINE: 5 POV characters (Mara, Jonas, Dani, Priya, Zoe, Callum). PASS. (8) ENDING HEIGHTENED: Resolution impacts Mara (career/identity), Dani (art/sisterhood), Callum (daughter/legacy), Jonas (career/conscience). PASS. ALL 8 CRITERIA PASS.",
+                "arc_notes": "Internal quality gate \u2014 not a narrative chapter; remove from final manuscript."
+              }
+            ]
+          },
+          "persist": {
+            "persisted": false,
+            "reason": "persist requested but project_id/user_id missing"
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

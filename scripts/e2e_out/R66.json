@@ -1,0 +1,42 @@
+{
+  "test": {
+    "id": "R66",
+    "title": "Write Short Story from Three-Act Outline (Post-Apocalyptic)",
+    "source": "chat",
+    "prompt": "Write the short story \"Signal from the Deep\". Genre slug: post-apocalyptic.",
+    "route": "chapter.short-story` (task)",
+    "prerequisite": "R58",
+    "expected": [
+      "routes to `chapter.short-story`, kind=queued; complete; auto-loads outline",
+      "S1 Setup(~25%); S2-3 Confrontation(~50%); midpoint \u2260 climax; S4-5 Resolution; pre-climax false resolution identifiable",
+      "`published_content_v2` row; `content_versions_v2` snapshot; Prime Directive; CR-009 email"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing the short story 'Signal from the Deep' \u2014 I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "write",
+    "data": null,
+    "job_id": "db9120cc723c4f0bb61392bcafc39445",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "db9120cc723c4f0bb61392bcafc39445",
+    "status": "complete",
+    "result": {
+      "execution_id": "d5893be0-6875-4604-8a4c-ac7ef0861c6c",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValidationError",
+        "message": "2 validation errors for WriteChapterRequest\nproject_id\n  Field required [type=missing, input_value={'title': 'Signal from th...t': True, 'async': True}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nchapter_number\n  Field required [type=missing, input_value={'title': 'Signal from th...t': True, 'async': True}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

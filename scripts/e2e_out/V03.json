@@ -1,0 +1,46 @@
+{
+  "test": {
+    "id": "V03",
+    "title": "Voice \u2014 Email Report",
+    "source": "voice",
+    "prompt": "Send me an email with a summary of that research use the subject line voice test research report",
+    "route": "library.email-content` (task)",
+    "prerequisite": "",
+    "expected": [
+      "flat `{response, kind=\"queued\"}`",
+      "routes `library.email-content`",
+      "job_id",
+      "complete",
+      "email to `app_config.recipient_email`",
+      "subject \"voice test research report\"",
+      "body = summary of saved report",
+      "BCC if configured"
+    ]
+  },
+  "response": {
+    "response": "Sending an email with the research report summary. I'll let you know when it's sent.",
+    "kind": "queued",
+    "tool": "library",
+    "op": "email-content",
+    "job_id": "92c6c7a60ddc43f69a7293d31cfab34e",
+    "status": "queued"
+  },
+  "job_result": {
+    "job_id": "92c6c7a60ddc43f69a7293d31cfab34e",
+    "status": "complete",
+    "result": {
+      "execution_id": "d417a113-ea27-4db3-ac01-c31fb76b1fdf",
+      "step_name": "library",
+      "status": "ok",
+      "payload": {
+        "op": "email-content",
+        "result": {
+          "emailed": false,
+          "error_message": "Couldn't find research_report matching 'that research'. No email sent."
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

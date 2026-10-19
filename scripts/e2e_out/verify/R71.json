@@ -1,0 +1,284 @@
+{
+  "id": "R71",
+  "title": "Revise Outline \u2014 Add Prologue and Epilogue to The Accord",
+  "route": "`brainstorm.revise-outline` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=brainstorm.revise-outline got=brainstorm.revise-outline OK",
+    "job=complete",
+    "outline title='The Accord' chapters=14 persisted=True projects_recent=3"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Revise the outline for \"The Accord\". Add a prologue that opens with a classified diplomatic transmission intercepted decades before the main story begins \u2014 hinting at the alien contact that will drive the political crisis. Add an epilogue set 20 years after the climax showing the long-term consequences of the accord on human civilization. Keep the existing 10 chapters and Freytags Pyramid structure. Genre slug: political-scifi."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Queuing revision of the outline for \"The Accord\". I'll let you know when it's ready.",
+        "tool": "brainstorm",
+        "op": "revise-outline",
+        "data": null,
+        "job_id": "a69d582ff3dc4c7aad43a0bac95cfeb6",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "a69d582ff3dc4c7aad43a0bac95cfeb6",
+        "status": "complete",
+        "result": {
+          "execution_id": "54959388-b757-4c1a-932f-af7f7ee3f245",
+          "step_name": "brainstorm",
+          "status": "ok",
+          "payload": {
+            "op": "revise-outline",
+            "result": {
+              "revised": true,
+              "outline": {
+                "title": "The Accord",
+                "premise": "In 2041, a secret multinational treaty \u2014 the Accord \u2014 promises to end climate collapse by granting an AI governance system called SOVEREIGN unprecedented control over global resource allocation, energy grids, and population movement. What the public does not know is that the Accord's true urgency derives from a classified first-contact signal intercepted in 2019, which convinced a cabal of Northern Hemisphere technocrats that humanity has at most thirty years to present a unified, resource-stable civilisation to an approaching intelligence \u2014 or be deemed unworthy of survival. A mid-level UN treaty analyst discovers that SOVEREIGN's founding algorithm contains a deliberate flaw that will systematically deprioritise the Global South, condemning billions to engineered scarcity while the treaty's architects secure their own nations' survival. She has seventy-two hours before the Accord is ratified to expose the flaw, survive the people trying to silence her, and decide how much she is willing to destroy to save people she has never met.",
+                "themes": [
+                  "Who decides who survives when there is not enough for everyone",
+                  "The moral cost of institutional loyalty versus individual conscience",
+                  "How democratic consent is manufactured and then weaponised",
+                  "The difference between a system that is fair and a system that appears fair",
+                  "Whether exposing a catastrophic truth is worth the chaos it unleashes",
+                  "Whether the threat of an external judge makes humanity more or less humane to itself"
+                ],
+                "story_arc_name": "Freytag's Pyramid (Five-Act Structure)",
+                "dramatic_question": "Can UN treaty analyst Mara Voss expose the fatal flaw inside the Accord's AI governance algorithm before the treaty is ratified and billions in the Global South are condemned to engineered scarcity \u2014 and can she do it without becoming the very kind of ruthless operator she is trying to destroy, even after she learns that the architects believe an alien intelligence is watching the outcome?",
+                "wow_factor": "The novel teaches the reader, in accurate and terrifying procedural detail, exactly how a multilateral treaty is drafted, lobbied, and ratified \u2014 and then reveals that the entire architecture was secretly shaped by a classified first-contact signal, so that the question of who gets to survive is being answered not just for humanity's sake but as an audition for a cosmic audience no one elected.",
+                "characters": [
+                  {
+                    "name": "Mara Voss",
+                    "role": "Protagonist / POV 1",
+                    "archetype": "The whistleblower analyst \u2014 a mid-level UN treaty specialist who is brilliant at reading institutional language and catastrophically bad at institutional politics.",
+                    "off_axis_attribute": "She is constitutionally incapable of strategic silence: when she sees something wrong she says so immediately, without calculation, which has stalled her career for a decade and is about to get her killed.",
+                    "description": "Age 38. Born in Stuttgart to a Ghanaian mother and a German father, she grew up between two worlds and belongs fully to neither. Works as a Senior Analyst in the UN Office of Treaty Compliance, Geneva. Hobby: competitive chess, which she plays online at 2 a.m. when she cannot sleep. Private worry: she suspects her decade of institutional loyalty has made her complicit in things she never examined closely enough. Friend outside the plot: Yusuf, a Nairobi-based epidemiologist she met at a conference in 2037 and calls every few weeks for no reason except that he makes her laugh.",
+                    "dramatic_question": "Will Mara expose the Accord's flaw and survive \u2014 and will she remain the person she was when she started, or will the methods she uses to win corrupt her in ways she cannot undo?",
+                    "humiliation": "Being publicly discredited as a paranoid ideologue so that the flaw she found is dismissed as a conspiracy theory.",
+                    "terror": "That she will expose the truth and it will not matter \u2014 that the world will ratify the Accord anyway because the alternative is worse.",
+                    "happiness": "A world in which the Accord is rebuilt honestly, even if it takes another decade, and she had some part in making that possible."
+                  },
+                  {
+                    "name": "Director Elias Vance",
+                    "role": "Antagonist / POV 2",
+                    "archetype": "The architect \u2014 the senior UN official who designed the Accord and genuinely believes the flaw is a necessary and defensible triage decision, not a crime.",
+                    "off_axis_attribute": "He is not cynical; he is worse \u2014 he is sincere. He believes with complete moral conviction that sacrificing the Global South is the only mathematically survivable path for the species, and his certainty makes him more dangerous than any opportunist.",
+                    "description": "Age 61. Norwegian. Former climate scientist turned diplomat. Has two adult children in Oslo whom he has not seen in three years. Keeps a handwritten notebook of projected mortality figures that he updates weekly \u2014 a private ritual of accountability he tells himself is penance. Hobby: long-distance open-water swimming, which he does alone and in silence. He has read every major famine study published since 1950. He is not a monster. That is the problem. He has also read, in full, the 2019 Reykjavik Signal file \u2014 and it is the reason he stopped sleeping.",
+                    "dramatic_question": "Will Vance succeed in ratifying the Accord before Mara destroys it \u2014 and will he be able to live inside the world he has built, knowing what it cost and what he believes is still coming?",
+                    "humiliation": "Being reduced, in the historical record, to a bureaucratic war criminal rather than the man who made the hardest decision in human history.",
+                    "terror": "That Mara is right \u2014 not about the flaw being wrong, but about the process: that a decision this large was made by twelve people in a room and called a treaty.",
+                    "happiness": "Ratification. A functioning SOVEREIGN. Ten years of stabilised global temperature. The knowledge that the people he chose to save were, in fact, saved \u2014 and that whatever is approaching finds something worth preserving."
+                  },
+                  {
+                    "name": "Kofi Asante",
+                    "role": "Secondary protagonist / POV 3",
+                    "archetype": "The diplomat's conscience \u2014 Ghana's lead treaty negotiator, who signed the Accord in good faith and is about to discover what he actually signed.",
+                    "off_axis_attribute": "He is a man of profound personal warmth who has spent thirty years in diplomacy by learning to suppress every instinct that warmth produces \u2014 and the suppression is beginning to crack.",
+                    "description": "Age 54. Accra-born, educated at LSE and Harvard Kennedy School. His wife Adwoa is a paediatrician in Kumasi; they have not lived in the same city for eleven years. He collects first-edition West African literature and reads it on planes. He has a recurring nightmare in which he is signing a document and cannot read what it says. He is three years from a pension that would let him go home.",
+                    "dramatic_question": "When Kofi learns the truth about what he signed, will he use his position to stop ratification \u2014 knowing it will end his career, his marriage, and possibly his freedom?",
+                    "humiliation": "Being remembered as the African diplomat who handed his own continent to an algorithm.",
+                    "terror": "That his thirty years of careful, patient, legitimate diplomacy amounted to a system that was rigged before he entered the room.",
+                    "happiness": "Going home to Adwoa with his integrity intact."
+                  },
+                  {
+                    "name": "Petra Sokolova",
+                    "role": "Ally / secondary POV 4",
+                    "archetype": "The fixer \u2014 a Czech investigative journalist who has spent fifteen years covering the UN and knows where every body is buried, literally and institutionally.",
+                    "off_axis_attribute": "She is fearless about every danger except one: she has a teenage son in Prague whom she has kept completely secret from her professional life, and the moment anyone threatens him she becomes someone she does not recognise.",
+                    "description": "Age 44. Based in Geneva. Has burned three sources in her career by publishing before they were safe \u2014 a fact she has never admitted publicly and thinks about every day. Drinks too much coffee, not enough water. Has a press credential that gets her into rooms she is not supposed to be in. Her son Tom\u00e1\u0161 is 16, lives with her ex-husband in Prague, and thinks his mother covers 'boring meetings.'",
+                    "dramatic_question": "Will Petra publish the story \u2014 and what will she sacrifice to do it when her son becomes a target?",
+                    "humiliation": "Being the journalist who had the story of the century and got it wrong \u2014 wrong enough to be used as a weapon against the truth.",
+                    "terror": "Tom\u00e1\u0161 being used as leverage against her.",
+                    "happiness": "Publishing a story that cannot be killed and walking away clean."
+                  },
+                  {
+                    "name": "Dr. Yusuf Adeyemi",
+                    "role": "Supporting / moral witness",
+                    "archetype": "The human cost \u2014 a WHO epidemiologist based in Nairobi whose field data was used, without his knowledge, to calibrate SOVEREIGN's deprioritisation parameters.",
+                    "off_axis_attribute": "He is the most morally clear character in the novel, which makes him the most politically powerless \u2014 his clarity reads as naivety to everyone around him until it is too late.",
+                    "description": "Age 41. Lagos-born, Nairobi-based. Mara's friend from the 2037 conference. Has spent six years tracking resource-allocation mortality in sub-Saharan Africa. Runs a small clinic on weekends. Does not own a suit. Has been trying to get a meeting with the UN treaty office for eight months and been politely redirected every time.",
+                    "dramatic_question": "Will Yusuf's testimony be enough to make the flaw undeniable \u2014 and can he survive long enough to give it?",
+                    "humiliation": "Discovering that his own published research was the technical foundation for a system designed to kill the people he has spent his career trying to save.",
+                    "terror": "Being disappeared quietly \u2014 not killed dramatically, just professionally erased and discredited until no one returns his calls.",
+                    "happiness": "His data being read by someone with the power to act on it."
+                  },
+                  {
+                    "name": "Ambassador Lena Hartmann",
+                    "role": "Swing character / moral complication",
+                    "archetype": "The true believer turned doubter \u2014 Germany's UN Ambassador, one of the Accord's twelve architects, who begins to waver when she understands the full scope of what she approved.",
+                    "off_axis_attribute": "She is a woman of genuine democratic principle who has spent her career arguing that process matters as much as outcome \u2014 and she is now complicit in the most anti-democratic act in modern history, which she approved because she trusted Vance.",
+                    "description": "Age 57. Berlin-born. Has represented Germany at the UN for nine years. Her husband died of a heat-related illness during the 2038 European thermal event. That death is why she signed. She keeps his photograph on her desk and has not moved it since. She does not know about the Reykjavik Signal \u2014 Vance kept it from her deliberately, judging that she would refuse to sign if she knew the full rationale.",
+                    "dramatic_question": "Will Hartmann break ranks with Vance and vote to delay ratification \u2014 knowing that delay may mean no treaty at all and climate collapse for everyone?",
+                    "humiliation": "Being seen as the person who either betrayed the world by stopping the Accord or betrayed the world by enabling it \u2014 there is no version of this story in which she is not guilty of something.",
+                    "terror": "That her husband died for nothing \u2014 that the treaty she signed in his memory is a lie.",
+                    "happiness": "A version of the Accord that she could have shown him."
+                  },
+                  {
+                    "name": "Commander Astrid Lund",
+                    "role": "Historical POV \u2014 Prologue / Epilogue anchor",
+                    "archetype": "The signals officer \u2014 a Norwegian naval intelligence analyst who in 2019 was the first human being to formally document and classify the Reykjavik Signal.",
+                    "off_axis_attribute": "She is meticulous to the point of self-erasure in her professional life, but she kept one unauthorised copy of the raw signal file \u2014 not for any strategic reason, but because she could not bear for it to exist only inside a classification system she did not trust.",
+                    "description": "Age 34 in 2019; age 56 in 2041; age 76 in 2061. Born in Troms\u00f8. Spent her career in signals intelligence and retired early after the Reykjavik file was buried. Lives alone on the Lofoten Islands. Has never spoken publicly about what she heard. Knows Vance \u2014 he was the civilian liaison who received her report and then classified it at the highest level. She has watched the Accord negotiations for two years with a feeling she cannot name.",
+                    "dramatic_question": "Will Astrid's suppressed record of the Reykjavik Signal survive long enough to become part of the historical truth \u2014 and does she owe the world a testimony she was ordered never to give?",
+                    "humiliation": "Being the person who found the signal, reported it correctly, and was then erased from the record so completely that history will credit Vance with the discovery.",
+                    "terror": "That the signal was real, that something is coming, and that humanity will face it having just spent twenty years tearing itself apart over who deserved to survive.",
+                    "happiness": "Living long enough to see the Revised Accord name the signal openly \u2014 to see the secret become a shared fact that humanity can argue about in public, the way democracies are supposed to argue."
+                  }
+                ],
+                "chapters": [
+                  {
+                    "chapter_number": 0,
+                    "title": "Prologue: The Signal (Reykjavik, 14 November 2019)",
+                    "act": "Act I \u2014 Historical frame",
+                    "arc_point": "Exposition \u2014 Inciting seed (deep past)",
+                    "pov_character": "Commander Astrid Lund",
+                    "bridge_from_prior": "N/A \u2014 opening",
+                    "beat": "Astrid, alone at a signals console in a NATO listening post outside Reykjavik, isolates a non-terrestrial narrowband transmission of unmistakable mathematical structure, files a classified report that reaches exactly one civilian recipient \u2014 Elias Vance \u2014 and is then ordered to destroy her notes and never speak of it; she destroys the official copy and keeps one."
+                  },
+                  {
+                    "chapter_number": 1,
+                    "title": "The Parameter",
+                    "act": "Act I \u2014 Present day",
+                    "arc_point": "Exposition \u2014 Inciting document",
+                    "pov_character": "None (omniscient / document voice)",
+                    "bridge_from_prior": "The redacted memo references 'Project Reykjavik baseline assumptions' in its header \u2014 a phrase that will mean nothing to the reader yet and everything by Chapter 7.",
+                    "beat": "A single redacted internal memo dated 14 March 2041 \u2014 seventy-two hours before ratification \u2014 from SOVEREIGN's lead architect to Director Vance confirms the deprioritisation coefficient is set at 0.31, below standard audit detection threshold, and recommends proceeding."
+                  },
+                  {
+                    "chapter_number": 2,
+                    "title": "Forty Thousand Pages",
+                    "act": "Act I \u2014 Present day",
+                    "arc_point": "Exposition \u2014 World and protagonist established",
+                    "pov_character": "Mara Voss",
+                    "bridge_from_prior": "The memo in Chapter 1 is the document Mara's office has been tasked with cross-referencing against the Accord's technical annexes.",
+                    "beat": "Mara's night-shift cross-reference flags the statistical anomaly in Annex 14-C; her supervisor reads it, goes pale, and orders her to delete the flag and go home; she does not delete it."
+                  },
+                  {
+                    "chapter_number": 3,
+                    "title": "The Architect's Arithmetic",
+                    "act": "Act I \u2014 Present day",
+                    "arc_point": "Exposition \u2014 Antagonist and stakes established",
+                    "pov_character": "Elias Vance",
+                    "bridge_from_prior": "Mara's supervisor immediately calls Vance to report the flag; this chapter opens on Vance receiving that call at 6 a.m.",
+                    "beat": "Vance convenes his inner circle, explains the deprioritisation coefficient as a defensible triage mechanism shaped by the Reykjavik Signal's thirty-year civilisational deadline, and orders Mara's access revoked \u2014 calm, methodical, and entirely sincere."
+                  },
+                  {
+                    "chapter_number": 4,
+                    "title": "Forty-Eight Hours",
+                    "act": "Act II \u2014 Present day",
+                    "arc_point": "Rising Action \u2014 Protagonist commits and first obstacle lands",
+                    "pov_character": "Mara Voss",
+                    "bridge_from_prior": "Mara arrives at work to find her credentials revoked \u2014 a direct consequence of Vance's order in Chapter 3.",
+                    "beat": "Locked out and escorted from the building under administrative review for unauthorised data handling, Mara copies her analysis to an encrypted drive before IT can wipe her workstation and arranges a meeting with Petra Sokolova \u2014 the drive in her coat pocket, forty-eight hours on the clock."
+                  },
+                  {
+                    "chapter_number": 5,
+                    "title": "What Kofi Signed",
+                    "act": "Act II \u2014 Present day",
+                    "arc_point": "Rising Action \u2014 Second POV enters; stakes widen to Global South",
+                    "pov_character": "Kofi Asante",
+                    "bridge_from_prior": "Mara, unable to reach anyone inside the UN, calls Yusuf; Yusuf tells her Kofi has been stonewalled on Annex 14-C briefings for three weeks; Mara calls Kofi directly and this chapter opens on his response.",
+                    "beat": "Kofi runs the coefficient numbers himself in his New York office, sits very still, calls Adwoa without telling her what he found, files an emergency technical review request that his chief of staff says will be blocked, and sends it anyway \u2014 triggering Vance's team to begin diplomatically isolating Ghana."
+                  },
+                  {
+                    "chapter_number": 6,
+                    "title": "The Source and the Story",
+                    "act": "Act II \u2014 Present day",
+                    "arc_point": "Rising Action \u2014 Alliance formed; moral complication introduced",
+                    "pov_character": "Petra Sokolova",
+                    "bridge_from_prior": "Mara's meeting with Petra \u2014 arranged in Chapter 4 \u2014 happens here; Petra receives the encrypted drive.",
+                    "beat": "Petra verifies the data with a mathematician contact over six hours, begins drafting the story, then receives a message with photographs of Tom\u00e1\u0161 near his Prague school \u2014 an implicit threat that causes her to push publication back twelve hours under the lie of 'further verification,' fracturing the protagonists' alliance from within."
+                  },
+                  {
+                    "chapter_number": 7,
+                    "title": "Yusuf's Data",
+                    "act": "Act II \u2014 Present day",
+                    "arc_point": "Rising Action \u2014 Midpoint reversal; the flaw becomes undeniable and personal",
+                    "pov_character": "Yusuf Adeyemi",
+                    "bridge_from_prior": "Mara, growing desperate as Petra delays, calls Yusuf and asks him to compare his original WHO mortality field data against SOVEREIGN's published calibration inputs.",
+                    "beat": "Yusuf discovers his own sub-Saharan mortality research was inverted inside SOVEREIGN's algorithm \u2014 high-mortality regions flagged for deprioritisation rather than priority \u2014 records a twelve-minute video testimony, uploads it to a secure server, sends the link to Mara, Kofi, and Petra, and then watches his internet and phone go dark in real time."
+                  },
+                  {
+                    "chapter_number": 8,
+                    "title": "The Hartmann Vote",
+                    "act": "Act III \u2014 Present day",
+                    "arc_point": "Climax \u2014 The irreversible decision",
+                    "pov_character": "Mara Voss",
+                    "bridge_from_prior": "Yusuf's video reaches Mara and Kofi simultaneously; Mara forwards it to Hartmann with a single line and Kofi uses his emergency review request as procedural cover to secure a fifteen-minute private meeting with her one hour before ratification opens.",
+                    "beat": "Hartmann watches Yusuf's video, asks Mara one question \u2014 'Did Vance know?' \u2014 waits forty seconds, then walks to the floor and requests a procedural postponement; Vance intercepts her and makes his full case including the Reykjavik Signal rationale; Hartmann votes conscience anyway; Petra, seeing Hartmann move on the session feed, publishes twelve hours early before her son question is resolved."
+                  },
+                  {
+                    "chapter_number": 9,
+                    "title": "Cascade",
+                    "act": "Act IV \u2014 Present day",
+                    "arc_point": "Falling Action \u2014 Consequences ripple; the world reacts",
+                    "pov_character": "Elias Vance",
+                    "bridge_from_prior": "Vance watches Hartmann's floor move and Petra's story break simultaneously; this chapter opens on his response.",
+                    "beat": "Three African bloc nations withdraw their ratification instruments, the EU calls an emergency session, and Vance goes on record with a prepared statement \u2014 technically accurate, including the Reykjavik Signal context \u2014 that destroys him anyway; his children in Oslo call; he does not answer; he opens his mortality notebook and writes only the date."
+                  },
+                  {
+                    "chapter_number": 10,
+                    "title": "What It Cost",
+                    "act": "Act IV \u2014 Present day",
+                    "arc_point": "Falling Action \u2014 Personal costs land; subplots close",
+                    "pov_character": "Kofi Asante",
+                    "bridge_from_prior": "The ratification postponement triggers an emergency African Union session in Addis Ababa; Kofi is summoned to testify.",
+                    "beat": "Kofi testifies before the AU with precision and is told quietly by a senior colleague that his career is over not because he was wrong but because he was right in a way that embarrassed thirty governments; he calls Adwoa, drafts a framework proposal for a reconstructed Accord with open-source algorithm and mandatory Global South co-authorship, submits it as a non-paper, and watches it get filed \u2014 not accepted, not rejected, just filed."
+                  },
+                  {
+                    "chapter_number": 11,
+                    "title": "The Accord (Suspended)",
+                    "act": "Act V \u2014 Present day",
+                    "arc_point": "Resolution \u2014 Dramatic question answered",
+                    "pov_character": "Mara Voss",
+                    "bridge_from_prior": "The UN Secretariat issues a formal suspension notice pending technical review; Mara receives it at her personal email having been formally terminated three days earlier.",
+                    "beat": "Mara reads the suspension notice in her Geneva apartment, calls Yusuf \u2014 who answers on the first ring \u2014 and they talk for a long time about nothing important; she plays a chess game she loses badly and does not mind; the Accord is suspended, the flaw is public, and she did not become Vance to do it."
+                  },
+                  {
+                    "chapter_number": 12,
+                    "title": "Epilogue I: The Non-Paper (2043)",
+                    "act": "Act V \u2014 Near future",
+                    "arc_point": "Resolution \u2014 Denouement; the world after",
+                    "pov_character": "None (omniscient / document voice)",
+                    "bridge_from_prior": "Kofi's framework non-paper, filed in Chapter 10, reappears here as a historical document cited in the Secretary-General's address.",
+                    "beat": "An excerpt from the UN Secretary-General's 2043 address announces negotiations on the Revised Accord \u2014 built on Kofi's non-paper framework, open-source algorithm, forty-nation equity committee, SOVEREIGN's successor named COMMONS \u2014 crediting 'internal compliance review' for identifying the original flaw; Mara Voss is not mentioned; Yusuf Adeyemi is listed as technical consultant; Elias Vance is not mentioned; the Reykjavik Signal is referenced only as 'strategic long-range planning assumptions, classification pending review.'"
+                  },
+                  {
+                    "chapter_number": 13,
+                    "title": "Epilogue II: What Remains (Lofoten Islands, 2061)",
+                    "act": "Act V \u2014 Far future",
+                    "arc_point": "Resolution \u2014 Long-term consequences; the signal answered",
+                    "pov_character": "Commander Astrid Lund",
+                    "bridge_from_prior": "The 2043 epilogue's reference to 'classification pending review' on the Reykjavik Signal is the thread \u2014 twenty years later, that review has concluded.",
+                    "beat": "Astrid, age 76, reads the UN General Assembly's public declassification of the Reykjavik Signal and the announcement that COMMONS has been designated humanity's formal response architecture; the Revised Accord \u2014 transparent, co-authored, imperfect \u2014 is the document humanity will present to whatever is coming; she takes her unauthorised copy of the raw signal file from a locked drawer, holds it for a long moment, and burns it, because it is no longer a secret and secrets were never what she wanted to keep."
+                  }
+                ]
+              },
+              "chapters_before": 12,
+              "chapters_after": 14,
+              "characters_after": 7,
+              "persist": {
+                "persisted": true,
+                "project_id": "7976c085-41d3-46c6-9444-77b75bbdc289",
+                "created_project": false
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Revise the outline for \"The Accord\". Add a prologue that opens with a classified diplomatic transmission intercepted decades before the main story begins \u2014 hinting at the alien contact that will drive the political crisis. Add an epilogue set 20 years after the climax showing the long-term consequences of the accord on human civilization. Keep the existing 10 chapters and Freytags Pyramid structure. Genre slug: political-scifi."
+    }
+  ],
+  "expected": [
+    "routes to `brainstorm.revise-outline`, kind=queued; complete; Freytag preserved",
+    "outline gains chapter number=0 (Prologue) + number=11 (Epilogue); `outline_versions_v2` snapshot of pre-revision; original 10 chapters preserved; CR-009 email shows Prologue+10+Epilogue"
+  ]
+}

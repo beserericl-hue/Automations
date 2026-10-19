@@ -1,0 +1,207 @@
+{
+  "id": "V24",
+  "title": "Voice \u2014 Retrieve Research Report (No Callback)",
+  "route": "`library.retrieve` (info) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.retrieve got=library.retrieve OK",
+    "items=22 found=True"
+  ],
+  "steps": [
+    [
+      "voice",
+      "Can you pull up my research report about post apocalyptic fiction trends"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "response": "Here's what I found.",
+        "kind": "data",
+        "tool": "library",
+        "op": "retrieve",
+        "data": {
+          "execution_id": "92fef2db-28b5-4d3b-b6a8-c3bfad07c8ca",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "retrieve",
+            "result": {
+              "items": [
+                {
+                  "id": "a63095a7-b83d-4d55-8a52-9c883a32b631",
+                  "topic": "current trends, new books, hot Amazon Kindle keywords, and best sellers in post-apocalyptic fiction",
+                  "genre_slug": "",
+                  "status": "draft",
+                  "created_at": "2026-07-01T23:15:23.818375+00:00"
+                },
+                {
+                  "id": "eb33f92c-0d0b-49db-9694-0f47919f688e",
+                  "topic": "Post-Apocalyptic Fiction Trends 2026",
+                  "genre_slug": "",
+                  "status": "draft",
+                  "created_at": "2026-07-01T20:15:18.918876+00:00"
+                },
+                {
+                  "id": "05455c49-d867-40d8-945e-d0f2081dbfa8",
+                  "topic": "Post-Apocalyptic Fiction Trends 2026",
+                  "genre_slug": "",
+                  "status": "draft",
+                  "created_at": "2026-07-01T20:06:36.996738+00:00"
+                },
+                {
+                  "id": "58c63ecf-dec1-4025-a941-189ef628541f",
+                  "topic": "current trends, new books, hot Amazon Kindle keywords, and bestsellers in post-apocalyptic fiction",
+                  "genre_slug": "",
+                  "status": "draft",
+                  "created_at": "2026-06-21T20:39:28.413311+00:00"
+                },
+                {
+                  "id": "c70c0ea8-14a4-4345-942c-4e82af2bd0a9",
+                  "topic": "Get the research report about \"Post-Apocalyptic Fiction Trends 2026\"",
+                  "genre_slug": "",
+                  "status": "draft",
+                  "created_at": "2026-06-21T19:16:27.743873+00:00"
+                },
+                {
+                  "id": "afd93027-1337-46e2-93bf-b8be4df4fb12",
+                  "topic": "Post-Apocalyptic Fiction Trends 2026",
+                  "genre_slug": "",
+                  "status": "draft",
+                  "created_at": "2026-06-21T18:46:33.081348+00:00"
+                },
+                {
+                  "id": "f9c40a66-660d-42e7-9543-00b897ef7044",
+                  "topic": "Post-Apocalyptic Fiction Kindle Trends 2026",
+                  "genre_slug": "post-apocalyptic",
+                  "status": "final",
+                  "created_at": "2026-03-16T19:58:29.704282+00:00"
+                },
+                {
+                  "id": "2e201574-c9d5-4555-b48a-dd5694593bf3",
+                  "topic": "Post-Apocalyptic Fiction Trends 2026",
+                  "genre_slug": "post-apocalyptic",
+                  "status": "final",
+                  "created_at": "2026-03-10T19:36:22.604816+00:00"
+                },
+                {
+                  "id": "a8baddea-d7ff-45ac-91a3-023e26e1e4a0",
+                  "topic": "Post-Apocalyptic Fiction Trends 2026",
+                  "genre_slug": "post-apocalyptic",
+                  "status": "final",
+                  "created_at": "2026-03-09T15:36:47.247188+00:00"
+                },
+                {
+                  "id": "782d6c0d-583f-47cc-9b64-b08a863a214a",
+                  "topic": "Post-Apocalyptic Fiction Trends 2026",
+                  "genre_slug": "post-apocalyptic",
+                  "status": "final",
+                  "created_at": "2026-03-09T14:23:22.365101+00:00"
+                },
+                {
+                  "id": "16625255-40cc-4c12-a285-2a1b834aebf7",
+                  "topic": "Post-Apocalyptic Fiction Trends 2026",
+                  "genre_slug": "post-apocalyptic",
+                  "status": "draft",
+                  "created_at": "2026-03-09T14:22:06.702574+00:00"
+                },
+                {
+                  "id": "a599a415-f37e-42ce-9f28-4f075118ba2f",
+                  "topic": "Save that research as a report call it post apocalyptic trends twenty twenty six",
+                  "genre_slug": "",
+                  "status": "draft",
+                  "created_at": "2026-07-01T23:20:34.904957+00:00"
+                },
+                {
+                  "id": "4a364af6-990b-4727-bf86-a0726b9346cb",
+                  "topic": "current state of post-apocalyptic fiction in 2026, including trending themes, notable new releases, and evolution since COVID, with citations",
+                  "genre_slug": "",
+                  "status": "draft",
+                  "created_at": "2026-07-01T20:09:39.414931+00:00"
+                },
+                {
+                  "id": "cf022dab-ec09-484d-b87c-d188203275ec",
+                  "topic": "current state of post-apocalyptic fiction in 2026, including trending themes, notable new releases, and evolution since COVID, with citations",
+                  "genre_slug": "",
+                  "status": "draft",
+                  "created_at": "2026-07-01T20:00:58.978582+00:00"
+                },
+                {
+                  "id": "baf6824f-9a5e-42f4-93e5-7d42cc1f9c89",
+                  "topic": "Save that research as a report call it post apocalyptic trends twenty twenty six",
+                  "genre_slug": "",
+                  "status": "draft",
+                  "created_at": "2026-06-21T20:44:31.389858+00:00"
+                },
+                {
+                  "id": "db886118-0fb8-4599-95a9-63ffe9d629b1",
+                  "topic": "current state of post-apocalyptic fiction in 2026, including trending themes, notable new releases, and genre evolution since COVID, with citations",
+                  "genre_slug": "",
+                  "status": "draft",
+                  "created_at": "2026-06-21T18:39:19.962953+00:00"
+                },
+                {
+                  "id": "b4659734-d144-40f9-b261-689866957a98",
+                  "topic": "the current state of post-apocalyptic fiction in 2026. What are the trending themes, notable new releases, and how has the genre evolved since COVID? Include citations.",
+                  "genre_slug": "",
+                  "status": "draft",
+                  "created_at": "2026-06-21T18:33:45.369444+00:00"
+                },
+                {
+                  "id": "3ceb87e8-ca5f-4c0d-8369-87db284506d5",
+                  "topic": "Current State of Post-Apocalyptic Fiction in 2026",
+                  "genre_slug": "post-apocalyptic",
+                  "status": "final",
+                  "created_at": "2026-03-10T19:35:26.082513+00:00"
+                },
+                {
+                  "id": "7806296c-32e1-417a-b6db-1769ffa2e42f",
+                  "topic": "Post-Apocalyptic Trends 2026",
+                  "genre_slug": "post-apocalyptic",
+                  "status": "final",
+                  "created_at": "2026-03-09T16:47:43.926975+00:00"
+                },
+                {
+                  "id": "1af4dc69-411a-4ef1-969e-2bdefa3137a3",
+                  "topic": "Post-Apocalyptic Trends 2026",
+                  "genre_slug": "post-apocalyptic",
+                  "status": "final",
+                  "created_at": "2026-03-09T16:46:45.244458+00:00"
+                },
+                {
+                  "id": "c4497279-5904-4535-80d1-7fe549bcc193",
+                  "topic": "Relevance of Post-Apocalyptic Fiction in 2026",
+                  "genre_slug": "post-apocalyptic",
+                  "status": "final",
+                  "created_at": "2026-03-09T14:27:06.614693+00:00"
+                },
+                {
+                  "id": "45d1f7e3-ecd4-43f8-965c-2662fd09df9c",
+                  "topic": "Native Americans of Baltimore County",
+                  "genre_slug": "ancient-history",
+                  "status": "final",
+                  "created_at": "2026-03-20T13:10:05.480819+00:00"
+                }
+              ],
+              "count": 22,
+              "found": true,
+              "content_type": "research",
+              "search_term": "Can you pull up my research report about post apocalyptic fiction trends"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "job_result": null,
+      "resolved_prompt": "Can you pull up my research report about post apocalyptic fiction trends"
+    }
+  ],
+  "expected": [
+    "flat `{response, kind=\"data\"}`",
+    "content_type=research_report",
+    "inline summary",
+    "NO outbound call",
+    "user-scoped"
+  ]
+}

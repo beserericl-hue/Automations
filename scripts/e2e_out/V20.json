@@ -1,0 +1,44 @@
+{
+  "test": {
+    "id": "V20",
+    "title": "Voice \u2014 Messy/Natural Speech",
+    "source": "voice",
+    "prompt": "Um yeah so I want to uh write a blog post about like how political science fiction predicted the rise of like AI governance and surveillance states you know like nineteen eighty four and all that genre is political sci fi about two thousand words",
+    "route": "chapter.blog` (task)",
+    "prerequisite": "",
+    "expected": [
+      "flat queued",
+      "routes `chapter.blog`",
+      "strips fillers",
+      "maps \"political sci fi\"\u2192`political-scifi`",
+      "~2000 words",
+      "Prime Directive",
+      "`published_content_v2`",
+      "CR-009 email"
+    ]
+  },
+  "response": {
+    "response": "Queuing your blog post about political science fiction and AI governance. I'll let you know when it's ready.",
+    "kind": "queued",
+    "tool": "chapter",
+    "op": "blog",
+    "job_id": "d82beef8b93e4eecb6dba2774941c0ce",
+    "status": "queued"
+  },
+  "job_result": {
+    "job_id": "d82beef8b93e4eecb6dba2774941c0ce",
+    "status": "complete",
+    "result": {
+      "execution_id": "552bf971-fc87-4710-882d-fcb64897bf64",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValueError",
+        "message": "invalid literal for int() with base 10: '2000 words'",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

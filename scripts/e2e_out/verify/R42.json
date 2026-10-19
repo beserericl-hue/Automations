@@ -1,0 +1,70 @@
+{
+  "id": "R42",
+  "title": "Cron Auto-Publish (Scheduled Publisher)",
+  "route": "`library.lifecycle` (info) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.lifecycle got=chapter.blog MISMATCH",
+    "job=complete",
+    "blog_post recent=4 word_count=1227 persist=True"
+  ],
+  "steps": [
+    [
+      "chat",
+      "[Manual setup: SET status='scheduled', metadata schedule_date to a past timestamp in published_content_v2 via Supabase SQL, then wait for engine cron to process]"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Queuing a blog post on 'Power Structures in Space: How Sci-Fi Predicts Real-World Politics'. I'll let you know when it's ready.",
+        "tool": "chapter",
+        "op": "blog",
+        "data": null,
+        "job_id": "9edf985b75554fd3bc90ef80c38c8351",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "9edf985b75554fd3bc90ef80c38c8351",
+        "status": "complete",
+        "result": {
+          "execution_id": "b0f84aad-7a84-4392-b99d-4620cb646a1c",
+          "step_name": "chapter",
+          "status": "ok",
+          "payload": {
+            "op": "blog",
+            "result": {
+              "written": true,
+              "title": "Who Rules the Sky? How Sci-Fi Has Been Mapping Real Space Politics All Along",
+              "content_text": "# Who Rules the Sky? How Sci-Fi Has Been Mapping Real Space Politics All Along\n\nIn 2007, China shot one of its own weather satellites out of orbit. The debris field it left behind is still up there. That single test demonstrated something science fiction readers already knew: space is not a frontier of peaceful exploration. It's a battlefield being quietly carved up by governments, generals, and billionaires.\n\nThe genre has been rehearsing this argument for decades. The question worth asking now is whether we've been paying attention., -\n\n## Fiction as Blueprint, Not Warning\n\nWhen Peter Thiel, Elon Musk, and Marc Andreessen talk about the future, they cite science fiction. Not casually, strategically. *Snow Crash* gave Silicon Valley the template for the metaverse. *The Moon is a Harsh Mistress* handed libertarian tech founders a philosophy of orbital sovereignty. These aren't stories being read for entertainment. They're being used as operational manuals.\n\nResearchers call this \"materialized science fiction\", speculative narratives that tech elites convert into real platforms, governance models, and infrastructure projects. The gap between the page and the launchpad has never been smaller.\n\nThis matters because when fiction becomes policy, the politics baked into the story come along for the ride. A novel that imagines space as a place for rugged individualists to escape state control doesn't just entertain, it justifies a particular vision of who should own low Earth orbit., -\n\n## The Orbital Power Grab Sci-Fi Saw Coming\n\nLook at any serious science fiction dealing with space governance and you'll find a recurring pattern: centralized power, whether corporate or state, eventually dominates the high ground. The entity that controls communications, navigation, and surveillance from orbit controls everything below it.\n\nThat's not speculation anymore. It's current events.\n\nThe U.S. formally designated space a warfighting domain in the 2010s, standing up U.S. Space Command and the Space Force to operationalize what strategists now call \"spacepower.\" Doctrine documents discuss orbital regimes, space control, and space superiority in the same language military planners once reserved for naval dominance.\n\nMeanwhile, China and Russia are developing their own counterspace capabilities, jamming, spoofing, blinding sensors with lasers, and yes, kinetic kill vehicles that can physically destroy satellites. The term \"counterspace\" is clinical, but what it describes is war-fighting in orbit, conducted just below the threshold of open conflict.\n\nScience fiction gave us the vocabulary for this decades ago. The *Expanse* series by James S.A. Corey depicts Earth, Mars, and the asteroid belt locked in exactly this kind of cold-war competition over orbital infrastructure and resource access. What makes the series feel authentic isn't the spaceships. It's the political logic, the way controlling transit corridors and communication relays translates directly into coercive power over populations who depend on them., -\n\n## Corporate Sovereignty and the Mega-Constellation Problem\n\nHere's a fact that would fit comfortably in a dystopian novel: a single private company now operates more satellites than all governments combined operated just a decade ago. Starlink's constellation of thousands of small spacecraft gives SpaceX quasi-sovereign power over global internet connectivity. During the early months of the war in Ukraine, battlefield communications ran through that constellation. One company's terms of service became a factor in a land war in Europe.\n\nScience fiction has long imagined corporations filling the governance vacuum that states leave in space. What it sometimes missed is how quickly this transition would happen, and how little drama would accompany it. There was no declaration, no treaty, no public debate. The infrastructure simply appeared.\n\nThe dual-use nature of these constellations makes the politics thornier. GPS navigation, financial transaction timing, climate monitoring, and military targeting all run through the same orbital hardware. Disrupting one disrupts all. This entanglement, civilian dependency on military assets and vice versa, is exactly the kind of structural vulnerability that sci-fi authors have used to build plot tension. In the real world, it's a strategic risk that defense planners are only beginning to price in.\n\nThe Kessler syndrome scenario, where a cascade of collisions creates a debris field that makes low Earth orbit unusable, appears in fiction as a catastrophic endpoint. In reality, it's a live concern that shapes ASAT weapon doctrine. Nations capable of destroying satellites in orbit are also capable of rendering orbit inaccessible to everyone, including themselves. The deterrence logic is grimly familiar to anyone who lived through nuclear strategy debates., -\n\n## What the Genre Gets Wrong, And Why That Also Matters\n\nScience fiction has a bias problem. For most of its history, the genre imagined space through a particular lens: masculine, Western, and oriented toward individual heroism or state power. The corporation or the empire fills the villain role; the lone pioneer or the scrappy resistance fills the hero role. The political imagination stays narrow.\n\nCritical scholars have pointed out that this framing isn't neutral. Stories about rugged individualists escaping Earth's governments to build free communities in space carry ideological weight. They normalize the idea that space governance should be minimal, that technical elites should lead, and that the messy compromises of democratic politics are obstacles rather than features.\n\nLiberatory science fiction, work by authors like Ursula K. Le Guin, Octavia Butler, and more recently Becky Chambers, imagines different structures. Decentralized communities. Cooperative resource management. Power that flows from consent rather than orbital position. These aren't just aesthetic choices. They're arguments about what's possible.\n\nThe tension between these two traditions in fiction mirrors a real tension in contemporary space policy. On one side: privatization, minimal regulation, first-mover sovereignty. On the other: international norms, the Outer Space Treaty, UN discussions about rules of the road for responsible orbital behavior. Neither side has won. The outcome will shape who benefits from space infrastructure for generations., -\n\n## Reading the Future: Recommendations\n\nIf you want fiction that takes space politics seriously, start here:\n\n**The Expanse series** by James S.A. Corey, The most politically rigorous hard sci-fi of the past decade. Resource scarcity, colonial resentment, and great-power competition map almost directly onto current orbital dynamics.\n\n***A Fire Upon the Deep*** by Vernor Vinge, Examines how information control becomes power at civilizational scale. Relevant to anyone thinking about satellite communication dominance.\n\n***The Dispossessed*** by Ursula K. Le Guin, A direct argument about what anarchist and statist space societies actually look like from the inside. Slow, precise, and still unmatched.\n\n***Ancillary Justice*** by Ann Leckie, Empire, surveillance, and distributed identity. The politics of how empires maintain loyalty across vast distances.\n\n**For film**: *High Life* (2018) strips space of heroism entirely. *Prospect* (2018) treats orbital economics as brutal and mundane, which is probably closer to the truth than most blockbusters., -\n\n## The Stakes Are Not Abstract\n\nSpace policy is often discussed as though it's a technical domain, orbital mechanics, launch windows, spectrum allocation. But every decision about who can put satellites where, who can destroy whose infrastructure, and who gets to write the norms is a political decision with winners and losers.\n\nScience fiction has been running simulations on these decisions for a century. Some of those simulations are now being executed by people with launch vehicles and government contracts. The stories we tell about space shape the space we build.\n\nThat's not a metaphor. It's a mechanism., -\n\n**Discussion prompt:** Which science fiction work do you think most accurately predicted the current state of space politics, and which got it most wrong? Drop your picks in the comments.",
+              "word_count": 1227,
+              "persist": {
+                "persisted": true,
+                "content_id": "58414d81-316f-40dc-b51c-8dba962b48e0"
+              },
+              "token_usage": {
+                "calls": 2,
+                "input_tokens": 2438,
+                "output_tokens": 3612,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+                "total_tokens": 6050,
+                "cost_usd": 0.061494
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Power Structures in Space: How Sci-Fi Predicts Real-World Politics"
+    }
+  ],
+  "expected": [
+    "Engine cron detects past-due scheduled item; status 'scheduled' \u2192 'published'; published_at set",
+    "Email to centralized recipient (not hardcoded); Version snapshot in `content_versions_v2` before publish"
+  ]
+}

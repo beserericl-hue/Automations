@@ -1,0 +1,47 @@
+{
+  "test": {
+    "id": "V32",
+    "title": "Voice \u2014 Centralized Email Verification",
+    "source": "voice",
+    "prompt": "Send me an email report with just the text centralized email voice test and subject line V32 Email Config Test",
+    "route": "library.email-content` (task)",
+    "prerequisite": "",
+    "expected": [
+      "flat `{response, kind=\"queued\"}`",
+      "routes `library.email-content`",
+      "complete",
+      "email to `app_config.recipient_email` (not hardcoded)",
+      "subject \"V32 Email Config Test\"",
+      "body contains \"centralized email voice test\"",
+      "BCC if configured"
+    ]
+  },
+  "response": {
+    "response": "Sending your email now.",
+    "kind": "queued",
+    "tool": "library",
+    "op": "email-content",
+    "job_id": "681d3d38d90a48cbbac2ac887fe3c9e0",
+    "status": "queued"
+  },
+  "job_result": {
+    "job_id": "681d3d38d90a48cbbac2ac887fe3c9e0",
+    "status": "complete",
+    "result": {
+      "execution_id": "75e77edb-aba0-4cfa-b742-01daa4213cbb",
+      "step_name": "library",
+      "status": "ok",
+      "payload": {
+        "op": "email-content",
+        "result": {
+          "emailed": true,
+          "to": "eric@agileadtesting.com",
+          "subject": "V32 Email Config Test",
+          "content_type": "inline"
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

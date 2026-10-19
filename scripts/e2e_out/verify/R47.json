@@ -1,0 +1,54 @@
+{
+  "id": "R47",
+  "title": "Prime Directive \u2014 Social Posts",
+  "route": "`media.social-posts` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=media.social-posts got=media.social-posts OK",
+    "job=complete",
+    "platforms=['twitter']"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Repurpose this into Twitter posts: \"New research shows that AI-powered marketing tools are fundamentally changing how brands connect with audiences. From personalized content to predictive analytics, the landscape is shifting fast.\" Platform: twitter. Genre slug: ai-marketing."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Got it \u2014 I've started on that. It runs in the background and I'll let you know when it's ready.",
+        "tool": "media",
+        "op": "social-posts",
+        "data": null,
+        "job_id": "1c653c817f104eca908e092eb78c4c31",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "1c653c817f104eca908e092eb78c4c31",
+        "status": "complete",
+        "result": {
+          "execution_id": "29e2e988-2656-46e4-93fc-eb2bca320c65",
+          "step_name": "media",
+          "status": "ok",
+          "payload": {
+            "op": "social-posts",
+            "result": {
+              "twitter": "AI isn't just optimizing marketing anymore\u2014it's rewriting the rules. Personalized content. Predictive analytics. Brands that adapt win. Those that don't? Left behind. The shift is happening now. #AIMarketing"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Repurpose this into Twitter posts: \"New research shows that AI-powered marketing tools are fundamentally changing how brands connect with audiences. From personalized content to predictive analytics, the landscape is shifting fast.\" Platform: twitter. Genre slug: ai-marketing."
+    }
+  ],
+  "expected": [
+    "routes to `media.social-posts`, kind=queued; complete",
+    "No \"game-changing/revolutionize/unleash/cutting-edge\"; human voice; no hype; tight; CR-009 email received"
+  ]
+}

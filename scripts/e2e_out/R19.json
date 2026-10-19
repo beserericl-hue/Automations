@@ -1,0 +1,48 @@
+{
+  "test": {
+    "id": "R19",
+    "title": "Cover Art \u2014 New Genre (ancient-history)",
+    "source": "chat",
+    "prompt": "Generate cover art for an ancient-history novel called \"The Last Pharaoh's Scribe\". Genre slug: ancient-history. The image should show an ancient Egyptian library with papyrus scrolls, oil lamps, and a view of Alexandria's harbor through a columned window.",
+    "route": "media.cover-art` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `media.cover-art`, kind=queued; job reaches status=complete",
+      "Art uses ancient-history guidelines (classical painting, warm golden light, earth tones)",
+      "NOT modern/tech aesthetic; Email arrives; Row in `generated_images_v2`; CR-009 email received"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Generating cover art for \"The Last Pharaoh's Scribe\" based on your description. I'll let you know when it's ready.",
+    "tool": "media",
+    "op": "cover-art",
+    "data": null,
+    "job_id": "ee1ae6c5914f4018a12b548be43b5096",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "ee1ae6c5914f4018a12b548be43b5096",
+    "status": "complete",
+    "result": {
+      "execution_id": "b476cd85-ed6e-47c7-b70a-d02174751f17",
+      "step_name": "media",
+      "status": "ok",
+      "payload": {
+        "op": "cover-art",
+        "result": {
+          "image_url": "https://gvbvwcnmjkdpclcisqrr.supabase.co/storage/v1/object/public/cover-images/+14105914612/20260621185944_untitled.png",
+          "storage_path": "+14105914612/20260621185944_untitled.png",
+          "provider": "kieai",
+          "persisted": true,
+          "db_recorded": true,
+          "prompt": "Professional book cover illustration for the novel \"Untitled\". evocative, atmospheric, high detail, dramatic lighting, portrait orientation, no text, no lettering, no title overlay"
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

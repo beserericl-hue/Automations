@@ -44,7 +44,7 @@ npx playwright test --headed --project=chromium-noauth
 ```env
 # .env (local)
 E2E_TEST_EMAIL=eric@agileadtesting.com
-E2E_TEST_PASSWORD=Fr332bafami!y
+E2E_TEST_PASSWORD=<rotated 2026-10-19 — see credentials-map.md>
 ```
 
 CI sets these via GitHub secrets.

@@ -1,0 +1,689 @@
+{
+  "test": {
+    "id": "V11",
+    "title": "Voice \u2014 Brainstorm Story",
+    "source": "voice",
+    "prompt": "Brainstorm a new story called The Clockwork Rebellion its about sentient clockwork automatons in Victorian London who organize a labor revolution genre post apocalyptic eight chapters themes are freedom versus control and what makes someone human",
+    "route": "brainstorm.story` (task)",
+    "prerequisite": "",
+    "expected": [
+      "flat `{response, kind=\"queued\"}`",
+      "routes `brainstorm.story`",
+      "maps \"post apocalyptic\"\u2192`post-apocalyptic`",
+      "8 chapters",
+      "themes present",
+      "`writing_projects_v2` row",
+      "CR-009 email"
+    ]
+  },
+  "response": {
+    "response": "Queuing a new story brainstorm for 'The Clockwork Rebellion'. I'll let you know when the outline is ready.",
+    "kind": "queued",
+    "tool": "brainstorm",
+    "op": "story",
+    "job_id": "5c0fba7a043b4dfbb27076180b6cf3e8",
+    "status": "queued"
+  },
+  "job_result": {
+    "job_id": "5c0fba7a043b4dfbb27076180b6cf3e8",
+    "status": "complete",
+    "result": {
+      "execution_id": "79de0bb2-01a8-496d-95b0-862bb77a009a",
+      "step_name": "brainstorm",
+      "status": "ok",
+      "payload": {
+        "op": "story",
+        "result": {
+          "outline": {
+            "title": "The Clockwork Rebellion",
+            "premise": "In a shattered North America fifty years after a cascading technological collapse known as the Silence, a young engineer named Mara Voss discovers a sealed pre-Silence vault beneath the ruins of Chicago containing functional automated machinery \u2014 clockwork-level mechanical computers and self-regulating systems \u2014 that could restart industrial civilization. But the dominant power, the Compact of Wardens, has built its authority on controlling all technology above a certain complexity, and its enforcer-priests will kill to keep the vault secret. Mara must smuggle the vault's knowledge across a fractured continent, build a coalition of desperate communities, and trigger a rebellion before the Wardens can bury the discovery \u2014 and her \u2014 forever.",
+            "themes": [
+              "Knowledge as power and as danger",
+              "The cost of rebuilding versus the comfort of ruin",
+              "Institutional violence disguised as order",
+              "Loyalty tested by survival",
+              "The moral weight of progress"
+            ],
+            "story_arc_name": "The Hero's Journey (with Ensemble Escalation)",
+            "dramatic_question": "Can Mara Voss smuggle the vault's mechanical knowledge across a dying continent and ignite a rebellion before the Wardens destroy both the discovery and everyone who knows it exists?",
+            "wow_factor": "Every chapter contains a working mechanical or engineering principle \u2014 gear ratios, escapement mechanisms, water-wheel governors, pneumatic logic gates \u2014 described with enough real detail that a reader could attempt to build them, making the rebellion itself a functional instruction manual for restarting civilization.",
+            "characters": [
+              {
+                "name": "Mara Voss",
+                "role": "Protagonist, POV 1",
+                "archetype": "The Engineer \u2014 a brilliant technical mind who can fix anything mechanical.",
+                "off_axis_attribute": "She is catastrophically bad at lying; her face betrays every deception, which is a lethal liability in a world where concealment is survival \u2014 she compensates by constructing elaborate mechanical distractions so people are never looking at her face when she needs to deceive them.",
+                "dramatic_question": "Will Mara sacrifice the people she loves to deliver the vault's knowledge to the world, or will she protect them and let the knowledge die?",
+                "description": "Mara is 28, a salvage-engineer in the Chicago Rubble Quarter who repairs hand-pumps and grain mills for food-rations. She keeps a private notebook of mechanical observations she calls 'the Ledger' \u2014 sketches of every working machine she has ever seen. Her hobby is constructing small automata from scrap that she gives to children in the quarter. Her closest friend outside the plot is a one-armed ferryman named Dov who tells terrible jokes. Her private worry is that she is becoming her father \u2014 a man who loved machines more than people and died alone in a collapsed tunnel. She would be humiliated by being publicly called a coward. She is terrified of enclosed spaces after a childhood cave-in. She would be happy if she could build one thing that outlasted her.",
+                "moral_complication": "Midway through the novel, Mara can guarantee the vault's schematics reach the free settlements by allowing the Wardens to capture and execute her mentor Sable \u2014 who is already dying of radiation sickness and has volunteered \u2014 but the plan requires Mara to actively betray Sable's location rather than merely fail to save her. The reader understands why she would do it. The reader also understands it is a betrayal. Whatever she chooses, she will carry it."
+              },
+              {
+                "name": "Sable Orin",
+                "role": "Mentor / Secondary POV 2",
+                "archetype": "The Keeper \u2014 an archivist who has spent thirty years hiding pre-Silence documents inside religious texts.",
+                "off_axis_attribute": "She is dying of slow radiation sickness from years of exposure to a pre-Silence medical scanner she used as a reading lamp, and she knows it, and she has decided this makes her fearless in a way that frightens everyone around her.",
+                "dramatic_question": "Will Sable's sacrifice mean anything, or will the knowledge she protected die with her?",
+                "description": "Sable is 61, runs a scriptorium in the Rubble Quarter under the cover of copying religious texts. She is the one who found the vault entrance and brought Mara to it. She collects pre-Silence children's encyclopedias because they explain complex things simply. She has a dry, precise humor that emerges at the worst moments. Her private worry is that she has spent her life preserving knowledge no one will ever use. She would be humiliated by pity. She is terrified of having lived pointlessly. She would be happy to see one machine she documented actually run.",
+                "moral_complication": "Sable knows that the vault contains not only beneficial mechanical knowledge but also weapons-manufacturing schematics. She has chosen not to tell Mara. She tells herself this is protection. The reader will understand it is also control."
+              },
+              {
+                "name": "Castor Vane",
+                "role": "Antagonist, POV 3",
+                "archetype": "The Enforcer-Priest \u2014 the Compact of Wardens' chief Inquisitor, a man who genuinely believes technological suppression is mercy.",
+                "off_axis_attribute": "He is a gifted amateur botanist who tends a secret greenhouse of pre-Silence cultivars; he understands, privately, that preserving living things requires exactly the kind of careful, generational stewardship he denies to machines \u2014 and he cannot reconcile this without breaking himself.",
+                "dramatic_question": "Will Castor destroy the rebellion and confirm his faith in the Compact, or will he realize the Compact is the catastrophe it claims to prevent?",
+                "description": "Castor is 45, lean, precise, and genuinely kind to individuals while being systematically brutal to groups. He has a habit of quoting pre-Silence agricultural manuals as scripture because no one knows the difference. He is a superb horseman. His private worry is a recurring dream in which he is the one who caused the Silence. He would be humiliated by being shown mercy by someone he has wronged. He is terrified of the Silence happening again. He would be happy if the world stayed exactly as it is.",
+                "moral_complication": "Late in the novel, Castor discovers that the Compact's founding documents \u2014 which he has enforced his entire life \u2014 were forged. The Silence was not caused by unchecked technology; it was caused by a specific military weapon the Compact's founders controlled. The Compact was built on a lie to preserve the founders' descendants in power. He can suppress this information and maintain order, or release it and cause chaos. He chooses suppression \u2014 and the reader must decide whether he is wrong."
+              },
+              {
+                "name": "Renn Aldric",
+                "role": "Ally / Secondary POV 4",
+                "archetype": "The Soldier \u2014 a deserter from the Warden militia who knows their patrol patterns and codes.",
+                "off_axis_attribute": "He has a compulsive honesty that is almost as dangerous as Mara's inability to lie \u2014 he cannot stop himself from telling people exactly what he thinks of them, which has cost him every command he has ever held and which he frames as integrity but is actually unprocessed rage.",
+                "dramatic_question": "Will Renn find something worth protecting that isn't just a cause to die for?",
+                "description": "Renn is 34, broad, scarred across the jaw from a militia flogging. He deserted after being ordered to burn a settlement's grain stores as punishment for harboring a mechanic. He is a skilled tracker and a mediocre cook who insists he is an excellent cook. He carves wooden figures of animals he has never seen \u2014 lions, elephants \u2014 from pre-Silence picture books. His private worry is that he is not brave, only reckless, and that one day the difference will matter. He would be humiliated by being saved by someone he was supposed to protect. He is terrified of fire. He would be happy if he could sit still for one full day without feeling guilty.",
+                "moral_complication": "Renn knows the location of a Warden supply cache that could arm the rebellion \u2014 but reaching it requires leading Mara's group through the settlement he failed to save, past the graves of people he watched burn. He has told no one about the cache because telling them means explaining what he did and did not do."
+              },
+              {
+                "name": "Petra Solm",
+                "role": "Coalition Leader / Secondary Character",
+                "archetype": "The Warlord \u2014 leader of the Ironfield Free Settlement, the largest ungoverned community on the continent.",
+                "off_axis_attribute": "She is genuinely, specifically afraid of clocks \u2014 any ticking mechanism triggers a panic response she has never explained to anyone \u2014 which makes her the least likely person to lead a mechanical revolution and the most symbolically necessary one.",
+                "dramatic_question": "Will Petra risk her settlement's safety for a rebellion she does not believe can succeed?",
+                "description": "Petra is 50, heavyset, with a politician's memory for names and a general's instinct for terrain. She has held Ironfield together for fifteen years through negotiation, threat, and occasional assassination. She grows prize tomatoes. Her private worry is that Ironfield's prosperity depends on the Wardens leaving them alone, and she has been paying them tribute in secret for three years. She would be humiliated by her people learning about the tribute. She is terrified of losing Ironfield to war. She would be happy to die in her own bed.",
+                "moral_complication": "Petra's secret tribute to the Wardens means she has been, functionally, funding the suppression of the very knowledge Mara is trying to spread. When this is revealed, the coalition nearly collapses."
+              },
+              {
+                "name": "Dov Marsh",
+                "role": "Supporting \u2014 Mara's friend, ferryman",
+                "archetype": "The Loyal Ordinary Man",
+                "off_axis_attribute": "He is the only character in the novel who has read the vault's contents before Mara \u2014 he found the entrance two years earlier, understood nothing, and sealed it again because he was afraid. He has never told anyone.",
+                "dramatic_question": "Will Dov's cowardice two years ago cost the rebellion everything, or can he redeem it?",
+                "description": "Dov is 40, one-armed (lost to a mill accident), runs a ferry across the Chicago River. He is the person Mara trusts most in the world. He tells bad jokes as a nervous habit. He is a surprisingly good judge of character. His private worry is that he is a coward and everyone will eventually know it.",
+                "moral_complication": "Dov's prior discovery of the vault, had he reported it, might have given the rebellion two more years of preparation. His silence was fear. He must decide when to confess this to Mara."
+              }
+            ],
+            "chapters": [
+              {
+                "chapter_number": 0,
+                "title": "Prologue: The Day the Clocks Stopped",
+                "act": "Act I",
+                "arc_point": "The Ordinary World (Before)",
+                "pov_character": "Omniscient / Historical Record",
+                "bridge_from_prior": "None \u2014 opening frame",
+                "beat": "A fragmented historical record describes the Silence: fifty years ago, cascading electromagnetic and infrastructural collapse killed ninety percent of North America's population in eighteen months. The Compact of Wardens rose from the ashes, declared all machinery above hand-tool complexity a sin against survival, and began enforcing this with fire. The record ends mid-sentence \u2014 someone stopped writing.",
+                "arc_notes": "Hero's Journey: The Ordinary World established as broken stasis."
+              },
+              {
+                "chapter_number": 1,
+                "title": "The Salvage Queen",
+                "act": "Act I",
+                "arc_point": "Ordinary World",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "The prologue's broken record is the world Mara wakes into.",
+                "beat": "Mara repairs a grain-mill governor for a settlement elder, demonstrating her engineering genius and her face-betrayal problem when she tries to overcharge him. Dov meets her at the river with a bad joke and a warning: Warden patrols have doubled in the Rubble Quarter. Mara notes this in her Ledger and goes home to find Sable waiting at her door with a lantern and a very specific look.",
+                "arc_notes": "Hero's Journey: Ordinary World \u2014 competence established, threat introduced."
+              },
+              {
+                "chapter_number": 2,
+                "title": "What Sable Found",
+                "act": "Act I",
+                "arc_point": "Call to Adventure",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Sable's arrival at Mara's door \u2014 direct continuation.",
+                "beat": "Sable leads Mara through a collapsed subway tunnel (Mara's claustrophobia activated immediately) to a sealed pre-Silence vault door. Sable has been unable to open it for six months. Mara reads the mechanical lock in three minutes and opens it. Inside: rows of clockwork analytical engines, pneumatic logic systems, and a library of engineering schematics still sealed in nitrogen canisters. Mara's hands shake. The dramatic question ignites.",
+                "arc_notes": "Hero's Journey: Call to Adventure \u2014 the vault is the call."
+              },
+              {
+                "chapter_number": 3,
+                "title": "The Ledger Grows",
+                "act": "Act I",
+                "arc_point": "Call to Adventure / Refusal",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara and Sable emerge from the vault with the first canister.",
+                "beat": "Mara spends a night cataloguing the vault's contents and realizes the scope: this is not a cache, it is a complete industrial restart package. She also finds the weapons schematics Sable has not mentioned. Mara confronts Sable; Sable deflects. Mara's refusal: she wants to copy the schematics quietly and distribute them anonymously, without a rebellion. Sable tells her the Wardens already know something is here \u2014 the doubled patrols are not coincidence.",
+                "arc_notes": "Hero's Journey: Refusal of the Call \u2014 Mara wants a safe path that does not exist."
+              },
+              {
+                "chapter_number": 4,
+                "title": "The Inquisitor Arrives",
+                "act": "Act I",
+                "arc_point": "Ordinary World Threatened",
+                "pov_character": "Castor Vane",
+                "bridge_from_prior": "The doubled patrols Sable mentioned are Castor's doing \u2014 he received an informant's report about unusual activity in the Rubble Quarter.",
+                "beat": "Castor rides into Chicago's Warden garrison with six Inquisitors. He visits his informant \u2014 a settlement elder \u2014 and learns that a salvage-engineer named Mara Voss has been asking questions about pre-Silence tunnel systems. Castor tends his portable plant specimens that evening and writes in his journal that he hopes this is nothing. His tone tells the reader it is not nothing.",
+                "arc_notes": "Hero's Journey: The antagonist's ordinary world \u2014 Castor's faith and its cracks introduced."
+              },
+              {
+                "chapter_number": 5,
+                "title": "Dov's Confession",
+                "act": "Act I",
+                "arc_point": "Complications Mount",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara goes to Dov for ferry transport of the first canister \u2014 and Dov, seeing the canister, goes white.",
+                "beat": "Dov confesses he found the vault two years ago, understood nothing, and sealed it from fear. Mara's reaction is not anger but a cold, precise recalculation of everything she thought she knew about her closest friend. She decides to trust him anyway \u2014 she needs the ferry \u2014 but the relationship is cracked. New dramatic problem: if Dov found it, someone may have seen him. The informant who tipped Castor may have seen Dov, not Mara.",
+                "arc_notes": "Hero's Journey: Complications \u2014 a reveal about an existing character recasts the threat."
+              },
+              {
+                "chapter_number": 6,
+                "title": "Crossing the River",
+                "act": "Act I",
+                "arc_point": "Crossing the Threshold",
+                "pov_character": "Renn Aldric",
+                "bridge_from_prior": "Dov's ferry crosses the river \u2014 Renn is waiting on the far bank, having been sent by a free-settlement contact Sable trusted.",
+                "beat": "Renn meets Mara and Sable at the river crossing. He immediately tells Mara that her plan to distribute schematics anonymously is suicidal and she is naive. Mara tells him his opinion was not requested. They establish an antagonistic working relationship. Renn knows the Warden patrol schedule for the next four days. They have four days to move the first canister to safety.",
+                "arc_notes": "Hero's Journey: Crossing the Threshold \u2014 the group forms, the clock starts."
+              },
+              {
+                "chapter_number": 7,
+                "title": "The Patrol",
+                "act": "Act I",
+                "arc_point": "Tests and Allies",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "The four-day window Renn named \u2014 the group is moving.",
+                "beat": "The group moves the first canister through the Rubble Quarter at night. A Warden patrol stops them; Mara must lie about the canister's contents. Her face betrays her. She deploys a mechanical distraction \u2014 a small automaton she built for a child, wound up and released \u2014 and the patrol chases it. They escape. Story turn: one Inquisitor does not chase the automaton. He watches Mara's face instead.",
+                "arc_notes": "Hero's Journey: Tests \u2014 Mara's weakness nearly exposed, her ingenuity saves them, but a new threat is seeded."
+              },
+              {
+                "chapter_number": 8,
+                "title": "The Inquisitor Who Watched",
+                "act": "Act I",
+                "arc_point": "Tests and Allies",
+                "pov_character": "Castor Vane",
+                "bridge_from_prior": "The Inquisitor who watched Mara's face reports to Castor \u2014 thread: information passed up the chain.",
+                "beat": "Castor receives the report: a woman with a canister, a one-armed ferryman, a deserter. He identifies Renn Aldric from the description and feels something close to relief \u2014 a deserter is a criminal, this is simple. He orders Renn's capture, not Mara's. He wants the deserter, not the engineer. This is his first mistake. He tends his greenhouse and does not sleep.",
+                "arc_notes": "Hero's Journey: The antagonist misreads the threat \u2014 dramatic irony established."
+              },
+              {
+                "chapter_number": 9,
+                "title": "Ironfield",
+                "act": "Act I",
+                "arc_point": "Crossing the Threshold Complete",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "The group's destination is Ironfield \u2014 Sable arranged it; this is where the first canister must go.",
+                "beat": "The group arrives at Ironfield. Petra Solm receives them with the precise warmth of a politician who has not decided whether they are assets or liabilities. She agrees to look at the canister's contents. When Mara demonstrates a working clockwork logic gate from the vault's schematics, Petra's face does something complicated \u2014 and her eyes go to the ticking mechanism with naked fear before she controls herself. She agrees to host them. She does not agree to the rebellion.",
+                "arc_notes": "Hero's Journey: Threshold crossed \u2014 the first ally found, but conditional."
+              },
+              {
+                "chapter_number": 10,
+                "title": "What the Schematics Say",
+                "act": "Act II-A",
+                "arc_point": "The Road of Trials Begins",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Petra has agreed to host \u2014 Mara now has time and space to study the schematics properly.",
+                "beat": "Mara opens the first canister fully and begins translating the schematics. New dramatic problem: the schematics are written in a pre-Silence engineering notation she only partially understands. She needs a second reader. Sable can read the notation but is visibly weaker \u2014 the radiation sickness is accelerating. Mara realizes she has weeks, not months, before Sable cannot help her. The vault's knowledge is racing against Sable's life.",
+                "arc_notes": "Hero's Journey: Road of Trials \u2014 a new constraint reframes the urgency."
+              },
+              {
+                "chapter_number": 11,
+                "title": "The Tribute",
+                "act": "Act II-A",
+                "arc_point": "Road of Trials",
+                "pov_character": "Renn Aldric",
+                "bridge_from_prior": "Renn, exploring Ironfield's perimeter, intercepts a Warden courier \u2014 thread: Renn's patrol knowledge leads him to the right place at the right time.",
+                "beat": "Renn captures a Warden courier and finds a receipt \u2014 Ironfield has been paying tribute to the Compact for three years. He brings this to Mara privately. New dramatic problem: their safest base is compromised. Renn wants to confront Petra immediately. Mara, who cannot lie but can calculate, says they need Petra's resources before they can afford to lose her. Renn's compulsive honesty wars with Mara's pragmatism. They do not resolve it.",
+                "arc_notes": "Hero's Journey: Road of Trials \u2014 internal coalition fracture introduced."
+              },
+              {
+                "chapter_number": 12,
+                "title": "The Governor Mechanism",
+                "act": "Act II-A",
+                "arc_point": "Road of Trials",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara continues schematic work while the tribute crisis simmers \u2014 Sable is translating alongside her.",
+                "beat": "Mara and Sable successfully decode the vault's centrifugal governor design \u2014 a self-regulating speed control that could run a water-powered mill at consistent output without human supervision. Mara builds a working prototype in Ironfield's smithy. When it runs, three of Ironfield's craftspeople watch with expressions Mara has never seen on adults before: pure wonder. Story turn: one of them is a Warden informant. He leaves the smithy immediately.",
+                "arc_notes": "Hero's Journey: Road of Trials \u2014 the knowledge spreads, but so does the secret."
+              },
+              {
+                "chapter_number": 13,
+                "title": "Castor Moves",
+                "act": "Act II-A",
+                "arc_point": "Road of Trials / Antagonist Escalates",
+                "pov_character": "Castor Vane",
+                "bridge_from_prior": "The informant who left the smithy sends a message to the Warden garrison \u2014 thread: information travels to Castor.",
+                "beat": "Castor receives confirmation: a working mechanical governor demonstrated in Ironfield. He understands immediately what this means. He requisitions two full militia companies and begins the march to Ironfield. He writes a letter to the Compact's High Council describing the threat. He does not mention the weapons schematics in the vault \u2014 he does not yet know about them \u2014 but he frames his report as a spiritual emergency. He is not wrong, by his own logic.",
+                "arc_notes": "Hero's Journey: Road of Trials \u2014 antagonist escalation forces the timeline."
+              },
+              {
+                "chapter_number": 14,
+                "title": "Sable's Condition",
+                "act": "Act II-A",
+                "arc_point": "Road of Trials",
+                "pov_character": "Sable Orin",
+                "bridge_from_prior": "Mara notices Sable cannot hold a pen steadily \u2014 thread: the radiation sickness visible consequence.",
+                "beat": "Sable's POV for the first time: she is in more pain than she has admitted. She reviews what she has translated and what remains. She calculates she has perhaps three weeks of useful work left. She makes a private decision: she will tell Mara about the weapons schematics, but not yet \u2014 not until Mara has enough of the beneficial knowledge to proceed without her. She writes a letter she does not send. The reader sees her control and her love and her dishonesty all at once.",
+                "arc_notes": "Hero's Journey: Road of Trials \u2014 mentor's hidden agenda and mortality both escalate."
+              },
+              {
+                "chapter_number": 15,
+                "title": "The Cache",
+                "act": "Act II-A",
+                "arc_point": "Road of Trials",
+                "pov_character": "Renn Aldric",
+                "bridge_from_prior": "Renn learns Castor's militia is marching \u2014 thread: Renn's Warden knowledge means he understands the timeline better than anyone.",
+                "beat": "Renn tells the group they have perhaps eight days before the militia arrives. He then, for the first time, mentions the Warden supply cache \u2014 and must explain why he knows about it. He tells them about the settlement he failed to save. The room goes quiet. Mara does not comfort him. She asks how many rifles are in the cache. Renn tells her. She says they will go get them. This is the moment Renn realizes she is not going to judge him \u2014 she is going to use him, which is somehow worse and better simultaneously.",
+                "arc_notes": "Hero's Journey: Road of Trials \u2014 Renn's hidden past revealed, new resource identified, emotional cost paid."
+              },
+              {
+                "chapter_number": 16,
+                "title": "The Burned Settlement",
+                "act": "Act II-A",
+                "arc_point": "Road of Trials",
+                "pov_character": "Renn Aldric",
+                "bridge_from_prior": "The group travels to the cache \u2014 through the burned settlement.",
+                "beat": "Renn leads the group through the ruins of Ashford Settlement. He names the graves as they pass them. Mara says nothing. Dov tells a joke so bad it breaks the silence and Renn almost laughs and hates himself for it. They find the cache intact. Story turn: the cache has been recently restocked \u2014 the Wardens are using it as a forward supply point. Someone is already here.",
+                "arc_notes": "Hero's Journey: Road of Trials \u2014 setback, emotional weight, and new threat combined."
+              },
+              {
+                "chapter_number": 17,
+                "title": "The Forward Scout",
+                "act": "Act II-A",
+                "arc_point": "Road of Trials",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "The cache is occupied \u2014 direct continuation.",
+                "beat": "The group finds a single Warden forward scout in the cache. Renn wants to kill him. Mara refuses \u2014 she wants information. She interrogates the scout using a mechanical trick: she shows him a working clockwork device and watches his face, because she has learned that people who are afraid of machines cannot hide it, and people who are fascinated cannot hide that either. The scout is fascinated. His name is Fen. He is seventeen. Mara recruits him. Renn is furious.",
+                "arc_notes": "Hero's Journey: Road of Trials \u2014 new ally from unexpected source, internal conflict sharpens."
+              },
+              {
+                "chapter_number": 18,
+                "title": "Fen's Knowledge",
+                "act": "Act II-A",
+                "arc_point": "Road of Trials",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Fen has joined them \u2014 thread: his knowledge is the bridge.",
+                "beat": "Fen tells them something Castor does not know he knows: the Compact's High Council is traveling to Chicago personally to oversee the vault's destruction. They will arrive in twelve days. This changes everything \u2014 the vault cannot be emptied in time, and the Council's presence means execution authority on the spot. New dramatic problem: Mara must choose between saving the vault's contents and saving the people who know about it. She cannot do both.",
+                "arc_notes": "Hero's Journey: Road of Trials \u2014 new information recasts the dramatic question entirely."
+              },
+              {
+                "chapter_number": 19,
+                "title": "The Midpoint Choice",
+                "act": "Act II-A",
+                "arc_point": "Midpoint Reversal",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "The twelve-day deadline \u2014 direct consequence of Fen's intelligence.",
+                "beat": "Mara proposes a radical reversal of strategy: instead of smuggling the knowledge out quietly, they make it public immediately \u2014 a demonstration, in Ironfield, of every working machine they can build from the schematics, open to every settlement within three days' travel. Force the Wardens to suppress it in front of witnesses. Turn the vault's discovery into a public event the Compact cannot quietly bury. Sable says this will get them all killed. Mara says the alternative is the knowledge dies with Sable. The room chooses Mara's plan. The rebellion becomes real.",
+                "arc_notes": "Hero's Journey: Midpoint Reversal \u2014 the protagonist's strategy inverts, passive to active, hiding to public confrontation."
+              },
+              {
+                "chapter_number": 20,
+                "title": "Petra's Secret",
+                "act": "Act II-B",
+                "arc_point": "Complications Deepen",
+                "pov_character": "Petra Solm",
+                "bridge_from_prior": "The public demonstration plan requires Ironfield's full cooperation \u2014 Mara goes to Petra, and Renn follows with the tribute receipt.",
+                "beat": "Renn confronts Petra with the tribute receipt in front of Mara. Petra does not deny it. She explains: three years ago, the Wardens threatened to burn Ironfield. She paid. She has been paying. She is not ashamed \u2014 she saved fifteen hundred lives. Mara asks if she will stop paying now. Petra says she does not know. Story turn: Petra reveals she has already sent a message to the Wardens about the group's presence \u2014 not to betray them, she says, but to buy time. The message may have already arrived.",
+                "arc_notes": "Hero's Journey: Complications Deepen \u2014 ally revealed as partial betrayer, coalition nearly collapses."
+              },
+              {
+                "chapter_number": 21,
+                "title": "Castor Receives the Message",
+                "act": "Act II-B",
+                "arc_point": "Complications Deepen",
+                "pov_character": "Castor Vane",
+                "bridge_from_prior": "Petra's message \u2014 thread: the message travels directly to Castor.",
+                "beat": "Castor reads Petra's message. It confirms the group's location and, crucially, mentions a 'demonstration of pre-Silence machinery' being planned. Castor accelerates his march. He also, for the first time, reads the full informant report carefully and notices the weapons schematics reference. He stops walking. He sits down in a field. He understands that the vault contains not just dangerous knowledge but the specific kind of dangerous knowledge the Compact was supposedly founded to prevent. He is not relieved. He is afraid.",
+                "arc_notes": "Hero's Journey: Antagonist's faith begins to crack \u2014 the weapons reference triggers doubt."
+              },
+              {
+                "chapter_number": 22,
+                "title": "The Demonstration Builds",
+                "act": "Act II-B",
+                "arc_point": "Complications Deepen",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Despite Petra's partial betrayal, the demonstration proceeds \u2014 Mara has no other option.",
+                "beat": "Mara organizes Ironfield's craftspeople to build demonstration machines from the schematics: a water-wheel governor, a pneumatic grain sorter, a clockwork loom shuttle. She teaches the engineering principles as she builds, ensuring the knowledge transfers even if the machines are destroyed. New dramatic problem: the craftspeople are learning faster than she expected, but they are also talking \u2014 word is spreading to neighboring settlements faster than planned, which means Warden informants are also hearing it faster than planned.",
+                "arc_notes": "Hero's Journey: Complications \u2014 success creates its own danger."
+              },
+              {
+                "chapter_number": 23,
+                "title": "Sable Tells the Truth",
+                "act": "Act II-B",
+                "arc_point": "Complications Deepen",
+                "pov_character": "Sable Orin",
+                "bridge_from_prior": "Sable watches Mara teach \u2014 and realizes she has run out of time to keep the weapons secret.",
+                "beat": "Sable calls Mara aside and tells her about the weapons schematics. Mara's reaction is not anger \u2014 it is a long silence, and then: 'How long have you known?' Sable tells her. Mara walks away. She does not come back for two hours. When she returns, she tells Sable that the weapons schematics will be kept separate, in a sealed canister, and that only Sable will know where it is. Sable realizes Mara has just made her responsible for the most dangerous thing in the world. This is Mara's punishment and her trust simultaneously.",
+                "arc_notes": "Hero's Journey: Complications \u2014 mentor's deception resolved, moral weight redistributed."
+              },
+              {
+                "chapter_number": 24,
+                "title": "Dov's Redemption Attempt",
+                "act": "Act II-B",
+                "arc_point": "Complications Deepen",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Dov, watching Mara's confrontation with Sable, decides he cannot wait any longer to act on his guilt.",
+                "beat": "Dov volunteers to go back to Chicago alone, to the vault, and retrieve the remaining canisters before the Wardens seal it. Mara tells him it is suicide. Dov says he knows. He says he found it first and did nothing and people died because of what the Wardens have been doing and he needs to do something that is not nothing. Mara lets him go. She gives him a mechanical timing device \u2014 a clockwork delay trigger \u2014 and explains exactly how to use it to seal the vault behind him if he is followed. She does not say goodbye properly. She will regret this.",
+                "arc_notes": "Hero's Journey: Complications \u2014 consequence of earlier cowardice drives a character to dangerous action."
+              },
+              {
+                "chapter_number": 25,
+                "title": "The Settlements Arrive",
+                "act": "Act II-B",
+                "arc_point": "Complications Deepen",
+                "pov_character": "Renn Aldric",
+                "bridge_from_prior": "Word of the demonstration has spread \u2014 settlements are sending representatives to Ironfield.",
+                "beat": "Renn manages the arrival of delegates from eleven settlements. He is, to his own surprise, good at this \u2014 his compulsive honesty turns out to be an asset in coalition-building because everyone knows exactly where they stand with him. New dramatic problem: two of the eleven delegates are Warden sympathizers who have come to assess, not join. Renn identifies them by their questions. He does not expel them \u2014 he feeds them false information about the demonstration's timing. This is the first deliberate deception of his life and it makes him feel sick and competent simultaneously.",
+                "arc_notes": "Hero's Journey: Complications \u2014 Renn's character growth expressed through action, not reflection."
+              },
+              {
+                "chapter_number": 26,
+                "title": "Castor's Doubt",
+                "act": "Act II-B",
+                "arc_point": "Complications Deepen",
+                "pov_character": "Castor Vane",
+                "bridge_from_prior": "Castor's march continues \u2014 he is three days from Ironfield and cannot stop thinking about the weapons schematics.",
+                "beat": "Castor sends a private message to the Compact's archive requesting the founding documents \u2014 the original charter that established the technology prohibition. He tells himself he wants to confirm his authority. The reader understands he wants to confirm his faith. He receives a reply that the founding documents are restricted to the High Council. This is the first time in his career he has been denied access to something. He rides in silence for the rest of the day.",
+                "arc_notes": "Hero's Journey: Antagonist's Road of Trials \u2014 the crack in his faith widens."
+              },
+              {
+                "chapter_number": 27,
+                "title": "The Clockwork Loom",
+                "act": "Act II-B",
+                "arc_point": "Complications Deepen",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "The demonstration machines are nearing completion \u2014 Mara is in the smithy.",
+                "beat": "Mara completes the clockwork loom shuttle and runs it. It produces twelve inches of cloth in the time a hand-weaver produces two. The craftspeople watching do the math aloud. One woman starts crying \u2014 not from wonder but from arithmetic: she has spent thirty years weaving cloth by hand, six days a week, and this machine would have given her back twenty of those years. Mara feels the weight of what was stolen from these people. Story turn: Fen, watching, says quietly that his mother was a weaver. He does not say anything else. He does not need to.",
+                "arc_notes": "Hero's Journey: Complications \u2014 the human cost of the Silence made concrete, Fen's loyalty cemented."
+              },
+              {
+                "chapter_number": 28,
+                "title": "Dov in the Vault",
+                "act": "Act II-B",
+                "arc_point": "Complications Deepen",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Dov left for Chicago \u2014 Mara receives a coded signal from him via a relay runner.",
+                "beat": "The signal is good: Dov reached the vault. Mara exhales. Then a second signal arrives four hours later: Wardens are in the tunnel. Then silence. Mara waits. No third signal. She does not know if Dov used the timing device or was captured. She cannot go back for him \u2014 the demonstration is in two days and the militia is coming. She continues building. Her hands do not shake. This frightens her more than shaking would.",
+                "arc_notes": "Hero's Journey: Complications \u2014 consequence of Mara's earlier choice arrives; she cannot fix it."
+              },
+              {
+                "chapter_number": 29,
+                "title": "The Militia's Vanguard",
+                "act": "Act II-B",
+                "arc_point": "Approach to the Ordeal",
+                "pov_character": "Renn Aldric",
+                "bridge_from_prior": "Renn's scouts report the militia's vanguard is visible on the horizon \u2014 thread: the march Castor ordered has arrived.",
+                "beat": "Renn counts the vanguard: forty riders, Inquisitor pennants. The main body is a day behind. He reports to Mara. She says: move the demonstration up by one day. Renn says that is impossible \u2014 the machines are not finished. Mara says: demonstrate what is finished. Renn says: what if it fails? Mara says: then we demonstrate that we tried. Renn looks at her for a long moment and then goes to organize the defense perimeter. This is the moment he decides she is worth following.",
+                "arc_notes": "Hero's Journey: Approach to the Ordeal \u2014 the timeline collapses, the group commits."
+              },
+              {
+                "chapter_number": 30,
+                "title": "The Night Before",
+                "act": "Act II-B",
+                "arc_point": "Approach to the Ordeal",
+                "pov_character": "Sable Orin",
+                "bridge_from_prior": "The demonstration is tomorrow \u2014 Sable spends the night writing.",
+                "beat": "Sable writes through the night, completing her translation of the remaining schematics in a compressed notation she has developed \u2014 a shorthand that Mara can read, designed to fit on fewer pages. She finishes at dawn. She seals the weapons canister and hides it in a place only she knows. She writes Mara a letter explaining where it is and why she made the choices she made. She does not give Mara the letter yet. She tucks it into her coat. She goes to watch the sunrise and finds Fen already there, also watching. They do not speak. They watch the sun come up over a world that is about to change.",
+                "arc_notes": "Hero's Journey: Approach to the Ordeal \u2014 mentor prepares for sacrifice, emotional stakes raised."
+              },
+              {
+                "chapter_number": 31,
+                "title": "The Demonstration",
+                "act": "Act II-B",
+                "arc_point": "The Ordeal",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Dawn \u2014 the demonstration begins.",
+                "beat": "Mara runs the demonstration in Ironfield's central square before delegates from eleven settlements and several hundred residents. The water-wheel governor, the pneumatic grain sorter, the clockwork loom shuttle \u2014 all run. The crowd's reaction is not celebration; it is a stunned, collective silence, and then a sound Mara has never heard from a crowd before: people doing arithmetic out loud, calculating what their lives could have been. The Warden vanguard arrives at Ironfield's gate during the demonstration. Renn holds the gate. The vanguard's commander demands entry. Petra, standing beside Mara, makes her decision: she refuses entry. This is the moment Petra chooses the rebellion.",
+                "arc_notes": "Hero's Journey: The Ordeal \u2014 the central confrontation begins, the coalition commits."
+              },
+              {
+                "chapter_number": 32,
+                "title": "The Gate Holds",
+                "act": "Act II-B",
+                "arc_point": "The Ordeal",
+                "pov_character": "Renn Aldric",
+                "bridge_from_prior": "Petra refused entry \u2014 Renn is at the gate.",
+                "beat": "Renn commands Ironfield's defense. The vanguard does not attack \u2014 they are waiting for the main body. Renn uses the time to send riders to the eleven settlement delegates with a specific message: go home, build what you saw, teach everyone. The knowledge is already out. Story turn: one of the Warden-sympathizer delegates has already left \u2014 and taken detailed notes. Renn realizes the false timing information he fed them was irrelevant; they saw the real demonstration. He has failed at his first deception. But the knowledge is still spreading.",
+                "arc_notes": "Hero's Journey: Ordeal \u2014 the plan partially fails, but the core goal advances anyway."
+              },
+              {
+                "chapter_number": 33,
+                "title": "Castor at the Gate",
+                "act": "Act II-B",
+                "arc_point": "The Ordeal",
+                "pov_character": "Castor Vane",
+                "bridge_from_prior": "The main militia body arrives \u2014 Castor rides to the gate himself.",
+                "beat": "Castor arrives at Ironfield's gate and speaks to Renn through the wall. He offers terms: surrender the schematics, surrender the engineer, and Ironfield will not burn. Renn tells him the schematics are already gone \u2014 distributed to eleven settlements. Castor knows this may be true. He asks to speak to Mara Voss. Renn says no. Castor says he will give them until morning. He returns to his camp and, for the first time, does not write in his journal. He sits with his plants and tries to remember why he became an Inquisitor.",
+                "arc_notes": "Hero's Journey: Ordeal \u2014 antagonist offers terms, both sides pause, Castor's faith at its lowest."
+              },
+              {
+                "chapter_number": 34,
+                "title": "Mara's Moral Crisis",
+                "act": "Act II-B",
+                "arc_point": "The Ordeal",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Castor's offer of terms \u2014 Mara must decide.",
+                "beat": "Sable comes to Mara that night and says: I will go out. I will surrender myself. I am dying anyway. If I go, Castor gets a body to show the Council, the group escapes, and the schematics are already distributed. Mara understands immediately that this is the moral complication she cannot solve cleanly. Sable has volunteered. It is not murder. But Mara would be actively directing Sable to her death to save the others. She sits with this for a long time. She does not answer Sable. She goes to the wall and looks at the militia campfires.",
+                "arc_notes": "Hero's Journey: Ordeal \u2014 the moral complication reaches its crisis point."
+              },
+              {
+                "chapter_number": 35,
+                "title": "Dov Returns",
+                "act": "Act II-B",
+                "arc_point": "The Ordeal",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara is at the wall \u2014 and a figure approaches the gate from the wrong direction.",
+                "beat": "Dov arrives at Ironfield's gate from the south, not the north \u2014 he went around the militia. He is carrying two canisters. He used the timing device: the vault is sealed, the Wardens cannot enter it without destroying its contents. He is also badly beaten \u2014 he was caught, escaped, and ran for three days. He tells Mara this with a bad joke. She hugs him so hard he makes a noise. Story turn: the two canisters he brought contain the weapons schematics' companion documents \u2014 the ones that explain what the weapons were designed to counter. This changes the weapons question entirely.",
+                "arc_notes": "Hero's Journey: Ordeal \u2014 the consequence of Mara's earlier trust in Dov pays off; the weapons question recast."
+              },
+              {
+                "chapter_number": 36,
+                "title": "The Weapons Question",
+                "act": "Act II-B",
+                "arc_point": "The Ordeal",
+                "pov_character": "Sable Orin",
+                "bridge_from_prior": "Dov's canisters \u2014 Sable reads the companion documents.",
+                "beat": "Sable reads through the night. The companion documents reveal: the weapons in the vault were not general armaments. They were specifically designed to counter the military weapon that caused the Silence \u2014 a weapon the Compact's founders controlled. The vault was built by people who knew the Compact was coming and wanted to leave a defense. The Compact did not prevent the Silence. The Compact's founders caused it. Sable holds this knowledge and understands that it will destroy the Compact's legitimacy entirely \u2014 and that Castor does not know this yet.",
+                "arc_notes": "Hero's Journey: Ordeal \u2014 the central reveal: the Compact's founding lie exposed."
+              },
+              {
+                "chapter_number": 37,
+                "title": "Castor Learns the Truth",
+                "act": "Act III",
+                "arc_point": "The Road Back",
+                "pov_character": "Castor Vane",
+                "bridge_from_prior": "Sable sends a messenger to Castor's camp with a single document from the companion files \u2014 the founding weapon's specifications, with the Compact founders' signatures.",
+                "beat": "Castor reads the document alone in his tent. He reads it three times. He goes outside and vomits. He comes back in and reads it again. He has spent his life enforcing a prohibition that was designed not to protect people but to protect the people who caused the catastrophe from accountability. He sits until dawn. He does not order the attack. His second-in-command comes to ask for orders. Castor says: wait.",
+                "arc_notes": "Hero's Journey: Road Back \u2014 antagonist's faith destroyed, his choice now becomes the pivot of the climax."
+              },
+              {
+                "chapter_number": 38,
+                "title": "The High Council Arrives",
+                "act": "Act III",
+                "arc_point": "The Road Back",
+                "pov_character": "Castor Vane",
+                "bridge_from_prior": "Castor's 'wait' order \u2014 the High Council arrives at his camp before he can act on his doubt.",
+                "beat": "The High Council \u2014 three elderly administrators in Compact robes \u2014 arrives at Castor's camp. They have traveled from the capital. They review Castor's situation and are displeased by his hesitation. They order an immediate assault on Ironfield. Castor asks them about the founding documents. The eldest Council member's face does something that tells Castor everything: she knows. They all know. The Compact has always known. Castor is given a direct order to burn Ironfield and execute everyone inside.",
+                "arc_notes": "Hero's Journey: Road Back \u2014 the antagonist faces his own ordeal; the institutional evil made explicit."
+              },
+              {
+                "chapter_number": 39,
+                "title": "Sable's Plan",
+                "act": "Act III",
+                "arc_point": "The Road Back",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Inside Ironfield, Mara watches the Council arrive at Castor's camp \u2014 thread: visible from the wall.",
+                "beat": "Mara sees the Council's arrival and understands the assault is now inevitable and imminent. She calls the group together. Sable presents a plan: use the vault's pneumatic logic system \u2014 which they have partially reconstructed in Ironfield's smithy \u2014 to send a compressed-air signal across a network of pre-Silence pipe infrastructure that still runs under the region. The signal will trigger pre-positioned demonstrations in three other settlements simultaneously. The Compact cannot suppress four simultaneous public demonstrations. Mara says: can we build it in time? Sable says: I can finish the calculations. Mara says: then do it.",
+                "arc_notes": "Hero's Journey: Road Back \u2014 the group's plan escalates to match the threat."
+              },
+              {
+                "chapter_number": 40,
+                "title": "Building the Signal",
+                "act": "Act III",
+                "arc_point": "The Road Back",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Sable's plan accepted \u2014 Mara builds.",
+                "beat": "Mara and Ironfield's craftspeople work through the night building the pneumatic signal system. Mara teaches as she builds \u2014 every person in the smithy learns the principle, not just the procedure. Fen turns out to be a natural engineer; he solves a pressure-valve problem Mara has been stuck on for an hour in ten minutes. Mara looks at him and sees the future of the thing she is trying to start. Story turn: the system works in testing. It will work. They have one hour before dawn, when the assault will come.",
+                "arc_notes": "Hero's Journey: Road Back \u2014 the technical climax approaches, the knowledge is now in multiple minds."
+              },
+              {
+                "chapter_number": 41,
+                "title": "Castor's Choice",
+                "act": "Act III",
+                "arc_point": "The Climax",
+                "pov_character": "Castor Vane",
+                "bridge_from_prior": "Dawn \u2014 Castor has his orders and his knowledge and must choose.",
+                "beat": "Castor assembles his militia at dawn. The High Council watches. He rides to the front of the formation. He turns his horse to face the Council instead of Ironfield. He tells them, in front of two hundred soldiers, what the founding documents say. He names the weapon. He names the founders. He says: we have been enforcing a lie. Half the soldiers do not understand. Half do. The Council orders his arrest. Four of his six Inquisitors move to comply. Two do not. Castor does not resist arrest. He has done what he came to do. The assault order passes to his second-in-command.",
+                "arc_notes": "Hero's Journey: Climax \u2014 the antagonist's arc resolves; his choice fractures the Compact's military force."
+              },
+              {
+                "chapter_number": 42,
+                "title": "The Signal Fires",
+                "act": "Act III",
+                "arc_point": "The Climax",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "The assault begins \u2014 Mara fires the pneumatic signal.",
+                "beat": "As the militia advances on Ironfield's gate, Mara triggers the pneumatic signal system. Across three settlements, pre-positioned demonstrations begin simultaneously: working machines, in public, with crowds watching. The assault on Ironfield continues \u2014 the gate is breached. Renn holds the inner perimeter. Mara does not run. She stands in the smithy and keeps the signal running, because if it stops before the three settlements have confirmed receipt, the plan fails. She is the most exposed person in Ironfield. She knows this.",
+                "arc_notes": "Hero's Journey: Climax \u2014 the dramatic question reaches its answer; the knowledge cannot be suppressed."
+              },
+              {
+                "chapter_number": 43,
+                "title": "The Gate Breaks",
+                "act": "Act III",
+                "arc_point": "The Climax",
+                "pov_character": "Renn Aldric",
+                "bridge_from_prior": "The gate is breached \u2014 Renn's perimeter is the last defense.",
+                "beat": "Renn fights at the inner perimeter. He is not reckless \u2014 for the first time in his life, he is genuinely careful, because he has decided he wants to live. He takes a wound to the shoulder. He keeps fighting. The militia's advance slows \u2014 Castor's public speech has fractured their cohesion; soldiers are arguing with each other in the middle of the assault. Renn sees this and does something tactically brilliant: he stops fighting and starts talking, loudly, repeating what Castor said about the founding lie, to the soldiers who are already hesitating.",
+                "arc_notes": "Hero's Journey: Climax \u2014 Renn's arc resolves; he finds something worth surviving for."
+              },
+              {
+                "chapter_number": 44,
+                "title": "Sable's Last Work",
+                "act": "Act III",
+                "arc_point": "The Climax",
+                "pov_character": "Sable Orin",
+                "bridge_from_prior": "The signal is running \u2014 Sable is in the smithy with Mara.",
+                "beat": "Sable receives confirmation signals from all three settlements: demonstrations running, crowds present, knowledge transferred. She tells Mara. Mara can stop the signal now. Sable gives Mara the letter she wrote \u2014 the one explaining the weapons canister's location and her choices. Mara reads the first line and looks up. Sable is already walking toward the militia soldiers who have entered the smithy. She is not running. She is walking toward them with her hands open, drawing their attention, giving Mara time to get the signal equipment out. She is not surrendering. She is choosing. The soldiers stop when they see an old woman walking toward them calmly. It buys forty seconds. It is enough.",
+                "arc_notes": "Hero's Journey: Climax \u2014 mentor's sacrifice; the moral complication resolves on Sable's terms, not Mara's."
+              },
+              {
+                "chapter_number": 45,
+                "title": "The Compact Fractures",
+                "act": "Act III",
+                "arc_point": "The Climax",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Sable's forty seconds \u2014 Mara gets the equipment out and reaches the square.",
+                "beat": "In Ironfield's square, the assault has stalled. Castor's speech has spread through the militia by word of mouth. The High Council is trying to restore order and failing. Petra, who has been watching from her hall, walks into the square and addresses the soldiers directly \u2014 she names every settlement that has been paying tribute, including her own, and says the Compact's authority is built on extortion and a lie. The soldiers' cohesion collapses. The assault ends not with a battle but with soldiers sitting down. The High Council attempts to flee. Renn stops them.",
+                "arc_notes": "Hero's Journey: Climax \u2014 the central resolution; the Compact's authority destroyed publicly."
+              },
+              {
+                "chapter_number": 46,
+                "title": "After the Silence",
+                "act": "Act III",
+                "arc_point": "The Reward",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "The assault has ended \u2014 the square is quiet.",
+                "beat": "Mara finds Sable in the smithy, alive \u2014 the soldiers who stopped her did not execute her; Castor's speech had already reached them. Sable is sitting on the floor, exhausted, with a soldier's canteen. She looks at Mara and says: 'Did it work?' Mara says: 'It worked.' Sable closes her eyes. She is not dead. She is just done. Mara sits beside her on the floor of the smithy and they do not speak for a long time. Outside, people are examining the machines.",
+                "arc_notes": "Hero's Journey: The Reward \u2014 the dramatic question answered, the emotional cost acknowledged."
+              },
+              {
+                "chapter_number": 47,
+                "title": "Castor in Chains",
+                "act": "Act III",
+                "arc_point": "The Road Back",
+                "pov_character": "Castor Vane",
+                "bridge_from_prior": "Renn stopped the High Council \u2014 Castor is in Ironfield's makeshift holding area.",
+                "beat": "Mara visits Castor in custody. She brings him his plant specimens, which were left in his camp. He is surprised. She asks him why he spoke. He says: because the alternative was to be the thing I was afraid of becoming. She asks what that is. He says: someone who knew and said nothing. She looks at him for a long time. She does not forgive him \u2014 she is not the right person to forgive him. She leaves the plants. She leaves.",
+                "arc_notes": "Hero's Journey: Road Back \u2014 antagonist's arc closes; not redeemed, but honest."
+              },
+              {
+                "chapter_number": 48,
+                "title": "The Weapons Canister",
+                "act": "Act III",
+                "arc_point": "The Road Back",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Sable's letter named the weapons canister's location \u2014 Mara retrieves it.",
+                "beat": "Mara retrieves the weapons canister. She gathers the group \u2014 Renn, Dov, Fen, Petra \u2014 and presents the question: what do they do with it? Renn says destroy it. Fen says study it. Petra says lock it away. Dov says nothing for a long time and then says: 'Ask Sable.' They go ask Sable. Sable says: 'Hide it where I hid it, and write down where it is, and give the location to someone who is not any of us.' They do this. The canister goes back into the ground. The location goes to a settlement council of seven people who do not know each other.",
+                "arc_notes": "Hero's Journey: Road Back \u2014 the weapons subplot resolved before the climax's denouement."
+              },
+              {
+                "chapter_number": 49,
+                "title": "Petra's Reckoning",
+                "act": "Act III",
+                "arc_point": "The Road Back",
+                "pov_character": "Petra Solm",
+                "bridge_from_prior": "Petra's public speech in the square \u2014 her people now know about the tribute.",
+                "beat": "Petra faces Ironfield's council. She explains the tribute. She does not ask for forgiveness \u2014 she explains the arithmetic: fifteen hundred lives versus three years of grain. The council debates for two hours. They do not remove her. They impose a condition: all future decisions of this magnitude require council approval. Petra accepts. She goes home and tends her tomatoes. She is not happy. She is still here. For Petra, this is the same thing.",
+                "arc_notes": "Hero's Journey: Road Back \u2014 secondary character's arc resolved; accountability without destruction."
+              },
+              {
+                "chapter_number": 50,
+                "title": "Renn's Settlement",
+                "act": "Act III",
+                "arc_point": "The Road Back",
+                "pov_character": "Renn Aldric",
+                "bridge_from_prior": "The rebellion's aftermath \u2014 Renn has been managing the militia's disintegration.",
+                "beat": "Renn organizes the former militia soldiers who have refused to return to Compact service. He sends them, in small groups, to settlements that need defense. He goes himself to Ashford \u2014 the burned settlement \u2014 with six of them. They begin clearing the ruins. He does not know what he is building yet. He carves a lion from a piece of Ashford's charred timber and leaves it at the largest grave marker. He does not cry. He comes back the next day and starts on the foundations.",
+                "arc_notes": "Hero's Journey: Road Back \u2014 Renn's arc closes; he has found something worth building."
+              },
+              {
+                "chapter_number": 51,
+                "title": "Dov's Ferry",
+                "act": "Act III",
+                "arc_point": "The Road Back",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara goes back to Chicago \u2014 she needs to see the vault.",
+                "beat": "Mara and Dov return to Chicago. The vault is sealed by Dov's timing device. Mara opens it \u2014 she designed it, she can open it. Inside, everything is intact. She stands in the vault for a long time. She takes nothing. She leaves the vault open. She goes back to the surface and tells Dov: anyone who wants to learn can come here. Dov says: who will teach them? Mara says: Fen, to start. Dov tells a joke. It is still terrible. Mara laughs anyway.",
+                "arc_notes": "Hero's Journey: Road Back \u2014 the vault's purpose fulfilled; the knowledge is no longer secret."
+              },
+              {
+                "chapter_number": 52,
+                "title": "The Compact's End",
+                "act": "Act III",
+                "arc_point": "The Resurrection",
+                "pov_character": "Castor Vane",
+                "bridge_from_prior": "The High Council is in custody \u2014 Castor is released pending a settlement tribunal.",
+                "beat": "Castor testifies before a coalition tribunal about the Compact's founding documents and the weapon that caused the Silence. His testimony is the first public accounting of the Compact's origins. The High Council does not deny it \u2014 they are too old and too tired and, Castor thinks, perhaps relieved. The Compact is formally dissolved by the tribunal. Castor is not punished \u2014 he is the one who told the truth. He is also not celebrated. He is simply released. He walks out of the tribunal into a world that no longer has a place for him and starts walking north, toward his greenhouse.",
+                "arc_notes": "Hero's Journey: Resurrection \u2014 the institutional antagonist destroyed; Castor's personal cost made concrete."
+              },
+              {
+                "chapter_number": 53,
+                "title": "Fen Teaches",
+                "act": "Act III",
+                "arc_point": "The Resurrection",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara left the vault open and named Fen as teacher \u2014 thread: Fen's first class.",
+                "beat": "Mara watches Fen teach his first group of students in the vault \u2014 twelve people from four settlements, ranging from sixteen to sixty. He explains the escapement mechanism of a clockwork regulator with the same words Mara used when she taught him, and then adds something she never said: 'The reason this works is that it fails safely. If the spring runs down, the clock stops. It does not explode. Good machines fail safely.' Mara writes this in her Ledger. It is the best thing anyone has said in this book.",
+                "arc_notes": "Hero's Journey: Resurrection \u2014 the knowledge is self-sustaining; the protagonist's goal achieved."
+              },
+              {
+                "chapter_number": 54,
+                "title": "Sable's Last Translation",
+                "act": "Act III",
+                "arc_point": "The Resurrection",
+                "pov_character": "Sable Orin",
+                "bridge_from_prior": "Sable is recovering in Ironfield \u2014 Mara sends her Fen's words via letter.",
+                "beat": "Sable reads Fen's words in Mara's letter. She laughs \u2014 a real laugh, not the dry precise kind. She finishes her last translation: a pre-Silence manual on water purification systems, which she has been working on for six months. She gives it to Ironfield's council. She then asks Petra if she can have a room with a south-facing window. Petra gives her one. Sable sits in the sun and reads a pre-Silence children's encyclopedia about animals. She is not done. She is resting.",
+                "arc_notes": "Hero's Journey: Resurrection \u2014 mentor's arc closes; she has lived to see the knowledge used."
+              },
+              {
+                "chapter_number": 55,
+                "title": "The Ledger Complete",
+                "act": "Act III",
+                "arc_point": "Return with the Elixir",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Mara is back in Chicago, at the vault, with her Ledger.",
+                "beat": "Mara fills the last page of her Ledger. She has documented every working machine she has seen or built since the vault opened. She starts a new notebook. She titles it: 'Volume Two.' She is not finished. She will never be finished. This is not a tragedy \u2014 it is the point. She goes upstairs to find Dov waiting with food and a joke so bad she groans before he finishes it. She eats. She goes back to work. Story turn: a runner arrives from a settlement three days east \u2014 they have built a working water-wheel governor from the schematics and it is running. They want to know what to build next.",
+                "arc_notes": "Hero's Journey: Return with the Elixir \u2014 the protagonist's arc closes; the knowledge is alive and spreading."
+              },
+              {
+                "chapter_number": 56,
+                "title": "Epilogue: The Clocks Start",
+                "act": "Act III",
+                "arc_point": "Return with the Elixir / Coda",
+                "pov_character": "Omniscient / Future Record",
+                "bridge_from_prior": "The runner's message \u2014 the knowledge is spreading; the epilogue shows where it goes.",
+                "beat": "A future historical record \u2014 written in the same fragmented style as the prologue, but complete, unbroken \u2014 describes what happened in the decade after the Ironfield Demonstration: seventeen settlements with working water-wheel mills, four with clockwork grain sorters, two with pneumatic logic systems managing irrigation. Fen Marsh (he has taken Dov's name) runs the vault as a teaching institution. Renn Aldric is named in a settlement charter as a founding builder. Sable Orin's translations are cited in twelve subsequent engineering manuals. Castor Vane is recorded as a botanical surveyor in the northern territories. Mara Voss is listed as the author of forty-seven engineering manuals and the dedicatee of a water-purification system that serves sixty thousand people. The record does not end mid-sentence. It ends: 'And the clocks ran.'",
+                "arc_notes": "Hero's Journey: Return with the Elixir \u2014 the dramatic question answered in full; all character arcs confirmed."
+              }
+            ]
+          },
+          "persist": {
+            "persisted": false,
+            "reason": "persist requested but project_id/user_id missing"
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

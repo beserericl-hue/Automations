@@ -1,0 +1,66 @@
+{
+  "id": "V21",
+  "title": "Voice \u2014 List Research Reports",
+  "route": "`library.list-outlines` (info) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.list-outlines got=library.retrieve MISMATCH",
+    "items=2 found=True"
+  ],
+  "steps": [
+    [
+      "voice",
+      "Show me all my research reports"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "response": "Here's what I found.",
+        "kind": "data",
+        "tool": "library",
+        "op": "retrieve",
+        "data": {
+          "execution_id": "5b36c13b-e7ae-42b4-9619-218b5b379e06",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "retrieve",
+            "result": {
+              "items": [
+                {
+                  "id": "8a96f298-6e03-45c2-857f-38ab6aab9715",
+                  "topic": "Show me all my research reports",
+                  "genre_slug": "",
+                  "status": "draft",
+                  "created_at": "2026-06-21T20:58:07.793848+00:00"
+                },
+                {
+                  "id": "cd3f4f39-8ce7-4f2d-b248-625d62eb146b",
+                  "topic": "List my research reports",
+                  "genre_slug": "",
+                  "status": "draft",
+                  "created_at": "2026-06-21T19:11:30.343743+00:00"
+                }
+              ],
+              "count": 2,
+              "found": true,
+              "content_type": "research",
+              "search_term": "Show me all my research reports"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "job_result": null,
+      "resolved_prompt": "Show me all my research reports"
+    }
+  ],
+  "expected": [
+    "flat `{response, kind=\"data\"}`",
+    "content_type=research_report filter",
+    "inline list (title + date)",
+    "user-scoped"
+  ]
+}

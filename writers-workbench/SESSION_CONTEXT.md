@@ -1499,7 +1499,7 @@ User reported "can't log in" on PROD; reset email link redirected to `localhost:
 
 - **Root cause:** both Supabase projects (DEV `gvbvwcnmjkdpclcisqrr` and PROD `faklxfakgzkpkbxfihzh`) have **Auth → URL Configuration → Site URL** set to the factory default `http://localhost:3000`. Password-reset / magic-link emails embed Site URL as the redirect target → email link drops the user on a dead local address.
 - **Aggravating side-effect:** the partial-recovery flow can land you in a state where the password gets silently changed but you don't know to what. User couldn't remember the new password on either tier.
-- **Fix applied:** admin-reset password on both via the service-role key (`PUT /auth/v1/admin/users/{id}` with `{password: 'Fr332bafami!y'}`). Verified token issuance afterward. Both DEV and PROD accept `Fr332bafami!y` again — the same value that's in `E2E_TEST_PASSWORD`.
+- **Fix applied:** admin-reset password on both via the service-role key (`PUT /auth/v1/admin/users/{id}` with `{password: '<rotated 2026-10-19 — see credentials-map.md>'}`). Verified token issuance afterward. Both DEV and PROD accept `<rotated 2026-10-19 — see credentials-map.md>` again — the same value that's in `E2E_TEST_PASSWORD`.
 - **Still TODO:** update Site URL + Redirect URLs allowlist on both Supabase projects so the email flow actually works for real users. Two paths: (a) Supabase dashboard → Auth → URL Configuration on each project, or (b) Supabase Management API with a PAT (https://supabase.com/dashboard/account/tokens).
 
 PROD URL config to set (from Supabase dashboard or Management API):
@@ -1605,7 +1605,7 @@ The two-table model (admin-provisioned `users_v2` row + a `auth.users` row creat
 
 ### JR's account on PROD — repaired
 
-One-shot service-role patch ran during this session (Eric chose path b). Sequence: `POST /auth/v1/admin/users` with `{email: 'racemert@yahoo.com', password: 'Wr!ters1', email_confirm: true}` → returned UID `3657ca48-48e5-403a-9087-4bb4bb5101b1` → `PATCH /rest/v1/users_v2?user_id=eq.+17063338699` set `supabase_auth_uid` to that UID → `POST /auth/v1/token?grant_type=password` smoke-test returned a valid `access_token` (login_ok). JR can sign in with `racemert@yahoo.com` / `Wr!ters1`.
+One-shot service-role patch ran during this session (Eric chose path b). Sequence: `POST /auth/v1/admin/users` with `{email: 'racemert@yahoo.com', password: '<PROD password, treat as compromised — see credentials-map.md>', email_confirm: true}` → returned UID `3657ca48-48e5-403a-9087-4bb4bb5101b1` → `PATCH /rest/v1/users_v2?user_id=eq.+17063338699` set `supabase_auth_uid` to that UID → `POST /auth/v1/token?grant_type=password` smoke-test returned a valid `access_token` (login_ok). JR can sign in with `racemert@yahoo.com` / `<PROD password, treat as compromised — see credentials-map.md>`.
 
 ### Google OAuth button hidden behind flag
 

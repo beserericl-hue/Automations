@@ -1,0 +1,76 @@
+{
+  "id": "R08",
+  "title": "Write Short Story (historical-time-travel)",
+  "route": "`chapter.short-story` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=chapter.short-story got=chapter.short-story OK",
+    "job=complete",
+    "short_story recent=1 word_count=1977 persist=True"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Write a short story. Genre slug: historical-time-travel. Premise: A historian discovers that antique photographs can transport her to the moment they were taken. She finds a photo of the Titanic's maiden voyage departure and must decide whether to warn the passengers. Tone: literary, bittersweet. Length: 2500 words. Research topics: [\"Titanic maiden voyage Southampton 1912\", \"history of early photography techniques\", \"time travel paradoxes in fiction\"]"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Queuing your short story \u2014 I'll let you know when it's ready.",
+        "tool": "chapter",
+        "op": "short-story",
+        "data": null,
+        "job_id": "3743df8299194ff5a312638a99569ea2",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "3743df8299194ff5a312638a99569ea2",
+        "status": "complete",
+        "result": {
+          "execution_id": "bffd4ab4-023a-4d98-93c0-cf88724689cb",
+          "step_name": "chapter",
+          "status": "ok",
+          "payload": {
+            "op": "short-story",
+            "result": {
+              "written": true,
+              "title": "A historian discovers that antique photographs can transport",
+              "content_text": "# A Historian Discovers That Antique Photographs Can Transport\n\nThe photograph arrived in a box of estate donations, wrapped in brown paper and smelling of old houses. Dr. Clara Marsh set it on her desk at the university archive and pulled the wrapping back carefully, the way she handled everything old.\n\nIt was a gelatin silver print, roughly four by six inches. The image showed a crowd on a dock. In the background, impossibly large, rose the hull of a ship. Four funnels. The White Star Line's colors on the stacks, though the print was black and white, she knew them by shape. The handwriting on the reverse read: *Southampton, 10 April 1912. Bon voyage.*\n\nClara turned it face up again and studied it under her desk lamp. The crowd wore Edwardian coats and hats. A woman near the left edge was laughing at something off-frame. A boy stood very still, looking directly at the camera, hands in his coat pockets.\n\nShe picked it up to examine the emulsion quality. Her thumb pressed the surface.\n\nThe archive disappeared., -\n\nThe cold hit her first. Then the smell: coal smoke, salt water, tar, and something else underneath, like wet rope left in the sun. She was standing on stone, and around her was noise, whistles, the groan of winches, men shouting in short bursts. The air tasted of the sea.\n\nShe was on the dock at Southampton.\n\nThe ship was in front of her. Nothing she had read, no photograph she had studied, had prepared her for the scale of it. The hull rose like a cliff. She had to tilt her head back to find the funnels, and even then the tops of them blurred in a thin haze of coal smoke. The ship made the warehouses behind her look like sheds.\n\nPeople moved around her, through her almost, without quite touching her. A porter struggled past with a tower of leather trunks. Two women in long coats and wide hats walked with their arms linked, one of them holding a small dog tucked under her elbow. A man in a uniform shouted something at a group of workers near the gangway.\n\nClara stood still. She was wearing her archive clothes, dark trousers, a grey wool sweater, and no one looked at her twice. She was not sure if they could see her clearly or not. She felt solid. She felt entirely real.\n\nShe looked at her hand. The photograph was still in it.\n\nShe understood, in the way you understand something that cannot be explained, that the photograph was the anchor. She was here because she had touched it. She would go back when she let go.\n\nShe was not ready to let go., -\n\nThe clock on the dock building read five minutes past noon. She had arrived just after departure preparations, she thought. The gangways were still in place. The crowd on the quay was thick, families seeing off relatives, dock workers, reporters with cameras on tripods. The atmosphere was festive in the way of things people believe will end well.\n\nClara walked toward the nearest gangway. A steward stood at the base of it, checking papers. She stopped a few feet away and watched passengers board. A couple in their sixties, the man in a black coat, the woman carrying a small case. Behind them, a young woman alone, clutching a ticket, looking up at the hull with an expression Clara could not read, wonder, or fear, or both.\n\n1,500 people would die. She knew the number the way she knew other numbers from her work, the casualties at the Somme, the dead at Pompeii. Numbers she had written in papers and said aloud in lectures without feeling them in her chest the way she felt this one now, standing ten feet from a gangway with the ship right there.\n\nShe looked at the crowd. She thought about what she could do. She could shout. She could grab someone's arm and say: this ship will hit an iceberg on the night of April 14th, in water so cold that most of the people who go into it will be dead in minutes, and there are not enough lifeboats, and more than fifteen hundred of you will not reach New York.\n\nShe thought about what would happen. They would look at her. The steward would come over. Someone might fetch a constable. They would think she was ill, or drunk, or mad. The ship would sail at noon, it had already sailed, in every account she had ever read, and she would be removed from the dock and the photograph would still be in her hand.\n\nOr.\n\nShe thought about the other thing historians were trained to think about, the thing that lived in the back of every temporal thought experiment she had ever read: the question of what you break when you reach back.\n\nShe had no idea how this worked. She had touched a photograph and arrived in 1912. She did not know the rules. She did not know if she could change anything, or if her presence here was already written into the history she had studied, a ghost that the accounts had never mentioned because no one had thought to write down the strange woman in grey standing near the gangway.\n\nShe did not know if changing it was possible. She did not know if it was right., -\n\nShe walked along the quay, away from the main crowd, to where the hull curved away from the dock. Up close the steel plates were enormous, riveted in rows she could have laid her arm across. The ship smelled of fresh paint over iron. She put her free hand flat against the hull, and it was cold and solid and real.\n\nA man was standing a few feet away, also looking up at the ship. He was in his forties, she guessed, in a good coat but not a wealthy man's coat. He had a notebook in one hand and a pencil in the other, and he was writing something without looking down at the page, his eyes moving along the hull.\n\n\"She's something,\" he said, not to her particularly.\n\n\"Yes,\" Clara said.\n\n\"Guarantee group man told me she's eight hundred and eighty feet long.\" He shook his head. \"Biggest thing ever moved on water. And they say she's practically unsinkable.\" He said it with the mild pride of someone repeating a fact they find satisfying.\n\nClara looked at him. He had kind eyes and ink stains on his fingers. A journalist, she thought.\n\nShe could tell him. She could give him enough detail, the iceberg, the coordinates, the date, the time, 11:40 PM ship's time on April 14th, that he might write it down, might even believe her, might find a way to get the information to someone who could act on it. Wireless operators. The captain. Someone.\n\nShe could also be completely wrong about what was possible. She could change nothing. She could change everything. She could create something she had no name for.\n\nShe stood with the photograph in her hand and the cold hull at her back and the noise of the dock all around her, and she thought about the boy she had seen in the photograph, standing very still, looking at the camera. She had no idea if he had been a passenger or a bystander. She had no idea if he had lived.\n\nShe thought about the woman near the left edge of the photograph, laughing at something off-frame.\n\nShe thought about 1,500 people in water at negative two degrees Celsius.\n\nShe thought about what a historian was. Someone who studied what had happened. Someone who tried to understand it honestly, without imposing what they wished had been true. Someone who knew that the past was not a place you could fix.\n\nExcept she was standing in it., -\n\nThe journalist wrote something in his notebook and walked away, back toward the main crowd. Clara stayed where she was.\n\nShe thought: I can shout. I can grab someone. I can find Thomas Andrews, the designer, who is on this ship right now somewhere above me, and I can tell him exactly where the hull will fail, the starboard bow, the way the watertight compartments are not sealed at the top, the way the flooding will cascade. He would understand the technical language. He might believe her.\n\nShe thought: and then what. And then what.\n\nShe did not know what she believed about time. She did not know if this moment was fixed or open. She only knew that she was a woman from 2024 standing on a dock in 1912 holding a photograph, and that the photograph was her only way home, and that she did not understand the thing she was doing well enough to do it responsibly.\n\nThat was the thought that stopped her. Not cowardice. Not the fear of being wrong about the physics of it. The thing that stopped her was the word *responsibly*.\n\nShe had spent twenty years studying the past. She had learned that the past was not simple. She had learned that interventions had costs that were invisible until they weren't. She had learned that the confident certainty that you know what's best, applied to a situation you don't fully understand, was the beginning of most disasters.\n\nShe did not fully understand this situation.\n\nShe looked up at the funnels one more time. The coal smoke drifted south, toward the Solent. Somewhere above her, in the first-class staterooms, people were unpacking steamer trunks and finding their way to the reception rooms with their polished wood and deep carpets and potted palms. In third class, emigrants were settling into berths, heading toward something they hoped would be better. The crew had lifeboat stations assigned that they had not properly drilled.\n\nClara pressed her thumb harder against the photograph.\n\nShe thought: I don't know enough. And that is the truest thing I can say.\n\nShe let herself come back., -\n\nThe archive was quiet. The desk lamp was on. The brown paper wrapping sat beside the photograph, and the photograph was in her hand, and her hand was shaking.\n\nShe set it down on the desk and sat back in her chair and looked at the ceiling for a long time.\n\nShe was not sure what she had done, or not done, or whether the distinction meant anything. She was not sure the photograph would take her back if she touched it again. She was not sure she wanted to know.\n\nWhat she was sure of: she had stood on that dock. She had felt the cold. She had heard the winches and smelled the coal smoke and put her hand against the hull of the ship. She had stood close enough to history to feel it breathe.\n\nAnd she had not understood it well enough to touch it.\n\nShe pulled a fresh notepad toward her and uncapped a pen. She wrote the date at the top: *Southampton, 10 April 1912.* She wrote what she had seen, the scale of the hull, the smell of the dock, the journalist with ink-stained fingers, the woman with the small dog, the boy in the photograph who had looked directly at the camera.\n\nShe wrote it all down. Every detail. The way historians do.\n\nThe photograph lay face up on the desk. The boy was still there, hands in his pockets, looking at the camera, waiting.\n\nClara looked back at him for a moment. Then she carefully rewrapped the photograph in its brown paper, labeled it with the accession number, and carried it to the archive shelf, where it would be safe, and studied, and never fully understood.\n\nShe went home in the dark and did not sleep for a long time.",
+              "word_count": 1977,
+              "persist": {
+                "persisted": true,
+                "content_id": "f9f462d2-9adc-46ea-bf46-4d928de42331"
+              },
+              "token_usage": {
+                "calls": 2,
+                "input_tokens": 2613,
+                "output_tokens": 4179,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+                "total_tokens": 6792,
+                "cost_usd": 0.070524
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Write a short story. Genre slug: historical-time-travel. Premise: A historian discovers that antique photographs can transport her to the moment they were taken. She finds a photo of the Titanic's maiden voyage departure and must decide whether to warn the passengers. Tone: literary, bittersweet. Length: 2500 words. Research topics: Power Structures in Space: How Sci-Fi Predicts Real-World Politics"
+    }
+  ],
+  "expected": [
+    "routes to `chapter.short-story`, kind=queued; job reaches status=complete",
+    "Story uses historical-time-travel tone (meticulous, wonder-infused)",
+    "**Writing Prime Directive:** Clear everyday language. Short sentences. Genuine emotion. Concrete details.",
+    "Perplexity research on all 3 topics performed",
+    "Cover art generated (period-appropriate) via `media.cover-art`",
+    "Email arrives with complete story",
+    "Draft row in `published_content_v2` (content_type=short_story, user_id=\"+14105914612\")",
+    "CR-009 task-completion email received"
+  ]
+}

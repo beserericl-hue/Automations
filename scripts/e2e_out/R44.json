@@ -1,0 +1,60 @@
+{
+  "test": {
+    "id": "R44",
+    "title": "Prime Directive \u2014 Newsletter",
+    "source": "chat",
+    "prompt": "Write a newsletter for the ancient-history genre. Topic: \"New Archaeological Discoveries Reshaping Our Understanding of Ancient Egypt\". Genre slug: ancient-history. Date: 2026-03-10.",
+    "route": "chapter.newsletter` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to newsletter durable saga, kind=queued; complete",
+      "No banned cliche words; gets to the point; specific findings; genuine tone; CR-009 email received"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing your newsletter for the ancient-history genre. I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "newsletter",
+    "data": null,
+    "job_id": "1d9d884a5ef24b48b5101bab3447fffe",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "1d9d884a5ef24b48b5101bab3447fffe",
+    "status": "complete",
+    "result": {
+      "execution_id": "6c128290-4fad-4899-9edc-70952658dca2",
+      "step_name": "chapter",
+      "status": "ok",
+      "payload": {
+        "op": "newsletter",
+        "result": {
+          "written": true,
+          "title": "New Finds Reshaping Ancient Egypt",
+          "subject_line": "The Sands Are Talking: Egypt's Biggest Discoveries of 2025",
+          "content_text": "_A lost pharaoh's tomb, a mummy's last meal, and a queen's face carved in stone._\n\nFor most of recorded history, Thutmose II was a pharaoh without a grave. Every other king of Egypt's 18th Dynasty had been accounted for, until early 2025, when an Anglo-Egyptian team announced they had found him. His tomb sat in the limestone cliffs of Nuwyat, in Upper Egypt, waiting. That single discovery would have been enough to make this a landmark year for Egyptology. But it is only the beginning. From a mummy's last summer meal to a defaced royal tomb at Abydos, the ground beneath Egypt is giving up secrets at a remarkable pace. Here is what the shovels have turned up, and what it means for how we understand the ancient world.\n\n## The Pharaoh Who Was Missing: Thutmose II Found at Last\n\nThe 18th Dynasty produced some of Egypt's most famous rulers, Hatshepsut, Akhenaten, Tutankhamun. But one name had always been conspicuously absent from the archaeological record: Thutmose II, husband of Hatshepsut and father of Thutmose III. His mummy was known, but his tomb was not. That gap is now closed.\n\nThe newly identified tomb is cut into limestone at the necropolis of Nuwyat, near the Valley of the Kings. Its rock-cut entrance and internal chambers match the architectural style of early New Kingdom royal burials. Inside, excavators found a ceramic pot whose shape and fabric align with 18th-Dynasty funerary ware, likely used as a canopic jar container or offerings vessel.\n\nThis is not a minor footnote. It fills the last missing burial of an entire dynasty and gives archaeologists a fixed point from which to reassess the funerary practices of Egypt's most celebrated royal family. [Source: https://www.nationalgeographic.fr/histoire/retrospective-archeologie-six-decouvertes-archeologiques-qui-ont-marque-annee-2025]\n\n## A King Without a Name: The Erased Cartouches of Abydos\n\nAt Abydos, one of Egypt's oldest sacred cities, archaeologists have uncovered a vast royal tomb dating to roughly 3,600 years ago, the turbulent transition between the late Middle Kingdom and the Second Intermediate Period. The tomb's ground plan echoes that of Senusret III, one of Egypt's most powerful pharaohs.\n\nThe walls are decorated with gold-inlaid hieroglyphs and images honoring major gods. But someone, at some point in antiquity, chiseled away every cartouche, every place where the king's name should appear. The owner is, for now, anonymous.\n\nThe complex shows signs of reuse and restoration across centuries, meaning it was not simply abandoned. Someone kept coming back. The deliberate erasure of the royal name raises questions that cut to the heart of Egyptian political history: who wanted this king forgotten, and why? [Source: https://www.youtube.com/watch?v=NUniKKifq4o]\n\n## A Mummy's Last Day: 130 Watermelon Seeds and a Summer Death\n\nOne of the most quietly remarkable finds of recent Egyptian archaeology involves no tomb and no inscription. It involves fruit.\n\nCT-scans and micro-CT analysis of a recently studied mummy revealed more than 130 watermelon seeds preserved inside the stomach and intestines. The person had eaten watermelon just hours before dying. In Egypt, watermelon ripens in high summer. That single biological fact tells researchers something no text could: this person died on a hot summer day along the Nile floodplain.\n\nThe analysis used radiology, endoscopy, and micro-CT imaging, no unwrapping required. The same techniques can detect atherosclerosis, parasitic infection, and old injuries. It is forensic medicine applied to the ancient world, and it is producing the kind of intimate, human detail that no hieroglyph ever recorded. [Source: https://www.youtube.com/watch?v=NUniKKifq4o]\n\n## Saqqara, Abusir, and the Long Life of Egypt's Sacred Landscapes\n\nTwo sites north of Luxor are yielding fresh insights into Egypt's Old Kingdom, the age of pyramid-builders and the first great bureaucratic state.\n\nAt Saqqara, French-Egyptian teams are re-examining clusters of mastaba tombs belonging to priests who served 5th and 6th Dynasty kings. High-resolution documentation of false doors, offering tables, and carved daily-life scenes, butchery, bread-making, perfume production, is producing new readings of priestly titles and family networks. Micro-stratigraphic excavation is also revealing secondary burials and reused chambers, showing that Saqqara remained an active ritual landscape for centuries after the Old Kingdom ended. [Source: https://www.youtube.com/watch?v=4thR0oQh9XA]\n\nAt Abusir, the pyramid complex of Sahure is being reopened after a century of partial exploration. Digital imaging of relief scenes depicting naval expeditions and tribute is revealing previously misread inscriptions that refine our picture of early Old Kingdom foreign contacts. Conservation teams are stabilizing collapsed sections, and researchers believe undocumented storage rooms and decorated spaces still lie sealed within the complex. [Source: https://www.nationalgeographic.fr/video/histoire/les-nouvelles-fouilles-archeologiques-de-la-pyramide-de-sahoure]\n\n## Cleopatra's Father, a Possible Portrait, and the Ptolemaic Balancing Act\n\nOn Egypt's Mediterranean coast, west of Alexandria, the site of Taposiris Magna has produced two striking finds from a temple associated with the cults of Osiris and Isis.\n\nThe first is a bust identified as Ptolemy XII Auletes, Cleopatra VII's father. The second is a statue head that may depict Cleopatra herself. Both are carved in a style that merges Greek Hellenistic portrait conventions with traditional Egyptian iconographic elements: individualized faces rendered in the manner of a Greek ruler, set within a visual language inherited from the pharaohs.\n\nThis is the Ptolemaic predicament made visible in stone. These rulers were Macedonian Greeks governing an ancient Egyptian civilization. Every public image they produced had to speak to both worlds at once. These statues show exactly how they managed that, and how fragile the negotiation could be. [Source: https://www.youtube.com/watch?v=eiulXTc3PZo]\n\nEgypt has been studied for two centuries, and it still surprises. A missing pharaoh turns up in limestone. A mummy holds summer fruit in its stomach. A king's name is scraped from a wall and the mystery outlasts the erasure by three thousand years.\n\nEach of these discoveries changes something, a dynasty's burial record, a map of sacred geography, our sense of what a single ancient life looked like on its last day. And each one is a reminder that the story of ancient Egypt is not finished. The ground still has more to say.\n\nWhich of these finds strikes you most? The anonymous king of Abydos, the watermelon seeds, or the face that might be Cleopatra's? Reply and tell us, we read every response.",
+          "word_count": 1012,
+          "section_count": 5,
+          "persist": {
+            "persisted": true,
+            "content_id": "3d1725a9-4c74-468b-b47a-55fd4deae88b"
+          },
+          "token_usage": {
+            "calls": 2,
+            "input_tokens": 2485,
+            "output_tokens": 3374,
+            "cache_read_tokens": 0,
+            "cache_write_tokens": 0,
+            "total_tokens": 5859,
+            "cost_usd": 0.058065
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

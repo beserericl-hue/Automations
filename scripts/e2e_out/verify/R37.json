@@ -1,0 +1,51 @@
+{
+  "id": "R37",
+  "title": "Retrieve Content \u2014 Not Found",
+  "route": "`library.retrieve` (info) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.retrieve got=library.retrieve OK",
+    "items=0 found=False"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Find my draft about quantum surfing on Jupiter"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "data",
+        "assistant_message": "",
+        "tool": "library",
+        "op": "retrieve",
+        "data": {
+          "execution_id": "8c61a342-df49-48db-a8a8-df3f76f7abe8",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "retrieve",
+            "result": {
+              "items": [],
+              "count": 0,
+              "found": false,
+              "search_term": "Find my draft about quantum surfing on Jupiter"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        },
+        "job_id": null,
+        "status": null,
+        "jobs": null,
+        "error": null
+      },
+      "job_result": null,
+      "resolved_prompt": "Find my draft about quantum surfing on Jupiter"
+    }
+  ],
+  "expected": [
+    "routes to `library.retrieve`, kind=data; found=false; suggests alternatives; no crash"
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "id": "R91",
+  "title": "Revert Outline \u2014 Project Not Found",
+  "route": "`library.revert` (outline) \u00b7 impl: built (E2E-2)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.revert got=library.revert OK",
+    "job=complete",
+    "reverted=False"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Revert the outline for \"A Story That Does Not Exist\" to version 1"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Reverting the outline for \"A Story That Does Not Exist\" to version 1.",
+        "tool": "library",
+        "op": "revert",
+        "data": null,
+        "job_id": "4c6b74821ce6428f959a81c9bd16ac40",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "4c6b74821ce6428f959a81c9bd16ac40",
+        "status": "complete",
+        "result": {
+          "execution_id": "b84911bb-9ef2-438f-93f6-e987542feef4",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "revert",
+            "result": {
+              "reverted": false,
+              "error_message": "project 'A Story That Does Not Exist' not found"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Revert the outline for \"A Story That Does Not Exist\" to version 1"
+    }
+  ],
+  "expected": [
+    "routes to `library.revert`; project not found \u2192 clear error; nothing written/modified; job failed (or inline error) with informative error_message"
+  ]
+}

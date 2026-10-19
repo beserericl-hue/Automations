@@ -1,0 +1,160 @@
+# Full E2E verify — 157 tests — start 2026-07-01T20:04:18.699097+00:00
+[1/157] R01 PASS :: Deep Research (Perplexity) :: route exp=research.run got=research.run OK | job=complete | research_reports_v2 recent=2 | report_len=17781
+[2/157] R02 PASS :: Save Research Report :: route exp=research.run got=research.run OK | job=complete | research_reports_v2 recent=3 | report_len=18630
+[3/157] R03 PASS :: Email Report :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=Regression Test: Email Report err=None
+[4/157] R04 PASS :: Story Bible — Read (Empty) :: route exp=story_bible.list got=story_bible.list OK | entries=None found=False
+[5/157] R05 PASS :: Centralized Email Config (app_config) :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=R05: Centralized Email Config Test err=None
+[6/157] R06 PASS :: Write Blog Post (post-apocalyptic) :: route exp=chapter.blog got=chapter.blog OK | job=complete | blog_post recent=1 word_count=1293 persist=True
+[7/157] R07 PASS :: Write Newsletter (political-scifi) :: route exp=chapter.newsletter got=chapter.newsletter OK | job=complete | newsletter recent=1 word_count=1056 persist=True
+[8/157] R08 PASS :: Write Short Story (historical-time-travel) :: route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=1 word_count=1977 persist=True
+[9/157] R09 PASS :: Generate Cover Art (standalone) :: route exp=media.cover-art got=library.retrieve MISMATCH | items=28 found=True
+[10/157] R10 PASS :: Repurpose to Social — Twitter :: route exp=media.social-posts got=media.social-posts OK | job=complete | platforms=['twitter']
+[11/157] R11 PASS :: Repurpose to Social — LinkedIn :: route exp=media.social-posts got=media.social-posts OK | job=complete | platforms=['linkedin']
+[12/157] R12 PASS :: Repurpose to Social — Facebook :: route exp=media.social-posts got=media.social-posts OK | job=complete | platforms=['facebook']
+[13/157] R13 PASS :: Repurpose to Social — Instagram :: route exp=media.social-posts got=media.social-posts OK | job=complete | platforms=['instagram']
+[14/157] R14 PASS :: Write Blog Post (ancient-history) :: route exp=chapter.blog got=chapter.blog OK | job=complete | blog_post recent=2 word_count=1666 persist=True
+[15/157] R15 PASS :: Write Short Story (ai-marketing) :: route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=2 word_count=1620 persist=True
+[16/157] R16 PASS :: Write Newsletter (political-history) :: route exp=chapter.newsletter got=chapter.newsletter OK | job=complete | newsletter recent=2 word_count=1014 persist=True
+[17/157] R17 PASS :: Write Chapter (ancient-history, new project) :: route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=1 word_count=7610 persist=True
+[18/157] R18 PASS :: Cover Art — New Genre (ai-marketing) :: route exp=media.cover-art got=media.cover-art OK | job=complete | generated_images recent=1 image_url=yes
+[19/157] R19 PASS :: Cover Art — New Genre (ancient-history) :: route exp=media.cover-art got=media.cover-art OK | job=complete | generated_images recent=2 image_url=yes
+[20/157] R20 PASS :: List Drafts :: route exp=library.list-outlines got=library.retrieve MISMATCH | items=50 found=True
+[21/157] R21 PASS :: List Drafts — Filter by Type :: route exp=library.list-outlines got=library.retrieve MISMATCH | items=11 found=True
+[22/157] R22 PASS :: Approve Draft :: route exp=library.lifecycle got=library.lifecycle OK | status=approved matched=None error=None
+[23/157] R23 PASS :: Publish Content :: route exp=library.lifecycle got=library.lifecycle OK | status=published matched=None error=None
+[24/157] R24 PASS :: List Published :: route exp=library.list-outlines got=library.retrieve MISMATCH | items=5 found=True
+[25/157] R25 PASS :: Reject Draft :: route exp=library.lifecycle got=library.lifecycle OK | status=rejected matched=None error=None
+[26/157] R26 PASS :: Schedule Publishing :: route exp=library.lifecycle got=library.lifecycle OK | status=scheduled matched=None error=None
+[27/157] R27 PASS :: List Scheduled Content :: route exp=library.list-outlines got=library.retrieve MISMATCH | items=1 found=True
+[28/157] R28 PASS :: Version History on Approve/Publish :: route exp=library.versions got=library.retrieve MISMATCH | items=50 found=True
+[29/157] R29 PASS :: Get Specific Version :: route exp=library.versions got=library.versions OK | count=None versions=0
+[30/157] R30 PASS :: Brainstorm Story :: route exp=brainstorm.story got=brainstorm.story OK | job=complete | outline title='The Seed Vault' chapters=8 persisted=True projects_recent=0
+[31/157] R31 PASS :: Write Chapter from Stored Outline :: route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=2 word_count=6422 persist=True
+[32/157] R32 PASS :: Story Bible — Read After Chapter :: route exp=story_bible.list got=story_bible.list OK | entries=41 found=True
+[33/157] R33 PASS :: List Research Reports :: route exp=library.list-outlines got=library.retrieve MISMATCH | items=2 found=True
+[34/157] R34 PASS :: Get Research Report :: route exp=library.retrieve got=library.retrieve OK | items=20 found=True
+[35/157] R35 PASS :: Update Research Report :: route exp=library.lifecycle got=library.lifecycle OK | status=published matched=None error=None
+[36/157] R36 PASS :: Retrieve Content — Search by Title :: route exp=library.retrieve got=library.retrieve OK | items=2 found=True
+[37/157] R37 PASS :: Retrieve Content — Not Found :: route exp=library.retrieve got=library.retrieve OK | items=0 found=False
+[38/157] R38 PASS :: Unknown Genre Slug :: route exp=chapter.blog got=chapter.blog OK | job=complete | blog_post recent=3 word_count=981 persist=True
+[39/157] R39 PASS :: Minimal Input (Agent Fills Gaps) :: route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=3 word_count=2534 persist=True
+[40/157] R40 PASS :: Multi-Step Conversation :: route exp=research.run got=research.run OK | job=complete | research_reports_v2 recent=5 | report_len=16551
+[41/157] R41 PASS :: Cross-Genre Cover Art :: route exp=media.cover-art got=media.cover-art OK | job=complete | generated_images recent=3 image_url=yes
+[42/157] R42 PASS :: Cron Auto-Publish (Scheduled Publisher) :: route exp=library.lifecycle got=chapter.blog MISMATCH | job=complete | blog_post recent=4 word_count=1227 persist=True
+[43/157] R43 PASS :: Prime Directive — Blog Post :: route exp=chapter.blog got=chapter.blog OK | job=complete | blog_post recent=5 word_count=1206 persist=True
+[44/157] R44 PASS :: Prime Directive — Newsletter :: route exp=chapter.newsletter got=chapter.newsletter OK | job=complete | newsletter recent=3 word_count=1221 persist=True
+[45/157] R45 PASS :: Prime Directive — Short Story :: route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=4 word_count=1166 persist=True
+[46/157] R46 PASS :: Prime Directive — Chapter :: route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=3 word_count=6779 persist=True
+[47/157] R47 PASS :: Prime Directive — Social Posts :: route exp=media.social-posts got=media.social-posts OK | job=complete | platforms=['twitter']
+[48/157] R48 PASS :: Prime Directive — Brainstorm Outline :: route exp=brainstorm.story got=brainstorm.story OK | job=complete | outline title='The Diplomat's Gambit' chapters=10 persisted=True projects_recent=1
+[49/157] R49 PASS :: Brainstorm Uses Structure Model :: route exp=brainstorm.story got=brainstorm.short-story MISMATCH | job=complete | outline title='The Wrong Side' chapters=3 persisted=True projects_recent=1
+[50/157] R50 PASS :: Short Story Has 5-Stage Arc :: route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=5 word_count=2149 persist=True
+[51/157] R51 PASS :: Chapter Has Internal Arc + Transformation :: route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=4 word_count=8229 persist=True
+[52/157] R52 PASS :: Correct Genre Name Preserved (R43 Guard) :: route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=5 word_count=1840 persist=True
+[53/157] R53 PASS :: List Story Arcs :: route exp=library.retrieve got=library.retrieve OK | items=8 found=True
+[54/157] R54 PASS :: Brainstorm Short Story — Freytags Pyramid (Post-Ap :: route exp=brainstorm.story got=brainstorm.short-story MISMATCH | job=complete | outline title='The Inoculator' chapters=5 persisted=True projects_recent=2
+[55/157] R55 PASS :: Brainstorm Book — Freytags Pyramid (Political Sci- :: route exp=brainstorm.story got=brainstorm.story OK | job=complete | outline title='The Accord' chapters=12 persisted=True projects_recent=2
+[56/157] R56 PASS :: Brainstorm Short Story — Freytags Pyramid (Ancient :: route exp=brainstorm.story got=brainstorm.short-story MISMATCH | job=complete | outline title='The Consulship of Gaius Varro' chapters=5 persisted=True projects_recent=3
+[57/157] R57 PASS :: Brainstorm Short Story — Freytags Pyramid (Histori :: route exp=brainstorm.story got=brainstorm.short-story MISMATCH | job=complete | outline title='The Witness' chapters=5 persisted=True projects_recent=3
+[58/157] R58 PASS :: Brainstorm Short Story — Three-Act Structure (Post :: route exp=brainstorm.story got=brainstorm.short-story MISMATCH | job=complete | outline title='Signal from the Deep' chapters=3 persisted=True projects_recent=3
+[59/157] R59 PASS :: Brainstorm Book — Three-Act Structure (AI Marketin :: route exp=brainstorm.story got=brainstorm.story OK | job=complete | outline title='The Optimization' chapters=10 persisted=True projects_recent=3
+[60/157] R60 PASS :: Brainstorm Short Story — Three-Act Structure (Poli :: route exp=brainstorm.story got=brainstorm.short-story MISMATCH | job=complete | outline title='The Unpublished' chapters=3 persisted=True projects_recent=3
+[61/157] R61 PASS :: Brainstorm Book — Three-Act Structure (Historical  :: route exp=brainstorm.story got=brainstorm.story OK | job=complete | outline title='The Correction' chapters=11 persisted=True projects_recent=3
+[62/157] R62 PASS :: Write Short Story from Freytags Pyramid Outline (P :: route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=5 word_count=2740 persist=True
+[63/157] R63 PASS :: Write Chapter 1 from Freytags Pyramid Outline (Pol :: route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=5 word_count=7003 persist=True
+[64/157] R64 PASS :: Write Short Story from Freytags Pyramid Outline (A :: route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=5 word_count=2848 persist=True
+[65/157] R65 PASS :: Write Short Story from Freytags Pyramid Outline (H :: route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=5 word_count=2970 persist=True
+[66/157] R66 PASS :: Write Short Story from Three-Act Outline (Post-Apo :: route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=5 word_count=2767 persist=True
+[67/157] R67 PASS :: Write Chapter 1 from Three-Act Outline (AI Marketi :: route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=6 word_count=6346 persist=True
+[68/157] R68 PASS :: Write Short Story from Three-Act Outline (Politica :: route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=5 word_count=2813 persist=True
+[69/157] R69 PASS :: Write Chapter 1 from Three-Act Outline (Historical :: route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=7 word_count=7484 persist=True
+[70/157] R70 PASS :: Retrieve Outline — The Accord :: route exp=library.retrieve got=library.retrieve OK | items=1 found=True
+[71/157] R71 PASS :: Revise Outline — Add Prologue and Epilogue to The  :: route exp=brainstorm.revise-outline got=brainstorm.revise-outline OK | job=complete | outline title='The Accord' chapters=14 persisted=True projects_recent=3
+[72/157] R72 PASS :: Write Prologue — The Accord :: route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=8 word_count=6737 persist=True
+[73/157] R73 PASS :: Write Epilogue — The Accord :: route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=8 word_count=9621 persist=True
+[74/157] R74 PASS :: Retrieve Outline — The Correction :: route exp=library.retrieve got=library.retrieve OK | items=1 found=True
+[75/157] R75 PASS :: Revise Outline — Add Prologue to The Correction :: route exp=brainstorm.revise-outline got=brainstorm.revise-outline OK | job=complete | outline title='The Correction' chapters=13 persisted=True projects_recent=3
+[76/157] R76 PASS :: Write Prologue — The Correction :: route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=8 word_count=7406 persist=True
+[77/157] R77 PASS :: Retrieve Outline — The Optimization :: route exp=library.retrieve got=library.retrieve OK | items=1 found=True
+[78/157] R78 PASS :: Revise Outline — Add Epilogue Only to The Optimiza :: route exp=brainstorm.revise-outline got=brainstorm.revise-outline OK | job=complete | outline title='The Optimization' chapters=11 persisted=True projects_recent=3
+[79/157] R79 FAIL :: Write Epilogue — The Optimization :: route exp=chapter.write got=chapter.write OK | job=in_progress | async job did not complete
+[80/157] R80 PASS :: Retrieve Outline — The Consulship of Gaius Varro :: route exp=library.retrieve got=library.retrieve OK | items=1 found=True
+[81/157] R81 PASS :: Revise Outline — Add Prologue and Epilogue to Gaiu :: route exp=brainstorm.revise-outline got=chapter.write MISMATCH | job=complete | chapter rows recent=8 word_count=7477 persist=True
+[82/157] R82 PASS :: List All Outlines :: route exp=library.list-outlines got=library.list-outlines OK | items=21 found=None
+[83/157] R83 PASS :: List Outlines — Alternate Phrasing :: route exp=library.list-outlines got=library.list-outlines OK | items=21 found=None
+[84/157] R84 PASS :: Outline Version History — The Accord :: route exp=library.versions got=library.versions OK | count=4 versions=4
+[85/157] R85 PASS :: Outline Version History — The Correction :: route exp=library.versions got=library.versions OK | count=4 versions=4
+[86/157] R86 PASS :: Outline Version History — No Revisions :: route exp=library.versions got=library.versions OK | count=2 versions=2
+[87/157] R87 PASS :: Revert Outline — The Accord to Version 1 :: route exp=library.revert got=library.revert OK | job=complete | reverted=True
+[88/157] R88 PASS :: Verify Revert — Retrieve Reverted Outline :: route exp=library.retrieve got=library.retrieve OK | items=1 found=True
+[89/157] R89 FAIL :: Revert Outline — The Optimization to Pre-Epilogue  :: route exp=library.versions got=library.revert MISMATCH | job=complete | reverted=True
+[90/157] R90 PASS :: Revert Outline — Invalid Version Number :: route exp=library.revert got=library.revert OK | job=complete | reverted=False
+[91/157] R91 PASS :: Revert Outline — Project Not Found :: route exp=library.revert got=library.revert OK | job=complete | reverted=False
+[92/157] R92 PASS :: Outline Revision Creates Version Snapshot :: route exp=brainstorm.revise-outline got=brainstorm.revise-outline OK | job=complete | outline title='The Accord' chapters=11 persisted=True projects_recent=3
+[93/157] R93 PASS :: Verify Version History After Multiple Revisions :: route exp=library.versions got=library.versions OK | count=8 versions=8
+[94/157] R94 PASS :: Delete a Draft :: route exp=library.lifecycle got=library.lifecycle OK | job=complete | status=published matched=None error=Cannot delete published content — unpublish it first.
+[95/157] R95 PASS :: Delete Published Item — Error :: route exp=library.lifecycle got=library.lifecycle OK | job=complete | status=deleted matched=None error=None
+[96/157] R96 PASS :: List Deleted Items :: route exp=library.lifecycle got=library.lifecycle OK | status=4 matched=None error=None
+[97/157] R97 PASS :: List Deleted — Filter by Type :: route exp=library.lifecycle got=library.lifecycle OK | status=0 matched=None error=None
+[98/157] R98 FAIL :: Undelete Content :: route exp=library.lifecycle got=library.lifecycle OK | job=complete | status=None matched=False error=No content matching 'The Forgotten Engineers of Rome' found 
+[99/157] R99 PASS :: Verify Undelete — Item Returns to Drafts :: route exp=library.list-outlines got=library.retrieve MISMATCH | items=50 found=True
+[100/157] R100 PASS :: Email Outline :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=The Seed Vault — Outline err=None
+[101/157] R101 PASS :: Email Short Story :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=A disillusioned Roman soldier discovers err=None
+[102/157] R102 PASS :: Email Research Report :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=Research Report — Post-Apocalyptic Fiction Trends  err
+[103/157] R103 PASS :: Email Chapter :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=Chapter 1 — The Escort err=None
+[104/157] R104 PASS :: Email Newsletter :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=Revolutions That Remade the World err=None
+[105/157] R105 PASS :: Email Content Not Found :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=False to=None subject=None err=Couldn't find short_story matching 'A Story That Definitely Doe
+[106/157] V01 PASS :: Voice — Deep Research :: route exp=research.run got=research.run OK | job=complete | research_reports_v2 recent=5 | report_len=17637
+[107/157] V02 PASS :: Voice — Save Research :: route exp=research.run got=research.run OK | job=complete | research_reports_v2 recent=5 | report_len=17547
+[108/157] V03 FAIL :: Voice — Email Report :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=False to=None subject=None err=Couldn't find research matching 'that research'. No email sent.
+[109/157] V04 PASS :: Voice — Write Blog Post :: route exp=chapter.blog got=chapter.blog OK | job=complete | blog_post recent=5 word_count=1387 persist=True
+[110/157] V05 PASS :: Voice — Write Newsletter :: route exp=chapter.newsletter got=chapter.newsletter OK | job=complete | newsletter recent=4 word_count=956 persist=True
+[111/157] V06 PASS :: Voice — Write Short Story :: route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=5 word_count=2749 persist=True
+[112/157] V07 PASS :: Voice — Generate Cover Art :: route exp=media.cover-art got=media.cover-art OK | job=complete | generated_images recent=4 image_url=yes
+[113/157] V08 PASS :: Voice — Social Media (Twitter) :: route exp=media.social-posts got=media.social-posts OK | job=complete | platforms=['twitter']
+[114/157] V09 PASS :: Voice — Social Media (LinkedIn) :: route exp=media.social-posts got=media.social-posts OK | job=complete | platforms=['linkedin']
+[115/157] V10 PASS :: Voice — Social Media (Instagram) :: route exp=media.social-posts got=media.social-posts OK | job=complete | platforms=['instagram']
+[116/157] V11 PASS :: Voice — Brainstorm Story :: route exp=brainstorm.story got=library.retrieve MISMATCH | items=50 found=True
+[117/157] V12 PASS :: Voice — Write Chapter from Outline :: route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=8 word_count=7329 persist=True
+[118/157] V13 PASS :: Voice — List Drafts :: route exp=library.list-outlines got=library.retrieve MISMATCH | items=50 found=True
+[119/157] V14 PASS :: Voice — Approve and Publish :: route exp=library.lifecycle got=library.lifecycle OK | status=published matched=None error=None
+[120/157] V15 PASS :: Voice — Reject Draft :: route exp=library.lifecycle got=library.lifecycle OK | status=rejected matched=None error=None
+[121/157] V16 PASS :: Voice — Schedule Content :: route exp=library.lifecycle got=library.lifecycle OK | status=scheduled matched=None error=None
+[122/157] V17 PASS :: Voice — List Scheduled :: route exp=library.list-outlines got=library.retrieve MISMATCH | items=1 found=True
+[123/157] V18 PASS :: Voice — Story Bible :: route exp=story_bible.list got=story_bible.list OK | entries=48 found=True
+[124/157] V19 PASS :: Voice — Genre Inference (Ambiguous) :: route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=5 word_count=2442 persist=True
+[125/157] V20 PASS :: Voice — Messy/Natural Speech :: route exp=chapter.blog got=chapter.blog OK | job=complete | blog_post recent=5 word_count=1632 persist=True
+[126/157] V21 PASS :: Voice — List Research Reports :: route exp=library.list-outlines got=library.retrieve MISMATCH | items=2 found=True
+[127/157] V22 FAIL :: Voice — Multi-Step Voice Workflow :: route exp=research.run got=reply MISMATCH | research_reports_v2 recent=5 | report_len=0
+[128/157] V23 PASS :: Voice — Retrieve Content (No Callback) :: route exp=library.retrieve got=library.retrieve OK | items=2 found=True
+[129/157] V24 PASS :: Voice — Retrieve Research Report (No Callback) :: route exp=library.retrieve got=library.retrieve OK | items=22 found=True
+[130/157] V25 PASS :: Voice — Retrieve Draft Story (No Callback) :: route exp=library.retrieve got=library.retrieve OK | items=2 found=True
+[131/157] V26 PASS :: Voice — Retrieve & Callback — Review Mode :: route exp=notify.eve-callback got=notify.eve-callback OK | job=complete | kind=queued invoked=True found=None
+[132/157] V27 PASS :: Voice — Retrieve & Callback — Brainstorm Mode :: route exp=notify.eve-callback got=notify.eve-callback OK | job=complete | kind=queued invoked=True found=None
+[133/157] V28 PASS :: Voice — Callback Review with Editorial Feedback :: route exp=notify.eve-callback got=notify.eve-callback OK | job=complete | kind=queued invoked=True found=None
+[134/157] V29 PASS :: Voice — KB Cleanup (Back-to-Back Retrievals) :: route exp=notify.eve-callback got=notify.eve-callback OK | job=complete | kind=queued invoked=True found=None
+[135/157] V30 PASS :: Voice — Content Not Found :: route exp=notify.eve-callback got=notify.eve-callback OK | job=complete | kind=queued invoked=True found=None
+[136/157] V31 PASS :: Voice — Parallel Tasks + Callback :: route exp=chapter.newsletter got=queued MISMATCH | job=complete | newsletter recent=5 word_count=1056 persist=True
+[137/157] V32 PASS :: Voice — Centralized Email Verification :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=V32 Email Config Test err=None
+[138/157] V33 PASS :: Voice — Delete Draft :: route exp=library.lifecycle got=library.lifecycle OK | job=complete | status=published matched=None error=Cannot delete published content — unpublish it first.
+[139/157] V34 PASS :: Voice — Delete Published Error :: route exp=library.lifecycle got=library.lifecycle OK | job=complete | status=deleted matched=None error=None
+[140/157] V35 PASS :: Voice — List Deleted (Trash) :: route exp=library.lifecycle got=library.lifecycle OK | status=4 matched=None error=None
+[141/157] V36 FAIL :: Voice — Undelete :: route exp=library.lifecycle got=library.lifecycle OK | job=complete | status=None matched=False error=No content matching 'The Forgotten Engineers of Rome' found 
+[142/157] V37 PASS :: Voice — Email Outline :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=The Seed Vault — Outline err=None
+[143/157] V38 PASS :: Voice — Email Short Story :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=A disillusioned Roman soldier discovers err=None
+[144/157] V39 PASS :: Voice — Email Research Report :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=Research Report — Post-Apocalyptic Fiction Trends  err
+[145/157] V40 PASS :: Voice — Email Chapter :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=Chapter 1 — The Escort err=None
+[146/157] R110 PASS :: Brainstorm Book Outline with Story Arc :: route exp=brainstorm.story got=brainstorm.story OK | job=complete | outline title='The Signal Beneath' chapters=10 persisted=True projects_recent=4
+[147/157] R111 PASS :: Brainstorm Chapter Outline for Prologue (Same Arc) :: route exp=chapter.plan got=chapter.plan OK | job=complete | sub_chapters=5 arc=The Hero's Journey
+[148/157] R112 PASS :: Brainstorm Chapter Outline for Chapter 1 (Same Arc :: route exp=chapter.plan got=chapter.plan OK | job=complete | sub_chapters=5 arc=The Hero's Journey
+[149/157] R113 PASS :: Brainstorm Chapter Outline with Different Story Ar :: route exp=chapter.plan got=chapter.plan OK | job=complete | sub_chapters=5 arc=Fichtean Curve
+[150/157] R114 PASS :: Write Prologue (After Chapter Outline Exists) :: route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=8 word_count=5945 persist=True
+[151/157] R115 PASS :: Write Chapter 1 (After Chapter Outline Exists) :: route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=8 word_count=6603 persist=True
+[152/157] R116 PASS :: Write Chapter Without Chapter Outline (Should Trig :: route exp=chapter.plan got=chapter.write MISMATCH | job=complete | chapter rows recent=8 word_count=6757 persist=True
+[153/157] R117 PASS :: Write Chapter for Book Without Book Outline (Shoul :: route exp=library.retrieve got=chapter.write MISMATCH | job=complete | chapter rows recent=8 word_count=7405 persist=True
+[154/157] R118 PASS :: Revise Chapter Outline :: route exp=brainstorm.revise-outline got=chapter.plan MISMATCH | job=complete | sub_chapters=5 arc=The Hero's Journey
+[155/157] R119 PASS :: Consistency Check: Character Names :: route exp=chapter.qa got=chapter.qa OK | job=complete | qa/repair keys=['chapter_id', 'scores', 'findings', 'character_consistency', 'token_usage']
+[156/157] R120 PASS :: Kishōtenketsu Chapter Arc (No Conflict Structure) :: route exp=chapter.plan got=chapter.plan OK | job=complete | sub_chapters=5 arc=Kishōtenketsu
+[157/157] R121 PASS :: Full Pipeline: Outline → Chapter Outline → Write → :: route exp=library.retrieve got=chapter.write MISMATCH | job=complete | chapter rows recent=8 word_count=7732 persist=True
+
+DONE 2026-07-02T00:36:52.871701+00:00 :: {'PASS': 151, 'FAIL': 6}

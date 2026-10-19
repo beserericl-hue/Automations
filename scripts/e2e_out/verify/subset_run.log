@@ -1,0 +1,10 @@
+# Full E2E verify — 6 tests — start 2026-07-02T12:00:30.284548+00:00
+[1/6] R79 PASS :: Write Epilogue — The Optimization :: route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=1 word_count=8443 persist=True
+[2/6] R89 PASS :: Revert Outline — The Optimization to Pre-Epilogue  :: route exp=library.revert got=library.revert OK | job=complete | reverted=True
+[3/6] R98 PASS :: Undelete Content :: route exp=library.lifecycle got=library.lifecycle OK | job=complete | seed=e77a28f9 status=draft want=draft prestate=deleted
+[4/6] V03 PASS :: Voice — Email Report :: route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=voice test research report err=None
+[5/6] V22 FAIL :: Voice — Multi-Step Voice Workflow :: route exp=chapter.blog got=reply MISMATCH | blog_post recent=0 word_count=0 persist=None
+[6/6] V36 PASS :: Voice — Undelete :: route exp=library.lifecycle got=library.lifecycle OK | job=complete | seed=fbe02f83 status=draft want=draft prestate=deleted
+
+DONE 2026-07-02T12:34:56.300150+00:00 :: {'PASS': 5, 'FAIL': 1}
+EXIT 0

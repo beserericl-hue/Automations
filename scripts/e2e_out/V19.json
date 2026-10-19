@@ -1,0 +1,43 @@
+{
+  "test": {
+    "id": "V19",
+    "title": "Voice \u2014 Genre Inference (Ambiguous)",
+    "source": "voice",
+    "prompt": "Write me a story about ancient Egypt like pharaohs and pyramids and stuff",
+    "route": "chapter.short-story` (task)",
+    "prerequisite": "",
+    "expected": [
+      "flat queued",
+      "routes `chapter.short-story`",
+      "infers `ancient-history` from content",
+      "defaults fill missing params",
+      "Prime Directive",
+      "`published_content_v2`",
+      "CR-009 email"
+    ]
+  },
+  "response": {
+    "response": "Queuing your short story about ancient Egypt. I'll let you know when it's ready.",
+    "kind": "queued",
+    "tool": "chapter",
+    "op": "write",
+    "job_id": "a74b142bd4f7460994da72f123eef2bd",
+    "status": "queued"
+  },
+  "job_result": {
+    "job_id": "a74b142bd4f7460994da72f123eef2bd",
+    "status": "complete",
+    "result": {
+      "execution_id": "79add404-4fe3-4fbf-9ef5-e486922ea5e5",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValidationError",
+        "message": "2 validation errors for WriteChapterRequest\nproject_id\n  Field required [type=missing, input_value={'premise': 'A story abou...t': True, 'async': True}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nchapter_number\n  Field required [type=missing, input_value={'premise': 'A story abou...t': True, 'async': True}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

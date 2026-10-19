@@ -1,0 +1,181 @@
+{
+  "id": "VP01",
+  "title": "Brainstorm 'The Last Signal' (post-apoc, Hero's Journey, 6 ch)",
+  "message": "Brainstorm a post-apocalyptic novel called \"The Last Signal\" using the Hero's Journey arc with 6 chapters. The protagonist is Maya Chen, a former radio engineer, twenty-eight, who intercepts a signal that shouldn't exist and follows it across the Rust Coast wastelands in 2087.",
+  "verdict": "PASS",
+  "evidence": "persisted=True chapters=8 project_found=True",
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing the brainstorm for \"The Last Signal\" \u2014 I'll let you know when the outline is ready.",
+    "tool": "brainstorm",
+    "op": "story",
+    "data": null,
+    "job_id": "bed38670ebe642c88b12c052e615868b",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "bed38670ebe642c88b12c052e615868b",
+    "status": "complete",
+    "result": {
+      "execution_id": "b3b60201-b453-4209-ad1d-8f8f4893a96a",
+      "step_name": "brainstorm",
+      "status": "ok",
+      "payload": {
+        "op": "story",
+        "result": {
+          "outline": {
+            "title": "The Last Signal",
+            "premise": "Seven years after a solar electromagnetic pulse destroys global infrastructure, a former radio engineer discovers that a repeating signal buried in atmospheric static is not random noise \u2014 it is a structured transmission from a pre-collapse government bunker whose occupants believe the outside world is dead. To reach the bunker before a warlord's army does, she must cross 400 miles of fractured wasteland, decode the signal's coordinates, and decide whether the bunker's secret \u2014 a cache of seed-vault biotechnology that could restart agriculture \u2014 belongs to everyone or only to those with the power to control it.",
+            "themes": [
+              "Knowledge as power and responsibility",
+              "The cost of hope in a world that has learned to live without it",
+              "Who decides who survives",
+              "The moral weight of a secret kept for survival",
+              "Loyalty versus the greater good"
+            ],
+            "story_arc_name": "The Hero's Journey",
+            "dramatic_question": "Can radio engineer Mara Voss decode the last signal, reach the buried bunker, and bring its life-saving biotechnology to the wasteland's survivors before the warlord Crale seizes it and uses it to enslave them?",
+            "wow_factor": "The protagonist decodes a real, technically accurate radio transmission step by step across the novel \u2014 teaching the reader exactly how pre-collapse emergency broadcast protocols work \u2014 so the reader solves the puzzle alongside her, making the bunker's location feel genuinely earned rather than handed over by plot convenience.",
+            "characters": [
+              {
+                "name": "Mara Voss",
+                "role": "Protagonist and POV character",
+                "archetype": "The engineer-survivor: a woman whose technical mind is her greatest weapon and her greatest prison.",
+                "off_axis_attribute": "She is brilliant with systems and frequencies but catastrophically bad at reading human loyalty \u2014 she trusts schematics more than people and has been betrayed twice because of it; she knows this about herself and still cannot stop doing it.",
+                "dramatic_question": "Will Mara deliver the bunker's biotechnology to the survivors who need it, or will her inability to trust the right people get everyone killed \u2014 including herself?",
+                "description": "Mara is 34, lean and sun-darkened, with hands that are always doing something \u2014 splicing wire, tapping code, adjusting a dial. Before the Pulse she was a broadcast engineer for a regional public radio station in the American interior. She collects pre-collapse technical manuals the way others collect food. Her private worry is that she has become so adapted to the wasteland that she no longer remembers what she was trying to survive for. She has one friend she likes for no plot reason: an elderly scavenger named Dov who trades her batteries for company and never asks her anything important. What would humiliate her: being proven wrong about a technical calculation in front of people who depend on her. What would terrify her: discovering that the signal is a trap laid specifically for people like her. What would make her happy: hearing a human voice on a frequency she has never tuned before.",
+                "moral_complication": "Midway through the journey, Mara discovers that the bunker's lead scientist, Dr. Okafor, deliberately withheld the seed-vault coordinates from the outside world for three years \u2014 not from cruelty but because he calculated that releasing them prematurely would trigger a war that would destroy the technology before it could be deployed. He was right. Mara can expose this to her allies, which will fracture the coalition she needs to reach the bunker, or she can keep it secret and use it as leverage \u2014 becoming exactly the kind of person who decides who gets to know the truth."
+              },
+              {
+                "name": "Crale",
+                "role": "Antagonist",
+                "archetype": "The warlord-pragmatist: a man who built order out of chaos and genuinely believes that centralised control is the only thing standing between the survivors and extinction.",
+                "off_axis_attribute": "He keeps a handwritten journal of every person who has died under his command, with a one-sentence note about each \u2014 not from guilt but from a compulsive need to account for the cost of his decisions; the journal is the most honest thing about him.",
+                "dramatic_question": "Will Crale seize the bunker's technology and consolidate power, or will the journal's accumulating weight finally break his certainty that control equals survival?",
+                "description": "Crale is 51, broad-shouldered, with a military bearing that survived the Pulse intact. He was a FEMA regional coordinator before the collapse and genuinely saved thousands of lives in the first two years. His army is disciplined and fed. He is not a monster \u2014 he is a man who decided that democracy was a luxury the apocalypse could not afford, and has been paying for that decision ever since. He has a private hobby: he repairs pre-collapse mechanical watches, which he gives away to people who impress him. What would humiliate him: being shown that his control has made people more afraid than safe. What would terrify him: losing the journal. What would make him happy: a world orderly enough that he could stop making the calculations he makes.",
+                "moral_complication": "Crale knows that if Mara distributes the seed-vault technology freely, some communities will misuse it, some will hoard it, and the resulting conflict will kill more people in the short term than his controlled distribution would. He is probably right about the short term. He is almost certainly wrong about the long term. The reader cannot easily dismiss his arithmetic."
+              },
+              {
+                "name": "Tom\u00e1s Reyes",
+                "role": "Ally and secondary POV character",
+                "archetype": "The former soldier turned reluctant guide: a man who knows the wasteland's routes and factions better than anyone alive.",
+                "off_axis_attribute": "He is physically fearless \u2014 he has walked into Crale's camps alone to barter \u2014 but he is secretly terrified of enclosed spaces, a phobia that becomes catastrophic when the journey requires entering underground infrastructure.",
+                "dramatic_question": "Will Tom\u00e1s choose loyalty to Mara's mission over the deal he has already made with Crale's lieutenant to deliver her location?",
+                "description": "Tom\u00e1s is 41, wiry and weather-beaten, with a scar across his jaw from a pre-collapse bar fight that he finds funnier than anyone else does. He was a US Army combat engineer before the Pulse \u2014 he knows how to blow things up, build things, and navigate by stars. He guides small groups across the wasteland for food and ammunition. He has a daughter, Pilar, who lives in a settlement three days east; he has not seen her in eight months. His private worry is that Pilar has stopped waiting for him. He likes Mara because she never pretends to be fine when she is not. What would humiliate him: showing his claustrophobia in front of people who need him to be steady. What would terrify him: learning that Pilar joined Crale's settlements. What would make him happy: a road safe enough to walk without checking over his shoulder.",
+                "moral_complication": "Tom\u00e1s made the deal with Crale's lieutenant before he understood what the bunker contained. Now he knows. He can honour the deal \u2014 which will get Mara captured and the technology controlled \u2014 or he can break it, which will put Pilar's settlement in Crale's crosshairs as punishment."
+              },
+              {
+                "name": "Dr. Amara Okafor",
+                "role": "The bunker's lead scientist and moral fulcrum",
+                "archetype": "The keeper of the secret: a scientist who made a terrible calculation and has been living inside it for three years.",
+                "off_axis_attribute": "She is a world-class botanist and geneticist who, since the Pulse, has developed an obsessive, almost religious relationship with a single living tomato plant she has kept alive in the bunker for seven years \u2014 she talks to it, names it, and her emotional state can be read entirely through how she tends it.",
+                "dramatic_question": "Will Dr. Okafor release the seed-vault technology on her own terms, or will she finally accept that the calculation she made three years ago \u2014 however correct \u2014 was not hers alone to make?",
+                "description": "Amara is 58, small and precise, with the focused stillness of someone who has learned to conserve every calorie of energy. She was a senior researcher at a USDA seed-preservation facility that was retrofitted into the bunker after the Pulse. She has kept 23 survivors alive underground for seven years through sheer organisational discipline. She started transmitting the signal six months ago when the bunker's power reserves finally reached a level she judged sufficient to risk contact. She has not told the other bunker survivors what the signal says or why she sent it. What would humiliate her: being told that her three years of silence cost lives she could have saved. What would terrify her: the tomato plant dying. What would make her happy: seeing a field of growing things under open sky.",
+                "moral_complication": "Okafor withheld the signal for three years because she calculated that premature release would trigger a resource war. She was right \u2014 Crale's army is already moving. But the three years of silence also meant that dozens of communities starved who might have been saved. She cannot unknow this. Neither can the reader."
+              },
+              {
+                "name": "Sable",
+                "role": "Antagonist's lieutenant and mirror character",
+                "archetype": "The true believer who is beginning to doubt: a young enforcer who has built her entire identity on Crale's vision.",
+                "off_axis_attribute": "She is Crale's most effective field commander and also, privately, a gifted poet \u2014 she writes in a small notebook she keeps inside her body armour, and the poems are nothing like the person she presents to the world.",
+                "dramatic_question": "Will Sable carry out Crale's order to destroy the bunker's technology if it cannot be secured, or will the poems she has been writing \u2014 which are, without her realising it, about a world she wants rather than the one she enforces \u2014 finally speak louder than her loyalty?",
+                "description": "Sable is 27, tall and angular, with the economical movements of someone trained to waste nothing. She was 20 when the Pulse hit \u2014 old enough to remember the old world, young enough to have built her entire adult identity in the new one. She found Crale's organisation at 21 and rose fast. She has never questioned an order. She is beginning to. What would humiliate her: anyone reading the poems. What would terrify her: Crale being wrong about something fundamental. What would make her happy: she does not yet know, which is the most frightening thing about her situation."
+              }
+            ],
+            "chapters": [
+              {
+                "chapter_number": 0,
+                "title": "Prologue: Static",
+                "act": "Setup",
+                "arc_point": "Stage 1 \u2014 Ordinary World",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "N/A \u2014 opening",
+                "beat": "Seven years after the Pulse, Mara lives alone in a repurposed water tower on the edge of a survivor settlement, spending her nights scanning dead frequencies on a hand-built receiver; she hears nothing but static, and the prologue ends on the image of her writing in a log: 'Day 2,547. Nothing.' \u2014 establishing the ordinary world of silence and diminished hope.",
+                "arc_notes": "Hero's Journey Stage 1: Ordinary World. Establishes Mara's baseline \u2014 her competence, her isolation, her private longing for a signal that never comes. The emotional tone is disciplined grief."
+              },
+              {
+                "chapter_number": 1,
+                "title": "The Frequency",
+                "act": "Act 1 \u2014 Setup",
+                "arc_point": "Stage 2 \u2014 Call to Adventure / Stage 3 \u2014 Refusal of the Call",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Direct continuation: Mara at her receiver, the morning after the prologue's log entry.",
+                "beat": "Mara detects a faint, structured repeating signal buried in atmospheric noise \u2014 three tones, a pause, five tones, a pause, then a burst of what she recognises as corrupted Morse; she spends the chapter decoding the first layer and realises it is not random, it is a deliberate transmission using a pre-collapse FEMA emergency protocol she helped design. Her refusal: she tells herself it is a trap, a ghost signal, a reflection \u2014 anything but what it is \u2014 and she nearly destroys her notes before stopping herself. Story turn: a second transmission arrives, different from the first, containing four characters she recognises as a partial grid coordinate.",
+                "arc_notes": "Hero's Journey Stages 2 and 3: Call to Adventure and Refusal. The signal is the call; Mara's rationalisation is the refusal. The chapter ends with the partial coordinate \u2014 the door is open and she cannot pretend she did not see it."
+              },
+              {
+                "chapter_number": 2,
+                "title": "The Guide and the Deal",
+                "act": "Act 1 \u2014 Setup into Threshold",
+                "arc_point": "Stage 4 \u2014 Meeting the Mentor / Stage 5 \u2014 Crossing the Threshold",
+                "pov_character": "Tom\u00e1s Reyes",
+                "bridge_from_prior": "Thread: Mara brings her decoded partial coordinate to the settlement's trading post to find a guide; Tom\u00e1s is the guide she is directed to \u2014 the scene opens from his POV as she arrives and shows him the coordinate fragment.",
+                "beat": "Tom\u00e1s recognises the grid sector immediately \u2014 it is deep in contested territory, three days inside Crale's expanding border \u2014 and he refuses, then negotiates, then agrees when Mara shows him the full signal structure and he understands what the bunker must contain; the mentor figure here is split: Tom\u00e1s provides the wasteland knowledge and Mara provides the technical knowledge, each equipping the other. Moral complication introduced: Tom\u00e1s's scene ends with him alone, writing a message to Crale's lieutenant \u2014 he has already been paid to report unusual radio activity in this settlement. He sends it. Story turn: Crale's army, 200 miles west, begins to move.",
+                "arc_notes": "Hero's Journey Stages 4 and 5: Meeting the Mentor (mutual equipping between Mara and Tom\u00e1s) and Crossing the Threshold (they depart the settlement at dawn \u2014 the door closes). The POV switch to Tom\u00e1s is bridged by Mara's arrival at the trading post; his betrayal is the first crack in the alliance."
+              },
+              {
+                "chapter_number": 3,
+                "title": "The Wasteland's Rules",
+                "act": "Act 2 \u2014 Rising Complications",
+                "arc_point": "Stage 6 \u2014 Tests, Allies, and Enemies",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: direct continuation of the journey \u2014 Mara and Tom\u00e1s are two days out from the settlement, navigating the contested zone; Mara is decoding the next layer of the signal as they travel.",
+                "beat": "Three scenes of escalating trial: (1) Mara and Tom\u00e1s are stopped at a checkpoint run by a small independent faction who confiscate Mara's receiver \u2014 she has to rebuild a functional antenna from scavenged parts overnight to continue decoding; (2) Tom\u00e1s's claustrophobia is exposed when they must pass through a collapsed highway underpass, and Mara sees him freeze \u2014 she covers for him but files it away; (3) Mara decodes the second coordinate layer and realises the bunker is not where she expected \u2014 it is 40 miles deeper into Crale's territory than the partial grid suggested. New dramatic problem: the signal's third transmission contains a countdown \u2014 the bunker's backup power will fail in eleven days, sealing it permanently. Story turn: Sable's advance unit is now one day behind them.",
+                "arc_notes": "Hero's Journey Stage 6: Tests, Allies, and Enemies. The special world reveals its rules \u2014 checkpoints, factions, the physics of the wasteland. Mara's technical skill is tested practically. Tom\u00e1s's hidden weakness is exposed. The countdown is the new dramatic problem that did not exist in the setup."
+              },
+              {
+                "chapter_number": 4,
+                "title": "The Inmost Cave",
+                "act": "Act 2 \u2014 Midpoint Reversal",
+                "arc_point": "Stage 7 \u2014 Approach to the Inmost Cave / Stage 8 \u2014 The Ordeal",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: Mara and Tom\u00e1s reach the bunker's surface entrance \u2014 a decommissioned weather station \u2014 using the coordinates Mara has now fully decoded; the chapter opens as they break the surface seal.",
+                "beat": "They descend into the bunker and meet Dr. Okafor and the 23 survivors; the approach is the tense negotiation of trust between the surface people and the bunker people. The Ordeal arrives in two waves: first, Tom\u00e1s confesses his deal with Crale's lieutenant \u2014 he told them the settlement's location but not the bunker's; Mara's trust in him shatters and she must decide whether to expel him from the group with Sable one day away, or keep him because she needs his knowledge; second, Dr. Okafor reveals that she withheld the signal for three years and shows Mara the death-toll calculations she made \u2014 the moral complication lands fully. Mara must choose: expose Okafor to the bunker survivors and fracture the group, or keep the secret and use it as leverage to control the distribution plan. She keeps the secret. Story turn: Sable's unit reaches the surface entrance.",
+                "arc_notes": "Hero's Journey Stages 7 and 8: Approach to the Inmost Cave and The Ordeal. The ordeal is not physical \u2014 it is the double betrayal (Tom\u00e1s, Okafor) and Mara's own moral compromise in response. She emerges from this chapter having made a choice she cannot undo and is not sure was right. This is the midpoint reversal: she came to retrieve a gift and discovered she has become the kind of person who keeps secrets."
+              },
+              {
+                "chapter_number": 5,
+                "title": "The Reward and the Reckoning",
+                "act": "Act 2 \u2014 Crisis into Act 3",
+                "arc_point": "Stage 9 \u2014 Reward / Stage 10 \u2014 Road Back",
+                "pov_character": "Sable",
+                "bridge_from_prior": "Thread: Sable's unit has breached the weather station above; the chapter opens from Sable's POV as she descends toward the bunker door \u2014 she has Crale's order to secure the technology or destroy it.",
+                "beat": "Sable reaches the bunker's inner door and makes radio contact with Crale; he gives the order to destroy the seed vault if it cannot be extracted intact and controlled. Inside, Mara has used the eleven-day countdown as leverage to force Okafor to begin transmitting the full seed-vault protocols openly on every frequency \u2014 the reward is not a physical object but a broadcast, the technology released into the air before anyone can stop it. Sable hears the broadcast begin on her own radio. New dramatic problem: Crale, receiving the broadcast, orders Sable to execute everyone in the bunker. Sable opens her notebook. Story turn: she does not give the order. She tells her unit the bunker is empty. The Road Back begins \u2014 Mara must now get the bunker's people to the surface and into the open wasteland before Crale's main force arrives and Sable's lie is discovered.",
+                "arc_notes": "Hero's Journey Stages 9 and 10: Reward (the broadcast \u2014 the technology released, irreversible) and Road Back (the race to the surface with Crale's army closing). The POV switch to Sable is bridged by her physical arrival at the bunker door; her choice not to execute is the consequence of the poems \u2014 the first time her inner life overrides her loyalty. This is the chapter's new dramatic problem: Sable has bought them time but created a new threat to herself."
+              },
+              {
+                "chapter_number": 6,
+                "title": "The Last Signal",
+                "act": "Act 3 \u2014 Climax and Resolution",
+                "arc_point": "Stage 11 \u2014 Resurrection / Stage 12 \u2014 Return with the Elixir",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: direct continuation \u2014 Mara leads the bunker survivors up through the weather station as Crale's main force arrives at the perimeter; Tom\u00e1s, who has stayed, is at the surface holding the entrance.",
+                "beat": "The Resurrection: Crale himself arrives and confronts Mara at the surface \u2014 not with violence but with his arithmetic, his journal, his genuine belief that she has just condemned thousands to a resource war. Mara's response is to show him the broadcast log \u2014 the seed-vault protocols are already being received by seventeen settlements; the technology is no longer a secret that can be controlled, only a fact that can be used or ignored. Crale opens his journal and writes one sentence. He stands down. The climax is resolved not by force but by the irreversibility of information. Resolution: Tom\u00e1s reunites with Pilar, who has come to the surface with a group from her settlement that received the broadcast \u2014 she heard it and came. Dr. Okafor steps outside and sees open sky for the first time in seven years; she is holding the tomato plant. Sable, standing apart from Crale's army, tears a page from her notebook and gives it to Mara \u2014 it is a poem about a field. Mara transmits one final signal on the bunker's frequency: her own voice, saying the settlement coordinates where the seed protocols can be collected. Story turn and final image: someone, somewhere, transmits back.",
+                "arc_notes": "Hero's Journey Stages 11 and 12: Resurrection (Mara faces Crale and the full weight of her choices \u2014 the secret she kept, the trust she broke, the broadcast she forced \u2014 and survives them all by accepting that the technology was never hers to control) and Return with the Elixir (the elixir is the broadcast itself \u2014 knowledge released, irreversible, belonging to everyone). The ending impacts all five major characters with different emotional stakes: Mara earns the reply she has waited 2,547 days for; Tom\u00e1s gets Pilar; Okafor gets the sky; Sable gets the first honest act of her adult life; Crale writes his last journal entry and stops."
+              },
+              {
+                "chapter_number": 7,
+                "title": "Epilogue: Open Frequency",
+                "act": "Resolution",
+                "arc_point": "Stage 12 \u2014 Return with the Elixir (coda)",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: three months after the broadcast; Mara is back at her receiver in the water tower \u2014 the same image as the prologue, but transformed.",
+                "beat": "Mara's log reads 'Day 2,637. Fourteen settlements transmitting. Frequency open.' She is no longer scanning for a signal \u2014 she is coordinating them. The final line is not written in the log; it is spoken aloud into the microphone, and the chapter ends before we hear the reply \u2014 the reader understands it is coming.",
+                "arc_notes": "Hero's Journey Stage 12 coda: the ordinary world is the same water tower, the same receiver, but the hero is unrecognisably different \u2014 she is no longer waiting, she is transmitting. The circular structure of the monomyth is complete: she left a world of silence and returned to it carrying sound."
+              }
+            ]
+          },
+          "persist": {
+            "persisted": true,
+            "project_id": "dd10c1c3-e025-4cd7-854d-21db32a2e4da",
+            "created_project": false
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

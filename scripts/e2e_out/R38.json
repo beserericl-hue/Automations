@@ -1,0 +1,41 @@
+{
+  "test": {
+    "id": "R38",
+    "title": "Unknown Genre Slug",
+    "source": "chat",
+    "prompt": "Write a blog post in the cyberpunk genre. Genre slug: cyberpunk. Topic: \"Neon and Chrome\". Target length: 1000 words.",
+    "route": "chapter.blog` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `chapter.blog`, kind=queued; asks clarification OR picks closest genre (political-scifi)",
+      "Does NOT crash / null genre config; if it proceeds, blog generates; job reaches complete; CR-009 email received"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing a blog post about 'Neon and Chrome' in the cyberpunk genre. I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "blog",
+    "data": null,
+    "job_id": "0c797083a5ad489ca09a173678080e0b",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "0c797083a5ad489ca09a173678080e0b",
+    "status": "complete",
+    "result": {
+      "execution_id": "69978643-1594-4baa-b8dd-05edceb8738d",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValueError",
+        "message": "invalid literal for int() with base 10: '1000 words'",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

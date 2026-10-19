@@ -1,0 +1,42 @@
+{
+  "test": {
+    "id": "R79",
+    "title": "Write Epilogue \u2014 The Optimization",
+    "source": "chat",
+    "prompt": "Write the epilogue for \"The Optimization\". Genre slug: ai-marketing.",
+    "route": "chapter.write` (task)",
+    "prerequisite": "R78",
+    "expected": [
+      "routes to `chapter.write`, kind=queued; complete; chapter_number=Epilogue; labeled \"Epilogue\"",
+      "content = 5 years later, AI rebuilt (matches R78); closure; 1500-3000 words; `published_content_v2` row",
+      "email subject \"The Optimization - Epilogue\"; chapter_count NOT incremented; snapshot; Prime Directive"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing the epilogue for \"The Optimization\" \u2014 I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "write",
+    "data": null,
+    "job_id": "8c96e9337e4642f38dc42af27ef1be6b",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "8c96e9337e4642f38dc42af27ef1be6b",
+    "status": "complete",
+    "result": {
+      "execution_id": "f322705b-a40f-4928-b8f4-aae20d2a5dd8",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValidationError",
+        "message": "2 validation errors for WriteChapterRequest\nproject_id\n  Field required [type=missing, input_value={'project_title': 'The Op...t': True, 'async': True}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nchapter_number\n  Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='epilogue', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/int_parsing",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

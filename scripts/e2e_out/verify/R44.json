@@ -1,0 +1,72 @@
+{
+  "id": "R44",
+  "title": "Prime Directive \u2014 Newsletter",
+  "route": "`chapter.newsletter` (task) \u00b7 impl: built (E2E-3)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=chapter.newsletter got=chapter.newsletter OK",
+    "job=complete",
+    "newsletter recent=3 word_count=1221 persist=True"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Write a newsletter for the ancient-history genre. Topic: \"New Archaeological Discoveries Reshaping Our Understanding of Ancient Egypt\". Genre slug: ancient-history. Date: 2026-03-10."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Queuing your newsletter for the ancient-history genre. I'll let you know when it's ready.",
+        "tool": "chapter",
+        "op": "newsletter",
+        "data": null,
+        "job_id": "d3e1665969b24de19567e5cf04cb3353",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "d3e1665969b24de19567e5cf04cb3353",
+        "status": "complete",
+        "result": {
+          "execution_id": "a4681ae1-4e7c-4931-ac60-2cbef943cd9d",
+          "step_name": "chapter",
+          "status": "ok",
+          "payload": {
+            "op": "newsletter",
+            "result": {
+              "written": true,
+              "title": "Sand, Salt, and Secrets: The New Archaeology of Ancient Egypt",
+              "subject_line": "They Found a 1,300-Metre Tunnel Beneath Ancient Egypt \u2014 And That's Just the Start",
+              "content_text": "_Royal tombs, gilded hieroglyphs, 2,000 ram mummies, Egypt is rewriting its own story._\n\nPicture a narrow trench in the Nile Delta. The walls sweat. A pump chugs steadily in the background, fighting groundwater that rises faster than the team can dig. Six metres below the Roman rubble, a mudbrick wall emerges from the clay, untouched for 2,600 years. This is Egyptian archaeology in 2024: muddy, technically demanding, and producing discoveries that force historians to rethink what they thought they knew. From the marshy Delta to the cliffs of Upper Egypt, a string of recent finds is reshaping our picture of ancient Egyptian religion, engineering, and daily life. Here is what the shovels and sensors have turned up.\n\n## A Lost Temple Buried Under the Delta Mud\n\nTell el-Fara'in, in the western Nile Delta, was once the city of Buto, a sacred place long before the pharaohs built pyramids. Today it is low, waterlogged farmland, and excavating it means fighting the ground itself. Pumps run constantly. Raised walkways cross reed-choked depressions. The soil is a sticky, saturated clay that clings to every tool.\n\nBeneath the Roman and Ptolemaic debris at a mound called Kom C, archaeologists suspected something older was hiding. Rather than dig blind, they used electrical resistivity tomography, inserting metal electrodes into the ground and passing small electric currents through the soil. The team recorded 1,332 individual measurements, which a computer assembled into a 3D map of what lay below. The image was clear: a rectangular structure roughly 25 by 20 metres, sitting 3 to 6 metres down. (https://www.science-et-vie.com/science-et-culture/l-egypte/un-secret-garde-pendant-plus-de-2000-ans-enfouie-sous-une-ville-egyptienne-une-mysterieuse-structure-vieille-de-2600-ans-vient-detre-decouverte-234244.html)\n\nWhen targeted test trenches confirmed the signal, the walls that emerged were mudbrick laid on an artificial sand foundation, a construction technique specific to the Saite, or 26th, Dynasty, dating to the 7th and 6th centuries BCE. Among the first objects recovered: amulets and a steatite scarab bearing the cartouche of Thutmose III, mixed into ritual debris above the structure. The building's scale, its altar-like feature, and the ritual character of the finds point to a temple or priestly complex. For now, it remains mostly underground, waiting for the pumps and the patience of future seasons. (https://www.en-vols.com/inspirations/culture/egypte-tell-el-farain-edifice-antique/)\n\n## The Tunnel Beneath Taposiris Magna\n\nWest of Alexandria, where the desert meets the Mediterranean coast, lie the ruins of Taposiris Magna. Archaeologists working beneath the site have mapped a tunnel more than 1,300 metres long, cut deep into the bedrock. Its height and direction stay almost perfectly consistent along the entire length, a feat of ancient planning that engineers today describe as geometrically remarkable. (https://www.youtube.com/watch?v=s9LQFcLCVcA)\n\nExploring it is slow work. The air is damp and carries salt from the nearby sea. In places, ancient collapses have narrowed the passage to a crawl. Artificial lighting strings along the straight stretches, and scaffolding props up fractured sections of the roof. The tunnel's purpose is still debated, but its scale and precision confirm that the builders of Taposiris Magna were solving serious engineering problems, not improvising.\n\nTaposiris Magna has drawn international attention in recent years partly because of speculation about elite burials in its vicinity. Whatever the tunnel ultimately yields, its existence alone expands what we know about the infrastructure hidden beneath Egypt's ancient cities.\n\n## A Royal Tomb at Abydos, Gilded and Stocked for Eternity\n\nAbydos, in Upper Egypt, has been excavated for over a century. It still surprises. A recently uncovered royal tomb, roughly 3,600 years old and dating to the Second Intermediate Period, was found with its walls covered in gilded hieroglyphs, texts praising the gods, preserving the name and titles of a ruler whose identity is still being confirmed. The tomb's layout mirrors other known royal burials at the site, suggesting a standardised approach to elite funerary architecture during this turbulent era between the Middle and New Kingdoms. (https://www.youtube.com/watch?v=NUniKKifq4o)\n\nThe complex is not just a burial chamber. Alongside the tomb, excavators found large clay ovens, storage rooms, and quantities of inscribed ostraca, the limestone flakes and pottery sherds used as everyday writing surfaces. This was an active mortuary operation: bread was baked here, supplies were stored, administrative notes were written. The dead required a staff.\n\nOne detail from the human remains found at Abydos is quietly striking. The stomach contents of one individual preserved more than 130 melon seeds, likely a watermelon-like fruit eaten in the hot months before death. It is the kind of small, specific fact that makes a 3,600-year-old person suddenly feel close.\n\n## Two Thousand Years of Burials in a Single Saqqara Tomb\n\nSaqqara, the vast necropolis south of Cairo, has yielded another layered discovery. An Egyptian-Japanese team exposed a rock-cut tomb whose earliest chambers were carved during the 2nd Dynasty, around 2650 BCE, already a sophisticated piece of work for its time. But the tomb did not stay sealed. Later generations found it and used it again. (https://www.youtube.com/watch?v=CvUv84wJV1U)\n\nInside the same space, excavators found an 18th-Dynasty coffin containing a well-preserved alabaster vessel, and Ptolemaic-period burials added centuries later still. The tomb's interior is a cross-section of Egyptian funerary practice spanning nearly two millennia. Among the finds: human remains buried with a coloured helmet, an infant burial, terracotta statues of Isis, amulets, pottery models, and ostraca written in hieratic, the cursive script used for everyday and religious texts.\n\nThis kind of long-term site reuse was not unusual in ancient Egypt. Sacred ground stayed sacred. A tomb that held power in 2650 BCE still held enough significance in the Ptolemaic period for families to place their dead beside ancestors they had never known.\n\n## Two Thousand Ram Mummies and a Renaissance in Egyptian Fieldwork\n\nAt Abydos, a separate mission working within a temple precinct uncovered more than 2,000 ram mummies, along with other animal offerings. They are stacked in dedicated chambers, their linen wrappings, resin, and painted casings creating a dense record of organised cult activity, almost certainly offerings to a ram-associated deity, possibly a local form of Osiris. The sheer number points to a sustained, large-scale religious operation running over many generations.\n\nWhat connects all of these discoveries, the Saite temple under the Delta mud, the Taposiris tunnel, the Abydos royal tomb, the Saqqara burial sequence, the ram mummies, is the approach behind them. Current fieldwork in Egypt increasingly pairs traditional excavation with remote sensing, resistivity tomography, and careful stratigraphic micro-excavation. International teams work under Egyptian leadership. Results are communicated publicly and quickly. (https://agencevu.com/serie/le-renouveau-de-larcheologie-egyptienne/)\n\nThe ground is not running out of secrets. If anything, better tools are showing how much remains.\n\nEach of these sites is still active. The Saite temple at Tell el-Fara'in has barely been touched. The Taposiris tunnel has not been fully explored. The Abydos tomb is still being read. Egyptian archaeology is not wrapping up old questions, it is opening new ones at a pace that would have seemed unlikely twenty years ago.\n\nIf you write historical fiction set in ancient Egypt, or simply love the ancient world, these discoveries offer raw material that no novelist could invent: a royal kitchen baking bread for the dead, a 1,300-metre tunnel cut straight through bedrock, a man who ate watermelon seeds on a summer day 36 centuries ago and never saw the autumn.\n\nWhich of these finds strikes you most? A hidden temple, a geometric tunnel, or two thousand mummified rams? Write back and tell us, or share this with someone who would want to know.",
+              "word_count": 1221,
+              "section_count": 5,
+              "persist": {
+                "persisted": true,
+                "content_id": "a53c3ed4-f666-4f4b-8d96-c50aedb3054b"
+              },
+              "token_usage": {
+                "calls": 2,
+                "input_tokens": 2374,
+                "output_tokens": 3647,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+                "total_tokens": 6021,
+                "cost_usd": 0.061827
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Write a newsletter for the ancient-history genre. Topic: \"New Archaeological Discoveries Reshaping Our Understanding of Ancient Egypt\". Genre slug: ancient-history. Date: 2026-03-10."
+    }
+  ],
+  "expected": [
+    "routes to newsletter durable saga, kind=queued; complete",
+    "No banned cliche words; gets to the point; specific findings; genuine tone; CR-009 email received"
+  ]
+}

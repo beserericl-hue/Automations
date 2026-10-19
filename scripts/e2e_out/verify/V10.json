@@ -1,0 +1,55 @@
+{
+  "id": "V10",
+  "title": "Voice \u2014 Social Media (Instagram)",
+  "route": "`media.social-posts` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=media.social-posts got=media.social-posts OK",
+    "job=complete",
+    "platforms=['instagram']"
+  ],
+  "steps": [
+    [
+      "voice",
+      "Turn that time travel story about the Titanic into Instagram posts with lots of hashtags"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "response": "Got it \u2014 I've started on that. It runs in the background and I'll let you know when it's ready.",
+        "kind": "queued",
+        "tool": "media",
+        "op": "social-posts",
+        "job_id": "294b30676ec044599106792ed8b7d0f6",
+        "status": "queued"
+      },
+      "job_result": {
+        "job_id": "294b30676ec044599106792ed8b7d0f6",
+        "status": "complete",
+        "result": {
+          "execution_id": "db938ceb-bf14-4c8a-95ab-262c7d2fabd4",
+          "step_name": "media",
+          "status": "ok",
+          "payload": {
+            "op": "social-posts",
+            "result": {
+              "instagram": "She had one chance to save everything\u2014and forty-eight hours to do it. When a single decision unravels a life built on lies, how far will you go to fix it? \ud83d\udd25 New thriller coming soon. #ThrillerBooks #Suspense #PageTurner"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Turn that time travel story about the Titanic into Instagram posts with lots of hashtags"
+    }
+  ],
+  "expected": [
+    "flat `{response, kind=\"queued\"}`",
+    "routes `media.social-posts`",
+    "platform=instagram",
+    "resolves \"that time travel story\" from context",
+    "20-30 hashtags",
+    "CR-009 email"
+  ]
+}

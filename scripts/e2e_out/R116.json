@@ -1,0 +1,41 @@
+{
+  "test": {
+    "id": "R116",
+    "title": "\u2014 Write Chapter Without Chapter Outline (Should Trigger Brainstorm First)",
+    "source": "chat",
+    "prompt": "Write Chapter 3 of \"The Signal Beneath\"",
+    "route": "chapter.plan` (task)",
+    "prerequisite": "R110; no chapter outline for Ch3",
+    "expected": [
+      "engine detects no chapter_outline for Ch3 \u2192 routes `chapter.plan` FIRST (NOT chapter.write); kind=queued; completed",
+      "chapter outline generated + saved; CR-009 email says \"outline emailed for review\"; chapter.write NOT called; no prose written; chat response says review the outline before writing"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing chapter 3 of \"The Signal Beneath\" \u2014 I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "write",
+    "data": null,
+    "job_id": "76e51c80305d41e986de1680b327c1d7",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "76e51c80305d41e986de1680b327c1d7",
+    "status": "complete",
+    "result": {
+      "execution_id": "cf3abe26-3147-43cc-a17e-da750bde3801",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValidationError",
+        "message": "1 validation error for WriteChapterRequest\nproject_id\n  Field required [type=missing, input_value={'project_title': 'The Si...t': True, 'async': True}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

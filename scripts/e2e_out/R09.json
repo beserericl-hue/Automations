@@ -1,0 +1,52 @@
+{
+  "test": {
+    "id": "R09",
+    "title": "Generate Cover Art (standalone)",
+    "source": "chat",
+    "prompt": "Generate cover art for a political-scifi short story called \"The Senate of Stars\". The story is about a diplomat navigating a galactic parliament where every species has a fundamentally different concept of justice. Genre slug: political-scifi. The image should show a vast circular chamber with alien delegates, lit by the light of a dying star through a massive viewport.",
+    "route": "media.cover-art` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `media.cover-art`, kind=queued; job reaches status=complete",
+      "Image generated and URL returned in job result",
+      "Art style matches political-scifi guidelines (dark, imposing, cerebral)",
+      "Email arrives with image attachment",
+      "No text/words in the image",
+      "Row exists in `generated_images_v2` (user_id=\"+14105914612\")",
+      "CR-009 task-completion email received"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Generating cover art for \"The Senate of Stars\" \u2014 I'll let you know when it's ready.",
+    "tool": "media",
+    "op": "cover-art",
+    "data": null,
+    "job_id": "e25567a78dc54358846556776651f1a2",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "e25567a78dc54358846556776651f1a2",
+    "status": "complete",
+    "result": {
+      "execution_id": "62510c95-f667-4f96-a8d4-7590969f5499",
+      "step_name": "media",
+      "status": "ok",
+      "payload": {
+        "op": "cover-art",
+        "result": {
+          "image_url": "https://gvbvwcnmjkdpclcisqrr.supabase.co/storage/v1/object/public/cover-images/+14105914612/20260621185236_untitled.png",
+          "storage_path": "+14105914612/20260621185236_untitled.png",
+          "provider": "kieai",
+          "persisted": true,
+          "db_recorded": true,
+          "prompt": "Professional book cover illustration for the novel \"Untitled\". evocative, atmospheric, high detail, dramatic lighting, portrait orientation, no text, no lettering, no title overlay"
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

@@ -1,0 +1,147 @@
+{
+  "id": "R113",
+  "title": "Brainstorm Chapter Outline with Different Story Arc",
+  "route": "`chapter.plan` (task) \u00b7 impl: built (E2E-4)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=chapter.plan got=chapter.plan OK",
+    "job=complete",
+    "sub_chapters=5 arc=Fichtean Curve"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Create a chapter outline for Chapter 2 of \"The Signal Beneath\" using the Fichtean Curve"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Planning chapter 2 for \"The Signal Beneath\" using the Fichtean Curve. I'll let you know when the outline is ready.",
+        "tool": "chapter",
+        "op": "plan",
+        "data": null,
+        "job_id": "e4ee5c7b03c843628d37d34d905e344b",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "e4ee5c7b03c843628d37d34d905e344b",
+        "status": "complete",
+        "result": {
+          "execution_id": "2496c2e1-c076-4112-aa65-b4f21bfd2868",
+          "step_name": "chapter",
+          "status": "ok",
+          "payload": {
+            "op": "plan",
+            "result": {
+              "chapter_number": 2,
+              "chapter_story_arc": "Fichtean Curve",
+              "book_arc": "The Hero's Journey",
+              "sub_chapter_briefs": [
+                {
+                  "number": 1,
+                  "title": "Knock and Announce",
+                  "beat": "Tom\u00e1s arrives at Mara's farmhouse on his regular morning run, notices the lights were on all night (lamp oil residue, cold coffee, her eyes), and she meets him at the door before he can knock \u2014 which she has never done before. He registers that something has changed in her before she says a word.",
+                  "pov_character": "",
+                  "brief": "Tom\u00e1s arrives at Mara's farmhouse on his regular morning run, notices the lights were on all night (lamp oil residue, cold coffee, her eyes), and she meets him at the door before he can knock \u2014 which she has never done before. He registers that something has changed in her before she says a word.",
+                  "arc_beat": "Opening in Medias Res \u2014 drop into tension already present; Tom\u00e1s reads Mara's state the way a courier reads weather",
+                  "characters": [
+                    "Tom\u00e1s Reyes",
+                    "Mara Voss"
+                  ],
+                  "setting": "Mara's farmhouse exterior and threshold, early morning, grey light, frost on the ground",
+                  "emotional_tone": "Quiet unease; the specific alertness of a man trained to notice what is wrong before being told",
+                  "connects_to_book_arc": "Stage 4 \u2014 Meeting the Mentor: establishes Tom\u00e1s as someone whose expertise Mara needs; the scene positions him as the person who will name what she has found and give it its full weight \u2014 his arrival is the moment the mentor enters the story"
+                },
+                {
+                  "number": 2,
+                  "title": "The Pattern",
+                  "beat": "Mara plays the recorded signal for Tom\u00e1s. He listens once, goes very still, asks her to play it again, and on the second pass identifies the encryption structure \u2014 a pre-Cascade military burst-transmission protocol, modified but unmistakable to anyone who spent three years running signals exercises with it. He tells her what that means: not a hobbyist, not a lucky scavenger. Someone rebuilt a hardened military transmitter. He names the implication she has been avoiding: the Reclamation Authority will already be hunting it.",
+                  "pov_character": "",
+                  "brief": "Mara plays the recorded signal for Tom\u00e1s. He listens once, goes very still, asks her to play it again, and on the second pass identifies the encryption structure \u2014 a pre-Cascade military burst-transmission protocol, modified but unmistakable to anyone who spent three years running signals exercises with it. He tells her what that means: not a hobbyist, not a lucky scavenger. Someone rebuilt a hardened military transmitter. He names the implication she has been avoiding: the Reclamation Authority will already be hunting it.",
+                  "arc_beat": "First Crisis \u2014 the stakes are raised beyond Mara's original framing; what she thought was a mystery is now a military-grade threat with a known predator already in motion",
+                  "characters": [
+                    "Tom\u00e1s Reyes",
+                    "Mara Voss"
+                  ],
+                  "setting": "Mara's workroom \u2014 the receiver on the bench, logbook open, the signal playing through a small speaker",
+                  "emotional_tone": "The specific dread of expertise: Tom\u00e1s knows exactly what he is hearing and wishes he did not",
+                  "connects_to_book_arc": "Stage 4 \u2014 Meeting the Mentor: Tom\u00e1s's military signals background is the gift the mentor brings; his identification of the protocol is the irreplaceable piece of knowledge that transforms the signal from curiosity to mission \u2014 and to danger"
+                },
+                {
+                  "number": 3,
+                  "title": "What He Carries",
+                  "beat": "A brief exhale: Tom\u00e1s makes coffee from his own supplies (a courier's luxury), and while his hands are busy he tells Mara about his route \u2014 six settlements, 400 miles of terrain he knows better than anyone alive on the eastern seaboard. He does not offer to guide her. He talks about the settlements the way a man talks about people he is responsible for. Mara listens and understands that he is telling her what the signal would mean to those people \u2014 warmth, medicine, contact \u2014 before she has asked him for anything. [ESCALATING THREAD PLANTED HERE: Tom\u00e1s mentions, almost in passing, that one of his route settlements \u2014 Harrow Station \u2014 was 'cleared out' two years ago by what people call a Reclamation sweep; he does not know the details, only the absence. This small fact will resurface with greater pressure in Chapter 4 when Mara and Tom\u00e1s pass through Harrow Country, and will explode in Chapter 6 when Aldric Senn's identity and his role in the Harrow Station massacre is revealed \u2014 the thread starts as geography, becomes history, becomes accusation.]",
+                  "pov_character": "",
+                  "brief": "A brief exhale: Tom\u00e1s makes coffee from his own supplies (a courier's luxury), and while his hands are busy he tells Mara about his route \u2014 six settlements, 400 miles of terrain he knows better than anyone alive on the eastern seaboard. He does not offer to guide her. He talks about the settlements the way a man talks about people he is responsible for. Mara listens and understands that he is telling her what the signal would mean to those people \u2014 warmth, medicine, contact \u2014 before she has asked him for anything. [ESCALATING THREAD PLANTED HERE: Tom\u00e1s mentions, almost in passing, that one of his route settlements \u2014 Harrow Station \u2014 was 'cleared out' two years ago by what people call a Reclamation sweep; he does not know the details, only the absence. This small fact will resurface with greater pressure in Chapter 4 when Mara and Tom\u00e1s pass through Harrow Country, and will explode in Chapter 6 when Aldric Senn's identity and his role in the Harrow Station massacre is revealed \u2014 the thread starts as geography, becomes history, becomes accusation.]",
+                  "arc_beat": "Mini-Resolution after First Crisis \u2014 brief recovery; backstory revealed in motion; the Harrow Station detail planted as a small, quiet story turn",
+                  "characters": [
+                    "Tom\u00e1s Reyes",
+                    "Mara Voss"
+                  ],
+                  "setting": "Mara's kitchen, the receiver audible from the next room, morning light strengthening",
+                  "emotional_tone": "Deceptive calm; the warmth of two people who trust each other inside a situation that is about to demand more than trust",
+                  "connects_to_book_arc": "Stage 4 \u2014 Meeting the Mentor: the mentor's gift is not only technical knowledge but route knowledge and the moral weight of the settlements he serves; this scene establishes what Tom\u00e1s is protecting and why his eventual condition matters"
+                },
+                {
+                  "number": 4,
+                  "title": "The Condition",
+                  "beat": "Tom\u00e1s agrees to guide Mara west \u2014 but only after extracting a specific promise: whatever she finds at the signal's source, whatever it is, she shares it with every settlement on his route. Not the Reclamation Authority. Not a single faction. Everyone. He names the settlements by name, slowly, like a list of the dead he is trying to keep alive. Mara makes the promise. The reader is immediately inside her qualification of it \u2014 she tells herself she means it, she tells herself she will mean it when the time comes, she tells herself the promise is conditional on the signal being what she thinks it is. She does not say any of this aloud. [ESCALATING THREAD CONTINUES: this promise \u2014 made sincerely on the surface, already being eroded underneath \u2014 is the lie that will pressure Mara in Chapter 5 when Priya asks her directly what she intends to do with the broadcast, and will reach its reckoning in Chapter 7 when Mara must choose, at the transmitter, between a targeted broadcast that serves her own need to act and the open broadcast Tom\u00e1s made her promise.]",
+                  "pov_character": "",
+                  "brief": "Tom\u00e1s agrees to guide Mara west \u2014 but only after extracting a specific promise: whatever she finds at the signal's source, whatever it is, she shares it with every settlement on his route. Not the Reclamation Authority. Not a single faction. Everyone. He names the settlements by name, slowly, like a list of the dead he is trying to keep alive. Mara makes the promise. The reader is immediately inside her qualification of it \u2014 she tells herself she means it, she tells herself she will mean it when the time comes, she tells herself the promise is conditional on the signal being what she thinks it is. She does not say any of this aloud. [ESCALATING THREAD CONTINUES: this promise \u2014 made sincerely on the surface, already being eroded underneath \u2014 is the lie that will pressure Mara in Chapter 5 when Priya asks her directly what she intends to do with the broadcast, and will reach its reckoning in Chapter 7 when Mara must choose, at the transmitter, between a targeted broadcast that serves her own need to act and the open broadcast Tom\u00e1s made her promise.]",
+                  "arc_beat": "Second Crisis \u2014 more personal and moral than the first; the cost is not physical danger but a promise that implicates Mara's character; the crisis is whether she is the person she is presenting herself as",
+                  "characters": [
+                    "Tom\u00e1s Reyes",
+                    "Mara Voss"
+                  ],
+                  "setting": "Mara's farmhouse, both of them standing now, the receiver still running in the background",
+                  "emotional_tone": "The specific discomfort of a promise made with full sincerity and immediate private reservation \u2014 Tom\u00e1s's gravity, Mara's performed certainty",
+                  "connects_to_book_arc": "Stage 5 \u2014 Crossing the Threshold: the promise is the door closing; Mara has committed to the journey and to a moral obligation she is already beginning to hedge; the threshold is not geographic but ethical"
+                },
+                {
+                  "number": 5,
+                  "title": "West",
+                  "beat": "They pack in near-silence, Tom\u00e1s with the efficiency of a man who has done this a thousand times, Mara with the controlled deliberateness of someone who knows she is leaving and does not know if she is coming back. She locks the farmhouse. She takes her logbook. She does not take the watch she was repairing \u2014 Dani's watch, the reader understands without being told \u2014 and then goes back for it at the last moment. As they move out onto the road heading west, Tom\u00e1s says, without looking at her: 'The RA will have the signal by now. We have maybe four days before they have people in the field.' Mara does not answer. The chapter ends on the road opening ahead of them and the farmhouse shrinking behind \u2014 and on Mara's private thought that she does not know yet whether the signal is hope or a trap, but that she has never been able to leave a frequency unresolved.",
+                  "pov_character": "",
+                  "brief": "They pack in near-silence, Tom\u00e1s with the efficiency of a man who has done this a thousand times, Mara with the controlled deliberateness of someone who knows she is leaving and does not know if she is coming back. She locks the farmhouse. She takes her logbook. She does not take the watch she was repairing \u2014 Dani's watch, the reader understands without being told \u2014 and then goes back for it at the last moment. As they move out onto the road heading west, Tom\u00e1s says, without looking at her: 'The RA will have the signal by now. We have maybe four days before they have people in the field.' Mara does not answer. The chapter ends on the road opening ahead of them and the farmhouse shrinking behind \u2014 and on Mara's private thought that she does not know yet whether the signal is hope or a trap, but that she has never been able to leave a frequency unresolved.",
+                  "arc_beat": "Climax and Resolution of the chapter's Fichtean arc \u2014 the commitment is made physical; the road west begins; the hook for Chapter 3 is planted in Tom\u00e1s's four-day warning, which is exactly the timeline Cassia Vane is now activating",
+                  "characters": [
+                    "Tom\u00e1s Reyes",
+                    "Mara Voss"
+                  ],
+                  "setting": "Mara's farmhouse exterior, then the road west, morning, open country",
+                  "emotional_tone": "Irrevocable forward motion; the specific grief of leaving a place you have made safe; the quiet terror of beginning",
+                  "connects_to_book_arc": "Stage 5 \u2014 Crossing the Threshold: the physical departure is the threshold crossing; the ordinary world (the farmhouse, the logbook, the receiver on the bench) is left behind; Tom\u00e1s's warning about the RA's timeline directly bridges to Chapter 3 and Cassia Vane's activation of the suppression team \u2014 the two timelines are now running in parallel and the reader feels both"
+                }
+              ],
+              "count": 5,
+              "persist": {
+                "persisted": true,
+                "chapter_number": 2
+              },
+              "token_usage": {
+                "calls": 1,
+                "input_tokens": 1824,
+                "output_tokens": 2092,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 9825,
+                "total_tokens": 13741,
+                "cost_usd": 0.073696
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Create a chapter outline for Chapter 2 of \"The Signal Beneath\" using the Fichtean Curve"
+    }
+  ],
+  "expected": [
+    "routes `chapter.plan`, `chapter_story_arc`=\"Fichtean Curve\"; completed",
+    "chapter_story_arc distinct from book's Hero's Journey; arc_beat = Fichtean stages; connects_to_book_arc still references Hero's Journey Ch2 stage; both arc prompt_texts loaded; no cross-contamination; CR-009 email"
+  ]
+}

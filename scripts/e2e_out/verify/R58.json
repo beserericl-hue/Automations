@@ -1,0 +1,110 @@
+{
+  "id": "R58",
+  "title": "Brainstorm Short Story \u2014 Three-Act Structure (Post-Apocalyptic)",
+  "route": "`brainstorm.story`/`brainstorm.short-story` (task) \u00b7 impl: built \u00b7 arc fidelity: built (E2E-4)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=brainstorm.story got=brainstorm.short-story MISMATCH",
+    "job=complete",
+    "outline title='Signal from the Deep' chapters=3 persisted=True projects_recent=3"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Brainstorm a short story using the Three-Act Structure about a radio operator in a flooded world who picks up a signal from a city that was supposed to be underwater. Genre: post-apocalyptic. Title: Signal from the Deep. 5 sections. Themes: hope vs. delusion, isolation, the pull of the impossible."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Queuing short story brainstorm for 'Signal from the Deep' \u2014 I'll let you know when it's ready.",
+        "tool": "brainstorm",
+        "op": "short-story",
+        "data": null,
+        "job_id": "90130f859568409d9bf367c704dd7929",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "90130f859568409d9bf367c704dd7929",
+        "status": "complete",
+        "result": {
+          "execution_id": "7489919b-44a1-4ff8-a600-a5940314db94",
+          "step_name": "brainstorm",
+          "status": "ok",
+          "payload": {
+            "op": "short-story",
+            "result": {
+              "outline": {
+                "title": "Signal from the Deep",
+                "premise": "In a world drowned by catastrophic flooding decades ago, Maren Voss operates a lonely radio relay station perched atop a half-submerged skyscraper. Her job is to log silence \u2014 to confirm that the dead cities below stay dead. When she picks up a coherent broadcast from Valence, a coastal metropolis that sank thirty years ago, she must decide whether the signal is proof of impossible survival, a trap laid by desperate scavengers, or the hallucination of a mind too long alone \u2014 and whether chasing it is an act of courage or the final surrender to delusion.",
+                "themes": [
+                  "Hope versus delusion \u2014 the danger and necessity of believing in the impossible",
+                  "Isolation as slow erosion of the self",
+                  "The pull of the impossible as both salvation and destruction"
+                ],
+                "story_arc_name": "",
+                "dramatic_question": "",
+                "wow_factor": "",
+                "characters": [
+                  {
+                    "name": "Maren Voss",
+                    "role": "Protagonist \u2014 solo radio operator at Relay Station Apex",
+                    "arc": "Begins as a woman who has made peace with a world of confirmed losses; ends having risked everything on an unverifiable hope, changed by the act of reaching rather than by what she finds."
+                  },
+                  {
+                    "name": "The Voice",
+                    "role": "Disembodied presence \u2014 the broadcaster transmitting from Valence, identity unknown",
+                    "arc": "Exists only as signal and implication; never fully explained, serving as a mirror for Maren's need rather than a character in their own right."
+                  },
+                  {
+                    "name": "Dov Reiss",
+                    "role": "Secondary \u2014 Maren's monthly supply runner and only human contact",
+                    "arc": "Starts as a pragmatic anchor to Maren's reality; his failure to return on schedule becomes the crack that lets the signal's pull become irresistible."
+                  }
+                ],
+                "chapters": [
+                  {
+                    "chapter_number": 1,
+                    "title": "Thirty Years of Quiet",
+                    "beat": "Maren's routine world of catalogued silence is shattered when her equipment locks onto a clear, structured broadcast rising from the coordinates of drowned Valence.",
+                    "arc_notes": "Act I \u2014 Setup: Ordinary world established, inciting incident delivered, first plot point crossed as Maren chooses to respond to the signal rather than log it as interference and move on."
+                  },
+                  {
+                    "chapter_number": 2,
+                    "title": "The Frequency of Need",
+                    "beat": "Maren spends days in obsessive dialogue with The Voice, her certainty of its reality growing even as Dov fails to arrive and her supplies dwindle, until a navigational coordinate embedded in the broadcast forces her to choose between staying safe and sailing toward Valence.",
+                    "arc_notes": "Act II \u2014 Confrontation: Early obstacles and midpoint shift; Dov's absence removes her last anchor to caution, the coordinate transmission reframes the stakes from passive listening to active and dangerous pursuit, and Maren's isolation is revealed as the wound that makes the signal impossible to resist."
+                  },
+                  {
+                    "chapter_number": 3,
+                    "title": "What the Water Keeps",
+                    "beat": "Maren reaches the coordinates above Valence and finds not a living city but a looping automated beacon set by survivors who died years ago \u2014 yet she broadcasts her own voice into the deep anyway, planting a signal for anyone still listening, and turns her boat toward an unmapped ridge that may hold higher ground.",
+                    "arc_notes": "Act III \u2014 Resolution: Climax and transformation made visible; the external mystery resolves into ambiguous loss rather than triumph, but Maren's internal arc completes as she chooses to generate hope rather than merely receive it, demonstrating she has moved from passive endurance to active belief."
+                  }
+                ],
+                "form": "short_story"
+              },
+              "persist": {
+                "persisted": true,
+                "project_id": "11baad09-556a-446d-a52c-8dbae9f9045f",
+                "created_project": false
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Brainstorm a short story using the Three-Act Structure about a radio operator in a flooded world who picks up a signal from a city that was supposed to be underwater. Genre: post-apocalyptic. Title: Signal from the Deep. 5 sections. Themes: hope vs. delusion, isolation, the pull of the impossible."
+    }
+  ],
+  "expected": [
+    "routes to `brainstorm.story`, kind=queued; complete; `story_arc=\"Three-Act Structure\"`",
+    "`writing_projects_v2` \"Signal from the Deep\" with 5 sections; arc_notes reference 3-act beats",
+    "S1 Setup (~25%, the signal); S2-3 Confrontation (~50%, midpoint setback \u2260 climax); S4-5 Resolution (pre-climax false resolution \u2192 climax \u2192 denouement)",
+    "arc_notes Three-Act terminology; CR-009 email \"Signal from the Deep\""
+  ]
+}

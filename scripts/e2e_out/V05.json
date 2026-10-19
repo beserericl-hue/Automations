@@ -1,0 +1,63 @@
+{
+  "test": {
+    "id": "V05",
+    "title": "Voice \u2014 Write Newsletter",
+    "source": "voice",
+    "prompt": "Write me a newsletter for the political history genre about revolutions that changed the world date today",
+    "route": "chapter.newsletter` (task)",
+    "prerequisite": "",
+    "expected": [
+      "flat `{response, kind=\"queued\"}`",
+      "routes newsletter saga",
+      "job_id",
+      "complete",
+      "`genre_slug=political-history`",
+      "date\u2192today",
+      "`published_content_v2` draft",
+      "CR-009 email"
+    ]
+  },
+  "response": {
+    "response": "Queuing a newsletter about world-changing revolutions for the political history genre. I'll let you know when it's ready.",
+    "kind": "queued",
+    "tool": "chapter",
+    "op": "newsletter",
+    "job_id": "6129dd32b8c24996b33208e73ab535ed",
+    "status": "queued"
+  },
+  "job_result": {
+    "job_id": "6129dd32b8c24996b33208e73ab535ed",
+    "status": "complete",
+    "result": {
+      "execution_id": "d22dd374-c42c-44e4-93f4-cd4aff89ed3a",
+      "step_name": "chapter",
+      "status": "ok",
+      "payload": {
+        "op": "newsletter",
+        "result": {
+          "written": true,
+          "title": "When the World Turned: Revolutions That Remade History",
+          "subject_line": "Five Revolutions That Broke the Old Order \u2014 And What They Left Behind",
+          "content_text": "_From Paris to Havana, the anatomy of upheaval, and why it still matters today._\n\nA revolution is not a policy shift or a change of faces at the top. It is a foundational rupture, a moment when institutions, legitimacy, and social order are torn up and rebuilt from scratch. Political scientists define it precisely: mass mobilization, elite defection from the old regime, and a state in crisis, whether from war, fiscal collapse, or a simple loss of belief in its own right to rule. These moments are rare. But when they happen, they tend to reorder everything, borders, economies, the language of politics itself. This issue walks through five revolutions that did exactly that, and asks what patterns connect them across centuries.\n\n## The French Revolution: The Template\n\nWhen Louis XVI convened the Estates-General in 1789, he was trying to solve a debt crisis. What he got was the demolition of the French monarchy, the execution of the king and queen, and a decade of war that swept across Europe. The French Revolution matters not just for what it destroyed, feudal privilege, absolute monarchy, the Church's grip on law, but for the vocabulary it gave the world. Liberty, equality, fraternity. Left and right as political categories. The nation as the source of sovereign power. These ideas did not stay in France. They spread to Haiti, where enslaved people used them to launch the only successful slave revolution in history. They spread to Latin America, where creole elites used them to justify independence from Spain. Scholars at Cambridge's comparative revolution program note that the French case established the basic structural template still used to analyze upheaval: dissident elites, mass frustration, shared ideology, and acute state crisis converging at once. (https://www.cambridge.org/core/books/anatomies-of-revolution/revolutions-in-the-contemporary-world/4BA993EA361E896CF1E2A2E864D908E4) Every revolution since has been read against it.\n\n## The Russian Revolution: Social Transformation at State Scale\n\nOctober 1917 is the clearest example of what theorists call a social revolution, one that does not merely swap rulers but dismantles class relations and property regimes. The Bolsheviks nationalized industry, redistributed land, and built a state apparatus designed to accelerate industrialization by force. Within three decades, the Soviet Union had gone from a largely agrarian empire to a nuclear power. The cost was staggering: collectivization famines, the Gulag, political terror. But the structural transformation was undeniable. The revolution also exported its model. Communist parties took power in China, Cuba, Vietnam, and across Eastern Europe, each adapting the Soviet template to local conditions. Scholars group these into a 'wave' of communist revolutions spanning the mid-20th century, transnational in their ideological diffusion, connected by shared doctrine and Soviet material support. (https://www.nature.com/articles/s41599-022-01120-9) The Russian case remains the reference point for debates about whether radical social transformation can be achieved without authoritarian consolidation, a question that has never been satisfactorily answered.\n\n## Anti-Colonial Revolutions: The Most Numerous and Most Overlooked\n\nBetween 1945 and 1975, more than 80 countries achieved independence from colonial rule. Many did so through negotiation. Many others did not. Algeria fought an eight-year war against France. Vietnam fought the French, then the Americans. Angola, Mozambique, and Guinea-Bissau fought Portugal. Kenya's Mau Mau uprising reshaped British colonial policy across Africa. Contemporary research in world-systems analysis frames these revolutions as the most geopolitically consequential of the 20th century, they dismantled the European colonial order and created the majority of today's sovereign states. (https://www.tandfonline.com/doi/full/10.1080/01436597.2020.1779053) But their post-revolutionary trajectories were often grim. Many new states faced authoritarian consolidation, economic dependency, and Cold War interference that constrained their ambitions. The egalitarian promises of national liberation movements, land reform, universal education, economic sovereignty, ran into the structural realities of a global economy that had been organized, for centuries, to extract rather than develop. Recent scholarship revisits these revolutions to take their ambitions seriously, while being clear-eyed about the constraints they faced.\n\n## 1989: The Anti-Communist Wave\n\nIn 1989, within the span of a single year, communist governments fell in Poland, Hungary, East Germany, Czechoslovakia, Bulgaria, and Romania. The Berlin Wall came down in November. By December 1991, the Soviet Union itself had dissolved. What made this wave unusual was its speed and, in most cases, its relative lack of violence. Political scientists point to a classic 'revolutionary situation': regimes that had lost economic legitimacy after decades of stagnation, ruling elites who had stopped believing in their own ideology, and mass populations who had long since stopped believing it either. The 'sultanist' quality of some regimes, Romania's Ceau\u0219escu being the extreme case, made them especially brittle when the conjuncture of crises hit simultaneously. (https://www.cambridge.org/core/books/anatomies-of-revolution/revolutions-in-the-contemporary-world/4BA993EA361E896CF1E2A2E864D908E4) The wave also demonstrated transnational diffusion in real time: events in Warsaw emboldened protesters in Budapest, who emboldened protesters in Leipzig, who emboldened protesters in Prague. The template traveled faster than any government could respond. The post-1989 settlements, however, produced mixed results, liberal democracy in some states, oligarchic capture in others, and an expanded NATO whose eastern expansion would become a source of conflict for decades.\n\n## What Revolutions Actually Change, and What They Don't\n\nThe honest record of revolutions is complicated. They break old orders. They rarely build new ones cleanly. The French Revolution produced Napoleon. The Russian Revolution produced Stalin. Many anti-colonial revolutions produced one-party states. The Iranian Revolution of 1979 replaced a secular autocracy with a theocratic one. This is not an argument against revolutions, it is an argument for taking them seriously as historical events rather than myths. Contemporary scholars distinguish between revolutions that achieve genuine social transformation (changed property relations, redistributed power, altered class structures) and those that replace one elite with another without touching the underlying structure. (https://www.nature.com/articles/s41599-022-01120-9) The former are rarer and more consequential. The latter are more common and often more disappointing. The analytical vocabulary now used to study revolutions, 'revolutionary situation,' 'elite defection,' 'transnational diffusion,' 'political opportunity structure', is useful precisely because it strips away the romance and asks concrete questions: Who moved first? What broke the regime's hold? What did the new order actually change? Those questions are worth asking about any uprising, historical or current.\n\nRevolutions are not made by ideas alone, or by grievances alone, or by charismatic leaders alone. They happen when all of these converge with a state that has run out of road. Understanding that pattern does not predict the future, but it does make the present more legible. Which current regimes show the classic signs, economic legitimacy eroding, ruling elites defecting, mass frustration building? Which recent uprisings met the scholarly threshold for revolution, and which fell short? We'd like to hear your thinking. Reply to this email with the case you find most instructive, historical or contemporary, and we'll feature the best responses in the next issue.",
+          "word_count": 1106,
+          "section_count": 5,
+          "persist": {
+            "persisted": true,
+            "content_id": "d3a89f63-ac9a-428c-81e8-133eace00600"
+          },
+          "token_usage": {
+            "calls": 2,
+            "input_tokens": 1979,
+            "output_tokens": 3035,
+            "cache_read_tokens": 0,
+            "cache_write_tokens": 0,
+            "total_tokens": 5014,
+            "cost_usd": 0.051462
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

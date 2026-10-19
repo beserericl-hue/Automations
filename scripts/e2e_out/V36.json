@@ -1,0 +1,58 @@
+{
+  "test": {
+    "id": "V36",
+    "title": "Voice \u2014 Undelete",
+    "source": "voice",
+    "prompt": "Undelete The Forgotten Engineers of Rome put it back in drafts",
+    "route": "library.lifecycle` (task)",
+    "prerequisite": "V33",
+    "expected": [
+      "flat `{response, kind=\"queued\"}`",
+      "op=undelete",
+      "complete",
+      "status deleted\u2192draft",
+      "maps \"put it back in drafts\"\u2192draft",
+      "email"
+    ]
+  },
+  "response": {
+    "response": "Undeleting 'The Forgotten Engineers of Rome' and restoring it to drafts.",
+    "kind": "queued",
+    "tool": "library",
+    "op": "lifecycle",
+    "job_id": "6d68426ad3904e7589998ae304d9e842",
+    "status": "queued"
+  },
+  "job_result": {
+    "job_id": "6d68426ad3904e7589998ae304d9e842",
+    "status": "complete",
+    "result": {
+      "execution_id": "d0a8c172-c786-4ddb-b7ff-af43ecbf62c2",
+      "step_name": "library",
+      "status": "ok",
+      "payload": {
+        "op": "lifecycle",
+        "result": {
+          "id": "67b034d9-ece4-4bb0-ad2d-7d0f036c4d9e",
+          "user_id": "+14105914612",
+          "title": "Newsletter",
+          "content_type": "newsletter",
+          "genre_slug": "political-scifi",
+          "content_text": "",
+          "storage_path": "author-content/drafts/newsletter_2026-03-09_104626.md",
+          "cover_image_path": null,
+          "status": "draft",
+          "project_id": null,
+          "chapter_number": null,
+          "metadata": {},
+          "created_at": "2026-03-09T14:46:27.230449+00:00",
+          "updated_at": "2026-06-21T21:02:36.900731+00:00",
+          "published_at": null,
+          "deleted_at": null
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "test": {
+    "id": "R32",
+    "prompt": "Get the story bible for project \"The Seed Vault\""
+  },
+  "response": {
+    "kind": "reply",
+    "assistant_message": "How can I help with your writing?",
+    "tool": null,
+    "op": null,
+    "data": null,
+    "job_id": null,
+    "status": null,
+    "jobs": null,
+    "error": null
+  },
+  "job_result": null
+}

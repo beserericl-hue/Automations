@@ -1,0 +1,57 @@
+{
+  "id": "R100",
+  "title": "Email Outline",
+  "route": "`library.email-content` (task) \u00b7 impl: built (E2E-1)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.email-content got=library.email-content OK",
+    "job=complete",
+    "emailed=True to=eric@agileadtesting.com subject=The Seed Vault \u2014 Outline err=None"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Email me the outline for \"The Seed Vault\""
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Sending the outline for \"The Seed Vault\" via email.",
+        "tool": "library",
+        "op": "email-content",
+        "data": null,
+        "job_id": "2e4d54ea5696405d82a906ac0042a1ea",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "2e4d54ea5696405d82a906ac0042a1ea",
+        "status": "complete",
+        "result": {
+          "execution_id": "d173b14b-cd44-4094-be9c-f30a05a96a0e",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "email-content",
+            "result": {
+              "emailed": true,
+              "to": "eric@agileadtesting.com",
+              "subject": "The Seed Vault \u2014 Outline",
+              "content_type": "outline"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Email me the outline for \"The Seed Vault\""
+    }
+  ],
+  "expected": [
+    "routes to `library.email-content` (content_type=outline), kind=queued; complete",
+    "reads outline JSONB from `writing_projects_v2`; renders structured HTML (characters + chapters, not raw JSON); email sent; subject references title + \"outline\""
+  ]
+}

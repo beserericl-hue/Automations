@@ -1,0 +1,62 @@
+[
+  {
+    "id": "VP01",
+    "title": "Brainstorm 'The Last Signal' (post-apoc, Hero's Journey, 6 ch)",
+    "verdict": "PASS",
+    "evidence": "persisted=True chapters=8 project_found=True"
+  },
+  {
+    "id": "VP02",
+    "title": "Write chapter 1 of The Last Signal",
+    "verdict": "PASS",
+    "evidence": "persisted=True words=7827"
+  },
+  {
+    "id": "VP03",
+    "title": "Write chapter 2 of The Last Signal",
+    "verdict": "PASS",
+    "evidence": "persisted=True words=5710"
+  },
+  {
+    "id": "VP04",
+    "title": "Write chapter 3 of The Last Signal",
+    "verdict": "PASS",
+    "evidence": "persisted=True words=8284"
+  },
+  {
+    "id": "VP05",
+    "title": "Approve chapter 1 of The Last Signal",
+    "verdict": "PASS",
+    "evidence": "status=approved error=None"
+  },
+  {
+    "id": "VP06",
+    "title": "Approve chapter 2 of The Last Signal",
+    "verdict": "PASS",
+    "evidence": "status=approved error=None"
+  },
+  {
+    "id": "VP07",
+    "title": "Approve chapter 3 of The Last Signal",
+    "verdict": "PASS",
+    "evidence": "status=approved error=None"
+  },
+  {
+    "id": "VP08",
+    "title": "Generate cover art for The Last Signal",
+    "verdict": "PASS",
+    "evidence": "image_url=https://gvbvwcnmjkdpclcisqrr.supabase.co/storage/v"
+  },
+  {
+    "id": "VP09",
+    "title": "Story bible for The Last Signal (auto-populated)",
+    "verdict": "PASS",
+    "evidence": "entries=82 found=True"
+  },
+  {
+    "id": "VP10",
+    "title": "Inject deliberate drift in ch3 (DB)",
+    "verdict": "FAIL",
+    "evidence": "ch3 exists but no 'Maya Chen' occurrence to alter"
+  }
+]

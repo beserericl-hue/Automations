@@ -1,0 +1,119 @@
+{
+  "id": "R119",
+  "title": "Consistency Check: Character Names",
+  "route": "`chapter.qa` (task) \u00b7 impl: built (E2E-4, deterministic name cross-check)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=chapter.qa got=chapter.qa OK",
+    "job=complete",
+    "qa/repair keys=['chapter_id', 'scores', 'findings', 'character_consistency', 'token_usage']"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Check Chapter 1 of \"The Signal Beneath\" for character name consistency with the book outline"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Queuing a quality check for Chapter 1 of \"The Signal Beneath\". I'll let you know when it's ready.",
+        "tool": "chapter",
+        "op": "qa",
+        "data": null,
+        "job_id": "ffd9ca0c28b6498f95f801714775923d",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "ffd9ca0c28b6498f95f801714775923d",
+        "status": "complete",
+        "result": {
+          "execution_id": "9d7a9ef9-07f4-4987-bb9e-134877f30f3b",
+          "step_name": "chapter",
+          "status": "ok",
+          "payload": {
+            "op": "qa",
+            "result": {
+              "chapter_id": null,
+              "scores": {
+                "character_follows_guide": 0.0,
+                "outline_follows_guide": 0.0,
+                "dialogue_follows_guide": 0.0,
+                "prose_transparent": 0.0,
+                "story_turn_density": 0.0,
+                "no_boring_paragraphs": 0.0,
+                "period_language_ok": 0.0,
+                "character_consistency": 0.0,
+                "research_gaps": [
+                  "No chapter text supplied \u2014 research gap analysis requires prose to scan for asserted period or factual claims."
+                ]
+              },
+              "findings": [
+                {
+                  "dimension": "character_follows_guide",
+                  "problem": "No chapter text was provided. There are no characters to evaluate.",
+                  "fix": "Provide the chapter text so characters can be assessed against the guide's forbidden types and POV requirements."
+                },
+                {
+                  "dimension": "outline_follows_guide",
+                  "problem": "No chapter text was provided. Outline conformance cannot be assessed.",
+                  "fix": "Provide the chapter text and the outline it is meant to follow."
+                },
+                {
+                  "dimension": "dialogue_follows_guide",
+                  "problem": "No chapter text was provided. Dialogue cannot be evaluated for snappiness, diction distinction, or tag discipline.",
+                  "fix": "Provide the chapter text."
+                },
+                {
+                  "dimension": "prose_transparent",
+                  "problem": "No chapter text was provided. Prose transparency cannot be assessed.",
+                  "fix": "Provide the chapter text."
+                },
+                {
+                  "dimension": "story_turn_density",
+                  "problem": "No chapter text was provided. Story turns cannot be counted or assessed against the 1-per-4-to-6-pages target.",
+                  "fix": "Provide the chapter text with approximate page count."
+                },
+                {
+                  "dimension": "no_boring_paragraphs",
+                  "problem": "No chapter text was provided. Boring paragraphs cannot be identified.",
+                  "fix": "Provide the chapter text."
+                },
+                {
+                  "dimension": "period_language_ok",
+                  "problem": "No chapter text was provided. Although the period is stated as contemporary, anachronism scanning requires actual prose.",
+                  "fix": "Provide the chapter text."
+                },
+                {
+                  "dimension": "character_consistency",
+                  "problem": "No chapter text and no LOCKED CHARACTERS roster were provided. Consistency with established cast cannot be verified.",
+                  "fix": "Provide both the chapter text and the locked character roster."
+                }
+              ],
+              "character_consistency": null,
+              "token_usage": {
+                "calls": 1,
+                "input_tokens": 14,
+                "output_tokens": 636,
+                "cache_read_tokens": 2393,
+                "cache_write_tokens": 0,
+                "total_tokens": 3043,
+                "cost_usd": 0.0103
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Check Chapter 1 of \"The Signal Beneath\" for character name consistency with the book outline"
+    }
+  ],
+  "expected": [
+    "routes `chapter.qa`, kind=queued; completed; loads Ch1 prose + character roster from `writing_projects_v2.outline.characters`",
+    "every name verified against the roster; no invented names; roles consistent; no renamed characters (e.g. \"Maya\"\u2260\"Maria\"); QA report inline or via CR-009 email listing discrepancies/confirming consistency"
+  ]
+}

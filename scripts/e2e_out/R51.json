@@ -1,0 +1,42 @@
+{
+  "test": {
+    "id": "R51",
+    "title": "Chapter Has Internal Arc + Transformation",
+    "source": "chat",
+    "prompt": "Write chapter 1 of a story called \"The Cartographer's Lie\" in post-apocalyptic genre. Brief: A map-maker is hired to chart the forbidden eastern territories. On the first day, she discovers the map she was given to copy is intentionally wrong.",
+    "route": "chapter.write` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `chapter.write`, kind=queued; complete",
+      "Identifiable internal arc; protagonist's state changes; `next_chapter_notes` references arc; \u22651 role identifiable",
+      "Draft row; CR-009 email received"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing chapter 1 of \"The Cartographer's Lie\" \u2014 I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "write",
+    "data": null,
+    "job_id": "a0ae6f98fc84446f923831bf2d2762e9",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "a0ae6f98fc84446f923831bf2d2762e9",
+    "status": "complete",
+    "result": {
+      "execution_id": "9be7d018-7a6a-42e3-95e2-d7eddd2d61b5",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValidationError",
+        "message": "1 validation error for WriteChapterRequest\nproject_id\n  Field required [type=missing, input_value={'project_title': \"The Ca...t': True, 'async': True}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

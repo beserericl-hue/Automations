@@ -43,7 +43,7 @@ The webServer block in `playwright.config.ts` automatically starts the local dev
 cd writers-workbench
 E2E_BASE_URL=https://writersworkbench-develop.up.railway.app \
 E2E_TEST_EMAIL=eric@agileadtesting.com \
-E2E_TEST_PASSWORD=Fr332bafami!y \
+E2E_TEST_PASSWORD=<rotated 2026-10-19 — see credentials-map.md> \
 SUPABASE_URL=https://gvbvwcnmjkdpclcisqrr.supabase.co \
 VITE_SUPABASE_ANON_KEY=sb_publishable_tWjSepIO8xym2ZcfYHP-vQ_OiBPx2Dp \
   npx playwright test newsletter-fullflow sprint-regression-suite --project=chromium

@@ -109,7 +109,7 @@ Quick hotfix on top of v1.1.0:
 - EditUserDialog toast — surfaces `note` field.
 
 **JR's account on PROD repaired** during the session via service-role:
-1. `POST /auth/v1/admin/users` `{email:'racemert@yahoo.com', password:'Wr!ters1', email_confirm:true}` → UID `3657ca48-...`.
+1. `POST /auth/v1/admin/users` `{email:'racemert@yahoo.com', password:'<redacted — see credentials-map>', email_confirm:true}` → UID `3657ca48-...`.
 2. `PATCH /rest/v1/users_v2?user_id=eq.+17063338699` set supabase_auth_uid.
 3. `POST /auth/v1/token?grant_type=password` smoke test → valid access_token. JR can sign in.
 

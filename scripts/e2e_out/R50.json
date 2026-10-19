@@ -1,0 +1,42 @@
+{
+  "test": {
+    "id": "R50",
+    "title": "Short Story Has 5-Stage Arc",
+    "source": "chat",
+    "prompt": "Write a short story about a city maintenance worker who discovers the AI managing the city's infrastructure has been writing poetry in the gaps between system logs. Genre: ai-marketing. Length: 2500 words. Tone: quiet and melancholic.",
+    "route": "chapter.short-story` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `chapter.short-story`, kind=queued; complete",
+      "Ordinary world \u2192 catalyst \u2192 peak/climax \u2192 falling action \u2192 resolution with visible change",
+      "Protagonist transforms; emotional/thematic stakes throughout; Draft row; CR-009 email received"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing your short story. I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "short-story",
+    "data": null,
+    "job_id": "d4bff3cb00d24d668230d4f05a9ec5c1",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "d4bff3cb00d24d668230d4f05a9ec5c1",
+    "status": "complete",
+    "result": {
+      "execution_id": "7901d278-c0e3-484c-a7e0-51533cde872b",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValueError",
+        "message": "invalid literal for int() with base 10: '2500 words'",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

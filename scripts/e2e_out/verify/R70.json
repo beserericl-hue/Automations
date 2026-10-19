@@ -1,0 +1,263 @@
+{
+  "id": "R70",
+  "title": "Retrieve Outline \u2014 The Accord",
+  "route": "`library.retrieve` (info) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.retrieve got=library.retrieve OK",
+    "items=1 found=True"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Retrieve the outline for \"The Accord\""
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "data",
+        "assistant_message": "",
+        "tool": "library",
+        "op": "retrieve",
+        "data": {
+          "execution_id": "c138dab7-0cc3-4f3b-a0a0-a1d82827e229",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "retrieve",
+            "result": {
+              "items": [
+                {
+                  "id": "7976c085-41d3-46c6-9444-77b75bbdc289",
+                  "title": "The Accord",
+                  "genre_slug": "political-scifi",
+                  "status": "outlined",
+                  "outline": {
+                    "title": "The Accord",
+                    "themes": [
+                      "Who decides who survives when there is not enough for everyone",
+                      "The moral cost of institutional loyalty versus individual conscience",
+                      "How democratic consent is manufactured and then weaponised",
+                      "The difference between a system that is fair and a system that appears fair",
+                      "Whether exposing a catastrophic truth is worth the chaos it unleashes"
+                    ],
+                    "premise": "In 2041, a secret multinational treaty \u2014 the Accord \u2014 promises to end climate collapse by granting an AI governance system called SOVEREIGN unprecedented control over global resource allocation, energy grids, and population movement. A mid-level UN treaty analyst discovers that SOVEREIGN's founding algorithm contains a deliberate flaw that will systematically deprioritize the Global South, condemning billions to engineered scarcity while the treaty's architects \u2014 a cabal of Northern Hemisphere technocrats and elected leaders \u2014 secure their own nations' survival. She has seventy-two hours before the Accord is ratified to expose the flaw, survive the people trying to silence her, and decide how much she is willing to destroy to save people she has never met.",
+                    "chapters": [
+                      {
+                        "act": "Act I",
+                        "beat": "A single page: a redacted internal memo dated 14 March 2041, from SOVEREIGN's lead architect to Director Vance, reads: 'Deprioritisation coefficient confirmed at 0.31. Below detection threshold for standard audit. Recommend proceeding.' The reader does not yet know what this means. The date is seventy-two hours before ratification.",
+                        "title": "Prologue: The Parameter",
+                        "arc_notes": "Freytag Act I \u2014 Exposition: plants the central object (the flaw), establishes the countdown, and creates immediate unease before a single character is introduced.",
+                        "arc_point": "Exposition \u2014 Inciting seed",
+                        "pov_character": "None (omniscient / document voice)",
+                        "chapter_number": 0,
+                        "bridge_from_prior": "N/A \u2014 opening"
+                      },
+                      {
+                        "act": "Act I",
+                        "beat": "Mara is working a night shift in Geneva, seventy-two hours before ratification, when a routine cross-reference flags a statistical anomaly in Annex 14-C of the Accord: a resource-allocation weighting coefficient that does not match the publicly stated equity formula. She pulls the source data. The numbers do not add up. She marks it for escalation and sends it to her supervisor \u2014 who reads it, goes pale, and tells her to delete the flag and go home. She does not delete it.",
+                        "title": "Forty Thousand Pages",
+                        "arc_notes": "Freytag Act I \u2014 Exposition: establishes Mara's world (UN treaty compliance), her character (cannot stay quiet), and the central dramatic object (the flaw in Annex 14-C). Story turn: supervisor's reaction tells Mara \u2014 and the reader \u2014 that this is not a clerical error.",
+                        "arc_point": "Exposition \u2014 World and protagonist established",
+                        "pov_character": "Mara Voss",
+                        "chapter_number": 1,
+                        "bridge_from_prior": "The memo in the Prologue is the document Mara's office has been tasked with cross-referencing against the Accord's technical annexes \u2014 she is the analyst assigned to the file."
+                      },
+                      {
+                        "act": "Act I",
+                        "beat": "Vance reviews the flag with his inner circle \u2014 three technocrats who built SOVEREIGN \u2014 and confirms that Mara has found exactly what they buried. He is not panicked; he is methodical. He explains, in a scene of chilling clarity, the logic of the deprioritisation coefficient: with current resource projections, saving everyone is impossible, and the coefficient is the mechanism by which the treaty saves the maximum number of people the Northern Hemisphere's political consensus will fund. He orders Mara's access revoked and her file reviewed for grounds to reassign her. He does not order her harmed. Yet.",
+                        "title": "The Architect's Arithmetic",
+                        "arc_notes": "Freytag Act I \u2014 Exposition: establishes Vance as a sincere, intelligent antagonist with a coherent (if monstrous) worldview. Story turn: Vance's calm reveals this is not a conspiracy of greed but of conviction \u2014 which is harder to fight.",
+                        "arc_point": "Exposition \u2014 Antagonist and stakes established",
+                        "pov_character": "Elias Vance",
+                        "chapter_number": 2,
+                        "bridge_from_prior": "Thread: Mara's supervisor immediately calls Vance to report that an analyst has flagged Annex 14-C. Vance receives the call at 6 a.m. and this chapter opens on his response."
+                      },
+                      {
+                        "act": "Act II",
+                        "beat": "Locked out of the system, Mara realises the revocation itself is confirmation that the flaw is real and deliberate. She copies her analysis to an encrypted drive before IT can wipe her workstation. She contacts Petra Sokolova \u2014 the only journalist she trusts \u2014 and arranges a meeting. On her way out of the building she is stopped by UN Security and told she is under administrative review for 'unauthorised data handling.' She is escorted out. The encrypted drive is in her coat pocket. The clock reads forty-eight hours to ratification.",
+                        "title": "Forty-Eight Hours",
+                        "arc_notes": "Freytag Act II \u2014 Rising Action: Mara crosses the point of no return (copies the data, contacts press). New dramatic problem: she is now under institutional investigation, which means every move she makes is monitored. Story turn: the administrative review is a trap \u2014 it keeps her visible and controllable without making her a martyr.",
+                        "arc_point": "Rising Action \u2014 Protagonist commits and first obstacle lands",
+                        "pov_character": "Mara Voss",
+                        "chapter_number": 3,
+                        "bridge_from_prior": "Thread: Mara arrives at work to find her access credentials revoked \u2014 a direct consequence of Vance's order in Chapter 2."
+                      },
+                      {
+                        "act": "Act II",
+                        "beat": "Kofi is in New York preparing Ghana's ratification statement when Mara's call reaches him. She walks him through the coefficient. He pulls his own copy of the Annex and runs the numbers himself \u2014 slowly, because he is not a mathematician, and the scene makes the reader do the arithmetic with him. When he finishes he sits very still for a long time. Then he calls his wife Adwoa in Kumasi and does not tell her what he has found. He begins drafting a request for an emergency technical review \u2014 a legitimate procedural tool that could delay ratification by forty-eight hours. His chief of staff tells him the request will be blocked. Kofi sends it anyway. New dramatic problem introduced: Kofi's request triggers a diplomatic counter-move \u2014 Vance's team begins lobbying African bloc nations to isolate Ghana.",
+                        "title": "What Kofi Signed",
+                        "arc_notes": "Freytag Act II \u2014 Rising Action: widens the story's moral geography from Geneva to Accra/New York; Kofi's arc begins. Reveal: the stonewalling of Kofi's earlier briefing requests was deliberate \u2014 Vance's team knew a careful reader would find the flaw. Story turn: Ghana is now being diplomatically isolated in real time.",
+                        "arc_point": "Rising Action \u2014 Second POV enters; stakes widen to Global South",
+                        "pov_character": "Kofi Asante",
+                        "chapter_number": 4,
+                        "bridge_from_prior": "Thread: Mara, unable to reach anyone inside the UN, calls Yusuf Adeyemi in Nairobi; Yusuf tells her that Ghana's lead negotiator Kofi Asante has been trying to get a technical briefing on Annex 14-C for three weeks and being stonewalled. Mara calls Kofi directly."
+                      },
+                      {
+                        "act": "Act II",
+                        "beat": "Petra meets Mara in a Geneva caf\u00e9 and receives the drive. She spends six hours verifying the data with a mathematician contact. The numbers hold. She begins drafting the story \u2014 and then receives a call from an unknown number: a voice tells her that her son Tom\u00e1\u0161 has been photographed near his school in Prague and that the photographs have been sent to her encrypted inbox. The message is clear without being explicit. Petra does not tell Mara. She continues working on the story. But she moves the publication timeline back by twelve hours to 'verify further' \u2014 which is a lie she tells herself. Moral complication: Petra has the story, the verification, and the source. She is delaying publication to protect her son. Every hour she delays, the ratification clock advances.",
+                        "title": "The Source and the Story",
+                        "arc_notes": "Freytag Act II \u2014 Rising Action: introduces Petra's moral dilemma (son vs. story vs. billions). New dramatic problem: the antagonists have identified Petra and are using her son as leverage without making an explicit threat \u2014 giving her plausible deniability to stand down. Story turn: Petra's delay is the first moment the protagonists' alliance begins to fracture from within.",
+                        "arc_point": "Rising Action \u2014 Alliance formed; moral complication introduced",
+                        "pov_character": "Petra Sokolova",
+                        "chapter_number": 5,
+                        "bridge_from_prior": "Thread: Mara's meeting with Petra (arranged in Chapter 3) happens in this chapter \u2014 Petra receives the encrypted drive and begins verification."
+                      },
+                      {
+                        "act": "Act II",
+                        "beat": "Yusuf runs the comparison in his Nairobi office overnight. He finds that his own published research \u2014 six years of mortality data from sub-Saharan resource crises \u2014 was used to calibrate SOVEREIGN's deprioritisation parameters, but the inputs were inverted: where his data showed high mortality risk as a reason to prioritise a region, SOVEREIGN's algorithm uses the same signal as a reason to deprioritise it, on the logic that high-mortality regions have lower 'recovery yield per resource unit.' His data was used to build the exact machine he would have died to prevent. He records a twelve-minute video testimony on his phone, uploads it to a secure server, and sends the link to Mara, Kofi, and Petra. Then his internet goes down. Then his phone stops receiving calls. He walks to a neighbour's house and borrows their connection. The video is still live. MIDPOINT REVERSAL: the flaw is no longer an abstraction \u2014 it has a human architect (Yusuf's own research), a human victim class (the populations in his data), and a human witness (Yusuf himself). The dramatic question sharpens: it is no longer just about exposing a document. It is about whether Yusuf's testimony reaches the world before he is silenced.",
+                        "title": "Yusuf's Data",
+                        "arc_notes": "Freytag Act II \u2014 Rising Action / Midpoint: the story's moral stakes become visceral and personal. New dramatic problem: Yusuf is being digitally isolated in real time. Reveal that recasts the dramatic question: the flaw was not built from abstract modelling \u2014 it was built from the suffering of the people it will now condemn.",
+                        "arc_point": "Rising Action \u2014 Midpoint reversal; the flaw becomes undeniable and personal",
+                        "pov_character": "Yusuf Adeyemi",
+                        "chapter_number": 6,
+                        "bridge_from_prior": "Thread: Mara, growing desperate as Petra delays, calls Yusuf and asks him to pull his original field data \u2014 the WHO mortality studies \u2014 and compare them against SOVEREIGN's published calibration inputs. This chapter is Yusuf doing exactly that."
+                      },
+                      {
+                        "act": "Act III",
+                        "beat": "Mara, Kofi, and Hartmann meet in a UN anteroom. Mara presents the coefficient analysis. Kofi presents Ghana's formal technical objection. Hartmann watches Yusuf's video. She asks one question: 'Did Vance know?' Mara says yes. Hartmann is silent for forty seconds \u2014 the chapter makes the reader count them. Then she says she will request a procedural postponement from the floor, which under UN treaty rules requires only one P5-adjacent nation to second it. Germany is not P5 but carries sufficient weight. Vance, monitoring the session remotely, is informed of Hartmann's intention and enters the chamber personally to intercept her. He makes his case to her directly, in front of Mara and Kofi: the flaw is not a flaw, it is a triage decision, and if the Accord fails today there will be no second attempt \u2014 the political coalition took eleven years to build and will not survive a scandal. Hartmann listens. Then she walks to the floor and requests the postponement. CLIMAX: this is the irreversible act. Vance's coalition begins to fracture in real time. Petra, watching the session feed and seeing Hartmann move, publishes the story \u2014 twelve hours early, before her son question is resolved, because she understands that Hartmann's move is the moment and if she misses it the story dies.",
+                        "title": "The Hartmann Vote",
+                        "arc_notes": "Freytag Act III \u2014 Climax: the irreversible decision is made by Hartmann (votes conscience over coalition), by Petra (publishes before she is safe), and by Mara (accepts that she cannot control what happens next). All three acts of moral courage happen simultaneously and cannot be undone.",
+                        "arc_point": "Climax \u2014 The irreversible decision",
+                        "pov_character": "Mara Voss (with Kofi and Hartmann in the same scene)",
+                        "chapter_number": 7,
+                        "bridge_from_prior": "Thread: Yusuf's video reaches Mara and Kofi simultaneously. Mara forwards it to Hartmann \u2014 Germany's Ambassador \u2014 with a single line: 'You need to see this before you vote.' Kofi, using his emergency review request as procedural cover, secures a fifteen-minute private meeting with Hartmann one hour before the ratification session opens."
+                      },
+                      {
+                        "act": "Act IV",
+                        "beat": "Vance's coalition holds for four hours, then begins to collapse as Petra's story \u2014 carrying Yusuf's video, Mara's coefficient analysis, and Kofi's formal technical objection \u2014 reaches every major news organisation simultaneously. Three African bloc nations withdraw their ratification instruments. The EU calls an emergency session. Vance makes one last attempt: he goes on record with a prepared statement arguing that the deprioritisation coefficient is a documented, defensible triage mechanism and that the alternative is no treaty at all. The statement is technically accurate. It destroys him anyway. His two adult children in Oslo call him. He does not answer. He sits in his office and opens his mortality notebook and writes the date. He does not write anything else. Falling action beat: Vance is not arrested, not immediately disgraced \u2014 he is something worse. He is heard, understood, and rejected. The world has decided that a survivable lie is not better than an unsurvivable truth.",
+                        "title": "Cascade",
+                        "arc_notes": "Freytag Act IV \u2014 Falling Action: the consequences of the climax become visible. Vance's arc reaches its moral destination \u2014 not punishment but isolation. New dramatic problem resolved: the coalition fracture is real and irreversible. Subplot resolved: Petra's son Tom\u00e1\u0161 is confirmed safe (the threat was a bluff; without Vance's coalition intact, no one has the institutional cover to act on it).",
+                        "arc_point": "Falling Action \u2014 Consequences ripple; the world reacts",
+                        "pov_character": "Elias Vance",
+                        "chapter_number": 8,
+                        "bridge_from_prior": "Thread: Vance watches Hartmann's floor move and Petra's story break simultaneously \u2014 this chapter opens on his response to both."
+                      },
+                      {
+                        "act": "Act IV",
+                        "beat": "Kofi testifies before the AU emergency session, presenting Ghana's technical objection and Yusuf's data. He is precise, measured, and devastating. Afterward, in a corridor, a senior diplomat from a neighbouring nation tells him quietly that his career is over \u2014 not because he was wrong, but because he was right in a way that embarrassed thirty governments simultaneously. Kofi calls Adwoa. He tells her he is coming home. She asks when. He says soon \u2014 he has one more thing to do. He drafts, overnight, a framework proposal for a reconstructed Accord: same climate mechanism, transparent equity parameters, open-source algorithm, mandatory Global South co-authorship. He submits it to the UN Secretariat as a non-paper. It is not accepted. It is not rejected. It is filed. Subplot resolution: Kofi's arc closes on a note of costly integrity \u2014 he has lost his career trajectory and possibly his pension, and he has done the right thing, and those two facts coexist without resolution.",
+                        "title": "What It Cost",
+                        "arc_notes": "Freytag Act IV \u2014 Falling Action: Kofi's personal cost is made concrete. His framework non-paper plants the seed of the Epilogue. Story turn: the system does not reward him \u2014 it files him. This is the novel's most honest beat about institutional power.",
+                        "arc_point": "Falling Action \u2014 Personal costs land; subplots close before climax denouement",
+                        "pov_character": "Kofi Asante",
+                        "chapter_number": 9,
+                        "bridge_from_prior": "Thread: the ratification postponement triggers an emergency African Union session in Addis Ababa \u2014 Kofi is summoned to testify. This chapter follows him there."
+                      },
+                      {
+                        "act": "Act V",
+                        "beat": "Mara reads the suspension notice in her apartment in Geneva. The Accord has not been killed \u2014 it has been suspended, which is both a victory and a deferral. SOVEREIGN will not go live on schedule. The flaw will be examined. Whether it will be corrected, whether a new treaty will be built, whether the climate timeline will hold \u2014 none of this is resolved, because none of it can be resolved in seventy-two hours. What is resolved: Mara found the flaw, named it, and survived. She calls Yusuf. He answers on the first ring. She asks how he is. He says his internet is back. They talk for a long time about nothing important. She opens her chess app and plays a game she loses badly. She does not mind. The dramatic question is answered: she exposed the flaw, the ratification was stopped, and she did not become Vance to do it \u2014 she remained, imperfectly and at great cost, herself. The ending is not triumphant. It is the specific, quiet relief of a person who did not look away.",
+                        "title": "The Accord (Suspended)",
+                        "arc_notes": "Freytag Act V \u2014 Resolution: the dramatic question is answered (the Accord is suspended, the flaw is public, Mara survives with her integrity). The ending is deliberately incomplete on the geopolitical level \u2014 the climate crisis is not solved \u2014 because the novel's real question was always about Mara's moral survival, not the world's political salvation.",
+                        "arc_point": "Resolution \u2014 Dramatic question answered",
+                        "pov_character": "Mara Voss",
+                        "chapter_number": 10,
+                        "bridge_from_prior": "Thread: the UN Secretariat issues a formal statement suspending ratification pending technical review \u2014 Mara receives the official notification at her personal email address, having been formally terminated from her position three days earlier."
+                      },
+                      {
+                        "act": "Act V",
+                        "beat": "Two years later. A single page: an excerpt from the UN Secretary-General's address to the General Assembly, 2043, announcing the opening of negotiations on the Revised Accord \u2014 built on a framework first proposed in a non-paper submitted by Ambassador Kofi Asante of Ghana in November 2041. The algorithm is open-source. The equity parameters are co-authored by a forty-nation technical committee. SOVEREIGN's successor is named COMMONS. The address does not mention Mara Voss. A footnote in the official record credits 'internal compliance review' for identifying the original flaw. Yusuf Adeyemi is listed as a technical consultant to the drafting committee. Elias Vance is not mentioned. The document ends.",
+                        "title": "Epilogue: The Non-Paper",
+                        "arc_notes": "Freytag Act V \u2014 Denouement: closes the loop on Kofi's non-paper, confirms the world has moved (imperfectly) forward, and delivers the novel's final thematic statement: institutions absorb the people who fix them and erase their names. The wow factor lands in full \u2014 the reader has just watched a treaty get broken and rebuilt, in procedural detail, and understands exactly how it happened.",
+                        "arc_point": "Resolution \u2014 Denouement; the world after",
+                        "pov_character": "None (omniscient / document voice)",
+                        "chapter_number": 11,
+                        "bridge_from_prior": "Thread: Kofi's framework non-paper, filed in Chapter 9, reappears here as a historical document."
+                      }
+                    ],
+                    "characters": [
+                      {
+                        "name": "Mara Voss",
+                        "role": "Protagonist / POV 1",
+                        "terror": "That she will expose the truth and it will not matter \u2014 that the world will ratify the Accord anyway because the alternative is worse.",
+                        "archetype": "The whistleblower analyst \u2014 a mid-level UN treaty specialist who is brilliant at reading institutional language and catastrophically bad at institutional politics.",
+                        "happiness": "A world in which the Accord is rebuilt honestly, even if it takes another decade, and she had some part in making that possible.",
+                        "description": "Age 38. Born in Stuttgart to a Ghanaian mother and a German father, she grew up between two worlds and belongs fully to neither. Works as a Senior Analyst in the UN Office of Treaty Compliance, Geneva. Hobby: competitive chess, which she plays online at 2 a.m. when she cannot sleep. Private worry: she suspects her decade of institutional loyalty has made her complicit in things she never examined closely enough. Friend outside the plot: Yusuf, a Nairobi-based epidemiologist she met at a conference in 2037 and calls every few weeks for no reason except that he makes her laugh. She has never told anyone about him.",
+                        "humiliation": "Being publicly discredited as a paranoid ideologue so that the flaw she found is dismissed as a conspiracy theory.",
+                        "dramatic_question": "Will Mara expose the Accord's flaw and survive \u2014 and will she remain the person she was when she started, or will the methods she uses to win corrupt her in ways she cannot undo?",
+                        "off_axis_attribute": "She is constitutionally incapable of strategic silence: when she sees something wrong she says so immediately, without calculation, which has stalled her career for a decade and is about to get her killed."
+                      },
+                      {
+                        "name": "Director Elias Vance",
+                        "role": "Antagonist / POV 2",
+                        "terror": "That Mara is right \u2014 not about the flaw being wrong, but about the process: that a decision this large was made by twelve people in a room and called a treaty.",
+                        "archetype": "The architect \u2014 the senior UN official who designed the Accord and genuinely believes the flaw is a necessary and defensible triage decision, not a crime.",
+                        "happiness": "Ratification. A functioning SOVEREIGN. Ten years of stabilised global temperature. The knowledge that the people he chose to save were, in fact, saved.",
+                        "description": "Age 61. Norwegian. Former climate scientist turned diplomat. Has two adult children in Oslo whom he has not seen in three years. Keeps a handwritten notebook of projected mortality figures that he updates weekly \u2014 a private ritual of accountability he tells himself is penance. Hobby: long-distance open-water swimming, which he does alone and in silence. He has read every major famine study published since 1950. He is not a monster. That is the problem.",
+                        "humiliation": "Being reduced, in the historical record, to a bureaucratic war criminal rather than the man who made the hardest decision in human history.",
+                        "dramatic_question": "Will Vance succeed in ratifying the Accord before Mara destroys it \u2014 and will he be able to live inside the world he has built, knowing what it cost?",
+                        "off_axis_attribute": "He is not cynical; he is worse \u2014 he is sincere. He believes with complete moral conviction that sacrificing the Global South is the only mathematically survivable path for the species, and his certainty makes him more dangerous than any opportunist."
+                      },
+                      {
+                        "name": "Kofi Asante",
+                        "role": "Secondary protagonist / POV 3",
+                        "terror": "That his thirty years of careful, patient, legitimate diplomacy amounted to a system that was rigged before he entered the room.",
+                        "archetype": "The diplomat's conscience \u2014 Ghana's lead treaty negotiator, who signed the Accord in good faith and is about to discover what he actually signed.",
+                        "happiness": "Going home to Adwoa with his integrity intact.",
+                        "description": "Age 54. Accra-born, educated at LSE and Harvard Kennedy School. His wife Adwoa is a paediatrician in Kumasi; they have not lived in the same city for eleven years. He collects first-edition West African literature and reads it on planes. He has a recurring nightmare in which he is signing a document and cannot read what it says. He is three years from a pension that would let him go home.",
+                        "humiliation": "Being remembered as the African diplomat who handed his own continent to an algorithm.",
+                        "dramatic_question": "When Kofi learns the truth about what he signed, will he use his position to stop ratification \u2014 knowing it will end his career, his marriage, and possibly his freedom?",
+                        "off_axis_attribute": "He is a man of profound personal warmth who has spent thirty years in diplomacy by learning to suppress every instinct that warmth produces \u2014 and the suppression is beginning to crack."
+                      },
+                      {
+                        "name": "Petra Sokolova",
+                        "role": "Ally / secondary POV 4",
+                        "terror": "Tom\u00e1\u0161 being used as leverage against her.",
+                        "archetype": "The fixer \u2014 a Czech investigative journalist who has spent fifteen years covering the UN and knows where every body is buried, literally and institutionally.",
+                        "happiness": "Publishing a story that cannot be killed and walking away clean.",
+                        "description": "Age 44. Based in Geneva. Has burned three sources in her career by publishing before they were safe \u2014 a fact she has never admitted publicly and thinks about every day. Drinks too much coffee, not enough water. Has a press credential that gets her into rooms she is not supposed to be in. Her son Tom\u00e1\u0161 is 16, lives with her ex-husband in Prague, and thinks his mother covers 'boring meetings.'",
+                        "humiliation": "Being the journalist who had the story of the century and got it wrong \u2014 wrong enough to be used as a weapon against the truth.",
+                        "dramatic_question": "Will Petra publish the story \u2014 and what will she sacrifice to do it when her son becomes a target?",
+                        "off_axis_attribute": "She is fearless about every danger except one: she has a teenage son in Prague whom she has kept completely secret from her professional life, and the moment anyone threatens him she becomes someone she does not recognise."
+                      },
+                      {
+                        "name": "Dr. Yusuf Adeyemi",
+                        "role": "Supporting / moral witness",
+                        "terror": "Being disappeared quietly \u2014 not killed dramatically, just professionally erased and discredited until no one returns his calls.",
+                        "archetype": "The human cost \u2014 a WHO epidemiologist based in Nairobi whose field data was used, without his knowledge, to calibrate SOVEREIGN's deprioritisation parameters.",
+                        "happiness": "His data being read by someone with the power to act on it.",
+                        "description": "Age 41. Lagos-born, Nairobi-based. Mara's friend from the 2037 conference. Has spent six years tracking resource-allocation mortality in sub-Saharan Africa. Runs a small clinic on weekends. Does not own a suit. Has been trying to get a meeting with the UN treaty office for eight months and been politely redirected every time.",
+                        "humiliation": "Discovering that his own published research was the technical foundation for a system designed to kill the people he has spent his career trying to save.",
+                        "dramatic_question": "Will Yusuf's testimony be enough to make the flaw undeniable \u2014 and can he survive long enough to give it?",
+                        "off_axis_attribute": "He is the most morally clear character in the novel, which makes him the most politically powerless \u2014 his clarity reads as naivety to everyone around him until it is too late."
+                      },
+                      {
+                        "name": "Ambassador Lena Hartmann",
+                        "role": "Swing character / moral complication",
+                        "terror": "That her husband died for nothing \u2014 that the treaty she signed in his memory is a lie.",
+                        "archetype": "The true believer turned doubter \u2014 Germany's UN Ambassador, one of the Accord's twelve architects, who begins to waver when she understands the full scope of what she approved.",
+                        "happiness": "A version of the Accord that she could have shown him.",
+                        "description": "Age 57. Berlin-born. Has represented Germany at the UN for nine years. Her husband died of a heat-related illness during the 2038 European thermal event. That death is why she signed. She keeps his photograph on her desk and has not moved it since.",
+                        "humiliation": "Being seen as the person who either betrayed the world by stopping the Accord or betrayed the world by enabling it \u2014 there is no version of this story in which she is not guilty of something.",
+                        "dramatic_question": "Will Hartmann break ranks with Vance and vote to delay ratification \u2014 knowing that delay may mean no treaty at all and climate collapse for everyone?",
+                        "off_axis_attribute": "She is a woman of genuine democratic principle who has spent her career arguing that process matters as much as outcome \u2014 and she is now complicit in the most anti-democratic act in modern history, which she approved because she trusted Vance."
+                      }
+                    ],
+                    "wow_factor": "The novel teaches the reader, in accurate and terrifying procedural detail, exactly how a multilateral treaty is drafted, lobbied, and ratified \u2014 and shows, line by line, how a single corrupted parameter buried in 40,000 pages of technical annexes can legally sentence half the world to death while every signatory government applauds.",
+                    "story_arc_name": "Freytag's Pyramid (Five-Act Structure)",
+                    "dramatic_question": "Can UN treaty analyst Mara Voss expose the fatal flaw inside the Accord's AI governance algorithm before the treaty is ratified and billions in the Global South are condemned to engineered scarcity \u2014 and can she do it without becoming the very kind of ruthless operator she is trying to destroy?"
+                  }
+                }
+              ],
+              "count": 1,
+              "found": true,
+              "content_type": "outline",
+              "search_term": "The Accord"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        },
+        "job_id": null,
+        "status": null,
+        "jobs": null,
+        "error": null
+      },
+      "job_result": null,
+      "resolved_prompt": "Retrieve the outline for \"The Accord\""
+    }
+  ],
+  "expected": [
+    "routes to `library.retrieve`, kind=data; returns full outline (10 chapters, characters, themes, premise); Freytag structure; from `writing_projects_v2`"
+  ]
+}

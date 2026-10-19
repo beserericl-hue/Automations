@@ -1,0 +1,72 @@
+{
+  "id": "V30",
+  "title": "Voice \u2014 Content Not Found",
+  "route": "`notify.eve-callback` (task) \u00b7 impl: built (E2E-5)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=notify.eve-callback got=notify.eve-callback OK",
+    "job=complete",
+    "kind=queued invoked=True found=None"
+  ],
+  "steps": [
+    [
+      "voice",
+      "Pull up my draft story about alien wizards on Neptune and call me back"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "response": "Pulling up your draft story and I'll call you back to review it.",
+        "kind": "queued",
+        "tool": "notify",
+        "op": "eve-callback",
+        "job_id": "295073846b7d4735b5d0d18aaaffe5ee",
+        "status": "queued"
+      },
+      "job_result": {
+        "job_id": "295073846b7d4735b5d0d18aaaffe5ee",
+        "status": "complete",
+        "result": {
+          "execution_id": "c9055656-b190-4117-801d-d28bdc5cc03e",
+          "step_name": "notify",
+          "status": "ok",
+          "payload": {
+            "op": "eve-callback",
+            "result": {
+              "invoked": true,
+              "found": true,
+              "callback_mode": "review",
+              "phone": "+14105914612",
+              "content_type": "draft story",
+              "content_title": "When Sci-Fi Becomes Space Policy",
+              "eve": {
+                "dry_run": true,
+                "reason": "ELEVENLABS_API_KEY/AGENT_ID not configured",
+                "planned": {
+                  "content_type": "draft story",
+                  "content_title": "When Sci-Fi Becomes Space Policy",
+                  "content_text": "# When Sci-Fi Becomes Space Policy\n\n*How fictional empires shape real orbital governance*\n\nScience fiction doesn't just entertain\u2014it blueprints the future. As humanity stands on the edge of becoming a multi-planetary species, the power structures imagined in our favorite stories are quietly influencing the treaties, corporations, and geopolitical tensions that will define space itself.\n\n---\n\n## The Cold War Wrote the Script\n\nLong before we debated Mars colonies, science fiction became the battleground for Cold War anxieties. During the 1950s and 60s, [Cold War propaganda](https://alphahistory.com/coldwar/cold-war-propaganda/) seeped into sci-fi films where communism appeared as shadowy alien forces\u2014a metaphor for infiltration and loss of control. Works like *Invasion of the Body Snatchers* and *Red Planet Mars* weren't just entertainment; they shaped how Americans understood existential threats. This pattern continued into the 1980s, where [political undertones in sci-fi movies](https://newretro.net/blogs/main/analyzing-the-political-undertones-in-80s-sci-fi-movies) reflected nuclear anxiety through stories of rogue AI and authoritarian collapse. The lesson: fiction doesn't just reflect political fears\u2014it legitimizes them as inevitable futures worth preparing for.\n\n---\n\n## From Outer Space to Geopolitics\n\nToday's space politics read like yesterday's science fiction. [The view from outer space](https://www.cambridge.org/core/journals/social-science-history/article/view-from-outer-space-science-fiction-and-political-fantasy-in-the-cold-war-united-states/A37708AE984C124A95C2C84293F2E7AC) reframed global ambitions as planetary ones, introducing a framework where institutional power struggles became cosmic ones. Modern works like *The Expanse* now function as policy laboratories. [The Expanse and the Geopolitics of Space Colonization](https://www.wired.com/story/the-expanse-space-politics-geopolitics/) maps Belt politics directly onto current U.S.-China space race tensions, predicting resource conflicts between Earth, Mars, and outer planets. When NASA planners discuss the Artemis program, they're not just engineering\u2014they're navigating fictional power structures that have already colonized our collective imagination.\n\n---\n\n## Empires, Federations, and Corporate Futures\n\nScience fiction offers competing visions of space governance, each with real-world implications. [How Science Fiction Predicts Political Structures in Space](https://www.scientificamerican.com/article/science-fiction-predicts-space-politics/) examines *Dune* and *Foundation* as blueprints for interstellar empires, showing how these narratives anticipate federations or hegemonies in actual space treaties. Meanwhile, [Star Trek's Federation](https://foreignpolicy.com/2023/07/20/star-trek-federation-space-politics-un-nasa/) presents a utopian alternative\u2014international cooperation amid rivalry\u2014that experts now reference when debating the Artemis Accords. But there's a darker current: [5 Sci-Fi Novels Shaped by Real World Politics](https://kevinklehr.com/2019/06/10/5-sci-fi-novels-shaped-by-real-world-politics-guest-blog-by-emmanuel-nataf/) shows how *Star Wars* drew from Nixon-era imperial power structures, warning that our fictional futures often mirror our present anxieties about concentrated power. The question isn't whether space will be governed\u2014it's which fictional model we'll unconsciously adopt.\n\n---\n\n## When Fiction Influences Policy\n\n[Sci-Fi's Influence on Real-World Space Policy](https://www.theatlantic.com/science/archive/2021/10/science-fiction-space-policy-nasa-artemis/620374/) documents how *Star Trek* and *The Expanse* have shaped NASA's public messaging and policy priorities. Space policy experts now explicitly compare fictional governance models to emerging real-world structures, as shown in discussions of [space diplomacy](https://www.youtube.com/watch?v=TpkVprMaxno) where autonomous political entities off-Earth are no longer speculative\u2014they're operational assumptions. [Power and Prophecy](https://www.newyorker.com/magazine/2022/05/02/science-fiction-space-power-politics) connects Cold War sci-fi fantasies to contemporary billionaire-led ventures that challenge state monopolies on space. The feedback loop is complete: fiction predicts power structures, policy responds to those predictions, and reality begins to match the script.\n\n---\n\n## The Geopolitics We're Building\n\n[Imperial Imaginaries](https://www.e-ir.info/2015/06/11/imperial-imaginaries-employing-science-fiction-to-talk-about-geopolitics/) argues that science fiction mediates how we understand international relations in space\u2014offering imaginary resolutions to real power dilemmas. As we move toward multi-planetary governance, the frameworks we've absorbed from decades of sci-fi will shape treaties, corporate charters, and colonial hierarchies. The stakes are no longer metaphorical. Whether space becomes a federation of equals, a corporate frontier, or a new arena for great-power competition depends partly on which stories we've internalized as inevitable. The future of space politics isn't being written in policy documents\u2014it's being written in the stories we tell ourselves about what's possible.\n\n---\n\nScience fiction has always been a technology for thinking about power. As we stand at the threshold of becoming a spacefaring civilization, the question isn't whether our stories will shape reality\u2014it's whether we're conscious enough to choose which stories we want to come true. What fictional model of space governance do you think we should be building toward?",
+                  "callback_mode": "review",
+                  "phone": "+14105914612"
+                }
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Pull up my draft story about alien wizards on Neptune and call me back"
+    }
+  ],
+  "expected": [
+    "flat `{response, kind=\"data\"}` with error (no job_id, no callback)",
+    "retrieve returns found=false",
+    "`notify.eve-callback` NOT invoked",
+    "no outbound call",
+    "no KB op",
+    "response = not-found message",
+    "assert callback op not called when retrieve found=false"
+  ]
+}

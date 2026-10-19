@@ -1,0 +1,120 @@
+{
+  "test": {
+    "id": "R56",
+    "title": "Brainstorm Short Story \u2014 Freytags Pyramid (Ancient History)",
+    "source": "chat",
+    "prompt": "Brainstorm a short story using Freytags Pyramid about a Roman senator who poisons his rivals to secure the consulship, only for his own family to be destroyed by the same poison network he built. Genre: ancient-history. Title: The Consulship of Gaius Varro. 5 sections. Themes: ambition, legacy, self-destruction.",
+    "route": "brainstorm.story`/`brainstorm.short-story` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `brainstorm.story`, kind=queued; complete; `story_arc=\"Freytags Pyramid\"`",
+      "`writing_projects_v2` \"The Consulship of Gaius Varro\" with 5 sections; classic tragedy arc",
+      "Climax (midpoint) = consulship achieved AND unraveling begins; Falling = network turns on him; Catastrophe = ruin",
+      "Roman details researched; arc_notes use Freytag terminology; CR-009 email subject contains the title"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing short story brainstorm for 'The Consulship of Gaius Varro' \u2014 I'll let you know when it's ready.",
+    "tool": "brainstorm",
+    "op": "short-story",
+    "data": null,
+    "job_id": "44845428d3334fc4bc9de4794997f399",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "44845428d3334fc4bc9de4794997f399",
+    "status": "complete",
+    "result": {
+      "execution_id": "8c2536f3-3842-4985-a038-9cbbb749ec1b",
+      "step_name": "brainstorm",
+      "status": "ok",
+      "payload": {
+        "op": "short-story",
+        "result": {
+          "outline": {
+            "title": "The Consulship of Gaius Varro",
+            "premise": "In the final decades of the Roman Republic, Senator Gaius Varro systematically eliminates his political rivals through a network of poisoners, bribers, and informants, clawing his way to the consulship he believes will immortalize his name. But the very apparatus of corruption he has constructed \u2014 loyal to coin rather than to blood \u2014 turns against his own household, killing his son and destroying his wife, leaving Varro to hold the highest office in Rome with nothing left worth ruling.",
+            "themes": [
+              "Ambition as self-destruction",
+              "Legacy versus living",
+              "The corruption of means by ends",
+              "The indifference of power to love"
+            ],
+            "story_arc_name": "",
+            "dramatic_question": "",
+            "wow_factor": "",
+            "characters": [
+              {
+                "name": "Gaius Varro",
+                "role": "Protagonist \u2014 Senator and consul-seeker",
+                "arc": "Transforms from a calculating but loving patriarch into a hollowed monument to his own ambition, winning the office that costs him everything he claimed to be winning it for."
+              },
+              {
+                "name": "Livia Varro",
+                "role": "Gaius's wife \u2014 moral anchor and eventual victim",
+                "arc": "Begins as a quietly complicit partner who looks away from her husband's methods, and ends as an unwitting casualty of the poison network she never confronted."
+              },
+              {
+                "name": "Marcus Varro",
+                "role": "Gaius's son \u2014 idealistic young advocate",
+                "arc": "Discovers his father's poisoner and threatens to expose him, believing in the Republic's laws, and is silenced by the very network his father built."
+              },
+              {
+                "name": "Drusus",
+                "role": "Gaius's chief poisoner and fixer \u2014 freedman operative",
+                "arc": "Serves Gaius with cold professional loyalty until self-preservation demands he neutralize the senator's own son, proving the network was never truly Gaius's to command."
+              },
+              {
+                "name": "Quintus Servilius",
+                "role": "Gaius's chief political rival \u2014 the man he most fears",
+                "arc": "Dies mid-story as a trophy of Gaius's ambition, his death the apex moment that reveals the true cost of the senator's methods."
+              }
+            ],
+            "chapters": [
+              {
+                "chapter_number": 1,
+                "title": "The Senator's Table",
+                "beat": "Gaius Varro hosts a lavish dinner for Rome's political elite, presenting himself as a devoted father and statesman while privately directing Drusus to begin poisoning Quintus Servilius.",
+                "arc_notes": "Exposition \u2014 establishes Gaius's world of domestic warmth and political ruthlessness, plants the tension between his public image and private machinery, and introduces Marcus's idealism as the story's moral fault line."
+              },
+              {
+                "chapter_number": 2,
+                "title": "The Climb Requires Hands",
+                "beat": "As Servilius begins to sicken and withdraw from the consular race, Gaius expands his poison network to neutralize two more rivals, drawing Drusus deeper into the household's affairs and bringing the operation dangerously close to Marcus's awareness.",
+                "arc_notes": "Rising Action \u2014 escalates Gaius's moral compromise, tightens the network's proximity to his family, and builds dread as Marcus begins asking questions his father cannot safely answer."
+              },
+              {
+                "chapter_number": 3,
+                "title": "The Fasces and the Cup",
+                "beat": "Gaius is elected consul and celebrates his triumph, but at the height of the feast Marcus confronts him with proof of Drusus's poisonings and declares he will bring the evidence before the Senate \u2014 the goal is reached and the first crack splits the foundation.",
+                "arc_notes": "Climax \u2014 the midpoint apex at which Gaius achieves everything he sought and simultaneously faces the destruction of it; his son's integrity becomes the direct threat his ambition has created."
+              },
+              {
+                "chapter_number": 4,
+                "title": "What the Network Knows",
+                "beat": "Gaius hesitates, unable to order his son's death, but Drusus \u2014 acting on self-preservation \u2014 poisons Marcus before the young man can reach the Senate; Livia, who drank from the same cup prepared for her son, dies beside him.",
+                "arc_notes": "Falling Action \u2014 the consequence of the climax becomes catastrophic and irreversible; Gaius discovers that the network he built obeys its own logic of survival, not his love, and that his hesitation changed nothing."
+              },
+              {
+                "chapter_number": 5,
+                "title": "The Consul Sits Alone",
+                "beat": "Gaius Varro takes his seat in the curule chair on the first day of his consulship, the fasces carried before him through a city that cheers his name, while his house stands empty and Drusus has vanished into Rome's shadows \u2014 the office is his and it is worthless.",
+                "arc_notes": "Resolution \u2014 closes the story's central dramatic question by delivering the consulship Gaius destroyed his family to obtain, rendering it a monument to absence; the ambition is fulfilled and the man is gutted, answering Act I's portrait of the loving patriarch with its complete negation."
+              }
+            ],
+            "form": "short_story"
+          },
+          "persist": {
+            "persisted": false,
+            "reason": "persist requested but project_id/user_id missing"
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

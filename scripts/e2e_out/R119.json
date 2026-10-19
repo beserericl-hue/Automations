@@ -1,0 +1,108 @@
+{
+  "test": {
+    "id": "R119",
+    "title": "\u2014 Consistency Check: Character Names",
+    "source": "chat",
+    "prompt": "Check Chapter 1 of \"The Signal Beneath\" for character name consistency with the book outline",
+    "route": "chapter.qa` (task)",
+    "prerequisite": "R115",
+    "expected": [
+      "routes `chapter.qa`, kind=queued; completed; loads Ch1 prose + character roster from `writing_projects_v2.outline.characters`",
+      "every name verified against the roster; no invented names; roles consistent; no renamed characters (e.g. \"Maya\"\u2260\"Maria\"); QA report inline or via CR-009 email listing discrepancies/confirming consistency"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing a quality check for Chapter 1 of \"The Signal Beneath\". I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "qa",
+    "data": null,
+    "job_id": "7133c562b1534faebf74d1d3e5089911",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "7133c562b1534faebf74d1d3e5089911",
+    "status": "complete",
+    "result": {
+      "execution_id": "7fe70962-7cca-4772-812f-84cba3421d86",
+      "step_name": "chapter",
+      "status": "ok",
+      "payload": {
+        "op": "qa",
+        "result": {
+          "chapter_id": null,
+          "scores": {
+            "character_follows_guide": 0.0,
+            "outline_follows_guide": 0.0,
+            "dialogue_follows_guide": 0.0,
+            "prose_transparent": 0.0,
+            "story_turn_density": 0.0,
+            "no_boring_paragraphs": 0.0,
+            "period_language_ok": 0.0,
+            "character_consistency": 0.0,
+            "research_gaps": [
+              "No chapter text supplied \u2014 no historical or period facts can be flagged for verification.",
+              "No chapter text supplied \u2014 no scenes identified where a researched contemporary detail (price, technology, institution, slang, procedure) would deepen the prose."
+            ]
+          },
+          "findings": [
+            {
+              "dimension": "character_follows_guide",
+              "problem": "No chapter text was provided. Cannot evaluate character behaviour, POV discipline, or forbidden character types.",
+              "fix": "Provide the chapter text so characters can be assessed against the guide."
+            },
+            {
+              "dimension": "outline_follows_guide",
+              "problem": "No chapter text was provided. Cannot verify alignment with any outline.",
+              "fix": "Provide the chapter text and the outline it is meant to follow."
+            },
+            {
+              "dimension": "dialogue_follows_guide",
+              "problem": "No chapter text was provided. Cannot evaluate tennis-match rhythm, diction differentiation, tag usage, or action beats.",
+              "fix": "Provide the chapter text."
+            },
+            {
+              "dimension": "prose_transparent",
+              "problem": "No chapter text was provided. Cannot assess whether prose serves story or calls attention to itself.",
+              "fix": "Provide the chapter text."
+            },
+            {
+              "dimension": "story_turn_density",
+              "problem": "No chapter text was provided. Cannot count story turns or assess density against the 1-per-4-to-6-pages target.",
+              "fix": "Provide the chapter text with approximate page count."
+            },
+            {
+              "dimension": "no_boring_paragraphs",
+              "problem": "No chapter text was provided. Cannot identify paragraphs that restate, describe without character interaction, or explain period without drama.",
+              "fix": "Provide the chapter text."
+            },
+            {
+              "dimension": "period_language_ok",
+              "problem": "No chapter text was provided. Period is stated as 'contemporary', but no prose exists to scan for anachronism or period-inconsistent language.",
+              "fix": "Provide the chapter text."
+            },
+            {
+              "dimension": "character_consistency",
+              "problem": "No chapter text was provided and no LOCKED CHARACTERS roster was supplied (placeholder '{locked_character_roster}' was not filled in). Cannot verify name, role, gender, age, trait, or relationship consistency.",
+              "fix": "Fill in the LOCKED CHARACTERS roster and provide the chapter text before requesting a QA review."
+            }
+          ],
+          "character_consistency": null,
+          "token_usage": {
+            "calls": 1,
+            "input_tokens": 14,
+            "output_tokens": 723,
+            "cache_read_tokens": 0,
+            "cache_write_tokens": 2393,
+            "total_tokens": 3130,
+            "cost_usd": 0.019861
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

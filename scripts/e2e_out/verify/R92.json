@@ -1,0 +1,211 @@
+{
+  "id": "R92",
+  "title": "Outline Revision Creates Version Snapshot",
+  "route": "`brainstorm.revise-outline` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=brainstorm.revise-outline got=brainstorm.revise-outline OK",
+    "job=complete",
+    "outline title='The Accord' chapters=11 persisted=True projects_recent=3"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Revise the outline for \"The Accord\". Add a prologue set during humanity's first contact with the alien signal \u2014 a radio astronomer alone in an observatory at 3 AM hearing a pattern in the static. Keep the existing 10 chapters and Freytags Pyramid structure. Genre slug: political-scifi."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Queuing revision of the outline for \"The Accord\" to add a prologue. I'll let you know when it's ready.",
+        "tool": "brainstorm",
+        "op": "revise-outline",
+        "data": null,
+        "job_id": "834e0d449e5c405da3d78e7ce3beb48d",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "834e0d449e5c405da3d78e7ce3beb48d",
+        "status": "complete",
+        "result": {
+          "execution_id": "259ceac8-1816-46f5-8b5f-254028b72edf",
+          "step_name": "brainstorm",
+          "status": "ok",
+          "payload": {
+            "op": "revise-outline",
+            "result": {
+              "revised": true,
+              "outline": {
+                "title": "The Accord",
+                "premise": "Senior diplomatic attach\u00e9 Elena Vasquez brokers a groundbreaking peace treaty between the warring colonies of Kepler-442b and Proxima Centauri b, ending a brutal eight-year conflict over rare earth mining rights. But when she discovers the treaty's classified annexes contain provisions that will systematically enslave the losing side's population under the guise of 'reparative labor obligations,' Elena must choose between preserving the peace she sacrificed everything to achieve and exposing a conspiracy that reaches the highest levels of the Colonial Administrative Council \u2014 all while the alien signal that first drove humanity to the stars remains unanswered, a silent witness to what we have become.",
+                "themes": [
+                  "Complicity in systemic injustice",
+                  "The machinery of institutional power",
+                  "Moral compromise as the price of peace",
+                  "Information asymmetry in negotiations",
+                  "The corruption of noble intentions",
+                  "What first contact reveals about the species making contact"
+                ],
+                "story_arc_name": "Freytag's Pyramid",
+                "dramatic_question": "Can Elena Vasquez expose the treaty's enslavement provisions before they are permanently implemented \u2014 and can she live with what her exposure costs?",
+                "wow_factor": "The novel opens with the moment humanity first heard proof it was not alone in the universe \u2014 and then shows, across ten chapters, exactly how little that knowledge changed us.",
+                "characters": [
+                  {
+                    "name": "Dr. Yuki Tanaka",
+                    "role": "Prologue POV \u2014 Radio Astronomer",
+                    "description": "34-year-old radio astronomer at the Atacama Deep-Field Array, working a solo overnight shift in 2089. Meticulous, insomniac, and quietly furious that her career has stalled because she refuses to publish results she cannot replicate. Off-axis attribute: she is the most rigorous scientist on staff and the worst at accepting good news \u2014 her first instinct on hearing the signal is to look for the error, not to celebrate.",
+                    "arc": "Static within the prologue \u2014 she hears the signal, verifies it three times, and files the report that changes human history; her fate after that night is never shown, which is the point."
+                  },
+                  {
+                    "name": "Elena Vasquez",
+                    "role": "Protagonist",
+                    "description": "42-year-old senior diplomatic attach\u00e9 with the Colonial Administrative Council. Brilliant negotiator who believes deeply in the possibility of just peace. Haunted by early career failure in the Titan Mining Dispute. Off-axis attribute: she is extraordinarily good at reading rooms and catastrophically bad at reading people she admires \u2014 she extends to mentors and superiors a trust she would never extend to adversaries.",
+                    "arc": "Transforms from idealistic peacemaker to complicit participant to reluctant whistleblower, ultimately destroyed by her choice to expose the truth."
+                  },
+                  {
+                    "name": "Administrator Marcus Chen",
+                    "role": "Antagonist",
+                    "description": "Director of Colonial Affairs who orchestrates the treaty's hidden clauses. Views Elena as a useful tool whose idealism makes her the perfect unwitting front for the operation. Genuinely believes enslavement serves the greater good of colonial stability.",
+                    "arc": "Static \u2014 represents the calculated machinery of power; his certainty never wavers, which is what makes him monstrous."
+                  },
+                  {
+                    "name": "Captain Zara Al-Rashid",
+                    "role": "Dynamic Supporting",
+                    "description": "Elena's former partner and current military liaison to the peace talks. Ambitious officer who discovers the truth but chooses self-preservation over justice.",
+                    "arc": "Evolves from Elena's ally to her betrayer when forced to choose between friendship and career survival."
+                  },
+                  {
+                    "name": "Dr. James Okafor",
+                    "role": "Static Moral Compass",
+                    "description": "Independent colonial rights advocate and Elena's former mentor. The only major character who sees through the conspiracy from the beginning.",
+                    "arc": "Represents unwavering ethical stance \u2014 consistently warns Elena about the treaty's dangers and pays the ultimate price."
+                  }
+                ],
+                "chapters": [
+                  {
+                    "chapter_number": 0,
+                    "title": "Prologue: The Pattern",
+                    "act": "ACT 0 \u2014 PROLOGUE (2089, Earth, Atacama Deep-Field Array)",
+                    "arc_point": "Inciting incident of the entire human colonial era",
+                    "pov_character": "Dr. Yuki Tanaka",
+                    "bridge_from_prior": "None \u2014 this is the first scene; it establishes the causal origin of the colonial expansion that the rest of the novel inhabits.",
+                    "beat": "Alone at 3 AM, radio astronomer Yuki Tanaka isolates a non-random repeating signal from deep space, verifies it three times looking for the error rather than the miracle, and files the report that will send humanity to the stars \u2014 the last line of her log reads 'Awaiting instructions,' and no instructions ever come that night."
+                  },
+                  {
+                    "chapter_number": 1,
+                    "title": "The Summons",
+                    "act": "ACT 1 \u2014 INTRODUCTION",
+                    "arc_point": "Ordinary world established; inciting incident delivered",
+                    "pov_character": "Elena Vasquez",
+                    "bridge_from_prior": "The colonial expansion triggered by Tanaka's signal is the world Elena inhabits; the first chapter's opening line places Elena in a corridor of the Colonial Administrative Council building whose foundation stone reads '2089 \u2014 Per Aspera' \u2014 a direct consequence of that night.",
+                    "beat": "Administrator Chen summons Elena and assigns her to mediate the Kepler-Proxima peace talks, framing it as a career-defining opportunity; Elena accepts, driven equally by ambition and genuine belief in diplomatic solutions."
+                  },
+                  {
+                    "chapter_number": 2,
+                    "title": "First Contact",
+                    "act": "ACT 1 \u2014 INTRODUCTION continued",
+                    "arc_point": "World-building complete; supporting cast established",
+                    "pov_character": "Elena Vasquez",
+                    "bridge_from_prior": "Elena travels directly from Chen's briefing to the neutral station \u2014 the assignment just given is the situation she now enters.",
+                    "beat": "Elena arrives at the neutral station, meets the colonial delegations, and begins to map the human cost of eight years of mining war \u2014 the complexity is greater than Chen's briefing suggested, and Dr. Okafor's quiet presence at the margins of the talks is the first thing that unsettles her."
+                  },
+                  {
+                    "chapter_number": 3,
+                    "title": "Finding Common Ground",
+                    "act": "ACT 2 \u2014 RISING ACTION begins",
+                    "arc_point": "First obstacle overcome; hidden agenda introduced",
+                    "pov_character": "Elena Vasquez",
+                    "bridge_from_prior": "The delegations Elena met in chapter 2 are the same parties she now maneuvers \u2014 her read of their positions in the prior chapter drives her strategy here.",
+                    "beat": "Elena engineers a breakthrough by pivoting both sides toward a shared external-threat framework, but Dr. Okafor pulls her aside to name what she has not yet seen: Chen is running a parallel negotiation track she has no access to."
+                  },
+                  {
+                    "chapter_number": 4,
+                    "title": "The Price of Progress",
+                    "act": "ACT 2 \u2014 RISING ACTION",
+                    "arc_point": "First moral compromise; protagonist crosses a line",
+                    "pov_character": "Elena Vasquez",
+                    "bridge_from_prior": "The parallel track Okafor warned her about in chapter 3 has now produced draft language that lands on Elena's desk \u2014 she is being asked to endorse terms she did not write.",
+                    "beat": "Negotiations stall on reparations until Chen presents a 'shared labor arrangements' framework that both delegations accept; Elena notices the draft language is evasive but rationalizes her unease and endorses the framework, her first act of willful blindness."
+                  },
+                  {
+                    "chapter_number": 5,
+                    "title": "Momentum",
+                    "act": "ACT 2 \u2014 RISING ACTION",
+                    "arc_point": "Point of no return approaches; protagonist ignores final warning",
+                    "pov_character": "Elena Vasquez",
+                    "bridge_from_prior": "The framework Elena endorsed in chapter 4 has accelerated the talks \u2014 the momentum she created is now the force carrying her past the last warning signs.",
+                    "beat": "Chen promises Elena a senior ambassadorship as the talks race toward conclusion; Captain Al-Rashid warns her privately that the secret annexes are not routine, but Elena, intoxicated by imminent success, dismisses the warning and signs off on the annexes unread."
+                  },
+                  {
+                    "chapter_number": 6,
+                    "title": "The Signing",
+                    "act": "ACT 3 \u2014 CLIMAX",
+                    "arc_point": "Midpoint reversal: triumph and catastrophe arrive simultaneously",
+                    "pov_character": "Elena Vasquez",
+                    "bridge_from_prior": "The annexes Elena signed off on in chapter 5 are the documents Okafor now places in her hands \u2014 the consequence of her prior choice is the instrument of her destruction.",
+                    "beat": "In the same hour that Elena is hailed as peacemaker at the treaty's signing ceremony, Dr. Okafor delivers leaked documents proving the 'labor arrangements' are systematic enslavement \u2014 Elena realizes she has been the perfect unwitting front, and her greatest professional triumph is the worst thing she has ever done."
+                  },
+                  {
+                    "chapter_number": 7,
+                    "title": "Damage Control",
+                    "act": "ACT 4 \u2014 FALLING ACTION begins",
+                    "arc_point": "Protagonist attempts repair; discovers she is trapped",
+                    "pov_character": "Elena Vasquez",
+                    "bridge_from_prior": "The leaked documents Okafor gave Elena in chapter 6 are the evidence she now confronts Chen with \u2014 the prior scene's revelation drives this scene's confrontation.",
+                    "beat": "Elena confronts Chen, who neither denies the enslavement provisions nor apologizes for them, and calmly explains that implementation has already begun and her reputation is now inseparable from the treaty's survival \u2014 she is not a whistleblower yet, she is a hostage."
+                  },
+                  {
+                    "chapter_number": 8,
+                    "title": "The Informant",
+                    "act": "ACT 4 \u2014 FALLING ACTION",
+                    "arc_point": "Allies destroyed; cost of resistance made concrete",
+                    "pov_character": "Elena Vasquez",
+                    "bridge_from_prior": "Chen's warning in chapter 7 that he is watching her is the context for Al-Rashid's betrayal \u2014 the surveillance Chen implied is the mechanism Al-Rashid uses.",
+                    "beat": "Elena makes secret contact with journalists to expose the annexes; Al-Rashid reports her movements to Chen; Dr. Okafor is arrested on fabricated charges and dies in custody \u2014 Elena now knows that silence is complicity in genocide and speech is complicity in renewed war, and there is no third option."
+                  },
+                  {
+                    "chapter_number": 9,
+                    "title": "Point of No Return",
+                    "act": "ACT 4 \u2014 FALLING ACTION concludes",
+                    "arc_point": "Protagonist's final choice; machinery of power responds",
+                    "pov_character": "Elena Vasquez",
+                    "bridge_from_prior": "Okafor's death in chapter 8 is the event that removes Elena's last reason for hesitation \u2014 his sacrifice is the direct cause of her decision here.",
+                    "beat": "Elena releases the classified annexes through multiple simultaneous channels; Chen immediately moves to discredit her as mentally unstable and the documents as forgeries, but the information is already spreading beyond containment."
+                  },
+                  {
+                    "chapter_number": 10,
+                    "title": "The Reckoning",
+                    "act": "ACT 5 \u2014 CATASTROPHE",
+                    "arc_point": "Resolution: moral victory purchased at total personal cost",
+                    "pov_character": "Elena Vasquez",
+                    "bridge_from_prior": "The released documents from chapter 9 have reached the colonial populations \u2014 their revolt is the direct consequence of Elena's action, and she now faces trial for that consequence.",
+                    "beat": "The colonial populations revolt, violence resumes, and Elena stands trial for breach of classified information while the enslavement provisions are quietly suspended but never formally revoked; in her final scene she sits in a holding cell and reads, on a contraband tablet, Yuki Tanaka's original 2089 signal report \u2014 the last line, 'Awaiting instructions,' now reads like a verdict on the species that received it."
+                  }
+                ]
+              },
+              "chapters_before": 10,
+              "chapters_after": 11,
+              "characters_after": 5,
+              "persist": {
+                "persisted": true,
+                "project_id": "7976c085-41d3-46c6-9444-77b75bbdc289",
+                "created_project": false
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Revise the outline for \"The Accord\". Add a prologue set during humanity's first contact with the alien signal \u2014 a radio astronomer alone in an observatory at 3 AM hearing a pattern in the static. Keep the existing 10 chapters and Freytags Pyramid structure. Genre slug: political-scifi."
+    }
+  ],
+  "expected": [
+    "routes to `brainstorm.revise-outline`, kind=queued; complete",
+    "current (v1) outline snapshotted to `outline_versions_v2` before save; new Prologue(0) themed radio astronomer 3AM; 10 chapters preserved; no Epilogue",
+    "`writing_projects_v2.outline` updated; PRESERVE EXISTING CHARACTERS enforced; revised-outline email sent"
+  ]
+}

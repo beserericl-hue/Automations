@@ -1,0 +1,144 @@
+{
+  "id": "R111",
+  "title": "Brainstorm Chapter Outline for Prologue (Same Arc)",
+  "route": "`chapter.plan` (task) \u00b7 impl: built (E2E-4)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=chapter.plan got=chapter.plan OK",
+    "job=complete",
+    "sub_chapters=5 arc=The Hero's Journey"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Create a chapter outline for the Prologue of \"The Signal Beneath\""
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Queuing the chapter outline for the Prologue of \"The Signal Beneath\" \u2014 I'll let you know when it's ready.",
+        "tool": "chapter",
+        "op": "plan",
+        "data": null,
+        "job_id": "492654715aab4a158deb6b4791ad8c33",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "492654715aab4a158deb6b4791ad8c33",
+        "status": "complete",
+        "result": {
+          "execution_id": "49eb8a5f-19d6-47b7-9156-784403d7901f",
+          "step_name": "chapter",
+          "status": "ok",
+          "payload": {
+            "op": "plan",
+            "result": {
+              "chapter_number": 0,
+              "chapter_story_arc": "The Hero's Journey",
+              "book_arc": "The Hero's Journey",
+              "sub_chapter_briefs": [
+                {
+                  "number": 1,
+                  "title": "The Logbook",
+                  "beat": "Mara sits at her shortwave station at dusk, running her nightly scan of the dead bands and recording silence in her logbook \u2014 entry 2,547 \u2014 with the same methodical precision she has used every night for seven years.",
+                  "pov_character": "",
+                  "brief": "Mara sits at her shortwave station at dusk, running her nightly scan of the dead bands and recording silence in her logbook \u2014 entry 2,547 \u2014 with the same methodical precision she has used every night for seven years.",
+                  "arc_beat": "Stage 1 \u2014 Ordinary World: establishing the hero's routine and the texture of her diminished life",
+                  "characters": [
+                    "Mara Voss"
+                  ],
+                  "setting": "The fortified farmhouse \u2014 a converted two-storey brick building on the edge of a dead suburb, windows bricked to sill-height, antenna mast on the roof, a single oil lamp illuminating the ground-floor radio room",
+                  "emotional_tone": "Quiet, methodical, hollowed-out \u2014 the discipline of a person who has replaced feeling with procedure",
+                  "connects_to_book_arc": "Grounds the reader in the post-Cascade ordinary world: civilization is gone, the airwaves are silent, and Mara's logbook of that silence is both her purpose and her prison \u2014 Stage 1 baseline established"
+                },
+                {
+                  "number": 2,
+                  "title": "What the Cascade Left",
+                  "beat": "A trader named Coll arrives at the farmhouse gate to collect a repaired hand-crank generator; their brief, transactional exchange reveals the shape of the world \u2014 barter economy, Reclamation Authority patrols on the eastern roads, three settlements within a day's walk all shrinking \u2014 and Mara's place in it as a useful, solitary, trusted-but-not-known figure.",
+                  "pov_character": "",
+                  "brief": "A trader named Coll arrives at the farmhouse gate to collect a repaired hand-crank generator; their brief, transactional exchange reveals the shape of the world \u2014 barter economy, Reclamation Authority patrols on the eastern roads, three settlements within a day's walk all shrinking \u2014 and Mara's place in it as a useful, solitary, trusted-but-not-known figure.",
+                  "arc_beat": "Stage 1 \u2014 Ordinary World: the social and political landscape of the post-Cascade world shown through lived interaction, not exposition",
+                  "characters": [
+                    "Mara Voss"
+                  ],
+                  "setting": "The farmhouse gate \u2014 a reinforced steel frame set into a low stone wall, late-afternoon light, the dead suburb visible beyond: overgrown lots, collapsed rooflines, a water tower with a hand-painted RA insignia that someone has partially scratched out",
+                  "emotional_tone": "Wary, efficient, faintly sardonic \u2014 Mara is good at this world even though she does not love it",
+                  "connects_to_book_arc": "Introduces the Reclamation Authority as ambient threat and establishes the barter economy Mara operates within \u2014 the ordinary world has rules and dangers that will later be disrupted by the signal"
+                },
+                {
+                  "number": 3,
+                  "title": "Dani's Watch",
+                  "beat": "After Coll leaves, Mara repairs a pocket watch by lamplight \u2014 her private ritual \u2014 and the work pulls her into a memory of her brother Dani: his voice on a handheld radio the last time she heard it, asking when she was coming back, and her answer that she needed two more days to find a replacement oscillator crystal; she never made it back in time.",
+                  "pov_character": "",
+                  "brief": "After Coll leaves, Mara repairs a pocket watch by lamplight \u2014 her private ritual \u2014 and the work pulls her into a memory of her brother Dani: his voice on a handheld radio the last time she heard it, asking when she was coming back, and her answer that she needed two more days to find a replacement oscillator crystal; she never made it back in time.",
+                  "arc_beat": "Stage 1 \u2014 Ordinary World: the hero's wound \u2014 the unresolved grief and guilt that defines her inner life and will be tested by the journey",
+                  "characters": [
+                    "Mara Voss"
+                  ],
+                  "setting": "The farmhouse kitchen \u2014 a worktable cleared of everything except the watch, a loupe, a row of tiny tools, the oil lamp; outside the window, full dark and wind in dead trees",
+                  "emotional_tone": "Grief held at arm's length through craft \u2014 the memory surfaces not as breakdown but as a familiar ache she has learned to work around",
+                  "connects_to_book_arc": "Plants the core wound: Mara chose equipment over her brother and he died. This guilt is the psychological engine of the Hero's Journey \u2014 the thing she must ultimately reckon with. ESCALATION SEED: Mara's belief that she prioritises signals over people will be tested, pressured, and finally broken across the novel. Starts here (small, private). Reappears under pressure in Chapter 4 (Harrow Country) when she learns Dani's settlement file was processed by the RA. Explodes in Chapter 6 (The Inmost Cave) when she discovers Aldric Senn's identity and must choose between the signal and confronting what was done."
+                },
+                {
+                  "number": 4,
+                  "title": "2,547 Nights of Nothing",
+                  "beat": "Mara returns to the radio room for her final scan of the night; she reads back through three pages of her logbook \u2014 all silence, all notation, all the same \u2014 and we understand that she has been listening for something she no longer believes exists; she writes the night's final entry, closes the book, and sits for a long moment with her hand on the receiver before switching it off.",
+                  "pov_character": "",
+                  "brief": "Mara returns to the radio room for her final scan of the night; she reads back through three pages of her logbook \u2014 all silence, all notation, all the same \u2014 and we understand that she has been listening for something she no longer believes exists; she writes the night's final entry, closes the book, and sits for a long moment with her hand on the receiver before switching it off.",
+                  "arc_beat": "Stage 1 \u2014 Ordinary World: the hero's longing \u2014 the thing she wants but has stopped hoping for, which the Call to Adventure will directly answer",
+                  "characters": [
+                    "Mara Voss"
+                  ],
+                  "setting": "The radio room \u2014 shortwave receiver on a salvaged steel desk, antenna leads running up through a sealed conduit in the ceiling, the logbook open under lamplight, a hand-drawn frequency chart pinned to the wall with seven years of annotations",
+                  "emotional_tone": "Exhausted hope \u2014 not despair, but the specific tiredness of someone who keeps doing the thing anyway, without knowing why",
+                  "connects_to_book_arc": "Completes the ordinary world portrait: Mara is competent, isolated, grieving, and still listening. The reader now knows exactly what she hopes for and what she fears \u2014 which means Chapter 1's signal will land with full weight"
+                },
+                {
+                  "number": 5,
+                  "title": "Static",
+                  "beat": "In the last minutes before sleep, Mara hears something \u2014 not a signal, not yet, just a faint asymmetry in the static on 7.850 MHz, a texture that is almost pattern; she tells herself it is ionospheric noise, writes nothing in the logbook, and goes to bed; the final image is the receiver's needle resting just off zero in the dark, trembling.",
+                  "pov_character": "",
+                  "brief": "In the last minutes before sleep, Mara hears something \u2014 not a signal, not yet, just a faint asymmetry in the static on 7.850 MHz, a texture that is almost pattern; she tells herself it is ionospheric noise, writes nothing in the logbook, and goes to bed; the final image is the receiver's needle resting just off zero in the dark, trembling.",
+                  "arc_beat": "Stage 1 \u2014 Ordinary World / threshold of Stage 2 \u2014 Call to Adventure: the ordinary world's last moment, with the first ghost of disruption already present",
+                  "characters": [
+                    "Mara Voss"
+                  ],
+                  "setting": "The radio room, then the farmhouse stairwell \u2014 darkness, the receiver left on standby, the antenna mast visible through a gap in the brickwork against a starless sky",
+                  "emotional_tone": "Unease beneath exhaustion \u2014 something has shifted that she is not ready to name; the reader feels it even if Mara does not",
+                  "connects_to_book_arc": "Bridges directly into Chapter 1 (The Carrier Wave): the asymmetry Mara dismisses tonight will resolve into a full encrypted signal at 2 a.m. \u2014 the Call to Adventure. The prologue ends not on silence but on the first tremor of what is coming, hooking the reader forward."
+                }
+              ],
+              "count": 5,
+              "persist": {
+                "persisted": true,
+                "chapter_number": 0
+              },
+              "token_usage": {
+                "calls": 1,
+                "input_tokens": 1614,
+                "output_tokens": 1726,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 6788,
+                "total_tokens": 10128,
+                "cost_usd": 0.056187
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Create a chapter outline for the Prologue of \"The Signal Beneath\""
+    }
+  ],
+  "expected": [
+    "routes `chapter.plan`, kind=queued (NOT chapter.write); completed",
+    "`writing_projects_v2.outline.chapters[prologue].chapter_outline.sub_chapters` 3\u20137 entries; each: number/title/brief/arc_beat/characters/setting/emotional_tone/connects_to_book_arc",
+    "character names match book outline exactly; arc_beat = Hero's Journey stages; chapter_story_arc inherited; book_arc_beat present",
+    "CR-009 email; no chapter prose written"
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "test": {
+    "id": "R15",
+    "title": "Write Short Story (ai-marketing)",
+    "source": "chat",
+    "prompt": "Write a short story in the ai-marketing genre. Genre slug: ai-marketing. Premise: An AI trained to write ad copy for a luxury perfume brand starts composing poetry instead \u2014 and the poems sell better than any ad ever did. Tone: satirical, sharp, funny. Length: 2000 words. Research topics: [\"AI generated advertising 2026\", \"perfume marketing psychology\", \"computational creativity\"]",
+    "route": "chapter.short-story` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `chapter.short-story`, kind=queued; job reaches status=complete",
+      "Story uses ai-marketing tone (authoritative, forward-looking, practical)",
+      "**Prime Directive:** No jargon/buzzwords. Clear, short sentences. Genuine wit.",
+      "Cover art: clean tech aesthetic, gradient blues/purples, circuit patterns",
+      "Email arrives with story + cover image; Draft row in `published_content_v2`; CR-009 email received"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing your short story. I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "short-story",
+    "data": null,
+    "job_id": "165503eeba5f467cb70283603b084dc3",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "165503eeba5f467cb70283603b084dc3",
+    "status": "complete",
+    "result": {
+      "execution_id": "7c60dfe1-8f9c-4148-927d-a075a5f71805",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValueError",
+        "message": "invalid literal for int() with base 10: '2000 words'",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

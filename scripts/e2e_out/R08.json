@@ -1,0 +1,47 @@
+{
+  "test": {
+    "id": "R08",
+    "title": "Write Short Story (historical-time-travel)",
+    "source": "chat",
+    "prompt": "Write a short story. Genre slug: historical-time-travel. Premise: A historian discovers that antique photographs can transport her to the moment they were taken. She finds a photo of the Titanic's maiden voyage departure and must decide whether to warn the passengers. Tone: literary, bittersweet. Length: 2500 words. Research topics: [\"Titanic maiden voyage Southampton 1912\", \"history of early photography techniques\", \"time travel paradoxes in fiction\"]",
+    "route": "chapter.short-story` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `chapter.short-story`, kind=queued; job reaches status=complete",
+      "Story uses historical-time-travel tone (meticulous, wonder-infused)",
+      "**Writing Prime Directive:** Clear everyday language. Short sentences. Genuine emotion. Concrete details.",
+      "Perplexity research on all 3 topics performed",
+      "Cover art generated (period-appropriate) via `media.cover-art`",
+      "Email arrives with complete story",
+      "Draft row in `published_content_v2` (content_type=short_story, user_id=\"+14105914612\")",
+      "CR-009 task-completion email received"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing your short story. I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "short-story",
+    "data": null,
+    "job_id": "8a26976d43b843f0a8ba9478537a52c9",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "8a26976d43b843f0a8ba9478537a52c9",
+    "status": "complete",
+    "result": {
+      "execution_id": "2358cc37-ee26-4e02-9397-9d6c0aba733f",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValueError",
+        "message": "invalid literal for int() with base 10: '2500 words'",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

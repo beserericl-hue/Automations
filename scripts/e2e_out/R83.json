@@ -1,0 +1,25 @@
+{
+  "test": {
+    "id": "R83",
+    "title": "List Outlines \u2014 Alternate Phrasing",
+    "source": "chat",
+    "prompt": "Show me my outlines",
+    "route": "library.list-outlines` (info)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `library.list-outlines`, kind=data; same result set as R82; stop words don't pollute the query"
+    ]
+  },
+  "response": {
+    "kind": "reply",
+    "assistant_message": "How can I help with your writing?",
+    "tool": null,
+    "op": null,
+    "data": null,
+    "job_id": null,
+    "status": null,
+    "jobs": null,
+    "error": null
+  },
+  "job_result": null
+}

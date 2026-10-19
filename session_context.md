@@ -39,7 +39,7 @@ function — no skips — then rebuild the vault testing docs.
   `WritersWorkbench` develop env. Test user `+14105914612` (`eric@agileadtesting.com`). **URL-encode the
   `+` as `%2B` in REST queries** (a raw `+` decodes to a space → 0 rows — this bit us).
 - **DEV Workbench**: `https://writersworkbench-develop.up.railway.app`. Login
-  `eric@agileadtesting.com` / `Fr332bafami!y` (marketing-copy §2).
+  `eric@agileadtesting.com` / `<rotated 2026-10-19 — see credentials-map.md>` (marketing-copy §2).
 - **Engine E2E harness**: `scripts/e2e_manifest.py` → `scripts/e2e_out/manifest.json` from
   `knowledgebase/.../testing/engine-chat-e2e-suite.md` (157 tests). `scripts/e2e_full_verify.py` runs all
   through chat/voice, polls, verifies vs DEV Supabase, writes `scripts/e2e_out/verify/<id>.json`. Env:
@@ -48,7 +48,7 @@ function — no skips — then rebuild the vault testing docs.
 - **Playwright UI**: `writers-workbench/playwright.config.ts`, test dir `e2e/`. Register a new spec by
   adding its filename to the `chromium` project's `testMatch` regex. Run vs DEV (no local servers):
   `E2E_BASE_URL=https://writersworkbench-develop.up.railway.app E2E_TEST_EMAIL=eric@agileadtesting.com
-  E2E_TEST_PASSWORD='Fr332bafami!y' SUPABASE_URL=<dev> VITE_SUPABASE_ANON_KEY=<dev anon>
+  E2E_TEST_PASSWORD='<rotated 2026-10-19 — see credentials-map.md>' SUPABASE_URL=<dev> VITE_SUPABASE_ANON_KEY=<dev anon>
   npx playwright test <spec> --project=chromium`. `auth.setup.ts` uses the Supabase password-grant API
   path when `E2E_BASE_URL` is set. Optional deterministic chapter picking: `E2E_SUPA_URL,
   E2E_SUPA_SERVICE_KEY, E2E_USER_ID`. Reusable `e2e/pages/workbench.page.ts` (`WorkbenchPage`).

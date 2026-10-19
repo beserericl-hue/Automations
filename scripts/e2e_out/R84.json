@@ -1,0 +1,41 @@
+{
+  "test": {
+    "id": "R84",
+    "title": "Outline Version History \u2014 The Accord",
+    "source": "chat",
+    "prompt": "Show outline version history for \"The Accord\"",
+    "route": "library.versions` (info: list)",
+    "prerequisite": "R71",
+    "expected": [
+      "routes to `library.versions` (list, outline), kind=data; queries `outline_versions_v2` (case-insensitive title)",
+      "\u22651 version entry (R71 pre-revision snapshot); each entry: version_number, created_at, chapter count; chronological order"
+    ]
+  },
+  "response": {
+    "kind": "data",
+    "assistant_message": "",
+    "tool": "library",
+    "op": "versions",
+    "data": {
+      "execution_id": "dd33c3d8-ecf8-4591-9549-4352c65e691b",
+      "step_name": "library",
+      "status": "ok",
+      "payload": {
+        "op": "versions",
+        "result": {
+          "scope": "outline",
+          "project_id": "7976c085-41d3-46c6-9444-77b75bbdc289",
+          "versions": [],
+          "count": 0
+        }
+      },
+      "error": null,
+      "next_stage": null
+    },
+    "job_id": null,
+    "status": null,
+    "jobs": null,
+    "error": null
+  },
+  "job_result": null
+}

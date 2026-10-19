@@ -1,0 +1,70 @@
+{
+  "id": "R38",
+  "title": "Unknown Genre Slug",
+  "route": "`chapter.blog` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=chapter.blog got=chapter.blog OK",
+    "job=complete",
+    "blog_post recent=3 word_count=981 persist=True"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Write a blog post in the cyberpunk genre. Genre slug: cyberpunk. Topic: \"Neon and Chrome\". Target length: 1000 words."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Queuing a blog post on 'Neon and Chrome' in the cyberpunk genre. I'll let you know when it's ready.",
+        "tool": "chapter",
+        "op": "blog",
+        "data": null,
+        "job_id": "779855936a01463b92c2c33f7e877109",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "779855936a01463b92c2c33f7e877109",
+        "status": "complete",
+        "result": {
+          "execution_id": "37bc50da-08f2-4c3d-a1d9-932c76ccda0b",
+          "step_name": "chapter",
+          "status": "ok",
+          "payload": {
+            "op": "blog",
+            "result": {
+              "written": true,
+              "title": "Neon and Chrome: Why Science Fiction's Favorite Aesthetic Owns the Real World Now",
+              "content_text": "# Neon and Chrome: Why Science Fiction's Favorite Aesthetic Owns the Real World Now\n\nWalk through any city nightlife district after midnight and you'll feel it before you see it, a low hum of bass, wet asphalt throwing up pink and cyan, chrome catching the glow from a dozen directions at once. It looks lifted straight from a William Gibson novel. That's not a coincidence.\n\nScience fiction invented this visual language. Now the real world has caught up, and the result is stranger and more interesting than most genre writers predicted., -\n\n## The Aesthetic That Cyberpunk Built\n\nGibson's *Neuromancer* (1984) gave us the template: dense urban grids, neon signage bleeding into rain-slicked streets, chrome everywhere as shorthand for both wealth and danger. Ridley Scott's *Blade Runner* (1982) put it on screen and burned it into the cultural memory.\n\nFor decades, neon and chrome stayed safely fictional. They were signals that said *this is the future*, or at least a future, one that was equal parts seductive and threatening.\n\nWhat nobody quite anticipated was that the aesthetic would become a design choice for birthday parties.\n\nHere we are., -\n\n## From Fiction to the Street\n\nModern urban nightlife has adopted the visual grammar of cyberpunk almost wholesale. LED strip lighting in saturated pinks, cyans, and purples lines storefronts and bars. Digital billboards run animated gradients. Wet pavement doubles every light source into a blurred, shifting mirror.\n\nThe materials are different from the genre's imagination, acrylic panels, polycarbonate diffusers, RGB halos rather than actual gas neon, but the effect lands in the same place. You stand in it and your brain says *future*.\n\nFashion followed the same path. Chrome-effect accessories, mirror sunglasses, silver chains, metallic sneakers, reflective vinyl jackets, catch and scatter neon light whenever the wearer moves. High-gloss PVC and metallic-coated textiles turn a crowded room into a fractured light show. Chrome Hearts, inspired jewelry pairs gothic crosses with toxic neon green colorways, which is an aesthetic choice so specific and strange that it could only exist in a world already saturated with this visual vocabulary.\n\nEven hairstyles participate. UV-reactive beads, fiber-optic hair pieces, and metallic cuffs glow under club lighting. Holographic eyeshadow and chrome-effect lip gloss flare under colored LEDs. Temporary UV tattoos trace luminous lines along arms and necks.\n\nThis is not subtle. That's the point., -\n\n## The Digital Layer\n\nGraphic designers now work in a style they call Cyber Neon, electric blue and magenta over dark backgrounds, glossy 3D chrome lettering, effects named *glassmorphism* and *chromatic aberration* that simulate polished metal and illuminated glass. It's the aesthetic of social media brand assets, music video titles, and influencer content.\n\nAnd then there's the documentation loop. Attendees at neon-chrome events shoot vertical reels and TikToks, apply filters that push saturation further, add artificial glow, overlay chrome text. The real environment gets amplified into something even more fictional-looking before it reaches an audience. The gap between the sci-fi source material and the social media output has nearly closed.\n\nLimited-edition trading cards and collectibles use neon foil stamping and chrome finishes. The terms collectors use, *neon refractor*, *chrome variant*, *glow parallel*, mirror the language of the environments they're sold in. The aesthetic has become a product category., -\n\n## What Science Fiction Got Right (and Wrong)\n\nCyberpunk's neon-chrome future was almost always dystopian. The gleam was a cover for rot. Corporations owned everything, surveillance was total, and the beautiful lights existed to distract you from how bad things had gotten.\n\nSome of that reads as accurate. The neon districts of 2025 are heavily branded. The chrome accessories are often fast fashion. The TikToks feed algorithms that monetize attention. The immersive visual environment is, in part, a machine for selling things.\n\nBut cyberpunk mostly imagined this aesthetic as something imposed, a corporate veneer over a suffering population. What actually happened is that people chose it, enthusiastically, for their own celebrations. Birthday parties. Bar mitzvahs. Weddings. Arts galas in converted performance spaces where formalwear meets light-up pins and reflective fabrics.\n\nThe genre didn't predict that neon and chrome would become the visual language of joy as much as dread. That people would find the sensory overload fun rather than oppressive. That the aesthetic would mean *we're having a good time* rather than *we are trapped*.\n\nThat's a more interesting outcome than most of the fiction managed., -\n\n## Recommended Reading and Watching\n\nIf you want to trace this aesthetic back to its roots, or see where writers are taking it now, start here:\n\n- **William Gibson, *Neuromancer* (1984)**, The origin point. Still the clearest articulation of what neon and chrome mean as a cultural signal.\n- **Ridley Scott, *Blade Runner* (1982)**, The visual template. Watch it and then walk through any dense city nightlife district. The conversation between them is obvious.\n- **Denis Villeneuve, *Blade Runner 2049* (2017)**, Updates the palette. Colder, more amber, but the chrome-and-neon grammar is intact and expanded.\n- **Janelle Mon\u00e1e, *The ArchAndroid* (2010)**, Music as cyberpunk. Mon\u00e1e built an entire aesthetic universe from these materials before the current wave arrived.\n- **Richard K. Morgan, *Altered Carbon* (2002)**, Neon-soaked noir that takes the dystopian reading seriously while still making the world feel alive.\n- **Neon Genesis Evangelion (1995)**, Anime's version of the same visual language, with a very different emotional register underneath., -\n\nScience fiction gave us neon and chrome as a warning dressed up as a spectacle. The real world took the spectacle and ran with it. Whether the warning still applies is worth thinking about the next time you're standing in a parking lot watching chrome hubcaps pick up the glow from a bar sign across the street.\n\n**Discussion prompt:** Cyberpunk imagined neon and chrome as signs of a society in decline. But people now actively choose this aesthetic for celebrations and self-expression. Does that change what the aesthetic means, or does the dystopian reading still hold?",
+              "word_count": 981,
+              "persist": {
+                "persisted": true,
+                "content_id": "22de8204-03c5-421b-bf79-7e06c0cd9157"
+              },
+              "token_usage": {
+                "calls": 2,
+                "input_tokens": 2337,
+                "output_tokens": 3180,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+                "total_tokens": 5517,
+                "cost_usd": 0.054711
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Write a blog post in the cyberpunk genre. Genre slug: cyberpunk. Topic: \"Neon and Chrome\". Target length: 1000 words."
+    }
+  ],
+  "expected": [
+    "routes to `chapter.blog`, kind=queued; asks clarification OR picks closest genre (political-scifi)",
+    "Does NOT crash / null genre config; if it proceeds, blog generates; job reaches complete; CR-009 email received"
+  ]
+}

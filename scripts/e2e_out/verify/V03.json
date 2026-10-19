@@ -1,0 +1,60 @@
+{
+  "id": "V03",
+  "title": "Voice \u2014 Email Report",
+  "route": "`library.email-content` (task) \u00b7 impl: built (E2E-1)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.email-content got=library.email-content OK",
+    "job=complete",
+    "emailed=True to=eric@agileadtesting.com subject=voice test research report err=None"
+  ],
+  "steps": [
+    [
+      "voice",
+      "Send me an email with a summary of that research use the subject line voice test research report"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "response": "Sending an email with the research report summary. I'll let you know when it's sent.",
+        "kind": "queued",
+        "tool": "library",
+        "op": "email-content",
+        "job_id": "b43c8d1772684d41ad12681161804b6a",
+        "status": "queued"
+      },
+      "job_result": {
+        "job_id": "b43c8d1772684d41ad12681161804b6a",
+        "status": "complete",
+        "result": {
+          "execution_id": "3d2f367c-3b91-47d6-b156-7608fbabfae5",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "email-content",
+            "result": {
+              "emailed": true,
+              "to": "eric@agileadtesting.com",
+              "subject": "voice test research report",
+              "content_type": "research"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Send me an email with a summary of that research use the subject line voice test research report"
+    }
+  ],
+  "expected": [
+    "flat `{response, kind=\"queued\"}`",
+    "routes `library.email-content`",
+    "job_id",
+    "complete",
+    "email to `app_config.recipient_email`",
+    "subject \"voice test research report\"",
+    "body = summary of saved report",
+    "BCC if configured"
+  ]
+}

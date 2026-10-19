@@ -1,0 +1,59 @@
+{
+  "id": "R03",
+  "title": "Email Report",
+  "route": "`library.email-content` (task) \u00b7 impl: built (E2E-1)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.email-content got=library.email-content OK",
+    "job=complete",
+    "emailed=True to=eric@agileadtesting.com subject=Regression Test: Email Report err=None"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Send me an email report with this content:\n\n  # Post-Apocalyptic Fiction Trends 2026\n\n  ## Key Findings\n  - Climate fiction is merging with post-apocalyptic themes\n  - Solarpunk counternarratives are gaining traction\n  - AI apocalypse stories have surged 300% since 2024\n\n  ## Recommended Reading\n  1. \"The Last Garden\" by Sarah Chen\n  2. \"Ash Protocol\" by Marcus Webb\n\n  Send it to eric@agileadtesting.com with subject line \"Regression Test: Email Report\""
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Sending your email report now.",
+        "tool": "library",
+        "op": "email-content",
+        "data": null,
+        "job_id": "dba49256d6844db9a05ac733ef669d61",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "dba49256d6844db9a05ac733ef669d61",
+        "status": "complete",
+        "result": {
+          "execution_id": "36c7fc14-7391-4e88-87e5-f474411a265e",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "email-content",
+            "result": {
+              "emailed": true,
+              "to": "eric@agileadtesting.com",
+              "subject": "Regression Test: Email Report",
+              "content_type": "inline"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Send me an email report with this content:\n\n  # Post-Apocalyptic Fiction Trends 2026\n\n  ## Key Findings\n  - Climate fiction is merging with post-apocalyptic themes\n  - Solarpunk counternarratives are gaining traction\n  - AI apocalypse stories have surged 300% since 2024\n\n  ## Recommended Reading\n  1. \"The Last Garden\" by Sarah Chen\n  2. \"Ash Protocol\" by Marcus Webb\n\n  Send it to eric@agileadtesting.com with subject line \"Regression Test: Email Report\""
+    }
+  ],
+  "expected": [
+    "routes to `library.email-content`, kind=queued; job reaches status=complete",
+    "Email arrives at eric@agileadtesting.com",
+    "Email is formatted HTML (headings, bullet points, numbered list)",
+    "Subject line matches \"Regression Test: Email Report\""
+  ]
+}

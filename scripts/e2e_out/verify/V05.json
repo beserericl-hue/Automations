@@ -1,0 +1,75 @@
+{
+  "id": "V05",
+  "title": "Voice \u2014 Write Newsletter",
+  "route": "`chapter.newsletter` (task) \u00b7 impl: built (E2E-3)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=chapter.newsletter got=chapter.newsletter OK",
+    "job=complete",
+    "newsletter recent=4 word_count=956 persist=True"
+  ],
+  "steps": [
+    [
+      "voice",
+      "Write me a newsletter for the political history genre about revolutions that changed the world date today"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "response": "Queuing a newsletter about revolutions that changed the world for the political history genre. I'll let you know when it's ready.",
+        "kind": "queued",
+        "tool": "chapter",
+        "op": "newsletter",
+        "job_id": "d99d8a629da947d3b92580ad593eda46",
+        "status": "queued"
+      },
+      "job_result": {
+        "job_id": "d99d8a629da947d3b92580ad593eda46",
+        "status": "complete",
+        "result": {
+          "execution_id": "a04f01b5-8eda-433d-ac24-2620ec6f8e26",
+          "step_name": "chapter",
+          "status": "ok",
+          "payload": {
+            "op": "newsletter",
+            "result": {
+              "written": true,
+              "title": "The World Turned Upside Down: Revolutions That Remade History",
+              "subject_line": "Five Revolutions That Rewrote the Map",
+              "content_text": "_From Paris barricades to anti-colonial uprisings, how ordinary people ended empires._\n\nIn 1789, a Paris crowd stormed a fortress that held seven prisoners. Within three years, a king was dead and the word 'citizen' meant something new. That is how fast a revolution can move, and how completely it can change what ordinary life looks like. Revolutions are not just dramatic moments. They are ruptures that redraw borders, collapse dynasties, and force every society watching to ask: could this happen here? Scholars at Cambridge and in the journal *Nature* describe the 20th century alone as producing multiple distinct 'waves' of revolution, democratic, communist, anti-colonial, and finally anti-communist, each reshaping the world system in turn. [https://www.cambridge.org/core/books/anatomies-of-revolution/revolutions-in-the-contemporary-world/4BA993EA361E896CF1E2A2E864D908E4] [https://www.nature.com/articles/s41599-022-01120-9] This issue walks through five of those upheavals, what caused them, and why they still matter.\n\n## The French Revolution: Liberty as a Weapon\n\nBefore 1789, most Europeans assumed monarchy was simply the natural order. The French Revolution ended that assumption. When the Estates-General met in May 1789, France was bankrupt, bread was scarce, and the court at Versailles was visibly out of touch. The storming of the Bastille on July 14 was less a military operation than a public statement, the old authority could be physically dismantled. [https://www.historysnob.com/war-and-historical-events/20-major-revolutions-throughout-history] What followed was violent and contradictory. The Revolution executed its own leaders, fought European coalitions, and eventually handed power to Napoleon. But it exported three ideas that never went back in the box: popular sovereignty, civic equality before the law, and the nation as a political community. Every revolution that came after borrowed its vocabulary from Paris.\n\n## The Russian Revolution: Two Upheavals, One Catastrophe\n\nRussia in 1917 was fighting a war it was losing, feeding a population it could not supply, and ruled by a tsar who believed God had personally appointed him. The February Revolution ended the Romanov dynasty almost by accident, strikes and bread riots in Petrograd spiraled beyond anyone's control, and Nicholas II abdicated in March. [https://en.wikipedia.org/wiki/List_of_revolutions_and_rebellions] The Bolsheviks seized that opening in October. Lenin's party was a minority, but it was organized, it had a clear program, and it moved fast. The civil war that followed killed millions. By 1922, the Soviet Union existed, a state built on the explicit rejection of capitalism and private property. For the next 70 years, every government on earth had to decide where it stood relative to that fact. The Russian Revolution did not just change Russia. It structured global politics. [https://www.nature.com/articles/s41599-022-01120-9]\n\n## Anti-Colonial Revolutions: Independence as the Goal\n\nThe most numerous revolutions of the 20th century were not communist or democratic, they were national liberation struggles. From the 1950s through the 1970s, dozens of countries in Africa, Asia, and the Middle East ended formal colonial rule. [https://www.nature.com/articles/s41599-022-01120-9] Algeria fought France for eight years, from 1954 to 1962, in a war that killed roughly a million people. Vietnam fought first France, then the United States. Kenya's Mau Mau uprising forced Britain to reckon with the cost of holding an empire by force. These revolutions shared a common structure: colonial administration had created educated local elites who then organized mass movements against the same system that trained them. The slogans were about sovereignty and dignity as much as economics. The result was a near-complete redrawing of the world map between 1945 and 1980. [https://www.tandfonline.com/doi/full/10.1080/01436597.2020.1779053]\n\n## The 1989 Revolutions: Communism Collapses Without a Shot\n\nIn 1989, the anti-communist revolutions of Eastern Europe happened with a speed that stunned everyone, including the people leading them. Poland held semi-free elections in June. Hungary opened its border with Austria in September. By November, East Germans were dismantling the Berlin Wall with hammers. Romania was the exception, Nicolae Ceau\u0219escu was shot on Christmas Day, but across the bloc, regimes that had seemed permanent simply stopped functioning. [https://www.cambridge.org/core/books/anatomies-of-revolution/revolutions-in-the-contemporary-world/4BA993EA361E896CF1E2A2E864D908E4] Scholars point to a combination of economic stagnation, a Soviet leadership unwilling to send tanks a second time, and decades of quiet civil society organizing, Solidarity in Poland, Charter 77 in Czechoslovakia. The revolutions of 1989 were not spontaneous. They were the visible surface of long underground work. Within two years, the Soviet Union itself dissolved. The Cold War's defining structure vanished in roughly 24 months.\n\n## What Revolutions Actually Need to Succeed\n\nAcross all these cases, researchers identify a consistent pattern. Successful revolutions tend to require three things at once: a state in crisis (usually financial, military, or both), a population with shared grievances and the organizational capacity to act on them, and elites who defect from the existing order. [https://www.nature.com/articles/s41599-022-01120-9] Remove any one element and uprisings tend to fail or get crushed. That is why most protests do not become revolutions. It is also why revolutions are so hard to predict, the conditions can exist for years before the trigger appears. The storming of the Bastille, the bread riots in Petrograd, the fall of the Berlin Wall: in each case, a specific moment crystallized a much longer buildup. Understanding that buildup is what separates historical analysis from myth. Revolutions are not made by heroes. They are made by conditions, and by the people organized enough to act when those conditions arrive. [https://www.reddit.com/r/history/comments/4o5qkt/what_was_the_most_influential_revolution_why/]\n\nHistory does not repeat, but it does offer patterns. The revolutions covered here, French, Russian, anti-colonial, anti-communist, each emerged from a specific crisis, but each also drew on the memory of what came before. The French borrowed from the English Civil War. The Bolsheviks studied the Paris Commune. Anti-colonial leaders read Rousseau and Marx in the same breath. That chain of influence is still active. So here is the question worth sitting with: when you look at today's political tensions, economic inequality, contested legitimacy, elite fractures, which of these historical patterns, if any, do you see echoed? Reply and tell us. We read every response.",
+              "word_count": 956,
+              "section_count": 5,
+              "persist": {
+                "persisted": true,
+                "content_id": "1d3008c7-6b13-4353-b0c9-20406e8d3a6b"
+              },
+              "token_usage": {
+                "calls": 2,
+                "input_tokens": 1594,
+                "output_tokens": 2614,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+                "total_tokens": 4208,
+                "cost_usd": 0.043992
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Write me a newsletter for the political history genre about revolutions that changed the world date today"
+    }
+  ],
+  "expected": [
+    "flat `{response, kind=\"queued\"}`",
+    "routes newsletter saga",
+    "job_id",
+    "complete",
+    "`genre_slug=political-history`",
+    "date\u2192today",
+    "`published_content_v2` draft",
+    "CR-009 email"
+  ]
+}

@@ -11,7 +11,7 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/');
   const url = page.url();
   if (url.includes('/login')) {
-    test.skip(true, 'No test credentials — set E2E_TEST_EMAIL and E2E_TEST_PASSWORD');
+    test.skip(true, 'No test credentials — set E2E_TEST_EMAIL + SUPABASE_SERVICE_ROLE_KEY (auth is passwordless)');
   }
 });
 

@@ -1,0 +1,55 @@
+{
+  "test": {
+    "id": "R96",
+    "title": "List Deleted Items",
+    "source": "chat",
+    "prompt": "Show my deleted content",
+    "route": "library.lifecycle` (list_deleted)",
+    "prerequisite": "R94",
+    "expected": [
+      "routes to `library.lifecycle` (list_deleted), kind=data; queries status='deleted'; includes \"The Forgotten Engineers of Rome\"; up to 20 items"
+    ]
+  },
+  "response": {
+    "kind": "data",
+    "assistant_message": "Retrieving your deleted content.",
+    "tool": "library",
+    "op": "lifecycle",
+    "data": {
+      "execution_id": "4f335caf-92e4-4df1-9929-876efd560a0c",
+      "step_name": "library",
+      "status": "ok",
+      "payload": {
+        "op": "lifecycle",
+        "result": {
+          "items": [
+            {
+              "id": "9991c09a-f2a9-46a8-8e75-7465ce15361f",
+              "title": "Newsletter",
+              "status": "deleted",
+              "content_type": "newsletter",
+              "chapter_number": null,
+              "updated_at": "2026-06-21T20:21:29.565724+00:00"
+            },
+            {
+              "id": "67b034d9-ece4-4bb0-ad2d-7d0f036c4d9e",
+              "title": "Newsletter",
+              "status": "deleted",
+              "content_type": "newsletter",
+              "chapter_number": null,
+              "updated_at": "2026-06-21T20:21:38.412686+00:00"
+            }
+          ],
+          "count": 2
+        }
+      },
+      "error": null,
+      "next_stage": null
+    },
+    "job_id": null,
+    "status": null,
+    "jobs": null,
+    "error": null
+  },
+  "job_result": null
+}

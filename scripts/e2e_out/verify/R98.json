@@ -1,0 +1,68 @@
+{
+  "id": "R98",
+  "title": "Undelete Content",
+  "route": "`library.lifecycle` (undelete) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.lifecycle got=library.lifecycle OK",
+    "job=complete",
+    "seed=e77a28f9 status=draft want=draft prestate=deleted"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Undelete \"The Forgotten Engineers of Rome\""
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Undeleting \"E2E Lifecycle R98 9d2f59d7\" now.",
+        "tool": "library",
+        "op": "lifecycle",
+        "data": null,
+        "job_id": "db6af02060fa4251b8bfe9e8d8538ac2",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "db6af02060fa4251b8bfe9e8d8538ac2",
+        "status": "complete",
+        "result": {
+          "execution_id": "3c24af5b-bf78-44ca-9ba9-3c71ba172ca0",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "lifecycle",
+            "result": {
+              "id": "e77a28f9-5525-416e-98db-8e131c5b53dc",
+              "user_id": "+14105914612",
+              "title": "E2E Lifecycle R98 9d2f59d7",
+              "content_type": "chapter",
+              "genre_slug": "post-apocalyptic",
+              "content_text": "Disposable lifecycle fixture for R98. Disposable lifecycle fixture for R98. Disposable lifecycle fixture for R98. Disposable lifecycle fixture for R98. Disposable lifecycle fixture for R98. Disposable lifecycle fixture for R98. Disposable lifecycle fixture for R98. Disposable lifecycle fixture for R98. Disposable lifecycle fixture for R98. Disposable lifecycle fixture for R98. Disposable lifecycle fixture for R98. Disposable lifecycle fixture for R98. ",
+              "storage_path": null,
+              "cover_image_path": null,
+              "status": "draft",
+              "project_id": null,
+              "chapter_number": null,
+              "metadata": {},
+              "created_at": "2026-07-02T12:10:58.932174+00:00",
+              "updated_at": "2026-07-02T12:11:00.75723+00:00",
+              "published_at": null,
+              "deleted_at": null
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Undelete \"E2E Lifecycle R98 9d2f59d7\""
+    }
+  ],
+  "expected": [
+    "routes to `library.lifecycle` (undelete), kind=queued; complete; status 'deleted' \u2192 'draft'; restore email; no longer in list-deleted"
+  ]
+}

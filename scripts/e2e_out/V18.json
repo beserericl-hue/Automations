@@ -1,0 +1,21 @@
+{
+  "test": {
+    "id": "V18",
+    "title": "Voice \u2014 Story Bible",
+    "source": "voice",
+    "prompt": "Get the story bible for The Clockwork Rebellion",
+    "route": "story_bible.list` (info)",
+    "prerequisite": "V12",
+    "expected": [
+      "flat `{response, kind=\"data\"}`",
+      "routes `story_bible.list`",
+      "inline character/location entries",
+      "user-scoped"
+    ]
+  },
+  "response": {
+    "response": "How can I help with your writing?",
+    "kind": "reply"
+  },
+  "job_result": null
+}

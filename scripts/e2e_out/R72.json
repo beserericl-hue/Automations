@@ -1,0 +1,42 @@
+{
+  "test": {
+    "id": "R72",
+    "title": "Write Prologue \u2014 The Accord",
+    "source": "chat",
+    "prompt": "Write the prologue for \"The Accord\". Genre slug: political-scifi.",
+    "route": "chapter.write` (task)",
+    "prerequisite": "R71",
+    "expected": [
+      "routes to `chapter.write`, kind=queued; complete; chapter_number=Prologue(0); labeled \"Prologue\" not \"Chapter 0\"",
+      "prologue-specific prompt; 1500-3000 words; content matches R71 concept; `published_content_v2` row chapter_number=0",
+      "email subject \"The Accord - Prologue\"; `story_bible_v2` entries; snapshot; Prime Directive"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing the prologue for \"The Accord\" \u2014 I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "write",
+    "data": null,
+    "job_id": "6c016dd8d9534ffca75a97ce7d623e77",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "6c016dd8d9534ffca75a97ce7d623e77",
+    "status": "complete",
+    "result": {
+      "execution_id": "f5632f76-995c-425c-a9b5-8faa12e263ba",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValidationError",
+        "message": "2 validation errors for WriteChapterRequest\nproject_id\n  Field required [type=missing, input_value={'project_title': 'The Ac...t': True, 'async': True}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nchapter_number\n  Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='prologue', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/int_parsing",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

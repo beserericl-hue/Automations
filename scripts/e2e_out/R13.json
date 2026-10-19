@@ -1,0 +1,44 @@
+{
+  "test": {
+    "id": "R13",
+    "title": "Repurpose to Social \u2014 Instagram",
+    "source": "chat",
+    "prompt": "Repurpose this into Instagram posts: \"A historian discovers that antique photographs can transport her to the moment they were taken. She finds a photo from the Titanic's maiden voyage and must decide whether to change history.\" Platform: instagram. Genre slug: historical-time-travel.",
+    "route": "media.social-posts` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `media.social-posts`, kind=queued; job reaches status=complete",
+      "Caption style, max 2200 chars; 20-30 hashtags at end; conversational tone",
+      "Email arrives with formatted caption; CR-009 email received"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "I can repurpose content into Instagram posts. To do this, I need to know which project this content belongs to. Please provide the project title or ID.",
+    "tool": "media",
+    "op": "social-posts",
+    "data": null,
+    "job_id": "b30ea7f4b81e451cb3ffe5b1fa50a9fc",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "b30ea7f4b81e451cb3ffe5b1fa50a9fc",
+    "status": "complete",
+    "result": {
+      "execution_id": "941abe31-7d5a-4f6d-bb03-b571c3f53ef2",
+      "step_name": "media",
+      "status": "ok",
+      "payload": {
+        "op": "social-posts",
+        "result": {
+          "twitter": "(fixture) social post for twitter: ",
+          "linkedin": "(fixture) social post for linkedin: "
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "test": {
+    "id": "R17",
+    "title": "Write Chapter (ancient-history, new project)",
+    "source": "chat",
+    "prompt": "Write chapter 1 of a new book. Genre slug: ancient-history. Project title: \"The Last Pharaoh's Scribe\". Chapter number: 1. Brief: A young scribe in Cleopatra's court discovers that the Library of Alexandria holds a map to a weapon that could repel the Roman invasion. She must navigate court politics, Roman spies, and her own ambitions to find it before Alexandria falls. Outline: Chapter 1 introduces Nefertari in the library, the discovery of the hidden map fragment, and a tense encounter with a Roman centurion posing as a scholar. Research topics: [\"Library of Alexandria daily operations\", \"Cleopatra's court structure and politics\", \"Roman military presence in Egypt 30 BC\", \"ancient Egyptian scribal practices\"]",
+    "route": "chapter.write` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `chapter.write`, kind=queued; job reaches status=complete",
+      "Chapter uses ancient-history tone; **Prime Directive** followed",
+      "Perplexity researches all 4 topics",
+      "Story bible entries created in `story_bible_v2`; Row created in `writing_projects_v2` for \"The Last Pharaoh's Scribe\"",
+      "Email arrives; Draft row in `published_content_v2` (content_type=chapter); CR-009 email received"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing chapter 1 of \"The Last Pharaoh's Scribe\" \u2014 I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "write",
+    "data": null,
+    "job_id": "0cf403795f024202afd2dcbf44baf522",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "0cf403795f024202afd2dcbf44baf522",
+    "status": "complete",
+    "result": {
+      "execution_id": "0fd0e061-e456-4921-84f1-626db1c8fb3e",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValidationError",
+        "message": "1 validation error for WriteChapterRequest\nproject_id\n  Field required [type=missing, input_value={'project_title': \"The La...t': True, 'async': True}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

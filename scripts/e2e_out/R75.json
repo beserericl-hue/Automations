@@ -1,0 +1,44 @@
+{
+  "test": {
+    "id": "R75",
+    "title": "Revise Outline \u2014 Add Prologue to The Correction",
+    "source": "chat",
+    "prompt": "Revise the outline for \"The Correction\". Add a prologue set in 2089 where the protagonist's granddaughter discovers her grandmother's hidden journal describing impossible historical events \u2014 this frames the entire story as a mystery being uncovered. Keep the existing 10 chapters and Three-Act Structure. Genre slug: historical-time-travel.",
+    "route": "brainstorm.revise-outline` (task)",
+    "prerequisite": "R74",
+    "expected": [
+      "routes to `brainstorm.revise-outline`, kind=queued; complete; Three-Act preserved",
+      "outline gains chapter number=0 (Prologue, 2089/journal/mystery); `outline_versions_v2` snapshot; original 10 preserved; NO Epilogue added; CR-009 email shows Prologue+10 (no Epilogue)"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing outline revision for \"The Correction\" \u2014 I'll let you know when it's ready.",
+    "tool": "brainstorm",
+    "op": "revise-outline",
+    "data": null,
+    "job_id": "74adf008c22f4c42a6bbf32a867cd979",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "74adf008c22f4c42a6bbf32a867cd979",
+    "status": "complete",
+    "result": {
+      "execution_id": "13842079-ab73-41fa-9cc9-5ed6daae950e",
+      "step_name": "brainstorm",
+      "status": "ok",
+      "payload": {
+        "op": "revise-outline",
+        "result": {
+          "revised": false,
+          "outline": {},
+          "error": "no outline to revise"
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

@@ -1,0 +1,131 @@
+{
+  "id": "R80",
+  "title": "Retrieve Outline \u2014 The Consulship of Gaius Varro",
+  "route": "`library.retrieve` (info) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.retrieve got=library.retrieve OK",
+    "items=1 found=True"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Retrieve the outline for \"The Consulship of Gaius Varro\""
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "data",
+        "assistant_message": "",
+        "tool": "library",
+        "op": "retrieve",
+        "data": {
+          "execution_id": "06d4f106-33f9-4457-834c-ebf50565923d",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "retrieve",
+            "result": {
+              "items": [
+                {
+                  "id": "c2929621-03f5-4ad9-96a6-d72a03684c44",
+                  "title": "The Consulship of Gaius Varro",
+                  "genre_slug": "ancient-history",
+                  "status": "outlined",
+                  "outline": {
+                    "form": "short_story",
+                    "title": "The Consulship of Gaius Varro",
+                    "themes": [
+                      "Ambition as self-destruction",
+                      "Legacy corrupted at its root",
+                      "The instruments of power become the instruments of ruin"
+                    ],
+                    "premise": "In the final decades of the Roman Republic, Senator Gaius Varro systematically poisons his political rivals to secure the consulship \u2014 the pinnacle of Roman public life \u2014 only to watch the very network of poisoners, informants, and desperate men he cultivated turn inward and consume his own household, leaving him consul of a ruined family and an empty name.",
+                    "chapters": [
+                      {
+                        "beat": "Gaius Varro hosts a dinner for rival senators in his famous garden, presenting himself as Rome's most virtuous man while quietly arranging the first poisoning through Drusilla.",
+                        "title": "The Senator's Garden",
+                        "arc_notes": "Exposition \u2014 establishes Gaius's world of political performance and hidden corruption, introduces the household, plants the poison network, and shows the gap between his public virtue and private method.",
+                        "chapter_number": 1
+                      },
+                      {
+                        "beat": "Two rivals fall ill and withdraw from the consular race; Gaius accelerates his campaign, silences a suspicious freedman with Drusilla's help, and Marcus begins to notice unexplained deaths clustering around his father's advancement.",
+                        "title": "The Climb Requires Everything",
+                        "arc_notes": "Rising Action \u2014 stakes escalate as the poison network expands, Drusilla accumulates dangerous knowledge, Marcus's suspicion grows, and Livia's silence becomes complicity; every success tightens the trap.",
+                        "chapter_number": 2
+                      },
+                      {
+                        "beat": "Gaius is elected consul in a ceremony of public triumph, but that same evening Drusilla \u2014 having been approached by Servilius \u2014 slips the wrong cup to Livia instead of Servilius, whether by accident or design left ambiguous; Livia dies before dawn.",
+                        "title": "Consul of Rome",
+                        "arc_notes": "Climax \u2014 the apex of Freytag's Pyramid: the goal is achieved and the first catastrophic crack appears simultaneously; the instrument of Gaius's rise delivers the wound that will unmake him.",
+                        "chapter_number": 3
+                      },
+                      {
+                        "beat": "Servilius produces Drusilla before the Senate, who testifies to every death Gaius arranged; Marcus, attempting to defend his father, is implicated by Drusilla's records and arrested on charges of conspiracy, dying in custody within the week.",
+                        "title": "What the Poison Knows",
+                        "arc_notes": "Falling Action \u2014 consequences of the climax ripple outward; the network Gaius built becomes a public instrument of his ruin; transformation is made visible as the consul sits in his curule chair while his son dies in a cell.",
+                        "chapter_number": 4
+                      },
+                      {
+                        "beat": "Gaius completes his consular year \u2014 stripped of allies, his son dead, his wife buried, Drusilla vanished \u2014 and on the last day of his term walks alone through his famous garden, consul of nothing, the name Varro now synonymous in Rome with poison rather than virtue.",
+                        "title": "The Empty Fasces",
+                        "arc_notes": "Resolution (Catastrophe/Survival-with-Consequence) \u2014 Gaius survives but inherits only the hollow office he murdered for; the central dramatic question is answered: the legacy he built is the legacy that destroyed him; ambition achieves its object and finds it a ruin.",
+                        "chapter_number": 5
+                      }
+                    ],
+                    "characters": [
+                      {
+                        "arc": "Rises from calculating opportunist to consul, then watches his ambition devour everything he claimed to be building toward.",
+                        "name": "Gaius Varro",
+                        "role": "Protagonist \u2014 Senator and aspiring consul"
+                      },
+                      {
+                        "arc": "Suspects her husband's methods, chooses silence to protect her children, and dies for that silence when the poison network turns on the family.",
+                        "name": "Livia Varro",
+                        "role": "Gaius's wife \u2014 keeper of the household and his moral conscience"
+                      },
+                      {
+                        "arc": "Idolizes his father, discovers the truth of his methods, and is destroyed by a poisoner's accusation before he can act on what he knows.",
+                        "name": "Marcus Varro",
+                        "role": "Gaius's eldest son \u2014 idealistic young advocate"
+                      },
+                      {
+                        "arc": "Begins as Gaius's loyal instrument, accumulates leverage over him, and ultimately turns her knowledge into a weapon when a rival offers her more than Gaius can.",
+                        "name": "Drusilla",
+                        "role": "The poisoner \u2014 a freed Greek slave and apothecary who serves Gaius"
+                      },
+                      {
+                        "arc": "Survives Gaius's poison attempt, uncovers Drusilla, and uses her to dismantle the Varro family from the inside.",
+                        "name": "Senator Quintus Servilius",
+                        "role": "Gaius's chief political rival and final target"
+                      }
+                    ],
+                    "wow_factor": "",
+                    "story_arc_name": "",
+                    "dramatic_question": ""
+                  }
+                }
+              ],
+              "count": 1,
+              "found": true,
+              "content_type": "outline",
+              "search_term": "The Consulship of Gaius Varro"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        },
+        "job_id": null,
+        "status": null,
+        "jobs": null,
+        "error": null
+      },
+      "job_result": null,
+      "resolved_prompt": "Retrieve the outline for \"The Consulship of Gaius Varro\""
+    }
+  ],
+  "expected": [
+    "routes to `library.retrieve`, kind=data; full outline; Freytag structure; from `writing_projects_v2`"
+  ]
+}

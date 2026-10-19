@@ -1,0 +1,41 @@
+{
+  "test": {
+    "id": "R93",
+    "title": "Verify Version History After Multiple Revisions",
+    "source": "chat",
+    "prompt": "Show outline version history for \"The Accord\"",
+    "route": "library.versions` (info: list)",
+    "prerequisite": "R92",
+    "expected": [
+      "routes to `library.versions` (list, outline), kind=data; \u22653 version entries (v1 original 10-ch; v2 prologue+epilogue; v3 pre-re-revision reverted state)",
+      "chronological order; each entry version_number/created_at/chapter count"
+    ]
+  },
+  "response": {
+    "kind": "data",
+    "assistant_message": "",
+    "tool": "library",
+    "op": "versions",
+    "data": {
+      "execution_id": "7a9c25d8-ac34-44a1-9ed4-6dea545cc71e",
+      "step_name": "library",
+      "status": "ok",
+      "payload": {
+        "op": "versions",
+        "result": {
+          "scope": "outline",
+          "project_id": "7976c085-41d3-46c6-9444-77b75bbdc289",
+          "versions": [],
+          "count": 0
+        }
+      },
+      "error": null,
+      "next_stage": null
+    },
+    "job_id": null,
+    "status": null,
+    "jobs": null,
+    "error": null
+  },
+  "job_result": null
+}

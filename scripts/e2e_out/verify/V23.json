@@ -1,0 +1,70 @@
+{
+  "id": "V23",
+  "title": "Voice \u2014 Retrieve Content (No Callback)",
+  "route": "`library.retrieve` (info) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.retrieve got=library.retrieve OK",
+    "items=2 found=True"
+  ],
+  "steps": [
+    [
+      "voice",
+      "Find my draft story about the Titanic"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "response": "Here's what I found.",
+        "kind": "data",
+        "tool": "library",
+        "op": "retrieve",
+        "data": {
+          "execution_id": "4a321101-edec-4ca3-9e44-c282c9b43f56",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "retrieve",
+            "result": {
+              "items": [
+                {
+                  "id": "1738646d-25ec-46bf-89c5-2ffdab1ce01b",
+                  "title": "Find my draft short story about the Titanic",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T19:41:18.644437+00:00"
+                },
+                {
+                  "id": "6c3d149d-ce85-4283-8f1f-7575f4c70b98",
+                  "title": "Find my draft short story about the Titanic",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-06-21T20:59:41.575159+00:00"
+                }
+              ],
+              "count": 2,
+              "found": true,
+              "search_term": "the Titanic"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "job_result": null,
+      "resolved_prompt": "Find my draft story about the Titanic"
+    }
+  ],
+  "expected": [
+    "flat `{response, kind=\"data\"}`",
+    "routes `library.retrieve` (Titanic)",
+    "inline summary (title/type/char count)",
+    "NO outbound call",
+    "user-scoped"
+  ]
+}

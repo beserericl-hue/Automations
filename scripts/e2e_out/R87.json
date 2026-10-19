@@ -1,0 +1,44 @@
+{
+  "test": {
+    "id": "R87",
+    "title": "Revert Outline \u2014 The Accord to Version 1",
+    "source": "chat",
+    "prompt": "Revert the outline for \"The Accord\" to version 1",
+    "route": "library.revert` (task: outline)",
+    "prerequisite": "R84",
+    "expected": [
+      "routes to `library.revert` (outline, version 1), kind=queued; job_id; complete",
+      "current outline snapshotted to `outline_versions_v2` before overwrite; v1 content loaded; `writing_projects_v2.outline` updated",
+      "reverted = original 10 chapters, no Prologue(0)/Epilogue(11); Freytag intact; confirmation names title + version"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Reverting the outline for \"The Accord\" to version 1.",
+    "tool": "library",
+    "op": "revert",
+    "data": null,
+    "job_id": "7cebe1e269024803ab3f4d4321d84483",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "7cebe1e269024803ab3f4d4321d84483",
+    "status": "complete",
+    "result": {
+      "execution_id": "b45f1da6-0103-4bdb-9c6e-342e8fd55ce9",
+      "step_name": "library",
+      "status": "ok",
+      "payload": {
+        "op": "revert",
+        "result": {
+          "reverted": false,
+          "error_message": "version 1 not found for 'The Accord'"
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

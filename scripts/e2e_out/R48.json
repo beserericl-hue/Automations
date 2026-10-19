@@ -1,0 +1,581 @@
+{
+  "test": {
+    "id": "R48",
+    "title": "Prime Directive \u2014 Brainstorm Outline",
+    "source": "chat",
+    "prompt": "Brainstorm a political-history story called \"The Diplomat's Gambit\" about a Cold War spy who discovers that both superpowers are being manipulated by the same shadowy organization. Themes: deception, loyalty, the illusion of choice. 8 chapters. Genre slug: political-history.",
+    "route": "brainstorm.story` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `brainstorm.story`, kind=queued; complete",
+      "Direct premise (no buzzwords); specific characters; concrete chapter briefs; themes via plot mechanics",
+      "Row in `writing_projects_v2` with outline JSONB; CR-009 email received"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing a new story brainstorm for \"The Diplomat's Gambit\" \u2014 I'll let you know when the outline is ready.",
+    "tool": "brainstorm",
+    "op": "story",
+    "data": null,
+    "job_id": "1f7cac542f6147acb9aee5befc4b6276",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "1f7cac542f6147acb9aee5befc4b6276",
+    "status": "complete",
+    "result": {
+      "execution_id": "8cec8010-3dfd-47c7-a1fd-8ab4044195a9",
+      "step_name": "brainstorm",
+      "status": "ok",
+      "payload": {
+        "op": "story",
+        "result": {
+          "outline": {
+            "title": "The Diplomat's Gambit",
+            "premise": "In 1938-1939, a seasoned British diplomat at the Foreign Office must navigate the treacherous politics of appeasement, secret back-channels, and personal betrayal to determine whether a covert peace treaty with Nazi Germany\u2014one that would sacrifice Czechoslovakia and Poland\u2014can be stopped before it is signed, or whether he himself will become the instrument of Europe's destruction.",
+            "themes": [
+              "The moral cost of pragmatism in statecraft",
+              "Loyalty to country versus loyalty to conscience",
+              "The machinery of institutional betrayal",
+              "How ordinary men become complicit in catastrophe",
+              "The illusion of control in the face of historical forces"
+            ],
+            "story_arc_name": "The Corrupted Servant Arc",
+            "dramatic_question": "Can British diplomat Edward Ashworth expose and destroy a secret back-channel treaty between Chamberlain's inner circle and Nazi Germany before it is signed\u2014knowing that doing so will end his career, destroy his marriage, and possibly cost him his life?",
+            "wow_factor": "The novel reveals, in procedurally accurate detail, how the British Foreign Office's own internal classification system was used to hide a second, secret appeasement treaty from Parliament\u2014showing that the real betrayal of Europe was not weakness but deliberate, documented conspiracy conducted through the machinery of British bureaucracy itself.",
+            "characters": [
+              {
+                "name": "Edward Ashworth",
+                "role": "Protagonist, POV character",
+                "archetype": "The seasoned diplomat \u2014 a man who has spent twenty years learning to say nothing while meaning everything",
+                "off_axis_attribute": "He is constitutionally incapable of small talk and therefore catastrophically bad at the social performance that diplomacy actually requires; he compensates by being the best reader of documents in the Foreign Office, which makes him dangerous when he finds the wrong file.",
+                "dramatic_question": "Will Edward sacrifice his career, his marriage, and his belief in British institutions to stop a conspiracy he helped build, or will he convince himself that the system will correct itself and do nothing?",
+                "description": "Age 47, First Secretary at the Central European desk. Widower of a Czech woman, Marta, who died of tuberculosis in 1931 \u2014 a fact that gives him a personal stake in Czechoslovakia that his superiors consider a disqualifying bias. Collects Ordnance Survey maps as a hobby; knows the topography of Central Europe better than any general. His closest friend is a Foreign Office archivist named Clement Dowd, whom he likes for no plot reason except that Clement tells terrible jokes. His private worry: that he has spent his entire career producing elegant prose that changed nothing.",
+                "humiliation": "Being publicly exposed as a man who knew and said nothing \u2014 the diplomat who filed the perfect memorandum while the world burned.",
+                "terror": "That his dead wife Marta's country will be erased from the map and he will have been, in some technical sense, present and complicit.",
+                "happiness": "A single moment in which his knowledge of a document, a clause, a precedent, actually stops something terrible from happening."
+              },
+              {
+                "name": "Sir Reginald Vane",
+                "role": "Antagonist, POV character",
+                "archetype": "The mandarin \u2014 the permanent under-secretary who has outlasted six foreign secretaries and believes the Empire is a machine that must be lubricated with necessary evil",
+                "off_axis_attribute": "He genuinely loves Edward Ashworth, in the way a chess player loves the piece he is about to sacrifice \u2014 and this affection makes him more dangerous, not less, because he will destroy Edward with real regret and complete efficiency.",
+                "dramatic_question": "Will Vane's belief that he is saving Britain from a worse war justify what he has done, or will the exposure of the treaty reveal him as the architect of a crime against civilization?",
+                "description": "Age 62, Permanent Under-Secretary, Foreign Office. Has served since 1899. Keeps a private diary in cipher \u2014 not for security but out of habit formed in the Boer War. Plays the organ at his parish church every Sunday, badly, and no one dares tell him. His off-hours reading is Roman history; he sees himself as a Fabius Maximus, buying time through strategic retreat. His private worry: that he is not, in fact, the cold strategist he believes himself to be, but simply a frightened old man who cannot imagine another war.",
+                "humiliation": "Being shown, in public, that his strategy was not strategy at all but cowardice dressed in the language of statecraft.",
+                "terror": "Another 1914 \u2014 the telegram traffic, the mobilization orders, the lists of the dead.",
+                "happiness": "A signed treaty, a quiet retirement, and the private knowledge that he held the line."
+              },
+              {
+                "name": "Hana Kov\u00e1\u0159ov\u00e1",
+                "role": "Secondary protagonist, POV character",
+                "archetype": "The foreign agent \u2014 a Czech intelligence officer operating under diplomatic cover in London",
+                "off_axis_attribute": "She is a genuinely warm person who makes friends easily and keeps them, which is operationally disastrous because she cannot bring herself to burn a source even when the source has become a liability.",
+                "dramatic_question": "Will Hana get the evidence of the secret treaty to Prague in time to give Czechoslovakia any diplomatic leverage, or will her growing attachment to Edward Ashworth compromise the mission entirely?",
+                "description": "Age 34, officially attached to the Czech Legation as a cultural attach\u00e9. Speaks five languages. Her real employer is the Czechoslovak military intelligence service, the Druh\u00fd odbor. She was a concert pianist before she was recruited; she still practices two hours a day in her Bayswater flat, which her neighbors find maddening. Her closest friend in London is a Hungarian \u00e9migr\u00e9 journalist named Zsolt Fekete, who knows more than he should. Her private worry: that Prague will fall before she can get home, and she will spend the rest of her life as a diplomat for a country that no longer exists.",
+                "humiliation": "Being used \u2014 by Edward, by her own service, by anyone \u2014 as an instrument rather than a person.",
+                "terror": "The phone call from Prague that does not come.",
+                "happiness": "Playing Jan\u00e1\u010dek in a concert hall in a free Czechoslovakia."
+              },
+              {
+                "name": "Clara Ashworth",
+                "role": "Supporting character, occasional POV",
+                "archetype": "The political wife \u2014 a woman of considerable intelligence who has spent fifteen years translating her ambitions into her husband's career",
+                "off_axis_attribute": "She has been conducting a quiet, entirely non-romantic friendship with Sir Reginald Vane for three years, sharing political gossip and receiving career advice, without understanding that Vane has been using her as an unwitting intelligence source on her husband's state of mind.",
+                "dramatic_question": "When Clara discovers she has been instrumentalized by Vane, will she protect her husband or protect the life she has built?",
+                "description": "Age 43. Daughter of a Liberal MP. Runs a political salon from their Kensington home every second Thursday. Reads everything \u2014 newspapers, Hansard, Foreign Office white papers she is not supposed to have access to. Privately writes poetry she has never shown anyone. Her private worry: that she married a man she admires but does not love, and that this is entirely her own fault.",
+                "humiliation": "Being pitied.",
+                "terror": "Discovering that her political instincts, which she trusts completely, have been manipulated by someone smarter.",
+                "happiness": "A single act of genuine consequence \u2014 something she did, not Edward, not her father."
+              },
+              {
+                "name": "Franz Kellner",
+                "role": "Supporting antagonist, occasional POV",
+                "archetype": "The German intermediary \u2014 a career diplomat in the German Foreign Ministry who is neither a true Nazi nor a true resister, but a man navigating the space between",
+                "off_axis_attribute": "He has a photographic memory for faces but cannot remember names, which makes him socially unreliable and professionally terrifying \u2014 he can identify every person in a room but cannot introduce them.",
+                "dramatic_question": "Will Kellner's private disgust at what he is facilitating be enough to make him act, or will his survival instinct keep him compliant until it is too late?",
+                "description": "Age 41, German Embassy, London. A Bavarian Catholic. Joined the Foreign Ministry in 1922, before the Nazis. Keeps a small notebook of things he has done that he is ashamed of; it is nearly full. His hobby is bookbinding \u2014 he repairs damaged volumes for a Bloomsbury antiquarian. His private worry: that his children will one day read his file and understand what he was.",
+                "humiliation": "Being called a good German by someone who means it as a compliment.",
+                "terror": "The Gestapo arriving at his London flat.",
+                "happiness": "A world in which his children grow up without knowing what he knows."
+              },
+              {
+                "name": "Clement Dowd",
+                "role": "Supporting character",
+                "archetype": "The archivist \u2014 the man who knows where everything is filed and what it means",
+                "off_axis_attribute": "He has a gambling debt to a man connected to the German Embassy, which he has never told Edward, and which Vane knows about and has chosen not to use \u2014 yet.",
+                "dramatic_question": "Will Clement's loyalty to Edward survive the moment when Vane offers to make the debt disappear in exchange for one small act of betrayal?",
+                "description": "Age 52. Has worked in the Foreign Office registry since 1910. Knows the classification system better than the man who designed it. Tells terrible jokes. Drinks too much at lunch but never in the morning. His private worry: the debt, always the debt.",
+                "humiliation": "Being caught between two men he respects and choosing the wrong one.",
+                "terror": "The bailiff. The public shame of financial ruin.",
+                "happiness": "A clean ledger and a quiet evening."
+              },
+              {
+                "name": "Zsolt Fekete",
+                "role": "Supporting character",
+                "archetype": "The journalist \u2014 a Hungarian \u00e9migr\u00e9 who publishes in three languages and is trusted by no government",
+                "off_axis_attribute": "He is scrupulously honest in print and comprehensively dishonest in person \u2014 he will lie to your face to protect a source and then publish the truth with surgical precision.",
+                "dramatic_question": "Will Zsolt publish the story of the secret treaty when Hana brings it to him, knowing it will end her cover and possibly get her killed?",
+                "description": "Age 38. Writes for a Czech \u00e9migr\u00e9 newspaper, a French weekly, and occasionally the Manchester Guardian under a pseudonym. Lives in a Soho bedsit surrounded by filing cabinets. His private worry: that he has become so accustomed to catastrophe that he no longer feels it properly.",
+                "humiliation": "Being scooped on the story of his life by someone with less information.",
+                "terror": "Being deported back to Hungary.",
+                "happiness": "The front page."
+              }
+            ],
+            "chapters": [
+              {
+                "chapter_number": 0,
+                "title": "Prologue: The Registry, September 1939",
+                "act": "Prologue",
+                "arc_point": "Frame \u2014 the aftermath glimpsed before the cause",
+                "pov_character": "Edward Ashworth",
+                "bridge_from_prior": "None \u2014 opening frame",
+                "beat": "Edward stands in the Foreign Office registry at 3 a.m., the night Britain declares war on Germany, burning a single document. He does not look like a hero. He looks like a man who has made every possible mistake and is now correcting the last one.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Frame: the cost of the arc is shown before the arc begins; the reader knows the war came, and must now discover whether Edward caused it, prevented something worse, or simply failed."
+              },
+              {
+                "chapter_number": 1,
+                "title": "The Central European Desk",
+                "act": "Act I",
+                "arc_point": "Ordinary World",
+                "pov_character": "Edward Ashworth",
+                "bridge_from_prior": "The prologue's burning document is the same registry Edward now works in; the reader enters his daily world knowing its ending.",
+                "beat": "Edward processes routine cable traffic from Prague and Vienna, noting anomalies in the diplomatic language that suggest a back-channel is operating outside normal Foreign Office traffic; his superior dismisses his concern. A story turn: a cable arrives that uses a phrase Edward last saw in a 1935 memorandum he was told had been destroyed.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Ordinary World: Edward's competence and his institutional loyalty are established simultaneously, as is the first crack."
+              },
+              {
+                "chapter_number": 2,
+                "title": "The Salon",
+                "act": "Act I",
+                "arc_point": "Ordinary World \u2014 domestic stakes established",
+                "pov_character": "Clara Ashworth",
+                "bridge_from_prior": "Edward returns home from the Foreign Office carrying the anomalous cable in his mind; Clara observes his distraction at her Thursday salon.",
+                "beat": "Clara hosts MPs, journalists, and minor Foreign Office figures; Sir Reginald Vane attends and is charming. Clara notices Vane watching Edward with an expression she cannot name. Story turn: Vane asks Clara, apparently casually, whether Edward has mentioned anything unusual about his current caseload.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Ordinary World: the domestic sphere is shown to be already penetrated by the conspiracy; Clara is already being used without knowing it."
+              },
+              {
+                "chapter_number": 3,
+                "title": "The Czech Legation",
+                "act": "Act I",
+                "arc_point": "Ordinary World \u2014 antagonist world introduced",
+                "pov_character": "Hana Kov\u00e1\u0159ov\u00e1",
+                "bridge_from_prior": "Vane's question to Clara at the salon is the thread \u2014 Hana's intelligence service has intercepted a report that Vane asked about Ashworth, which is why Hana has been tasked with making contact with Edward.",
+                "beat": "Hana attends a concert at the Wigmore Hall where Edward is also present \u2014 a meeting arranged by her service. She observes him, assesses him, and makes the first move: she mentions Marta's name. Story turn: Edward's reaction tells her everything \u2014 he is not a man who has made peace with Czechoslovakia's fate.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Ordinary World: the foreign intelligence perspective is introduced; the reader now has three simultaneous views of the same conspiracy."
+              },
+              {
+                "chapter_number": 4,
+                "title": "The Phrase in the Cable",
+                "act": "Act I",
+                "arc_point": "Inciting Incident",
+                "pov_character": "Edward Ashworth",
+                "bridge_from_prior": "Hana's mention of Marta has shaken Edward; he returns to the office the next morning with renewed attention to the anomalous cable.",
+                "beat": "Edward traces the phrase through the registry with Clement's help and finds it connects to a 1935 file that has been reclassified to a level above his clearance \u2014 a level that should not exist for a routine diplomatic file. Story turn: Clement tells him the reclassification was ordered personally by Vane.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Inciting Incident: the conspiracy becomes concrete; Edward now has a specific anomaly he cannot explain away."
+              },
+              {
+                "chapter_number": 5,
+                "title": "Vane's Office",
+                "act": "Act I",
+                "arc_point": "Inciting Incident \u2014 protagonist confronts the system",
+                "pov_character": "Edward Ashworth",
+                "bridge_from_prior": "Edward goes directly from the registry to Vane's office with the cable.",
+                "beat": "Vane receives Edward with warmth and explains the reclassification as a routine security precaution related to a sensitive negotiation. His explanation is entirely plausible and entirely wrong. Story turn: Vane, while explaining, accidentally uses the same anomalous phrase \u2014 and Edward sees that Vane does not realize he has done it.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Inciting Incident: the antagonist is established as both brilliant and, for the first time, slightly careless; Edward's advantage is identified."
+              },
+              {
+                "chapter_number": 6,
+                "title": "The German Embassy Garden Party",
+                "act": "Act I",
+                "arc_point": "World of the Adventure introduced",
+                "pov_character": "Franz Kellner",
+                "bridge_from_prior": "Vane's meeting with Edward is the thread \u2014 Kellner was briefed by Vane's intermediary that Edward had been asking questions; Kellner attends the garden party knowing Edward will be there.",
+                "beat": "Kellner observes Edward at the German Embassy's summer reception, assessing whether he is a threat. He watches Edward speak to Hana and recognizes her as Czech intelligence. Story turn: Kellner decides not to report Hana's presence to Berlin \u2014 the first small act of non-compliance in his notebook.",
+                "arc_notes": "Corrupted Servant Arc \u2014 World of the Adventure: the German side of the conspiracy is shown; Kellner's moral position is established as unstable."
+              },
+              {
+                "chapter_number": 7,
+                "title": "Bayswater, Late Evening",
+                "act": "Act I",
+                "arc_point": "Call to Adventure",
+                "pov_character": "Hana Kov\u00e1\u0159ov\u00e1",
+                "bridge_from_prior": "Kellner recognized Hana at the garden party; she made him and is now in her flat, reporting to Prague by coded telegram and reassessing her exposure.",
+                "beat": "Hana receives new instructions from Prague: the Druh\u00fd odbor has intelligence that a document \u2014 a draft treaty framework \u2014 exists in the Foreign Office under a classification that should not exist. She is to obtain it. Story turn: the instructions include a name \u2014 Clement Dowd \u2014 as a possible access point.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Call to Adventure: the mission becomes specific and dangerous; Hana now has a target inside the Foreign Office."
+              },
+              {
+                "chapter_number": 8,
+                "title": "The Moral Arithmetic",
+                "act": "Act I",
+                "arc_point": "Refusal of the Call",
+                "pov_character": "Edward Ashworth",
+                "bridge_from_prior": "Hana's Prague instructions named Clement; Edward, unaware, has lunch with Clement the next day and notices Clement is nervous.",
+                "beat": "Edward considers what he knows: an anomalous phrase, a reclassified file, Vane's slip. He constructs the logical shape of what might be happening and finds it too large to be true. He decides to do nothing \u2014 to file a memorandum through proper channels and wait. Story turn: the memorandum is returned to him within two hours, marked 'No Action Required,' with Vane's initials.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Refusal of the Call: Edward's institutional loyalty is shown as an active obstacle; the system has already been captured."
+              },
+              {
+                "chapter_number": 9,
+                "title": "The Journalist's Bedsit",
+                "act": "Act I",
+                "arc_point": "Meeting the Mentor / Ally",
+                "pov_character": "Hana Kov\u00e1\u0159ov\u00e1",
+                "bridge_from_prior": "Hana's Prague instructions named Clement as an access point; she goes instead to Zsolt, who knows Clement socially.",
+                "beat": "Hana tells Zsolt what she is looking for without naming the source. Zsolt tells her he has heard rumors of a second Munich \u2014 a framework agreement that goes further than the public treaty. Story turn: Zsolt says he has a source inside the Foreign Office who will talk, but only to another Foreign Office man \u2014 which means she needs Edward Ashworth.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Meeting the Ally: the journalist becomes the bridge between Hana and Edward; the alliance that will drive the middle is formed."
+              },
+              {
+                "chapter_number": 10,
+                "title": "Crossing the Line",
+                "act": "Act I",
+                "arc_point": "Crossing the Threshold",
+                "pov_character": "Edward Ashworth",
+                "bridge_from_prior": "Zsolt's source inside the Foreign Office is Edward \u2014 Zsolt has sent a note to Edward through a mutual acquaintance, naming the document and asking for a meeting.",
+                "beat": "Edward meets Zsolt at a Soho caf\u00e9. Zsolt shows him a fragment \u2014 a single paragraph from what appears to be a draft treaty framework, in English, with a German annotation in the margin in a hand Edward recognizes as Vane's. Story turn: the paragraph contains a clause that would bind Britain to non-intervention in Poland as well as Czechoslovakia \u2014 this is not appeasement, it is a guarantee of German conquest.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Crossing the Threshold: Edward cannot un-see what he has seen; the refusal of the call is over."
+              },
+              {
+                "chapter_number": 11,
+                "title": "Vane's Diary",
+                "act": "Act I",
+                "arc_point": "Crossing the Threshold \u2014 antagonist's perspective",
+                "pov_character": "Sir Reginald Vane",
+                "bridge_from_prior": "Zsolt's source told him about the document; Vane's intermediary has reported that Zsolt met with someone from the Foreign Office.",
+                "beat": "Vane writes in his cipher diary: the framework is six weeks from signature. He reviews the list of people who could derail it and finds Edward's name at the top. He does not want to destroy Edward. He begins to plan how to neutralize him without destroying him. Story turn: Vane writes: 'Use Clara.'",
+                "arc_notes": "Corrupted Servant Arc \u2014 Crossing the Threshold: the antagonist's plan is revealed to the reader before the protagonist knows it; dramatic irony is established."
+              },
+              {
+                "chapter_number": 12,
+                "title": "The Registry After Hours",
+                "act": "Act II-A",
+                "arc_point": "Tests, Allies, Enemies \u2014 first attempt",
+                "pov_character": "Edward Ashworth",
+                "bridge_from_prior": "Edward, having crossed the threshold, goes to Clement after hours to request access to the reclassified file.",
+                "beat": "Clement refuses \u2014 he is visibly frightened. Edward presses him and Clement admits that someone has already warned him that Edward might ask. Story turn: Clement reveals the name of the person who warned him: not Vane, but a junior minister Edward has never suspected \u2014 Lord Hartley, Parliamentary Under-Secretary, who is Vane's political cover.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Tests, Allies, Enemies: a new antagonist layer is revealed; the conspiracy is wider than Edward thought."
+              },
+              {
+                "chapter_number": 13,
+                "title": "The Wigmore Hall, Again",
+                "act": "Act II-A",
+                "arc_point": "Tests, Allies, Enemies \u2014 alliance deepens",
+                "pov_character": "Hana Kov\u00e1\u0159ov\u00e1",
+                "bridge_from_prior": "Edward, blocked at the registry, contacts Hana through Zsolt \u2014 the thread is Zsolt's message that Edward wants to meet.",
+                "beat": "Edward and Hana meet properly for the first time. He is guarded; she is direct. She tells him what Prague knows: the framework treaty has a signing ceremony planned for a location outside London \u2014 a private estate. Story turn: the estate belongs to Lord Hartley.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Tests, Allies, Enemies: the alliance between Edward and Hana is formalized; the conspiracy's physical location is identified."
+              },
+              {
+                "chapter_number": 14,
+                "title": "Lord Hartley's File",
+                "act": "Act II-A",
+                "arc_point": "Tests, Allies, Enemies \u2014 new complication",
+                "pov_character": "Edward Ashworth",
+                "bridge_from_prior": "Hana named Hartley's estate; Edward goes back to the registry to pull Hartley's open file.",
+                "beat": "Edward finds that Hartley's file is entirely clean \u2014 suspiciously clean, as if recently audited. But a cross-reference leads him to a 1936 trade delegation file that contains a photograph: Hartley, Vane, and a man Edward identifies as a senior official in the German Foreign Ministry, at a private dinner in Zurich. Story turn: the German official in the photograph is Franz Kellner's direct superior.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Tests, Allies, Enemies: the conspiracy's timeline is extended back to 1936; it is older and more deliberate than Edward imagined."
+              },
+              {
+                "chapter_number": 15,
+                "title": "Kellner's Notebook",
+                "act": "Act II-A",
+                "arc_point": "Tests, Allies, Enemies \u2014 antagonist's internal fracture",
+                "pov_character": "Franz Kellner",
+                "bridge_from_prior": "The photograph Edward found connects to Kellner's superior; Kellner has been summoned to the German Embassy for a briefing on the treaty's final terms.",
+                "beat": "Kellner is shown the final framework document for the first time. He reads the Poland clause and writes one line in his notebook: 'This is not a treaty. This is a permission slip for murder.' Story turn: Kellner is told he will be the German signatory's witness at the Hartley estate ceremony \u2014 he cannot refuse without exposing himself.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Tests, Allies, Enemies: Kellner's moral crisis reaches its peak; his complicity is about to become irreversible."
+              },
+              {
+                "chapter_number": 16,
+                "title": "Clara's Lunch",
+                "act": "Act II-A",
+                "arc_point": "Tests, Allies, Enemies \u2014 domestic front opens",
+                "pov_character": "Clara Ashworth",
+                "bridge_from_prior": "Vane's diary said 'Use Clara'; he has now invited her to lunch at his club.",
+                "beat": "Vane tells Clara, with apparent concern, that Edward is under investigation for unauthorized contact with a foreign intelligence officer \u2014 Hana. He frames it as a warning from a friend. Story turn: Clara realizes she has been feeding Vane information about Edward's state of mind for three years, and that she has just been told this to make her doubt her husband.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Tests, Allies, Enemies: Clara's arc turns; she is no longer a passive instrument but an active agent whose choice will matter."
+              },
+              {
+                "chapter_number": 17,
+                "title": "The Confrontation at Home",
+                "act": "Act II-A",
+                "arc_point": "Tests, Allies, Enemies \u2014 marriage under pressure",
+                "pov_character": "Edward Ashworth",
+                "bridge_from_prior": "Clara returns from Vane's lunch and confronts Edward directly.",
+                "beat": "Clara tells Edward what Vane said. Edward, for the first time, tells Clara the truth about what he has found. Story turn: Clara reveals that she has been reporting Edward's moods and preoccupations to Vane for three years, believing it was harmless political gossip \u2014 and that she now understands it was not.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Tests, Allies, Enemies: the marriage is cracked open; Clara's guilt becomes an active force; Edward must decide whether to trust her."
+              },
+              {
+                "chapter_number": 18,
+                "title": "The Debt",
+                "act": "Act II-A",
+                "arc_point": "Tests, Allies, Enemies \u2014 ally threatened",
+                "pov_character": "Clement Dowd",
+                "bridge_from_prior": "Vane, having used Clara, now moves on Clement \u2014 the thread is Vane's systematic neutralization of Edward's allies.",
+                "beat": "Vane's intermediary visits Clement and offers to make the gambling debt disappear in exchange for one thing: if Edward asks Clement for access to the reclassified file, Clement is to give it to him \u2014 but first alert Vane. Story turn: Clement agrees, then immediately goes to Edward and tells him everything, including the debt.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Tests, Allies, Enemies: Clement's loyalty is tested and holds, but at personal cost; the debt is now in the open and Vane's plan has a hole in it."
+              },
+              {
+                "chapter_number": 19,
+                "title": "The Trap and the Counter-Trap",
+                "act": "Act II-A",
+                "arc_point": "Midpoint approach \u2014 protagonist takes the offensive",
+                "pov_character": "Edward Ashworth",
+                "bridge_from_prior": "Clement's confession gives Edward the shape of Vane's plan; Edward now knows the file is bait.",
+                "beat": "Edward, Hana, and Zsolt meet and construct a counter-plan: Edward will request the file through Clement, triggering Vane's alert, while Hana uses the distraction to access a parallel file through the Czech Legation's own back-channel source inside the Foreign Office. Story turn: Hana reveals that her back-channel source is a Foreign Office cipher clerk who has been photographing documents \u2014 and that the clerk has already photographed part of the framework treaty.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Midpoint approach: the protagonist shifts from reactive to active; the counter-conspiracy is formed."
+              },
+              {
+                "chapter_number": 20,
+                "title": "The Cipher Clerk",
+                "act": "Act II-A",
+                "arc_point": "Midpoint \u2014 new information recasts the dramatic question",
+                "pov_character": "Hana Kov\u00e1\u0159ov\u00e1",
+                "bridge_from_prior": "The cipher clerk Hana mentioned is her source; she goes to collect the photographs.",
+                "beat": "The cipher clerk \u2014 a young woman named Agnes Peel \u2014 gives Hana six photographs of the framework treaty's preamble and first three clauses. Story turn: the photographs reveal that the treaty has a sunset clause: if not signed by a specific date \u2014 October 15, 1938 \u2014 it lapses. The date is five weeks away. The dramatic question sharpens: it is now a race against a deadline.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Midpoint Reversal: the abstract conspiracy becomes a ticking clock; the reader now knows the exact stakes and the exact timeline."
+              },
+              {
+                "chapter_number": 21,
+                "title": "Vane Moves First",
+                "act": "Act II-B",
+                "arc_point": "Complications escalate \u2014 antagonist accelerates",
+                "pov_character": "Sir Reginald Vane",
+                "bridge_from_prior": "Clement triggered Vane's alert by telling Edward about the debt \u2014 Vane now knows his plan has been partially exposed.",
+                "beat": "Vane accelerates the timeline: he contacts Hartley and moves the signing ceremony forward by two weeks, to October 1st. He also initiates a formal security review of Edward's conduct, which will result in Edward's suspension from the Central European desk within 48 hours. Story turn: Vane writes in his diary: 'Edward will understand, eventually. He always does.'",
+                "arc_notes": "Corrupted Servant Arc \u2014 Complications Escalate: the antagonist's response is proportionate and devastating; the deadline has moved."
+              },
+              {
+                "chapter_number": 22,
+                "title": "The Suspension",
+                "act": "Act II-B",
+                "arc_point": "Complications escalate \u2014 protagonist's institutional access cut off",
+                "pov_character": "Edward Ashworth",
+                "bridge_from_prior": "Vane's security review is the thread; Edward is called to the Personnel division the morning after Vane's decision.",
+                "beat": "Edward is suspended from duty pending a security review \u2014 his pass is taken, his desk is cleared, and he is escorted from the building. Story turn: as he leaves, Clement passes him in the corridor and presses a folded paper into his hand \u2014 it is a hand-copied excerpt from the reclassified file, the section Clement memorized before the file was moved.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Complications Escalate: Edward loses his institutional base; Clement's loyalty produces the first concrete piece of the treaty text."
+              },
+              {
+                "chapter_number": 23,
+                "title": "What Clement Remembered",
+                "act": "Act II-B",
+                "arc_point": "Complications escalate \u2014 new dramatic problem: the evidence is incomplete",
+                "pov_character": "Edward Ashworth",
+                "bridge_from_prior": "The folded paper Clement gave Edward is the thread; Edward reads it in a Whitehall pub.",
+                "beat": "The excerpt confirms the Poland clause and adds a new element: a financial annex \u2014 British banks will extend credit to Germany in exchange for a ten-year non-aggression guarantee. This is not just political betrayal; it is a commercial transaction. Story turn: the financial annex names the bank: Hartley's family bank, Hartley & Sons, which will profit directly from the treaty.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Complications Escalate: the conspiracy's motive is revealed as partly financial; Hartley is now a more dangerous antagonist than Vane."
+              },
+              {
+                "chapter_number": 24,
+                "title": "Zsolt's Source Burns",
+                "act": "Act II-B",
+                "arc_point": "Complications escalate \u2014 ally lost",
+                "pov_character": "Hana Kov\u00e1\u0159ov\u00e1",
+                "bridge_from_prior": "Agnes Peel, the cipher clerk, is the thread \u2014 Vane's security review has flagged unusual access patterns in the cipher room.",
+                "beat": "Agnes Peel is arrested by Special Branch on suspicion of passing classified material to a foreign power. Hana learns of this through Zsolt and goes immediately to ground. Story turn: Agnes, before her arrest, managed to post one final photograph to Hana's dead-letter address \u2014 it contains the signature page of the treaty framework, with Vane's name already written in as a witness.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Complications Escalate: an ally is sacrificed; the evidence set is now nearly complete but the team has lost its access route."
+              },
+              {
+                "chapter_number": 25,
+                "title": "The Moral Complication",
+                "act": "Act II-B",
+                "arc_point": "Complications escalate \u2014 protagonist's moral crisis",
+                "pov_character": "Edward Ashworth",
+                "bridge_from_prior": "Agnes's arrest is the thread \u2014 Edward knows that Agnes will be questioned about her contacts, which leads back to Hana, which leads back to him.",
+                "beat": "Edward is approached by a Special Branch officer who offers him a deal: testify that Hana Kov\u00e1\u0159ov\u00e1 recruited Agnes Peel as a foreign agent, and the security review against Edward will be dropped. Edward would be reinstated, the treaty would proceed, and Hana would be expelled. Story turn: Edward realizes that if he takes the deal, he saves himself and destroys Hana \u2014 but the treaty gets signed. If he refuses, he loses everything and may still fail to stop it. The reader cannot easily resolve this for him.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Moral Crisis: the central moral complication is presented; Edward must choose between self-preservation and the mission, with no guarantee the mission succeeds either way."
+              },
+              {
+                "chapter_number": 26,
+                "title": "Edward's Choice",
+                "act": "Act II-B",
+                "arc_point": "Complications escalate \u2014 protagonist acts on the moral complication",
+                "pov_character": "Edward Ashworth",
+                "bridge_from_prior": "The Special Branch offer is the thread; Edward has 24 hours to decide.",
+                "beat": "Edward refuses the deal \u2014 but not cleanly. He tells the Special Branch officer that he cannot testify to something he did not witness. He does not say Hana is innocent. He does not say she is guilty. He says nothing useful and walks away. Story turn: the Special Branch officer tells him: 'That's the wrong answer, Mr. Ashworth. You'll understand why shortly.'",
+                "arc_notes": "Corrupted Servant Arc \u2014 Moral Crisis: Edward's refusal is principled but evasive; he has not lied but he has not been brave; the reader understands he will regret this either way."
+              },
+              {
+                "chapter_number": 27,
+                "title": "Kellner Reaches Out",
+                "act": "Act II-B",
+                "arc_point": "Complications escalate \u2014 unexpected ally",
+                "pov_character": "Franz Kellner",
+                "bridge_from_prior": "The Special Branch pressure on Edward is the thread \u2014 Kellner's intermediary has reported that Edward refused to cooperate, which tells Kellner that Edward is still active.",
+                "beat": "Kellner leaves a message for Edward through the Bloomsbury antiquarian bookshop \u2014 a book with a note inside, the way he repairs damaged volumes. The note contains one piece of information: the exact address of the Hartley estate and the new date of the signing ceremony, October 1st. Story turn: the note also says: 'I will be there. I will do what I can. Do not ask me to do more.'",
+                "arc_notes": "Corrupted Servant Arc \u2014 Unexpected Ally: Kellner's small act of non-compliance becomes a decisive one; the German side of the conspiracy has a fracture."
+              },
+              {
+                "chapter_number": 28,
+                "title": "Clara Acts",
+                "act": "Act II-B",
+                "arc_point": "Complications escalate \u2014 secondary character takes independent action",
+                "pov_character": "Clara Ashworth",
+                "bridge_from_prior": "Edward has told Clara about the treaty and his suspension; Clara has been sitting with this information and her guilt about Vane.",
+                "beat": "Clara goes to her father, the retired Liberal MP, and tells him everything. He is horrified and contacts two former Cabinet colleagues. Story turn: one of the former Cabinet colleagues tells Clara that he has heard rumors of the treaty before \u2014 from Vane himself, three years ago, framed as a hypothetical. He has a note he made at the time. Clara takes the note.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Secondary Character Acts: Clara's arc reaches its active phase; she produces independent evidence that corroborates Edward's case."
+              },
+              {
+                "chapter_number": 29,
+                "title": "The Evidence Assembled",
+                "act": "Act II-B",
+                "arc_point": "Crisis approach \u2014 the case is built",
+                "pov_character": "Edward Ashworth",
+                "bridge_from_prior": "Clara brings the former Cabinet minister's note to Edward; the thread is the accumulation of evidence.",
+                "beat": "Edward, Hana, Zsolt, and Clara meet in Zsolt's Soho bedsit and lay out what they have: Clement's memorized excerpt, Agnes's photographs, Kellner's note with the date and location, and the Cabinet minister's corroborating memo. Story turn: Zsolt calculates that they have enough to publish \u2014 but publication alone will not stop the signing; they need someone inside the government to act on the evidence before October 1st.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Crisis Approach: the evidence is complete but the mechanism for using it is unclear; the team must find a path to action."
+              },
+              {
+                "chapter_number": 30,
+                "title": "The Foreign Secretary",
+                "act": "Act II-B",
+                "arc_point": "Crisis approach \u2014 the protagonist attempts the official route",
+                "pov_character": "Edward Ashworth",
+                "bridge_from_prior": "The team decided they need someone inside government; Edward goes directly to the Foreign Secretary's private secretary.",
+                "beat": "Edward requests an urgent meeting with the Foreign Secretary, Lord Halifax, and is granted fifteen minutes. He presents the evidence. Halifax listens, thanks him, and says he will look into it. Story turn: two hours later, Edward receives a phone call from Vane's office: his security review has been upgraded to a formal investigation, and he is to surrender his passport.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Crisis: the official route is closed; Halifax has either been captured by the conspiracy or has chosen not to act; Edward is now isolated from every institutional resource."
+              },
+              {
+                "chapter_number": 31,
+                "title": "Vane's Regret",
+                "act": "Act II-B",
+                "arc_point": "Crisis \u2014 antagonist's perspective at the moment of maximum power",
+                "pov_character": "Sir Reginald Vane",
+                "bridge_from_prior": "Halifax informed Vane of Edward's visit; Vane is now moving to complete the neutralization.",
+                "beat": "Vane reviews the situation: Edward has been isolated, Hana is under surveillance, Zsolt can be deported. The treaty will be signed in four days. He writes in his diary: 'I have done what was necessary. I will not pretend it was easy.' Story turn: Vane receives a call from Hartley \u2014 the German delegation has arrived early and wants the ceremony moved to tomorrow night.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Crisis: the antagonist is at maximum power but the timeline has compressed again; the final confrontation is now 24 hours away."
+              },
+              {
+                "chapter_number": 32,
+                "title": "The Deportation Order",
+                "act": "Act II-B",
+                "arc_point": "Crisis \u2014 ally under direct threat",
+                "pov_character": "Hana Kov\u00e1\u0159ov\u00e1",
+                "bridge_from_prior": "Vane's neutralization plan targeted Hana; she receives notice that her diplomatic accreditation has been revoked and she must leave Britain within 48 hours.",
+                "beat": "Hana goes to Zsolt. She has 48 hours and the photographs. She tells Zsolt to publish \u2014 everything, now, regardless of what it does to her cover. Story turn: Zsolt tells her he cannot publish in Britain; the D-Notice system will suppress it. But he can publish in Paris tonight, and the story will be back in London by morning \u2014 if they move in the next three hours.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Crisis: Hana's arc reaches its sacrifice point; she is choosing the mission over her own safety and career."
+              },
+              {
+                "chapter_number": 33,
+                "title": "The Paris Wire",
+                "act": "Act II-B",
+                "arc_point": "Crisis \u2014 the public weapon is deployed",
+                "pov_character": "Zsolt Fekete",
+                "bridge_from_prior": "Hana gave Zsolt the photographs and told him to publish; he is now at a Soho telephone exchange calling his Paris editor.",
+                "beat": "Zsolt dictates the story to his Paris editor \u2014 the framework treaty, the Poland clause, the financial annex, Vane's name as witness, the Hartley estate. The editor confirms publication in the morning edition. Story turn: Zsolt's Paris editor tells him that a German journalist has already filed a story denying the treaty's existence \u2014 which means Berlin knows the story is coming.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Crisis: the public weapon is deployed but the enemy is already preparing a counter-narrative; the race is now between the morning papers and the signing ceremony."
+              },
+              {
+                "chapter_number": 34,
+                "title": "The Night Drive",
+                "act": "Act II-B",
+                "arc_point": "Crisis \u2014 protagonist moves toward the climax",
+                "pov_character": "Edward Ashworth",
+                "bridge_from_prior": "Zsolt has filed the story; Edward knows the signing is tonight at Hartley's estate and that the story will not reach London until morning \u2014 after the ceremony.",
+                "beat": "Edward, whose passport has been surrendered but who has not been formally arrested, drives through the night toward Hartley's estate in Wiltshire. Clara, without being asked, gets into the car. Story turn: halfway there, Edward receives a message via Kellner's bookshop intermediary \u2014 Kellner will leave the estate's service entrance unlocked.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Dark Night of the Soul: the protagonist is moving toward the final confrontation with no institutional support, no legal standing, and no guarantee of success."
+              },
+              {
+                "chapter_number": 35,
+                "title": "Hartley's Estate",
+                "act": "Act III",
+                "arc_point": "Climax \u2014 the signing ceremony",
+                "pov_character": "Edward Ashworth",
+                "bridge_from_prior": "Edward drove to the estate; Kellner left the service entrance unlocked.",
+                "beat": "Edward enters the estate and finds the signing room \u2014 a private library. The German delegation, Hartley, and Vane are present. The treaty is on the table. Edward enters and places Agnes's photographs on the table in front of Vane. Story turn: Vane looks at the photographs, looks at Edward, and says: 'You're too late. The story in Paris will be denied. This will be signed tonight.' Edward says: 'Read the photograph again. Look at the date on the sunset clause.' Vane reads it. The sunset clause expires at midnight on September 30th. It is now September 30th. It is 11:47 p.m.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Climax: the central confrontation; the dramatic question reaches its resolution point."
+              },
+              {
+                "chapter_number": 36,
+                "title": "Thirteen Minutes",
+                "act": "Act III",
+                "arc_point": "Climax \u2014 the resolution",
+                "pov_character": "Edward Ashworth",
+                "bridge_from_prior": "The sunset clause expires at midnight; it is 11:47.",
+                "beat": "Hartley moves to sign immediately. Kellner, standing as the German witness, drops his pen. He bends to retrieve it. He takes two minutes. Hartley signs. Vane moves to sign as British witness. Edward says: 'If you sign that, I will walk out of this room and give the photographs to every journalist in London. The story is already in Paris. You will not be able to deny it.' Vane holds the pen. Story turn: the clock passes midnight. The sunset clause has expired. The treaty is legally void the moment Vane signs after midnight \u2014 and Vane, the man who knows every clause of every document, knows this.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Climax Resolution: the treaty is stopped not by heroism but by a procedural fact \u2014 the kind of fact only a man who reads documents would know; the wow factor is delivered."
+              },
+              {
+                "chapter_number": 37,
+                "title": "What Vane Does",
+                "act": "Act III",
+                "arc_point": "Climax \u2014 antagonist's resolution",
+                "pov_character": "Sir Reginald Vane",
+                "bridge_from_prior": "Vane is holding the pen at midnight; the treaty is void.",
+                "beat": "Vane sets down the pen. He tells the German delegation that there has been a procedural error and the ceremony must be rescheduled. The Germans are furious. Hartley is furious. Vane is entirely calm. Story turn: alone with Edward for a moment, Vane says: 'You've bought us a war, Edward. I hope you're proud of yourself.' Edward says: 'I've bought us a choice. That's all anyone can do.'",
+                "arc_notes": "Corrupted Servant Arc \u2014 Antagonist Resolution: Vane's arc ends not in arrest or disgrace but in a quiet, devastating exchange; his belief that he was right is unshaken; the reader must decide."
+              },
+              {
+                "chapter_number": 38,
+                "title": "The Morning Papers",
+                "act": "Act III",
+                "arc_point": "Falling Action \u2014 public consequences",
+                "pov_character": "Hana Kov\u00e1\u0159ov\u00e1",
+                "bridge_from_prior": "Zsolt filed the story in Paris; it is now morning and the papers are out.",
+                "beat": "Hana reads the Paris story in a Bayswater caf\u00e9, her deportation order in her pocket. The story is on the front page. The British papers are carrying denials \u2014 but the denials are specific enough to confirm the story's accuracy to anyone who reads carefully. Story turn: Hana receives a telegram from Prague: the Czechoslovak government is using the story as leverage in emergency talks with France. It may not be enough. But it is something.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Falling Action: Hana's arc reaches its partial resolution; her mission produced a consequence, though not a salvation."
+              },
+              {
+                "chapter_number": 39,
+                "title": "Clement's Clean Ledger",
+                "act": "Act III",
+                "arc_point": "Falling Action \u2014 secondary character resolution",
+                "pov_character": "Clement Dowd",
+                "bridge_from_prior": "The public story has broken; Vane's intermediary, who held Clement's debt, has gone to ground.",
+                "beat": "Clement is called before an internal inquiry. He tells the truth about the reclassified file and the debt. Story turn: the inquiry, embarrassed by the Paris story, quietly cancels the debt as part of a settlement \u2014 not because Clement deserves it, but because a public trial would be worse for the Foreign Office than a quiet resolution. Clement goes home and tells his wife everything.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Falling Action: Clement's subplot is resolved before the final chapter; the reader gets closure on the ally's arc."
+              },
+              {
+                "chapter_number": 40,
+                "title": "Kellner's Notebook",
+                "act": "Act III",
+                "arc_point": "Falling Action \u2014 antagonist-adjacent resolution",
+                "pov_character": "Franz Kellner",
+                "bridge_from_prior": "Kellner dropped his pen at the signing ceremony; he returns to the German Embassy the next morning.",
+                "beat": "Kellner is recalled to Berlin for consultations. He packs his notebook. On the train to Dover, he tears out the pages of things he is ashamed of and burns them in the compartment ashtray. Story turn: he keeps the last page \u2014 the line about the permission slip for murder \u2014 and puts it in his breast pocket. He does not know why.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Falling Action: Kellner's arc ends in ambiguity; he has done one good thing and is returning to a system that will require many more bad ones."
+              },
+              {
+                "chapter_number": 41,
+                "title": "The Kensington House",
+                "act": "Act III",
+                "arc_point": "Falling Action \u2014 marriage resolution",
+                "pov_character": "Clara Ashworth",
+                "bridge_from_prior": "Clara was in the car with Edward; she has returned home while he deals with the aftermath.",
+                "beat": "Clara sits in the empty house and writes a poem \u2014 the first one she has shown anyone. She leaves it on Edward's desk. Story turn: when Edward comes home, he reads it. It is about a woman who spent fifteen years translating her intelligence into someone else's career and one night drove through the dark toward something real. He does not say it is good. He says: 'You were there.'",
+                "arc_notes": "Corrupted Servant Arc \u2014 Falling Action: Clara's arc resolves on her own terms; her act of consequence was real and is acknowledged."
+              },
+              {
+                "chapter_number": 42,
+                "title": "Edward's Reinstatement",
+                "act": "Act III",
+                "arc_point": "Resolution \u2014 protagonist's institutional fate",
+                "pov_character": "Edward Ashworth",
+                "bridge_from_prior": "The Paris story and the internal inquiry have created political pressure; Edward is summoned to the Foreign Office.",
+                "beat": "Edward is reinstated \u2014 quietly, without ceremony, with a letter that acknowledges no wrongdoing on anyone's part. He is reassigned to a minor desk. Vane remains in post. Hartley resigns for health reasons. Story turn: Edward's new desk is the registry itself \u2014 he has been given Clement's job, effectively. He accepts it. He knows where everything is filed.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Resolution: the institutional world reasserts its self-protective logic; Edward wins the battle and loses the career; the reader understands this is how institutions work."
+              },
+              {
+                "chapter_number": 43,
+                "title": "Epilogue: The Registry, September 1939",
+                "act": "Epilogue",
+                "arc_point": "Frame closed \u2014 the cost named",
+                "pov_character": "Edward Ashworth",
+                "bridge_from_prior": "The prologue showed Edward burning a document in the registry on the night war was declared; this chapter returns to that moment and completes it.",
+                "beat": "Edward burns the document \u2014 it is Vane's cipher diary, which Clement found in Vane's desk after Vane suffered a stroke in August 1939 and was quietly retired. The diary contains everything: the full conspiracy, the names, the dates. Edward burns it not to protect Vane but because the war has started and the men named in it are needed. Story turn: as the last page burns, Edward thinks: Vane was wrong about everything and right about one thing \u2014 there is no clean choice in statecraft, only the choice you can live with. He closes the registry door and goes to his desk. There is a cable from Prague. He opens it.",
+                "arc_notes": "Corrupted Servant Arc \u2014 Resolution and Frame Closed: the prologue's image is explained and recontextualized; Edward's final act is morally ambiguous \u2014 he has destroyed evidence to serve the war effort, which is exactly what Vane would have done; the arc ends on the question, not the answer."
+              }
+            ]
+          },
+          "persist": {
+            "persisted": false,
+            "reason": "persist requested but project_id/user_id missing"
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

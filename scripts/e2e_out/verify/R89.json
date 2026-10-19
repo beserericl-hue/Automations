@@ -1,0 +1,130 @@
+{
+  "id": "R89",
+  "title": "Revert Outline \u2014 The Optimization to Pre-Epilogue Version",
+  "route": "`library.versions` (list) + `library.revert` (outline) \u00b7 impl: built (E2E-2)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.revert got=library.revert OK",
+    "job=complete",
+    "reverted=True"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Show outline version history for \"The Optimization\""
+    ],
+    [
+      "chat",
+      "Revert the outline for \"The Optimization\" to version 1"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "data",
+        "assistant_message": "",
+        "tool": "library",
+        "op": "versions",
+        "data": {
+          "execution_id": "b64d1b16-0ed8-4205-8bc3-87d5422dccf1",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "versions",
+            "result": {
+              "scope": "outline",
+              "project_id": "2701d335-d6af-411c-aeb8-4105132f890f",
+              "versions": [
+                {
+                  "version_number": 1,
+                  "created_at": "2026-07-01T21:32:54.212829+00:00",
+                  "revision_note": "pre-revision snapshot",
+                  "chapter_count": 8
+                },
+                {
+                  "version_number": 2,
+                  "created_at": "2026-07-01T21:32:54.257003+00:00",
+                  "revision_note": "Auto-snapshot before outline change",
+                  "chapter_count": 8
+                },
+                {
+                  "version_number": 3,
+                  "created_at": "2026-07-01T22:44:02.297784+00:00",
+                  "revision_note": "pre-revision snapshot",
+                  "chapter_count": 10
+                },
+                {
+                  "version_number": 4,
+                  "created_at": "2026-07-01T22:44:02.357007+00:00",
+                  "revision_note": "Auto-snapshot before outline change",
+                  "chapter_count": 10
+                },
+                {
+                  "version_number": 5,
+                  "created_at": "2026-07-01T23:07:33.189067+00:00",
+                  "revision_note": "pre-revert snapshot (to v1)",
+                  "chapter_count": 11
+                },
+                {
+                  "version_number": 6,
+                  "created_at": "2026-07-01T23:07:33.277027+00:00",
+                  "revision_note": "Auto-snapshot before outline change",
+                  "chapter_count": 11
+                }
+              ],
+              "count": 6
+            }
+          },
+          "error": null,
+          "next_stage": null
+        },
+        "job_id": null,
+        "status": null,
+        "jobs": null,
+        "error": null
+      },
+      "job_result": null,
+      "resolved_prompt": "Show outline version history for \"The Optimization\""
+    },
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Reverting the outline for \"The Optimization\" to version 1.",
+        "tool": "library",
+        "op": "revert",
+        "data": null,
+        "job_id": "166c3e545b3542e4b4d61d9417c013a2",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "166c3e545b3542e4b4d61d9417c013a2",
+        "status": "complete",
+        "result": {
+          "execution_id": "45fd8fe1-07af-49d2-aca1-88c408364739",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "revert",
+            "result": {
+              "reverted": true,
+              "scope": "outline",
+              "project_id": "2701d335-d6af-411c-aeb8-4105132f890f",
+              "title": "The Optimization",
+              "version": 1,
+              "chapter_count": 8
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Revert the outline for \"The Optimization\" to version 1"
+    }
+  ],
+  "expected": [
+    "Step 1 \u2192 `library.versions`, kind=data; \u22651 entry (pre-epilogue 8-ch); version_number/created_at/chapter count(8)",
+    "Step 2 \u2192 `library.revert`, kind=queued; complete; current (with-epilogue) snapshotted; outline updated to v1 (8 chapters, no epilogue); confirmation names title + version"
+  ]
+}

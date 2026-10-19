@@ -1,0 +1,22 @@
+{
+  "test": {
+    "id": "V08",
+    "title": "Voice \u2014 Social Media (Twitter)",
+    "source": "voice",
+    "prompt": "Take this and make twitter posts from it The Last Signal is a new story about a radio operator in flooded Manhattan picking up a mysterious broadcast platform twitter",
+    "route": "media.social-posts` (task)",
+    "prerequisite": "",
+    "expected": [
+      "flat `{response, kind=\"queued\"}`",
+      "routes `media.social-posts`",
+      "platform=twitter",
+      "tweets \u2264280 chars",
+      "CR-009 email"
+    ]
+  },
+  "response": {
+    "response": "How can I help with your writing?",
+    "kind": "reply"
+  },
+  "job_result": null
+}

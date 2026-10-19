@@ -1,0 +1,45 @@
+{
+  "test": {
+    "id": "R12",
+    "title": "Repurpose to Social \u2014 Facebook",
+    "source": "chat",
+    "prompt": "Repurpose this into Facebook posts: \"The Last Signal is a post-apocalyptic short story about a lone radio operator in flooded Manhattan picking up a mysterious broadcast from across the Atlantic. Now free to read on our blog.\" Platform: facebook. Genre slug: post-apocalyptic.",
+    "route": "media.social-posts` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `media.social-posts`, kind=queued; job reaches status=complete",
+      "Conversational, community-engaging tone",
+      "Cover image generated via `media.cover-art` sub-task",
+      "Email arrives with posts + image; CR-009 email received"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "I can repurpose \"The Last Signal\" into Facebook posts. To do this, I need the project ID for \"The Last Signal\". Could you please provide it?",
+    "tool": "media",
+    "op": "social-posts",
+    "data": null,
+    "job_id": "3316f544b8fc47799e3f31dbdd82c9be",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "3316f544b8fc47799e3f31dbdd82c9be",
+    "status": "complete",
+    "result": {
+      "execution_id": "171462a2-0b3c-4e2c-818e-cd859e349229",
+      "step_name": "media",
+      "status": "ok",
+      "payload": {
+        "op": "social-posts",
+        "result": {
+          "twitter": "(fixture) social post for twitter: ",
+          "linkedin": "(fixture) social post for linkedin: "
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

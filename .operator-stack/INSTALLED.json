@@ -1,0 +1,19 @@
+{
+  "operator-stack-fa-w2": {
+    "release": "20261013-onboarding-v18",
+    "host": "claude-code",
+    "skills": [
+      "brand-positioning",
+      "claims-compliance-guard",
+      "copy-chief",
+      "direct-response-copy",
+      "feed-the-machine",
+      "funnel-architect",
+      "launch-readiness-preflight",
+      "operator-resources-fa",
+      "operator-resources-w2",
+      "operator-start",
+      "project-memory-manager"
+    ]
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "id": "R90",
+  "title": "Revert Outline \u2014 Invalid Version Number",
+  "route": "`library.revert` (outline) \u00b7 impl: built (E2E-2)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.revert got=library.revert OK",
+    "job=complete",
+    "reverted=False"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Revert the outline for \"The Accord\" to version 99"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Reverting the outline for \"The Accord\" to version 99.",
+        "tool": "library",
+        "op": "revert",
+        "data": null,
+        "job_id": "18483690ccb94792834e488b9aed1641",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "18483690ccb94792834e488b9aed1641",
+        "status": "complete",
+        "result": {
+          "execution_id": "9d0e6c9e-69a9-405d-8122-bff46390834a",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "revert",
+            "result": {
+              "reverted": false,
+              "error_message": "version 99 not found for 'The Accord'"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Revert the outline for \"The Accord\" to version 99"
+    }
+  ],
+  "expected": [
+    "routes to `library.revert`; version 99 not found \u2192 clear error (no silent failure)",
+    "`writing_projects_v2.outline` NOT modified; no new snapshot; job status=failed (or inline error) with informative error_message"
+  ]
+}

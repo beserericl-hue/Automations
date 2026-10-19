@@ -1,0 +1,42 @@
+{
+  "test": {
+    "id": "R52",
+    "title": "Correct Genre Name Preserved (R43 Guard)",
+    "source": "chat",
+    "prompt": "Write a short story about a political consultant who realizes the candidate she is managing is being blackmailed by a rival AI. Genre: political-scifi. Length: 2000 words. Tone: tense thriller.",
+    "route": "chapter.short-story` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `chapter.short-story`, kind=queued; complete",
+      "Reflects political-scifi themes; genre guidelines applied; no `[undefined]` in subject/text/title",
+      "Tension arc + transformation; Draft row; CR-009 email received"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing your short story. I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "short-story",
+    "data": null,
+    "job_id": "1d1a80512884408099708d3929842006",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "1d1a80512884408099708d3929842006",
+    "status": "complete",
+    "result": {
+      "execution_id": "206ca4ea-7bea-4e56-8b50-4e3f83e20df4",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValueError",
+        "message": "invalid literal for int() with base 10: '2000 words'",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

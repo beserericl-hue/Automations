@@ -1,0 +1,57 @@
+{
+  "id": "R102",
+  "title": "Email Research Report",
+  "route": "`library.email-content` (task) \u00b7 impl: built (E2E-1)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.email-content got=library.email-content OK",
+    "job=complete",
+    "emailed=True to=eric@agileadtesting.com subject=Research Report \u2014 Post-Apocalyptic Fiction Trends  err=None"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Email me the research report on \"Post-Apocalyptic Fiction Trends 2026\""
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Sending the research report to your email.",
+        "tool": "library",
+        "op": "email-content",
+        "data": null,
+        "job_id": "d1994dd39b0f4b4b98e8c26423a159e0",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "d1994dd39b0f4b4b98e8c26423a159e0",
+        "status": "complete",
+        "result": {
+          "execution_id": "400c330c-3811-40f5-8cb6-221a8f98994a",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "email-content",
+            "result": {
+              "emailed": true,
+              "to": "eric@agileadtesting.com",
+              "subject": "Research Report \u2014 Post-Apocalyptic Fiction Trends 2026",
+              "content_type": "research"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Email me the research report on \"Post-Apocalyptic Fiction Trends 2026\""
+    }
+  ],
+  "expected": [
+    "routes to `library.email-content` (content_type=research), kind=queued; complete",
+    "reads from `research_reports_v2` (ilike title); HTML; email sent; subject references report"
+  ]
+}

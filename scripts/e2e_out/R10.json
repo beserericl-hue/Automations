@@ -1,0 +1,46 @@
+{
+  "test": {
+    "id": "R10",
+    "title": "Repurpose to Social \u2014 Twitter",
+    "source": "chat",
+    "prompt": "Repurpose this into Twitter posts: \"The Senate of Stars is a new political sci-fi short story about a diplomat navigating a galactic parliament where every species has a different concept of justice. A meditation on diplomacy, compromise, and whether true fairness is even possible across civilizations.\" Platform: twitter.",
+    "route": "media.social-posts` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `media.social-posts`, kind=queued; job reaches status=complete",
+      "Output is a thread of tweets (each under 280 chars)",
+      "**Writing Prime Directive:** No cliches, no hype. Reads like a human wrote it.",
+      "Includes relevant hashtags; Email arrives with formatted tweets",
+      "CR-009 task-completion email received"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Got it \u2014 I've started on that. It runs in the background and I'll let you know when it's ready.",
+    "tool": "media",
+    "op": "social-posts",
+    "data": null,
+    "job_id": "7ed4e45f458c4d5d9f062a48d99787f1",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "7ed4e45f458c4d5d9f062a48d99787f1",
+    "status": "complete",
+    "result": {
+      "execution_id": "2ef852c0-173c-46b3-bb8f-ea33c932f566",
+      "step_name": "media",
+      "status": "ok",
+      "payload": {
+        "op": "social-posts",
+        "result": {
+          "twitter": "(fixture) social post for twitter: ",
+          "linkedin": "(fixture) social post for linkedin: "
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

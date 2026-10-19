@@ -1,0 +1,47 @@
+{
+  "test": {
+    "id": "V40",
+    "title": "Voice \u2014 Email Chapter",
+    "source": "voice",
+    "prompt": "Send me chapter one of The Seed Vault in an email",
+    "route": "library.email-content` (task)",
+    "prerequisite": "",
+    "expected": [
+      "flat queued",
+      "content_type=chapter, chapter_number=1",
+      "complete",
+      "reads from `published_content_v2` (user-scoped)",
+      "HTML email",
+      "subject \"The Seed Vault \u2014 Chapter 1\"",
+      "BCC if configured"
+    ]
+  },
+  "response": {
+    "response": "Sending chapter one of 'The Seed Vault' via email.",
+    "kind": "queued",
+    "tool": "library",
+    "op": "email-content",
+    "job_id": "14d3d9b1b79f48dda5d42673887b78e9",
+    "status": "queued"
+  },
+  "job_result": {
+    "job_id": "14d3d9b1b79f48dda5d42673887b78e9",
+    "status": "complete",
+    "result": {
+      "execution_id": "3417d3bb-bc3d-47ac-943c-a6849f5bb3f7",
+      "step_name": "library",
+      "status": "ok",
+      "payload": {
+        "op": "email-content",
+        "result": {
+          "emailed": true,
+          "to": "eric@agileadtesting.com",
+          "subject": "Chapter 1 \u2014 The Last Garden",
+          "content_type": "chapter"
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

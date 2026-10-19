@@ -1,0 +1,54 @@
+{
+  "id": "V08",
+  "title": "Voice \u2014 Social Media (Twitter)",
+  "route": "`media.social-posts` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=media.social-posts got=media.social-posts OK",
+    "job=complete",
+    "platforms=['twitter']"
+  ],
+  "steps": [
+    [
+      "voice",
+      "Take this and make twitter posts from it The Last Signal is a new story about a radio operator in flooded Manhattan picking up a mysterious broadcast platform twitter"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "response": "Got it \u2014 I've started on that. It runs in the background and I'll let you know when it's ready.",
+        "kind": "queued",
+        "tool": "media",
+        "op": "social-posts",
+        "job_id": "a1f1c38bfce244d98cce00d99cb2bceb",
+        "status": "queued"
+      },
+      "job_result": {
+        "job_id": "a1f1c38bfce244d98cce00d99cb2bceb",
+        "status": "complete",
+        "result": {
+          "execution_id": "6d899fa3-2835-4933-b00d-9f5398ac76d9",
+          "step_name": "media",
+          "status": "ok",
+          "payload": {
+            "op": "social-posts",
+            "result": {
+              "twitter": "A woman wakes in a hospital with no memory of how she got there. The only clue: a name whispered by a stranger. Now she has 48 hours to find him\u2014before someone finds her. #amwriting #thriller"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Take this and make twitter posts from it The Last Signal is a new story about a radio operator in flooded Manhattan picking up a mysterious broadcast platform twitter"
+    }
+  ],
+  "expected": [
+    "flat `{response, kind=\"queued\"}`",
+    "routes `media.social-posts`",
+    "platform=twitter",
+    "tweets \u2264280 chars",
+    "CR-009 email"
+  ]
+}

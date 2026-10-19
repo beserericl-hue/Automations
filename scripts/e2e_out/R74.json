@@ -1,0 +1,488 @@
+{
+  "test": {
+    "id": "R74",
+    "title": "Retrieve Outline \u2014 The Correction",
+    "source": "chat",
+    "prompt": "Retrieve the outline for \"The Correction\"",
+    "route": "library.retrieve` (info)",
+    "prerequisite": "R61",
+    "expected": [
+      "routes to `library.retrieve`, kind=data; full outline (10 chapters); Three-Act structure; from `writing_projects_v2`"
+    ]
+  },
+  "response": {
+    "kind": "data",
+    "assistant_message": "",
+    "tool": "library",
+    "op": "retrieve",
+    "data": {
+      "execution_id": "f48caeff-214c-4a29-9418-c882184dd312",
+      "step_name": "library",
+      "status": "ok",
+      "payload": {
+        "op": "retrieve",
+        "result": {
+          "items": [
+            {
+              "id": "9991c09a-f2a9-46a8-8e75-7465ce15361f",
+              "title": "Newsletter",
+              "status": "draft",
+              "content_type": "newsletter",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-09T14:34:41.179763+00:00"
+            },
+            {
+              "id": "67b034d9-ece4-4bb0-ad2d-7d0f036c4d9e",
+              "title": "Newsletter",
+              "status": "draft",
+              "content_type": "newsletter",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-09T14:46:27.230449+00:00"
+            },
+            {
+              "id": "4325073c-ba25-47b9-b0f7-f62b0abaaf57",
+              "title": "Newsletter",
+              "status": "draft",
+              "content_type": "newsletter",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-09T14:54:09.718527+00:00"
+            },
+            {
+              "id": "319c08de-2a6b-43b1-8c68-c0d62d520d6e",
+              "title": "When Sci-Fi Becomes Space Policy",
+              "status": "draft",
+              "content_type": "newsletter",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-09T15:07:47.380011+00:00"
+            },
+            {
+              "id": "2c0bcdc3-d3e9-4f74-b102-75dc3b985eeb",
+              "title": "A historian discovers that antique",
+              "status": "draft",
+              "content_type": "short_story",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-09T15:26:27.106062+00:00"
+            },
+            {
+              "id": "d88c15e9-6b7a-44b8-8e8d-b25bc4ddfb86",
+              "title": "The AI Marketing Revolution: How Intelligent Tools Are Reshaping Digital Strategy in 2026",
+              "status": "draft",
+              "content_type": "blog_post",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-09T17:34:14.336617+00:00"
+            },
+            {
+              "id": "c5552200-5e8c-4930-9999-f740426bb7d5",
+              "title": "Revolutions That Remade the World",
+              "status": "draft",
+              "content_type": "newsletter",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-09T17:34:23.524258+00:00"
+            },
+            {
+              "id": "3f842c49-6a0b-4912-9ab2-a58010c347fb",
+              "title": "A disillusioned Roman soldier discovers",
+              "status": "draft",
+              "content_type": "short_story",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-09T17:37:39.843318+00:00"
+            },
+            {
+              "id": "0272ea75-7aa8-4cda-b298-4942f208fb26",
+              "title": "Why Post-Apocalyptic Fiction Matters More Than Ever in 2026",
+              "status": "draft",
+              "content_type": "blog_post",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-10T21:24:17.564526+00:00"
+            },
+            {
+              "id": "39896269-c101-4837-9158-1bcdbd3c3ce2",
+              "title": "Why Post-Apocalyptic Fiction Matters More Than Ever in 2026",
+              "status": "draft",
+              "content_type": "blog_post",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-10T21:27:24.455447+00:00"
+            },
+            {
+              "id": "33356a66-3fd6-42be-891e-8e1eeecdcd5a",
+              "title": "How Star Wars Predicted Our Space Wars",
+              "status": "draft",
+              "content_type": "newsletter",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-10T21:29:54.908066+00:00"
+            },
+            {
+              "id": "0cf2ca4e-c699-4c29-a525-66506e469a37",
+              "title": "Arrival at the Citadel",
+              "status": "draft",
+              "content_type": "chapter",
+              "project_id": "3460e7cc-9f54-4ae9-a504-977a0a798ae0",
+              "chapter_number": 1,
+              "created_at": "2026-03-10T22:04:49.698855+00:00"
+            },
+            {
+              "id": "996783ea-fd2c-442f-80f5-216f1adb5485",
+              "title": "The Forgotten Engineers of Rome: How Aqueducts Shaped an Empire",
+              "status": "draft",
+              "content_type": "blog_post",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-10T23:27:17.868931+00:00"
+            },
+            {
+              "id": "ee1cffb6-820b-4a09-883a-dff580f974a5",
+              "title": "Maps Redrawn: 2025's Political Shifts",
+              "status": "draft",
+              "content_type": "newsletter",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-11T00:08:25.439439+00:00"
+            },
+            {
+              "id": "cd8c86d1-9583-4826-9390-37efbbb06f68",
+              "title": "The Last Copy",
+              "status": "draft",
+              "content_type": "chapter",
+              "project_id": "b3fcb0db-1b48-4bcc-8fc6-393ab3c1235d",
+              "chapter_number": 1,
+              "created_at": "2026-03-11T00:19:01.807885+00:00"
+            },
+            {
+              "id": "8cb603b0-7af1-43bb-b1f3-a9cb14c928f6",
+              "title": "Why Post-Apocalyptic Fiction Matters More Than Ever in 2026",
+              "status": "approved",
+              "content_type": "blog_post",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-09T14:28:08.991248+00:00"
+            },
+            {
+              "id": "d2254f1c-34ed-4162-ae32-73abc5c3b726",
+              "title": "The Last Garden",
+              "status": "draft",
+              "content_type": "chapter",
+              "project_id": "43fe34a5-fe18-47ba-bf7f-7ff40b9a4d00",
+              "chapter_number": 1,
+              "created_at": "2026-03-11T22:57:05.231797+00:00"
+            },
+            {
+              "id": "8f9e3163-ebb2-4790-916d-def0855491f2",
+              "title": "A sanitation bot, unit 734,",
+              "status": "draft",
+              "content_type": "short_story",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-12T21:59:19.275223+00:00"
+            },
+            {
+              "id": "a433f0f4-2bb4-4d96-8b14-5c0cdfef428e",
+              "title": "A sanitation bot, unit 734,",
+              "status": "draft",
+              "content_type": "short_story",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-12T22:01:17.786695+00:00"
+            },
+            {
+              "id": "952fdbd7-96ff-4250-8813-3cff82d48df9",
+              "title": "Forged for the Arena: Inside the Grueling World of Roman Gladiator Training",
+              "status": "draft",
+              "content_type": "blog_post",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-12T23:33:17.807715+00:00"
+            },
+            {
+              "id": "6e262e85-9e5d-4fca-816e-e7e4654d1d8a",
+              "title": "AI Content Tools Are Rewriting Marketing's Playbook",
+              "status": "draft",
+              "content_type": "blog_post",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-12T23:40:56.098252+00:00"
+            },
+            {
+              "id": "282b084c-8598-464e-8b59-f97846bf7c2b",
+              "title": "AI Content Tools Are Rewriting Marketing Playbooks (And the Results Are Mixed)",
+              "status": "draft",
+              "content_type": "blog_post",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-12T23:53:07.213709+00:00"
+            },
+            {
+              "id": "edf1d66b-52a9-4ec7-8839-90eb3c08baa4",
+              "title": "A city maintenance worker discovers",
+              "status": "draft",
+              "content_type": "short_story",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-13T00:16:03.420908+00:00"
+            },
+            {
+              "id": "2d819c74-4592-492d-88f3-ed6a8ad116b9",
+              "title": "A city maintenance worker discovers",
+              "status": "draft",
+              "content_type": "short_story",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-13T00:18:17.859428+00:00"
+            },
+            {
+              "id": "6e9714fe-3386-4ff7-92eb-6d07fd41857f",
+              "title": "The Master's Chart",
+              "status": "draft",
+              "content_type": "chapter",
+              "project_id": "619ed4ac-004f-4d3d-b887-12bef233b176",
+              "chapter_number": 1,
+              "created_at": "2026-03-13T00:25:26.23258+00:00"
+            },
+            {
+              "id": "fd648813-b242-4640-85ef-f28c5bdcd7f3",
+              "title": "A historian discovers that antique",
+              "status": "draft",
+              "content_type": "short_story",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-13T01:00:28.711572+00:00"
+            },
+            {
+              "id": "893125b2-5338-4f3c-bf67-6ff331e902cd",
+              "title": "A historian discovers that antique",
+              "status": "draft",
+              "content_type": "short_story",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-13T01:02:41.87747+00:00"
+            },
+            {
+              "id": "9c644125-0c22-4c53-895f-9aae8ddd2752",
+              "title": "A historian discovers that antique",
+              "status": "draft",
+              "content_type": "short_story",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-13T01:16:59.739594+00:00"
+            },
+            {
+              "id": "bb5ecbde-9743-4916-9e7f-99c4d58a9b2f",
+              "title": "A historian discovers that antique",
+              "status": "draft",
+              "content_type": "short_story",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-13T01:19:29.885516+00:00"
+            },
+            {
+              "id": "a01fb547-d2f6-4eb6-872e-4960569eae3f",
+              "title": "Why Post-Apocalyptic Fiction Matters More Than Ever in 2026",
+              "status": "published",
+              "content_type": "blog_post",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-10T15:47:46.683654+00:00"
+            },
+            {
+              "id": "a47f5359-1a48-4446-aaa7-eae28dc163f3",
+              "title": "The Forgotten Engineers of Rome: How Aqueducts Shaped an Empire",
+              "status": "published",
+              "content_type": "blog_post",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-09T14:17:05.2302+00:00"
+            },
+            {
+              "id": "c6b29332-4f2f-4a73-a6ca-2cc238d927ae",
+              "title": "The Weight of Knowing",
+              "status": "draft",
+              "content_type": "short_story",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-13T01:38:38.633145+00:00"
+            },
+            {
+              "id": "cd1368a5-97f1-4326-b156-79c4ddc9f818",
+              "title": "The Weight of Knowing",
+              "status": "draft",
+              "content_type": "short_story",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-13T01:41:49.237681+00:00"
+            },
+            {
+              "id": "20327e99-d70d-4490-9fc4-95cef957ad39",
+              "title": "Neutral Ground",
+              "status": "draft",
+              "content_type": "chapter",
+              "project_id": "7976c085-41d3-46c6-9444-77b75bbdc289",
+              "chapter_number": 1,
+              "created_at": "2026-03-13T18:04:15.089504+00:00"
+            },
+            {
+              "id": "e6cb81bb-60f3-48b0-b66b-1b56e4a831a5",
+              "title": "The Poison Crown",
+              "status": "draft",
+              "content_type": "short_story",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-13T19:59:16.847182+00:00"
+            },
+            {
+              "id": "9232d19c-4f35-4f7e-8be0-f265f3a9d094",
+              "title": "The Poison Crown",
+              "status": "draft",
+              "content_type": "short_story",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-13T20:05:06.130162+00:00"
+            },
+            {
+              "id": "99d7d067-e9ee-486a-b408-e8d96df245ef",
+              "title": "The Witness",
+              "status": "draft",
+              "content_type": "short_story",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-13T20:48:35.744918+00:00"
+            },
+            {
+              "id": "4a85ec11-c1fd-4621-9968-bfb48810e965",
+              "title": "The Witness",
+              "status": "draft",
+              "content_type": "short_story",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-13T20:52:31.568966+00:00"
+            },
+            {
+              "id": "a992de79-09be-42ed-b6eb-441d29f2a921",
+              "title": "The Witness",
+              "status": "draft",
+              "content_type": "short_story",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-13T21:22:46.921102+00:00"
+            },
+            {
+              "id": "7a33f540-393f-4c78-b08a-1c7b7cd67cd8",
+              "title": "The Witness",
+              "status": "draft",
+              "content_type": "short_story",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-13T21:26:46.245917+00:00"
+            },
+            {
+              "id": "7c6c8b09-2a1e-4178-9c7c-5ff1c0293e26",
+              "title": "The Last Train",
+              "status": "draft",
+              "content_type": "chapter",
+              "project_id": "392d77bd-c518-4299-af27-f97e986fe213",
+              "chapter_number": 0,
+              "created_at": "2026-03-14T19:45:46.971661+00:00"
+            },
+            {
+              "id": "a17e1283-453e-4d3d-9e1a-547b934dcb90",
+              "title": "The Weight of Remembering",
+              "status": "draft",
+              "content_type": "chapter",
+              "project_id": "392d77bd-c518-4299-af27-f97e986fe213",
+              "chapter_number": 1,
+              "created_at": "2026-03-14T20:06:11.52185+00:00"
+            },
+            {
+              "id": "038943da-2b26-4d97-ba4d-d29dd5e2aaf6",
+              "title": "The Archivist Arrives",
+              "status": "draft",
+              "content_type": "chapter",
+              "project_id": "392d77bd-c518-4299-af27-f97e986fe213",
+              "chapter_number": 2,
+              "created_at": "2026-03-15T15:48:00.125493+00:00"
+            },
+            {
+              "id": "00764ece-998d-45a6-85ce-163197e07ccc",
+              "title": "The Underground Network",
+              "status": "approved",
+              "content_type": "chapter",
+              "project_id": "08927b47-f1d7-4350-bc18-05a3c964f7a2",
+              "chapter_number": 4,
+              "created_at": "2026-03-30T11:37:33.447947+00:00"
+            },
+            {
+              "id": "67d33a7d-3a90-418b-890f-fa95805b2868",
+              "title": "An AI trained to write",
+              "status": "published",
+              "content_type": "short_story",
+              "project_id": null,
+              "chapter_number": null,
+              "created_at": "2026-03-11T00:02:41.271941+00:00"
+            },
+            {
+              "id": "0e6f8b9d-7a66-413a-8e23-910efafe9230",
+              "title": "The First Contact",
+              "status": "approved",
+              "content_type": "chapter",
+              "project_id": "08927b47-f1d7-4350-bc18-05a3c964f7a2",
+              "chapter_number": 3,
+              "created_at": "2026-03-29T16:56:02.820462+00:00"
+            },
+            {
+              "id": "4d7c8cb7-2b07-42d3-a637-c6e5d5416cb5",
+              "title": "The Sympathizer",
+              "status": "approved",
+              "content_type": "chapter",
+              "project_id": "08927b47-f1d7-4350-bc18-05a3c964f7a2",
+              "chapter_number": 5,
+              "created_at": "2026-03-30T12:32:15.455594+00:00"
+            },
+            {
+              "id": "798b4e3c-a1e8-422e-8feb-6e19af88d9db",
+              "title": "The Foreman's Dilemma",
+              "status": "approved",
+              "content_type": "chapter",
+              "project_id": "08927b47-f1d7-4350-bc18-05a3c964f7a2",
+              "chapter_number": 6,
+              "created_at": "2026-03-30T12:53:43.751558+00:00"
+            },
+            {
+              "id": "4b3f42df-d0f0-445c-89a7-d660f1aceab5",
+              "title": "The Investigation Deepens",
+              "status": "approved",
+              "content_type": "chapter",
+              "project_id": "08927b47-f1d7-4350-bc18-05a3c964f7a2",
+              "chapter_number": 7,
+              "created_at": "2026-03-30T13:22:08.300673+00:00"
+            },
+            {
+              "id": "d3f140e1-c1d4-404c-a32e-1ea4472b05aa",
+              "title": "The Midnight Council",
+              "status": "approved",
+              "content_type": "chapter",
+              "project_id": "08927b47-f1d7-4350-bc18-05a3c964f7a2",
+              "chapter_number": 8,
+              "created_at": "2026-03-30T13:56:16.949803+00:00"
+            }
+          ]
+        }
+      },
+      "error": null,
+      "next_stage": null
+    },
+    "job_id": null,
+    "status": null,
+    "jobs": null,
+    "error": null
+  },
+  "job_result": null
+}

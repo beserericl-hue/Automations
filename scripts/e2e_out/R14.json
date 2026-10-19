@@ -1,0 +1,45 @@
+{
+  "test": {
+    "id": "R14",
+    "title": "Write Blog Post (ancient-history)",
+    "source": "chat",
+    "prompt": "Write a blog post in the ancient-history genre. Topic: \"The Forgotten Engineers of Rome: How Aqueducts Shaped an Empire\". Genre slug: ancient-history. Keywords: Roman engineering, aqueducts, ancient infrastructure, Frontinus. Target length: 1500 words.",
+    "route": "chapter.blog` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `chapter.blog`, kind=queued; job reaches status=complete",
+      "Blog uses ancient-history tone (immersive, sensory-rich, reverent of detail)",
+      "**Prime Directive:** Plain language, no hype, concrete examples",
+      "Cover art: classical oil painting style, warm golden light, marble/stone",
+      "Content Ingestion may return 0 items \u2014 job continues gracefully (fallback working)",
+      "Email arrives with blog + cover image; Draft row in `published_content_v2`; CR-009 email received"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing your blog post \u2014 I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "blog",
+    "data": null,
+    "job_id": "fa1c6faf45fe48c9b288a16e620be688",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "fa1c6faf45fe48c9b288a16e620be688",
+    "status": "complete",
+    "result": {
+      "execution_id": "9196ac72-83b2-4a3c-a812-6cf138d31290",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValueError",
+        "message": "invalid literal for int() with base 10: '1500 words'",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

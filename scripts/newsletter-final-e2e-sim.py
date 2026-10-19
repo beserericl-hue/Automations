@@ -23,7 +23,7 @@ PSQL = "/usr/local/opt/postgresql@17/bin/psql"
 PG_ENV = {
     "PGHOST": "aws-1-us-east-2.pooler.supabase.com", "PGPORT": "5432",
     "PGUSER": "postgres.gvbvwcnmjkdpclcisqrr", "PGDATABASE": "postgres",
-    "PGPASSWORD": "Fr332bafami!y",
+    "PGPASSWORD": "<rotated 2026-10-19 — see credentials-map.md>",
 }
 
 

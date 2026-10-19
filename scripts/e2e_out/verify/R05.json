@@ -1,0 +1,59 @@
+{
+  "id": "R05",
+  "title": "Centralized Email Config (app_config)",
+  "route": "`library.email-content` (task) \u00b7 impl: built (E2E-1)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.email-content got=library.email-content OK",
+    "job=complete",
+    "emailed=True to=eric@agileadtesting.com subject=R05: Centralized Email Config Test err=None"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Send me an email report with this content:\n\n  # Centralized Email Test\n\n  This test verifies that the hub reads recipient_email from the app_config table in Supabase.\n\n  Use subject line \"R05: Centralized Email Config Test\""
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Sending your email report now.",
+        "tool": "library",
+        "op": "email-content",
+        "data": null,
+        "job_id": "1413edd56d8f4b4ead36a57e9d5811be",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "1413edd56d8f4b4ead36a57e9d5811be",
+        "status": "complete",
+        "result": {
+          "execution_id": "86a9c217-0b6a-4cf9-b65d-e7cb41a17b38",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "email-content",
+            "result": {
+              "emailed": true,
+              "to": "eric@agileadtesting.com",
+              "subject": "R05: Centralized Email Config Test",
+              "content_type": "inline"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Send me an email report with this content:\n\n  # Centralized Email Test\n\n  This test verifies that the hub reads recipient_email from the app_config table in Supabase.\n\n  Use subject line \"R05: Centralized Email Config Test\""
+    }
+  ],
+  "expected": [
+    "routes to `library.email-content`, kind=queued; job reaches status=complete",
+    "Email arrives at the address stored in `app_config.recipient_email` in DEV Supabase",
+    "If `bcc_email` is set, BCC recipient also receives the email",
+    "No hardcoded email addresses used \u2014 all pulled from DEV Supabase app_config"
+  ]
+}

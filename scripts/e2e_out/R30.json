@@ -1,0 +1,501 @@
+{
+  "test": {
+    "id": "R30",
+    "prompt": "Brainstorm a post-apocalyptic story called \"The Seed Vault\" about the last seed bank on Earth and the botanist who must protect it. 8 chapters."
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing a new story brainstorm for \"The Seed Vault\" \u2014 I'll let you know when the outline is ready.",
+    "tool": "brainstorm",
+    "op": "story",
+    "data": null,
+    "job_id": "7241bbbc578747d883ac9c1884081752",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "7241bbbc578747d883ac9c1884081752",
+    "status": "complete",
+    "result": {
+      "execution_id": "2452a5b1-8052-4354-9e4a-8ed19775ab48",
+      "step_name": "brainstorm",
+      "status": "ok",
+      "payload": {
+        "op": "story",
+        "result": {
+          "outline": {
+            "title": "The Seed Vault",
+            "premise": "Ten years after a engineered blight wiped out 90% of the world's crop species, a former agricultural geneticist and a hardened vault security chief must fight through a collapsed civilization to reach the Svalbard Global Seed Vault \u2014 the last repository of viable seed stock \u2014 before a well-organized faction of survivors seizes it to control who eats and who starves in the new world.",
+            "themes": [
+              "Who controls food controls humanity",
+              "The cost of survival versus the price of conscience",
+              "Knowledge as both weapon and salvation",
+              "Institutional collapse and the people who fill the vacuum",
+              "What we owe the future versus what we owe the living"
+            ],
+            "story_arc_name": "The Road to Svalbard",
+            "dramatic_question": "Can geneticist Mara Voss and vault chief Erik Strand reach the Svalbard Seed Vault and open it to all survivors before the Covenant faction locks it down and uses it to enslave the remnant world?",
+            "wow_factor": "Every chapter contains accurate, procedurally correct detail about real seed-preservation science \u2014 cryogenics, germination protocols, genetic diversity thresholds \u2014 so the reader learns, in correct technical detail, exactly how the last food on Earth works and why losing it means permanent extinction, making the vault itself feel like a ticking biological bomb.",
+            "characters": [
+              {
+                "name": "Mara Voss",
+                "role": "Protagonist / POV 1",
+                "archetype": "The scientist who must become a fighter",
+                "off_axis_attribute": "She is brilliant at reading plant genetics but catastrophically bad at reading people \u2014 she trusts data over instinct and has been wrong about humans in ways that have already cost lives, a wound she carries without admitting.",
+                "dramatic_question": "Can Mara use her scientific knowledge to open the vault for all of humanity without becoming the kind of ruthless operator she despises?",
+                "description": "Late 30s, former CGIAR crop geneticist who helped design the blight-resistant protocols that failed. She carries a battered field notebook filled with germination data and a private guilt she has never spoken aloud: she believes her own lab's security breach allowed the blight to be weaponized. Outside the plot she kept bees, argued about football with her sister, and read Victorian novels for comfort. She is terrified of being responsible for another mass death. She would be humiliated by being proven complicit in the blight. She is made happy by the smell of soil after rain."
+              },
+              {
+                "name": "Erik Strand",
+                "role": "Deuteragonist / POV 2",
+                "archetype": "The hardened security chief with a buried conscience",
+                "off_axis_attribute": "He is physically fearless and tactically brilliant but is secretly phobic about confined underground spaces \u2014 the vault he is supposed to protect is buried 130 metres into a mountain, and he has never told anyone.",
+                "dramatic_question": "Can Erik protect Mara and the vault without reverting to the authoritarian methods he used before the collapse, which he knows made him a monster?",
+                "description": "Mid 40s, former Norwegian special forces, then Svalbard Vault security director for eight years before the blight. He evacuated the vault staff and sealed it alone when the collapse came. He plays chess against himself, carves small wooden animals he gives away immediately, and has a running mental argument with his dead commanding officer about proportional force. He is terrified of being buried alive. He would be humiliated by showing fear in front of people depending on him. He is made happy by open sky and cold wind."
+              },
+              {
+                "name": "Covenant Director Signe Dahl",
+                "role": "Primary Antagonist / POV 3",
+                "archetype": "The idealist who became a tyrant",
+                "off_axis_attribute": "She genuinely believes she is saving humanity and keeps a meticulous journal of every hard decision she makes \u2014 not to justify herself to others but because she is afraid she will stop feeling the weight of them.",
+                "dramatic_question": "Will Signe's conviction that controlled distribution is the only path to survival survive contact with what she must actually do to enforce it?",
+                "description": "Early 50s, former Norwegian Minister of Agriculture, now leader of the Covenant \u2014 a disciplined faction of former government officials, military, and agri-corporations who believe rationed seed access is the only way to prevent war over food. She is not cruel by nature; she is a bureaucrat who has decided that paperwork and process no longer exist and that she must be the process. She was a competitive orienteer before the collapse. She is terrified of chaos \u2014 specifically of watching people starve in a mob rather than in an orderly queue. She would be humiliated by being shown that her order has produced the same death toll as chaos, just tidier."
+              },
+              {
+                "name": "Tom\u00e1s Reyes",
+                "role": "Major Supporting / occasional close-third POV",
+                "archetype": "The morally compromised guide",
+                "off_axis_attribute": "He is the most competent wilderness survivor in the group but he is working a private deal with the Covenant \u2014 not out of ideology but because they have his daughter \u2014 and every scene he is in is shadowed by this secret.",
+                "dramatic_question": "Will Tom\u00e1s betray Mara and Erik to save his daughter, or find a third path that costs him everything?",
+                "description": "Late 30s, former Spanish agricultural aid worker who was in Norway when the blight hit. He knows the collapsed infrastructure routes from Bergen to Longyearbyen better than anyone alive. He cooks obsessively when stressed, making elaborate meals from almost nothing. His daughter Lucia is eight years old and held in a Covenant settlement in Troms\u00f8."
+              },
+              {
+                "name": "Dr. Priya Anand",
+                "role": "Major Supporting",
+                "archetype": "The keeper of the technical knowledge",
+                "off_axis_attribute": "She is the world's foremost expert on seed viability protocols and she is slowly going blind from a degenerative condition she has been treating with improvised medication \u2014 she has not told Mara because she fears being left behind.",
+                "dramatic_question": "Can Priya contribute her irreplaceable knowledge before her sight fails entirely, and will she tell the truth in time to matter?",
+                "description": "Mid 40s, former CGIAR colleague of Mara's, currently sheltering in a survivor commune in Troms\u00f8. She has memorized the vault's access protocols and germination sequencing from years of working with the original Norwegian Crop Research Institute. She hums film scores when she is frightened."
+              },
+              {
+                "name": "Commander Rolf Haug",
+                "role": "Antagonist Lieutenant / POV 4 (limited)",
+                "archetype": "The soldier who enforces orders he has stopped believing in",
+                "off_axis_attribute": "He is the Covenant's most effective field commander and he has begun secretly releasing seed packets to starving settlements off the official distribution list \u2014 small acts of sabotage against his own organization that he cannot stop doing.",
+                "dramatic_question": "Will Rolf's private defiance grow into open rebellion, or will he be destroyed by the Covenant before it can?",
+                "description": "Late 40s, former Norwegian Army colonel, now Signe Dahl's operational enforcer. He is the one who actually runs the Covenant's armed convoys and settlement enforcement. He was a devoted amateur beekeeper before the collapse \u2014 a detail that creates an unexpected bond with Mara when they finally meet."
+              },
+              {
+                "name": "Astrid Voss",
+                "role": "Supporting \u2014 Mara's sister",
+                "archetype": "The civilian survivor who represents what is at stake",
+                "off_axis_attribute": "She has become the de facto leader of a Bergen survivor settlement through sheer stubbornness and a talent for negotiation, but she is dying of a treatable infection and refuses to tell Mara because she does not want to be the reason Mara stops.",
+                "dramatic_question": "Will Astrid survive long enough to see whether her sister's mission succeeds?",
+                "description": "Mid 30s, former secondary school teacher. She is the human anchor that keeps Mara's mission personal rather than abstract. She runs the Bergen commune with a school timetable pinned to the wall and insists on lessons for the children every morning."
+              }
+            ],
+            "chapters": [
+              {
+                "chapter_number": 0,
+                "title": "Prologue: The Day the Fields Went Black",
+                "act": "Act I",
+                "arc_point": "Inciting Wound",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "None \u2014 opening",
+                "beat": "Ten years ago: Mara watches the first satellite images of the blight spreading across the European grain belt and recognizes, with cold horror, a genetic signature she has seen in her own lab's experimental pathogen files. She destroys the evidence before anyone else can see it.",
+                "arc_notes": "Establishes the wound at the heart of the story and Mara's hidden guilt; plants the moral complication that will drive her arc."
+              },
+              {
+                "chapter_number": 1,
+                "title": "Bergen, Year Ten",
+                "act": "Act I",
+                "arc_point": "Ordinary World / Status Quo",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Direct continuation: Mara in present day, living with the consequences of the prologue's choice.",
+                "beat": "Mara runs germination tests on the last viable seed stock in the Bergen commune, discovers the failure rate has crossed 70%, and calculates they have eight months before the commune starves; her sister Astrid dismisses the numbers to keep morale up, and their argument ends with Mara walking out into the rain.",
+                "arc_notes": "Ordinary World \u2014 establishes stakes, setting, and protagonist's core tension between data and human feeling."
+              },
+              {
+                "chapter_number": 2,
+                "title": "The Messenger",
+                "act": "Act I",
+                "arc_point": "Call to Adventure",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Consequence of Ch.1: Mara's germination report has been transmitted by radio to other communes; a stranger arrives having heard it.",
+                "beat": "A half-dead courier arrives in Bergen carrying a sealed message from Dr. Priya Anand in Troms\u00f8: the Svalbard vault is still intact, its seeds still viable, but a faction called the Covenant is moving a convoy north to seize it within sixty days; Priya has the access codes but needs Mara's genetic expertise to operate the vault's sequencing systems.",
+                "arc_notes": "Call to Adventure \u2014 the dramatic question is fully stated for the first time."
+              },
+              {
+                "chapter_number": 3,
+                "title": "What the Vault Holds",
+                "act": "Act I",
+                "arc_point": "Refusal of the Call",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Information from Ch.2: Mara digests Priya's message and its implications.",
+                "beat": "Mara explains to Astrid and the commune council exactly what the Svalbard vault contains \u2014 1.3 million seed varieties, the only genetic library capable of rebuilding world agriculture \u2014 and why opening it to one faction is a death sentence for everyone outside it; the council votes to send her, but Mara hesitates because she knows the journey will likely kill her and she has never told anyone about her role in the blight.",
+                "arc_notes": "Refusal of the Call \u2014 Mara's guilt and fear are dramatized; the vault's contents are explained with technical accuracy."
+              },
+              {
+                "chapter_number": 4,
+                "title": "The Vault Chief",
+                "act": "Act I",
+                "arc_point": "Meeting the Mentor / Threshold Guardian",
+                "pov_character": "Erik Strand",
+                "bridge_from_prior": "Thread: Priya's message named Erik Strand as the only person who can physically open the vault's outer security \u2014 Mara's council has sent a radio signal north; Erik receives it.",
+                "beat": "Erik, living alone in a fortified farmhouse outside Troms\u00f8, receives Mara's radio contact and immediately suspects a trap; he has been watching Covenant scouts for weeks and knows they are already moving; he decides to go to Troms\u00f8 to meet Priya in person before committing to anything.",
+                "arc_notes": "Threshold Guardian introduced \u2014 Erik's claustrophobia hinted at when he describes the vault in clipped, avoidant terms."
+              },
+              {
+                "chapter_number": 5,
+                "title": "Covenant Rising",
+                "act": "Act I",
+                "arc_point": "Antagonist Established",
+                "pov_character": "Signe Dahl",
+                "bridge_from_prior": "Thread: Covenant intelligence has intercepted Bergen's radio transmission about the vault; Signe is briefed.",
+                "beat": "Signe addresses her senior council in their Covenant headquarters in Troms\u00f8, laying out the case for controlled seed distribution with chilling bureaucratic logic; she orders Commander Rolf Haug to accelerate the convoy timeline to forty days and to find and neutralize whoever sent the Bergen transmission.",
+                "arc_notes": "Antagonist's worldview established \u2014 Signe is not a villain but a true believer; the Covenant's organizational strength is shown."
+              },
+              {
+                "chapter_number": 6,
+                "title": "Tom\u00e1s",
+                "act": "Act I",
+                "arc_point": "Assembling the Team",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: Mara is traveling north from Bergen; she is ambushed by a road gang and rescued by Tom\u00e1s Reyes.",
+                "beat": "Tom\u00e1s pulls Mara out of a roadside ambush with unsettling efficiency and offers to guide her to Troms\u00f8; he is charming, competent, and knows every collapsed bridge and Covenant checkpoint on the route; Mara accepts, not knowing he has already radioed the Covenant to report her location.",
+                "arc_notes": "Assembling the Team \u2014 the traitor is introduced without the reader knowing he is one; Tom\u00e1s's competence is established."
+              },
+              {
+                "chapter_number": 7,
+                "title": "Priya's Condition",
+                "act": "Act I",
+                "arc_point": "Assembling the Team / Complication",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: Mara and Tom\u00e1s arrive in Troms\u00f8; Mara goes directly to Priya.",
+                "beat": "Mara reunites with Priya and is shocked by her deterioration; Priya demonstrates the vault access protocols from memory, her knowledge is flawless, but when she reaches for a document she cannot find it \u2014 her vision is failing; Mara does not yet understand why; Priya insists she can make the journey.",
+                "arc_notes": "Complication introduced \u2014 Priya's hidden condition creates a ticking clock within the team."
+              },
+              {
+                "chapter_number": 8,
+                "title": "Erik in Troms\u00f8",
+                "act": "Act I",
+                "arc_point": "Team Assembled / Crossing the Threshold",
+                "pov_character": "Erik Strand",
+                "bridge_from_prior": "Thread: Erik arrives in Troms\u00f8 the same day as Mara; they meet at Priya's safe house.",
+                "beat": "Erik and Mara's first meeting is hostile \u2014 he thinks she is naive about the Covenant's capabilities, she thinks he is paranoid and obstructionist; they reach a working agreement only when Priya shows them both the vault's seed viability data and Erik realizes the window to act is closing; he agrees to lead them north.",
+                "arc_notes": "Crossing the Threshold \u2014 the team is complete; the journey is formally committed to."
+              },
+              {
+                "chapter_number": 9,
+                "title": "Rolf's Detour",
+                "act": "Act I",
+                "arc_point": "Antagonist Complication",
+                "pov_character": "Rolf Haug",
+                "bridge_from_prior": "Thread: Rolf has been ordered to find Mara; his scouts tracked her to Troms\u00f8 but lost her; he is now at a starving settlement outside Troms\u00f8 where he makes a decision.",
+                "beat": "Rolf diverts a Covenant seed convoy to feed a settlement that is not on the official distribution list; he watches children eat and feels something close to peace; then his radio crackles with Signe's voice asking for his position report, and he lies.",
+                "arc_notes": "Antagonist fracture introduced \u2014 Rolf's private rebellion is shown in action for the first time; his arc toward defection begins."
+              },
+              {
+                "chapter_number": 10,
+                "title": "The Road North",
+                "act": "Act II-A",
+                "arc_point": "Journey Begins / Tests and Allies",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: The group departs Troms\u00f8 on the E6 north; Tom\u00e1s leads.",
+                "beat": "The group moves through the collapsed highway corridor north of Troms\u00f8; Tom\u00e1s navigates them around two Covenant checkpoints with suspicious precision; Mara notices but says nothing; at camp that night she finds a Covenant frequency on Tom\u00e1s's radio and confronts him \u2014 he claims he monitors it for intelligence, and she chooses to believe him.",
+                "arc_notes": "Tests and Allies \u2014 first road obstacle; Mara's flaw (trusting data over instinct) is dramatized when she accepts a plausible lie."
+              },
+              {
+                "chapter_number": 11,
+                "title": "The Finnmark Crossing",
+                "act": "Act II-A",
+                "arc_point": "Tests and Allies",
+                "pov_character": "Erik Strand",
+                "bridge_from_prior": "Thread: The group must cross the Finnmark plateau in deteriorating weather; Erik takes point.",
+                "beat": "A blizzard pins the group in an abandoned reindeer herder's hut for two days; Erik and Mara, forced into close quarters, begin to talk \u2014 she about the science of what the vault holds, he about the eight years he spent alone maintaining it; he does not mention his claustrophobia but she notices he sleeps facing the door.",
+                "arc_notes": "Tests and Allies \u2014 character relationship deepens; vault's contents described in technical detail (wow factor activated)."
+              },
+              {
+                "chapter_number": 12,
+                "title": "Signe's Map",
+                "act": "Act II-A",
+                "arc_point": "Antagonist Advances",
+                "pov_character": "Signe Dahl",
+                "bridge_from_prior": "Thread: Tom\u00e1s has sent a position update to the Covenant; Signe receives it and updates her convoy plan.",
+                "beat": "Signe reviews the Covenant's seed distribution model with her agronomist team \u2014 the model is genuinely impressive, a rational system for rebuilding agriculture across northern Europe \u2014 but it requires exclusive vault access for the first five years; she marks Mara's last known position on the map and orders Rolf to intercept.",
+                "arc_notes": "Antagonist Advances \u2014 Signe's plan is shown to be coherent and even partially sympathetic, raising the moral stakes."
+              },
+              {
+                "chapter_number": 13,
+                "title": "Lucia",
+                "act": "Act II-A",
+                "arc_point": "Ally Complication",
+                "pov_character": "Tom\u00e1s Reyes",
+                "bridge_from_prior": "Thread: Tom\u00e1s receives a Covenant radio message that his daughter Lucia is ill; the message is a pressure tactic.",
+                "beat": "Tom\u00e1s listens to a recorded message of Lucia's voice \u2014 she sounds frightened \u2014 and the Covenant handler tells him that her medicine depends on his continued cooperation; that night he almost leads the group into a Covenant ambush but at the last second redirects them, unable to go through with it; he tells himself he is buying time.",
+                "arc_notes": "Ally Complication \u2014 Tom\u00e1s's betrayal is shown as agonizing rather than villainous; the reader understands his choice even as they fear it."
+              },
+              {
+                "chapter_number": 14,
+                "title": "Alta",
+                "act": "Act II-A",
+                "arc_point": "First Major Obstacle",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: The group reaches Alta, a former Covenant-controlled town; they need supplies.",
+                "beat": "In Alta, Mara attempts to trade germination data for food and medicine and is recognized by a Covenant informant; the group is forced to run, Priya falls and injures her wrist, and in the chaos Mara's field notebook \u2014 containing her private germination records and the evidence of her lab's role in the blight \u2014 is left behind in the market.",
+                "arc_notes": "First Major Obstacle \u2014 the notebook loss is a plot and moral catastrophe; Mara's secret is now potentially findable by the Covenant."
+              },
+              {
+                "chapter_number": 15,
+                "title": "The Notebook",
+                "act": "Act II-A",
+                "arc_point": "Antagonist Gains Leverage",
+                "pov_character": "Signe Dahl",
+                "bridge_from_prior": "Thread: The Covenant informant in Alta recovers Mara's notebook and sends it to Signe.",
+                "beat": "Signe reads Mara's notebook and finds the germination data \u2014 and the older entries that suggest Mara knew the blight pathogen's origin; Signe is not certain what she is reading but she is certain it is leverage; she dictates a message to Mara via radio: surrender to the Covenant or the notebook's contents become public.",
+                "arc_notes": "Antagonist Gains Leverage \u2014 the moral complication at Mara's core is now weaponized by the antagonist."
+              },
+              {
+                "chapter_number": 16,
+                "title": "Mara's Confession",
+                "act": "Act II-A",
+                "arc_point": "Midpoint Approach / Character Revelation",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: Mara receives Signe's radio message; she must now decide whether to tell Erik and Priya the truth.",
+                "beat": "Mara tells Erik and Priya about the lab breach \u2014 that she believes her own security failure allowed the blight pathogen to be stolen and weaponized \u2014 and watches their faces change; Priya is devastated; Erik is silent for a long time and then says: 'Then you owe the world this vault more than any of us.' The group continues north.",
+                "arc_notes": "Character Revelation \u2014 the central moral complication is fully surfaced; Erik's response reframes Mara's guilt as obligation rather than disqualification."
+              },
+              {
+                "chapter_number": 17,
+                "title": "Rolf's Disobedience",
+                "act": "Act II-A",
+                "arc_point": "Antagonist Fracture Deepens",
+                "pov_character": "Rolf Haug",
+                "bridge_from_prior": "Thread: Rolf has been ordered to intercept Mara's group; instead he has been distributing seeds off-list; Signe summons him by radio.",
+                "beat": "Rolf is confronted by Signe via radio about the unauthorized distributions; he lies smoothly and she accepts it, but her deputy has been tracking the discrepancies; Rolf realizes he has perhaps two weeks before he is arrested; he begins to think about what it would mean to switch sides.",
+                "arc_notes": "Antagonist Fracture Deepens \u2014 Rolf's arc toward defection accelerates; the Covenant's internal tension is established."
+              },
+              {
+                "chapter_number": 18,
+                "title": "The Crossing to Svalbard",
+                "act": "Act II-A",
+                "arc_point": "Point of No Return",
+                "pov_character": "Erik Strand",
+                "bridge_from_prior": "Thread: The group reaches Longyearbyen's mainland ferry point at Troms\u00f8 harbor; Erik has arranged a boat.",
+                "beat": "The group boards a small fishing vessel for the 1,000-kilometer Arctic crossing to Svalbard; mid-crossing, a Covenant patrol boat intercepts them; Erik bluffs their way through using old vault authority credentials he has kept; the patrol boat lets them pass but radios their position; the clock is now running in hours, not days.",
+                "arc_notes": "Point of No Return \u2014 the group is committed; the Covenant knows their position and destination."
+              },
+              {
+                "chapter_number": 19,
+                "title": "Svalbard",
+                "act": "Act II-B",
+                "arc_point": "Approach to the Inmost Cave",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: The boat arrives at Longyearbyen; the vault is visible in the mountainside above the town.",
+                "beat": "Mara sees the vault entrance for the first time \u2014 a concrete wedge jutting from the mountain, surrounded by permafrost and silence \u2014 and feels the full weight of what is inside it; the town of Longyearbyen is abandoned and partially burned; they find evidence that a Covenant advance team arrived two days ago and left, suggesting they are waiting for the main convoy.",
+                "arc_notes": "Approach to the Inmost Cave \u2014 the vault is physically established; the enemy has already been here."
+              },
+              {
+                "chapter_number": 20,
+                "title": "Inside the Mountain",
+                "act": "Act II-B",
+                "arc_point": "Ordeal Begins / Erik's Fear",
+                "pov_character": "Erik Strand",
+                "bridge_from_prior": "Thread: The group enters the vault access tunnel; Erik leads.",
+                "beat": "Erik opens the outer security doors using his biometric credentials and leads the group into the 130-metre tunnel; 60 metres in, his claustrophobia hits him like a physical blow \u2014 he stops, cannot breathe, cannot move forward; Mara sees it and quietly takes his hand and talks him through it, step by step, using the same calm voice she uses when explaining germination protocols.",
+                "arc_notes": "Ordeal Begins \u2014 Erik's hidden fear is dramatized; Mara's care for him shifts their relationship; the vault's physical reality is described in accurate detail."
+              },
+              {
+                "chapter_number": 21,
+                "title": "The Seed Library",
+                "act": "Act II-B",
+                "arc_point": "Ordeal / The Inmost Cave",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: The group reaches the inner vault chambers.",
+                "beat": "Mara enters the seed storage chambers at minus 18 degrees Celsius and confronts 1.3 million seed varieties in their foil packets \u2014 the entire genetic heritage of human agriculture \u2014 and begins the viability assessment; Priya assists but knocks over a tray she should have seen; Mara finally understands Priya's vision is nearly gone and the confrontation is devastating.",
+                "arc_notes": "Inmost Cave \u2014 the vault's contents are described in technical wonder; Priya's secret is exposed; the team faces a new crisis."
+              },
+              {
+                "chapter_number": 22,
+                "title": "Priya's Truth",
+                "act": "Act II-B",
+                "arc_point": "New Dramatic Problem",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: Direct continuation of Ch.21 confrontation.",
+                "beat": "Priya admits she has been nearly blind for three months and has been operating from memory; she has memorized the entire vault protocol sequence and can still direct Mara verbally, but she cannot physically operate the sequencing equipment; Mara must now learn in hours what Priya spent years mastering, while Priya dictates from a chair in the dark.",
+                "arc_notes": "New Dramatic Problem \u2014 the team's technical capability is halved; the solution requires Mara to trust Priya's voice over her own eyes, inverting her usual data-over-instinct flaw."
+              },
+              {
+                "chapter_number": 23,
+                "title": "Tom\u00e1s Breaks",
+                "act": "Act II-B",
+                "arc_point": "Betrayal / Crisis",
+                "pov_character": "Tom\u00e1s Reyes",
+                "bridge_from_prior": "Thread: Tom\u00e1s has been outside the vault monitoring the radio; he receives a new message about Lucia.",
+                "beat": "The Covenant tells Tom\u00e1s that Lucia has been moved to the vault convoy and will arrive with Signe in 36 hours \u2014 his daughter is now a hostage on the way to the vault; Tom\u00e1s transmits the vault's inner access status to the Covenant, then immediately regrets it and smashes the radio; he goes back inside and confesses to Erik.",
+                "arc_notes": "Betrayal \u2014 the traitor arc resolves not in clean villainy but in anguished self-sabotage; the group's security is now compromised."
+              },
+              {
+                "chapter_number": 24,
+                "title": "Erik's Verdict",
+                "act": "Act II-B",
+                "arc_point": "Team Crisis / Adaptation",
+                "pov_character": "Erik Strand",
+                "bridge_from_prior": "Thread: Direct continuation \u2014 Erik hears Tom\u00e1s's confession.",
+                "beat": "Erik's first instinct is to expel Tom\u00e1s; Mara argues that Tom\u00e1s's knowledge of Covenant convoy routes is now their most valuable asset and that his daughter being on the convoy changes the tactical picture entirely; Erik overrules his own instinct and keeps Tom\u00e1s, but takes his weapons; the group adapts their plan: they must open and distribute the vault before the convoy arrives.",
+                "arc_notes": "Adaptation \u2014 the team's plan must fundamentally change; Mara's argument wins, showing her growth in reading people."
+              },
+              {
+                "chapter_number": 25,
+                "title": "The Distribution Protocol",
+                "act": "Act II-B",
+                "arc_point": "New Plan / Rising Action",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: The group begins executing the new plan \u2014 open the vault and begin distribution before the Covenant arrives.",
+                "beat": "Mara and Priya work through the night on the germination sequencing protocol \u2014 Priya dictating, Mara executing \u2014 and produce a distribution manifest: which seed varieties go to which climate zones, in what quantities, with what germination instructions; it is the most important document in the world and Mara writes it by hand because the vault's printer is dead.",
+                "arc_notes": "Rising Action \u2014 the technical heart of the novel; the distribution protocol is described with accurate agricultural science."
+              },
+              {
+                "chapter_number": 26,
+                "title": "Rolf Defects",
+                "act": "Act II-B",
+                "arc_point": "Antagonist Fracture Resolves",
+                "pov_character": "Rolf Haug",
+                "bridge_from_prior": "Thread: Rolf is on the Covenant convoy heading to Svalbard; he has learned Lucia is aboard; he makes his decision.",
+                "beat": "Rolf approaches Lucia on the convoy ship and tells her quietly that her father is at the vault and that he is going to try to get her to him; he then goes to the convoy's communications officer and, using his command authority, sends a false position report that will delay the convoy's arrival by twelve hours; he has now committed treason against the Covenant.",
+                "arc_notes": "Antagonist Fracture Resolves \u2014 Rolf's arc completes its turn; the twelve-hour delay is the gift that makes the climax possible."
+              },
+              {
+                "chapter_number": 27,
+                "title": "Signe's Doubt",
+                "act": "Act II-B",
+                "arc_point": "Antagonist Humanized / Darkest Hour Approach",
+                "pov_character": "Signe Dahl",
+                "bridge_from_prior": "Thread: Signe is on the same convoy; she has been reading Mara's notebook more carefully.",
+                "beat": "Signe reads the older entries in Mara's notebook and realizes the blight pathogen's genetic signature matches a Covenant-affiliated agri-corporation's research program \u2014 not Mara's lab; Mara may have been wrong about her own guilt; Signe closes the notebook and sits with this for a long time, then writes in her own journal: 'If I am wrong about the origin, what else am I wrong about?'",
+                "arc_notes": "Antagonist Humanized \u2014 Signe's certainty cracks; the moral landscape shifts; Mara's guilt may be misplaced."
+              },
+              {
+                "chapter_number": 28,
+                "title": "Darkest Hour",
+                "act": "Act II-B",
+                "arc_point": "Darkest Hour",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: Inside the vault, the distribution manifest is nearly complete; then the vault's backup power fails.",
+                "beat": "The vault's emergency power system, running on decade-old batteries, fails at 3 a.m.; the temperature begins to rise; Mara calculates they have six hours before seed viability begins to degrade; Erik goes outside into the Arctic night to find the external generator, alone, in the dark, and Mara realizes she is terrified of losing him.",
+                "arc_notes": "Darkest Hour \u2014 physical and emotional crisis converge; the vault itself is now at risk; Mara's feelings for Erik are acknowledged."
+              },
+              {
+                "chapter_number": 29,
+                "title": "The Generator",
+                "act": "Act II-B",
+                "arc_point": "Darkest Hour Continues",
+                "pov_character": "Erik Strand",
+                "bridge_from_prior": "Thread: Direct continuation \u2014 Erik outside in the Arctic dark.",
+                "beat": "Erik finds the external generator housing buried under a snowdrift, clears it, and gets it running \u2014 but the fuel line has cracked and he must hold it manually in minus 30 degrees while Mara, guided by Priya's voice over a hand radio, reroutes the internal power circuit; it takes two hours; Erik's hands are frostbitten when he comes back inside.",
+                "arc_notes": "Darkest Hour Continues \u2014 physical cost is paid; the vault is saved but Erik is damaged; the team's bonds are tested and hold."
+              },
+              {
+                "chapter_number": 30,
+                "title": "Dawn Inventory",
+                "act": "Act III",
+                "arc_point": "Climax Approach",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: Power restored; the group has a few hours before the convoy arrives.",
+                "beat": "Mara completes the distribution manifest and packages the first seed consignments for the network of communes Priya has pre-identified; she and Tom\u00e1s load a snowmobile with the first distribution run; Erik, hands bandaged, monitors the radio and reports the Covenant convoy is four hours out \u2014 Rolf's delay worked, but barely.",
+                "arc_notes": "Climax Approach \u2014 the plan is in motion; the race is now explicit and timed."
+              },
+              {
+                "chapter_number": 31,
+                "title": "The Convoy Arrives",
+                "act": "Act III",
+                "arc_point": "Climax",
+                "pov_character": "Signe Dahl",
+                "bridge_from_prior": "Thread: Signe's convoy reaches Longyearbyen; she goes directly to the vault.",
+                "beat": "Signe arrives at the vault to find the outer doors open and Mara waiting for her alone; Mara has sent Erik, Priya, and Tom\u00e1s away with the first seed distribution; she faces Signe with the distribution manifest in her hand and offers it to her \u2014 not as surrender but as partnership; Signe reads it and sees that Mara's system is more sophisticated than the Covenant's own plan.",
+                "arc_notes": "Climax \u2014 the confrontation is intellectual and moral, not physical; the dramatic question reaches its crisis point."
+              },
+              {
+                "chapter_number": 32,
+                "title": "The Choice",
+                "act": "Act III",
+                "arc_point": "Climax Resolution",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: Direct continuation of the confrontation between Mara and Signe.",
+                "beat": "Signe tells Mara about the agri-corporation connection to the blight \u2014 Mara's guilt may be wrong \u2014 and then asks: will Mara accept Covenant oversight of distribution in exchange for Signe endorsing the open manifest? Mara refuses oversight but proposes a joint council; Signe, her certainty broken by her own journal entry, agrees; Rolf arrives with Lucia and hands her to Tom\u00e1s; the vault is opened to the world.",
+                "arc_notes": "Climax Resolution \u2014 the dramatic question is answered: the vault is opened to all, not seized by one; the resolution costs both women something."
+              },
+              {
+                "chapter_number": 33,
+                "title": "What It Costs",
+                "act": "Act III",
+                "arc_point": "Falling Action / Consequences",
+                "pov_character": "Erik Strand",
+                "bridge_from_prior": "Thread: Erik returns to the vault after the first distribution run and learns what happened.",
+                "beat": "Erik learns that Signe's Covenant will sit on the joint distribution council \u2014 the organization he has spent a year fighting will have a seat at the table; he is furious, then slowly understands that Mara has done what he could not: found a way to use the enemy rather than destroy them; his frostbitten hands are treated by the Covenant's medic, the first time he has accepted help from them.",
+                "arc_notes": "Falling Action \u2014 Erik's arc resolves; his authoritarian instinct is finally surrendered."
+              },
+              {
+                "chapter_number": 34,
+                "title": "Priya's Last Protocol",
+                "act": "Act III",
+                "arc_point": "Subplot Resolution",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: With the vault secured, Mara returns to Priya.",
+                "beat": "Priya, now fully blind, dictates the complete vault protocol from memory to three scribes simultaneously \u2014 Covenant agronomists and Mara's own people working side by side \u2014 ensuring the knowledge exists in multiple hands; when she finishes she says: 'Now I can stop remembering so hard.' Mara holds her hand.",
+                "arc_notes": "Subplot Resolution \u2014 Priya's arc completes; her sacrifice of sight is honored; the knowledge is distributed before the climactic scene so the ending is not cluttered."
+              },
+              {
+                "chapter_number": 35,
+                "title": "Astrid",
+                "act": "Act III",
+                "arc_point": "Subplot Resolution",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: A radio message from Bergen arrives; it is about Astrid.",
+                "beat": "Mara learns that Astrid's infection has worsened critically; the Covenant convoy carries antibiotics; Signe, without being asked, orders them released to Bergen; Astrid receives treatment in time; Mara learns for the first time that her sister has been dying and did not tell her, and understands that Astrid's silence was the same gift as her own mission \u2014 protecting the other from stopping.",
+                "arc_notes": "Subplot Resolution \u2014 Astrid's arc resolves before the epilogue; the thematic mirror between the sisters is made explicit."
+              },
+              {
+                "chapter_number": 36,
+                "title": "Rolf's Reckoning",
+                "act": "Act III",
+                "arc_point": "Subplot Resolution",
+                "pov_character": "Rolf Haug",
+                "bridge_from_prior": "Thread: Signe must decide what to do with Rolf's treason.",
+                "beat": "Signe formally charges Rolf with insubordination and then immediately suspends the charge, appointing him instead as the joint council's field distribution officer \u2014 the person best suited to the job of getting seeds to the settlements he has already been secretly feeding; Rolf accepts, and for the first time in years does not feel like a liar.",
+                "arc_notes": "Subplot Resolution \u2014 Rolf's arc completes; his private defiance becomes his official role."
+              },
+              {
+                "chapter_number": 37,
+                "title": "Tom\u00e1s and Lucia",
+                "act": "Act III",
+                "arc_point": "Subplot Resolution",
+                "pov_character": "Tom\u00e1s Reyes",
+                "bridge_from_prior": "Thread: Tom\u00e1s has Lucia; he must decide whether to stay or go.",
+                "beat": "Tom\u00e1s tells Mara the full truth of his betrayal \u2014 every radio message, every near-miss \u2014 and waits for her judgment; Mara says: 'You almost got us killed and you saved us anyway. That's the most human thing I've heard in ten years.' Tom\u00e1s stays to help with the first southern distribution run, Lucia beside him.",
+                "arc_notes": "Subplot Resolution \u2014 Tom\u00e1s's arc resolves with forgiveness that is earned rather than cheap."
+              },
+              {
+                "chapter_number": 38,
+                "title": "Epilogue: The First Planting",
+                "act": "Act III",
+                "arc_point": "Resolution",
+                "pov_character": "Mara Voss",
+                "bridge_from_prior": "Thread: Six months later; the first seeds from the vault have been distributed and planted.",
+                "beat": "Mara stands in a field outside Bergen and watches the first green shoots push through soil that has been dead for ten years; Astrid stands beside her, recovered; Erik is somewhere behind her \u2014 she can hear him carving; the joint council's first report sits in her pocket, imperfect and contested and alive; she does not know if she has been forgiven for the blight, but she knows the world is eating again.",
+                "arc_notes": "Resolution \u2014 the dramatic question is fully answered; the ending is earned and open; the wow factor (seed science as salvation) is given its final image."
+              }
+            ]
+          },
+          "persist": {
+            "persisted": false,
+            "reason": "persist requested but project_id/user_id missing"
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

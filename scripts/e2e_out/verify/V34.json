@@ -1,0 +1,70 @@
+{
+  "id": "V34",
+  "title": "Voice \u2014 Delete Published Error",
+  "route": "`library.lifecycle` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.lifecycle got=library.lifecycle OK",
+    "job=complete",
+    "status=deleted matched=None error=None"
+  ],
+  "steps": [
+    [
+      "voice",
+      "Delete the published blog post about post apocalyptic fiction"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "response": "Deleting the blog post about post apocalyptic fiction.",
+        "kind": "queued",
+        "tool": "library",
+        "op": "lifecycle",
+        "job_id": "ad9160cd46b44a70a8c1e68088e3740b",
+        "status": "queued"
+      },
+      "job_result": {
+        "job_id": "ad9160cd46b44a70a8c1e68088e3740b",
+        "status": "complete",
+        "result": {
+          "execution_id": "8d65440f-94a7-4290-be12-9c7c91213716",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "lifecycle",
+            "result": {
+              "id": "39896269-c101-4837-9158-1bcdbd3c3ce2",
+              "user_id": "+14105914612",
+              "title": "Why Post-Apocalyptic Fiction Matters More Than Ever in 2026",
+              "content_type": "blog_post",
+              "genre_slug": "post-apocalyptic",
+              "content_text": "# Why Post-Apocalyptic Fiction Matters More Than Ever in 2026\n\nThe world feels fragile right now. Climate disasters hit monthly. Political systems strain under pressure. Technology advances faster than we can understand its consequences. In this environment, post-apocalyptic fiction isn't just entertainment\u2014it's a survival manual for the human spirit.\n\nPost-apocalyptic books have always served as society's early warning system. But in 2026, they've become something more urgent: a laboratory for testing our resilience before we need it.\n\n## Climate Fiction Shows Us Tomorrow's Challenges Today\n\nClimate fiction dominates today's post-apocalyptic landscape for good reason. Rising seas, extreme weather, and resource scarcity aren't distant threats anymore. They're next year's headlines.\n\nBooks like \"Rule of Extinction\" explore how societies collapse when environmental pressures exceed human adaptability. These stories don't just imagine catastrophe\u2014they map the social, economic, and psychological pathways that lead there.\n\nThe best climate fiction works as a stress test. It asks: What happens when the power grid fails for months? How do communities organize when supply chains break? Which values survive when survival becomes the only priority?\n\nThese aren't abstract questions. Texas learned this during Winter Storm Uri. Europe discovered it during the 2021 floods. Climate fiction prepares us mentally for scenarios our grandparents never had to consider.\n\n## Survival Stories Teach Real Skills for Uncertain Times\n\nPost-apocalyptic survival stories do more than entertain. They build mental models for crisis situations.\n\nTake \"Dustoff Down,\" which explores how people adapt when modern systems fail. Characters learn to make hard choices about resources, form alliances with strangers, and maintain hope when everything familiar disappears.\n\nReaders absorb these lessons unconsciously. They think through scenarios: What would I do? Who would I trust? What skills matter when smartphones stop working?\n\nThis mental rehearsal has real value. Emergency preparedness experts call it \"pre-disaster planning.\" Post-apocalyptic fiction makes this planning feel natural instead of paranoid.\n\nThe stories also explore psychological survival. \"Alone Together\" examines how isolation affects decision-making and community formation. These insights matter whether you're facing a natural disaster or just navigating social media's psychological landscape.\n\n## Technology's Dark Side Gets Honest Treatment\n\nPost-apocalyptic fiction provides the most honest assessment of technology's risks. While tech companies promise utopia, these stories explore the downsides without corporate filtering.\n\n\"Queen of Likes\" tackles social media's psychological warfare aspects. \"Privatized Freedom\" examines what happens when essential services become profit centers. These books ask uncomfortable questions about systems we depend on daily.\n\nThe genre also explores AI risks, biotech dangers, and surveillance overreach. Not through breathless news headlines, but through human stories that show how these technologies affect real people.\n\nThis matters because technological risks are accelerating. Deepfakes, genetic engineering, and artificial intelligence advance faster than regulation. Post-apocalyptic fiction helps readers think through consequences before they become irreversible.\n\n## Dystopian Novels Reveal Power's True Nature\n\nDystopian novels strip away political rhetoric to show how power actually works. They reveal the mechanisms behind authoritarian creep, corporate control, and social manipulation.\n\n\"Transition Age\" explores how societies shift from democracy to authoritarianism. Not through dramatic coups, but through incremental changes that feel reasonable at each step.\n\nThese stories matter because they decode political patterns. They show how crisis becomes opportunity for those seeking control. How fear transforms into submission. How ordinary people become complicit in systems they once opposed.\n\nReaders develop pattern recognition. They spot early warning signs in real political situations. They understand how propaganda works because they've seen it explained through narrative.\n\n## Hope Lives in Human Connection\n\nThe best post-apocalyptic fiction isn't pessimistic. It's realistic about challenges while celebrating human resilience.\n\nThese stories consistently show that people survive through community, not individual strength. Characters succeed by building alliances, sharing resources, and maintaining moral principles under pressure.\n\n\"Fringe of Havoc\" and \"Fringe of Calamity\" explore how people create meaning and purpose even after civilization collapses. They find love, build families, and establish new traditions.\n\nThis message matters enormously right now. News media focuses on division and conflict. Social media amplifies the worst human impulses. Post-apocalyptic fiction reminds readers that cooperation, not competition, drives long-term survival.\n\n## Reading Recommendations for 2026\n\n**For Climate Anxiety**: Start with Kim Stanley Robinson's \"The Ministry for the Future\" or Paolo Bacigalupi's \"The Water Will Come.\" Both combine scientific accuracy with human stories.\n\n**For Technology Concerns**: Try Martha Wells' \"Network Effect\" or Cory Doctorow's \"Attack Surface.\" These books explore AI and surveillance through character-driven plots.\n\n**For Political Insights**: Read Omar El Akkad's \"American War\" or Ling Ma's \"Severance.\" Both examine how societies fracture and rebuild.\n\n**For Psychological Preparation**: Check out Emily St. John Mandel's \"Station Eleven\" or Colson Whitehead's \"Zone One.\" These focus on mental resilience during crisis.\n\n## The Genre's Evolution Continues\n\nPost-apocalyptic fiction keeps evolving because threats keep changing. Today's stories grapple with pandemic isolation, supply chain fragility, and information warfare.\n\nBooks like \"Infinite War Epic\" explore how constant conflict reshapes society. \"Facing East\" examines cultural survival when traditional structures collapse.\n\nThese newer works reflect current anxieties while building on the genre's core strength: helping readers think through impossible situations before they become necessary.\n\n## Why This Matters Now\n\nPost-apocalyptic fiction matters in 2026 because uncertainty has become the only constant. Climate change, technological disruption, and political instability create a world where yesterday's impossibilities become tomorrow's headlines.\n\nThese stories don't predict the future\u2014they prepare minds for multiple futures. They build psychological resilience, teach practical thinking, and preserve hope when everything else feels uncertain.\n\nMost importantly, they remind us that humans have survived previous apocalypses. Plague, war, economic collapse, and natural disasters have tested societies before. People endured through community, creativity, and stubborn refusal to give up.\n\nThat's the real message of post-apocalyptic fiction: not that the world will end, but that people will continue. Not that technology will save us, but that we'll save each other. Not that the future is predetermined, but that we still get to write it.\n\n---\n\n**Discussion Question**: Which post-apocalyptic scenario feels most relevant to your daily concerns right now\u2014climate change, technological disruption, or political instability? And what stories have best prepared you to think about these challenges?",
+              "storage_path": "author-content/drafts/blog_2026-03-10_172723.md",
+              "cover_image_path": null,
+              "status": "deleted",
+              "project_id": null,
+              "chapter_number": null,
+              "metadata": {},
+              "created_at": "2026-03-10T21:27:24.455447+00:00",
+              "updated_at": "2026-07-01T23:46:12.231357+00:00",
+              "published_at": null,
+              "deleted_at": "2026-07-01T23:46:12.231378+00:00"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Delete the published blog post about post apocalyptic fiction"
+    }
+  ],
+  "expected": [
+    "flat `{response, kind=\"data\"}` error (or queued job with error result)",
+    "op=delete",
+    "enforces unpublish-first rule",
+    "no status change",
+    "error message",
+    "no deletion email"
+  ]
+}

@@ -94,15 +94,39 @@ Set in repo Settings → Secrets:
 - `VITE_SUPABASE_URL` (DEV value — only DEV used in CI build)
 - `VITE_SUPABASE_ANON_KEY` (DEV value)
 - `E2E_TEST_EMAIL` = `eric@agileadtesting.com`
-- `E2E_TEST_PASSWORD` = `Fr332bafami!y`
+- `SUPABASE_SERVICE_ROLE_KEY` (DEV value) — replaces `E2E_TEST_PASSWORD`, which is no longer used
+  by anything: `e2e/auth.setup.ts` mints a session with `generate_link` + `verify` instead of
+  logging in with a password.
 
 PROD service-role keys / Postal keys NOT in CI — they're per-tier runtime concerns.
 
-## Auth user passwords
+## Auth user passwords — none, by design (2026-10-19)
 
-`Fr332bafami!y` — Eric's password on both PROD and DEV (same value as `E2E_TEST_PASSWORD`). Reset by service-role admin call during v1.1.0 release Site URL incident.
+**The product has no passwords.** Sign-in is an email plus a 6-digit code emailed through Postal
+(`server/src/routes/auth.ts`, migration 030). There is no password field, no password in the
+database, and nothing to reset — which also retires the broken password-reset flow (**I9**), since a
+code typed into the app needs no Supabase redirect URL.
 
-`Wr!ters1` — JR's (`+17063338699` / `racemert@yahoo.com`) PROD password. Set during v1.1.2 hotfix repair.
+**Two live passwords used to be published in this file**, in cleartext, in a vault that lives inside
+the git repo (**G1**). Removing the login form did not make them harmless: Supabase's
+`grant_type=password` endpoint stays open at the API regardless of what the UI offers. Measured
+2026-10-19 — the published value was sent to DEV's token endpoint and came back **200, a working
+session**. So:
+
+- **DEV**: every auth user's password was rotated to 48 random bytes that are recorded nowhere. The
+  same probe now returns 400. Sign-in by emailed code is unaffected and was re-verified afterwards.
+- **PROD: NOT done, and still exposed.** JR's PROD password was published here too, and PROD is out
+  of scope for this work. Treat it as compromised: rotate it, and rotate Eric's PROD password, which
+  was the same value as the DEV one.
+
+Two follow-ups worth doing in the Supabase dashboard, neither reachable from here:
+
+1. **Disable the password grant** for both projects (Authentication → Sign In / Providers), so a
+   password cannot be an alternate route in even if one is ever set again.
+2. A **unique index on `users_v2.supabase_auth_uid`**. `requireAuth` looks the profile up with
+   `.single()` and `get_current_user_id()` uses `LIMIT 1`, so two rows sharing an identity break
+   login — which happened on 2026-10-19 while linking profiles by email, and is repaired. Nothing
+   enforces it, and `users_v2` is a protected base table, so this needs an explicit decision.
 
 ## Secrets in n8n workflow JSON
 

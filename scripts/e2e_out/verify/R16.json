@@ -1,0 +1,75 @@
+{
+  "id": "R16",
+  "title": "Write Newsletter (political-history)",
+  "route": "`chapter.newsletter` (task) \u00b7 impl: built (E2E-3)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=chapter.newsletter got=chapter.newsletter OK",
+    "job=complete",
+    "newsletter recent=2 word_count=1014 persist=True"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Write a newsletter for the political-history genre. Topic: \"This Month in Political History: Revolutions That Changed the Map\". Genre slug: political-history. Date: 2026-03-10."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Queuing your newsletter for the political-history genre. I'll let you know when it's ready.",
+        "tool": "chapter",
+        "op": "newsletter",
+        "data": null,
+        "job_id": "eeec62c7bdd945e7bb462d071289739b",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "eeec62c7bdd945e7bb462d071289739b",
+        "status": "complete",
+        "result": {
+          "execution_id": "a37c9410-d278-4d75-8696-f29ede6669e6",
+          "step_name": "chapter",
+          "status": "ok",
+          "payload": {
+            "op": "newsletter",
+            "result": {
+              "written": true,
+              "title": "This Month in Political History: Revolutions That Changed the Map",
+              "subject_line": "When Borders Broke: The Revolutions That Redrew the World",
+              "content_text": "_From the Soviet collapse to the Arab Spring, how upheaval becomes cartography._\n\nPick up any political atlas from 1988 and compare it to one from 1995. Whole countries have vanished. New names crowd the index. Borders that looked permanent for decades had simply ceased to exist. Revolutions do many things, they topple leaders, rewrite constitutions, inspire neighbors, but the most dramatic ones change the map itself. This month, we trace three distinct waves of upheaval that did exactly that, and ask what they share beyond the obvious chaos.\n\n## The Soviet Collapse: Fifteen States from One\n\nOn Christmas Day 1991, Mikhail Gorbachev resigned and the Soviet flag over the Kremlin came down for the last time. Within days, fifteen independent states occupied the territory of what had been a single country. The transformation was staggering in scale, stretching from Estonia on the Baltic to Turkmenistan on the Afghan border.\n\nThe disintegration was not sudden. Economic crisis had hollowed out Moscow's authority through the 1980s. Nationalist movements in the Baltic states, Ukraine, Georgia, and elsewhere had spent years contesting the constitutional legitimacy of Soviet rule. Referenda, some credible, some not, gave independence movements a formal mandate that was hard for the international community to ignore [https://blog.oup.com/2014/02/world-revolutions-timeline-map/].\n\nOnce the UN and major powers recognized the new states, the borders locked in. International recognition has that effect: it converts a political fact on the ground into a legal one on the map. The lesson held even when Moscow objected. It is a pattern that would repeat itself in the Balkans almost immediately.\n\n## Yugoslavia's Fracture: Seven Countries, One Generation\n\nYugoslavia's breakup ran longer and bloodier than the Soviet dissolution. Between 1991 and 2008, the federation produced seven internationally recognized states: Slovenia, Croatia, Bosnia and Herzegovina, North Macedonia, Serbia, Montenegro, and eventually Kosovo [https://blog.oup.com/2014/02/world-revolutions-timeline-map/].\n\nThe drivers were familiar, economic failure, nationalist mobilization, a central government that had lost the ability to compel loyalty. But Yugoslavia added a particularly vicious ingredient: ethnic geography that did not match the internal administrative lines. When republics declared independence, significant minorities found themselves on the wrong side of new borders. Wars followed in Croatia, Bosnia, and Kosovo.\n\nScholars studying these cases note a consistent sequence: constitutional disputes first, then contested referenda, then international recognition that 'locks in' the outcome even over the objections of the predecessor state [https://blog.oup.com/2014/02/world-revolutions-timeline-map/]. The sequence matters because it shows that revolutions rarely happen in a single dramatic moment. They accumulate.\n\n## The Arab Spring: Regimes Fell, Borders Mostly Held\n\nThe wave that began in Tunisia in December 2010 looked, at first, like it might produce a new political map of the Middle East. Entrenched presidents fell in Tunisia, Egypt, Libya, and Yemen. Protests shook Bahrain, Jordan, Morocco, and Syria. Scholars described it as the most significant cluster of uprisings since the Russian Revolution of 1917 and the Chinese Revolution of 1949 in terms of its ambition to reshape states and regional order [https://www.allazimuth.com/2017/07/21/the-arab-spring-contemporary-revolutions-in-historical-comparison/].\n\nYet the map changed less than the headlines suggested. The Arab Spring overthrew governments but rarely redrew borders. Instead, it shattered state authority in several countries, producing civil wars where militias, foreign-backed factions, and remnant governments each controlled pieces of territory. Libya and Syria became the clearest examples: not new states, but fractured ones.\n\nOne pattern stood out. The most intense revolutionary episodes occurred in republics, not monarchies. Bahrain was the principal exception, protests there nearly became a full revolution before Saudi-led military intervention stabilized the ruling family [https://www.allazimuth.com/2017/07/21/the-arab-spring-contemporary-revolutions-in-historical-comparison/]. Researchers argue that monarchies' patronage networks and institutional flexibility gave them tools that republics, often more brittle and more corrupt, simply lacked.\n\n## What Spread the Fire: Media Then and Now\n\nEvery major revolutionary wave has had its communication technology. Pamphlets circulated the ideas of the French Revolution across Europe. Newspapers amplified the 1848 uprisings from Paris to Vienna to Budapest [https://www.britannica.com/event/Revolutions-of-1848]. The Arab Spring had satellite television and social media.\n\nPan-regional broadcasters gave protesters across a dozen countries a shared visual language, the same images of crowds, the same footage of police violence, the same faces of fallen leaders. Social media let organizers share tactics and slogans across borders in hours rather than weeks [https://www.allazimuth.com/2017/07/21/the-arab-spring-contemporary-revolutions-in-historical-comparison/]. The result was something that felt less like a series of national events and more like a single, region-wide movement.\n\nThis is not new in kind, only in speed. Historians and educators have long categorized upheavals under the framework of revolution, reaction, and reform, noting that revolutions in one country routinely trigger emulation in neighbors and fear-driven policy adjustments in governments watching from a distance [https://nhd.org/wp-content/uploads/2025/06/NHD_2026_ThemeBook_online_052225.pdf]. The medium changes. The contagion dynamic does not.\n\n## Reading the Map Backwards: What Patterns Emerge\n\nTimeline maps of modern revolutions reveal something striking: upheavals cluster. The early 1990s produced more new states than any period since decolonization. The early 2010s produced the most regime changes in the Arab world in a generation. These are not coincidences, they reflect shared structural conditions that make multiple countries vulnerable at the same moment [https://blog.oup.com/2014/02/world-revolutions-timeline-map/].\n\nThree conditions appear repeatedly across the cases above: economic crisis that delegitimizes the ruling government, nationalist or civic movements with enough organization to fill the vacuum, and an international environment willing to recognize the outcome. Remove any one of those, and the revolution either fails or produces a different result.\n\nPublic history projects and educational initiatives now present revolutions from different centuries side by side precisely to surface these patterns [https://nhd.org/wp-content/uploads/2025/06/NHD_2026_ThemeBook_online_052225.pdf]. The goal is not to make history feel inevitable, none of these outcomes were, but to show that the forces driving map changes are recognizable and recurring. That is worth knowing, especially now.\n\nThe borders on your map are younger than they look. Most of the states that exist today were shaped by upheavals within living memory. That is the central argument of this kind of history, not that revolution is inevitable, but that it is normal. Which of these cases strikes you as most relevant to what you are watching in the world right now? Reply and tell us. We read every response, and the best ones shape future issues.",
+              "word_count": 1014,
+              "section_count": 5,
+              "persist": {
+                "persisted": true,
+                "content_id": "9cf1902e-3e8a-412a-bbd7-89dcbd74547c"
+              },
+              "token_usage": {
+                "calls": 2,
+                "input_tokens": 1706,
+                "output_tokens": 2760,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+                "total_tokens": 4466,
+                "cost_usd": 0.046518
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Write a newsletter for the political-history genre. Topic: \"This Month in Political History: Revolutions That Changed the Map\". Genre slug: political-history. Date: 2026-03-10."
+    }
+  ],
+  "expected": [
+    "routes to newsletter durable saga, kind=queued; job reaches status=complete",
+    "Newsletter uses political-history tone (analytical, layered, draws parallels)",
+    "**Prime Directive:** Facts over hype. Show don't tell. No filler.",
+    "Cover art: documentary/oil painting style, amber lighting",
+    "Email arrives; Draft row in `published_content_v2`; CR-009 email received"
+  ]
+}

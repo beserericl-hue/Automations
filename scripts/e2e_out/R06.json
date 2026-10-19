@@ -1,0 +1,46 @@
+{
+  "test": {
+    "id": "R06",
+    "title": "Write Blog Post (post-apocalyptic)",
+    "source": "chat",
+    "prompt": "Write a blog post for the post-apocalyptic genre. Topic: \"Why Post-Apocalyptic Fiction Matters More Than Ever in 2026\". Genre slug: post-apocalyptic. Keywords: post-apocalyptic books, climate fiction, survival stories, dystopian novels. Target length: 1500 words.",
+    "route": "chapter.blog` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `chapter.blog`, kind=queued; job reaches status=complete",
+      "Blog post written in post-apocalyptic tone (gritty, visceral)",
+      "**Writing Prime Directive:** No cliches (revolutionize, game-changing, unleash, delve). Plain language. Short paragraphs. Shows, doesn't tell.",
+      "Cover art generated (ruins, decay, atmospheric) via `media.cover-art`",
+      "Email arrives with blog content",
+      "Draft row inserted into `published_content_v2` (content_type=blog_post, status=draft, user_id=\"+14105914612\")",
+      "CR-009 task-completion email received"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing your blog post \u2014 I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "blog",
+    "data": null,
+    "job_id": "695aaf47426d479bb82bd83698e0ed83",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "695aaf47426d479bb82bd83698e0ed83",
+    "status": "complete",
+    "result": {
+      "execution_id": "a1bfaa73-8c65-4dfc-9548-5bc8350bd67a",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValueError",
+        "message": "invalid literal for int() with base 10: '1500 words'",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

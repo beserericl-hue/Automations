@@ -1,0 +1,47 @@
+{
+  "test": {
+    "id": "V38",
+    "title": "Voice \u2014 Email Short Story",
+    "source": "voice",
+    "prompt": "Send me the short story about the Roman soldier by email",
+    "route": "library.email-content` (task)",
+    "prerequisite": "V06",
+    "expected": [
+      "flat queued",
+      "content_type=short_story",
+      "complete",
+      "reads from `published_content_v2` (user-scoped)",
+      "HTML email",
+      "subject references title",
+      "BCC if configured"
+    ]
+  },
+  "response": {
+    "response": "Sending the short story about the Roman soldier via email.",
+    "kind": "queued",
+    "tool": "library",
+    "op": "email-content",
+    "job_id": "147432ec67364ff987727777c4006565",
+    "status": "queued"
+  },
+  "job_result": {
+    "job_id": "147432ec67364ff987727777c4006565",
+    "status": "complete",
+    "result": {
+      "execution_id": "424d6b2a-d1b1-4303-a8df-ba3d7361242e",
+      "step_name": "library",
+      "status": "ok",
+      "payload": {
+        "op": "email-content",
+        "result": {
+          "emailed": true,
+          "to": "eric@agileadtesting.com",
+          "subject": "A disillusioned Roman soldier discovers",
+          "content_type": "short_story"
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

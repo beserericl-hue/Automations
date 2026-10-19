@@ -1,0 +1,47 @@
+{
+  "test": {
+    "id": "V37",
+    "title": "Voice \u2014 Email Outline",
+    "source": "voice",
+    "prompt": "Can you email me the outline for The Seed Vault I want to look at it on my phone",
+    "route": "library.email-content` (task)",
+    "prerequisite": "",
+    "expected": [
+      "flat queued",
+      "content_type=outline",
+      "complete",
+      "reads outline from `writing_projects_v2`",
+      "HTML email to `app_config.recipient_email`",
+      "subject references title + \"outline\"",
+      "BCC if configured"
+    ]
+  },
+  "response": {
+    "response": "Sending the outline for 'The Seed Vault' to your email.",
+    "kind": "queued",
+    "tool": "library",
+    "op": "email-content",
+    "job_id": "26cadb24ba8844e5b3dff7ada5839f72",
+    "status": "queued"
+  },
+  "job_result": {
+    "job_id": "26cadb24ba8844e5b3dff7ada5839f72",
+    "status": "complete",
+    "result": {
+      "execution_id": "badf793b-c2b0-48f9-a646-f74f15cac792",
+      "step_name": "library",
+      "status": "ok",
+      "payload": {
+        "op": "email-content",
+        "result": {
+          "emailed": true,
+          "to": "eric@agileadtesting.com",
+          "subject": "The Seed Vault \u2014 Outline",
+          "content_type": "outline"
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

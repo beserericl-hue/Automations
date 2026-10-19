@@ -1,0 +1,152 @@
+{
+  "id": "R21",
+  "title": "List Drafts \u2014 Filter by Type",
+  "route": "`library.list-outlines` (info) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.list-outlines got=library.retrieve MISMATCH",
+    "items=11 found=True"
+  ],
+  "steps": [
+    [
+      "chat",
+      "List my draft blog posts"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "data",
+        "assistant_message": "",
+        "tool": "library",
+        "op": "retrieve",
+        "data": {
+          "execution_id": "d1e470a4-1417-46e5-b8bf-227a99d9fe31",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "retrieve",
+            "result": {
+              "items": [
+                {
+                  "id": "1cece337-60bd-4bcb-9ce1-a15330bc3dd6",
+                  "title": "The Forgotten Engineers of Rome: How Aqueducts Shaped an Empire",
+                  "status": "draft",
+                  "content_type": "blog_post",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T20:21:16.231163+00:00"
+                },
+                {
+                  "id": "f3b2ddec-a012-4207-8f2a-2223e6b6f876",
+                  "title": "The World Is Already Ending: Why Post-Apocalyptic Fiction Hits Different in 2026",
+                  "status": "draft",
+                  "content_type": "blog_post",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T20:16:45.986419+00:00"
+                },
+                {
+                  "id": "64dbc7d1-ba0f-400b-a0f8-a493779ae286",
+                  "title": "Marketing in 2026 Looks Nothing Like It Did Two Years Ago",
+                  "status": "draft",
+                  "content_type": "blog_post",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-06-21T20:45:41.002202+00:00"
+                },
+                {
+                  "id": "c6c6a10c-f421-4d75-a577-1808b287a67b",
+                  "title": "Seamless Workflow Migration: Supercharge Your Marketing with AI",
+                  "status": "draft",
+                  "content_type": "blog_post",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-04-23T20:18:06.344788+00:00"
+                },
+                {
+                  "id": "2de8209c-3e03-4270-acfb-f2128c0bf628",
+                  "title": "Sprint 11 Workflow Migration: Why Your Postal Operations Need an AI Upgrade",
+                  "status": "draft",
+                  "content_type": "blog_post",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-04-23T20:12:39.597713+00:00"
+                },
+                {
+                  "id": "289a53d9-0503-48ad-8e9e-ec5a106b7d71",
+                  "title": "How Letters Conquered Distance: The Untold Story of Postal Migration",
+                  "status": "draft",
+                  "content_type": "blog_post",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-04-23T19:59:54.069379+00:00"
+                },
+                {
+                  "id": "282b084c-8598-464e-8b59-f97846bf7c2b",
+                  "title": "AI Content Tools Are Rewriting Marketing Playbooks (And the Results Are Mixed)",
+                  "status": "draft",
+                  "content_type": "blog_post",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-12T23:53:07.213709+00:00"
+                },
+                {
+                  "id": "6e262e85-9e5d-4fca-816e-e7e4654d1d8a",
+                  "title": "AI Content Tools Are Rewriting Marketing's Playbook",
+                  "status": "draft",
+                  "content_type": "blog_post",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-12T23:40:56.098252+00:00"
+                },
+                {
+                  "id": "952fdbd7-96ff-4250-8813-3cff82d48df9",
+                  "title": "Forged for the Arena: Inside the Grueling World of Roman Gladiator Training",
+                  "status": "draft",
+                  "content_type": "blog_post",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-12T23:33:17.807715+00:00"
+                },
+                {
+                  "id": "996783ea-fd2c-442f-80f5-216f1adb5485",
+                  "title": "The Forgotten Engineers of Rome: How Aqueducts Shaped an Empire",
+                  "status": "draft",
+                  "content_type": "blog_post",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-10T23:27:17.868931+00:00"
+                },
+                {
+                  "id": "d88c15e9-6b7a-44b8-8e8d-b25bc4ddfb86",
+                  "title": "The AI Marketing Revolution: How Intelligent Tools Are Reshaping Digital Strategy in 2026",
+                  "status": "draft",
+                  "content_type": "blog_post",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-09T17:34:14.336617+00:00"
+                }
+              ],
+              "count": 11,
+              "found": true,
+              "search_term": null
+            }
+          },
+          "error": null,
+          "next_stage": null
+        },
+        "job_id": null,
+        "status": null,
+        "jobs": null,
+        "error": null
+      },
+      "job_result": null,
+      "resolved_prompt": "List my draft blog posts"
+    }
+  ],
+  "expected": [
+    "routes to `library.list-outlines`, kind=data",
+    "Returns only content_type=blog_post; other types excluded"
+  ]
+}

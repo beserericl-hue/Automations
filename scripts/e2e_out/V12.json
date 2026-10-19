@@ -1,0 +1,43 @@
+{
+  "test": {
+    "id": "V12",
+    "title": "Voice \u2014 Write Chapter from Outline",
+    "source": "voice",
+    "prompt": "Write chapter one of The Clockwork Rebellion genre post apocalyptic chapter number one",
+    "route": "chapter.write` (task)",
+    "prerequisite": "V11",
+    "expected": [
+      "flat `{response, kind=\"queued\"}`",
+      "routes `chapter.write`",
+      "loads outline",
+      "chapter consistent with outline",
+      "Prime Directive",
+      "`published_content_v2` draft",
+      "CR-009 email"
+    ]
+  },
+  "response": {
+    "response": "Queuing chapter 1 of The Clockwork Rebellion \u2014 I'll let you know when it's ready.",
+    "kind": "queued",
+    "tool": "chapter",
+    "op": "write",
+    "job_id": "ed42c1af67fa4316835aacfd750de839",
+    "status": "queued"
+  },
+  "job_result": {
+    "job_id": "ed42c1af67fa4316835aacfd750de839",
+    "status": "complete",
+    "result": {
+      "execution_id": "251895a9-116f-4753-98a6-feb17ba01be7",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValidationError",
+        "message": "1 validation error for WriteChapterRequest\nproject_id\n  Field required [type=missing, input_value={'project_title': 'The Cl...t': True, 'async': True}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

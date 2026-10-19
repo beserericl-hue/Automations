@@ -1,0 +1,59 @@
+{
+  "test": {
+    "id": "V27",
+    "title": "Voice \u2014 Retrieve & Callback \u2014 Brainstorm Mode",
+    "source": "voice",
+    "prompt": "Load the research report on post apocalyptic trends and call me back let's brainstorm a new story outline from it",
+    "route": "notify.eve-callback` (task)",
+    "prerequisite": "",
+    "expected": [
+      "flat `{response, kind=\"queued\"}`",
+      "routes `notify.eve-callback`",
+      "complete",
+      "retrieve report \u2192 KB cleanup \u2192 upload \u2192 `brainstorm` first_message \u2192 outbound call \u2192 reset",
+      "assert payload `{content_type:\"research_report\", callback_mode:\"brainstorm\", phone:\"+14105914612\"}`",
+      "Eve references report data points (KB upload verified)"
+    ]
+  },
+  "response": {
+    "response": "Pulling up the research report and I'll call you back to brainstorm.",
+    "kind": "queued",
+    "tool": "notify",
+    "op": "eve-callback",
+    "job_id": "95e6e4fd97254a8bac9902c4b89c901d",
+    "status": "queued"
+  },
+  "job_result": {
+    "job_id": "95e6e4fd97254a8bac9902c4b89c901d",
+    "status": "complete",
+    "result": {
+      "execution_id": "2813e6a8-b8cc-4607-b1a3-a31171e26761",
+      "step_name": "notify",
+      "status": "ok",
+      "payload": {
+        "op": "eve-callback",
+        "result": {
+          "invoked": true,
+          "found": true,
+          "callback_mode": "brainstorm",
+          "phone": "+14105914612",
+          "content_type": "research report",
+          "content_title": "Why Post-Apocalyptic Fiction Matters More Than Ever in 2026",
+          "eve": {
+            "dry_run": true,
+            "reason": "ELEVENLABS_API_KEY/AGENT_ID not configured",
+            "planned": {
+              "content_type": "research report",
+              "content_title": "Why Post-Apocalyptic Fiction Matters More Than Ever in 2026",
+              "content_text": "# Why Post-Apocalyptic Fiction Matters More Than Ever in 2026\n\nAs we navigate through 2026, surrounded by headlines about extreme weather events, supply chain disruptions, and social upheaval, the dystopian worlds we once considered purely fictional feel uncomfortably familiar. Post-apocalyptic fiction isn't just entertainment anymore\u2014it's become a crucial lens for understanding our present moment and preparing for an uncertain future.\n\nThe genre that once seemed like escapist fantasy now serves as both mirror and compass, reflecting our current anxieties while offering insights into human resilience, community building, and survival in the face of systemic collapse.\n\n## The Prophetic Power of Speculative Literature\n\nPost-apocalyptic books have always served as society's early warning system. Margaret Atwood, a pioneer in speculative fiction, has long argued that dystopian novels don't predict the future\u2014they amplify present trends to their logical extremes. In her 2004 essay \"Writing Oryx and Crake,\" Atwood noted that effective speculative fiction takes \"real stuff\" happening now and asks \"what if this continues?\"\n\nThis predictive quality has proven remarkably accurate. Research by Dr. Judith Yaross Lee at Ohio University demonstrates that dystopian literature often anticipates technological and social developments by decades. Her 2019 study \"Fiction as Forecast\" analyzed over 200 speculative works from 1950-2000, finding that 78% accurately predicted at least one major technological or social trend.\n\nThe COVID-19 pandemic exemplified this phenomenon. Sales of post-apocalyptic books surged 35% during 2020-2021, according to BookScan data, as readers found parallels between fictional pandemics and their lived reality. Titles exploring themes of isolation, supply chain collapse, and social breakdown suddenly felt less like fiction and more like instruction manuals.\n\n## Climate Fiction: Our New Reality Manual\n\nClimate fiction, or \"cli-fi,\" has emerged as perhaps the most urgent subgenre within post-apocalyptic literature. As extreme weather events become increasingly common, these survival stories offer more than entertainment\u2014they provide frameworks for understanding and adapting to environmental catastrophe.\n\nDr. Sarah Dimick from the University of Rochester's climate fiction research project found that readers of cli-fi demonstrate significantly higher levels of climate awareness and preparedness behaviors. Her 2023 study, published in Environmental Communication, showed that regular readers of climate fiction were 40% more likely to have emergency preparedness plans and 60% more likely to engage in climate activism.\n\nThe genre's focus on environmental collapse resonates particularly strongly in 2026. With global temperatures continuing to rise and extreme weather events becoming normalized, climate fiction serves as both processing tool and preparation guide. These narratives help readers mentally rehearse responses to environmental crises while highlighting the interconnectedness of ecological and social systems.\n\nBooks exploring climate-driven societal collapse don't just entertain\u2014they educate. They demonstrate how environmental degradation cascades into economic instability, mass migration, and political upheaval. In our current context of increasing climate volatility, this educational function has become invaluable.\n\n## Survival Stories as Psychological Preparation\n\nPsychologists have identified a phenomenon called \"pre-traumatic stress\"\u2014anxiety about potential future disasters. Post-apocalyptic fiction serves as a form of exposure therapy, allowing readers to mentally rehearse survival scenarios in a safe, controlled environment.\n\nDr. Elena Rodriguez, a trauma psychologist at Stanford University, explains in her 2025 paper \"Fictional Rehearsal and Resilience\" that engaging with survival narratives can build psychological resilience. \"When readers mentally walk through disaster scenarios in fiction,\" Rodriguez writes, \"they develop cognitive scripts for crisis response. This mental rehearsal can reduce panic and improve decision-making during actual emergencies.\"\n\nThis preparatory function has become increasingly relevant as traditional support systems face unprecedented strain. Supply chain vulnerabilities, infrastructure failures, and social polarization have made the self-reliance themes common in survival stories more practical than paranoid.\n\nThe community-building aspects of post-apocalyptic fiction are equally important. These narratives often explore how groups form, maintain trust, and allocate resources under extreme stress. As social cohesion faces mounting challenges, these fictional explorations of cooperation and conflict provide valuable insights into human social dynamics.\n\n## Dystopian Novels as Democratic Warning Systems\n\nPolitical scientists have long recognized dystopian literature's role in defending democratic institutions. The \"Orwell Effect,\" named after George Orwell's prescient warnings about totalitarianism, describes how dystopian fiction can inoculate readers against authoritarian messaging.\n\nDr. James Patterson's research at Georgetown University's Democracy Institute shows that readers of dystopian novels demonstrate higher resistance to propaganda and greater awareness of democratic erosion. His 2024 study found that regular readers of political dystopias scored 25% higher on tests measuring recognition of authoritarian rhetoric and tactics.\n\nIn 2026's polarized political environment, this inoculation effect is crucial. Dystopian novels serve as democracy's immune system, helping readers recognize and resist the gradual erosion of civil liberties and institutional norms. They provide language and concepts for understanding complex political phenomena, from information warfare to the manipulation of crisis narratives.\n\n## The Therapeutic Value of Fictional Catastrophe\n\nBeyond their educational and preparatory functions, post-apocalyptic books serve important emotional and psychological needs. In a world where actual catastrophes dominate news cycles, fictional disasters offer a sense of control and resolution often absent from real-world crises.\n\nLiterary therapist Dr. Sarah Chen notes in her practice that clients increasingly turn to post-apocalyptic fiction as a form of emotional regulation. \"These narratives provide catharsis,\" Chen explains. \"Readers can experience the full arc of catastrophe and recovery in a contained space, which helps process anxiety about unresolved real-world threats.\"\n\nThe genre's emphasis on human adaptability and resilience offers hope amid overwhelming challenges. Even the darkest post-apocalyptic narratives typically feature survivors who find ways to continue, adapt, and sometimes thrive. This consistent message of human persistence provides psychological anchor points during turbulent times.\n\n## Essential Resources for Understanding Our Apocalyptic Moment\n\nFor those seeking to deepen their understanding of how speculative literature illuminates our current moment, several key resources stand out:\n\n**Academic Studies:**\n- \"The Apocalyptic Imagination in Contemporary Literature\" by Dr. Michael Adams (University of North Carolina, 2023)\n- \"Climate Fiction and Behavioral Change\" by the Environmental Psychology Research Group at Yale (2024)\n- \"Dystopian Literature as Democratic Defense\" published in Political Psychology Quarterly (2025)\n\n**Documentaries:**\n- \"Prophets of Doom: How Fiction Predicted Our Present\" (Netflix, 2024)\n- \"Reading the End Times: Literature and Climate Change\" (PBS, 2025)\n\n**Analysis Collections:**\n- \"Speculative Futures: Essays on Literature and Crisis\" edited by Dr. Rosa Martinez\n- \"The Fiction of Collapse: Literary Responses to Systemic Crisis\" by the Modern Literature Association\n\nThese resources provide essential context for understanding how post-apocalyptic fiction functions as more than entertainment\u2014serving as early warning system, preparation tool, and psychological support mechanism.\n\n## Looking Forward: Fiction as Survival Guide\n\nAs we move deeper into an era of unprecedented global challenges, post-apocalyptic fiction's relevance will only increase. These narratives don't just reflect our fears\u2014they help us process them, prepare for them, and ultimately transcend them.\n\nThe genre's enduring appeal lies not in its catastrophic scenarios but in its consistent faith in human adaptability. Even in the darkest imagined futures, people find ways to survive, connect, and create meaning. In 2026, surrounded by real-world uncertainty, that message of resilience isn't just compelling\u2014it's essential.\n\nPost-apocalyptic books matter because they remind us that endings are also beginnings, that collapse creates space for reconstruction, and that human creativity and cooperation can flourish even in the harshest conditions. In our current moment of multiple overlapping crises, we need these reminders more than ever.\n\n---\n\n*What role has post-apocalyptic fiction played in helping you understand or cope with current world events? Have you found particular themes or scenarios in these books that feel especially relevant to today's challenges? Share your thoughts on how speculative literature shapes our response to real-world uncertainty.*",
+              "callback_mode": "brainstorm",
+              "phone": "+14105914612"
+            }
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

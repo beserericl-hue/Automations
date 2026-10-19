@@ -1,0 +1,88 @@
+{
+  "id": "V22",
+  "title": "Voice \u2014 Multi-Step Voice Workflow",
+  "route": "msg1 `research.run`; msg2 `chapter.blog` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=chapter.blog got=chapter.blog OK",
+    "job=complete",
+    "blog_post recent=1 word_count=1292 persist=True"
+  ],
+  "steps": [
+    [
+      "voice",
+      "Research the fall of the Roman Empire and why it collapsed"
+    ],
+    [
+      "voice",
+      "Now write a blog post about that for the ancient history genre about fifteen hundred words"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "response": "Queuing research on the fall of the Roman Empire. I'll let you know when the report is ready.",
+        "kind": "queued",
+        "tool": "research",
+        "op": "run",
+        "job_id": "ba0df7d3254e4bd39f7975027a422eed",
+        "status": "queued"
+      },
+      "job_result": {
+        "job_id": "ba0df7d3254e4bd39f7975027a422eed",
+        "status": "in_progress"
+      },
+      "resolved_prompt": "Research the fall of the Roman Empire and why it collapsed"
+    },
+    {
+      "response": {
+        "response": "Got it \u2014 I've started on that. It runs in the background and I'll let you know when it's ready.",
+        "kind": "queued",
+        "tool": "chapter",
+        "op": "blog",
+        "job_id": "7edac000f36a419b87413e023a20eb4b",
+        "status": "queued"
+      },
+      "job_result": {
+        "job_id": "7edac000f36a419b87413e023a20eb4b",
+        "status": "complete",
+        "result": {
+          "execution_id": "e68603c5-d626-44a7-96be-70ab7616ea04",
+          "step_name": "chapter",
+          "status": "ok",
+          "payload": {
+            "op": "blog",
+            "result": {
+              "written": true,
+              "title": "A Day in Pompeii: What the Ash Preserved That History Almost Lost",
+              "content_text": "# A Day in Pompeii: What the Ash Preserved That History Almost Lost\n\nMost ancient cities rot slowly. Wood decays, plaster crumbles, organic material vanishes over centuries. Pompeii had no such luxury. When Vesuvius erupted on the 24th of August, 79 CE, it buried the city under several meters of volcanic pumice and ash in less than twenty-four hours. That catastrophe became one of archaeology's greatest gifts. The ash sealed everything: food on the counter, graffiti on the wall, a dog chained to a post, a woman clutching her jewelry box. Pompeii did not fade. It stopped.\n\nWhat that stoppage reveals about ordinary Roman life is still surprising scholars today., -\n\n## The City Was Not Asleep When It Died\n\nOne persistent image of Pompeii is a quiet, sun-drenched town caught off guard on a lazy afternoon. The reality is messier and more interesting.\n\nThe city had roughly 11,000 residents at the time of the eruption, possibly more. It was a working port town on the Bay of Naples, commercially active and politically loud. The streets were rutted by cart wheels. The pavements were worn smooth by foot traffic. Stepping stones crossed the roads so pedestrians could avoid the mud and waste that accumulated between the curbs.\n\nArchaeologists have found the remains of at least 80 thermopolia, street-food counters built into the fronts of buildings, with large ceramic vessels sunk into stone counters to keep food warm. A well-preserved one on the Via dell'Abbondanza, excavated in detail between 2019 and 2021 as part of the ongoing Pompeii Archaeological Park project, contained traces of duck, pig, goat, fish, and snails. These were not fancy dishes. They were fast food. The people eating them were workers, slaves, travelers, and shopkeepers who had no kitchen of their own.\n\nThe city smelled. It was loud. It was alive in a way that the plaster casts of its dead sometimes obscure., -\n\n## What the Walls Say\n\nIf you want to know what Romans actually thought, not what senators wrote in their memoirs, but what ordinary people felt on a Tuesday, read the graffiti.\n\nPompeii has given us over 11,000 inscriptions, scratched or painted on walls across the city. They range from election notices to insults to declarations of love to price lists. Some are funny. One reads: *\"Whoever defecates here, beware of bad luck.\"* Another records a simple transaction: a man named Successus loves a woman named Iris, who does not love him back, a fact her admirer has also taken the trouble to inscribe.\n\nElection graffiti is particularly revealing. Candidates for local office, aediles and duoviri, roughly equivalent to city councilors and mayors, had their supporters post painted endorsements across the city. These notices name specific groups backing specific candidates: the bakers, the fruit sellers, the muleteers, the goldsmiths. This is not the politics of the Roman Senate. This is neighborhood politics, ward-level organizing, the kind of thing that tells you how a city actually functioned below the level of the famous names.\n\nEpigraphers are still working through the Pompeian corpus. New 3D imaging of damaged wall surfaces has recovered text that was previously unreadable, and a few of these recovered inscriptions have shifted our understanding of the city's layout and commercial organization. The walls are not done talking., -\n\n## The Houses Tell a Story About Inequality\n\nPompeii is often described as a Roman town frozen in time, which is true, but it is easy to forget how unequal that frozen moment was.\n\nThe grand houses, the House of the Faun, the House of the Vettii, the House of the Tragic Poet, dominate the guidebooks and the photographs. They are genuinely spectacular, with mosaic floors, frescoed walls, and formal garden courtyards. But they represent a small slice of the population.\n\nMost Pompeians lived in much smaller spaces. Apartment blocks, called *insulae*, divided single buildings into multiple units. Workshops opened directly onto the street, with sleeping quarters above or behind. Some residents almost certainly slept in the same room where they worked. The famous *atrium* house with its rain-catching pool and painted triclinium was an aspiration for many, a reality for few.\n\nThis inequality shows up in the skeletons, too. Bioarchaeological analysis of Pompeian remains has found significant variation in health markers across the population. Some individuals show signs of good nutrition and limited physical stress. Others show evidence of heavy labor, dietary deficiency, and healed injuries. The ash preserved everyone equally. The city had not treated them that way., -\n\n## What We Still Do Not Know\n\nFor all its extraordinary preservation, Pompeii has gaps. Large ones.\n\nWe do not have a clear picture of the city's enslaved population, though we know it was substantial. Slavery was central to the Roman economy, and Pompeii was no exception. Some enslaved people are visible in the record, named in graffiti, depicted in paintings, mentioned in wax tablets, but the full shape of their lives, their origins, their relationships, their internal communities, remains largely invisible to us. The sources that survive were not written for them.\n\nWe also do not know exactly how many people died. Estimates range from around 2,000 to over 11,000, depending on assumptions about how many residents evacuated before the worst of the eruption. The number of bodies recovered so far is roughly 1,150. Excavation of the site is ongoing and covers only about two-thirds of the ancient city. More remains under the ground.\n\nThe date of the eruption itself has been contested. The traditional date of August 24th comes from a letter by Pliny the Younger, written decades after the event. But a charcoal inscription found in 2018, during excavations in the Regio V area, appears to reference a date in mid-October. The debate is not settled. It is a good reminder that even the most studied ancient site can still produce a surprise that forces historians to go back to the beginning., -\n\n## Further Reading and Watching\n\nIf Pompeii has caught your attention, these are worth your time:\n\n- **Mary Beard, *The Fires of Vesuvius* (2008)**, The clearest, most readable single-volume account of what Pompeii actually tells us about Roman life. Beard is honest about the limits of the evidence and sharp about what the city's fame has distorted.\n- **Alberto Angela, *A Day in the Life of Ancient Rome* (2009)**, Not strictly about Pompeii, but an excellent reconstruction of daily urban life in the same period. Angela is an Italian journalist and science communicator, and the book reads like a guided walk.\n- **Pompeii: The Mystery of the People Frozen in Time (BBC, 2013)**, A documentary that focuses on the forensic analysis of the plaster casts, with some genuinely striking results from skeletal and dental analysis.\n- **The Pompeii Bibliography and Mapping Project (online, University of Massachusetts Amherst)**, A free, searchable database of Pompeian scholarship and site data. Useful if you want to go deeper into any specific aspect of the site.\n\nThe Pompeii Archaeological Park also publishes regular updates on its excavations, in Italian and English, at pompeiisites.org. The Regio V excavations in particular have produced a steady stream of new finds since 2018., -\n\nPompeii is not just a monument to disaster. It is the most detailed picture we have of a working Roman town, complete with its food, its politics, its humor, its inequality, and its unanswered questions. Every new season of excavation adds something. The city keeps giving.\n\n**Discussion prompt:** The graffiti at Pompeii is one of the richest collections of ordinary Roman voices we have, but it still skews toward people who were literate and had access to public walls. What other kinds of evidence do you think could fill in the gaps for the people the inscriptions leave out? Drop your thoughts below.",
+              "word_count": 1292,
+              "persist": {
+                "persisted": true,
+                "content_id": "f93dfb6f-936d-4ebb-a05d-d92fcccb1546"
+              },
+              "token_usage": {
+                "calls": 2,
+                "input_tokens": 2053,
+                "output_tokens": 3367,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+                "total_tokens": 5420,
+                "cost_usd": 0.056664
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Now write a blog post about that for the ancient history genre about fifteen hundred words"
+    }
+  ],
+  "expected": [
+    "msg1 flat queued \u2192 `research.run` \u2192 complete \u2192 `research_reports_v2`",
+    "msg2 resolves \"that\"",
+    "flat queued \u2192 `chapter.blog` \u2192 complete \u2192 ~1500 words incorporating research",
+    "both CR-009 emails"
+  ]
+}

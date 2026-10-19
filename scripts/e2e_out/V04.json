@@ -1,0 +1,60 @@
+{
+  "test": {
+    "id": "V04",
+    "title": "Voice \u2014 Write Blog Post",
+    "source": "voice",
+    "prompt": "Write a blog post about how AI is changing marketing in twenty twenty six genre slug ai marketing keywords AI tools marketing automation target about fifteen hundred words",
+    "route": "chapter.blog` (task)",
+    "prerequisite": "",
+    "expected": [
+      "flat `{response, kind=\"queued\"}`",
+      "routes `chapter.blog`",
+      "maps \"ai marketing\"\u2192`ai-marketing`",
+      "~1500 words",
+      "Prime Directive",
+      "`published_content_v2` draft",
+      "CR-009 email"
+    ]
+  },
+  "response": {
+    "response": "Queuing your blog post about AI in marketing. I'll let you know when it's ready.",
+    "kind": "queued",
+    "tool": "chapter",
+    "op": "blog",
+    "job_id": "f01c8ef2e28a440d8251b0efb6d59b44",
+    "status": "queued"
+  },
+  "job_result": {
+    "job_id": "f01c8ef2e28a440d8251b0efb6d59b44",
+    "status": "complete",
+    "result": {
+      "execution_id": "3fc0a8c9-ca23-46ab-a40d-1924725443ec",
+      "step_name": "chapter",
+      "status": "ok",
+      "payload": {
+        "op": "blog",
+        "result": {
+          "written": true,
+          "title": "Marketing in 2026 Looks Nothing Like It Did Two Years Ago",
+          "content_text": "# Marketing in 2026 Looks Nothing Like It Did Two Years Ago\n\nA campaign that once took three weeks to build, test, and launch now takes a few hours. That's not a pitch, it's a Tuesday morning for a mid-sized marketing team in 2026. The shift isn't coming. It's already here, and it's stranger and more practical than most predictions suggested.\n\nThis post covers what's actually different: how AI tools and marketing automation have changed daily work, what that means for strategy, and where the real friction still lives., -\n\n## Search Changed Before Anyone Was Ready\n\nFor years, SEO meant ranking in a list of blue links. That model still exists, but it's no longer the whole game.\n\nIn 2026, a large share of searches return an AI-generated summary at the top of the page, what Google calls an AI Overview. The user reads a synthesized answer before they ever see a link. For marketers, this changes the core question from *how do I rank?* to *how does a machine understand and cite my content?*\n\nThe answer turns out to be: structure, clarity, and credibility. Content that is explicit about what it claims, who is behind it, and why it should be trusted is more likely to appear in these summaries. Vague, keyword-stuffed pages are less useful to an answer engine than a well-organized article with a clear author, a defined scope, and specific claims.\n\nThis has created a new discipline some are calling AEO, answer-engine optimization. It's less about density and more about being interpretable. Websites are being rebuilt around structured content and clear identity signals so that AI assistants can read them correctly. The practical result is that good writing and honest sourcing, long treated as nice-to-haves, are now functional requirements.\n\nFor science fiction readers, there's something almost *Neuromancer*-esque about it: your content now has to speak to machines first, and the machines decide whether humans see it., -\n\n## Automation Ate the Repetitive Work\n\nEmail sequencing, lead routing, bid management, A/B testing, performance reporting, these tasks haven't disappeared, but humans are no longer doing most of them by hand.\n\nMarketing automation in 2026 handles the execution layer of campaigns with minimal oversight. A system can run 40 subject-line variants, identify the winner, and redeploy budget toward the best-performing segment before a human has finished their morning coffee. That's not an exaggeration, it's the standard capability of most mid-tier platforms.\n\nWhat this means in practice is that marketing teams spend less time on repetitive execution and more time supervising systems and making judgment calls. The job has shifted. A marketer in 2026 is closer to a product manager or an editor than to a traditional campaign coordinator. They're shaping workflows, reviewing outputs, setting guardrails, and deciding when the machine's recommendation is wrong.\n\nThat last part matters. AI tools optimize for signals, clicks, conversions, engagement rates. They don't know when a campaign is off-brand, tone-deaf, or ethically questionable. Human judgment hasn't been removed from the process. It's been relocated to a higher level.\n\nThe organizational structure is changing too. Many teams have moved toward small, cross-functional pods, strategy, creative, analytics, and technical work grouped together, so they can act quickly on AI-generated insights rather than waiting for handoffs between departments., -\n\n## Campaigns Are Now Orchestrated, Not Built\n\nThe old model: a team builds creative assets, defines an audience, selects channels, launches, waits for data, and then adjusts. The cycle takes weeks.\n\nThe 2026 model: an orchestration workflow handles audience discovery, creative testing, channel deployment, measurement, and budget reallocation as a connected, continuous process. The gap between insight and action has collapsed from weeks to hours.\n\nSeveral platforms now describe AI not as a feature but as an operating layer, something that sits underneath the entire campaign and coordinates its moving parts. This includes multi-modal output: the same campaign might simultaneously deploy text ads, short-form video, audio spots, and AR overlays, with each format adjusted based on real-time performance data.\n\nVisual and voice-based discovery are mainstream now. Google Lens-style camera search and conversational interfaces have changed how people find products, which means campaigns have to work across formats that didn't exist as primary channels two years ago.\n\nFor marketers who grew up building static campaigns in PowerPoint and handing them off to media buyers, this is a significant mental shift. The campaign is no longer a finished object. It's a living system., -\n\n## Personalization Got More Powerful and More Constrained\n\nHyper-personalization, showing each user content tailored to their behavior, preferences, and context, is technically more capable than ever. Predictive analytics can anticipate what a customer needs before they search for it. Real-time adjustment means a message can change based on where someone is, what device they're using, or what they just did on the site.\n\nBut the data environment has tightened. Third-party cookies are largely gone. Consent requirements are stricter. Consumers are more aware of how their data is used, and more willing to walk away from brands that feel intrusive.\n\nThe result is that the best personalization in 2026 runs on first-party and zero-party data, information that customers have actively provided or that comes from direct relationships. A loyalty program, a preference quiz, a purchase history: these are the inputs. The trade-off is explicit. Brands that are transparent about what they collect and why tend to get better data, because customers trust them enough to share it.\n\nThis has made trust a functional marketing asset, not just a brand value. Companies that treat data transparency as a side issue are finding that their personalization systems are running on thin fuel.\n\nThe tension here is real and unresolved. The tools can do more than the ethics allow, and the ethics are still being worked out in real time., -\n\n## Creative Work Didn't Disappear, It Changed Shape\n\nGenerative AI can now produce coordinated campaign assets across formats, copy, images, video, audio, faster than any human team. This has changed what creative professionals spend their time on, but it hasn't made them redundant.\n\nThe teams producing the best work in 2026 treat AI as part of the creative process, not a replacement for it. A copywriter might generate 30 headline variants in minutes, then spend their actual working time deciding which three are worth developing and why. A designer might use AI to produce a visual direction quickly, then apply judgment about what fits the brand and what doesn't.\n\nThe skill that's become more valuable is taste, the ability to evaluate outputs, recognize what's missing, and push toward something that's genuinely good rather than statistically average. AI optimizes toward what has worked. It takes a human to decide what should work next.\n\nThis is, incidentally, a very old creative problem dressed in new clothes. Every tool that accelerated production, desktop publishing, stock photography, video editing software, raised the same question: now that it's easier to make things, what makes something worth making?, -\n\n## What to Read and Watch\n\nIf you want to think harder about where this is heading, these are worth your time:\n\n- **_Daemon_ by Daniel Suarez**, A thriller about automated systems that act without human oversight. Reads differently in 2026 than it did in 2006.\n- **_The Circle_ by Dave Eggers**, Still the sharpest fictional treatment of data transparency and the cost of convenience.\n- **_Ex Machina_ (2014)**, Less about robots, more about what we reveal when we think we're being evaluated.\n- **_Klara and the Sun_ by Kazuo Ishiguro**, A quiet, precise look at what it means to observe and serve human behavior. Relevant to anyone thinking about AI and personalization.\n- **_The Peripheral_ by William Gibson**, For the structural shift in how work gets done when timelines collapse and information moves faster than decisions., -\n\n## The Part That's Still Unsettled\n\nMarketing in 2026 is faster, more automated, and more capable of personalization at scale. The AI tools and marketing automation platforms that power this are genuinely impressive. But the hardest problems aren't technical.\n\nHow do you build consumer trust when personalization feels like surveillance? How do you maintain brand integrity when a system is generating content faster than any human can review it? How do you decide when the machine's optimization is pointing in the wrong direction?\n\nThese are judgment problems. They require people who understand both the tools and the stakes.\n\nThe marketers who are doing well right now aren't the ones who handed everything to AI. They're the ones who figured out what to hand over and what to keep., -\n\n**Discussion prompt:** If your content now has to be readable by machines before it reaches humans, does that change what good writing means, or just who the first reader is? Drop your take in the comments.",
+          "word_count": 1458,
+          "persist": {
+            "persisted": true,
+            "content_id": "64dbc7d1-ba0f-400b-a0f8-a493779ae286"
+          },
+          "token_usage": {
+            "calls": 2,
+            "input_tokens": 1403,
+            "output_tokens": 2961,
+            "cache_read_tokens": 0,
+            "cache_write_tokens": 0,
+            "total_tokens": 4364,
+            "cost_usd": 0.048624
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

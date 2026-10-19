@@ -1,0 +1,502 @@
+{
+  "id": "R99",
+  "title": "Verify Undelete \u2014 Item Returns to Drafts",
+  "route": "`library.list-outlines` / `library.retrieve` (info) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.list-outlines got=library.retrieve MISMATCH",
+    "items=50 found=True"
+  ],
+  "steps": [
+    [
+      "chat",
+      "List my drafts"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "data",
+        "assistant_message": "",
+        "tool": "library",
+        "op": "retrieve",
+        "data": {
+          "execution_id": "cec12732-7226-47f0-ab3a-8ae89fb8b0eb",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "retrieve",
+            "result": {
+              "items": [
+                {
+                  "id": "1352744e-4b8d-44b2-8ae2-31f8b68b9334",
+                  "title": "Prologue: The Pomerium",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "c2929621-03f5-4ad9-96a6-d72a03684c44",
+                  "chapter_number": 0,
+                  "created_at": "2026-07-01T23:06:19.952335+00:00"
+                },
+                {
+                  "id": "169e106e-b23d-4882-8881-d9fcd7b20ead",
+                  "title": "The Optimization \u2014 Chapter 999",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "2701d335-d6af-411c-aeb8-4105132f890f",
+                  "chapter_number": 999,
+                  "created_at": "2026-07-01T23:01:27.271933+00:00"
+                },
+                {
+                  "id": "6d241b28-8b0c-4b06-b5aa-fd14c2dc36a3",
+                  "title": "Prologue A: The Crescent Mark (Oxford, 1214)",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "d503b5ce-489d-4f87-92df-3cfac2eb3f4b",
+                  "chapter_number": 0,
+                  "created_at": "2026-07-01T22:41:00.363652+00:00"
+                },
+                {
+                  "id": "a3ef0c87-5302-43bf-83a3-e88bbe2e5469",
+                  "title": "The Accord \u2014 Chapter 999",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "7976c085-41d3-46c6-9444-77b75bbdc289",
+                  "chapter_number": 999,
+                  "created_at": "2026-07-01T22:27:40.859661+00:00"
+                },
+                {
+                  "id": "a50b5d98-9e35-4a0e-b3ea-91aeb5eecaf2",
+                  "title": "Prologue: The Signal (Reykjavik, 14 November 2019)",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "7976c085-41d3-46c6-9444-77b75bbdc289",
+                  "chapter_number": 0,
+                  "created_at": "2026-07-01T22:18:58.766354+00:00"
+                },
+                {
+                  "id": "da21f27b-e3e7-41b6-9b2d-a12690e36918",
+                  "title": "The Overflow Collection",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "d503b5ce-489d-4f87-92df-3cfac2eb3f4b",
+                  "chapter_number": 1,
+                  "created_at": "2026-07-01T22:09:33.864955+00:00"
+                },
+                {
+                  "id": "978f0705-4475-4043-91b8-66de006401b4",
+                  "title": "The Unpublished",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T22:02:13.892935+00:00"
+                },
+                {
+                  "id": "08987e1c-200f-450c-a516-a6f64d50a4c0",
+                  "title": "The Beautiful Machine",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "2701d335-d6af-411c-aeb8-4105132f890f",
+                  "chapter_number": 1,
+                  "created_at": "2026-07-01T21:59:45.600492+00:00"
+                },
+                {
+                  "id": "651d3378-7370-413c-829d-784c10c139f0",
+                  "title": "Signal from the Deep",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T21:53:47.676674+00:00"
+                },
+                {
+                  "id": "be274c22-ec37-4a79-b7d6-64a9694df133",
+                  "title": "The Witness",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T21:52:07.751768+00:00"
+                },
+                {
+                  "id": "ab57e0fe-0105-487f-a100-f4021a52f94a",
+                  "title": "The Consulship of Gaius Varro",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T21:50:20.404262+00:00"
+                },
+                {
+                  "id": "9b20dc10-5139-4bc8-bf17-d8d59d523085",
+                  "title": "The Inoculator",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T21:37:19.396256+00:00"
+                },
+                {
+                  "id": "c10ea7db-e6dc-4518-bf3b-ae6678b684cf",
+                  "title": "a political consultant who realizes the candidate she is man",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T21:24:58.035698+00:00"
+                },
+                {
+                  "id": "152d12a8-51fc-4dc3-9cfd-10551f76a4d8",
+                  "title": "A city maintenance worker discovers the AI managing the city",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T21:14:59.314361+00:00"
+                },
+                {
+                  "id": "3c1e9323-8f95-41e3-a3c1-9a67629b1af5",
+                  "title": "The Ambush at Narvik",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "43fe34a5-fe18-47ba-bf7f-7ff40b9a4d00",
+                  "chapter_number": 2,
+                  "created_at": "2026-07-01T21:08:58.620212+00:00"
+                },
+                {
+                  "id": "376c78d5-9da8-4bea-ac0a-52e270dc087a",
+                  "title": "A junior senator discovers that the AI running the galactic ",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T20:56:51.860117+00:00"
+                },
+                {
+                  "id": "a53c3ed4-f666-4f4b-8d96-c50aedb3054b",
+                  "title": "Sand, Salt, and Secrets: The New Archaeology of Ancient Egypt",
+                  "status": "draft",
+                  "content_type": "newsletter",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T20:55:44.656206+00:00"
+                },
+                {
+                  "id": "d3c30924-4a2e-4e89-a3ab-326d16907a9a",
+                  "title": "AI Content Tools Are Rewriting the Rules of Content Marketing",
+                  "status": "draft",
+                  "content_type": "blog_post",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T20:54:29.444023+00:00"
+                },
+                {
+                  "id": "58414d81-316f-40dc-b51c-8dba962b48e0",
+                  "title": "Who Rules the Sky? How Sci-Fi Has Been Mapping Real Space Politics All Along",
+                  "status": "draft",
+                  "content_type": "blog_post",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T20:53:25.138863+00:00"
+                },
+                {
+                  "id": "91ea05a9-1b93-4210-8694-2657703bf757",
+                  "title": "a robot learning to paint",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T20:46:27.764043+00:00"
+                },
+                {
+                  "id": "22de8204-03c5-421b-bf79-7e06c0cd9157",
+                  "title": "Neon and Chrome: Why Science Fiction's Favorite Aesthetic Owns the Real World Now",
+                  "status": "draft",
+                  "content_type": "blog_post",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T20:44:30.793826+00:00"
+                },
+                {
+                  "id": "9cf1902e-3e8a-412a-bbd7-89dcbd74547c",
+                  "title": "This Month in Political History: Revolutions That Changed the Map",
+                  "status": "draft",
+                  "content_type": "newsletter",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T20:23:38.146509+00:00"
+                },
+                {
+                  "id": "f2830a99-2548-461d-9881-fc2f95cf0634",
+                  "title": "An AI trained to write ad copy for a luxury perfume brand st",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T20:22:29.072543+00:00"
+                },
+                {
+                  "id": "1cece337-60bd-4bcb-9ce1-a15330bc3dd6",
+                  "title": "The Forgotten Engineers of Rome: How Aqueducts Shaped an Empire",
+                  "status": "draft",
+                  "content_type": "blog_post",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T20:21:16.231163+00:00"
+                },
+                {
+                  "id": "f9f462d2-9adc-46ea-bf46-4d928de42331",
+                  "title": "A historian discovers that antique photographs can transport",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T20:19:09.903679+00:00"
+                },
+                {
+                  "id": "f3b2ddec-a012-4207-8f2a-2223e6b6f876",
+                  "title": "The World Is Already Ending: Why Post-Apocalyptic Fiction Hits Different in 2026",
+                  "status": "draft",
+                  "content_type": "blog_post",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T20:16:45.986419+00:00"
+                },
+                {
+                  "id": "1738646d-25ec-46bf-89c5-2ffdab1ce01b",
+                  "title": "Find my draft short story about the Titanic",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T19:41:18.644437+00:00"
+                },
+                {
+                  "id": "bf907c51-3deb-4c91-8c49-c8fd31923854",
+                  "title": "Io Saturnalia! A Year of Roman Festivals",
+                  "status": "draft",
+                  "content_type": "newsletter",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-06-21T21:02:04.119622+00:00"
+                },
+                {
+                  "id": "6c3d149d-ce85-4283-8f1f-7575f4c70b98",
+                  "title": "Find my draft short story about the Titanic",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-06-21T20:59:41.575159+00:00"
+                },
+                {
+                  "id": "d3a89f63-ac9a-428c-81e8-133eace00600",
+                  "title": "When the World Turned: Revolutions That Remade History",
+                  "status": "draft",
+                  "content_type": "newsletter",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-06-21T20:46:44.669379+00:00"
+                },
+                {
+                  "id": "64dbc7d1-ba0f-400b-a0f8-a493779ae286",
+                  "title": "Marketing in 2026 Looks Nothing Like It Did Two Years Ago",
+                  "status": "draft",
+                  "content_type": "blog_post",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-06-21T20:45:41.002202+00:00"
+                },
+                {
+                  "id": "fc9d9bf7-c95d-4250-bb71-6f390162ee2d",
+                  "title": "The Unpublished",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-06-21T20:18:33.860702+00:00"
+                },
+                {
+                  "id": "0786347f-8a47-464e-9aa9-e45c123423a0",
+                  "title": "The Witness",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-06-21T20:16:23.933587+00:00"
+                },
+                {
+                  "id": "0e32f79f-8e2b-4804-b440-edb6be637381",
+                  "title": "The Consulship of Gaius Varro",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-06-21T20:14:40.211719+00:00"
+                },
+                {
+                  "id": "269d9660-ce3b-49e7-b910-bdc44d5d22a8",
+                  "title": "The Inoculator",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-06-21T20:12:58.537556+00:00"
+                },
+                {
+                  "id": "3d1725a9-4c74-468b-b47a-55fd4deae88b",
+                  "title": "New Finds Reshaping Ancient Egypt",
+                  "status": "draft",
+                  "content_type": "newsletter",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-06-21T19:42:54.097778+00:00"
+                },
+                {
+                  "id": "213e4f63-81a9-4bc6-988c-ba4d5b89ad6b",
+                  "title": "a robot learning to paint",
+                  "status": "draft",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-06-21T19:36:31.692638+00:00"
+                },
+                {
+                  "id": "4e3789fe-0b18-4c92-a9df-e8a4c8d29a5c",
+                  "title": "This Month in Political History: Revolutions That Changed the Map",
+                  "status": "draft",
+                  "content_type": "newsletter",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-06-21T18:57:06.114374+00:00"
+                },
+                {
+                  "id": "79596c4f-c5dc-458c-99e6-2e13a99b410e",
+                  "title": "Power Structures in Space: How Sci-Fi Predicts Real-World Politics",
+                  "status": "draft",
+                  "content_type": "newsletter",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-06-21T18:52:05.880569+00:00"
+                },
+                {
+                  "id": "e779fe6d-a82d-4922-9f1d-8f4b7a6d9f73",
+                  "title": "Epilogue: What the Ground Keeps",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 95,
+                  "created_at": "2026-06-06T22:53:17.913334+00:00"
+                },
+                {
+                  "id": "bc81deb7-84c2-4886-88e5-cfe271b4783b",
+                  "title": "The Federal Petition [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 91,
+                  "created_at": "2026-06-06T22:51:58.392072+00:00"
+                },
+                {
+                  "id": "acdd411d-ecc9-402f-b0d6-750a9a3ec4c2",
+                  "title": "Marcus's Redemption [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 83,
+                  "created_at": "2026-06-06T22:51:54.275424+00:00"
+                },
+                {
+                  "id": "290fc866-90bd-4393-a3e3-4198dbba25ca",
+                  "title": "The Site, One Year Later [Present \u2014 2025]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 94,
+                  "created_at": "2026-06-06T22:50:59.47364+00:00"
+                },
+                {
+                  "id": "d9725f07-45f0-4f7a-9905-a0556952bbca",
+                  "title": "What It Costs Slade [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 86,
+                  "created_at": "2026-06-06T22:48:17.883191+00:00"
+                },
+                {
+                  "id": "e83b4fcd-25c2-4ced-8b20-6d5f38a87c65",
+                  "title": "Nora's Quilt, Finished [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 93,
+                  "created_at": "2026-06-06T22:47:37.199583+00:00"
+                },
+                {
+                  "id": "8e5765c6-d6a3-4df5-b786-632f3a763a1c",
+                  "title": "Kimi's Archive, Continued [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 88,
+                  "created_at": "2026-06-06T22:47:03.806043+00:00"
+                },
+                {
+                  "id": "88bb3756-f347-483f-8563-579b2cc1f80c",
+                  "title": "The Mound, Closed [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 90,
+                  "created_at": "2026-06-06T22:46:44.847056+00:00"
+                },
+                {
+                  "id": "6854fc3e-335a-4aab-aacb-4ea647d3dd56",
+                  "title": "Voss's Footnote [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 92,
+                  "created_at": "2026-06-06T22:46:36.888639+00:00"
+                },
+                {
+                  "id": "10b6e941-4e54-428d-8580-7e3110e5542c",
+                  "title": "What It Costs Nora [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 87,
+                  "created_at": "2026-06-06T22:46:27.808548+00:00"
+                },
+                {
+                  "id": "2e03fea9-36b3-40b5-8513-2bcc89b785e2",
+                  "title": "Wren's Report [Present \u2014 2024]",
+                  "status": "draft",
+                  "content_type": "chapter",
+                  "project_id": "62cc734f-c861-4210-bc12-e9ea002fcf66",
+                  "chapter_number": 89,
+                  "created_at": "2026-06-06T22:44:02.377308+00:00"
+                }
+              ],
+              "count": 50,
+              "found": true,
+              "search_term": null
+            }
+          },
+          "error": null,
+          "next_stage": null
+        },
+        "job_id": null,
+        "status": null,
+        "jobs": null,
+        "error": null
+      },
+      "job_result": null,
+      "resolved_prompt": "List my drafts"
+    }
+  ],
+  "expected": [
+    "routes to library listing (status=draft), kind=data; \"The Forgotten Engineers of Rome\" present with status=draft"
+  ]
+}

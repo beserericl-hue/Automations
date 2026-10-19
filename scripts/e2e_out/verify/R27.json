@@ -1,0 +1,61 @@
+{
+  "id": "R27",
+  "title": "List Scheduled Content",
+  "route": "`library.list-outlines` (info) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.list-outlines got=library.retrieve MISMATCH",
+    "items=1 found=True"
+  ],
+  "steps": [
+    [
+      "chat",
+      "List my scheduled content"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "data",
+        "assistant_message": "",
+        "tool": "library",
+        "op": "retrieve",
+        "data": {
+          "execution_id": "126edcd9-51c6-4870-8657-1bc6e6d3bd0c",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "retrieve",
+            "result": {
+              "items": [
+                {
+                  "id": "7a7289de-22b0-4bd3-b6b6-627a12691577",
+                  "title": "Power Structures in Space: How Sci-Fi Predicts Real-World Politics",
+                  "status": "scheduled",
+                  "content_type": "newsletter",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-07-01T20:17:41.698774+00:00"
+                }
+              ],
+              "count": 1,
+              "found": true,
+              "search_term": null
+            }
+          },
+          "error": null,
+          "next_stage": null
+        },
+        "job_id": null,
+        "status": null,
+        "jobs": null,
+        "error": null
+      },
+      "job_result": null,
+      "resolved_prompt": "List my scheduled content"
+    }
+  ],
+  "expected": [
+    "routes to `library.list-outlines`, kind=data; returns the R26 item with scheduled date"
+  ]
+}

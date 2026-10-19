@@ -1,0 +1,42 @@
+{
+  "test": {
+    "id": "R73",
+    "title": "Write Epilogue \u2014 The Accord",
+    "source": "chat",
+    "prompt": "Write the epilogue for \"The Accord\". Genre slug: political-scifi.",
+    "route": "chapter.write` (task)",
+    "prerequisite": "R71",
+    "expected": [
+      "routes to `chapter.write`, kind=queued; complete; chapter_number=Epilogue; labeled \"Epilogue\" not \"Chapter 11\"",
+      "epilogue-specific prompt; 1500-3000 words; set 20 years later per R71; `published_content_v2` row",
+      "email subject \"The Accord - Epilogue\"; chapter_count NOT incremented; `story_bible_v2`; snapshot; Prime Directive"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing the epilogue for \"The Accord\" \u2014 I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "write",
+    "data": null,
+    "job_id": "bed60008c46f45f9bffa0dc46a92b748",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "bed60008c46f45f9bffa0dc46a92b748",
+    "status": "complete",
+    "result": {
+      "execution_id": "c876c8b3-e47b-4661-bd2c-ceec088c767b",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValidationError",
+        "message": "2 validation errors for WriteChapterRequest\nproject_id\n  Field required [type=missing, input_value={'project_title': 'The Ac...t': True, 'async': True}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nchapter_number\n  Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='epilogue', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/int_parsing",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

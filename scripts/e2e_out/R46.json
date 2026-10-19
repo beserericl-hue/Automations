@@ -1,0 +1,41 @@
+{
+  "test": {
+    "id": "R46",
+    "title": "Prime Directive \u2014 Chapter",
+    "source": "chat",
+    "prompt": "Write chapter 2 of \"The Seed Vault\". Genre slug: post-apocalyptic. Chapter number: 2. Brief: The botanist encounters the first raider scouts approaching the vault. She must decide whether to hide or make contact. Research topics: [\"Svalbard seed vault security systems\", \"post-collapse social dynamics\"]",
+    "route": "chapter.write` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `chapter.write`, kind=queued; complete",
+      "No cliches/buzzwords; tight descriptions; concrete action; respects reader; CR-009 email received"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing chapter 2 of \"The Seed Vault\" \u2014 I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "write",
+    "data": null,
+    "job_id": "f82ada5f764249aeb06b1d0f7b4397f4",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "f82ada5f764249aeb06b1d0f7b4397f4",
+    "status": "complete",
+    "result": {
+      "execution_id": "96ae6ada-10a8-49cc-bf20-de230ae1e98b",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValidationError",
+        "message": "1 validation error for WriteChapterRequest\nproject_id\n  Field required [type=missing, input_value={'project_title': 'The Se...t': True, 'async': True}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

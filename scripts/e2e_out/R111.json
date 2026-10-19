@@ -1,0 +1,43 @@
+{
+  "test": {
+    "id": "R111",
+    "title": "\u2014 Brainstorm Chapter Outline for Prologue (Same Arc)",
+    "source": "chat",
+    "prompt": "Create a chapter outline for the Prologue of \"The Signal Beneath\"",
+    "route": "chapter.plan` (task)",
+    "prerequisite": "R110",
+    "expected": [
+      "routes `chapter.plan`, kind=queued (NOT chapter.write); completed",
+      "`writing_projects_v2.outline.chapters[prologue].chapter_outline.sub_chapters` 3\u20137 entries; each: number/title/brief/arc_beat/characters/setting/emotional_tone/connects_to_book_arc",
+      "character names match book outline exactly; arc_beat = Hero's Journey stages; chapter_story_arc inherited; book_arc_beat present",
+      "CR-009 email; no chapter prose written"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Planning the outline for the Prologue of \"The Signal Beneath\".",
+    "tool": "chapter",
+    "op": "plan",
+    "data": null,
+    "job_id": "023fd28b83ef4721ad74da91ffc48409",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "023fd28b83ef4721ad74da91ffc48409",
+    "status": "complete",
+    "result": {
+      "execution_id": "612def9c-3a83-4428-b8c2-8beb1d25d4fb",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValueError",
+        "message": "invalid literal for int() with base 10: 'Prologue'",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

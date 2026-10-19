@@ -1,0 +1,63 @@
+{
+  "test": {
+    "id": "R16",
+    "title": "Write Newsletter (political-history)",
+    "source": "chat",
+    "prompt": "Write a newsletter for the political-history genre. Topic: \"This Month in Political History: Revolutions That Changed the Map\". Genre slug: political-history. Date: 2026-03-10.",
+    "route": "chapter.newsletter` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to newsletter durable saga, kind=queued; job reaches status=complete",
+      "Newsletter uses political-history tone (analytical, layered, draws parallels)",
+      "**Prime Directive:** Facts over hype. Show don't tell. No filler.",
+      "Cover art: documentary/oil painting style, amber lighting",
+      "Email arrives; Draft row in `published_content_v2`; CR-009 email received"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing your newsletter for the political-history genre. I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "newsletter",
+    "data": null,
+    "job_id": "baf04ce0c40644949a11c5962a8bde3d",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "baf04ce0c40644949a11c5962a8bde3d",
+    "status": "complete",
+    "result": {
+      "execution_id": "ca731aa6-65df-4082-adb2-b48039c2b07e",
+      "step_name": "chapter",
+      "status": "ok",
+      "payload": {
+        "op": "newsletter",
+        "result": {
+          "written": true,
+          "title": "This Month in Political History: Revolutions That Changed the Map",
+          "subject_line": "When the Map Broke: The Revolutions That Redrew Everything",
+          "content_text": "_From Paris streets to global borders, how a few years of upheaval reshaped the modern world._\n\nIn the summer of 1789, a crowd stormed a prison in Paris that held only seven inmates. The Bastille was more symbol than fortress. But symbols, it turns out, can bring down kingdoms. The French Revolution did not just change France. It changed how people everywhere thought about power, rights, and who gets to govern whom. This month, we look at how that revolution unfolded, what drove it, and why its consequences still echo in political arguments today.\n\n## A Kingdom Running Out of Money\n\nThe French Revolution did not begin with ideology. It began with debt. By the late 1780s, France was effectively bankrupt, drained by war costs, an inefficient tax system, and a nobility that largely exempted itself from paying. King Louis XVI had no good options. In May 1789, he summoned the Estates General, a representative body that had not met since 1614. That decision cracked open a political system that had been sealed shut for 175 years. The three estates, clergy, nobility, and commoners, arrived in Versailles with very different ideas about what should happen next. (https://en.wikipedia.org/wiki/French_Revolution)\n\n## The Third Estate Breaks the Frame\n\nThe commoners who made up the Third Estate represented roughly 97 percent of France's population. Yet under the old rules, their votes counted no more than the clergy's or the nobility's. In June 1789, they refused to accept that arrangement. They declared themselves a National Assembly and swore not to disband until France had a constitution. This was not a petition. It was a direct challenge to the Ancien r\u00e9gime, the entire social and political order built on royal authority and inherited privilege. The crown's legitimacy had not been abolished yet, but it had been publicly questioned in a way it could not survive. (https://en.wikipedia.org/wiki/French_Revolution)\n\n## The Bastille and What Followed\n\nOn 14 July 1789, Parisian crowds stormed the Bastille fortress. The act was as much theatrical as tactical, the prison held few prisoners and posed little military threat. But it told the king something he could not ignore: Paris was no longer under his control. What followed moved fast. The Assembly abolished feudalism. It stripped the Catholic Church of its independent authority over French civil life. It issued the Declaration of the Rights of Man and of the Citizen, a document that placed individual liberty and legal equality at the center of political life. Within months, France had dismantled institutions that had structured society for centuries. (https://en.wikipedia.org/wiki/French_Revolution)\n\n## From Reform to Terror\n\nRevolutions rarely stay moderate. France's did not. By September 1792, the monarchy was gone and the French First Republic had been declared. Louis XVI was executed in January 1793. The Reign of Terror followed, a period in which the revolutionary government executed thousands of perceived enemies, including many of its own early supporters. The same ideals of liberty and popular sovereignty that inspired the revolution were used to justify mass political violence. This pattern, radical reform collapsing into authoritarian control, would repeat in revolutions across the next two centuries, from Russia to China to Iran. France's experience became a reference point, and a warning. (https://en.wikipedia.org/wiki/French_Revolution)\n\n## The Map Changes, and Keeps Changing\n\nThe revolution did not stay inside France. It triggered the French Revolutionary Wars, pulling most of Europe into conflict. French armies carried revolutionary ideas, and French imperial ambitions, into neighboring states. Old dynasties fell or scrambled to adapt. New borders appeared. The concept of the nation-state, defined by shared citizenship rather than dynastic inheritance, spread across the continent. By the time Napoleon's coup of 18 Brumaire ended the revolutionary period in November 1799, France had been transformed from an absolute monarchy into a republic, and Europe had been permanently unsettled. The political vocabulary we still use, left and right, citizen, republic, rights, comes largely from this decade. (https://blog.oup.com/2014/02/world-revolutions-timeline-map/)\n\nThe French Revolution raises questions that no political system has fully answered: How do you dismantle an unjust order without the dismantling becoming its own form of injustice? When does legitimate popular anger become mob rule? And who, exactly, gets included in 'the people'? These are not historical curiosities. They show up in contemporary debates about constitutional reform, political violence, and democratic legitimacy. We'd like to hear from you: Which revolution do you think had the most lasting impact on the world's political map, and why? Reply to this email or join the conversation in our reader forum.",
+          "word_count": 745,
+          "section_count": 5,
+          "persist": {
+            "persisted": true,
+            "content_id": "4e3789fe-0b18-4c92-a9df-e8a4c8d29a5c"
+          },
+          "token_usage": {
+            "calls": 2,
+            "input_tokens": 1188,
+            "output_tokens": 1649,
+            "cache_read_tokens": 0,
+            "cache_write_tokens": 0,
+            "total_tokens": 2837,
+            "cost_usd": 0.028299
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

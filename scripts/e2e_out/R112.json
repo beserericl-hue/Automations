@@ -1,0 +1,129 @@
+{
+  "test": {
+    "id": "R112",
+    "title": "\u2014 Brainstorm Chapter Outline for Chapter 1 (Same Arc)",
+    "source": "chat",
+    "prompt": "Create a chapter outline for Chapter 1 of \"The Signal Beneath\"",
+    "route": "chapter.plan` (task)",
+    "prerequisite": "R110, R111",
+    "expected": [
+      "routes `chapter.plan`, kind=queued; completed; sub_chapters 3\u20137",
+      "briefs reflect book Ch1 brief (no drift); Prologue context injected (acknowledges prior events); Ch2 context injected (sets up hook); names match book outline; saved to outline; CR-009 email"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing the chapter outline for Chapter 1 of \"The Signal Beneath\" \u2014 I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "plan",
+    "data": null,
+    "job_id": "e27965fc195645a5be8189d3f4352a29",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "e27965fc195645a5be8189d3f4352a29",
+    "status": "complete",
+    "result": {
+      "execution_id": "6bb9f270-7311-442f-966d-8a1fe7ca2e7a",
+      "step_name": "chapter",
+      "status": "ok",
+      "payload": {
+        "op": "plan",
+        "result": {
+          "chapter_number": 1,
+          "chapter_story_arc": "",
+          "book_arc": "",
+          "sub_chapter_briefs": [
+            {
+              "number": 1,
+              "title": "The World Before",
+              "beat": "Protagonist moves through their ordinary daily routine, revealing what they love and what quietly unsettles them \u2014 a specific object, habit, or relationship signals that something is already slightly wrong beneath the surface.",
+              "pov_character": "",
+              "brief": "Protagonist moves through their ordinary daily routine, revealing what they love and what quietly unsettles them \u2014 a specific object, habit, or relationship signals that something is already slightly wrong beneath the surface.",
+              "arc_beat": "Ordinary World \u2014 establish stakes before disruption",
+              "characters": [
+                "Protagonist"
+              ],
+              "setting": "Protagonist's home or habitual daily environment, morning",
+              "emotional_tone": "Deceptive calm with an undercurrent of restlessness",
+              "connects_to_book_arc": "Anchors the reader in the world that will be destroyed or transformed \u2014 the loss of this world must matter later."
+            },
+            {
+              "number": 2,
+              "title": "The Thing That Is Already Wrong",
+              "beat": "A specific, concrete problem \u2014 a letter unopened, a person avoided, a debt unacknowledged \u2014 is revealed. The protagonist makes a small choice to ignore or defer it. ESCALATION SEED: this deferral is the lie/avoidance that will compound. Reappears with pressure ~ch.5; explodes ~ch.12.",
+              "pov_character": "",
+              "brief": "A specific, concrete problem \u2014 a letter unopened, a person avoided, a debt unacknowledged \u2014 is revealed. The protagonist makes a small choice to ignore or defer it. ESCALATION SEED: this deferral is the lie/avoidance that will compound. Reappears with pressure ~ch.5; explodes ~ch.12.",
+              "arc_beat": "Inciting Pressure \u2014 the flaw or threat that already exists",
+              "characters": [
+                "Protagonist"
+              ],
+              "setting": "Same environment, slightly later \u2014 a private moment",
+              "emotional_tone": "Low-grade dread, rationalisation, false reassurance",
+              "connects_to_book_arc": "Plants the escalating thread: a small avoidance now becomes the engine of later catastrophe."
+            },
+            {
+              "number": 3,
+              "title": "The Other Person",
+              "beat": "A second character enters \u2014 ally, antagonist, or complication. A specific exchange of dialogue reveals the relationship's tension or warmth AND delivers a piece of information the protagonist does not yet know how to use.",
+              "pov_character": "",
+              "brief": "A second character enters \u2014 ally, antagonist, or complication. A specific exchange of dialogue reveals the relationship's tension or warmth AND delivers a piece of information the protagonist does not yet know how to use.",
+              "arc_beat": "World Population \u2014 introduce the relational stakes",
+              "characters": [
+                "Protagonist",
+                "Secondary Character A"
+              ],
+              "setting": "A shared space \u2014 workplace, street, kitchen, threshold",
+              "emotional_tone": "Charged, watchful \u2014 affection and wariness coexist",
+              "connects_to_book_arc": "Establishes the human relationship whose fate will measure the protagonist's success or failure by the final chapter."
+            },
+            {
+              "number": 4,
+              "title": "The Inciting Event",
+              "beat": "Something happens that cannot be ignored or deferred. It is external, concrete, and irreversible \u2014 a message arrives, a confrontation occurs, a discovery is made. The protagonist's hope and fear from sub-chapter 1 are both activated simultaneously.",
+              "pov_character": "",
+              "brief": "Something happens that cannot be ignored or deferred. It is external, concrete, and irreversible \u2014 a message arrives, a confrontation occurs, a discovery is made. The protagonist's hope and fear from sub-chapter 1 are both activated simultaneously.",
+              "arc_beat": "Inciting Incident \u2014 the world changes",
+              "characters": [
+                "Protagonist",
+                "Secondary Character A"
+              ],
+              "setting": "The same environment or an immediate adjacent space \u2014 no time jump",
+              "emotional_tone": "Shock, then rapid calculation \u2014 the ground has shifted",
+              "connects_to_book_arc": "This is the hinge: everything before is the old life; everything after is the story. The book-level conflict is now in motion."
+            },
+            {
+              "number": 5,
+              "title": "The First Decision",
+              "beat": "The protagonist makes a concrete, active choice in response to the inciting event \u2014 not a plan, but an action taken or a door walked through. The choice is imperfect and will cost something. The chapter ends on a new dramatic question that pulls the reader into chapter 2.",
+              "pov_character": "",
+              "brief": "The protagonist makes a concrete, active choice in response to the inciting event \u2014 not a plan, but an action taken or a door walked through. The choice is imperfect and will cost something. The chapter ends on a new dramatic question that pulls the reader into chapter 2.",
+              "arc_beat": "Crossing the Threshold \u2014 protagonist commits to the story",
+              "characters": [
+                "Protagonist"
+              ],
+              "setting": "A liminal space \u2014 a doorway, a vehicle, a street \u2014 movement away from the ordinary world",
+              "emotional_tone": "Determined but afraid \u2014 no going back",
+              "connects_to_book_arc": "The protagonist is now an active agent in the book-level conflict. The reader's question \u2014 'will they succeed?' \u2014 is fully formed and unresolved."
+            }
+          ],
+          "count": 5,
+          "persist": null,
+          "token_usage": {
+            "calls": 1,
+            "input_tokens": 48,
+            "output_tokens": 991,
+            "cache_read_tokens": 0,
+            "cache_write_tokens": 1032,
+            "total_tokens": 2071,
+            "cost_usd": 0.018879
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

@@ -1,0 +1,143 @@
+{
+  "id": "R112",
+  "title": "Brainstorm Chapter Outline for Chapter 1 (Same Arc)",
+  "route": "`chapter.plan` (task) \u00b7 impl: built (E2E-4)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=chapter.plan got=chapter.plan OK",
+    "job=complete",
+    "sub_chapters=5 arc=The Hero's Journey"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Create a chapter outline for Chapter 1 of \"The Signal Beneath\""
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Planning the outline for Chapter 1 of \"The Signal Beneath\" now. I'll let you know when it's ready.",
+        "tool": "chapter",
+        "op": "plan",
+        "data": null,
+        "job_id": "58c9cdae0d174ff8a311b062fd4d42f9",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "58c9cdae0d174ff8a311b062fd4d42f9",
+        "status": "complete",
+        "result": {
+          "execution_id": "afb720de-2107-4998-9275-a9568836c4d5",
+          "step_name": "chapter",
+          "status": "ok",
+          "payload": {
+            "op": "plan",
+            "result": {
+              "chapter_number": 1,
+              "chapter_story_arc": "The Hero's Journey",
+              "book_arc": "The Hero's Journey",
+              "sub_chapter_briefs": [
+                {
+                  "number": 1,
+                  "title": "2 A.M. and the Dead Bands",
+                  "beat": "Mara sits at her receiver in the pre-dawn dark, running her nightly scan of the shortwave bands \u2014 all silence, as always \u2014 when the needle on 7.850 MHz twitches and holds. She does not move. She listens.",
+                  "pov_character": "",
+                  "brief": "Mara sits at her receiver in the pre-dawn dark, running her nightly scan of the shortwave bands \u2014 all silence, as always \u2014 when the needle on 7.850 MHz twitches and holds. She does not move. She listens.",
+                  "arc_beat": "Stage 2 \u2014 Call to Adventure (first contact: the signal arrives unbidden into the silence Mara has accepted as permanent)",
+                  "characters": [
+                    "Mara Voss"
+                  ],
+                  "setting": "Mara's fortified farmhouse \u2014 the receiver room, a former kitchen stripped to its studs and rebuilt around salvaged equipment; 2 a.m., no light except the amber glow of the dial",
+                  "emotional_tone": "Hyperalert stillness \u2014 the specific quality of attention Mara reserves for things that should not exist",
+                  "connects_to_book_arc": "The Call to Adventure lands: the signal on 7.850 MHz is the disruption that will end Mara's static existence and begin the journey west; it is undeniable because it is technically impossible, and Mara knows exactly why it is impossible"
+                },
+                {
+                  "number": 2,
+                  "title": "Signal Architecture",
+                  "beat": "Mara works through the night with pencil and logbook, stripping the signal down to its components \u2014 carrier wave, modulation pattern, repeat interval, bearing estimate. She rules out every natural and artifact explanation one by one. Her final notation, underlined twice: intentional. powered. west. 300\u2013400 miles.",
+                  "pov_character": "",
+                  "brief": "Mara works through the night with pencil and logbook, stripping the signal down to its components \u2014 carrier wave, modulation pattern, repeat interval, bearing estimate. She rules out every natural and artifact explanation one by one. Her final notation, underlined twice: intentional. powered. west. 300\u2013400 miles.",
+                  "arc_beat": "Stage 2 \u2014 Call to Adventure (the call is confirmed and quantified: this is not noise, it is a summons)",
+                  "characters": [
+                    "Mara Voss"
+                  ],
+                  "setting": "Same receiver room; the hour advances toward 4 a.m.; the logbook fills with Mara's private shorthand; a mechanical watch ticks on the shelf above the receiver",
+                  "emotional_tone": "Focused dread \u2014 the excitement of a technician who has found something extraordinary and the fear of someone who understands exactly what finding it means",
+                  "connects_to_book_arc": "Establishes Mara's core competence and the signal's reality before the story can complicate either; the technical confirmation is the threshold moment that makes refusal a choice rather than a default"
+                },
+                {
+                  "number": 3,
+                  "title": "The Fire She Does Not Light",
+                  "beat": "Mara tears the logbook pages out, holds them over the cold stove, and does not strike the match. She stands there long enough that her hand stops shaking. Then she folds the pages and puts them in her coat pocket. She tells herself this is not a decision.",
+                  "pov_character": "",
+                  "brief": "Mara tears the logbook pages out, holds them over the cold stove, and does not strike the match. She stands there long enough that her hand stops shaking. Then she folds the pages and puts them in her coat pocket. She tells herself this is not a decision.",
+                  "arc_beat": "Stage 3 \u2014 Refusal of the Call (the refusal is enacted physically \u2014 she almost destroys the evidence \u2014 and psychologically \u2014 she refuses to name what keeping it means)",
+                  "characters": [
+                    "Mara Voss"
+                  ],
+                  "setting": "The kitchen stove, cold; the farmhouse around her is dark and silent; first grey light beginning at the window",
+                  "emotional_tone": "Paralysis at the edge of commitment \u2014 the specific terror of someone who knows that knowing something changes everything",
+                  "connects_to_book_arc": "The refusal is rooted in Mara's wound: she left Dani to chase equipment and he died; going west means leaving again, and she does not yet know how to hold that; the unlit match is the novel's first image of a choice deferred"
+                },
+                {
+                  "number": 4,
+                  "title": "Memory Is Its Own Transmission",
+                  "beat": "By full daylight, Mara has rewritten every page from memory into a fresh logbook \u2014 neater than the originals, more complete, with a bearing calculation she did not have the first time. She stares at what she has done. The signal repeats on the receiver behind her, right on schedule.",
+                  "pov_character": "",
+                  "brief": "By full daylight, Mara has rewritten every page from memory into a fresh logbook \u2014 neater than the originals, more complete, with a bearing calculation she did not have the first time. She stares at what she has done. The signal repeats on the receiver behind her, right on schedule.",
+                  "arc_beat": "Stage 3 \u2014 Refusal of the Call collapses into Stage 2 \u2014 the refusal fails; the call is louder than the fear",
+                  "characters": [
+                    "Mara Voss"
+                  ],
+                  "setting": "The receiver room again, morning light; the fresh logbook open on the workbench; the receiver still running",
+                  "emotional_tone": "Rueful self-knowledge \u2014 Mara recognizes that she has already decided, that the rewriting was not compulsion but choice, and that she is afraid of herself for it",
+                  "connects_to_book_arc": "The escalating lie thread begins here in embryo: Mara has destroyed and recreated evidence, a habit of self-deception about her own motives that will compound when she makes the promise to Tom\u00e1s in Chapter 2 and begins qualifying it immediately; ESCALATION SEED \u2014 starts: Mara tells herself she is 'just documenting,' not deciding (Ch. 1); must reappear: Mara makes a promise to Tom\u00e1s she privately hedges (Ch. 2); explodes: the hedged promise costs someone something irreversible (Ch. 6)"
+                },
+                {
+                  "number": 5,
+                  "title": "The Knock",
+                  "beat": "A knock at the farmhouse door \u2014 Tom\u00e1s Reyes, two days early on his courier route, sheltering from weather. Mara lets him in. He sees the receiver running, hears the signal cycling through its repeat, and goes very still in a way that mirrors her own stillness. He says: 'That's not atmospheric.' He does not say what it is. He looks at her and waits.",
+                  "pov_character": "",
+                  "brief": "A knock at the farmhouse door \u2014 Tom\u00e1s Reyes, two days early on his courier route, sheltering from weather. Mara lets him in. He sees the receiver running, hears the signal cycling through its repeat, and goes very still in a way that mirrors her own stillness. He says: 'That's not atmospheric.' He does not say what it is. He looks at her and waits.",
+                  "arc_beat": "Stage 2 \u2014 Call to Adventure widens: a second witness arrives who recognizes the signal's significance, transforming Mara's private discovery into a shared crisis and making the journey suddenly possible",
+                  "characters": [
+                    "Mara Voss",
+                    "Tom\u00e1s Reyes"
+                  ],
+                  "setting": "The farmhouse door and receiver room; mid-morning; rain beginning outside",
+                  "emotional_tone": "The specific unease of a secret becoming shared \u2014 relief and exposure at once; the scene ends on suspension, not resolution",
+                  "connects_to_book_arc": "Sets up Chapter 2 directly: Tom\u00e1s has recognized something Mara has not yet named aloud; his military signals background will identify the encryption pattern as the hook that opens the next chapter; the dramatic question propelling the reader forward is not whether the signal is real \u2014 that is confirmed \u2014 but what Tom\u00e1s knows about it that Mara does not"
+                }
+              ],
+              "count": 5,
+              "persist": {
+                "persisted": true,
+                "chapter_number": 1
+              },
+              "token_usage": {
+                "calls": 1,
+                "input_tokens": 1750,
+                "output_tokens": 1611,
+                "cache_read_tokens": 6788,
+                "cache_write_tokens": 0,
+                "total_tokens": 10149,
+                "cost_usd": 0.031451
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Create a chapter outline for Chapter 1 of \"The Signal Beneath\""
+    }
+  ],
+  "expected": [
+    "routes `chapter.plan`, kind=queued; completed; sub_chapters 3\u20137",
+    "briefs reflect book Ch1 brief (no drift); Prologue context injected (acknowledges prior events); Ch2 context injected (sets up hook); names match book outline; saved to outline; CR-009 email"
+  ]
+}

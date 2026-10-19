@@ -1,0 +1,71 @@
+{
+  "id": "R43",
+  "title": "Prime Directive \u2014 Blog Post",
+  "route": "`chapter.blog` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=chapter.blog got=chapter.blog OK",
+    "job=complete",
+    "blog_post recent=5 word_count=1206 persist=True"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Write a blog post in the ai-marketing genre. Topic: \"How AI Tools Are Changing Content Marketing\". Genre slug: ai-marketing. Keywords: AI content tools, marketing automation, generative AI. Target length: 1200 words."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Queuing your blog post \u2014 I'll let you know when it's ready.",
+        "tool": "chapter",
+        "op": "blog",
+        "data": null,
+        "job_id": "3aae256a32f74412928cf434b677fcf4",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "3aae256a32f74412928cf434b677fcf4",
+        "status": "complete",
+        "result": {
+          "execution_id": "cccdd3cd-a12e-4de5-98dc-1699ff548eff",
+          "step_name": "chapter",
+          "status": "ok",
+          "payload": {
+            "op": "blog",
+            "result": {
+              "written": true,
+              "title": "AI Content Tools Are Rewriting the Rules of Content Marketing",
+              "content_text": "# AI Content Tools Are Rewriting the Rules of Content Marketing\n\nA content strategist sits down on a Monday morning. Instead of staring at a blank document, she opens an AI tool, feeds it last week's search trend data, and gets back 12 topic clusters, 40 potential headlines, and a draft outline, before her first coffee is finished. This isn't a future scenario. It's Tuesday at most mid-sized marketing teams right now.\n\nAI content tools and marketing automation have moved from experiment to infrastructure. The question isn't whether to use them. It's how to use them without producing content that reads like everyone else's., -\n\n## From Blank Page to Brief in Minutes\n\nThe biggest immediate impact of generative AI in content marketing is speed at the ideation stage. Tools trained on search data can scan competitor content, identify ranking gaps, and surface topics your audience is actively looking for, all before a writer types a single word.\n\nMarketers feed keyword lists or audience pain points into these systems and get back clusters of ideas, suggested H2 structures, and SEO angles. The strategist's job shifts from generating ideas to evaluating them.\n\nDraft creation follows the same pattern. A writer gives the AI a brief, target audience, goal, tone, key points, and gets back a working structure: intro, subheadings, a rough conclusion. Nobody faces a blank page anymore. The first hour of writing is now editing, not generating.\n\nThis matters for output volume. Teams that once published two long-form pieces a month can now publish six, assuming quality control keeps pace., -\n\n## Personalization That Doesn't Require a Team of Ten\n\nPersonalization used to mean segmenting your email list into three buckets. Now AI-driven platforms can serve different copy variations to different users based on purchase history, browsing behavior, and engagement patterns, automatically, in real time.\n\nAn e-commerce brand might show one version of a product landing page to first-time visitors and a different version to returning customers who've already browsed that category. The AI handles the logic. The marketing team sets the parameters and reviews performance.\n\nEmail is the clearest example. AI systems optimize not just content but send time, subject line, and call-to-action placement for individual users. One subscriber gets the email at 7 a.m. on a Tuesday because that's when they open. Another gets it Thursday afternoon. Neither knows the other exists.\n\nThis kind of personalization at scale was technically possible before. It just required engineering resources most teams didn't have. Marketing automation built on generative AI has made it a standard feature., -\n\n## One Article, Eight Assets\n\nRepurposing content is nothing new. What's changed is how fast it happens and how little manual work it takes.\n\nA 2,000-word pillar article can now be transformed, with AI assistance, into six to eight social posts, a 90-second video script, a downloadable checklist, and a short email sequence. The AI extracts key messages, adjusts tone for each platform, and trims or expands copy to fit format requirements.\n\nLinkedIn wants a different register than TikTok. A checklist needs bullet logic, not narrative flow. An email subject line needs to earn the open in seven words. AI tools handle these translations quickly, leaving human editors to check that the brand voice survived the conversion.\n\nFor small content teams, this is a genuine shift. A two-person team can now produce the content volume of a five-person team. The tradeoff is that the editor's job gets harder, more output means more to review, and the cost of letting thin content through is real., -\n\n## The Quality Problem Nobody Wants to Talk About\n\nSearch engines are actively demoting generic, AI-generated content. Google's helpful content guidance is explicit: thin pages that summarize what's already out there, without adding original insight or demonstrable expertise, rank poorly.\n\nThis creates a real tension. AI tools make it easy to produce a lot of content quickly. But volume without quality is a liability, not an asset.\n\nThe teams navigating this well have added explicit validation steps to their workflows. A common structure looks like this: strategist and AI brainstorm together, writer uses AI to draft, editor fact-checks and rewrites for voice, SEO reviews structure, then content ops repurposes the final piece. Every checkpoint has a human.\n\nThe concern isn't that AI writes badly. It's that AI writes blandly, competently assembling sentences that technically answer a question but don't say anything a reader couldn't find in ten other places. Original research, firsthand experience, specific examples, and genuine opinion are still human contributions. They're also what differentiates content that ranks and gets shared from content that disappears.\n\nMany organizations now add author bylines with credentials, cite primary sources, and include timestamps specifically to signal that a human was involved and accountable. This isn't just an SEO tactic. It's a trust signal., -\n\n## What This Means for Marketing Roles\n\nAI changes roles more than it eliminates them, at least so far.\n\nJunior writers produce first drafts faster. Senior editors spend less time on structure and more time on strategy, brand voice, and quality control. Content strategists focus more on evaluating AI outputs than generating raw ideas. SEO specialists use AI tools to run gap analyses that would have taken days.\n\nThe phrase you hear most often in content teams right now is \"AI helps, humans decide.\" Most organizations have formalized this with review checkpoints, places in the workflow where a human must approve before content moves forward. Facts, tone, legal compliance, and brand alignment all require human sign-off.\n\nThe teams struggling are the ones that removed human review steps to maximize speed. The ones succeeding treat AI as a capable but unreliable first draft, useful, but not finished., -\n\n## Further Reading and Watching\n\nIf you want to go deeper on how AI is reshaping creative and marketing work, these are worth your time:\n\n- **\"The Coming Wave\"** by Mustafa Suleyman, A clear-eyed look at what AI systems can and can't do, written by one of the people who built them.\n- **\"Klara and the Sun\"** by Kazuo Ishiguro, Fiction, but it asks sharp questions about what it means to perceive and communicate like a human versus a machine.\n- **\"The Social Dilemma\"** (Netflix, 2020), Dated in some ways, but still useful on how algorithmic personalization shapes what content people actually see.\n- **\"How Minds Change\"** by David McRaney, Not about AI, but directly relevant to why content that changes behavior requires more than information delivery., -\n\n## The Bottom Line\n\nAI content tools have made research faster, drafting faster, personalization more precise, and repurposing less labor-intensive. Marketing automation handles distribution timing that used to require manual scheduling. Generative AI fills the blank page.\n\nNone of that removes the need for a human who knows what good looks like, understands the audience, and can tell the difference between content that informs and content that just occupies space.\n\nThe teams winning right now treat AI as infrastructure, reliable, fast, and necessary, while keeping human judgment at every decision point that matters., -\n\n**Discussion prompt:** Has your team adopted AI content tools yet? If so, where in the workflow have they made the biggest difference, and where have they created new problems? Share your experience in the comments.",
+              "word_count": 1206,
+              "persist": {
+                "persisted": true,
+                "content_id": "d3c30924-4a2e-4e89-a3ab-326d16907a9a"
+              },
+              "token_usage": {
+                "calls": 2,
+                "input_tokens": 1916,
+                "output_tokens": 2964,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+                "total_tokens": 4880,
+                "cost_usd": 0.050208
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Write a blog post in the ai-marketing genre. Topic: \"How AI Tools Are Changing Content Marketing\". Genre slug: ai-marketing. Keywords: AI content tools, marketing automation, generative AI. Target length: 1200 words."
+    }
+  ],
+  "expected": [
+    "routes to `chapter.blog`, kind=queued; complete",
+    "No \"revolutionize\", \"game-changing\", \"unleash\", \"delve\", \"cutting-edge\", \"leverage\"",
+    "Short paragraphs (2-4 sentences); concrete examples; human voice; no hype; CR-009 email received"
+  ]
+}

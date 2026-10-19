@@ -14,7 +14,8 @@
  * Capture in dark mode:
  *   CAPTURE_THEME=dark npx playwright test e2e/capture-manual-screenshots.spec.ts --project=chromium
  *
- * Requires E2E_TEST_EMAIL and E2E_TEST_PASSWORD env vars (already used by auth.setup).
+ * Requires E2E_TEST_EMAIL + SUPABASE_SERVICE_ROLE_KEY (same vars auth.setup uses; the
+ * product is passwordless, so E2E_TEST_PASSWORD is ignored).
  */
 
 import { test, expect, Page } from '@playwright/test';

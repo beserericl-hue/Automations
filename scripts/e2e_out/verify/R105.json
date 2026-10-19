@@ -1,0 +1,55 @@
+{
+  "id": "R105",
+  "title": "Email Content Not Found",
+  "route": "`library.email-content` (task) \u00b7 impl: built (E2E-1)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.email-content got=library.email-content OK",
+    "job=complete",
+    "emailed=False to=None subject=None err=Couldn't find short_story matching 'A Story That Definitely Does Not Exist'. No email sent.",
+    "(expected not-found)"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Email me the short story titled \"A Story That Definitely Does Not Exist\""
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Sending \"A Story That Definitely Does Not Exist\" to your email.",
+        "tool": "library",
+        "op": "email-content",
+        "data": null,
+        "job_id": "050acf471b2742eca42dbcf974a5719c",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "050acf471b2742eca42dbcf974a5719c",
+        "status": "complete",
+        "result": {
+          "execution_id": "4eb7edec-8ac9-4f1a-9845-84a8ce27dac5",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "email-content",
+            "result": {
+              "emailed": false,
+              "error_message": "Couldn't find short_story matching 'A Story That Definitely Does Not Exist'. No email sent."
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Email me the short story titled \"A Story That Definitely Does Not Exist\""
+    }
+  ],
+  "expected": [
+    "routes to `library.email-content`; no match found \u2192 clear \"not found\" message; no email; job failed (or inline error) with informative error_message"
+  ]
+}

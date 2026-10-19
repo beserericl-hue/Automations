@@ -1,0 +1,107 @@
+{
+  "test": {
+    "id": "R60",
+    "title": "Brainstorm Short Story \u2014 Three-Act Structure (Political History)",
+    "source": "chat",
+    "prompt": "Brainstorm a short story using the Three-Act Structure about a journalist in 1970s Chile who uncovers evidence of CIA involvement in the upcoming coup, but no one will publish her story. Genre: political-history. Title: The Unpublished. 5 sections. Themes: truth vs. power, the cost of speaking out, complicity of silence.",
+    "route": "brainstorm.story`/`brainstorm.short-story` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `brainstorm.story`, kind=queued; complete; `story_arc=\"Three-Act Structure\"`",
+      "`writing_projects_v2` \"The Unpublished\" with 5 sections; Act1 setup; Act2 \u22653 obstacles + midpoint; Act3 pre-climax \u2192 climax \u2192 denouement",
+      "1970s Chile/Pinochet context; denouement addresses truth vs power; goal clear from Act1; CR-009 email \"The Unpublished\""
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Brainstorming a short story outline for 'The Unpublished'. I'll let you know when it's ready.",
+    "tool": "brainstorm",
+    "op": "short-story",
+    "data": null,
+    "job_id": "d68b4c8f643048c3870cd72d12b2c179",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "d68b4c8f643048c3870cd72d12b2c179",
+    "status": "complete",
+    "result": {
+      "execution_id": "80a4833c-2897-4db7-a211-10b9d8608efe",
+      "step_name": "brainstorm",
+      "status": "ok",
+      "payload": {
+        "op": "short-story",
+        "result": {
+          "outline": {
+            "title": "The Unpublished",
+            "premise": "In Santiago, Chile, in the tense months before September 1973, investigative journalist Valentina Reyes obtains irrefutable documentary proof of CIA coordination with Chilean military officers planning a coup against President Allende. She races to publish her findings, but every editor she approaches \u2014 intimidated, complicit, or simply afraid \u2014 turns her away, leaving her holding a truth that the world is not yet willing to print.",
+            "themes": [
+              "The weaponization of silence against inconvenient truth",
+              "Institutional cowardice as a form of political violence",
+              "The personal cost of bearing witness in a collapsing democracy",
+              "Complicity by omission in the machinery of power"
+            ],
+            "story_arc_name": "",
+            "dramatic_question": "",
+            "wow_factor": "",
+            "characters": [
+              {
+                "name": "Valentina Reyes",
+                "role": "Protagonist \u2014 investigative journalist at a Santiago daily newspaper",
+                "arc": "Begins believing that truth, once documented, is unstoppable; ends understanding that truth without a vessel is just another casualty of power, and chooses to preserve the evidence at devastating personal cost."
+              },
+              {
+                "name": "Rodrigo Fuentes",
+                "role": "Valentina's editor at El Diario del Sur, a centrist newspaper",
+                "arc": "Starts as a mentor who prizes journalistic courage, but reveals himself to be a man whose principles dissolve the moment his family's safety is threatened."
+              },
+              {
+                "name": "Comandante H\u00e9ctor Vidal",
+                "role": "Mid-ranking Chilean Army officer and Valentina's clandestine source",
+                "arc": "A conflicted insider who hands Valentina the documents out of conscience, then is disappeared before he can corroborate her story publicly."
+              },
+              {
+                "name": "Margaret Holt",
+                "role": "Santiago bureau chief for an American wire service",
+                "arc": "Presents herself as a fellow truth-seeker but ultimately protects her access and career over the story, embodying the foreign press's complicity."
+              },
+              {
+                "name": "Tom\u00e1s Reyes",
+                "role": "Valentina's younger brother, a student activist",
+                "arc": "His arrest by plainclothes security forces becomes the lever that forces Valentina to choose between publishing and his survival."
+              }
+            ],
+            "chapters": [
+              {
+                "chapter_number": 1,
+                "title": "The Documents",
+                "beat": "Valentina receives a cache of classified cables from Comandante Vidal proving CIA coordination with coup plotters, and her editor Rodrigo initially agrees to run the story \u2014 the ordinary world of a functioning, if fragile, press cracks open with possibility.",
+                "arc_notes": "Act I \u2014 Setup: Ordinary world established (Santiago's embattled free press in mid-1973), inciting incident delivered (Vidal hands over the documents), and First Plot Point reached when Rodrigo gives conditional approval to publish, committing Valentina irrevocably to the story."
+              },
+              {
+                "chapter_number": 2,
+                "title": "Every Door Closes",
+                "beat": "Rodrigo kills the story under pressure from the paper's owners, Vidal vanishes after a midnight arrest, and Margaret Holt at the American wire service declines to run the cables \u2014 then Tom\u00e1s is detained, and a security agent makes clear that Valentina's brother's fate is tied to her silence.",
+                "arc_notes": "Act II \u2014 Confrontation: Early obstacles escalate (Rodrigo's betrayal, Vidal's disappearance, Margaret's refusal) through the Midpoint reversal (Vidal's arrest transforms the story from a publishing problem into a survival crisis and confirms the coup's machinery is already in motion) to the Second Plot Point / darkest moment (Tom\u00e1s's detention strips Valentina of every ally and forces an impossible choice)."
+              },
+              {
+                "chapter_number": 3,
+                "title": "The Archive",
+                "beat": "On the morning of September 11, 1973, as jets circle La Moneda, Valentina surrenders the documents to a Swedish embassy contact for safekeeping rather than destroy them to save Tom\u00e1s \u2014 Tom\u00e1s is eventually released, the story goes unpublished for years, but the cables survive.",
+                "arc_notes": "Act III \u2014 Resolution: Climax arrives when Valentina chooses preservation over immediate publication (transformation made visible \u2014 she has moved from believing truth must be heard now to understanding that truth must first survive), and the resolution closes on the documents sealed in a diplomatic pouch, the coup's smoke rising outside, and Valentina walking toward the detention center to find her brother \u2014 closure that is earned but not triumphant."
+              }
+            ],
+            "form": "short_story"
+          },
+          "persist": {
+            "persisted": false,
+            "reason": "persist requested but project_id/user_id missing"
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

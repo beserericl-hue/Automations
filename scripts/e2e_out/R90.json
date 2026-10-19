@@ -1,0 +1,43 @@
+{
+  "test": {
+    "id": "R90",
+    "title": "Revert Outline \u2014 Invalid Version Number",
+    "source": "chat",
+    "prompt": "Revert the outline for \"The Accord\" to version 99",
+    "route": "library.revert` (outline)",
+    "prerequisite": "R84",
+    "expected": [
+      "routes to `library.revert`; version 99 not found \u2192 clear error (no silent failure)",
+      "`writing_projects_v2.outline` NOT modified; no new snapshot; job status=failed (or inline error) with informative error_message"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Reverting the outline for \"The Accord\" to version 99.",
+    "tool": "library",
+    "op": "revert",
+    "data": null,
+    "job_id": "ac8c48b36298476a8f41b548a7564655",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "ac8c48b36298476a8f41b548a7564655",
+    "status": "complete",
+    "result": {
+      "execution_id": "f166f2bc-6e13-467f-a122-8cb012e33068",
+      "step_name": "library",
+      "status": "ok",
+      "payload": {
+        "op": "revert",
+        "result": {
+          "reverted": false,
+          "error_message": "version 99 not found for 'The Accord'"
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

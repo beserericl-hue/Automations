@@ -1,0 +1,44 @@
+{
+  "test": {
+    "id": "V10",
+    "title": "Voice \u2014 Social Media (Instagram)",
+    "source": "voice",
+    "prompt": "Turn that time travel story about the Titanic into Instagram posts with lots of hashtags",
+    "route": "media.social-posts` (task)",
+    "prerequisite": "",
+    "expected": [
+      "flat `{response, kind=\"queued\"}`",
+      "routes `media.social-posts`",
+      "platform=instagram",
+      "resolves \"that time travel story\" from context",
+      "20-30 hashtags",
+      "CR-009 email"
+    ]
+  },
+  "response": {
+    "response": "Generating Instagram posts for 'time travel story about the Titanic'. I'll let you know when they're ready.",
+    "kind": "queued",
+    "tool": "media",
+    "op": "social-posts",
+    "job_id": "ac0c18ab4ec44b50bdde11cf61f4ab4e",
+    "status": "queued"
+  },
+  "job_result": {
+    "job_id": "ac0c18ab4ec44b50bdde11cf61f4ab4e",
+    "status": "complete",
+    "result": {
+      "execution_id": "1ba3c5fb-bb15-4852-bad6-0bcb8cb4605c",
+      "step_name": "media",
+      "status": "ok",
+      "payload": {
+        "op": "social-posts",
+        "result": {
+          "twitter": "(fixture) social post for twitter: ",
+          "linkedin": "(fixture) social post for linkedin: "
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

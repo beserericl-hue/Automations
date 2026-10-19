@@ -1,0 +1,28 @@
+{
+  "test": {
+    "id": "R04",
+    "title": "Story Bible \u2014 Read (Empty)",
+    "source": "chat",
+    "prompt": "Get the story bible for project \"Regression Test Project\"",
+    "route": "story_bible.list` (info)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `story_bible.list`, kind=data",
+      "Returns empty result or \"no entries found\" (project doesn't exist yet)",
+      "No errors \u2014 confirms DEV Supabase connection works",
+      "Response correctly scoped to user_id \"+14105914612\""
+    ]
+  },
+  "response": {
+    "kind": "reply",
+    "assistant_message": "How can I help with your writing?",
+    "tool": null,
+    "op": null,
+    "data": null,
+    "job_id": null,
+    "status": null,
+    "jobs": null,
+    "error": null
+  },
+  "job_result": null
+}

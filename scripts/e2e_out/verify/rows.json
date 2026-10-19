@@ -1,0 +1,1101 @@
+[
+  {
+    "n": 1,
+    "id": "R01",
+    "verdict": "PASS",
+    "title": "Deep Research (Perplexity)",
+    "ev": "route exp=research.run got=research.run OK | job=complete | research_reports_v2 recent=2 | report_len=17781"
+  },
+  {
+    "n": 2,
+    "id": "R02",
+    "verdict": "PASS",
+    "title": "Save Research Report",
+    "ev": "route exp=research.run got=research.run OK | job=complete | research_reports_v2 recent=3 | report_len=18630"
+  },
+  {
+    "n": 3,
+    "id": "R03",
+    "verdict": "PASS",
+    "title": "Email Report",
+    "ev": "route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=Regression Test: Email Report err=None"
+  },
+  {
+    "n": 4,
+    "id": "R04",
+    "verdict": "PASS",
+    "title": "Story Bible \u2014 Read (Empty)",
+    "ev": "route exp=story_bible.list got=story_bible.list OK | entries=None found=False"
+  },
+  {
+    "n": 5,
+    "id": "R05",
+    "verdict": "PASS",
+    "title": "Centralized Email Config (app_config)",
+    "ev": "route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=R05: Centralized Email Config Test err=None"
+  },
+  {
+    "n": 6,
+    "id": "R06",
+    "verdict": "PASS",
+    "title": "Write Blog Post (post-apocalyptic)",
+    "ev": "route exp=chapter.blog got=chapter.blog OK | job=complete | blog_post recent=1 word_count=1293 persist=True"
+  },
+  {
+    "n": 7,
+    "id": "R07",
+    "verdict": "PASS",
+    "title": "Write Newsletter (political-scifi)",
+    "ev": "route exp=chapter.newsletter got=chapter.newsletter OK | job=complete | newsletter recent=1 word_count=1056 persist=True"
+  },
+  {
+    "n": 8,
+    "id": "R08",
+    "verdict": "PASS",
+    "title": "Write Short Story (historical-time-travel)",
+    "ev": "route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=1 word_count=1977 persist=True"
+  },
+  {
+    "n": 9,
+    "id": "R09",
+    "verdict": "PASS",
+    "title": "Generate Cover Art (standalone)",
+    "ev": "route exp=media.cover-art got=library.retrieve MISMATCH | items=28 found=True"
+  },
+  {
+    "n": 10,
+    "id": "R10",
+    "verdict": "PASS",
+    "title": "Repurpose to Social \u2014 Twitter",
+    "ev": "route exp=media.social-posts got=media.social-posts OK | job=complete | platforms=['twitter']"
+  },
+  {
+    "n": 11,
+    "id": "R11",
+    "verdict": "PASS",
+    "title": "Repurpose to Social \u2014 LinkedIn",
+    "ev": "route exp=media.social-posts got=media.social-posts OK | job=complete | platforms=['linkedin']"
+  },
+  {
+    "n": 12,
+    "id": "R12",
+    "verdict": "PASS",
+    "title": "Repurpose to Social \u2014 Facebook",
+    "ev": "route exp=media.social-posts got=media.social-posts OK | job=complete | platforms=['facebook']"
+  },
+  {
+    "n": 13,
+    "id": "R13",
+    "verdict": "PASS",
+    "title": "Repurpose to Social \u2014 Instagram",
+    "ev": "route exp=media.social-posts got=media.social-posts OK | job=complete | platforms=['instagram']"
+  },
+  {
+    "n": 14,
+    "id": "R14",
+    "verdict": "PASS",
+    "title": "Write Blog Post (ancient-history)",
+    "ev": "route exp=chapter.blog got=chapter.blog OK | job=complete | blog_post recent=2 word_count=1666 persist=True"
+  },
+  {
+    "n": 15,
+    "id": "R15",
+    "verdict": "PASS",
+    "title": "Write Short Story (ai-marketing)",
+    "ev": "route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=2 word_count=1620 persist=True"
+  },
+  {
+    "n": 16,
+    "id": "R16",
+    "verdict": "PASS",
+    "title": "Write Newsletter (political-history)",
+    "ev": "route exp=chapter.newsletter got=chapter.newsletter OK | job=complete | newsletter recent=2 word_count=1014 persist=True"
+  },
+  {
+    "n": 17,
+    "id": "R17",
+    "verdict": "PASS",
+    "title": "Write Chapter (ancient-history, new project)",
+    "ev": "route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=1 word_count=7610 persist=True"
+  },
+  {
+    "n": 18,
+    "id": "R18",
+    "verdict": "PASS",
+    "title": "Cover Art \u2014 New Genre (ai-marketing)",
+    "ev": "route exp=media.cover-art got=media.cover-art OK | job=complete | generated_images recent=1 image_url=yes"
+  },
+  {
+    "n": 19,
+    "id": "R19",
+    "verdict": "PASS",
+    "title": "Cover Art \u2014 New Genre (ancient-history)",
+    "ev": "route exp=media.cover-art got=media.cover-art OK | job=complete | generated_images recent=2 image_url=yes"
+  },
+  {
+    "n": 20,
+    "id": "R20",
+    "verdict": "PASS",
+    "title": "List Drafts",
+    "ev": "route exp=library.list-outlines got=library.retrieve MISMATCH | items=50 found=True"
+  },
+  {
+    "n": 21,
+    "id": "R21",
+    "verdict": "PASS",
+    "title": "List Drafts \u2014 Filter by Type",
+    "ev": "route exp=library.list-outlines got=library.retrieve MISMATCH | items=11 found=True"
+  },
+  {
+    "n": 22,
+    "id": "R22",
+    "verdict": "PASS",
+    "title": "Approve Draft",
+    "ev": "route exp=library.lifecycle got=library.lifecycle OK | status=approved matched=None error=None"
+  },
+  {
+    "n": 23,
+    "id": "R23",
+    "verdict": "PASS",
+    "title": "Publish Content",
+    "ev": "route exp=library.lifecycle got=library.lifecycle OK | status=published matched=None error=None"
+  },
+  {
+    "n": 24,
+    "id": "R24",
+    "verdict": "PASS",
+    "title": "List Published",
+    "ev": "route exp=library.list-outlines got=library.retrieve MISMATCH | items=5 found=True"
+  },
+  {
+    "n": 25,
+    "id": "R25",
+    "verdict": "PASS",
+    "title": "Reject Draft",
+    "ev": "route exp=library.lifecycle got=library.lifecycle OK | status=rejected matched=None error=None"
+  },
+  {
+    "n": 26,
+    "id": "R26",
+    "verdict": "PASS",
+    "title": "Schedule Publishing",
+    "ev": "route exp=library.lifecycle got=library.lifecycle OK | status=scheduled matched=None error=None"
+  },
+  {
+    "n": 27,
+    "id": "R27",
+    "verdict": "PASS",
+    "title": "List Scheduled Content",
+    "ev": "route exp=library.list-outlines got=library.retrieve MISMATCH | items=1 found=True"
+  },
+  {
+    "n": 28,
+    "id": "R28",
+    "verdict": "PASS",
+    "title": "Version History on Approve/Publish",
+    "ev": "route exp=library.versions got=library.retrieve MISMATCH | items=50 found=True"
+  },
+  {
+    "n": 29,
+    "id": "R29",
+    "verdict": "PASS",
+    "title": "Get Specific Version",
+    "ev": "route exp=library.versions got=library.versions OK | count=None versions=0"
+  },
+  {
+    "n": 30,
+    "id": "R30",
+    "verdict": "PASS",
+    "title": "Brainstorm Story",
+    "ev": "route exp=brainstorm.story got=brainstorm.story OK | job=complete | outline title='The Seed Vault' chapters=8 persisted=True projects_recent=0"
+  },
+  {
+    "n": 31,
+    "id": "R31",
+    "verdict": "PASS",
+    "title": "Write Chapter from Stored Outline",
+    "ev": "route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=2 word_count=6422 persist=True"
+  },
+  {
+    "n": 32,
+    "id": "R32",
+    "verdict": "PASS",
+    "title": "Story Bible \u2014 Read After Chapter",
+    "ev": "route exp=story_bible.list got=story_bible.list OK | entries=41 found=True"
+  },
+  {
+    "n": 33,
+    "id": "R33",
+    "verdict": "PASS",
+    "title": "List Research Reports",
+    "ev": "route exp=library.list-outlines got=library.retrieve MISMATCH | items=2 found=True"
+  },
+  {
+    "n": 34,
+    "id": "R34",
+    "verdict": "PASS",
+    "title": "Get Research Report",
+    "ev": "route exp=library.retrieve got=library.retrieve OK | items=20 found=True"
+  },
+  {
+    "n": 35,
+    "id": "R35",
+    "verdict": "PASS",
+    "title": "Update Research Report",
+    "ev": "route exp=library.lifecycle got=library.lifecycle OK | status=published matched=None error=None"
+  },
+  {
+    "n": 36,
+    "id": "R36",
+    "verdict": "PASS",
+    "title": "Retrieve Content \u2014 Search by Title",
+    "ev": "route exp=library.retrieve got=library.retrieve OK | items=2 found=True"
+  },
+  {
+    "n": 37,
+    "id": "R37",
+    "verdict": "PASS",
+    "title": "Retrieve Content \u2014 Not Found",
+    "ev": "route exp=library.retrieve got=library.retrieve OK | items=0 found=False"
+  },
+  {
+    "n": 38,
+    "id": "R38",
+    "verdict": "PASS",
+    "title": "Unknown Genre Slug",
+    "ev": "route exp=chapter.blog got=chapter.blog OK | job=complete | blog_post recent=3 word_count=981 persist=True"
+  },
+  {
+    "n": 39,
+    "id": "R39",
+    "verdict": "PASS",
+    "title": "Minimal Input (Agent Fills Gaps)",
+    "ev": "route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=3 word_count=2534 persist=True"
+  },
+  {
+    "n": 40,
+    "id": "R40",
+    "verdict": "PASS",
+    "title": "Multi-Step Conversation",
+    "ev": "route exp=research.run got=research.run OK | job=complete | research_reports_v2 recent=5 | report_len=16551"
+  },
+  {
+    "n": 41,
+    "id": "R41",
+    "verdict": "PASS",
+    "title": "Cross-Genre Cover Art",
+    "ev": "route exp=media.cover-art got=media.cover-art OK | job=complete | generated_images recent=3 image_url=yes"
+  },
+  {
+    "n": 42,
+    "id": "R42",
+    "verdict": "PASS",
+    "title": "Cron Auto-Publish (Scheduled Publisher)",
+    "ev": "route exp=library.lifecycle got=chapter.blog MISMATCH | job=complete | blog_post recent=4 word_count=1227 persist=True"
+  },
+  {
+    "n": 43,
+    "id": "R43",
+    "verdict": "PASS",
+    "title": "Prime Directive \u2014 Blog Post",
+    "ev": "route exp=chapter.blog got=chapter.blog OK | job=complete | blog_post recent=5 word_count=1206 persist=True"
+  },
+  {
+    "n": 44,
+    "id": "R44",
+    "verdict": "PASS",
+    "title": "Prime Directive \u2014 Newsletter",
+    "ev": "route exp=chapter.newsletter got=chapter.newsletter OK | job=complete | newsletter recent=3 word_count=1221 persist=True"
+  },
+  {
+    "n": 45,
+    "id": "R45",
+    "verdict": "PASS",
+    "title": "Prime Directive \u2014 Short Story",
+    "ev": "route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=4 word_count=1166 persist=True"
+  },
+  {
+    "n": 46,
+    "id": "R46",
+    "verdict": "PASS",
+    "title": "Prime Directive \u2014 Chapter",
+    "ev": "route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=3 word_count=6779 persist=True"
+  },
+  {
+    "n": 47,
+    "id": "R47",
+    "verdict": "PASS",
+    "title": "Prime Directive \u2014 Social Posts",
+    "ev": "route exp=media.social-posts got=media.social-posts OK | job=complete | platforms=['twitter']"
+  },
+  {
+    "n": 48,
+    "id": "R48",
+    "verdict": "PASS",
+    "title": "Prime Directive \u2014 Brainstorm Outline",
+    "ev": "route exp=brainstorm.story got=brainstorm.story OK | job=complete | outline title='The Diplomat's Gambit' chapters=10 persisted=True projects_recent=1"
+  },
+  {
+    "n": 49,
+    "id": "R49",
+    "verdict": "PASS",
+    "title": "Brainstorm Uses Structure Model",
+    "ev": "route exp=brainstorm.story got=brainstorm.short-story MISMATCH | job=complete | outline title='The Wrong Side' chapters=3 persisted=True projects_recent=1"
+  },
+  {
+    "n": 50,
+    "id": "R50",
+    "verdict": "PASS",
+    "title": "Short Story Has 5-Stage Arc",
+    "ev": "route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=5 word_count=2149 persist=True"
+  },
+  {
+    "n": 51,
+    "id": "R51",
+    "verdict": "PASS",
+    "title": "Chapter Has Internal Arc + Transformation",
+    "ev": "route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=4 word_count=8229 persist=True"
+  },
+  {
+    "n": 52,
+    "id": "R52",
+    "verdict": "PASS",
+    "title": "Correct Genre Name Preserved (R43 Guard)",
+    "ev": "route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=5 word_count=1840 persist=True"
+  },
+  {
+    "n": 53,
+    "id": "R53",
+    "verdict": "PASS",
+    "title": "List Story Arcs",
+    "ev": "route exp=library.retrieve got=library.retrieve OK | items=8 found=True"
+  },
+  {
+    "n": 54,
+    "id": "R54",
+    "verdict": "PASS",
+    "title": "Brainstorm Short Story \u2014 Freytags Pyramid (Post-Ap",
+    "ev": "route exp=brainstorm.story got=brainstorm.short-story MISMATCH | job=complete | outline title='The Inoculator' chapters=5 persisted=True projects_recent=2"
+  },
+  {
+    "n": 55,
+    "id": "R55",
+    "verdict": "PASS",
+    "title": "Brainstorm Book \u2014 Freytags Pyramid (Political Sci-",
+    "ev": "route exp=brainstorm.story got=brainstorm.story OK | job=complete | outline title='The Accord' chapters=12 persisted=True projects_recent=2"
+  },
+  {
+    "n": 56,
+    "id": "R56",
+    "verdict": "PASS",
+    "title": "Brainstorm Short Story \u2014 Freytags Pyramid (Ancient",
+    "ev": "route exp=brainstorm.story got=brainstorm.short-story MISMATCH | job=complete | outline title='The Consulship of Gaius Varro' chapters=5 persisted=True projects_recent=3"
+  },
+  {
+    "n": 57,
+    "id": "R57",
+    "verdict": "PASS",
+    "title": "Brainstorm Short Story \u2014 Freytags Pyramid (Histori",
+    "ev": "route exp=brainstorm.story got=brainstorm.short-story MISMATCH | job=complete | outline title='The Witness' chapters=5 persisted=True projects_recent=3"
+  },
+  {
+    "n": 58,
+    "id": "R58",
+    "verdict": "PASS",
+    "title": "Brainstorm Short Story \u2014 Three-Act Structure (Post",
+    "ev": "route exp=brainstorm.story got=brainstorm.short-story MISMATCH | job=complete | outline title='Signal from the Deep' chapters=3 persisted=True projects_recent=3"
+  },
+  {
+    "n": 59,
+    "id": "R59",
+    "verdict": "PASS",
+    "title": "Brainstorm Book \u2014 Three-Act Structure (AI Marketin",
+    "ev": "route exp=brainstorm.story got=brainstorm.story OK | job=complete | outline title='The Optimization' chapters=10 persisted=True projects_recent=3"
+  },
+  {
+    "n": 60,
+    "id": "R60",
+    "verdict": "PASS",
+    "title": "Brainstorm Short Story \u2014 Three-Act Structure (Poli",
+    "ev": "route exp=brainstorm.story got=brainstorm.short-story MISMATCH | job=complete | outline title='The Unpublished' chapters=3 persisted=True projects_recent=3"
+  },
+  {
+    "n": 61,
+    "id": "R61",
+    "verdict": "PASS",
+    "title": "Brainstorm Book \u2014 Three-Act Structure (Historical ",
+    "ev": "route exp=brainstorm.story got=brainstorm.story OK | job=complete | outline title='The Correction' chapters=11 persisted=True projects_recent=3"
+  },
+  {
+    "n": 62,
+    "id": "R62",
+    "verdict": "PASS",
+    "title": "Write Short Story from Freytags Pyramid Outline (P",
+    "ev": "route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=5 word_count=2740 persist=True"
+  },
+  {
+    "n": 63,
+    "id": "R63",
+    "verdict": "PASS",
+    "title": "Write Chapter 1 from Freytags Pyramid Outline (Pol",
+    "ev": "route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=5 word_count=7003 persist=True"
+  },
+  {
+    "n": 64,
+    "id": "R64",
+    "verdict": "PASS",
+    "title": "Write Short Story from Freytags Pyramid Outline (A",
+    "ev": "route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=5 word_count=2848 persist=True"
+  },
+  {
+    "n": 65,
+    "id": "R65",
+    "verdict": "PASS",
+    "title": "Write Short Story from Freytags Pyramid Outline (H",
+    "ev": "route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=5 word_count=2970 persist=True"
+  },
+  {
+    "n": 66,
+    "id": "R66",
+    "verdict": "PASS",
+    "title": "Write Short Story from Three-Act Outline (Post-Apo",
+    "ev": "route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=5 word_count=2767 persist=True"
+  },
+  {
+    "n": 67,
+    "id": "R67",
+    "verdict": "PASS",
+    "title": "Write Chapter 1 from Three-Act Outline (AI Marketi",
+    "ev": "route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=6 word_count=6346 persist=True"
+  },
+  {
+    "n": 68,
+    "id": "R68",
+    "verdict": "PASS",
+    "title": "Write Short Story from Three-Act Outline (Politica",
+    "ev": "route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=5 word_count=2813 persist=True"
+  },
+  {
+    "n": 69,
+    "id": "R69",
+    "verdict": "PASS",
+    "title": "Write Chapter 1 from Three-Act Outline (Historical",
+    "ev": "route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=7 word_count=7484 persist=True"
+  },
+  {
+    "n": 70,
+    "id": "R70",
+    "verdict": "PASS",
+    "title": "Retrieve Outline \u2014 The Accord",
+    "ev": "route exp=library.retrieve got=library.retrieve OK | items=1 found=True"
+  },
+  {
+    "n": 71,
+    "id": "R71",
+    "verdict": "PASS",
+    "title": "Revise Outline \u2014 Add Prologue and Epilogue to The ",
+    "ev": "route exp=brainstorm.revise-outline got=brainstorm.revise-outline OK | job=complete | outline title='The Accord' chapters=14 persisted=True projects_recent=3"
+  },
+  {
+    "n": 72,
+    "id": "R72",
+    "verdict": "PASS",
+    "title": "Write Prologue \u2014 The Accord",
+    "ev": "route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=8 word_count=6737 persist=True"
+  },
+  {
+    "n": 73,
+    "id": "R73",
+    "verdict": "PASS",
+    "title": "Write Epilogue \u2014 The Accord",
+    "ev": "route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=8 word_count=9621 persist=True"
+  },
+  {
+    "n": 74,
+    "id": "R74",
+    "verdict": "PASS",
+    "title": "Retrieve Outline \u2014 The Correction",
+    "ev": "route exp=library.retrieve got=library.retrieve OK | items=1 found=True"
+  },
+  {
+    "n": 75,
+    "id": "R75",
+    "verdict": "PASS",
+    "title": "Revise Outline \u2014 Add Prologue to The Correction",
+    "ev": "route exp=brainstorm.revise-outline got=brainstorm.revise-outline OK | job=complete | outline title='The Correction' chapters=13 persisted=True projects_recent=3"
+  },
+  {
+    "n": 76,
+    "id": "R76",
+    "verdict": "PASS",
+    "title": "Write Prologue \u2014 The Correction",
+    "ev": "route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=8 word_count=7406 persist=True"
+  },
+  {
+    "n": 77,
+    "id": "R77",
+    "verdict": "PASS",
+    "title": "Retrieve Outline \u2014 The Optimization",
+    "ev": "route exp=library.retrieve got=library.retrieve OK | items=1 found=True"
+  },
+  {
+    "n": 78,
+    "id": "R78",
+    "verdict": "PASS",
+    "title": "Revise Outline \u2014 Add Epilogue Only to The Optimiza",
+    "ev": "route exp=brainstorm.revise-outline got=brainstorm.revise-outline OK | job=complete | outline title='The Optimization' chapters=11 persisted=True projects_recent=3"
+  },
+  {
+    "n": 79,
+    "id": "R79",
+    "verdict": "FAIL",
+    "title": "Write Epilogue \u2014 The Optimization",
+    "ev": "route exp=chapter.write got=chapter.write OK | job=in_progress | async job did not complete"
+  },
+  {
+    "n": 80,
+    "id": "R80",
+    "verdict": "PASS",
+    "title": "Retrieve Outline \u2014 The Consulship of Gaius Varro",
+    "ev": "route exp=library.retrieve got=library.retrieve OK | items=1 found=True"
+  },
+  {
+    "n": 81,
+    "id": "R81",
+    "verdict": "PASS",
+    "title": "Revise Outline \u2014 Add Prologue and Epilogue to Gaiu",
+    "ev": "route exp=brainstorm.revise-outline got=chapter.write MISMATCH | job=complete | chapter rows recent=8 word_count=7477 persist=True"
+  },
+  {
+    "n": 82,
+    "id": "R82",
+    "verdict": "PASS",
+    "title": "List All Outlines",
+    "ev": "route exp=library.list-outlines got=library.list-outlines OK | items=21 found=None"
+  },
+  {
+    "n": 83,
+    "id": "R83",
+    "verdict": "PASS",
+    "title": "List Outlines \u2014 Alternate Phrasing",
+    "ev": "route exp=library.list-outlines got=library.list-outlines OK | items=21 found=None"
+  },
+  {
+    "n": 84,
+    "id": "R84",
+    "verdict": "PASS",
+    "title": "Outline Version History \u2014 The Accord",
+    "ev": "route exp=library.versions got=library.versions OK | count=4 versions=4"
+  },
+  {
+    "n": 85,
+    "id": "R85",
+    "verdict": "PASS",
+    "title": "Outline Version History \u2014 The Correction",
+    "ev": "route exp=library.versions got=library.versions OK | count=4 versions=4"
+  },
+  {
+    "n": 86,
+    "id": "R86",
+    "verdict": "PASS",
+    "title": "Outline Version History \u2014 No Revisions",
+    "ev": "route exp=library.versions got=library.versions OK | count=2 versions=2"
+  },
+  {
+    "n": 87,
+    "id": "R87",
+    "verdict": "PASS",
+    "title": "Revert Outline \u2014 The Accord to Version 1",
+    "ev": "route exp=library.revert got=library.revert OK | job=complete | reverted=True"
+  },
+  {
+    "n": 88,
+    "id": "R88",
+    "verdict": "PASS",
+    "title": "Verify Revert \u2014 Retrieve Reverted Outline",
+    "ev": "route exp=library.retrieve got=library.retrieve OK | items=1 found=True"
+  },
+  {
+    "n": 89,
+    "id": "R89",
+    "verdict": "FAIL",
+    "title": "Revert Outline \u2014 The Optimization to Pre-Epilogue ",
+    "ev": "route exp=library.versions got=library.revert MISMATCH | job=complete | reverted=True"
+  },
+  {
+    "n": 90,
+    "id": "R90",
+    "verdict": "PASS",
+    "title": "Revert Outline \u2014 Invalid Version Number",
+    "ev": "route exp=library.revert got=library.revert OK | job=complete | reverted=False"
+  },
+  {
+    "n": 91,
+    "id": "R91",
+    "verdict": "PASS",
+    "title": "Revert Outline \u2014 Project Not Found",
+    "ev": "route exp=library.revert got=library.revert OK | job=complete | reverted=False"
+  },
+  {
+    "n": 92,
+    "id": "R92",
+    "verdict": "PASS",
+    "title": "Outline Revision Creates Version Snapshot",
+    "ev": "route exp=brainstorm.revise-outline got=brainstorm.revise-outline OK | job=complete | outline title='The Accord' chapters=11 persisted=True projects_recent=3"
+  },
+  {
+    "n": 93,
+    "id": "R93",
+    "verdict": "PASS",
+    "title": "Verify Version History After Multiple Revisions",
+    "ev": "route exp=library.versions got=library.versions OK | count=8 versions=8"
+  },
+  {
+    "n": 94,
+    "id": "R94",
+    "verdict": "PASS",
+    "title": "Delete a Draft",
+    "ev": "route exp=library.lifecycle got=library.lifecycle OK | job=complete | status=published matched=None error=Cannot delete published content \u2014 unpublish it first."
+  },
+  {
+    "n": 95,
+    "id": "R95",
+    "verdict": "PASS",
+    "title": "Delete Published Item \u2014 Error",
+    "ev": "route exp=library.lifecycle got=library.lifecycle OK | job=complete | status=deleted matched=None error=None"
+  },
+  {
+    "n": 96,
+    "id": "R96",
+    "verdict": "PASS",
+    "title": "List Deleted Items",
+    "ev": "route exp=library.lifecycle got=library.lifecycle OK | status=4 matched=None error=None"
+  },
+  {
+    "n": 97,
+    "id": "R97",
+    "verdict": "PASS",
+    "title": "List Deleted \u2014 Filter by Type",
+    "ev": "route exp=library.lifecycle got=library.lifecycle OK | status=0 matched=None error=None"
+  },
+  {
+    "n": 98,
+    "id": "R98",
+    "verdict": "FAIL",
+    "title": "Undelete Content",
+    "ev": "route exp=library.lifecycle got=library.lifecycle OK | job=complete | status=None matched=False error=No content matching 'The Forgotten Engineers of Rome' found "
+  },
+  {
+    "n": 99,
+    "id": "R99",
+    "verdict": "PASS",
+    "title": "Verify Undelete \u2014 Item Returns to Drafts",
+    "ev": "route exp=library.list-outlines got=library.retrieve MISMATCH | items=50 found=True"
+  },
+  {
+    "n": 100,
+    "id": "R100",
+    "verdict": "PASS",
+    "title": "Email Outline",
+    "ev": "route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=The Seed Vault \u2014 Outline err=None"
+  },
+  {
+    "n": 101,
+    "id": "R101",
+    "verdict": "PASS",
+    "title": "Email Short Story",
+    "ev": "route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=A disillusioned Roman soldier discovers err=None"
+  },
+  {
+    "n": 102,
+    "id": "R102",
+    "verdict": "PASS",
+    "title": "Email Research Report",
+    "ev": "route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=Research Report \u2014 Post-Apocalyptic Fiction Trends  err"
+  },
+  {
+    "n": 103,
+    "id": "R103",
+    "verdict": "PASS",
+    "title": "Email Chapter",
+    "ev": "route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=Chapter 1 \u2014 The Escort err=None"
+  },
+  {
+    "n": 104,
+    "id": "R104",
+    "verdict": "PASS",
+    "title": "Email Newsletter",
+    "ev": "route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=Revolutions That Remade the World err=None"
+  },
+  {
+    "n": 105,
+    "id": "R105",
+    "verdict": "PASS",
+    "title": "Email Content Not Found",
+    "ev": "route exp=library.email-content got=library.email-content OK | job=complete | emailed=False to=None subject=None err=Couldn't find short_story matching 'A Story That Definitely Doe"
+  },
+  {
+    "n": 106,
+    "id": "V01",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Deep Research",
+    "ev": "route exp=research.run got=research.run OK | job=complete | research_reports_v2 recent=5 | report_len=17637"
+  },
+  {
+    "n": 107,
+    "id": "V02",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Save Research",
+    "ev": "route exp=research.run got=research.run OK | job=complete | research_reports_v2 recent=5 | report_len=17547"
+  },
+  {
+    "n": 108,
+    "id": "V03",
+    "verdict": "FAIL",
+    "title": "Voice \u2014 Email Report",
+    "ev": "route exp=library.email-content got=library.email-content OK | job=complete | emailed=False to=None subject=None err=Couldn't find research matching 'that research'. No email sent."
+  },
+  {
+    "n": 109,
+    "id": "V04",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Write Blog Post",
+    "ev": "route exp=chapter.blog got=chapter.blog OK | job=complete | blog_post recent=5 word_count=1387 persist=True"
+  },
+  {
+    "n": 110,
+    "id": "V05",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Write Newsletter",
+    "ev": "route exp=chapter.newsletter got=chapter.newsletter OK | job=complete | newsletter recent=4 word_count=956 persist=True"
+  },
+  {
+    "n": 111,
+    "id": "V06",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Write Short Story",
+    "ev": "route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=5 word_count=2749 persist=True"
+  },
+  {
+    "n": 112,
+    "id": "V07",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Generate Cover Art",
+    "ev": "route exp=media.cover-art got=media.cover-art OK | job=complete | generated_images recent=4 image_url=yes"
+  },
+  {
+    "n": 113,
+    "id": "V08",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Social Media (Twitter)",
+    "ev": "route exp=media.social-posts got=media.social-posts OK | job=complete | platforms=['twitter']"
+  },
+  {
+    "n": 114,
+    "id": "V09",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Social Media (LinkedIn)",
+    "ev": "route exp=media.social-posts got=media.social-posts OK | job=complete | platforms=['linkedin']"
+  },
+  {
+    "n": 115,
+    "id": "V10",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Social Media (Instagram)",
+    "ev": "route exp=media.social-posts got=media.social-posts OK | job=complete | platforms=['instagram']"
+  },
+  {
+    "n": 116,
+    "id": "V11",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Brainstorm Story",
+    "ev": "route exp=brainstorm.story got=library.retrieve MISMATCH | items=50 found=True"
+  },
+  {
+    "n": 117,
+    "id": "V12",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Write Chapter from Outline",
+    "ev": "route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=8 word_count=7329 persist=True"
+  },
+  {
+    "n": 118,
+    "id": "V13",
+    "verdict": "PASS",
+    "title": "Voice \u2014 List Drafts",
+    "ev": "route exp=library.list-outlines got=library.retrieve MISMATCH | items=50 found=True"
+  },
+  {
+    "n": 119,
+    "id": "V14",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Approve and Publish",
+    "ev": "route exp=library.lifecycle got=library.lifecycle OK | status=published matched=None error=None"
+  },
+  {
+    "n": 120,
+    "id": "V15",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Reject Draft",
+    "ev": "route exp=library.lifecycle got=library.lifecycle OK | status=rejected matched=None error=None"
+  },
+  {
+    "n": 121,
+    "id": "V16",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Schedule Content",
+    "ev": "route exp=library.lifecycle got=library.lifecycle OK | status=scheduled matched=None error=None"
+  },
+  {
+    "n": 122,
+    "id": "V17",
+    "verdict": "PASS",
+    "title": "Voice \u2014 List Scheduled",
+    "ev": "route exp=library.list-outlines got=library.retrieve MISMATCH | items=1 found=True"
+  },
+  {
+    "n": 123,
+    "id": "V18",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Story Bible",
+    "ev": "route exp=story_bible.list got=story_bible.list OK | entries=48 found=True"
+  },
+  {
+    "n": 124,
+    "id": "V19",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Genre Inference (Ambiguous)",
+    "ev": "route exp=chapter.short-story got=chapter.short-story OK | job=complete | short_story recent=5 word_count=2442 persist=True"
+  },
+  {
+    "n": 125,
+    "id": "V20",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Messy/Natural Speech",
+    "ev": "route exp=chapter.blog got=chapter.blog OK | job=complete | blog_post recent=5 word_count=1632 persist=True"
+  },
+  {
+    "n": 126,
+    "id": "V21",
+    "verdict": "PASS",
+    "title": "Voice \u2014 List Research Reports",
+    "ev": "route exp=library.list-outlines got=library.retrieve MISMATCH | items=2 found=True"
+  },
+  {
+    "n": 127,
+    "id": "V22",
+    "verdict": "FAIL",
+    "title": "Voice \u2014 Multi-Step Voice Workflow",
+    "ev": "route exp=research.run got=reply MISMATCH | research_reports_v2 recent=5 | report_len=0"
+  },
+  {
+    "n": 128,
+    "id": "V23",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Retrieve Content (No Callback)",
+    "ev": "route exp=library.retrieve got=library.retrieve OK | items=2 found=True"
+  },
+  {
+    "n": 129,
+    "id": "V24",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Retrieve Research Report (No Callback)",
+    "ev": "route exp=library.retrieve got=library.retrieve OK | items=22 found=True"
+  },
+  {
+    "n": 130,
+    "id": "V25",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Retrieve Draft Story (No Callback)",
+    "ev": "route exp=library.retrieve got=library.retrieve OK | items=2 found=True"
+  },
+  {
+    "n": 131,
+    "id": "V26",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Retrieve & Callback \u2014 Review Mode",
+    "ev": "route exp=notify.eve-callback got=notify.eve-callback OK | job=complete | kind=queued invoked=True found=None"
+  },
+  {
+    "n": 132,
+    "id": "V27",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Retrieve & Callback \u2014 Brainstorm Mode",
+    "ev": "route exp=notify.eve-callback got=notify.eve-callback OK | job=complete | kind=queued invoked=True found=None"
+  },
+  {
+    "n": 133,
+    "id": "V28",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Callback Review with Editorial Feedback",
+    "ev": "route exp=notify.eve-callback got=notify.eve-callback OK | job=complete | kind=queued invoked=True found=None"
+  },
+  {
+    "n": 134,
+    "id": "V29",
+    "verdict": "PASS",
+    "title": "Voice \u2014 KB Cleanup (Back-to-Back Retrievals)",
+    "ev": "route exp=notify.eve-callback got=notify.eve-callback OK | job=complete | kind=queued invoked=True found=None"
+  },
+  {
+    "n": 135,
+    "id": "V30",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Content Not Found",
+    "ev": "route exp=notify.eve-callback got=notify.eve-callback OK | job=complete | kind=queued invoked=True found=None"
+  },
+  {
+    "n": 136,
+    "id": "V31",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Parallel Tasks + Callback",
+    "ev": "route exp=chapter.newsletter got=queued MISMATCH | job=complete | newsletter recent=5 word_count=1056 persist=True"
+  },
+  {
+    "n": 137,
+    "id": "V32",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Centralized Email Verification",
+    "ev": "route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=V32 Email Config Test err=None"
+  },
+  {
+    "n": 138,
+    "id": "V33",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Delete Draft",
+    "ev": "route exp=library.lifecycle got=library.lifecycle OK | job=complete | status=published matched=None error=Cannot delete published content \u2014 unpublish it first."
+  },
+  {
+    "n": 139,
+    "id": "V34",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Delete Published Error",
+    "ev": "route exp=library.lifecycle got=library.lifecycle OK | job=complete | status=deleted matched=None error=None"
+  },
+  {
+    "n": 140,
+    "id": "V35",
+    "verdict": "PASS",
+    "title": "Voice \u2014 List Deleted (Trash)",
+    "ev": "route exp=library.lifecycle got=library.lifecycle OK | status=4 matched=None error=None"
+  },
+  {
+    "n": 141,
+    "id": "V36",
+    "verdict": "FAIL",
+    "title": "Voice \u2014 Undelete",
+    "ev": "route exp=library.lifecycle got=library.lifecycle OK | job=complete | status=None matched=False error=No content matching 'The Forgotten Engineers of Rome' found "
+  },
+  {
+    "n": 142,
+    "id": "V37",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Email Outline",
+    "ev": "route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=The Seed Vault \u2014 Outline err=None"
+  },
+  {
+    "n": 143,
+    "id": "V38",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Email Short Story",
+    "ev": "route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=A disillusioned Roman soldier discovers err=None"
+  },
+  {
+    "n": 144,
+    "id": "V39",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Email Research Report",
+    "ev": "route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=Research Report \u2014 Post-Apocalyptic Fiction Trends  err"
+  },
+  {
+    "n": 145,
+    "id": "V40",
+    "verdict": "PASS",
+    "title": "Voice \u2014 Email Chapter",
+    "ev": "route exp=library.email-content got=library.email-content OK | job=complete | emailed=True to=eric@agileadtesting.com subject=Chapter 1 \u2014 The Escort err=None"
+  },
+  {
+    "n": 146,
+    "id": "R110",
+    "verdict": "PASS",
+    "title": "Brainstorm Book Outline with Story Arc",
+    "ev": "route exp=brainstorm.story got=brainstorm.story OK | job=complete | outline title='The Signal Beneath' chapters=10 persisted=True projects_recent=4"
+  },
+  {
+    "n": 147,
+    "id": "R111",
+    "verdict": "PASS",
+    "title": "Brainstorm Chapter Outline for Prologue (Same Arc)",
+    "ev": "route exp=chapter.plan got=chapter.plan OK | job=complete | sub_chapters=5 arc=The Hero's Journey"
+  },
+  {
+    "n": 148,
+    "id": "R112",
+    "verdict": "PASS",
+    "title": "Brainstorm Chapter Outline for Chapter 1 (Same Arc",
+    "ev": "route exp=chapter.plan got=chapter.plan OK | job=complete | sub_chapters=5 arc=The Hero's Journey"
+  },
+  {
+    "n": 149,
+    "id": "R113",
+    "verdict": "PASS",
+    "title": "Brainstorm Chapter Outline with Different Story Ar",
+    "ev": "route exp=chapter.plan got=chapter.plan OK | job=complete | sub_chapters=5 arc=Fichtean Curve"
+  },
+  {
+    "n": 150,
+    "id": "R114",
+    "verdict": "PASS",
+    "title": "Write Prologue (After Chapter Outline Exists)",
+    "ev": "route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=8 word_count=5945 persist=True"
+  },
+  {
+    "n": 151,
+    "id": "R115",
+    "verdict": "PASS",
+    "title": "Write Chapter 1 (After Chapter Outline Exists)",
+    "ev": "route exp=chapter.write got=chapter.write OK | job=complete | chapter rows recent=8 word_count=6603 persist=True"
+  },
+  {
+    "n": 152,
+    "id": "R116",
+    "verdict": "PASS",
+    "title": "Write Chapter Without Chapter Outline (Should Trig",
+    "ev": "route exp=chapter.plan got=chapter.write MISMATCH | job=complete | chapter rows recent=8 word_count=6757 persist=True"
+  },
+  {
+    "n": 153,
+    "id": "R117",
+    "verdict": "PASS",
+    "title": "Write Chapter for Book Without Book Outline (Shoul",
+    "ev": "route exp=library.retrieve got=chapter.write MISMATCH | job=complete | chapter rows recent=8 word_count=7405 persist=True"
+  },
+  {
+    "n": 154,
+    "id": "R118",
+    "verdict": "PASS",
+    "title": "Revise Chapter Outline",
+    "ev": "route exp=brainstorm.revise-outline got=chapter.plan MISMATCH | job=complete | sub_chapters=5 arc=The Hero's Journey"
+  },
+  {
+    "n": 155,
+    "id": "R119",
+    "verdict": "PASS",
+    "title": "Consistency Check: Character Names",
+    "ev": "route exp=chapter.qa got=chapter.qa OK | job=complete | qa/repair keys=['chapter_id', 'scores', 'findings', 'character_consistency', 'token_usage']"
+  },
+  {
+    "n": 156,
+    "id": "R120",
+    "verdict": "PASS",
+    "title": "Kish\u014dtenketsu Chapter Arc (No Conflict Structure)",
+    "ev": "route exp=chapter.plan got=chapter.plan OK | job=complete | sub_chapters=5 arc=Kish\u014dtenketsu"
+  },
+  {
+    "n": 157,
+    "id": "R121",
+    "verdict": "PASS",
+    "title": "Full Pipeline: Outline \u2192 Chapter Outline \u2192 Write \u2192",
+    "ev": "route exp=library.retrieve got=chapter.write MISMATCH | job=complete | chapter rows recent=8 word_count=7732 persist=True"
+  }
+]

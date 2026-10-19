@@ -1,0 +1,74 @@
+{
+  "id": "R14",
+  "title": "Write Blog Post (ancient-history)",
+  "route": "`chapter.blog` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=chapter.blog got=chapter.blog OK",
+    "job=complete",
+    "blog_post recent=2 word_count=1666 persist=True"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Write a blog post in the ancient-history genre. Topic: \"The Forgotten Engineers of Rome: How Aqueducts Shaped an Empire\". Genre slug: ancient-history. Keywords: Roman engineering, aqueducts, ancient infrastructure, Frontinus. Target length: 1500 words."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Queuing your blog post \u2014 I'll let you know when it's ready.",
+        "tool": "chapter",
+        "op": "blog",
+        "data": null,
+        "job_id": "bda193f3e10f454aa1b970c187d890d6",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "bda193f3e10f454aa1b970c187d890d6",
+        "status": "complete",
+        "result": {
+          "execution_id": "956a0a8b-4cf4-4186-b6de-115f8d9105ac",
+          "step_name": "chapter",
+          "status": "ok",
+          "payload": {
+            "op": "blog",
+            "result": {
+              "written": true,
+              "title": "The Forgotten Engineers of Rome: How Aqueducts Shaped an Empire",
+              "content_text": "# The Forgotten Engineers of Rome: How Aqueducts Shaped an Empire\n\nWalk through the Parco degli Acquedotti on a summer morning and you'll hear joggers, distant traffic, and birdsong. Then you'll round a bend and stop. Two thousand years of brick and volcanic concrete stretch across an open field, taller than a four-story building, casting long shadows over wildflowers. Nobody put up a fence. Nobody is charging admission. The arches of the Aqua Claudia just stand there, quietly outlasting everything built around them.\n\nThat's the thing about Roman aqueducts. They don't demand attention. They simply refuse to disappear., -\n\n## Water Before the Aqueducts\n\nBefore 312 BCE, Rome ran on wells, springs, and the Tiber. That worked for a small city. It did not work for an empire.\n\nThe Tiber was polluted. Wells ran dry or turned brackish. Springs near the city couldn't keep pace with a growing population that would eventually reach one million people, a number no European city would match again until London in the 1800s.\n\nThe solution wasn't to move the city closer to clean water. Roman engineers moved the water to the city.\n\nThe **Aqua Appia**, completed in 312 BCE under the censor Appius Claudius Caecus, was Rome's first aqueduct. It ran mostly underground, tapping springs in the Alban Hills and carrying water roughly 16 kilometers into the city through covered stone channels. You couldn't see most of it. That invisibility was the point, the channel stayed cool, protected from evaporation and contamination.\n\nBeneath modern Rome, that invisible hydraulic layer still exists. Construction workers occasionally break through into rectangular masonry tunnels lined with hydraulic mortar, their vertical inspection shafts still intact. The Aqua Appia has been underground for 2,300 years and it's still there., -\n\n## The Engineering Problem Nobody Talks About\n\nMost people know aqueducts as those dramatic arched bridges crossing valleys. That's the visible part. The real engineering challenge was something far less photogenic: **gradient**.\n\nRoman aqueducts worked entirely by gravity. No pumps. No pressure systems beyond what nature provided. Water had to flow downhill from source to city, continuously, across dozens of kilometers of varied terrain.\n\nThe engineers needed a slope shallow enough that the water wouldn't race through the channel and erode it, but steep enough that it wouldn't stagnate. They typically aimed for a fall of a few tens of centimeters per kilometer, a gradient so gentle it's nearly invisible to the naked eye.\n\nHitting that target across 70 or 90 kilometers of hills, valleys, and rock required surveying instruments called *chorobates* and *dioptra*, essentially ancient water levels and theodolites. Engineers sank vertical shafts into tunnel sections at regular intervals, both to excavate from multiple faces simultaneously and to check alignment and slope as they went.\n\nWhen the terrain dropped away into a valley, they had two options: tunnel through the hillside or build an arcade across the gap. The arcade solution, those famous arched bridges, was often cheaper and faster than tunneling, and it had the side effect of looking magnificent.\n\nThe Aqua Claudia's arcade in the Parco degli Acquedotti stands 28 meters high in places. Run your hand along the brick facing and you'll feel the mortar joints, tool marks, and the faint warmth the masonry holds from the afternoon sun. The *opus caementicium* core, Roman concrete made with pozzolanic volcanic ash, is harder now than when it was poured. The volcanic ash reacted with seawater and groundwater over centuries, forming new mineral structures inside the concrete. Modern engineers are still studying exactly how., -\n\n## Frontinus and the Book That Saved the System\n\nBy the first century CE, Rome had eleven major aqueducts delivering an estimated one million cubic meters of water per day. That's roughly 1,000 liters per person. London's daily per-capita water use today is around 150 liters.\n\nManaging that system required administration as much as engineering. Enter **Sextus Julius Frontinus**.\n\nAppointed curator aquarum (water commissioner) in 97 CE under Emperor Nerva, Frontinus inherited a system riddled with illegal taps, corrupt contractors, and decades of deferred maintenance. His response was methodical. He surveyed every aqueduct, measured actual flow versus theoretical capacity, and documented everything in a two-volume report called *De Aquaeductu Urbis Romae*, \"On the Aqueducts of the City of Rome.\"\n\nThe book is remarkable for what it reveals. Frontinus found that significant volumes of water were being siphoned off before reaching public distribution points. He found that the recorded lengths of aqueducts didn't match the actual distances, suggesting systematic fraud in construction contracts. He found maintenance records that hadn't been updated in years.\n\nHe fixed it. He plugged the illegal taps, renegotiated contracts, and reorganized the workforce of slaves and freedmen who maintained the system. Water pressure in Rome's public fountains increased noticeably within months of his appointment.\n\nFrontinus also understood the political weight of what he was managing. He wrote: \"With such an array of indispensable structures carrying so many waters, compare, if you will, the idle Pyramids or the useless, though famous, works of the Greeks.\"\n\nHe wasn't wrong. The aqueducts weren't monuments to power, they *were* power, made concrete and functional., -\n\n## Where the Water Went\n\nAt the city edge, aqueduct mains fed into **castella aquae**, masonry distribution tanks that served as both settling basins and flow regulators. Sediment dropped out of the water as it slowed in these tanks. Then sluices and stopcocks directed the flow through lead or ceramic pipes to different districts.\n\nThe hierarchy of distribution was explicit and political. Public fountains and baths had first claim. Private users, wealthy households and businesses, could purchase water rights, but their supply was cut first if the system ran low. The poorest Romans got their water from the hundreds of public fountains scattered across the city, which ran continuously. The overflow from those fountains drained into the sewers, flushing them.\n\nThe baths, the *thermae*, were the system's most visible social output. The Baths of Caracalla, completed in 216 CE, could accommodate 1,600 bathers simultaneously. They required a dedicated branch of the Aqua Marcia to function. Bathing in Rome wasn't a private luxury. It was a daily social ritual that the aqueducts made possible for everyone, not just the wealthy.\n\nThe water shaped the city's rhythms. It shaped where people gathered, how long they stayed, what they discussed. Infrastructure, in Rome, was social policy., -\n\n## What the Ruins Are Actually Telling Us\n\nThe arcades in the Parco degli Acquedotti aren't just pretty. They're a record of decision-making under constraint.\n\nLook at where the arches are tallest, those are the valleys the engineers refused to go around. Look at where two different aqueducts run parallel, their arches nearly touching, that's the result of centuries of expansion, each new system threading through an already-crowded landscape. Look at the patches of later brick repair interrupting older stone courses, that's Frontinus's maintenance program, or his successors', still visible in the masonry.\n\nModern Rome's water engineers still consult historical maps of the aqueduct routes before digging. Not out of reverence, but because the old channels are still down there, and hitting one with a backhoe creates problems. The ancient infrastructure doesn't just coexist with the modern city. It actively constrains it.\n\nUrban planners treat the major aqueduct remnants as protected heritage zones. The Parco degli Acquedotti exists partly because building around the arcades was legally complicated enough that the land stayed open. The engineers who built the Aqua Claudia in 52 CE inadvertently created a park that Romans use every morning., -\n\n## Further Reading and Watching\n\nIf this has you wanting more, start with Frontinus himself. *De Aquaeductu* is available in translation and is surprisingly readable, it reads less like an ancient text and more like a sharp-eyed infrastructure audit.\n\nFor broader context on Roman engineering, **\"SPQR\" by Mary Beard** puts the technical achievements in their social and political frame without losing the human detail. **\"The Fate of Rome\" by Kyle Harper** covers how the infrastructure that sustained the empire eventually became a vulnerability when it couldn't be maintained.\n\nOn screen, the documentary series **\"Ancient Impossible\"** (History Channel) has a solid episode on Roman engineering that covers aqueduct construction in practical terms. For a more academic treatment, Rick Steves' classroom resource on ancient Roman engineering walks through the construction sequence clearly, with good diagrams of gradient profiles and cross-sections of the *specus*.\n\nFor fiction that puts Roman infrastructure at the center of the story, **\"Pompeii\" by Robert Harris** is the obvious recommendation, its protagonist is a water engineer managing the Aqua Augusta in the days before Vesuvius erupts. Harris did his homework. The engineering details are accurate, and the novel makes a convincing case that the aqueduct system was as central to Roman life as the legions., -\n\n## The Names We Don't Know\n\nHere's the thing about Roman engineering that sits uncomfortably alongside all this admiration: we don't know who actually built it.\n\nWe know Frontinus wrote about the system. We know emperors commissioned new aqueducts and put their names on them. We know the censors who authorized the Aqua Appia and the Aqua Marcia. But the engineers who solved the gradient problems, who figured out how to sink shafts through rock and maintain alignment across kilometers of tunnel, who developed the *opus caementicium* mix that's still standing two millennia later, most of them are anonymous.\n\nSome were slaves. Some were freedmen. Some were Greek engineers working under Roman contracts. The empire's infrastructure was built by people whose names weren't considered worth recording.\n\nThe arches in the Parco degli Acquedotti stand because someone, whose name we'll never know, calculated a slope correctly. That calculation kept a million people alive. It shaped a city that shaped the world.\n\nThe least we can do is pay attention when we walk past., -\n\n**Discussion prompt:** Roman aqueducts delivered more water per person than many modern cities. What does that tell us about how we think about infrastructure investment today, and whose names we choose to remember when we talk about it?",
+              "word_count": 1666,
+              "persist": {
+                "persisted": true,
+                "content_id": "1cece337-60bd-4bcb-9ce1-a15330bc3dd6"
+              },
+              "token_usage": {
+                "calls": 2,
+                "input_tokens": 2187,
+                "output_tokens": 4058,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+                "total_tokens": 6245,
+                "cost_usd": 0.067431
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Write a blog post in the ancient-history genre. Topic: \"The Forgotten Engineers of Rome: How Aqueducts Shaped an Empire\". Genre slug: ancient-history. Keywords: Roman engineering, aqueducts, ancient infrastructure, Frontinus. Target length: 1500 words."
+    }
+  ],
+  "expected": [
+    "routes to `chapter.blog`, kind=queued; job reaches status=complete",
+    "Blog uses ancient-history tone (immersive, sensory-rich, reverent of detail)",
+    "**Prime Directive:** Plain language, no hype, concrete examples",
+    "Cover art: classical oil painting style, warm golden light, marble/stone",
+    "Content Ingestion may return 0 items \u2014 job continues gracefully (fallback working)",
+    "Email arrives with blog + cover image; Draft row in `published_content_v2`; CR-009 email received"
+  ]
+}

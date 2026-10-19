@@ -1,0 +1,59 @@
+{
+  "id": "R41",
+  "title": "Cross-Genre Cover Art",
+  "route": "`media.cover-art` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=media.cover-art got=media.cover-art OK",
+    "job=complete",
+    "generated_images recent=3 image_url=yes"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Message 1: Generate cover art for a post-apocalyptic story called \"Ash\". Genre slug: post-apocalyptic. A lone figure walking through a gray, ash-covered landscape."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Generating cover art for \"Ash\" now. I'll let you know when it's ready.",
+        "tool": "media",
+        "op": "cover-art",
+        "data": null,
+        "job_id": "8fbd16a77206465ca4ef1c90435f410d",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "8fbd16a77206465ca4ef1c90435f410d",
+        "status": "complete",
+        "result": {
+          "execution_id": "10590e67-c48e-411c-aac6-cbb852830cb0",
+          "step_name": "media",
+          "status": "ok",
+          "payload": {
+            "op": "cover-art",
+            "result": {
+              "image_url": "https://gvbvwcnmjkdpclcisqrr.supabase.co/storage/v1/object/public/cover-images/+14105914612/20260701205212_untitled.png",
+              "storage_path": "+14105914612/20260701205212_untitled.png",
+              "provider": "kieai",
+              "persisted": true,
+              "db_recorded": true,
+              "prompt": "Professional book cover illustration for the novel \"Untitled\". evocative, atmospheric, high detail, dramatic lighting, portrait orientation, no text, no lettering, no title overlay"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Message 1: Generate cover art for a post-apocalyptic story called \"Ash\". Genre slug: post-apocalyptic. A lone figure walking through a gray, ash-covered landscape."
+    }
+  ],
+  "expected": [
+    "Both \u2192 `media.cover-art`, complete; Image 1 post-apoc style; Image 2 ancient-history style; clearly different",
+    "Both rows in `generated_images_v2`; both CR-009 emails received"
+  ]
+}

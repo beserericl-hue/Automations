@@ -1,0 +1,41 @@
+{
+  "test": {
+    "id": "R45",
+    "title": "Prime Directive \u2014 Short Story",
+    "source": "chat",
+    "prompt": "Write a short story in the political-scifi genre. Genre slug: political-scifi. Premise: A junior senator discovers that the AI running the galactic parliament has been quietly editing legislation before votes. Tone: tense, cynical. Length: 1500 words.",
+    "route": "chapter.short-story` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `chapter.short-story`, kind=queued; complete",
+      "Clean prose, no purple prose; natural dialogue; short sentences for tension; everyday language; CR-009 email received"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing your short story. I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "short-story",
+    "data": null,
+    "job_id": "48d2bb391aa54c349168156b51bc3d52",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "48d2bb391aa54c349168156b51bc3d52",
+    "status": "complete",
+    "result": {
+      "execution_id": "3838d7e6-4045-47d6-b12f-d5a806df1d0e",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValueError",
+        "message": "invalid literal for int() with base 10: '1500 words'",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

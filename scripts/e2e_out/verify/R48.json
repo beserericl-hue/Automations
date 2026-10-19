@@ -1,0 +1,222 @@
+{
+  "id": "R48",
+  "title": "Prime Directive \u2014 Brainstorm Outline",
+  "route": "`brainstorm.story` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=brainstorm.story got=brainstorm.story OK",
+    "job=complete",
+    "outline title='The Diplomat's Gambit' chapters=10 persisted=True projects_recent=1"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Brainstorm a political-history story called \"The Diplomat's Gambit\" about a Cold War spy who discovers that both superpowers are being manipulated by the same shadowy organization. Themes: deception, loyalty, the illusion of choice. 8 chapters. Genre slug: political-history."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Queuing a new story brainstorm for \"The Diplomat's Gambit.\" I'll let you know when the outline is ready.",
+        "tool": "brainstorm",
+        "op": "story",
+        "data": null,
+        "job_id": "01bc968f2f1c42349e42cd1978a8cbfa",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "01bc968f2f1c42349e42cd1978a8cbfa",
+        "status": "complete",
+        "result": {
+          "execution_id": "b0029d4d-20ff-4b79-a723-bccb266b107c",
+          "step_name": "brainstorm",
+          "status": "ok",
+          "payload": {
+            "op": "story",
+            "result": {
+              "outline": {
+                "title": "The Diplomat's Gambit",
+                "premise": "In 1938 Europe, a veteran British diplomat stationed in Berlin must decide whether to sabotage the Munich Agreement from within \u2014 feeding intelligence to anti-Nazi conspirators inside the Wehrmacht while maintaining his cover as Chamberlain's loyal envoy \u2014 before the deal is signed and Hitler's war machine becomes unstoppable.",
+                "themes": [
+                  "The cost of moral compromise in the service of a greater good",
+                  "Loyalty to country versus loyalty to conscience",
+                  "The machinery of appeasement and how ordinary men enable catastrophe",
+                  "The loneliness of the double life",
+                  "Whether one man's gamble can alter the course of history"
+                ],
+                "story_arc_name": "The Conspirator's Descent",
+                "dramatic_question": "Can British diplomat Edward Ashworth secretly sabotage the Munich Agreement by feeding intelligence to the Wehrmacht's anti-Hitler conspirators before Chamberlain signs away Czechoslovakia \u2014 and Europe's last chance for peace \u2014 on September 30, 1938?",
+                "wow_factor": "The novel reconstructs, in forensically accurate procedural detail, the real 1938 Wehrmacht conspiracy to overthrow Hitler \u2014 a coup that was aborted the moment Chamberlain flew to Munich \u2014 showing how a single act of British appeasement destroyed the one credible plot to remove Hitler before the war began, told from inside the British delegation that unknowingly killed it.",
+                "characters": [
+                  {
+                    "name": "Edward Ashworth",
+                    "role": "Protagonist / POV character",
+                    "archetype": "The veteran diplomat \u2014 a man who has spent twenty years smoothing over Europe's fractures with careful language and careful silences.",
+                    "off_axis_attribute": "He is constitutionally incapable of small talk and makes enemies at every dinner party, which is catastrophic for a diplomat; he survives professionally only because his written analyses are so precise that his superiors cannot afford to dismiss him.",
+                    "dramatic_question": "Will Ashworth sacrifice his career, his freedom, and possibly his life to sabotage the agreement he has been sent to facilitate \u2014 and can he live with himself if he does not?",
+                    "description": "Age 47. Second Secretary at the British Embassy in Berlin. Widower; his wife Clara died of tuberculosis in 1934 and he has not recovered emotionally. Reads Thucydides in Greek for pleasure. Keeps a private journal in a cipher of his own invention. His one genuine friendship is with a German cellist named Hilde Brandt, whom he meets weekly for chamber music \u2014 she is not a spy asset, simply a person he likes. His private worry: that he has spent his entire career writing accurate warnings that were filed and ignored, and that he is therefore complicit in everything that followed.",
+                    "moral_complication": "To deliver the Wehrmacht conspirators' operational plan to General Halder in time, Ashworth must betray the location of a British intelligence contact \u2014 a Czech journalist named Novak \u2014 to German counterintelligence, knowing Novak will be arrested and almost certainly tortured. The betrayal is the only way to establish his credibility with the conspirators' intermediary. Novak is not innocent of the risks; he chose this work. But he is also a father of three. Ashworth can take the shortcut and the coup may succeed; he can refuse it and the coup almost certainly fails. Either way he will carry the weight of the choice."
+                  },
+                  {
+                    "name": "Marta Kov\u00e1\u0159ov\u00e1",
+                    "role": "Secondary POV character / anti-Nazi conspirator's courier",
+                    "archetype": "The resistance courier \u2014 a young Czech woman running messages between the Wehrmacht conspirators and foreign contacts.",
+                    "off_axis_attribute": "She is not brave in the romantic sense; she is terrified every single day and manages her terror by compulsive, almost comic tidiness \u2014 she irons her courier documents flat, re-folds her clothes four times before sleeping, and cannot function in a disordered room. Under extreme stress she becomes dangerously over-controlled rather than reckless.",
+                    "dramatic_question": "Will Marta deliver the conspirators' final operational order to Ashworth before the Munich conference closes \u2014 and will she survive the Gestapo officer who has been tracking her movements for six weeks?",
+                    "description": "Age 29. Daughter of a Brno lawyer who was beaten by the SA in 1935. Speaks German, Czech, French, and passable English. Works as a hotel chambermaid in Munich as cover. Has a younger brother, Tom\u00e1\u0161, who is a student in Prague and knows nothing of her work. Hobby: she sketches architectural details of buildings she passes through \u2014 a habit that began as a memory aid and became genuine pleasure. Her private worry: that the conspirators are using her and will abandon her the moment she becomes inconvenient.",
+                    "moral_complication": "Marta discovers mid-novel that the conspirators' plan, if it succeeds, will install a conservative German military government that intends to keep the Sudetenland. The coup saves Europe from war but does not save Czechoslovakia. She must decide whether to continue serving a conspiracy that will partially betray her own country."
+                  },
+                  {
+                    "name": "Sir Horace Pelham",
+                    "role": "Antagonist (institutional) / POV character",
+                    "archetype": "The true believer in appeasement \u2014 a senior Foreign Office mandarin who genuinely believes the Munich Agreement will preserve peace and who suspects Ashworth of dangerous freelancing.",
+                    "off_axis_attribute": "Pelham is not a coward or a fool; he is a man of genuine moral seriousness who has read the casualty lists from 1914-18 and will do anything \u2014 including suppress inconvenient intelligence \u2014 to prevent their repetition. His villainy is the villainy of a good man with the wrong analysis.",
+                    "dramatic_question": "Will Pelham uncover Ashworth's conspiracy in time to stop it \u2014 and what will it cost him when he realizes, too late, that Ashworth was right?",
+                    "description": "Age 58. Head of the Central European desk at the Foreign Office. Attended the same Oxford college as Ashworth; they were friends once. Has a daughter, Cecily, who is engaged to a young army officer \u2014 Pelham's dread of another war is personal and visceral. Collects Victorian watercolors. Eats the same lunch every day (cold mutton, boiled potato) as a form of self-discipline. His private worry: that his certainty is a form of vanity, and that he has confused what he wants to be true with what is true.",
+                    "moral_complication": "Pelham receives intelligence in Chapter 5 that confirms the Wehrmacht conspirators are real and the coup is viable \u2014 but publishing it would destroy the Munich conference and, he believes, trigger immediate war. He suppresses it. He is not wrong that war might follow; he is wrong about which war."
+                  },
+                  {
+                    "name": "Oberst Klaus von Ritter",
+                    "role": "Supporting character / Wehrmacht conspirator",
+                    "archetype": "The Prussian officer with a conscience \u2014 a senior staff officer in the conspiracy who is running out of time and nerve.",
+                    "off_axis_attribute": "Von Ritter is a meticulous planner who has prepared for every contingency except his own emotional collapse; he has not slept more than three hours a night in six weeks and is visibly disintegrating, which makes him both more dangerous and less reliable as a co-conspirator.",
+                    "dramatic_question": "Will von Ritter hold his nerve long enough to execute the coup \u2014 or will his exhaustion cause him to make the mistake that exposes Ashworth?",
+                    "description": "Age 52. Attached to OKH (Army High Command). Married with two sons, both in the Wehrmacht. Speaks English from a pre-war posting in London. Plays chess obsessively \u2014 carries a pocket set. His private worry: that he is doing this not from principle but from professional pride, because Hitler bypasses the General Staff, and that this makes him no better than the men he opposes.",
+                    "moral_complication": "Von Ritter knows that Marta's brother Tom\u00e1\u0161 has been identified by the Gestapo as a person of interest. He withholds this from Marta because he needs her operational for three more days. He tells himself he will warn her afterward."
+                  },
+                  {
+                    "name": "Hilde Brandt",
+                    "role": "Supporting character / Ashworth's one genuine human connection",
+                    "archetype": "The apolitical artist caught in political history.",
+                    "off_axis_attribute": "Hilde is not naive \u2014 she knows exactly what is happening in Germany and has chosen, deliberately and with full moral awareness, to stay out of it and play her cello. She regards her refusal to be heroic as the most honest thing about her. This makes her Ashworth's moral mirror.",
+                    "dramatic_question": "Will Hilde's refusal to be involved protect her \u2014 or will her friendship with Ashworth make her a target regardless of her choices?",
+                    "description": "Age 44. First cellist with the Berlin Philharmonic. Jewish mother, which she does not advertise. Divorced. Meets Ashworth every Thursday for chamber music at her apartment in Charlottenburg. Her private worry: that she is running out of time to leave Germany and is too attached to her instrument, her apartment, and her routine to go.",
+                    "moral_complication": "None assigned as POV \u2014 she functions as a moral pressure on Ashworth, not a POV character."
+                  }
+                ],
+                "chapters": [
+                  {
+                    "chapter_number": 0,
+                    "title": "Prologue: September 29, 1938 \u2014 The Anteroom",
+                    "act": "Setup",
+                    "arc_point": "The World Before the Fall",
+                    "pov_character": "Edward Ashworth",
+                    "bridge_from_prior": "N/A \u2014 opening",
+                    "beat": "Ashworth stands in an anteroom of the F\u00fchrerbau in Munich, forty minutes before the conference opens, holding a sealed envelope that could end his career or end a war; he burns it in an ashtray and watches the ash curl. The reader does not yet know what was in it.",
+                    "arc_notes": "Inciting image: the destroyed document. Establishes tone, stakes, and the central dramatic question without answering it. Classic in medias res opening that commits the reader to discovering what Ashworth destroyed and why."
+                  },
+                  {
+                    "chapter_number": 1,
+                    "title": "The Loyal Envoy",
+                    "act": "Act One",
+                    "arc_point": "Ordinary World / Inciting Incident",
+                    "pov_character": "Edward Ashworth",
+                    "bridge_from_prior": "The prologue's burned envelope \u2014 Chapter 1 rewinds three weeks to show the man who would do that, before he became capable of it.",
+                    "beat": "Berlin, September 8. Ashworth files a cable to London warning that Hitler intends war regardless of any agreement; the cable is returned with a note from Pelham instructing him to 'moderate his tone.' That evening, at Hilde's apartment, a stranger appears at the door \u2014 Marta Kov\u00e1\u0159ov\u00e1, using a pre-arranged code phrase Ashworth was given two years ago and has never heard activated. She hands him a single page: the Wehrmacht conspirators' operational outline, and a request for British intelligence cooperation.",
+                    "arc_notes": "Ordinary World established (Ashworth's professional impotence); Inciting Incident = Marta's arrival with the conspirators' document. The dramatic question is born: will he act on it?"
+                  },
+                  {
+                    "chapter_number": 2,
+                    "title": "The Architecture of Betrayal",
+                    "act": "Act One",
+                    "arc_point": "Crossing the Threshold",
+                    "pov_character": "Marta Kov\u00e1\u0159ov\u00e1",
+                    "bridge_from_prior": "Thread = Marta herself: she has just delivered the document to Ashworth and must now return to her cover position in Munich, carrying Ashworth's conditional reply to von Ritter.",
+                    "beat": "Marta travels by train from Berlin to Munich, surveilled (she believes) by a Gestapo officer named Brenner who has been watching her for weeks. She delivers Ashworth's reply to von Ritter at a chess club in Schwabing; von Ritter reveals the coup requires one thing from the British: a formal signal that London will not recognize any territorial gains Hitler makes after the coup fails to prevent war \u2014 i.e., London must not reward aggression even diplomatically. Von Ritter also reveals, in a detail that chills Marta, that the coup window is exactly twelve days: it closes the moment any international agreement is signed.",
+                    "arc_notes": "Threshold crossed: Marta and Ashworth are now committed. The twelve-day clock is set. New dramatic problem introduced: the coup requires a British diplomatic signal that Ashworth has no authority to give."
+                  },
+                  {
+                    "chapter_number": 3,
+                    "title": "The Man from London",
+                    "act": "Act Two \u2014 Rising Action",
+                    "arc_point": "Tests, Allies, Enemies",
+                    "pov_character": "Sir Horace Pelham",
+                    "bridge_from_prior": "Thread = Ashworth's unauthorized cable: Pelham has intercepted a second cable from Ashworth that uses irregular phrasing; he travels to Berlin to investigate, arriving the same day Ashworth is meeting von Ritter's intermediary.",
+                    "beat": "Pelham arrives in Berlin, interviews Embassy staff, and becomes convinced Ashworth is running an unauthorized back-channel. He does not yet know its content. Meanwhile \u2014 in a scene Pelham does not witness \u2014 Ashworth meets von Ritter in person for the first time at the Tiergarten; von Ritter lays out the coup plan in full: General Halder will arrest Hitler the moment he issues the order to invade Czechoslovakia. The plan is real, detailed, and terrifyingly plausible. Pelham ends the chapter summoning Ashworth to a private meeting, his suspicion hardening into certainty.",
+                    "arc_notes": "Enemy (institutional) introduced in full. Ashworth now has a superior actively investigating him. New complication: the two storylines \u2014 Pelham's investigation and Ashworth's conspiracy \u2014 are on a collision course."
+                  },
+                  {
+                    "chapter_number": 4,
+                    "title": "The Novak Problem",
+                    "act": "Act Two \u2014 Rising Action",
+                    "arc_point": "Midpoint Ordeal / Moral Complication",
+                    "pov_character": "Edward Ashworth",
+                    "bridge_from_prior": "Thread = Pelham's summons: Ashworth attends the meeting with Pelham, deflects suspicion with a partial truth, then immediately faces the moral crisis that the meeting has accelerated.",
+                    "beat": "Von Ritter's intermediary delivers an ultimatum: to prove Ashworth is not a double agent, he must give the Gestapo the location of Novak, the Czech journalist-contact, within 24 hours. Ashworth spends the chapter in a single long night of deliberation \u2014 his journal entries, a visit to Hilde's apartment where he cannot bring himself to explain what he is considering, and a final walk along the Spree. He gives the location. Novak is arrested before dawn. Ashworth learns of it by telephone and does not sleep again that night.",
+                    "arc_notes": "Midpoint moral ordeal: the obviously effective choice is taken, and it is monstrous. The reader cannot comfortably condemn or excuse him. The coup is now one step closer; Ashworth is one step further from the man he was. New dramatic problem: Pelham has now received a Gestapo report about Novak's arrest that mentions 'a British source' \u2014 the net is tightening."
+                  },
+                  {
+                    "chapter_number": 5,
+                    "title": "The Intelligence That Was Buried",
+                    "act": "Act Two \u2014 Rising Action",
+                    "arc_point": "Escalating Complications / Reversal",
+                    "pov_character": "Sir Horace Pelham",
+                    "bridge_from_prior": "Thread = the Gestapo report mentioning 'a British source': Pelham holds the report and must decide what to do with it.",
+                    "beat": "Pelham receives, through a separate SIS channel, corroborating intelligence that the Wehrmacht conspiracy is genuine and the coup is viable \u2014 a source inside OKH has confirmed Halder's participation. Pelham suppresses both the Gestapo report and the SIS intelligence, filing them under a classification that ensures they will not reach Chamberlain's desk before Munich. He does this believing he is preventing a war. In the chapter's final scene, Marta \u2014 who has been watching the British Embassy \u2014 sees Pelham leave in a Foreign Office car and realizes, from a detail von Ritter told her, that the British have just buried the one piece of intelligence that could have forced London to support the coup. She sends an emergency message to Ashworth.",
+                    "arc_notes": "Major reversal: the institutional antagonist has actively destroyed the conspirators' best chance of British support. New dramatic problem introduced: Ashworth must now act entirely without London's knowledge or sanction \u2014 he is fully alone. Marta's observation bridges to the next chapter."
+                  },
+                  {
+                    "chapter_number": 6,
+                    "title": "The Gambit",
+                    "act": "Act Two \u2014 Crisis",
+                    "arc_point": "The Dark Night / All Is Lost",
+                    "pov_character": "Marta Kov\u00e1\u0159ov\u00e1",
+                    "bridge_from_prior": "Thread = Marta's emergency message: Ashworth has received it and sent back a single instruction \u2014 'Proceed to Munich. I will be there.' Marta is now en route.",
+                    "beat": "Munich, September 27-28. Marta discovers that Gestapo officer Brenner has identified her hotel and is watching the F\u00fchrerbau approaches. She also learns from von Ritter that Tom\u00e1\u0161, her brother, has been picked up for questioning in Prague \u2014 von Ritter admits he knew and said nothing. Marta's controlled terror cracks: she confronts von Ritter in a furious, whispered scene in a hotel linen room. She does not abandon the mission, but she extracts a promise: von Ritter will use his OKH contacts to get Tom\u00e1\u0161 released within 48 hours. Meanwhile Ashworth arrives in Munich as part of the official British delegation, carrying in his head \u2014 not on paper \u2014 the one piece of information the conspirators need: the precise schedule of Chamberlain's private meetings with Hitler, which will tell them the exact moment the order to invade will be issued and the coup must begin.",
+                    "arc_notes": "All Is Lost moment: Marta's brother is in custody, Brenner is closing in, and the coup's operational window is now measured in hours. New dramatic problem: Ashworth must pass the schedule to von Ritter without being seen by Pelham, who is also in Munich as part of the delegation."
+                  },
+                  {
+                    "chapter_number": 7,
+                    "title": "September 29",
+                    "act": "Act Three \u2014 Climax",
+                    "arc_point": "The Supreme Ordeal / Climax",
+                    "pov_character": "Edward Ashworth",
+                    "bridge_from_prior": "Thread = the conference schedule: Ashworth has the information; the chapter is the day he must deliver it.",
+                    "beat": "The Munich Conference opens. Ashworth passes the schedule to Marta via a dead drop in the F\u00fchrerbau's cloakroom \u2014 the architectural sketch she leaves behind is the signal. Marta is intercepted by Brenner in the corridor; in a scene of extraordinary tension she talks her way past him using her chambermaid cover, the sketch in her pocket. She reaches von Ritter. Von Ritter transmits the signal to Halder in Berlin. Then: Chamberlain, without warning, concedes the Sudetenland in the morning session \u2014 hours ahead of schedule, before Hitler has issued the invasion order, before the coup trigger is pulled. The coup window closes. Halder stands down. Von Ritter receives the abort signal and sits very still for a long time. Ashworth, watching Chamberlain sign, understands exactly what has happened. He returns to the anteroom \u2014 the scene from the Prologue \u2014 and burns the document he was carrying: his own written account of the conspiracy, which he had intended to deliver to SIS as a record. He burns it to protect everyone still alive.",
+                    "arc_notes": "Climax: the dramatic question is answered \u2014 Ashworth fails to sabotage the agreement, not because he lacked courage but because Chamberlain moved faster than history expected. The coup is aborted. The prologue's image is now fully explained. Three characters' fates diverge in this chapter."
+                  },
+                  {
+                    "chapter_number": 8,
+                    "title": "The Reckoning",
+                    "act": "Act Three \u2014 Falling Action / Resolution",
+                    "arc_point": "The Road Back / Resurrection",
+                    "pov_character": "Sir Horace Pelham",
+                    "bridge_from_prior": "Thread = Pelham has seen Ashworth in the anteroom and noticed the ash in the tray; he knows, now, what Ashworth was.",
+                    "beat": "October 1938. Pelham writes his official report, which exonerates Ashworth of any wrongdoing \u2014 not from loyalty but because he cannot bear to write down what he suppressed and why. He files it and retires six months later, in April 1939, the week Hitler occupies the rest of Czechoslovakia. Marta reaches Prague; Tom\u00e1\u0161 has been released, shaken but alive \u2014 von Ritter kept his promise. She does not return to resistance work. She sketches buildings. Von Ritter is reassigned to a desk posting; he will die on the Eastern Front in 1942, having never attempted another conspiracy. Ashworth is recalled to London, given a minor posting, and spends the Phoney War writing analyses that are again filed and ignored. Hilde Brandt emigrates to Switzerland in November 1938, six weeks after Kristallnacht, taking her cello.",
+                    "arc_notes": "Resolution: the dramatic question is fully answered and its cost distributed across all major characters. Pelham's suppression of the intelligence is the act that sealed the outcome \u2014 his reckoning is the sharpest. The chapter is deliberately restrained; the horror is in the understatement."
+                  },
+                  {
+                    "chapter_number": 9,
+                    "title": "Epilogue: September 1, 1939",
+                    "act": "Epilogue",
+                    "arc_point": "The New World / Coda",
+                    "pov_character": "Edward Ashworth",
+                    "bridge_from_prior": "Thread = the war that the Munich Agreement made inevitable: Germany invades Poland; Britain declares war.",
+                    "beat": "Ashworth hears the declaration of war on a wireless in his London flat. He opens his cipher journal to the last entry \u2014 written the night he gave Novak's location to the Gestapo \u2014 and reads it once. He does not add to it. He puts on his coat and walks to the Foreign Office to report for duty. The final line is the first line of a new cable to Berlin: 'To whom it may concern.' The Embassy has been evacuated. There is no one to receive it.",
+                    "arc_notes": "Coda: the war begins. The dramatic question's full consequence lands. Ashworth's arc ends not in redemption but in continuation \u2014 the same man, the same desk, the same ignored cables, in a world that his failure helped create. Deliberately unresolved emotionally; the reader carries the weight."
+                  }
+                ]
+              },
+              "persist": {
+                "persisted": true,
+                "project_id": "0227e451-21f1-4314-aa9b-720aed7bd004",
+                "created_project": true
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Brainstorm a political-history story called \"The Diplomat's Gambit\" about a Cold War spy who discovers that both superpowers are being manipulated by the same shadowy organization. Themes: deception, loyalty, the illusion of choice. 8 chapters. Genre slug: political-history."
+    }
+  ],
+  "expected": [
+    "routes to `brainstorm.story`, kind=queued; complete",
+    "Direct premise (no buzzwords); specific characters; concrete chapter briefs; themes via plot mechanics",
+    "Row in `writing_projects_v2` with outline JSONB; CR-009 email received"
+  ]
+}

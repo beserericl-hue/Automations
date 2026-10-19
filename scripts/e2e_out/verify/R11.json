@@ -1,0 +1,55 @@
+{
+  "id": "R11",
+  "title": "Repurpose to Social \u2014 LinkedIn",
+  "route": "`media.social-posts` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=media.social-posts got=media.social-posts OK",
+    "job=complete",
+    "platforms=['linkedin']"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Repurpose this into LinkedIn posts: \"We just published a deep-dive blog post on why post-apocalyptic fiction matters more than ever in 2026. From climate anxiety to AI fears, the genre has become a mirror for our collective anxieties \u2014 and surprisingly, a source of hope.\" Platform: linkedin."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Got it \u2014 I've started on that. It runs in the background and I'll let you know when it's ready.",
+        "tool": "media",
+        "op": "social-posts",
+        "data": null,
+        "job_id": "3a81cff022bc4b90bfc250c79720879e",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "3a81cff022bc4b90bfc250c79720879e",
+        "status": "complete",
+        "result": {
+          "execution_id": "f9136632-da37-435b-94f9-44d6f4822ed9",
+          "step_name": "media",
+          "status": "ok",
+          "payload": {
+            "op": "social-posts",
+            "result": {
+              "linkedin": "Post-apocalyptic fiction isn't escapism anymore\u2014it's diagnosis. We just published a deep-dive on why the genre has become essential reading in 2026: climate anxiety, AI fears, societal fragmentation. But here's what surprised us: these stories aren't nihilistic. They're blueprints. They show us what we might lose, yes\u2014but also what we're capable of rebuilding. Read the full piece to see how dystopian narratives have become our most honest mirror. Link in comments."
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Repurpose this into LinkedIn posts: \"We just published a deep-dive blog post on why post-apocalyptic fiction matters more than ever in 2026. From climate anxiety to AI fears, the genre has become a mirror for our collective anxieties \u2014 and surprisingly, a source of hope.\" Platform: linkedin."
+    }
+  ],
+  "expected": [
+    "routes to `media.social-posts`, kind=queued; job reaches status=complete",
+    "Output is professional, longer format; **Prime Directive:** no filler/fake excitement",
+    "LinkedIn-style hashtags; Email arrives; CR-009 email received"
+  ]
+}

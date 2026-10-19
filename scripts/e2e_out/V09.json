@@ -1,0 +1,44 @@
+{
+  "test": {
+    "id": "V09",
+    "title": "Voice \u2014 Social Media (LinkedIn)",
+    "source": "voice",
+    "prompt": "Repurpose that blog post about AI marketing into LinkedIn posts",
+    "route": "media.social-posts` (task)",
+    "prerequisite": "",
+    "expected": [
+      "flat `{response, kind=\"queued\"}`",
+      "routes `media.social-posts`",
+      "platform=linkedin",
+      "resolves \"that blog post\" from context",
+      "LinkedIn-format",
+      "CR-009 email"
+    ]
+  },
+  "response": {
+    "response": "Queuing the repurposing of your AI marketing blog post for LinkedIn. I'll let you know when the posts are ready.",
+    "kind": "queued",
+    "tool": "media",
+    "op": "social-posts",
+    "job_id": "9cf7c66d2b024399a45d0879b67a90cb",
+    "status": "queued"
+  },
+  "job_result": {
+    "job_id": "9cf7c66d2b024399a45d0879b67a90cb",
+    "status": "complete",
+    "result": {
+      "execution_id": "8bbb5ad8-c783-4814-847e-12c87e0f01ea",
+      "step_name": "media",
+      "status": "ok",
+      "payload": {
+        "op": "social-posts",
+        "result": {
+          "twitter": "(fixture) social post for twitter: ",
+          "linkedin": "(fixture) social post for linkedin: "
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

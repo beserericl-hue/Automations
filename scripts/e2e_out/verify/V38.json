@@ -1,0 +1,59 @@
+{
+  "id": "V38",
+  "title": "Voice \u2014 Email Short Story",
+  "route": "`library.email-content` (task) \u00b7 impl: built (E2E-1)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.email-content got=library.email-content OK",
+    "job=complete",
+    "emailed=True to=eric@agileadtesting.com subject=A disillusioned Roman soldier discovers err=None"
+  ],
+  "steps": [
+    [
+      "voice",
+      "Send me the short story about the Roman soldier by email"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "response": "Sending the short story about the Roman soldier via email.",
+        "kind": "queued",
+        "tool": "library",
+        "op": "email-content",
+        "job_id": "6908dd88cfdc4035a86701d0f26095f7",
+        "status": "queued"
+      },
+      "job_result": {
+        "job_id": "6908dd88cfdc4035a86701d0f26095f7",
+        "status": "complete",
+        "result": {
+          "execution_id": "fe8143e8-db1c-4c54-bd82-19bbcfc48a39",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "email-content",
+            "result": {
+              "emailed": true,
+              "to": "eric@agileadtesting.com",
+              "subject": "A disillusioned Roman soldier discovers",
+              "content_type": "short_story"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Send me the short story about the Roman soldier by email"
+    }
+  ],
+  "expected": [
+    "flat queued",
+    "content_type=short_story",
+    "complete",
+    "reads from `published_content_v2` (user-scoped)",
+    "HTML email",
+    "subject references title",
+    "BCC if configured"
+  ]
+}

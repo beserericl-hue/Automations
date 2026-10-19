@@ -1,0 +1,57 @@
+{
+  "id": "R104",
+  "title": "Email Newsletter",
+  "route": "`library.email-content` (task) \u00b7 impl: built (E2E-1)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.email-content got=library.email-content OK",
+    "job=complete",
+    "emailed=True to=eric@agileadtesting.com subject=Revolutions That Remade the World err=None"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Email me the newsletter about revolutions that changed the world"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Sending the newsletter to your registered email address.",
+        "tool": "library",
+        "op": "email-content",
+        "data": null,
+        "job_id": "8b12cf246d4e4436b9ea72df11dcc34e",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "8b12cf246d4e4436b9ea72df11dcc34e",
+        "status": "complete",
+        "result": {
+          "execution_id": "e8f37559-ed15-4be4-b159-d611cb6af901",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "email-content",
+            "result": {
+              "emailed": true,
+              "to": "eric@agileadtesting.com",
+              "subject": "Revolutions That Remade the World",
+              "content_type": "newsletter"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Email me the newsletter about revolutions that changed the world"
+    }
+  ],
+  "expected": [
+    "routes to `library.email-content` (content_type=newsletter), kind=queued; complete",
+    "searches `published_content_v2` by keywords; HTML; email sent"
+  ]
+}

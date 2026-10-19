@@ -1,0 +1,97 @@
+{
+  "id": "R24",
+  "title": "List Published",
+  "route": "`library.list-outlines` (info) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.list-outlines got=library.retrieve MISMATCH",
+    "items=5 found=True"
+  ],
+  "steps": [
+    [
+      "chat",
+      "List my published content"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "data",
+        "assistant_message": "",
+        "tool": "library",
+        "op": "retrieve",
+        "data": {
+          "execution_id": "4def5cb8-a2f6-46bd-8278-b9d1aa5b71a0",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "retrieve",
+            "result": {
+              "items": [
+                {
+                  "id": "f8d687c2-ba44-4626-8791-ba3a46f49369",
+                  "title": "The Last Pharaoh's Scribe \u2014 Chapter 1",
+                  "status": "published",
+                  "content_type": "chapter",
+                  "project_id": "050f757d-d102-4951-8706-dd511e883dec",
+                  "chapter_number": 1,
+                  "created_at": "2026-07-01T20:31:07.648331+00:00"
+                },
+                {
+                  "id": "67d33a7d-3a90-418b-890f-fa95805b2868",
+                  "title": "An AI trained to write",
+                  "status": "published",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-11T00:02:41.271941+00:00"
+                },
+                {
+                  "id": "a01fb547-d2f6-4eb6-872e-4960569eae3f",
+                  "title": "Why Post-Apocalyptic Fiction Matters More Than Ever in 2026",
+                  "status": "published",
+                  "content_type": "blog_post",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-10T15:47:46.683654+00:00"
+                },
+                {
+                  "id": "a47f5359-1a48-4446-aaa7-eae28dc163f3",
+                  "title": "The Forgotten Engineers of Rome: How Aqueducts Shaped an Empire",
+                  "status": "published",
+                  "content_type": "blog_post",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-09T14:17:05.2302+00:00"
+                },
+                {
+                  "id": "460c4bdb-2242-4d98-b3c5-c3caf54ec0ef",
+                  "title": "An AI trained on 50",
+                  "status": "published",
+                  "content_type": "short_story",
+                  "project_id": null,
+                  "chapter_number": null,
+                  "created_at": "2026-03-09T13:34:09.744516+00:00"
+                }
+              ],
+              "count": 5,
+              "found": true,
+              "search_term": null
+            }
+          },
+          "error": null,
+          "next_stage": null
+        },
+        "job_id": null,
+        "status": null,
+        "jobs": null,
+        "error": null
+      },
+      "job_result": null,
+      "resolved_prompt": "List my published content"
+    }
+  ],
+  "expected": [
+    "routes to `library.list-outlines`, kind=data; returns the R23 item with published_at date"
+  ]
+}

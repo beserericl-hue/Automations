@@ -1,0 +1,41 @@
+{
+  "test": {
+    "id": "R69",
+    "title": "Write Chapter 1 from Three-Act Outline (Historical Time Travel)",
+    "source": "chat",
+    "prompt": "Write chapter 1 of \"The Correction\". Genre slug: historical-time-travel. Chapter number: 1.",
+    "route": "chapter.write` (task)",
+    "prerequisite": "R61",
+    "expected": [
+      "routes to `chapter.write`, kind=queued; complete; auto-loads 10-ch outline",
+      "Ch1 Act1 Setup (grief, machine works); goal locked in; characters/tone match R61; `published_content_v2` chapter row; `story_bible_v2`; snapshot; Prime Directive; CR-009 email"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing chapter 1 of \"The Correction\" \u2014 I'll let you know when it's ready.",
+    "tool": "chapter",
+    "op": "write",
+    "data": null,
+    "job_id": "edeaf77c90654b0fad2ef27f03daf27a",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "edeaf77c90654b0fad2ef27f03daf27a",
+    "status": "complete",
+    "result": {
+      "execution_id": "789778aa-169a-498f-9285-f855df0c9594",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValidationError",
+        "message": "1 validation error for WriteChapterRequest\nproject_id\n  Field required [type=missing, input_value={'project_title': 'The Co...t': True, 'async': True}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}

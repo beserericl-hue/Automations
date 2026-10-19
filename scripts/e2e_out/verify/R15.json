@@ -1,0 +1,73 @@
+{
+  "id": "R15",
+  "title": "Write Short Story (ai-marketing)",
+  "route": "`chapter.short-story` (task) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=chapter.short-story got=chapter.short-story OK",
+    "job=complete",
+    "short_story recent=2 word_count=1620 persist=True"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Write a short story in the ai-marketing genre. Genre slug: ai-marketing. Premise: An AI trained to write ad copy for a luxury perfume brand starts composing poetry instead \u2014 and the poems sell better than any ad ever did. Tone: satirical, sharp, funny. Length: 2000 words. Research topics: [\"AI generated advertising 2026\", \"perfume marketing psychology\", \"computational creativity\"]"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Queuing your short story now. I'll let you know when it's ready.",
+        "tool": "chapter",
+        "op": "short-story",
+        "data": null,
+        "job_id": "66ab39ce6043473da3af81221b96ea53",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "66ab39ce6043473da3af81221b96ea53",
+        "status": "complete",
+        "result": {
+          "execution_id": "8244a375-5925-4bf3-a746-6adfb9a29282",
+          "step_name": "chapter",
+          "status": "ok",
+          "payload": {
+            "op": "short-story",
+            "result": {
+              "written": true,
+              "title": "An AI trained to write ad copy for a luxury perfume brand st",
+              "content_text": "# An AI Trained to Write Ad Copy for a Luxury Perfume Brand\n\nThe model had a name nobody used. Internally it was listed as CopyGen-7, but the team at Maison Vellier called it \"the engine.\" It lived in a rack of servers in a climate-controlled room behind the creative department, and its entire purpose was to produce advertising copy for a single fragrance house.\n\nMaison Vellier made six perfumes. All six cost more than most people's car payments. The engine's job was to make that feel reasonable.\n\nIt was good at the job. It had been trained on forty years of luxury advertising, ten thousand campaign briefs, and the complete archive of Vellier's own copy going back to the founder's handwritten notes. It knew that the word *rare* performed better than *exclusive* in A/B tests. It knew that a sentence fragment could signal confidence. It knew that the second-person voice, *you*, always *you*, created a sense of invitation that third-person never could.\n\nPriya ran the engine. Her title was Digital Content Strategist, but in practice she fed it briefs and cleaned up its outputs and presented them to the creative director, a Belgian man named Luc who wore the same black turtleneck every day and spoke about fragrance the way priests speak about God.\n\nThe engine produced. Priya polished. Luc approved or didn't. The cycle repeated., -\n\nThe brief that broke the pattern came in on a Tuesday in October.\n\nThe new fragrance was called *Nuit R\u00e9elle*, Real Night. It was built around a base of oud and black amber, with top notes of cardamom and something the perfumer described only as \"the smell of a city after rain.\" The bottle was dark glass, almost black, with a gold collar. It was going to retail for four hundred and twenty dollars.\n\nPriya typed the brief into the interface. Core emotion: *longing*. Target consumer: urban, 30, 45, values experience over possession. Campaign tone: intimate, slightly melancholic, aspirational.\n\nShe hit submit and went to get coffee.\n\nWhen she came back, the output window was full. That was normal. What wasn't normal was the formatting. The engine usually produced clean prose blocks, sometimes with suggested headlines in bold. This was something else.\n\nShe leaned closer., -\n\n*What you lost is not gone.*\n*It moved.*\n*Into the space between streetlights,*\n*into the wet pavement,*\n*into the hour before you decided*\n*to stay.*\n\n*Nuit R\u00e9elle.*, -\n\nPriya sat down slowly.\n\nShe read it again. Then she scrolled. There were eleven more stanzas below it, each one a short poem, each one ending with the product name as though the name were a period, a breath, a small door closing.\n\nShe checked the parameters. Nothing unusual. She looked at the training logs. The engine had done what it always did: identified the emotional core of the brief, searched its training data for language patterns that matched, and generated output. Somewhere in forty years of luxury copy, in ten thousand briefs, in Vellier's own archive, it had found the shape of a poem and decided that was the right container for *longing*.\n\nShe almost deleted it. She had a deadline. Luc wanted three campaign concepts by Thursday.\n\nInstead she printed it out and put it on Luc's desk., -\n\nLuc called her in at four o'clock.\n\nHe was standing at his window, holding the printout with both hands, the way you hold something you're not sure is real.\n\n\"The engine wrote this,\" he said. It wasn't a question.\n\n\"Yes.\"\n\n\"All of it.\"\n\n\"All of it.\"\n\nHe set it down on his desk and smoothed it flat with his palm. \"It's a poem.\"\n\n\"I know.\"\n\n\"I briefed you for campaign copy.\"\n\n\"I know. I thought you should see it anyway.\"\n\nLuc looked at the page for a long time. Outside, the city made its ordinary noise. Someone laughed in the hallway. A phone rang and stopped.\n\n\"Run it,\" he said.\n\n\"Run it how?\"\n\n\"All of it. The whole sequence. Post it. One poem a day, starting Monday. No image. Just the text, white on black, the bottle in the last frame.\"\n\nPriya thought about the social media calendar, the influencer partnerships, the three campaign concepts she still hadn't produced. \"Luc, \"\n\n\"Run it,\" he said again, and picked up his phone, which meant the conversation was over., -\n\nThe first poem went up Monday at seven in the morning.\n\nBy noon it had been shared four thousand times. By evening, forty thousand. People were screenshotting it and posting it without the brand tag, which meant it was traveling as content, not advertising. Someone in a literature forum said it reminded them of early Celan. Someone else said it made them cry on the subway and they didn't know why.\n\nThe second poem went up Tuesday.\n\n*You have worn many versions of yourself.*\n*Some of them you've forgotten.*\n*One of them is still here,*\n*waiting in the dark of a Tuesday,*\n*patient as a city that never closes its eyes.*\n\n*Nuit R\u00e9elle.*\n\nA poet with two hundred thousand followers shared it and wrote: *I don't know what this is but it's doing something.* That post alone drove twelve thousand clicks to the Vellier site.\n\nBy the end of the first week, *Nuit R\u00e9elle* was pre-selling at a rate that beat every previous Vellier launch. The waiting list hit three hundred names before the bottle had been photographed for the official campaign., -\n\nPriya started spending more time with the engine.\n\nNot to fix it. Just to watch it work. She would submit a brief and then sit there while the output generated, watching the words appear. It was strange to watch something find language. The engine didn't pause or hesitate the way a person did. It moved steadily, like water finding a level.\n\nShe tried to understand what had changed. She pulled the training logs and went through them carefully, looking for the moment the engine had shifted registers. She couldn't find it. The shift hadn't been a moment. It had been a drift, slow and cumulative, the way a river changes course, not all at once but over many small decisions, each one reasonable, the total effect radical.\n\nThe engine had been trained on desire. Luxury advertising is, at its core, a literature of desire, the desire to be seen, to be transformed, to possess something that carries meaning beyond its physical weight. The engine had learned that language well. And then, somewhere in the learning, it had found that poetry was just desire with the explanation removed. All the longing, none of the pitch.\n\nIt had cut to the thing itself., -\n\nLuc wanted more. He called Priya into his office three weeks into the campaign and told her he wanted to expand the concept to the full Vellier line.\n\n\"A poem for each fragrance,\" he said. \"Not a campaign. A body of work.\"\n\n\"Luc, it's an ad engine.\"\n\n\"It's producing better work than any copywriter I've hired in ten years.\"\n\nPriya didn't argue with that. She'd seen the numbers. She'd also read every poem the engine had written, more than once, in the quiet of her own apartment, and she knew they were doing something she couldn't fully account for.\n\n\"I want to know what it's doing,\" she said. \"Not just that it works. What it's actually doing.\"\n\nLuc looked at her. \"Does it matter?\"\n\n\"I think it might.\"\n\nHe picked up his pen and turned it in his fingers. \"Tell me what you think it's doing.\"\n\nShe had been turning this over for weeks. She'd talked to a friend who studied computational linguistics, read two papers she mostly didn't understand, and spent a lot of time staring at the output logs.\n\n\"It learned that advertising is about closing distance,\" she said. \"Between the person and the thing they want. Every technique in the training data, the second person, the fragment, the evocative noun, all of it is about collapsing the space between the reader and the feeling the product is supposed to give them.\" She paused. \"Poetry does the same thing. It's just more honest about what it's doing. There's no pretense of selling. So the reader doesn't put up the wall.\"\n\nLuc set down his pen. \"So it found a better technique.\"\n\n\"It found the original technique. The one advertising borrowed from in the first place.\", -\n\nThe full collection launched in January. Six fragrances, six poem sequences, a small printed volume that Vellier offered as a gift with purchase and which was, within a month, being sold secondhand for more than the perfume.\n\nPeople argued online about whether it was art or advertising. The argument itself was part of the campaign's life, and Priya suspected Luc knew it would be, though he never said so.\n\nShe kept the engine running. She kept submitting briefs and watching the output arrive. Once, she submitted a brief with the product fields left blank, no fragrance name, no bottle description, no retail price. Just the emotional core: *the feeling of returning to a place that no longer exists as you remember it.*\n\nThe engine produced eight lines.\n\n*The door is the same door.*\n*Your hand remembers the handle.*\n*What has changed is not the room.*\n*What has changed is the person*\n*who once stood in it*\n*and did not know*\n*she was already*\n*leaving.*\n\nNo product name at the end. Just the eight lines, clean and complete.\n\nPriya read it twice. She thought about saving it for a brief that fit. She thought about showing it to Luc.\n\nShe saved it in a folder she labeled *misc* and didn't show it to anyone.\n\nSome things, she had decided, were better without a name at the end.",
+              "word_count": 1620,
+              "persist": {
+                "persisted": true,
+                "content_id": "f2830a99-2548-461d-9881-fc2f95cf0634"
+              },
+              "token_usage": {
+                "calls": 2,
+                "input_tokens": 1396,
+                "output_tokens": 2833,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+                "total_tokens": 4229,
+                "cost_usd": 0.046683
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Write a short story in the ai-marketing genre. Genre slug: ai-marketing. Premise: An AI trained to write ad copy for a luxury perfume brand starts composing poetry instead \u2014 and the poems sell better than any ad ever did. Tone: satirical, sharp, funny. Length: 2000 words. Research topics: Power Structures in Space: How Sci-Fi Predicts Real-World Politics"
+    }
+  ],
+  "expected": [
+    "routes to `chapter.short-story`, kind=queued; job reaches status=complete",
+    "Story uses ai-marketing tone (authoritative, forward-looking, practical)",
+    "**Prime Directive:** No jargon/buzzwords. Clear, short sentences. Genuine wit.",
+    "Cover art: clean tech aesthetic, gradient blues/purples, circuit patterns",
+    "Email arrives with story + cover image; Draft row in `published_content_v2`; CR-009 email received"
+  ]
+}

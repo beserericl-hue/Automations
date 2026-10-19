@@ -1,0 +1,98 @@
+{
+  "test": {
+    "id": "R49",
+    "title": "Brainstorm Uses Structure Model",
+    "source": "chat",
+    "prompt": "Brainstorm a short story about a soldier who wakes up 100 years after a war she started, only to find the enemy she fought won and built a better world. Genre: post-apocalyptic. Title: The Wrong Side. Sections: 5",
+    "route": "brainstorm.story` (task)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `brainstorm.story`, kind=queued; complete",
+      "Each section `arc_notes` names a structural beat; outline notes the model chosen",
+      "Characters have roles (Protagonist/Antagonist/Dynamic/Static); no character without a structural purpose",
+      "Row in `writing_projects_v2`; CR-009 email received"
+    ]
+  },
+  "response": {
+    "kind": "queued",
+    "assistant_message": "Queuing short story brainstorm for 'The Wrong Side' \u2014 I'll let you know when it's ready.",
+    "tool": "brainstorm",
+    "op": "short-story",
+    "data": null,
+    "job_id": "4817931ae62745468a6f07a224cb2e0a",
+    "status": "queued",
+    "jobs": null,
+    "error": null
+  },
+  "job_result": {
+    "job_id": "4817931ae62745468a6f07a224cb2e0a",
+    "status": "complete",
+    "result": {
+      "execution_id": "8856feae-bd5e-4453-b075-999458303c52",
+      "step_name": "brainstorm",
+      "status": "ok",
+      "payload": {
+        "op": "short-story",
+        "result": {
+          "outline": {
+            "title": "The Wrong Side",
+            "premise": "Sergeant Mara Voss awakens from an experimental cryo-suspension pod one hundred years after she led the first strike that ignited the Reclamation War, only to discover that the enemy nation she tried to destroy not only won the war but used its victory to build a thriving, peaceful civilization from the ashes\u2014forcing her to reckon with the possibility that everything she fought and killed for was wrong.",
+            "themes": [
+              "The moral cost of certainty in wartime",
+              "Guilt, accountability, and the possibility of redemption",
+              "History written by the victors versus lived truth",
+              "What it means to rebuild rather than conquer"
+            ],
+            "story_arc_name": "",
+            "dramatic_question": "",
+            "wow_factor": "",
+            "characters": [
+              {
+                "name": "Mara Voss",
+                "role": "Protagonist \u2014 former sergeant of the Aldric Coalition",
+                "arc": "Awakens as a proud soldier certain of her cause and must dismantle that certainty when confronted with the world her war created, ultimately choosing confession over self-justification."
+              },
+              {
+                "name": "Solen Dray",
+                "role": "Archivist of the Remnant Compact \u2014 descendant of the enemy",
+                "arc": "Begins as a detached historian studying Voss as a relic and ends as the reluctant witness who forces her to speak her guilt aloud."
+              },
+              {
+                "name": "Commander Aldric Voss",
+                "role": "Mara's dead brother \u2014 present only in memory and archive footage",
+                "arc": "Remembered as a righteous leader, revealed through records to have manufactured the atrocity that justified the war."
+              }
+            ],
+            "chapters": [
+              {
+                "chapter_number": 1,
+                "title": "Cold Wake",
+                "beat": "Mara Voss cracks open a cryo-pod in a ruined bunker and steps into a green, quiet world she does not recognize as the enemy territory she once bombed to rubble.",
+                "arc_notes": "Opening \u2014 world establishment and protagonist introduction; Mara's pride and disorientation are introduced together, setting up the dramatic irony of a soldier who believes she is behind enemy lines when she is actually inside a civilization she helped make possible."
+              },
+              {
+                "chapter_number": 2,
+                "title": "The Archive of Crimes",
+                "beat": "Archivist Solen Dray identifies Mara from a war-crimes registry and walks her through the Compact's historical record, including declassified evidence that her brother fabricated the massacre used to start the war.",
+                "arc_notes": "Rising action \u2014 central conflict deepens; Mara's identity as a righteous soldier is systematically dismantled by documented truth, and her grief over her brother's betrayal transforms her anger outward into something that begins to crack inward."
+              },
+              {
+                "chapter_number": 3,
+                "title": "Testimony",
+                "beat": "Mara stands before the Compact's public memory council and, instead of defending herself, gives a full confession on the record\u2014the first act of her life, she realizes, that might actually help someone.",
+                "arc_notes": "Climax and resolution \u2014 Mara rejects self-justification and chooses accountability; the ending is not absolution but purpose, as her testimony becomes the one true thing she can contribute to the better world built on her war's wreckage."
+              }
+            ],
+            "form": "short_story"
+          },
+          "persist": {
+            "persisted": false,
+            "reason": "persist requested but project_id/user_id missing"
+          }
+        }
+      },
+      "error": null,
+      "next_stage": null
+    }
+  }
+}

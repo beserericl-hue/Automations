@@ -1,0 +1,85 @@
+{
+  "id": "R53",
+  "title": "List Story Arcs",
+  "route": "`library.retrieve` (info) \u00b7 impl: built",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=library.retrieve got=library.retrieve OK",
+    "items=8 found=True"
+  ],
+  "steps": [
+    [
+      "chat",
+      "List the story arcs"
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "data",
+        "assistant_message": "",
+        "tool": "library",
+        "op": "retrieve",
+        "data": {
+          "execution_id": "950049fc-96d8-4458-b048-9b02cc2ec418",
+          "step_name": "library",
+          "status": "ok",
+          "payload": {
+            "op": "retrieve",
+            "result": {
+              "items": [
+                {
+                  "name": "Dan Harmon's Story Circle",
+                  "description": "8-step character transformation circle: Comfort Zone, Need, Unfamiliar Situation, Adapt, Get What They Wanted, Pay a Price, Return, Changed. Ideal for character-driven stories."
+                },
+                {
+                  "name": "Fichtean Curve",
+                  "description": "Plot structure built around sustained, rising tension. Drops readers into conflict via in medias res, escalates through three crises \u2014 each more intense than the last \u2014 toward a climax, then closes with a short, impactful resolution. Backstory revealed in motion."
+                },
+                {
+                  "name": "Freytags Pyramid",
+                  "description": "Five-Act Structure (Freytag's Pyramid) \u2014 Exposition, Rising Action, Climax, Falling Action, Resolution. Creates dedicated space for moral and emotional consequence. Ideal for tragedies, ensemble casts, complex subplots, and character-driven transformation."
+                },
+                {
+                  "name": "In Medias Res",
+                  "description": "Narrative entry technique \u2014 opens at a moment of high tension, then reveals backstory gradually through flashback and embedded exposition. Two-layer construction: Entry Scene + Underlying Chronology."
+                },
+                {
+                  "name": "Kish\u014dtenketsu",
+                  "description": "Traditional East Asian four-act narrative framework that builds emotional resonance through contrast and revelation rather than conflict. Four acts: Ki (Introduction), Sh\u014d (Development), Ten (Twist/Turn), Ketsu (Conclusion/Resolution). No conflict required."
+                },
+                {
+                  "name": "Seven-Point Structure",
+                  "description": "Dan Wells' Seven-Point Structure \u2014 seven pivotal moments built backward from Resolution: Hook, First Plot Point, First Pinch Point, Midpoint, Second Pinch Point, Second Plot Point, Resolution."
+                },
+                {
+                  "name": "The Hero's Journey",
+                  "description": "Joseph Campbell's Monomyth \u2014 the most universal narrative framework in human storytelling. 12 stages mapping departure, initiation, and return. The hero leaves the ordinary world, faces trials and transformation through an ordeal, and returns carrying an elixir that benefits others."
+                },
+                {
+                  "name": "Three-Act Structure",
+                  "description": "The most widely used narrative framework in history. Three phases: Setup (25%), Confrontation (50%), Resolution (25%). Key beats: Inciting Incident, Midpoint Shift, Second Plot Point (darkest moment), Climax. Works for every genre."
+                }
+              ],
+              "count": 8,
+              "found": true,
+              "content_type": "story_arc"
+            }
+          },
+          "error": null,
+          "next_stage": null
+        },
+        "job_id": null,
+        "status": null,
+        "jobs": null,
+        "error": null
+      },
+      "job_result": null,
+      "resolved_prompt": "List the story arcs"
+    }
+  ],
+  "expected": [
+    "routes to `library.retrieve`, kind=data; lists **Freytags Pyramid** and **Three-Act Structure** with descriptions",
+    "does NOT invoke `brainstorm.story` or any task tool; returned inline"
+  ]
+}

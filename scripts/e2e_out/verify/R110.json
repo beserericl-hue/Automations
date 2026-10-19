@@ -1,0 +1,231 @@
+{
+  "id": "R110",
+  "title": "Brainstorm Book Outline with Story Arc",
+  "route": "`brainstorm.story` (task) \u00b7 impl: built (E2E-4)",
+  "verdict": "PASS",
+  "evidence": [
+    "route exp=brainstorm.story got=brainstorm.story OK",
+    "job=complete",
+    "outline title='The Signal Beneath' chapters=10 persisted=True projects_recent=4"
+  ],
+  "steps": [
+    [
+      "chat",
+      "Brainstorm a book using the Hero's Journey called \"The Signal Beneath.\"\n  Genre: post-apocalyptic. 8 chapters.\n  Premise: A radio operator in a collapsed coastal city intercepts a signal from\n  a submerged research station. The signal contains coordinates and a child's voice.\n  She must decide whether to investigate alone or alert the warlord who controls\n  the only working boat.\n  Themes: sacrifice, trust, the cost of knowledge."
+    ]
+  ],
+  "runs": [
+    {
+      "response": {
+        "kind": "queued",
+        "assistant_message": "Queuing a new story brainstorm for \"The Signal Beneath.\" I'll let you know when the outline is ready.",
+        "tool": "brainstorm",
+        "op": "story",
+        "data": null,
+        "job_id": "f8a9f7acf42d4bdcafff0c227c173b46",
+        "status": "queued",
+        "jobs": null,
+        "error": null
+      },
+      "job_result": {
+        "job_id": "f8a9f7acf42d4bdcafff0c227c173b46",
+        "status": "complete",
+        "result": {
+          "execution_id": "af501d8a-b33f-4d7b-888c-0fa219f40be6",
+          "step_name": "brainstorm",
+          "status": "ok",
+          "payload": {
+            "op": "story",
+            "result": {
+              "outline": {
+                "title": "The Signal Beneath",
+                "premise": "Seven years after a solar superstorm called the Cascade wiped out global electronics and collapsed civilization, a former radio engineer named Mara Voss discovers a repeating encrypted signal buried in the static of a salvaged shortwave receiver \u2014 a signal that could not exist unless someone, somewhere, has rebuilt a functioning power grid and transmission network. Tracing the signal means crossing 400 miles of fractured wasteland, rival warlord territories, and her own buried past. But the signal is also being hunted by the Reclamation Authority, the authoritarian faction that controls the eastern seaboard by controlling all information \u2014 because whoever controls the signal controls the future.",
+                "themes": [
+                  "Information as power and liberation",
+                  "The cost of hope in a world that has learned to distrust it",
+                  "Complicity and moral compromise in survival",
+                  "What we owe the dead versus what we owe the living",
+                  "Reconstruction versus control"
+                ],
+                "story_arc_name": "The Hero's Journey",
+                "dramatic_question": "Can Mara Voss reach the source of the signal and broadcast it to the world before the Reclamation Authority silences it \u2014 and her \u2014 forever?",
+                "wow_factor": "The novel teaches the reader, in accurate and specific detail, how shortwave radio propagation, encryption, and clandestine broadcasting actually work \u2014 so that the signal itself becomes a character the reader understands technically and fears for emotionally, the way a reader of a heist novel fears for the vault.",
+                "characters": [
+                  {
+                    "name": "Mara Voss",
+                    "role": "Protagonist / POV",
+                    "archetype": "The Engineer \u2014 a technically brilliant woman who solves problems with her hands and her mind.",
+                    "off_axis_attribute": "She is catastrophically bad at letting people help her; she interprets every offer of assistance as a prelude to betrayal, which means she consistently makes her own situation worse by refusing alliances until it is almost too late.",
+                    "dramatic_question": "Can Mara trust another person enough to share the signal \u2014 and the risk \u2014 before her isolation destroys the mission and herself?",
+                    "description": "Mara is 34, lean and sun-damaged, with a radio operator's habit of going very still when she is thinking. Before the Cascade she was a shortwave hobbyist and licensed amateur radio operator who worked as a signal-processing contractor for a regional broadcaster. She lost her younger brother Dani in the first winter after the Cascade \u2014 not to violence but to a preventable infection, because she was away scavenging equipment instead of with him. She has never forgiven herself. She keeps a logbook of every signal she has ever heard since the Cascade, written in a private shorthand. Her private hobby is repairing mechanical watches \u2014 she finds the predictability of gears comforting. She worries, quietly and constantly, that she has become someone Dani would not recognize.",
+                    "humiliated_by": "Being proven wrong about a technical judgment in front of others \u2014 it strikes at the only identity she has left.",
+                    "terrified_by": "Arriving somewhere too late, as she was too late for Dani.",
+                    "made_happy_by": "The moment a repaired radio produces a clean carrier wave \u2014 the sound of order restored from chaos.",
+                    "moral_complication": "Midway through the journey, Mara learns that the signal's source community is sheltering a man named Aldric Senn, who she knows was a Reclamation Authority intelligence officer responsible for the massacre at Harrow Station \u2014 where 40 civilians were killed for hiding a transmitter. She can expose Senn to the community, which will likely get him killed and may fracture the community's trust in outsiders at the worst possible moment, or she can stay silent and use the community's resources to complete the broadcast, knowing a war criminal walks free. Either choice costs her something she cannot recover."
+                  },
+                  {
+                    "name": "Tom\u00e1s Reyes",
+                    "role": "Ally / Secondary POV",
+                    "archetype": "The Soldier \u2014 a former military communications specialist who now works as a courier between survivor settlements.",
+                    "off_axis_attribute": "He is a deeply sentimental man who carries a battered paperback anthology of poetry and quotes it, badly and at inappropriate moments, which people find either endearing or infuriating; this sentimentality means he forms attachments faster than is safe in the wasteland.",
+                    "dramatic_question": "Will Tom\u00e1s choose loyalty to Mara's mission over the safety of the settlement community he has come to love \u2014 knowing he cannot have both?",
+                    "description": "Tom\u00e1s is 41, broad-shouldered, with a courier's economy of movement. He served as a signals specialist in the army and was on a training exercise when the Cascade hit; he spent two years trying to reach his family in Tucson before accepting they were gone. He now runs a courier route between six settlements and is one of the few people in the wasteland who knows the terrain between the eastern seaboard and the interior. He has a dry, self-deprecating humor that masks a genuine grief he has never processed. He is quietly in love with a settlement doctor named Priya, which he has never said aloud to anyone. He is the person who first hears Mara's receiver and recognizes the signal's encryption pattern as military-grade.",
+                    "humiliated_by": "Being treated as muscle rather than as someone with knowledge and judgment.",
+                    "terrified_by": "Watching someone he cares about die because he hesitated.",
+                    "made_happy_by": "A meal shared with people who are not afraid, even briefly."
+                  },
+                  {
+                    "name": "Director Cassia Vane",
+                    "role": "Antagonist / Tertiary POV",
+                    "archetype": "The Administrator \u2014 the ideological architect of the Reclamation Authority's information-control doctrine.",
+                    "off_axis_attribute": "She genuinely believes she is saving civilization, and she is not entirely wrong \u2014 the RA's controlled rationing of information has prevented three regional wars \u2014 which makes her impossible to dismiss as simply evil and forces the reader to sit with the discomfort of her partial correctness.",
+                    "dramatic_question": "Will Cassia destroy the signal to preserve the order she has built, or will she recognize that the order she has built is the thing that needs to be destroyed?",
+                    "description": "Cassia is 52, immaculate in salvaged pre-Cascade clothing, with the stillness of someone who has learned that authority is performed as much as exercised. Before the Cascade she was a FEMA regional coordinator; she was one of the first people to understand that information collapse was as lethal as physical collapse, and she built the Reclamation Authority from that insight. She has a daughter, Fen, who lives in a free settlement and has not spoken to her in four years. She reads Cassia's broadcasts as propaganda and Cassia reads Fen's silence as ingratitude. Cassia has a private ritual: every night she writes a letter to Fen that she never sends. She is the most competent person in the novel and the most dangerous.",
+                    "humiliated_by": "Being shown that her information control has caused a preventable death \u2014 that her doctrine has the same body count as the chaos she replaced.",
+                    "terrified_by": "A world that returns to the first winter after the Cascade \u2014 the mass death, the complete social dissolution she clawed civilization back from.",
+                    "made_happy_by": "A day when her systems work exactly as designed and no one dies."
+                  },
+                  {
+                    "name": "Aldric Senn",
+                    "role": "Morally Compromised Supporting Character",
+                    "archetype": "The Collaborator \u2014 a man who did terrible things for a system he has since abandoned.",
+                    "off_axis_attribute": "He is the signal community's most skilled electrician and the reason their power grid works at all; his technical indispensability is the precise mechanism by which his past crimes are being laundered, and he knows it.",
+                    "dramatic_question": "Can Aldric's present usefulness redeem his past atrocity, or does redemption require confession regardless of cost?",
+                    "description": "Aldric is 48, quiet, with the careful movements of a man who has learned to take up as little space as possible. He was a mid-level RA intelligence officer who ordered the Harrow Station massacre under direct orders from Cassia Vane, then defected when he was ordered to do it again. He has rebuilt himself in the signal community as a technician and has not told anyone who he was. He is genuinely trying to be a different person. He is also genuinely guilty of 40 deaths. He recognizes Mara the moment she arrives \u2014 he processed her brother Dani's settlement file before Harrow Station.",
+                    "humiliated_by": "Being named aloud for what he did, in front of people who trusted him.",
+                    "terrified_by": "That his confession, if he makes it, will destroy the community he has helped build.",
+                    "made_happy_by": "A working circuit \u2014 the clean, simple morality of electricity that flows or does not."
+                  },
+                  {
+                    "name": "Priya Okafor",
+                    "role": "Supporting Character \u2014 Settlement Doctor",
+                    "archetype": "The Healer \u2014 the moral center of the signal community.",
+                    "off_axis_attribute": "She is ruthlessly pragmatic about triage and has made decisions about who lives and who dies that haunt her patients' families; her compassion is real but it has a hard edge that surprises people who expect softness.",
+                    "dramatic_question": "Will Priya protect her community by turning Mara away, or risk everything on the chance that the broadcast changes the world?",
+                    "description": "Priya is 38, the de facto leader of the Millhaven signal community, though she holds no formal title. She was a trauma surgeon before the Cascade and has kept people alive with instruments that would make a pre-Cascade OR nurse faint. She is the person who made the decision to build the transmitter and start broadcasting \u2014 she is the reason the signal exists. She is also the person who gave Aldric Senn a second chance without knowing his full history. She is quietly furious at the world for requiring her to be this strong for this long."
+                  }
+                ],
+                "chapters": [
+                  {
+                    "chapter_number": 0,
+                    "title": "Prologue: Static",
+                    "act": "Setup",
+                    "arc_point": "Stage 1 \u2014 Ordinary World",
+                    "pov_character": "Mara Voss",
+                    "bridge_from_prior": "N/A \u2014 opening",
+                    "beat": "Seven years after the Cascade, Mara lives alone in a fortified farmhouse on the edge of a dead suburb, trading repaired equipment for food and keeping meticulous logs of the silence on the shortwave bands; the world is established as broken, dangerous, and static \u2014 and so is she.",
+                    "arc_notes": "Ordinary World: establishes Mara's post-Cascade life, her isolation, her technical obsession, and the wound of Dani's death that governs her every choice. The reader sees the world's texture \u2014 the dead grid, the warlord checkpoints, the RA's propaganda broadcasts \u2014 and understands what has been lost."
+                  },
+                  {
+                    "chapter_number": 1,
+                    "title": "The Carrier Wave",
+                    "act": "Setup",
+                    "arc_point": "Stage 2 \u2014 Call to Adventure / Stage 3 \u2014 Refusal of the Call",
+                    "pov_character": "Mara Voss",
+                    "bridge_from_prior": "Direct continuation: Mara at her receiver, the same night as the prologue's closing image.",
+                    "beat": "At 2 a.m., Mara's salvaged shortwave receiver picks up a repeating encrypted signal on 7.850 MHz \u2014 a frequency that should be dead \u2014 and her technical analysis tells her it is not atmospheric bounce or artifact but a live, powered, intentional transmission from somewhere 300-400 miles west; she spends the chapter decoding its structure (a beacon, not a message) and then destroys her own notes in fear, before rewriting them from memory because she cannot help herself.",
+                    "arc_notes": "Call to Adventure: the signal is the summons. Refusal of the Call: Mara's destruction and rewriting of her notes dramatizes her internal conflict \u2014 she knows following this will get her killed, and she does it anyway, which tells us everything about who she is."
+                  },
+                  {
+                    "chapter_number": 2,
+                    "title": "The Courier",
+                    "act": "Setup / Rising Action",
+                    "arc_point": "Stage 4 \u2014 Meeting the Mentor / Stage 5 \u2014 Crossing the Threshold",
+                    "pov_character": "Tom\u00e1s Reyes",
+                    "bridge_from_prior": "Thread: Tom\u00e1s arrives at Mara's farmhouse on his regular courier run the morning after she detected the signal \u2014 he is the only person she has told, because she needs his route knowledge, and the reader sees the signal's existence through his reaction.",
+                    "beat": "Tom\u00e1s identifies the encryption pattern as a variant of pre-Cascade military burst-transmission protocol, which means the signal community has military-grade equipment \u2014 and military-grade enemies; he agrees to guide Mara west, but only after extracting a promise she will share whatever she finds with the settlements on his route, a promise she makes and immediately begins qualifying in her own mind.",
+                    "arc_notes": "Meeting the Mentor: Tom\u00e1s is not a classic sage but he carries the specific knowledge Mara lacks \u2014 terrain, human networks, military signals doctrine \u2014 and he equips her for the journey. Crossing the Threshold: their departure from the farmhouse at dawn is the point of no return; Mara locks the door knowing she may not return."
+                  },
+                  {
+                    "chapter_number": 3,
+                    "title": "The Reclamation",
+                    "act": "Rising Action",
+                    "arc_point": "Stage 6 \u2014 Tests, Allies, and Enemies (first half)",
+                    "pov_character": "Director Cassia Vane",
+                    "bridge_from_prior": "Thread: the RA's signal-intercept division has detected the same 7.850 MHz transmission that Mara found; Cassia is briefed on it in the same 24-hour window, and her response \u2014 dispatching a suppression team \u2014 is the consequence of the same event Mara is reacting to.",
+                    "beat": "Cassia reviews the intercepted signal with her technical staff, recognizes it as a functioning independent broadcast network \u2014 the one thing her doctrine cannot tolerate \u2014 and dispatches Agent Rook and a six-person suppression team westward; in a private scene she writes her nightly unsent letter to Fen, and the reader understands that the signal terrifies her not because it is dangerous but because it is proof that her monopoly on hope is not as total as she believed.",
+                    "arc_notes": "Tests, Allies, and Enemies: introduces the antagonist's full machinery and establishes the race structure of the novel. New dramatic problem introduced: the suppression team is faster than Mara and Tom\u00e1s \u2014 they have vehicles; Mara and Tom\u00e1s are on foot and bicycle. The reader now has a ticking clock."
+                  },
+                  {
+                    "chapter_number": 4,
+                    "title": "Harrow Country",
+                    "act": "Rising Action",
+                    "arc_point": "Stage 6 \u2014 Tests, Allies, and Enemies (second half)",
+                    "pov_character": "Mara Voss",
+                    "bridge_from_prior": "Thread: Mara and Tom\u00e1s pass through the ruins of Harrow Station \u2014 the site of the RA massacre Mara knows about \u2014 and Tom\u00e1s, who ran a courier route through here before the massacre, tells her what happened; this is the first time Mara connects the massacre to a specific RA officer by name: Aldric Senn.",
+                    "beat": "At Harrow Station, Mara and Tom\u00e1s are captured by a warlord named Fetch who controls the crossing; Mara repairs Fetch's broken diesel generator in exchange for passage, but during the repair she discovers Fetch is holding three people prisoner who were caught trying to reach the same signal source \u2014 which means the signal community has been broadcasting long enough that others are trying to find it, and the RA is not the only threat.",
+                    "arc_notes": "Tests, Allies, and Enemies: the warlord encounter tests Mara's technical skills under duress and her moral limits (she repairs the generator knowing Fetch will use it to maintain his captive-labor operation). New dramatic complication: the three prisoners include a teenage girl named Sable who has memorized a more precise bearing for the signal \u2014 Mara must decide whether to take her along, adding risk, or leave her to Fetch."
+                  },
+                  {
+                    "chapter_number": 5,
+                    "title": "Millhaven",
+                    "act": "Rising Action / Midpoint",
+                    "arc_point": "Stage 7 \u2014 Approach to the Inmost Cave",
+                    "pov_character": "Mara Voss",
+                    "bridge_from_prior": "Thread: Sable's bearing leads Mara, Tom\u00e1s, and Sable to Millhaven \u2014 the signal community \u2014 and Mara's first sight of a functioning power grid and a lit building at night is the emotional payoff of everything the novel has built toward; but arrival is not safety.",
+                    "beat": "Millhaven is a community of 200 people built around a pre-Cascade hydroelectric micro-dam; Priya introduces herself and the transmitter \u2014 a rebuilt military surplus HF rig running on 800 watts \u2014 and Mara realizes the signal is not a beacon calling for rescue but a deliberate broadcast of practical knowledge: medical protocols, crop disease treatments, water purification chemistry; then she sees Aldric Senn across the room and recognizes his name from Tom\u00e1s's account of Harrow Station, and the chapter ends on her stillness.",
+                    "arc_notes": "Approach to the Inmost Cave: Mara has reached the physical destination, but the real inmost cave is the moral confrontation with Senn that is now unavoidable. Midpoint reversal: the signal is not what Mara thought \u2014 it is not a power-grab or a rival faction's beacon but an act of radical generosity, which reframes the entire dramatic question and raises the stakes of the RA's suppression."
+                  },
+                  {
+                    "chapter_number": 6,
+                    "title": "The Inmost Cave",
+                    "act": "Crisis",
+                    "arc_point": "Stage 8 \u2014 The Ordeal",
+                    "pov_character": "Mara Voss",
+                    "bridge_from_prior": "Thread: the morning after arrival, Mara confronts Aldric Senn privately \u2014 she has spent the night deciding what to do \u2014 and the conversation is the chapter's engine.",
+                    "beat": "Mara confronts Senn; he does not deny Harrow Station and tells her something she did not know: her brother Dani's settlement was on the list for the next suppression operation, and Senn's defection \u2014 his refusal to carry out the second order \u2014 is the reason Dani's settlement still exists, though Dani himself died of infection before Senn defected; Mara must now choose whether to expose Senn (fracturing Millhaven at the worst moment, as the RA suppression team is now two days out) or stay silent and use Millhaven's resources to amplify the broadcast; she chooses silence, and the choice costs her the clean identity she has been protecting since Dani died.",
+                    "arc_notes": "The Ordeal: Mara's old self \u2014 the woman who survived by staying morally clean and alone \u2014 cannot survive this chapter. She makes a compromised choice for a larger good, which is the death of her previous identity and the birth of something more complicated and more human. The ordeal is entirely moral, not physical."
+                  },
+                  {
+                    "chapter_number": 7,
+                    "title": "The Broadcast",
+                    "act": "Climax",
+                    "arc_point": "Stage 9 \u2014 Reward / Stage 10 \u2014 Road Back / Stage 11 \u2014 Resurrection",
+                    "pov_character": "Mara Voss",
+                    "bridge_from_prior": "Thread: the RA suppression team arrives at Millhaven's perimeter \u2014 their approach was signaled by Tom\u00e1s's courier network, giving Millhaven 90 minutes \u2014 and Mara's plan to amplify and rebroadcast the signal on multiple frequencies simultaneously is the community's only option.",
+                    "beat": "In a compressed, high-stakes sequence: Mara and Senn work together to rig a wideband rebroadcast that will push the signal onto 11 frequencies simultaneously, making it impossible to suppress without destroying every receiver in the region; Cassia Vane arrives personally with the suppression team and offers Mara a deal \u2014 walk away, and Millhaven lives; Mara refuses and throws the switch; the broadcast goes out; Cassia orders the transmitter destroyed but not the people, because she has read Priya's medical broadcasts and knows \u2014 in a private, devastating moment \u2014 that one of them saved a technique she used on her own daughter Fen two years ago, and she cannot bring herself to be the person who silences that; the transmitter is destroyed but the signal has already propagated.",
+                    "arc_notes": "Reward: the broadcast is the sword seized from the ordeal \u2014 the act that the entire journey was building toward. Road Back: the suppression team's arrival is the pursuing force. Resurrection: Mara throwing the switch while knowing it will cost her the transmitter and possibly her freedom is the final death of her isolated, self-protective self \u2014 she acts for others, completely, for the first time since Dani."
+                  },
+                  {
+                    "chapter_number": 8,
+                    "title": "Frequencies",
+                    "act": "Resolution",
+                    "arc_point": "Stage 12 \u2014 Return with the Elixir",
+                    "pov_character": "Tom\u00e1s Reyes",
+                    "bridge_from_prior": "Thread: Tom\u00e1s, who spent the broadcast sequence running the courier network to coordinate the signal's reception across six settlements, now carries the news of what happened \u2014 he is the elixir's delivery mechanism, the person who takes the signal's existence back into the world.",
+                    "beat": "Three weeks after the broadcast: Tom\u00e1s rides his courier route and documents what the signal has changed \u2014 a settlement that used Priya's water-purification protocol and saved 12 lives, a farming community that treated a crop blight using the broadcast's agricultural data; Mara is with him, no longer alone, having accepted that the signal was never hers to own; Cassia Vane has withdrawn the suppression order but not acknowledged the broadcast publicly \u2014 a compromise that is not justice but is not nothing; Aldric Senn has confessed to Priya and the Millhaven community, and the community's response is left deliberately unresolved, because that is not Mara's story to finish; the chapter ends with Mara and Tom\u00e1s picking up a new signal on a different frequency \u2014 someone else, somewhere else, has started broadcasting.",
+                    "arc_notes": "Return with the Elixir: the elixir is not the signal itself but the proof that knowledge shared freely is more powerful than knowledge controlled. Mara returns to the world changed \u2014 she is no longer alone, no longer clean, and no longer late."
+                  },
+                  {
+                    "chapter_number": 9,
+                    "title": "Epilogue: Propagation",
+                    "act": "Coda",
+                    "arc_point": "Stage 12 \u2014 Return with the Elixir (coda)",
+                    "pov_character": "Director Cassia Vane",
+                    "bridge_from_prior": "Thread: the new signal Mara and Tom\u00e1s heard in Chapter 8 is the same signal Cassia's intercept division has just flagged for her \u2014 the world has changed and she is the last person to admit it.",
+                    "beat": "Cassia sits alone with her intercept equipment and listens to the new broadcast \u2014 it is using Priya's format, Mara's frequency-hopping technique, and a voice she does not recognize; she begins to write her nightly letter to Fen, and for the first time she writes something she intends to send; the novel ends on the question of whether she does.",
+                    "arc_notes": "Epilogue coda: the ending is heightened across three characters \u2014 Mara has paid the cost of moral compromise and gained human connection; Tom\u00e1s has chosen the mission over safety and found that the two are not opposites; Cassia has been shown that her order was built on a lie she told herself, and the cost is the world she controlled and the daughter she lost. The dramatic question is answered \u2014 the signal reached the world \u2014 but its consequences are still propagating, which is the point."
+                  }
+                ]
+              },
+              "persist": {
+                "persisted": true,
+                "project_id": "4b34ade1-daab-47aa-9903-cb9f734b1f69",
+                "created_project": true
+              }
+            }
+          },
+          "error": null,
+          "next_stage": null
+        }
+      },
+      "resolved_prompt": "Brainstorm a book using the Hero's Journey called \"The Signal Beneath.\"\n  Genre: post-apocalyptic. 8 chapters.\n  Premise: A radio operator in a collapsed coastal city intercepts a signal from\n  a submerged research station. The signal contains coordinates and a child's voice.\n  She must decide whether to investigate alone or alert the warlord who controls\n  the only working boat.\n  Themes: sacrifice, trust, the cost of knowledge."
+    }
+  ],
+  "expected": [
+    "routes `brainstorm.story`, kind=queued; job_id; status=completed",
+    "`writing_projects_v2` \"The Signal Beneath\" with `outline.story_arc_name`=\"The Hero's Journey\"; 8 chapters",
+    "each chapter `arc_notes` references Hero's Journey stages; `outline.characters` populated (name/role/arc/description)",
+    "CR-009 email with outline; no 5xx"
+  ]
+}

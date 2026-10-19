@@ -51,7 +51,7 @@ One-time setup. ~20 minutes. Run before opening the screen recorder.
 ### Account
 
 - Sign in to **DEV** Workbench at `writersworkbench-develop.up.railway.app`.
-- Account: `eric@agileadtesting.com` / `Fr332bafami!y`.
+- Account: `eric@agileadtesting.com` — sign-in is passwordless (a 6-digit code by email), so there is no password to quote here.
 - Use a clean browser profile (no extensions, no autofill noise) with cache cleared so PR #74 newsletter strings render correctly.
 
 ### Demo project to seed

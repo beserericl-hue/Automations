@@ -1,0 +1,27 @@
+{
+  "test": {
+    "id": "R20",
+    "title": "List Drafts",
+    "source": "chat",
+    "prompt": "List my drafts",
+    "route": "library.list-outlines` (info)",
+    "prerequisite": "",
+    "expected": [
+      "routes to `library.list-outlines`, kind=data",
+      "Returns formatted list with title, content_type, genre, date, UUID",
+      "Scoped to user_id \"+14105914612\"; count matches draft rows in `published_content_v2`"
+    ]
+  },
+  "response": {
+    "kind": "reply",
+    "assistant_message": "How can I help with your writing?",
+    "tool": null,
+    "op": null,
+    "data": null,
+    "job_id": null,
+    "status": null,
+    "jobs": null,
+    "error": null
+  },
+  "job_result": null
+}

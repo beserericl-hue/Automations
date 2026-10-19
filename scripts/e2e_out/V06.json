@@ -1,0 +1,44 @@
+{
+  "test": {
+    "id": "V06",
+    "title": "Voice \u2014 Write Short Story",
+    "source": "voice",
+    "prompt": "Write a short story in the ancient history genre about a Roman soldier who discovers a hidden library beneath the Colosseum make it about three thousand words and research Roman military life and the Colosseum underground tunnels",
+    "route": "chapter.short-story` (task)",
+    "prerequisite": "",
+    "expected": [
+      "flat `{response, kind=\"queued\"}`",
+      "routes `chapter.short-story`",
+      "`ancient-history`",
+      "research on the 2 topics woven in",
+      "~3000 words",
+      "Prime Directive",
+      "`published_content_v2` draft",
+      "CR-009 email"
+    ]
+  },
+  "response": {
+    "response": "Queuing your short story. I'll let you know when it's ready.",
+    "kind": "queued",
+    "tool": "chapter",
+    "op": "short-story",
+    "job_id": "178e65b666a548669ebd9c399a2f9f0f",
+    "status": "queued"
+  },
+  "job_result": {
+    "job_id": "178e65b666a548669ebd9c399a2f9f0f",
+    "status": "complete",
+    "result": {
+      "execution_id": "83b5a97b-9fe1-4014-afb2-ce6758b48803",
+      "step_name": "chapter",
+      "status": "error",
+      "payload": {},
+      "error": {
+        "code": "ValueError",
+        "message": "invalid literal for int() with base 10: '3000 words'",
+        "details": null
+      },
+      "next_stage": null
+    }
+  }
+}
