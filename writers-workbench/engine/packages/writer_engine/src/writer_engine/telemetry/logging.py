@@ -1,4 +1,4 @@
-"""structlog JSON logging set up once at process start."""
+"""structlog JSON logging set up once at process start, with secret redaction (C3/G4)."""
 
 from __future__ import annotations
 
@@ -6,6 +6,8 @@ import logging
 import sys
 
 import structlog
+
+from writer_engine.telemetry.redaction import redact_processor
 
 
 def configure_logging(level: str = "INFO", service: str = "writer-engine") -> None:
@@ -19,6 +21,13 @@ def configure_logging(level: str = "INFO", service: str = "writer-engine") -> No
             structlog.processors.TimeStamper(fmt="iso", utc=True),
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
+            # C3/G4: last before rendering, so it also covers the formatted exception text. Every
+            # service logs provider errors verbatim (`error=str(exc)[:200]`), and a provider error
+            # is one of the likeliest places for a credential to surface — an SDK that quotes the
+            # failing request brings the authorization header with it, and a PostgREST error can
+            # quote a URL carrying `apikey=`. Railway's logs are readable by anyone with project
+            # access and they are retained.
+            redact_processor,
             structlog.processors.JSONRenderer(sort_keys=True),
         ],
         wrapper_class=structlog.make_filtering_bound_logger(getattr(logging, level.upper(), logging.INFO)),
