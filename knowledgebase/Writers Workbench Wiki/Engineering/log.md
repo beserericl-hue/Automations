@@ -1490,3 +1490,50 @@ and awaited their in-flight jobs rather than having them cancelled.
 quality comparison before the default moves, and re-running the study for the 52 thin chapters (K6).
 
 Updated: [[remaining-work-inventory]].
+
+## [2026-10-20] benchmark | a whole book on the engine — 96 chapters, 99 minutes, $54
+
+Full write-up: [[book-scale-benchmark]]. The user authorised the spend and asked for three things —
+a complete book, the cost in tokens and dollars, and the load characteristics for a scaling
+benchmark — with everything kept in the project.
+
+**Result.** 618,865 words across 96 chapters, then Q/A on all 96, then 12 repairs. **$54.27**,
+**13,994,223 billable tokens**, 1,149 calls, **zero failures** in either queue. Writes took 99
+minutes at 8 concurrent (58 chapters/hour); Q/A took 9 minutes at 24 concurrent. Median $0.49 per
+chapter.
+
+**The scaling answer is not what the docs assumed.** Output-token use averaged 21,775/min against a
+90,000/min ceiling — **24%**. Three-quarters of the budget idled while the queue sat saturated at
+8/8 for the whole run. Tokens are not the near-term constraint; the slot count and the 12-call
+semaphore are, leaving roughly 3× headroom. B9's "TPM is the ceiling" framing was right in principle
+and wrong about where we are.
+
+**Four defects, every one invisible below book scale.**
+
+- **Every chapter was about to be written as "contemporary"** — caught in the readiness check the
+  user asked for *before* spending. No op derived the era; all 96 chapters carried theirs in the
+  outline and nothing read it. The deep-time half would have been written in modern idiom and then
+  scored wrong for being right.
+- **The craft-revision loop had never run on a real chapter** (K8). It existed only on the
+  single-call path. The correlation across 96 chapters is the argument: dimensions the drift pass
+  corrects scored 0.91–1.00; the ones nothing corrected scored worst — turn density 0.79 (under
+  threshold in 51 of 96), boring paragraphs 0.81 (39 of 96). The engine was fixing chapters for
+  exactly what it checked them against. This was the answer to "why is the pacing weak", and it was
+  structural, not a prompt problem: the seeds already said the right things.
+- **My own capacity verdict was wrong for 169 of 196 samples**, reporting `tpm_bound` while 76% of
+  the budget went unused and the logs held zero stalls. Queue age under a bulk submission is depth,
+  not throttling. `tpm_bound` now requires recorded stall evidence; otherwise it says `backlog`.
+- **`window.current` could have read zero forever** if any caller built a Redis client without
+  `decode_responses=True` — `bytes.rsplit(":")` raises TypeError, which the old except clause did not
+  catch, giving budgets that never limit anything.
+
+**Quality.** Write-time craft median 0.895; independent Q/A median 0.894 with **zero drift findings
+across the whole book** — the first book-scale verification of the two-cycle QA design. Character
+handling and continuity score 1.00; scene momentum is the weak axis, now addressed by K8.
+
+**Also closed this session:** passwordless email-code login (the published password in this repo was
+a live credential until rotated), the research visibility and scoping fixes, A7, A11, C2, C3/G4, C4,
+B3, B12, I3, J1, J2, K1–K8, D9 on DEV. PROD untouched throughout and still carrying two exposed
+passwords.
+
+Created: [[book-scale-benchmark]]. Updated: [[remaining-work-inventory]], [[index]].
