@@ -73,7 +73,13 @@ HEAVY = QueueProfile(
 # in minutes rather than occupying it for an hour and a half. max_tries=1 because a retry the user is
 # actively waiting through is worse than a prompt error.
 #
-# The ceiling is 600s and NOT the ~120s these operations actually take, because a job spends time
+# RAISED 600 -> 900 after the craft QA started returning evidence. Findings now carry the exact
+# quote AND a finished-prose replacement for each one, so a QA answer went from a few hundred output
+# tokens to several thousand and the call itself from ~30s to ~140s. Scoring 96 chapters at 24-way
+# concurrency, the tail crossed the old ceiling and 23 of them were killed mid-generation and lost
+# (max_tries=1). The op is no longer "short"; the ceiling has to reflect what it now does.
+#
+# The ceiling is NOT merely the ~140s these operations actually take, because a job spends time
 # queued on the LLM budget before it spends any time generating: `llm_budget_max_wait_s` is 300, so
 # under the very contention this split exists to survive, an interactive job can legitimately wait 5
 # minutes for an output-token grant and only then start. A 180s ceiling would kill those jobs
@@ -86,7 +92,7 @@ HEAVY = QueueProfile(
 INTERACTIVE = QueueProfile(
     name=QUEUE_INTERACTIVE,
     max_jobs=24,
-    job_timeout=600,
+    job_timeout=900,
     max_tries=1,
     keep_result=3600,
     drain_wait_s=20,

@@ -2229,7 +2229,16 @@ def _build_qa_system(period: str = "", roster_text: str = "") -> str:
             "follett_seeds.prose.dialogue",
             "follett_seeds.research.period_language",
             "follett_seeds.character.no_milk_and_water",
-            "follett_seeds.character.locked_roster",
+            # NOT `character.locked_roster`. It is a WRITING seed and it carries a "COPY-FIRST
+            # RULE: before writing anything new, copy the roster into your output verbatim, as a
+            # section labeled 'Confirmed cast'". In a reviewer prompt that must return strict JSON
+            # that instruction is actively harmful, and it became harmful the moment the roster
+            # placeholder started being substituted: with a literal `{locked_character_roster}` in
+            # the text the rule read as template noise and was ignored, but with a real roster in
+            # it the model obeys. Observed scoring 96 chapters — the answer came back as
+            # "# Confirmed Cast\n\n- **Marcus Tayac**: Protagonist..." instead of JSON, losing
+            # every score for that chapter. The roster is already supplied in the user prompt as
+            # "CHARACTER ROSTER (check consistency against this)", which is what a reviewer needs.
             "follett_seeds.research.no_dumping",
             "follett_seeds.plot.outline_gate",
         ],

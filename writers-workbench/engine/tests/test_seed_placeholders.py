@@ -16,7 +16,22 @@ failure rate is invisible on one chapter and costs a chapter a book.
 
 from __future__ import annotations
 
-from writer_engine.prompt_store.follett_seeds import compose_craft_system, fill_seed_placeholders
+import pytest
+
+from writer_engine.prompt_store.follett_seeds import (
+    compose_craft_system,
+    fill_seed_placeholders,
+    load_follett_seeds,
+)
+
+
+@pytest.fixture(autouse=True)
+def _seeds_registered() -> None:
+    """`compose_craft_system` reads from the prompt store, and the seeds are registered by an
+    import side effect elsewhere. Without this these tests pass or fail depending on which other
+    test file ran first, which is worse than failing."""
+    load_follett_seeds()
+
 
 SEEDS = ["follett_seeds.character.locked_roster", "follett_seeds.research.period_language"]
 
@@ -72,3 +87,49 @@ class TestComposedPromptsAreClean:
         from chapter_step.main import _build_qa_system
 
         assert "ca. 10,500 BCE" in _build_qa_system("ca. 10,500 BCE", "Kaya — potter")
+
+
+class TestTheQaPromptDoesNotAskForProse:
+    """The reviewer must return strict JSON, so it must not carry a seed that tells it to write a
+    prose section first.
+
+    `character.locked_roster` is a WRITING seed and it ends with a COPY-FIRST RULE: "before writing
+    anything new, copy the LOCKED CHARACTERS roster above into your output verbatim, as a section
+    labeled 'Confirmed cast'". It sat in the QA prompt harmlessly for as long as the roster was an
+    unsubstituted `{locked_character_roster}` placeholder — template noise the model ignored. The
+    moment the placeholder started carrying a real roster, the instruction became actionable and the
+    model followed it: scoring 96 chapters, an answer came back as
+
+        "# Confirmed Cast\\n\\n- **Marcus Tayac**: Protagonist; Piscataway Historic Preservation..."
+
+    instead of JSON, and that chapter lost all eight scores. Fixing one prompt bug switched another
+    one on.
+    """
+
+    @staticmethod
+    def _system() -> str:
+        from chapter_step.main import _build_qa_system
+
+        return _build_qa_system("March 2011", "Marcus Tayac — preservation officer")
+
+    def test_the_copy_first_rule_is_absent(self) -> None:
+        assert "COPY-FIRST RULE" not in self._system()
+        assert "Confirmed cast" not in self._system()
+
+    def test_the_reviewer_is_still_told_to_return_json(self) -> None:
+        assert "strict JSON" in self._system()
+
+    def test_the_roster_still_reaches_the_reviewer_elsewhere(self) -> None:
+        """Dropping the seed must not cost the reviewer the roster — it comes in the user prompt,
+        which is where a reviewer needs it."""
+        from chapter_step.main import _score_chapter
+
+        assert callable(_score_chapter)
+        # The user prompt is built in _score_chapter as "CHARACTER ROSTER (check consistency ...)".
+        import inspect
+
+        src = inspect.getsource(_score_chapter)
+        assert "CHARACTER ROSTER" in src
+
+    def test_the_period_substitution_that_started_this_still_works(self) -> None:
+        assert "March 2011" in self._system()
