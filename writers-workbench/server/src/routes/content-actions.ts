@@ -12,6 +12,7 @@
  * surfaces through the existing SSE `job-status` channel.
  */
 
+import crypto from 'crypto';
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { validateBody } from '../middleware/validate.js';
@@ -159,7 +160,7 @@ const CRAFT_DIMENSION_LABELS: Record<string, string> = {
  * been edited since the report ran, and offering an Apply that 422s on click is the failure the
  * drift source already learned to avoid.
  */
-function buildCraftAnnotations(
+export function buildCraftAnnotations(
   meta: Record<string, unknown>,
   chapterNumber: number | null,
   chapterText: string,
@@ -1074,3 +1075,219 @@ contentActionsRouter.post('/:id/lifecycle', validateBody(LifecycleSchema), async
     });
   }
 });
+
+// =====================================================================
+// Chapter approval readiness + bulk approve
+// =====================================================================
+// Approval is a real gate, not a label: the manuscript export filters on
+// `status in ('approved','published')` (routes/export.ts), so a book with 96
+// draft chapters exports nothing at all. Approving one chapter at a time
+// through the UI is 96 round trips, which is why none of them were approved.
+//
+// What blocks approval is deliberately narrow. Measured over a full 96-chapter
+// book: the continuity dimensions fail in 0-4 chapters each and a failure there
+// is a genuine defect. The two craft dimensions fail in 51 and 39 — gating on
+// those would block two thirds of the book on a known limitation of the
+// generator, which no automated pass fixes. They are editorial notes, and they
+// belong in the Review tab, not in a gate.
+//
+// Staleness blocks, though. Approving a chapter whose report describes prose
+// that was since replaced is approving something nobody read — and that was not
+// hypothetical: a repair pass rewrote four chapters and left their reports
+// twelve minutes stale, under a "5/8 passed" badge.
+
+const BLOCKING_CHECKS = new Set([
+  'Character craft',
+  'Character consistency',
+  'Follows the outline',
+  'Period language',
+  'Dialogue',
+  'Prose clarity',
+]);
+
+/** First 16 hex of the SHA-256 — the same fingerprint the engine stamps on a report. */
+export function proseFingerprint(text: string): string {
+  return crypto.createHash('sha256').update(text ?? '', 'utf8').digest('hex').slice(0, 16);
+}
+
+export interface ChapterReadiness {
+  id: string;
+  chapter_number: number | null;
+  title: string;
+  status: string;
+  eligible: boolean;
+  blockers: string[];
+  advisories: string[];
+}
+
+export function assessChapter(row: {
+  id: string;
+  chapter_number: number | null;
+  title: string | null;
+  status: string | null;
+  content_text: string | null;
+  metadata: Record<string, unknown> | null;
+}): ChapterReadiness {
+  const meta = row.metadata || {};
+  const report = meta.qa_report as
+    | { checks?: { name?: string; status?: string }[]; scored_sha256?: string }
+    | undefined;
+  const blockers: string[] = [];
+  const advisories: string[] = [];
+
+  if (!row.content_text || !row.content_text.trim()) {
+    blockers.push('The chapter has no text.');
+  }
+  if (!report || !Array.isArray(report.checks) || report.checks.length === 0) {
+    blockers.push('No Q/A report — run the Q/A check.');
+  } else {
+    if (!report.scored_sha256) {
+      blockers.push('The Q/A report predates verified scoring and cannot be confirmed — re-run it.');
+    } else if (report.scored_sha256 !== proseFingerprint(row.content_text || '')) {
+      blockers.push('The Q/A report describes an earlier draft — the chapter changed since it was scored.');
+    }
+    for (const c of report.checks) {
+      const name = c.name || '';
+      if (c.status === 'PASS') continue;
+      if (BLOCKING_CHECKS.has(name)) blockers.push(`${name} did not pass.`);
+      else advisories.push(`${name} is below threshold.`);
+    }
+  }
+  return {
+    id: row.id,
+    chapter_number: row.chapter_number,
+    title: row.title || '',
+    status: row.status || 'draft',
+    eligible: blockers.length === 0,
+    blockers,
+    advisories,
+  };
+}
+
+async function loadProjectChapters(projectId: string, userId: string) {
+  const supabase = getSupabaseAdmin();
+  const rows: Record<string, unknown>[] = [];
+  // Paged: PostgREST caps a response at 1000 rows, so `rows.length` on a single
+  // call is a page size, not a count.
+  for (let page = 0; ; page += 1) {
+    const { data, error } = await supabase
+      .from('published_content_v2')
+      .select('id, chapter_number, title, status, content_text, metadata')
+      .eq('project_id', projectId)
+      .eq('user_id', userId)
+      .eq('content_type', 'chapter')
+      .is('deleted_at', null)
+      .order('chapter_number', { ascending: true })
+      .range(page * 1000, page * 1000 + 999);
+    if (error) throw error;
+    rows.push(...(data || []));
+    if ((data || []).length < 1000) break;
+  }
+  return rows as unknown as Parameters<typeof assessChapter>[0][];
+}
+
+/**
+ * @openapi
+ * /content/project/{projectId}/approval-readiness:
+ *   get:
+ *     tags: [Content]
+ *     summary: Which chapters of a project can be approved, and what is blocking the rest
+ */
+contentActionsRouter.get('/project/:projectId/approval-readiness', async (req: Request, res: Response) => {
+  const userId = req.userId;
+  if (!userId) {
+    res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED' } });
+    return;
+  }
+  try {
+    const projectId = String(req.params.projectId);
+    const chapters = (await loadProjectChapters(projectId, userId)).map(assessChapter);
+    const pending = chapters.filter((c) => c.status !== 'approved' && c.status !== 'published');
+    res.json({
+      success: true,
+      chapters,
+      counts: {
+        total: chapters.length,
+        approved: chapters.length - pending.length,
+        eligible: pending.filter((c) => c.eligible).length,
+        blocked: pending.filter((c) => !c.eligible).length,
+        with_advisories: chapters.filter((c) => c.advisories.length > 0).length,
+      },
+    });
+  } catch (err) {
+    logger.error({ err, userId, projectId: String(req.params.projectId) }, 'approval-readiness failed');
+    res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL', message: err instanceof Error ? err.message : 'Internal error' },
+    });
+  }
+});
+
+const BulkApproveSchema = z.object({
+  // Default false so a mis-click cannot approve a book. The caller must say so.
+  confirm: z.literal(true),
+  // Optional allow-list; omitted means "every eligible chapter".
+  chapterNumbers: z.array(z.number().int()).max(2000).optional(),
+});
+
+/**
+ * @openapi
+ * /content/project/{projectId}/approve-eligible:
+ *   post:
+ *     tags: [Content]
+ *     summary: Approve every chapter that passes the gate
+ *     description: |
+ *       Approves only chapters with no blockers. Each approval snapshots the
+ *       prior text into `content_versions_v2` first, so it is reversible.
+ *       Blocked chapters are returned with their reasons and left alone.
+ */
+contentActionsRouter.post(
+  '/project/:projectId/approve-eligible',
+  validateBody(BulkApproveSchema),
+  async (req: Request, res: Response) => {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED' } });
+      return;
+    }
+    const { chapterNumbers } = req.body as z.infer<typeof BulkApproveSchema>;
+    const only = chapterNumbers ? new Set(chapterNumbers) : null;
+    try {
+      const supabase = getSupabaseAdmin();
+      const projectId = String(req.params.projectId);
+      const rows = await loadProjectChapters(projectId, userId);
+      const approved: number[] = [];
+      const skipped: { chapter_number: number | null; reason: string }[] = [];
+      for (const row of rows) {
+        if (only && !only.has(row.chapter_number ?? -1)) continue;
+        if (row.status === 'approved' || row.status === 'published') continue;
+        const verdict = assessChapter(row);
+        if (!verdict.eligible) {
+          skipped.push({ chapter_number: row.chapter_number, reason: verdict.blockers[0] });
+          continue;
+        }
+        try {
+          await serverSideLifecycle(supabase, row.id, userId, 'approve', undefined, {
+            content_text: row.content_text,
+            metadata: row.metadata,
+          });
+          approved.push(row.chapter_number ?? -1);
+        } catch (err) {
+          skipped.push({
+            chapter_number: row.chapter_number,
+            reason: err instanceof Error ? err.message.slice(0, 160) : 'approve failed',
+          });
+        }
+      }
+      logger.info({ userId, projectId, approved: approved.length, skipped: skipped.length },
+        'bulk approve complete');
+      res.json({ success: true, approved, skipped, counts: { approved: approved.length, skipped: skipped.length } });
+    } catch (err) {
+      logger.error({ err, userId, projectId: String(req.params.projectId) }, 'bulk approve failed');
+      res.status(500).json({
+        success: false,
+        error: { code: 'INTERNAL', message: err instanceof Error ? err.message : 'Internal error' },
+      });
+    }
+  },
+);
