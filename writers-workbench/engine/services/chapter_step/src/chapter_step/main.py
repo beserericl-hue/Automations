@@ -400,12 +400,24 @@ def _plan_system(
         + (
             "\n\nReturn strict JSON matching SubChapterPlan: 3-7 sub-chapters. Each sub-chapter MUST carry: "
             "number (1-based), title, brief (a concrete beat — a discrete movement, NOT a summary), "
-            "arc_beat (the CHAPTER-level arc stage it fulfils — use the chapter arc above if given, else the "
-            "book arc), characters (names taken EXACTLY from the CHARACTER ROSTER — never invent), setting, "
-            "emotional_tone, and connects_to_book_arc (how it advances the BOOK-level arc stage for this "
-            "chapter). Together the sub-chapters cover the chapter beginning/middle/end with at least one "
-            "story turn each. If the chapter arc is a non-conflict structure (Kishōtenketsu, Story Circle), "
-            "do NOT force combat/confrontation beats — honour that arc's shape."
+            "story_turn, arc_beat (the CHAPTER-level arc stage it fulfils — use the chapter arc above if "
+            "given, else the book arc), characters (names taken EXACTLY from the CHARACTER ROSTER — never "
+            "invent), setting, emotional_tone, and connects_to_book_arc (how it advances the BOOK-level arc "
+            "stage for this chapter).\n"
+            "story_turn is the one that gets skipped, so be exact about it: name in one sentence what is "
+            "DIFFERENT at the end of this sub-chapter than at its start. A discovery made, a decision taken "
+            "and acted on, a lie told, a relationship shifted, a threat arriving, something lost, a plan "
+            "broken. 'She reflects on her mother' is not a turn. 'She works the clay' is not a turn. If you "
+            "cannot name the change, the sub-chapter has no reason to exist — merge it into its neighbour "
+            "and plan one fewer.\n"
+            "THE LAST SUB-CHAPTER NEEDS ONE TOO. A chapter that closes on aftermath, summary or reflection "
+            "has no ending — give the final section a change of its own, even a small one, and let the "
+            "reflection happen around it. Measured across a 96-chapter book: half the chapters came in under "
+            "the pacing threshold, and the commonest finding was a final section of five or six pages in "
+            "which nothing new arose.\n"
+            "If the chapter arc is a non-conflict structure (Kishōtenketsu, Story Circle), do NOT force "
+            "combat/confrontation beats — a turn there can be quiet (a realisation that forces an action, an "
+            "arrival, a refusal) but it must still be a change."
         )
     )
 
@@ -931,10 +943,20 @@ async def _write_subchapter(
         )
     else:
         continuity = f"\n\n{plan_context}" if plan_context else ""
+    # The plan names the change this section must deliver; passing it on is the point. Without it the
+    # writer is told only what the section is ABOUT, which is how a section becomes five pages in
+    # which nothing happens — the commonest pacing finding across the 96-chapter run.
+    turn_line = (
+        f"THIS SECTION MUST END WITH A CHANGE: {brief.story_turn.strip()}\n"
+        "Do not close it on reflection or summary — the change has to occur on the page.\n"
+        if brief.story_turn.strip()
+        else ""
+    )
     user = (
         f"You are writing SUB-CHAPTER {idx + 1} of {total} of chapter {chapter_number}.\n"
         f"This sub-chapter's beat: {brief.title} — {brief.beat}"
         f"{(' (POV: ' + brief.pov_character + ')') if brief.pov_character else ''}\n"
+        f"{turn_line}"
         f"Write this sub-chapter in full (rich, scene-driven prose, not a summary), following the craft "
         f"rules, the project context, and the research grounding in the system prompt.\n\n"
         f"OUTPUT — story prose ONLY. Do NOT print a chapter or 'Sub-chapter N' heading, a 'Validation' "

@@ -64,6 +64,13 @@ class SubChapterBrief(BaseModel):
     pov_character: str = ""
     # E2E-4 chapter-outline fields
     brief: str = ""
+    # What CHANGES by the end of this section. The planner prompt asked for "at least one story turn
+    # each" in a trailing clause and there was nowhere to put the answer, so nothing forced the model
+    # to name one and the writer never received it. Measured across 96 chapters: story_turn_density
+    # scored 0.79 and was under threshold in 51 of them, with findings like "the final section
+    # contains no story turn at all — roughly 5-6 pages of aftermath". A field the plan must fill is
+    # the difference between asking and requiring.
+    story_turn: str = ""
     arc_beat: str = ""
     characters: list[str] = Field(default_factory=list)
     setting: str = ""
