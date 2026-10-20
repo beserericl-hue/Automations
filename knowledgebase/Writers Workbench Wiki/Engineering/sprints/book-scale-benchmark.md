@@ -1,8 +1,8 @@
 ---
 name: Book-scale benchmark — 96 chapters end to end
-description: The first full-book run on the Python engine. 618,865 words across 96 chapters, then Q/A on all of them, then repairs — measured for cost, tokens, throughput and queue behaviour. Settles B9's model question and B11's scaling question with numbers, and exposed four defects that only appear at book scale.
+description: The first full-book run on the Python engine. 618,865 words across 96 chapters, then Q/A, then repairs — measured for cost, tokens, throughput and queue behaviour. Settles B9's model question and B11's scaling question with numbers, exposed four defects that only appear at book scale, and diagnosed the pacing weakness its own score table revealed — fixed at the planner and measured over twelve chapters.
 type: concept
-tags: [benchmark, scaling, cost, engine, chapter-write, qa, 2026-10]
+tags: [benchmark, scaling, cost, engine, chapter-write, qa, pacing, 2026-10]
 last_reviewed: 2026-10-20
 ---
 
@@ -142,10 +142,62 @@ never limiting anything.
   0.0: the QA was never given the outline beat, and The Ossuary's era-specific casts are not in the
   6-entry roster. Chapter 1 went 0.00 → 0.95 on `outline_follows_guide` once the beat was passed.
 
+## The pacing fix — answered
+
+The score table's own structure was the diagnosis: every dimension some pass corrects scores
+0.91–1.00, and the two nothing corrects are the two weak ones. The engine checks facts and never
+checked whether anything happens.
+
+**Post-hoc revision does not work at this length.** Six whole-chapter rewrites across three
+chapters, under two prompts, all rejected for returning at 48–80% of the original. The craft seeds'
+own remedies are subtractive ("cut it", "demote or remove"), so asking a model to fix pacing in
+7,000 words produces 4,000 words. That loop now defaults OFF.
+
+**Fixing it at the planner works.** `SubChapterBrief.story_turn` — the planner must name, in one
+sentence, what is DIFFERENT at the end of each sub-chapter, the final one included, and the writer
+gets it as a hard ending contract. The prompt already asked for "at least one story turn each" in a
+trailing clause with no field to put the answer in, so nothing forced the model to name one and the
+writer never received one: it was told what each section was ABOUT, never what had to CHANGE.
+
+Measured over twelve chapters re-written 2026-10-20, each scored against **its own** baseline:
+
+| band | n | `story_turn_density` | improved | `no_boring_paragraphs` |
+|---|---|---|---|---|
+| weak (0.41–0.61) | 6 | 0.508 → 0.752 (**+0.243**) | 6/6 | 0.605 → 0.772 (+0.167) |
+| middle (0.72) | 4 | 0.720 → 0.792 (+0.073) | 2/4 | 0.742 → 0.805 (+0.062) |
+| strong (0.88) | 2 | 0.880 → 0.850 (−0.030) | 0/2 | 0.905 → 0.825 (−0.080) |
+| **all** | 12 | 0.641 → 0.782 (**+0.141**) | 8/12 | 0.701 → 0.792 (+0.091) |
+
+Mean delta +0.141, sd 0.135, **95% CI [+0.064, +0.217]** — excludes zero. Under the 0.80 threshold:
+10 of 12 before, 5 of 12 after. No dimension regressed: `outline_follows_guide` +0.068,
+`prose_transparent` +0.070, `character_follows_guide` −0.009 (it was already at 0.991). Whole-book
+8-dimension mean across the twelve: +0.051.
+
+The twelve span the distribution on purpose. Re-running only the worst would improve whatever the
+prompt said — pick the bottom of a distribution with ±0.2 run-to-run noise and the next sample
+regresses upward by construction, which is exactly why the earlier three-chapter comparison was
+worthless.
+
+**One real caveat: the chapters came back shorter.** Median 5,408 words against the book run's
+6,389, and length ratio correlates with the gain (r = −0.40). So part of the improvement is tighter
+prose rather than better-shaped prose. The claim that survives the confound is the length-controlled
+subset — the five chapters that came back the same length or longer (15, 51, 57, 62, 89) still gained
+**+0.104, 95% CI [+0.012, +0.196]**. The gain is real, and some of the headline number is density.
+Scene breaks held at a median of 4/chapter, so nothing structural was lost. Whether a 15% shorter
+book is acceptable is a product decision, not a defect: there is no explicit per-sub-chapter length
+target in the writer prompt at all, so length has always been whatever the model happened to do.
+
+Cost: **$5.38 for twelve chapters, $0.45 each**, 131 calls, 9–12 write calls per chapter against the
+book's 10.3. The change is free — same plan call, same five write calls.
+
+(First reading of this put it at $9.16/$0.76 per chapter. The cost window was 1.5 hours and caught
+the earlier craft-revision experiments, which had re-run chapters 65, 85 and 89 — the same three.
+A cost window is a guess; the run's own start time is the boundary.)
+
 ## Remaining questions
 
-* Does the craft loop actually move `story_turn_density`? Being measured by re-running the three
-  worst chapters (85, 65, 89 — turn density 0.55, 0.55, 0.41) with it live.
+* Should the writer prompt carry an explicit length target? It carries none, and the planner change
+  made chapters 15% shorter as a side effect.
 * At 24 concurrent, where does the next wall appear — the semaphore, Redis, or tokens?
 * The interactive verdict still cannot tell "50 users waiting" from "one operator ran a batch". It
   names the right lever either way, so it is noise rather than misdirection, but it would page

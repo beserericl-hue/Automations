@@ -1537,3 +1537,36 @@ B3, B12, I3, J1, J2, K1–K8, D9 on DEV. PROD untouched throughout and still car
 passwords.
 
 Created: [[book-scale-benchmark]]. Updated: [[remaining-work-inventory]], [[index]].
+
+## [2026-10-20] update | Pacing weakness fixed at the planner and measured
+
+Updated: [[book-scale-benchmark]] — new section "The pacing fix — answered".
+
+The benchmark's own score table was the diagnosis: every dimension some pass corrects scores
+0.91–1.00, and the two nothing corrects (`story_turn_density` 0.79, under threshold in 51 of 96;
+`no_boring_paragraphs` 0.81, under in 39) are the weak ones. The engine checked facts and never
+checked whether anything happened.
+
+Post-hoc revision was tried first and failed: six whole-chapter rewrites across three chapters,
+under two prompts, all rejected at 48–80% of the original, because the craft seeds' own remedies are
+subtractive. That loop defaults off (engine b25c405).
+
+Fixed at the planner instead (engine 82639df): `SubChapterBrief.story_turn`, the planner must name
+what is DIFFERENT at the end of each sub-chapter including the last, the writer gets it as an ending
+contract. Twelve chapters re-written and scored against their own baselines: turn density
+0.641 → 0.782, 95% CI [+0.064, +0.217]; under threshold 10/12 → 5/12; no dimension regressed; $5.38
+for the twelve, no extra calls per chapter.
+
+Caveat recorded rather than buried: the chapters came back 15% shorter (median 5,408 vs 6,389) and
+length correlates with the gain at r = −0.40, so part of the improvement is density. The five
+chapters that did NOT shorten still gained +0.104, CI [+0.012, +0.196], which is the claim that
+survives. Open question added: the writer prompt carries no length target at all.
+
+Also fixed (engine ba8c441): the plan's `characters` was requested and read by nothing, and
+`pov_character` was read by the writer but never requested, so the POV clause could not fire on any
+real chapter. Roster rule loosened — "names EXACTLY from the roster, never invent" made the planner
+return an empty cast for every chapter outside the 6-entry modern roster's era, same root cause as
+K7.
+
+Context: measurement run on DEV, all data kept in The Ossuary project; replaced prose retained in
+`content_versions_v2` (verified before the run, not after). PROD untouched.
