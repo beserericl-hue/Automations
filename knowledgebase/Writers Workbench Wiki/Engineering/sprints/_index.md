@@ -19,6 +19,11 @@ Two source-of-truth conventions:
   engine and n8n is turned off (E1); the runtime container collapses 21 processes to 3 rather than
   splitting into per-step Railway services (B10). Read this before [[planned-sprints]] or
   [[python-migration-roadmap]], both of which understate what is already built.
+- [[craft-repair-what-works]] — what actually fixes pacing and flat prose in a finished chapter, with the
+  measurements: three automated repair mechanisms all damage the text (whole-chapter revision returns
+  48-80% of the original; section-wise additive revision inflates to 123-144% and scores worse), while the
+  planner's `story_turn` and human-accepted line-level suggestions both work. Read before proposing another
+  repair loop.
 - [[completed-sprints]] — Sprint 0-7, 8, 10.a, 10.b, 11, 12 — all DEV-complete + most PROD-released.
 - [[newsletter-cluster]] — PRs #69, #70, #72, #73, #74, #75 — DEV-only.
 - [[sprint-8-rbac]] — RBAC + tiers + credits + impersonation deep dive.

@@ -1570,3 +1570,39 @@ K7.
 
 Context: measurement run on DEV, all data kept in The Ossuary project; replaced prose retained in
 `content_versions_v2` (verified before the run, not after). PROD untouched.
+
+## [2026-10-20] update | Craft repair: three mechanisms measured, two that work shipped
+
+Created: [[craft-repair-what-works]]. Updated: [[book-scale-benchmark]], [[index]], [[sprints/_index]].
+
+Answering "if Q/A is marking defects, how do we repair the chapter so it passes — does this have to
+be a human editor?" The answer split by defect type, and the split is measured rather than assumed.
+
+Continuity, consistency and plot direction are already fully automatic: 0-4 chapters of 96 flagged,
+and the drift pass fixes them. Pacing and flat prose are not, and three mechanisms were tried:
+whole-chapter revision (6 attempts, 48-80% of the original), section-wise revision with deletion
+forbidden (123-144% — it pads instead of cutting; 2 of 3 chapters scored WORSE), and "Q/A until it
+passes" (never built: given the first two it converges on a chapter with good scores and the wrong
+length). The model cannot improve pacing in finished prose without changing its size, and the size
+change is the damage.
+
+Shipped instead (engine 71ca9bd, server 7e62e6e):
+- Craft findings carry `quote` (verified against the chapter by `anchor_findings`, byte-exact span
+  recovery for reflowed whitespace) and `replacement` (finished prose). An unverified quote loses
+  its fix and survives as a note — Apply searches literally, so a fabricated anchor is a button that
+  422s on click.
+- `craft_qa` is now the third annotation source beside genre_eval and drift_scan. Apply is a literal
+  span replacement, so a chapter structurally cannot shrink to 2,800 words or balloon to 9,130. The
+  Review tab carries a badge, otherwise the fixes sit behind an unmarked tab while the Q/A tab says
+  "5/8 passed".
+- An approval gate: continuity failures and a stale/unstamped Q/A report block; pacing and flat
+  paragraphs are advisories (gating on them would block two thirds of the book). Plus a bulk
+  approve, since the manuscript export filters on `status in ('approved','published')` and all 96
+  chapters were `draft` — the book exported nothing.
+
+Also recorded three measurement lessons: an experiment arm that no-ops looks identical to one with
+no effect (it happened twice and was caught only by byte-identical word counts); unpaired group
+comparisons of deliberately-skewed samples are meaningless; and a cost window is a guess, not a
+boundary.
+
+Context: all on DEV, The Ossuary project. PROD untouched.

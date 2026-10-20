@@ -111,6 +111,7 @@ The catalog. One line per page. When answering a question, scan this first to fi
 
 - [[sprints/_index]]
 - [[book-scale-benchmark]] — **96 chapters end to end**: 618,865 words in 99 minutes for $54.27, 24% of the token budget, zero failures; settles B9 and B11 and found four defects only visible at book scale.
+- [[craft-repair-what-works]] — **three automated craft-repair mechanisms measured, all three damage the book** (revision deletes, additive section revision pads); the two that work are the planner upstream and line-level suggestions a human accepts. Keeps the numbers so the failed ones are not retried.
 - [[remaining-work-inventory]] — **PLAN OF RECORD (2026-10-15)**: everything left to finish in the engine, A–I with per-item status + the 4-gate sequencing. Supersedes [[work-ordering-2026-05]].
 - [[engine-e2e-parity-sprints]] — minimal sprints (E2E-1..E2E-5) to make the full [[engine-chat-e2e-suite]] runnable.
 - [[completed-sprints]] — Sprint 0-12 + newsletter cluster summary.
