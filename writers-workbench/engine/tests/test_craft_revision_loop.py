@@ -123,3 +123,71 @@ class TestTheLoopIsWiredIntoTheRealPath:
         src = self._write_src()
         i = src.index("rejected = craft_revision_rejected(text, revised)")
         assert "break" in src[i : i + 400]
+
+
+class TestTheRevisionHasALengthContract:
+    """The first version of this pass shortened every chapter it touched, because the craft rules it
+    applies say to: the remedy for a boring paragraph is listed as "(a) cut it" and the remedy for
+    loose pacing is "demote or remove" turns. Both are correct for a reviser with room to grow and
+    wrong for a 6,000-word chapter that must stay 6,000 words.
+
+    Measured on the three worst-paced Ossuary chapters: 2,596 words against 5,363, 4,178 against
+    5,223, 4,694 against 6,602. All three were rejected by the floor — the chapters were safe, and
+    the pass had cost money and changed nothing.
+    """
+
+    @staticmethod
+    def _prompt_for(text: str) -> str:
+        """The user prompt `_revise_chapter` would send, without making an LLM call."""
+        import asyncio
+        from unittest.mock import patch
+
+        captured: dict[str, str] = {}
+
+        class _Resp:
+            text = "revised"
+
+        class _Router:
+            async def complete(self, **kw: object) -> _Resp:
+                captured["prompt"] = str(kw.get("prompt"))
+                return _Resp()
+
+        from chapter_step import main as M
+
+        with patch.object(M, "get_router", lambda service=None: _Router()):
+            asyncio.run(
+                M._revise_chapter(
+                    text,
+                    low_dims=["story_turn_density", "no_boring_paragraphs"],
+                    findings=[{"dimension": "story_turn_density", "problem": "p", "fix": "f"}],
+                    model="claude-sonnet-4-6",
+                    genre_slug="historical-time-travel",
+                )
+            )
+        return captured["prompt"]
+
+    def test_it_states_the_word_count_and_the_floor(self) -> None:
+        chapter = _chapter(6400, breaks=4)
+        words = len(chapter.split())  # the separators count as words, so compute rather than assume
+        prompt = self._prompt_for(chapter)
+        assert "LENGTH IS A HARD CONSTRAINT" in prompt
+        assert f"{words:,} words" in prompt
+        assert f"{int(words * CRAFT_MIN_LENGTH_RATIO):,}" in prompt
+
+    def test_it_forbids_fixing_by_deletion(self) -> None:
+        prompt = self._prompt_for(_chapter(6400))
+        assert "Do NOT satisfy these notes by deletion" in prompt
+        assert "dramatised material in its place" in prompt
+
+    def test_it_warns_that_a_short_answer_is_discarded(self) -> None:
+        """The model should know the cost of ignoring the constraint, since the guard will."""
+        assert "will be rejected" in self._prompt_for(_chapter(6400))
+
+    def test_it_names_the_scene_breaks_to_keep(self) -> None:
+        prompt = self._prompt_for(_chapter(6400, breaks=4))
+        assert "Keep all 4 scene-break separators" in prompt
+
+    def test_the_findings_still_reach_the_model(self) -> None:
+        prompt = self._prompt_for(_chapter(6400))
+        assert "CRAFT ISSUES TO FIX" in prompt
+        assert "story_turn_density" in prompt

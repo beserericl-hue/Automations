@@ -2127,10 +2127,29 @@ async def _revise_chapter(
         )
         or "(no specific findings; apply the craft rules above)"
     )
+    # The length contract. Without it this pass SHRINKS the chapter, because the craft rules it is
+    # applying say so: the remedy for a boring paragraph is listed as "(a) cut it" and the remedy for
+    # loose pacing is "demote or remove" turns. Both are right for a reviser with room to grow, and
+    # wrong for a 6,000-word chapter that has to stay 6,000 words. Measured 2026-10-20 on the three
+    # worst-paced chapters of The Ossuary: every revision came back short — 2,596 words against
+    # 5,363, 4,178 against 5,223, 4,694 against 6,602 — and all three were rejected by the length
+    # floor, so the pass cost money and changed nothing. Cutting is only half a fix here; what the
+    # chapter needs is the dull passage REPLACED by dramatised material of comparable length.
+    words = len(text.split())
+    floor = int(words * CRAFT_MIN_LENGTH_RATIO)
+    breaks = text.count(SCENE_BREAK)
     user = (
         "Revise the chapter below to fix these craft issues, applying the rules in the system "
         "prompt. PRESERVE the story, characters, events, and POV exactly — improve only the prose, "
-        f"dialogue, pacing, and language. Return the full revised chapter.\n\n"
+        "dialogue, pacing, and language.\n\n"
+        f"LENGTH IS A HARD CONSTRAINT. The chapter is {words:,} words and the revision must be at "
+        f"least {floor:,}. Do NOT satisfy these notes by deletion: when you remove a dull or "
+        "repetitive passage you must put dramatised material in its place — an action, a discovery, "
+        "a turn, a moment of pressure on the POV character — of comparable length. A shorter "
+        "chapter will be rejected and your work discarded.\n"
+        f"Keep all {breaks} scene-break separators exactly as they appear ({SCENE_BREAK.strip()} on "
+        "its own line between sections).\n\n"
+        "Return the full revised chapter and nothing else.\n\n"
         f"CRAFT ISSUES TO FIX ({', '.join(low_dims)}):\n{findings_text}\n\nCHAPTER:\n{text}"
     )
     router = get_router(service=STEP_NAME)
