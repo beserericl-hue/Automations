@@ -114,9 +114,13 @@ class TestTheLoopIsWiredIntoTheRealPath:
         src = self._write_src()
         assert src.count("_score_chapter(text, period, roster_text, beat=beat)") >= 2
 
-    def test_it_is_bounded_and_can_be_switched_off(self) -> None:
+    def test_it_is_bounded_and_defaults_to_off(self) -> None:
+        """Off by default, and measured: six whole-chapter revisions across three chapters under two
+        different prompts all came back at 48-80% of the original and were rejected. A model asked to
+        rewrite 6,500 words and return all of them compresses as it goes. The loop stays wired for the
+        section-wise version, but it does not spend money by default for a result that is discarded."""
         src = self._write_src()
-        assert 'payload.get("max_craft_passes")' in src
+        assert 'payload.get("max_craft_passes"), 0)' in src
         assert "max(0, _coerce_int" in src
 
     def test_the_rejection_path_breaks_rather_than_retrying_forever(self) -> None:

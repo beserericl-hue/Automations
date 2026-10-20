@@ -1782,7 +1782,22 @@ async def _op_write(payload: dict) -> dict:
             # and no_boring_paragraphs 0.81, under in 39. The chapter was fixed for exactly what it
             # was checked against, and for nothing else.
             craft_done = 0
-            max_craft = max(0, _coerce_int(payload.get("max_craft_passes"), 1))
+            # DEFAULT 0 — off, measured. The loop is wired and guarded, and the mechanism does not
+            # work at this length: six attempts across chapters 65, 85 and 89, under two different
+            # prompts (the second stating the word count, forbidding deletion and warning that a
+            # short answer is discarded), produced six rejections at 48-80% of the original. A model
+            # asked to rewrite 6,500 words and return all of them compresses as it goes, and an
+            # instruction does not reliably stop it.
+            #
+            # Kept rather than deleted because the diagnosis stands — see the craft table in
+            # [[book-scale-benchmark]]: the dimensions no pass corrects are precisely the weak ones —
+            # and because the next mechanism is a small change to this loop rather than a different
+            # one. The chapter is already five sections joined by scene breaks, each ~1,300 words,
+            # which IS within faithful-reproduction range; revising section by section against the
+            # findings for that section, with the neighbours supplied as context rather than as
+            # output, is the version worth trying. Until then this costs ~$0.15 a chapter for a
+            # result that is thrown away, so it is off unless a caller asks.
+            max_craft = max(0, _coerce_int(payload.get("max_craft_passes"), 0))
             while craft_done < max_craft and final_qa is not None:
                 low = _low_dims(final_qa)
                 if not low:
