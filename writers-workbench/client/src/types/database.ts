@@ -297,6 +297,11 @@ export interface QAReport {
   generated_at: string;
   overall_status: 'PASS' | 'NEEDS_REVIEW';
   checks: QACheck[];
+  /** First 16 hex chars of the SHA-256 of the prose this report scored. Absent on reports written
+   *  before the engine started stamping them — those cannot be checked and are shown as such. */
+  scored_sha256?: string;
+  scored_words?: number;
+  craft_mean?: number;
 }
 
 export interface ContentIndex {

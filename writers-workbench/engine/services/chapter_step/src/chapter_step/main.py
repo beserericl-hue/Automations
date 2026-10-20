@@ -2302,6 +2302,76 @@ review.runner.MAX_DRAFT_CHARS."""
 
 QA_MAX_TOKENS = 12_288
 
+# The eight craft dimensions, in the order the rubric reports them. Used to average a score vector
+# so two versions of the same chapter can be compared.
+CRAFT_DIMENSIONS = (
+    "character_follows_guide",
+    "character_consistency",
+    "outline_follows_guide",
+    "period_language_ok",
+    "prose_transparent",
+    "dialogue_follows_guide",
+    "no_boring_paragraphs",
+    "story_turn_density",
+)
+
+REPAIR_REGRESSION_TOLERANCE = 0.02
+"""How much the craft mean may fall before a repair is thrown away.
+
+Not zero. Re-scoring the same chapter twice moves the mean by about ±0.09, so demanding a strict
+improvement would discard repairs that merely got scored on a bad day. But the tolerance is small
+on purpose: the failure this guards against is the measured one — six whole-chapter revisions
+rejected at 48-80% of the original, and a repair that cut chapter 30 from 7,000 words to 2,800 to
+"align" it. A repair that scores materially worse is a repair that ate the chapter."""
+
+
+def _dimension_scores(qa: ChapterCraftQa | None) -> dict[str, float]:
+    """Just the eight numbers. ``findings`` and ``research_gaps`` ride along in the model dump and
+    have no business in a score vector that gets compared, averaged and stored."""
+    if qa is None:
+        return {}
+    dumped = qa.model_dump(mode="json")
+    return {d: float(dumped[d]) for d in CRAFT_DIMENSIONS if isinstance(dumped.get(d), (int, float))}
+
+
+def craft_mean(scores: dict[str, Any] | None) -> float | None:
+    """Average the craft dimensions present in a score vector. None when there is nothing to average.
+
+    Only numeric dimensions count. A dimension the model could not assess must not be read as zero —
+    that was K7, where three dimensions were scored blind as 0.0 and dragged every mean down with
+    them."""
+    if not scores:
+        return None
+    vals = [float(scores[d]) for d in CRAFT_DIMENSIONS if isinstance(scores.get(d), (int, float))]
+    return sum(vals) / len(vals) if vals else None
+
+
+def qa_stamp(text: str) -> dict[str, Any]:
+    """Fingerprint the exact prose a report was computed from.
+
+    Without this a report cannot be told apart from a stale one, and that is not hypothetical: the
+    book run's repair pass rewrote chapters 0, 1, 25 and 77 at 20:52 and left reports generated at
+    20:40 sitting in the UI, so the Q/A panel showed findings against prose that had already been
+    replaced twelve minutes earlier. The panel was faithful; the report was lying."""
+    import hashlib
+
+    body = text or ""
+    return {
+        "scored_sha256": hashlib.sha256(body.encode("utf-8")).hexdigest()[:16],
+        "scored_words": len(body.split()),
+    }
+
+
+def qa_report_is_stale(qa_report: dict[str, Any] | None, text: str) -> bool:
+    """Does this report describe prose other than ``text``? Unstamped reports predate the stamp and
+    are reported stale, which is the safe direction: they are the ones that may be lying."""
+    if not isinstance(qa_report, dict):
+        return False
+    recorded = qa_report.get("scored_sha256")
+    if not recorded:
+        return True
+    return str(recorded) != qa_stamp(text)["scored_sha256"]
+
 
 async def _score_chapter(
     text: str, period: str, roster_text: str = "", beat: str = ""
@@ -2511,9 +2581,12 @@ _QA_DIM_LABELS = {
 }
 
 
-def _build_qa_report(scores: dict, findings: list, name_check: dict | None) -> dict:
+def _build_qa_report(scores: dict, findings: list, name_check: dict | None, scored_text: str = "") -> dict:
     """Transform the engine QA result into the UI's ``metadata.qa_report`` shape
-    ``{generated_at, checks:[{name,status:PASS|NEEDS_REVIEW,details}]}`` (QAReportPanel reads this)."""
+    ``{generated_at, checks:[{name,status:PASS|NEEDS_REVIEW,details}]}`` (QAReportPanel reads this).
+
+    ``scored_text`` fingerprints the prose this report was computed from, so a report left behind by
+    a later rewrite can be identified as stale instead of being read as current."""
     from datetime import UTC, datetime
 
     find_by_dim: dict[str, str] = {}
@@ -2557,7 +2630,11 @@ def _build_qa_report(scores: dict, findings: list, name_check: dict | None) -> d
                 "details": detail,
             }
         )
-    return {"generated_at": datetime.now(UTC).isoformat(), "checks": checks}
+    report: dict[str, Any] = {"generated_at": datetime.now(UTC).isoformat(), "checks": checks}
+    if scored_text:
+        report.update(qa_stamp(scored_text))
+        report["craft_mean"] = round(craft_mean(scores) or 0.0, 4)
+    return report
 
 
 def _drift_scan_from_namecheck(
@@ -2622,7 +2699,7 @@ async def _persist_qa_artifacts(
         from writer_engine.supabase.client import get_supabase_admin
 
         client = await get_supabase_admin()
-        qa_report = _build_qa_report(scores or {}, findings or [], name_check)
+        qa_report = _build_qa_report(scores or {}, findings or [], name_check, chapter_text)
         # merge qa_report into the chapter row's metadata (keyed on project+chapter)
         cur = await (
             client.table("published_content_v2")
@@ -2731,7 +2808,7 @@ async def _op_qa(payload: dict) -> dict:
         "scores": scores,
         "findings": findings,
         "character_consistency": name_check,
-        "qa_report": _build_qa_report(scores, findings, name_check),
+        "qa_report": _build_qa_report(scores, findings, name_check, chapter_text),
         "persist": persisted,
     }
 
@@ -3029,6 +3106,15 @@ async def _op_repair(payload: dict) -> dict:
     research_focus = str(payload.get("research_focus") or "")
     style_directives = str(payload.get("style_directives") or "")
     citation_mode = str(payload.get("citation_mode") or "")
+    beat = _chapter_outline_beat(ctx.get("outline") or {}, chapter_number)
+    # Score the chapter BEFORE touching it. Nothing did this: a repair rewrote the prose, persisted
+    # it, and left the previous report in place — so the Q/A panel described text that no longer
+    # existed, and no one could tell whether the repair had helped or hurt. Both halves of that are
+    # fixed here: re-score after, and compare against before.
+    before_qa = await _score_chapter(text, period, roster_text=roster_text, beat=beat)
+    before_scores = _dimension_scores(before_qa)
+    before_mean = craft_mean(before_scores)
+
     new_text, drift, passes = await _drift_correct_pass(
         text,
         ctx=ctx,
@@ -3043,6 +3129,40 @@ async def _op_repair(payload: dict) -> dict:
         style_directives=style_directives,
         citation_mode=citation_mode,
     )
+
+    # Verify the repair rather than trusting it, and keep the better of the two.
+    after_qa = await _score_chapter(new_text, period, roster_text=roster_text, beat=beat) if passes else None
+    after_scores = _dimension_scores(after_qa)
+    after_mean = craft_mean(after_scores)
+    rolled_back = False
+    verdict = "no change"
+    if passes:
+        if before_mean is None or after_mean is None:
+            # Unscoreable in either direction. Keep the repair (it is the drift-corrected text) but
+            # say so, rather than reporting a comparison that was never made.
+            verdict = "kept, unverified — the craft QA did not return a usable score"
+        elif after_mean < before_mean - REPAIR_REGRESSION_TOLERANCE:
+            rolled_back = True
+            repaired_mean = after_mean
+            new_text, after_scores, after_mean = text, before_scores, before_mean
+            verdict = (
+                f"ROLLED BACK — the repair scored {repaired_mean:.3f} against {before_mean:.3f} "
+                "before it, so the original text was kept"
+            )
+            logger.warning(
+                "chapter.repair.rolled_back",
+                chapter=chapter_number,
+                before=round(before_mean, 4),
+                after=round(repaired_mean, 4),
+            )
+        else:
+            verdict = f"kept — {before_mean:.3f} to {after_mean:.3f}"
+            logger.info(
+                "chapter.repair.verified",
+                chapter=chapter_number,
+                before=round(before_mean, 4),
+                after=round(after_mean, 4),
+            )
     persist_result = None
     # Persist whenever persist is requested — NOT only when a correction happened. A repair that
     # re-scans and finds the chapter already clean must still record the verified aligned=True state,
@@ -3060,14 +3180,39 @@ async def _op_repair(payload: dict) -> dict:
             drift_report=drift.model_dump(mode="json") if drift else None,
         )
         persist_result = await _persist_chapter_if_requested(payload, ctx, out, model=model)
+        # Refresh the Q/A report so it describes the text that is now stored. Without this the repair
+        # left the pre-repair report in place and the panel showed findings against replaced prose.
+        # On a rollback this still runs, and correctly re-stamps the ORIGINAL text as what was scored.
+        if after_scores:
+            await _persist_qa_artifacts(
+                payload,
+                after_scores,
+                (
+                    after_qa.findings
+                    if after_qa and not rolled_back
+                    else before_qa.findings
+                    if before_qa
+                    else []
+                )
+                or [],
+                None,
+                new_text,
+            )
     d = drift.model_dump(mode="json") if drift else None
     return {
-        "repaired": bool(passes),
+        "repaired": bool(passes) and not rolled_back,
         "content_text": new_text,
         "word_count": len(new_text.split()),
         "craft_passes": passes,
         "drift_report": d,
         "drift_detected": (d is not None and not d.get("aligned", True)) if d else None,
+        # What the repair did to the score, and whether its work was kept. `repaired: false` with
+        # `rolled_back: true` means the pass ran, was measured, and was thrown away on purpose.
+        "rolled_back": rolled_back,
+        "verdict": verdict,
+        "craft_mean_before": round(before_mean, 4) if before_mean is not None else None,
+        "craft_mean_after": round(after_mean, 4) if after_mean is not None else None,
+        "scores": after_scores or before_scores,
         "persist": persist_result,
     }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../config/supabase';
 import { useEngineJobQueue } from '../../hooks/useEngineJobQueue';
 import type { QAReport, QACheck } from '../../types/database';
@@ -10,11 +10,46 @@ interface QAReportPanelProps {
   chapterNumber: number | null;
   projectId: string | null;
   userId: string;
+  /** The prose currently on screen, so a report describing REPLACED prose can be called out. */
+  contentText?: string;
 }
 
-export default function QAReportPanel({ metadata, contentId, userId }: QAReportPanelProps) {
+export default function QAReportPanel({ metadata, contentId, userId, contentText = '' }: QAReportPanelProps) {
   const [expanded, setExpanded] = useState(true);
   const report = metadata?.qa_report as QAReport | undefined;
+
+  // Is this report describing the chapter you are reading, or one that has since been replaced?
+  // It is not a hypothetical: the book run's repair pass rewrote chapters at 20:52 and left reports
+  // generated at 20:40 in place, so this panel showed a "5/8 passed" badge and a list of findings
+  // against prose that no longer existed. The engine now fingerprints the text each report scored;
+  // reports written before that carry no fingerprint and are flagged as unverifiable rather than
+  // silently trusted.
+  const [staleness, setStaleness] = useState<'current' | 'stale' | 'unknown'>('unknown');
+  useEffect(() => {
+    const scored = report?.scored_sha256;
+    if (!report) return;
+    if (!scored) {
+      setStaleness('unknown');
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(contentText));
+        const hex = Array.from(new Uint8Array(buf))
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('')
+          .slice(0, 16);
+        if (!cancelled) setStaleness(hex === scored ? 'current' : 'stale');
+      } catch {
+        // crypto.subtle needs a secure context; on http the panel just doesn't claim either way.
+        if (!cancelled) setStaleness('unknown');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [report, contentText]);
 
   // Queue the Q/A op so the click returns immediately; the content refetches when the engine job
   // completes (and the panel shows the new report). The hook also handles a sync engine response.
@@ -99,6 +134,25 @@ export default function QAReportPanel({ metadata, contentId, userId }: QAReportP
 
   return (
     <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+      {staleness !== 'current' && (
+        <div
+          className={`px-4 py-2 text-xs ${
+            staleness === 'stale'
+              ? 'bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+              : 'bg-gray-50 text-gray-600 dark:bg-gray-800/50 dark:text-gray-400'
+          }`}
+        >
+          {staleness === 'stale' ? (
+            <>
+              <strong>This report is out of date.</strong> The chapter has been rewritten since it was
+              scored{report.scored_words ? ` (it read ${report.scored_words.toLocaleString()} words)` : ''} — the
+              findings below describe the earlier draft. Re-run the Q/A check for the text on screen.
+            </>
+          ) : (
+            <>This report predates checked scoring, so it cannot be confirmed against the current text. Re-run the Q/A check to be sure it describes what you are reading.</>
+          )}
+        </div>
+      )}
       {/* Header — always visible, click to expand */}
       <button
         onClick={() => setExpanded(!expanded)}

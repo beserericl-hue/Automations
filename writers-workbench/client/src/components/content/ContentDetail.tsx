@@ -694,6 +694,7 @@ export default function ContentDetail() {
                     chapterNumber={item.chapter_number}
                     projectId={item.project_id}
                     userId={userId!}
+                    contentText={item.content_text ?? ''}
                   />
                 </>
               )}
