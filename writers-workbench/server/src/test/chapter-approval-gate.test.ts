@@ -166,6 +166,7 @@ describe('craft annotations', () => {
       action: 'replace',
       target_text: 'The heater ticked as it cooled.',
       replacement_text: 'The heater ticked, and she finally opened the door.',
+      delta_chars: 'The heater ticked, and she finally opened the door.'.length - 'The heater ticked as it cooled.'.length,
     });
   });
 
@@ -225,5 +226,52 @@ describe('craft annotations', () => {
 
   it('is empty when there are no craft findings', () => {
     expect(buildCraftAnnotations({}, 7, PROSE, dismissedNone)).toEqual([]);
+  });
+});
+
+describe('a suggestion says what accepting it costs', () => {
+  // Measured on a real chapter the moment the new prompt went in: a 749-character research-dump
+  // paragraph came back with a 73-character replacement. That is a legitimate editorial call — the
+  // problem WAS the dump — but accepting it silently removes two thirds of a passage, and silent
+  // removal is exactly how every automated repair attempt damaged the book.
+  const dismissedNone = new Set<string>();
+  const PROSE2 = 'The tribal meeting hall sat at the end of a gravel road off Route 5.';
+
+  function build(replacement: string) {
+    return buildCraftAnnotations(
+      {
+        craft_findings: {
+          findings: [{ dimension: 'no_boring_paragraphs', problem: 'dump', quote: PROSE2, replacement }],
+        },
+      },
+      7,
+      PROSE2,
+      dismissedNone,
+    )[0];
+  }
+
+  it('reports a cut as a negative delta', () => {
+    const a = build('The hall sat off Route 5.');
+    expect(a.suggestion?.delta_chars).toBe(25 - PROSE2.length);
+    expect(a.suggestion?.delta_chars).toBeLessThan(0);
+  });
+
+  it('reports an expansion as a positive delta', () => {
+    const longer = PROSE2 + ' He had been coming here since he was nine years old.';
+    expect(build(longer).suggestion?.delta_chars).toBeGreaterThan(0);
+  });
+
+  it('is zero for a same-length rewrite', () => {
+    expect(build('x'.repeat(PROSE2.length)).suggestion?.delta_chars).toBe(0);
+  });
+
+  it('is absent on a note, which replaces nothing', () => {
+    const a = buildCraftAnnotations(
+      { craft_findings: { findings: [{ dimension: 'story_turn_density', problem: 'flat ending' }] } },
+      7,
+      PROSE2,
+      dismissedNone,
+    )[0];
+    expect(a.suggestion).toEqual({ action: 'note' });
   });
 });

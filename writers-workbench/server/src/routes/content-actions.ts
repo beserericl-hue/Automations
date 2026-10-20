@@ -107,6 +107,12 @@ interface UnifiedAnnotation {
     action: 'replace' | 'note';
     target_text?: string; // exact text to replace
     replacement_text?: string;
+    // How much prose this gains or loses, in characters. Shown at the point of decision because
+    // the failure mode every automated repair attempt hit was prose quietly disappearing: six
+    // whole-chapter revisions returned 48-80% of the original, and one repair cut a chapter from
+    // 7,000 words to 2,800. A per-span accept is bounded and reversible, but the author should
+    // still be told when accepting means deleting two thirds of a passage.
+    delta_chars?: number;
   };
   dismissed: boolean;
   raw: unknown; // original report fragment for debugging
@@ -190,7 +196,12 @@ export function buildCraftAnnotations(
       chapter_number: chapterNumber,
       suggestion:
         anchored && replacement
-          ? { action: 'replace', target_text: anchored, replacement_text: replacement }
+          ? {
+              action: 'replace',
+              target_text: anchored,
+              replacement_text: replacement,
+              delta_chars: replacement.length - anchored.length,
+            }
           : { action: 'note' },
       dismissed: dismissed.has(aid),
       raw: f,

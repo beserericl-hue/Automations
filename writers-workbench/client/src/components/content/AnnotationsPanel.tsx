@@ -27,6 +27,7 @@ interface UnifiedAnnotation {
     action: 'replace' | 'note';
     target_text?: string;
     replacement_text?: string;
+    delta_chars?: number;
   };
   dismissed: boolean;
 }
@@ -266,6 +267,23 @@ function AnnotationRow({
           {annotation.suggestion?.action === 'replace' && annotation.suggestion.replacement_text && (
             <div className="mt-2 rounded bg-green-50 px-2 py-1 text-xs text-green-800 dark:bg-green-900/30 dark:text-green-300">
               Suggested replacement: <span className="font-mono">{annotation.suggestion.replacement_text}</span>
+              {typeof annotation.suggestion.delta_chars === 'number' && annotation.suggestion.delta_chars !== 0 && (
+                // Say what accepting costs. Every automated repair this engine tried failed by
+                // silently removing prose — whole-chapter rewrites came back at 48-80% of the
+                // original — so a suggestion that deletes most of a passage must say so before it
+                // is accepted, not after.
+                <span
+                  className={`ml-2 whitespace-nowrap rounded px-1.5 py-0.5 font-medium ${
+                    annotation.suggestion.delta_chars < -200
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                      : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                  }`}
+                  title="Change in length if you accept this suggestion"
+                >
+                  {annotation.suggestion.delta_chars > 0 ? '+' : '−'}
+                  {Math.abs(annotation.suggestion.delta_chars).toLocaleString()} characters
+                </span>
+              )}
             </div>
           )}
           {applyError && (
