@@ -37,6 +37,8 @@ export interface EpubOptions {
   /** Fixed values make the output byte-stable, which is what makes it testable. */
   now?: Date;
   bookId?: string;
+  /** Cover image bytes. Declared three ways below because readers disagree about which they honour. */
+  cover?: { data: Buffer; ext: 'jpg' | 'png' } | null;
 }
 
 const CSS = `@page { margin: 5%; }
@@ -110,6 +112,20 @@ export async function buildEpub(opts: EpubOptions): Promise<Buffer> {
 
   const docs: { name: string; xhtml: string }[] = [];
   const navItems: string[] = [];
+  const cover = opts.cover ?? null;
+
+  // The cover page goes FIRST in the spine so the book opens on the artwork.
+  if (cover) {
+    docs.push({
+      name: 'cover.xhtml',
+      xhtml: xhtmlDoc(
+        title,
+        '<div style="text-align:center;margin:0;padding:0;">' +
+          `<img src="cover.${cover.ext}" alt="${esc(title)}" style="max-width:100%;max-height:100vh;"/>` +
+          '</div>',
+      ),
+    });
+  }
 
   docs.push({
     name: 'title.xhtml',
@@ -146,6 +162,12 @@ export async function buildEpub(opts: EpubOptions): Promise<Buffer> {
   const manifest = [
     '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>',
     '<item id="css" href="style.css" media-type="text/css"/>',
+    ...(cover
+      ? [
+          `<item id="cover-image" href="cover.${cover.ext}" ` +
+            `media-type="${cover.ext === 'png' ? 'image/png' : 'image/jpeg'}" properties="cover-image"/>`,
+        ]
+      : []),
     ...docs.map((d, i) => `<item id="x${i}" href="${d.name}" media-type="application/xhtml+xml"/>`),
   ].join('\n');
   const spine = docs.map((_, i) => `<itemref idref="x${i}"/>`).join('\n');
@@ -159,6 +181,9 @@ export async function buildEpub(opts: EpubOptions): Promise<Buffer> {
     (author ? `<dc:creator>${esc(author)}</dc:creator>\n` : '') +
     '<dc:language>en</dc:language>\n' +
     `<meta property="dcterms:modified">${now}</meta>\n` +
+    // The legacy EPUB 2 form. Several readers — including some Kindle paths — still look for it
+    // when choosing the shelf thumbnail, and declaring both costs one line.
+    (cover ? '<meta name="cover" content="cover-image"/>\n' : '') +
     '</metadata>\n' +
     `<manifest>\n${manifest}\n</manifest>\n` +
     `<spine>\n${spine}\n</spine>\n` +
@@ -178,6 +203,8 @@ export async function buildEpub(opts: EpubOptions): Promise<Buffer> {
   zip.file('OEBPS/content.opf', opf);
   zip.file('OEBPS/style.css', CSS);
   zip.file('OEBPS/nav.xhtml', navDoc);
+  // Already a compressed image format; deflating again costs time and saves nothing.
+  if (cover) zip.file(`OEBPS/cover.${cover.ext}`, cover.data, { compression: 'STORE' });
   for (const d of docs) zip.file(`OEBPS/${d.name}`, d.xhtml);
 
   return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });

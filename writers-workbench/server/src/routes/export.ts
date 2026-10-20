@@ -7,6 +7,7 @@ import { ExportRequestSchema } from '../schemas.js';
 import { logger } from '../lib/logger.js';
 import { z } from 'zod';
 import { buildEpub, epubFilename, type EpubChapter } from '../lib/epub.js';
+import { composeCover } from '../lib/cover.js';
 
 export const exportRouter = Router();
 
@@ -288,6 +289,8 @@ function parseContentToParagraphs(content: string): Paragraph[] {
 
 const EpubRequestSchema = z.object({
   project_id: z.string().uuid('project_id must be a valid UUID'),
+  /** Byline, and dc:creator — without it Books files the book under "Unknown Author". */
+  author: z.string().max(120).optional(),
   only_approved: z.boolean().optional().default(false),
   /** Default true: an unmarked draft read is how a draft gets mistaken for the final book. */
   mark_drafts: z.boolean().optional().default(true),
@@ -315,7 +318,9 @@ exportRouter.post(
   requireTierFeature('kdp_export'),
   validateBody(EpubRequestSchema),
   async (req, res) => {
-    const { project_id, only_approved, mark_drafts } = req.body as z.infer<typeof EpubRequestSchema>;
+    const { project_id, only_approved, mark_drafts, author } = req.body as z.infer<
+      typeof EpubRequestSchema
+    >;
     const user_id = req.userId!;
     try {
       const { data: project, error: projError } = await getSupabaseAdmin()
@@ -327,6 +332,16 @@ exportRouter.post(
       if (projError || !project) {
         res.status(404).json({ error: 'Project not found' });
         return;
+      }
+      // Fall back to the account's own name so a book is never filed under "Unknown Author".
+      let author_name = (author || '').trim();
+      if (!author_name) {
+        const { data: profile } = await getSupabaseAdmin()
+          .from('users_v2')
+          .select('name')
+          .eq('user_id', user_id)
+          .maybeSingle();
+        author_name = ((profile?.name as string) || '').trim();
       }
 
       // Paged: PostgREST caps a response at 1000 rows, and a book can exceed that in theory. More
@@ -361,10 +376,44 @@ exportRouter.post(
         return;
       }
 
+      // Cover: the project's selected art, composed into a portrait jacket with the title and
+      // author set on it. Raw square art is letterboxed by readers into the shelf tile with grey
+      // bars, and carries no words, so the shelf shows a picture rather than a book.
+      let cover: { data: Buffer; ext: 'jpg' | 'png' } | null = null;
+      try {
+        const { data: art } = await getSupabaseAdmin()
+          .from('generated_images_v2')
+          .select('storage_path')
+          .eq('project_id', project_id)
+          .eq('image_type', 'cover_art')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (art?.storage_path) {
+          const dl = await getSupabaseAdmin()
+            .storage.from('cover-images')
+            .download(art.storage_path as string);
+          if (dl.data) {
+            const raw = Buffer.from(await dl.data.arrayBuffer());
+            const composed = await composeCover({
+              art: raw,
+              title: project.title as string,
+              author: author_name,
+            });
+            // Falling back to the raw art is still better than no cover at all.
+            cover = composed ? { data: composed, ext: 'jpg' } : { data: raw, ext: 'png' };
+          }
+        }
+      } catch (err) {
+        logger.warn({ err, project_id }, 'epub: cover unavailable, exporting without one');
+      }
+
       const buffer = await buildEpub({
         title: project.title as string,
         chapters,
         markDrafts: mark_drafts,
+        author: author_name,
+        cover,
       });
 
       const filename = epubFilename(project.title as string);

@@ -40,6 +40,10 @@ type ExportFormat = 'docx' | 'epub';
 
 export default function ExportDialog({ projectId, projectTitle, open, onClose }: ExportDialogProps) {
   const [format, setFormat] = useState<ExportFormat>('docx');
+  // The byline, and dc:creator. Books files a book with no creator under "Unknown Author", and the
+  // composed cover has nowhere to put a name. Pre-filled from the account, editable because a pen
+  // name is not the name on the account.
+  const [authorName, setAuthorName] = useState('');
   const [pageSize, setPageSize] = useState('6x9');
   const [onlyApproved, setOnlyApproved] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -64,7 +68,12 @@ export default function ExportDialog({ projectId, projectTitle, open, onClose }:
         body: JSON.stringify(
           format === 'docx'
             ? { project_id: projectId, page_size: pageSize }
-            : { project_id: projectId, only_approved: onlyApproved, mark_drafts: true },
+            : {
+                project_id: projectId,
+                only_approved: onlyApproved,
+                mark_drafts: true,
+                ...(authorName.trim() ? { author: authorName.trim() } : {}),
+              },
         ),
       });
 
@@ -102,7 +111,7 @@ export default function ExportDialog({ projectId, projectTitle, open, onClose }:
           <p className="mt-1 text-sm text-gray-500">
             {format === 'docx'
               ? 'A KDP-formatted .docx for print. Approved chapters only.'
-              : 'An .epub to read on a Kindle or in Books before you approve — the pre-publish read.'}
+              : 'An .epub with your cover art, title and byline — to read on a Kindle or in Books before you approve.'}
           </p>
 
           <div className="mt-4 grid grid-cols-2 gap-2">
@@ -137,6 +146,25 @@ export default function ExportDialog({ projectId, projectTitle, open, onClose }:
               ))}
             </select>
           </div>
+
+          {format === 'epub' && (
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Author
+              </label>
+              <input
+                type="text"
+                value={authorName}
+                onChange={(e) => setAuthorName(e.target.value)}
+                placeholder="Your name as it should appear on the cover"
+                className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Printed on the cover and filed under this name in your library. Leave blank to use
+                your account name.
+              </p>
+            </div>
+          )}
 
           {format === 'epub' && (
             <label className="mt-4 flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">

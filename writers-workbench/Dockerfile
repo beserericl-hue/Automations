@@ -53,6 +53,11 @@ COPY --from=deps /app/package.json ./
 # Server compiled output
 COPY --from=build /app/server/dist ./dist
 
+# Runtime assets the compiled server reads from disk. Currently the bundled cover font (Raleway,
+# SIL OFL) that the EPUB export converts to glyph outlines — alpine ships no fonts, and without
+# this the cover composer degrades to the raw square art with no title on it.
+COPY --from=build /app/server/assets ./assets
+
 # Client build (served as static files by Express)
 COPY --from=build /app/client/dist ./public
 
