@@ -1771,6 +1771,52 @@ async def _op_write(payload: dict) -> dict:
                 model=plan.polish,
             )
             final_qa = await _score_chapter(text, period, roster_text, beat=beat)
+            # The craft-revision loop used to exist ONLY on the single-call path, so for a real
+            # 5-sub-chapter chapter nothing ever re-read the assembled prose against the craft
+            # dimensions: it was scored for telemetry and the score was never acted on.
+            #
+            # Measured across the 96-chapter Ossuary run, and the correlation is the whole argument:
+            # the dimensions the DRIFT pass covers scored 0.91-1.00 (character_follows_guide 1.00,
+            # character_consistency 1.00, outline 0.92, period 0.91), while the dimensions NOTHING
+            # corrected scored worst — story_turn_density 0.79, under threshold in 51 of 96 chapters,
+            # and no_boring_paragraphs 0.81, under in 39. The chapter was fixed for exactly what it
+            # was checked against, and for nothing else.
+            craft_done = 0
+            max_craft = max(0, _coerce_int(payload.get("max_craft_passes"), 1))
+            while craft_done < max_craft and final_qa is not None:
+                low = _low_dims(final_qa)
+                if not low:
+                    break
+                revised = await _revise_chapter(
+                    text,
+                    low_dims=low,
+                    findings=final_qa.findings,
+                    model=plan.polish,
+                    genre_slug=ctx["genre_slug"],
+                )
+                # Three ways a whole-chapter rewrite can quietly ruin the chapter, every one of
+                # which this codebase has already been bitten by: it returns truncated, it returns
+                # shorter, or it returns without the scene breaks (A13/J2 — the em-dash backstop
+                # once deleted them). Reject rather than persist any of those.
+                rejected = craft_revision_rejected(text, revised)
+                if rejected:
+                    logger.warning(
+                        "chapter.craft_revision_rejected",
+                        chapter=req.chapter_number,
+                        why=rejected,
+                        dims=low,
+                    )
+                    break
+                text = revised
+                craft_done += 1
+                passes += 1
+                logger.info(
+                    "chapter.craft_revised",
+                    chapter=req.chapter_number,
+                    dims=low,
+                    words=len(revised.split()),
+                )
+                final_qa = await _score_chapter(text, period, roster_text, beat=beat)
             sub_count = len(briefs)
         else:
             resp = await router.complete(
@@ -2016,6 +2062,49 @@ _DIM_TO_SEEDS = {
 }
 
 
+CRAFT_MIN_LENGTH_RATIO = 0.9
+"""A craft revision shorter than this fraction of the original is rejected.
+
+Post-hoc rewrites shorten — the drift pass carries a floor for exactly that reason. This one is
+tighter, because a craft polish has no business cutting a tenth of the chapter."""
+
+
+def craft_revision_rejected(before: str, after: str) -> str:
+    """Why this craft revision must not be kept, or "" to accept it.
+
+    Three ways a whole-chapter rewrite can quietly ruin a chapter, every one of which this codebase
+    has already been bitten by:
+
+    * it comes back **truncated** — the output ceiling was too low (see `_revise_max_tokens`);
+    * it comes back **shorter** — post-hoc rewrites shorten, and a craft polish has no business
+      cutting a tenth of the chapter;
+    * it comes back **without the scene breaks** — A13/J2, where the em-dash backstop deleted the
+      separators and left `", -"` in the prose.
+
+    Checked here rather than trusted, because the revision replaces the chapter.
+    """
+    before_words, after_words = len(before.split()), len(after.split())
+    if not after_words:
+        return "empty"
+    if after_words < CRAFT_MIN_LENGTH_RATIO * before_words:
+        return f"shorter: {after_words} words vs {before_words} (floor {CRAFT_MIN_LENGTH_RATIO:.0%})"
+    if after.count(SCENE_BREAK) < before.count(SCENE_BREAK):
+        return f"lost scene breaks: {after.count(SCENE_BREAK)} vs {before.count(SCENE_BREAK)}"
+    return ""
+
+
+def _revise_max_tokens(text: str) -> int:
+    """Output ceiling for a revision that must return the WHOLE chapter.
+
+    `_revise_chapter` asked for 8192 regardless of length. That was survivable while it only ran on
+    the single-call path, where a chapter is ~3,000 words — but a real chapter here is ~6,400 words,
+    roughly 9,000 output tokens, so the revision would come back truncated and replace the chapter
+    with a fragment. Fourth instance of this failure in this codebase: the 96-chapter outline, the
+    guardrails lens, the craft QA, and now this.
+    """
+    return max(8192, min(32_000, int(len(text.split()) * 2) + 2_000))
+
+
 async def _revise_chapter(
     text: str, *, low_dims: list[str], findings: list[dict], model: str, genre_slug: str
 ) -> str:
@@ -2046,7 +2135,11 @@ async def _revise_chapter(
     )
     router = get_router(service=STEP_NAME)
     resp = await router.complete(
-        provider="anthropic", model=model, system=system, prompt=user, max_tokens=8192
+        provider="anthropic",
+        model=model,
+        system=system,
+        prompt=user,
+        max_tokens=_revise_max_tokens(text),
     )
     return resp.text.strip()
 
