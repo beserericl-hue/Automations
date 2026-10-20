@@ -401,8 +401,11 @@ def _plan_system(
             "\n\nReturn strict JSON matching SubChapterPlan: 3-7 sub-chapters. Each sub-chapter MUST carry: "
             "number (1-based), title, brief (a concrete beat — a discrete movement, NOT a summary), "
             "story_turn, arc_beat (the CHAPTER-level arc stage it fulfils — use the chapter arc above if "
-            "given, else the book arc), characters (names taken EXACTLY from the CHARACTER ROSTER — never "
-            "invent), setting, emotional_tone, and connects_to_book_arc (how it advances the BOOK-level arc "
+            "given, else the book arc), characters (the people on the page in this sub-chapter; prefer "
+            "names from the CHARACTER ROSTER and never contradict it, but a chapter set outside the "
+            "roster's era may name its own cast), pov_character (which ONE of them the section is seen "
+            "through — the roster's protagonist unless the chapter clearly belongs to someone else), "
+            "setting, emotional_tone, and connects_to_book_arc (how it advances the BOOK-level arc "
             "stage for this chapter).\n"
             "story_turn is the one that gets skipped, so be exact about it: name in one sentence what is "
             "DIFFERENT at the end of this sub-chapter than at its start. A discovery made, a decision taken "
@@ -952,10 +955,20 @@ async def _write_subchapter(
         if brief.story_turn.strip()
         else ""
     )
+    # The plan names who is in the section and whose eyes it is seen through. Neither reached the
+    # writer before: `characters` was asked for and then never read, and `pov_character` was read but
+    # never asked for, so the POV clause below could not fire on a real chapter. The beat names its
+    # people in passing, which is weaker — a cast line is what stops a walk-on becoming a viewpoint.
+    cast_line = (
+        f"ON THE PAGE: {', '.join(c.strip() for c in brief.characters if str(c).strip())}\n"
+        if brief.characters
+        else ""
+    )
     user = (
         f"You are writing SUB-CHAPTER {idx + 1} of {total} of chapter {chapter_number}.\n"
         f"This sub-chapter's beat: {brief.title} — {brief.beat}"
         f"{(' (POV: ' + brief.pov_character + ')') if brief.pov_character else ''}\n"
+        f"{cast_line}"
         f"{turn_line}"
         f"Write this sub-chapter in full (rich, scene-driven prose, not a summary), following the craft "
         f"rules, the project context, and the research grounding in the system prompt.\n\n"

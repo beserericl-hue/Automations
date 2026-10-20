@@ -126,3 +126,52 @@ class TestTheWriterIsToldTheTurn:
     def test_whitespace_is_not_a_turn(self) -> None:
         prompt = self._prompt(SubChapterBrief(beat="b", story_turn="   "))
         assert "MUST END WITH A CHANGE" not in prompt
+
+
+class TestTheWriterIsToldWhoIsThere:
+    """Two fields the plan filled in and the writer never saw.
+
+    `characters` was asked for by the planner prompt and then read by nothing — paid for in output
+    tokens on every plan call and discarded. `pov_character` was the mirror image: the writer prompt
+    had a `(POV: …)` clause, but the planner was never asked for the field, so on every real chapter
+    it was empty and the clause could not fire. The beat text names its people in passing, which is
+    not the same thing: it does not say whose eyes the section is seen through.
+    """
+
+    def test_the_planner_asks_for_the_pov(self) -> None:
+        from chapter_step.main import _plan_system
+
+        system = _plan_system("historical-time-travel", {"chapters": []})
+        assert "pov_character" in system
+        assert "which ONE of them the section is seen through" in system
+
+    def test_the_cast_reaches_the_writer(self) -> None:
+        prompt = TestTheWriterIsToldTheTurn._prompt(
+            SubChapterBrief(beat="b", characters=["Makaya", "Kaya"], pov_character="Makaya")
+        )
+        assert "ON THE PAGE: Makaya, Kaya" in prompt
+        assert "(POV: Makaya)" in prompt
+
+    def test_an_empty_cast_adds_no_line(self) -> None:
+        prompt = TestTheWriterIsToldTheTurn._prompt(SubChapterBrief(beat="b"))
+        assert "ON THE PAGE" not in prompt
+
+    def test_blank_names_are_dropped_not_printed_as_commas(self) -> None:
+        prompt = TestTheWriterIsToldTheTurn._prompt(SubChapterBrief(beat="b", characters=["Kaya", "  ", ""]))
+        assert "ON THE PAGE: Kaya\n" in prompt
+
+    def test_the_output_ban_on_a_cast_label_survives(self) -> None:
+        """Naming the cast in the prompt is exactly what makes a model print a 'Confirmed cast:'
+        header, which _strip_scaffolding was written for."""
+        prompt = TestTheWriterIsToldTheTurn._prompt(SubChapterBrief(beat="b", characters=["Kaya"]))
+        assert "'Confirmed cast' / 'POV character' label" in prompt
+
+    def test_an_era_cast_outside_the_roster_is_allowed(self) -> None:
+        """The Ossuary's roster holds 6 modern entries for a book spanning 12,000 years. "names taken
+        EXACTLY from the CHARACTER ROSTER — never invent" made the planner return [] for every
+        deep-time chapter, which is obedient and useless."""
+        from chapter_step.main import _plan_system
+
+        system = _plan_system("historical-time-travel", {"chapters": []})
+        assert "may name its own cast" in system
+        assert "never contradict it" in system
