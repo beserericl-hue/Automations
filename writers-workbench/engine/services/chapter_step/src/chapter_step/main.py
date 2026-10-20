@@ -2250,10 +2250,24 @@ def _build_qa_system() -> str:
         "the chapter got them wrong. Measured on a 12,000-year project: its chapter 2 protagonist is "
         "in none of the 6 roster entries, and all three of these dimensions came back 0.0 — dragging "
         "a sound chapter to a mean of 0.458 and inviting revisions aimed at nothing.\n"
-        "For every score under 0.8, add a finding {dimension, problem, fix}. "
-        f"List AT MOST {QA_MAX_FINDINGS} findings and at most {QA_MAX_FINDINGS} research_gaps, each "
-        "one sentence: a longer answer gets truncated at the output ceiling and then parses as "
-        "nothing at all, which loses every score.\n"
+        "For every score under 0.8, add a finding {dimension, problem, fix, quote, replacement}.\n"
+        "QUOTE AND REPLACEMENT ARE WHAT MAKE A FINDING ACTIONABLE, so get them exactly right:\n"
+        "  * quote: the EXACT text from the chapter that is the problem — copied character for "
+        "character, including its punctuation. One to three sentences. Not a paraphrase, not a "
+        "summary, not your own words. It is looked up verbatim in the chapter, and a quote that is "
+        "not found there is DISCARDED along with your suggested fix.\n"
+        "  * replacement: the prose you would put in its place — finished writing in the author's "
+        "voice, ready to drop in, not an instruction about what to write. It must stand in for the "
+        "quote grammatically and keep the same facts, characters, period and point of view.\n"
+        "  * The replacement must NOT be shorter than the quote unless the problem IS the length. "
+        "A pacing or flat-prose problem is fixed by making something happen on the page, not by "
+        "deleting the passage where nothing does.\n"
+        "  * If a finding is about the chapter as a whole and no single passage carries it, leave "
+        "quote and replacement empty rather than inventing a span — an honest note is useful, a "
+        "fabricated anchor is not.\n"
+        f"List AT MOST {QA_MAX_FINDINGS} findings and at most {QA_MAX_FINDINGS} research_gaps. Keep "
+        "problem and fix to one sentence each: a longer answer gets truncated at the output ceiling "
+        "and then parses as nothing at all, which loses every score.\n"
         "Return strict JSON matching ChapterCraftQa (include character_consistency and research_gaps)."
     )
 
@@ -2420,6 +2434,10 @@ async def _score_chapter(
             )
             if i:
                 logger.info("chapter.qa.recovered_on_retry")
+            # Verify every quote against the FULL chapter, not the possibly-truncated body the
+            # model was shown: a quote from the part that was sent is still a real span of the
+            # chapter, and checking it against `body` would reject valid anchors near the cut.
+            qa.findings = anchor_findings(qa.findings, text)
             return qa
         except ProviderNotRegistered:
             return _fixture_qa()
@@ -2435,6 +2453,68 @@ async def _score_chapter(
                 error=str(exc)[:300],
             )
     return None
+
+
+def _normalise_ws(s: str) -> str:
+    return " ".join((s or "").split())
+
+
+def anchor_findings(findings: list[dict], text: str) -> list[dict]:
+    """Verify every finding's quote against the chapter and drop the ones that do not match.
+
+    An annotation is only safe to offer as a one-click fix if its target really is in the text:
+    Apply does a literal span replacement, so an unverified quote produces a button that 422s on
+    click — which the drift source already learned the hard way and works around by skipping flags
+    whose variant is no longer present.
+
+    Matching is exact first, then whitespace-normalised, because models reflow line breaks when
+    quoting. On a normalised hit the ORIGINAL span is recovered from the chapter so the stored
+    target_text is byte-exact; a quote the panel cannot find is worse than no quote.
+
+    A finding that loses its quote is kept as a note. It still tells the author something true; it
+    just cannot be applied in one click. What is never kept is a quote that does not exist — that
+    is a fabricated anchor, and this function exists to make that impossible rather than unlikely.
+    """
+    body = text or ""
+    flat = _normalise_ws(body)
+    out: list[dict] = []
+    for f in findings or []:
+        item = dict(f)
+        quote = str(item.get("quote") or "").strip()
+        if not quote:
+            item.pop("quote", None)
+            item.pop("replacement", None)
+            out.append(item)
+            continue
+        if quote in body:
+            item["quote_verified"] = True
+            out.append(item)
+            continue
+        # Whitespace-only difference — the usual case, because models reflow line breaks when they
+        # quote. Match the words with any run of whitespace between them, which recovers the span
+        # from the ORIGINAL text so the stored target_text stays byte-exact.
+        fq = _normalise_ws(quote)
+        recovered = ""
+        if fq and fq in flat:
+            pattern = r"\s+".join(re.escape(w) for w in fq.split())
+            m = re.search(pattern, body)
+            if m:
+                recovered = m.group(0)
+        if recovered:
+            item["quote"] = recovered
+            item["quote_verified"] = True
+            out.append(item)
+            continue
+        logger.info(
+            "chapter.qa.finding_quote_unmatched",
+            dimension=str(item.get("dimension") or ""),
+            quote=quote[:80],
+        )
+        item.pop("quote", None)
+        item.pop("replacement", None)
+        item["quote_verified"] = False
+        out.append(item)
+    return out
 
 
 def _low_dims(qa: ChapterCraftQa, threshold: float = CRAFT_THRESHOLD) -> list[str]:
@@ -2714,6 +2794,15 @@ async def _persist_qa_artifacts(
         if rows:
             meta = dict(rows[0].get("metadata") or {})
             meta["qa_report"] = qa_report
+            # The findings themselves, with their verified spans, so the annotations panel can pin
+            # each one to a line and offer a one-click Apply. The qa_report's `checks` are a
+            # human-readable summary and deliberately lossy — they collapse a finding to a sentence
+            # of advice with nowhere to click, which is why craft findings could not be actioned.
+            meta["craft_findings"] = {
+                "generated_at": qa_report.get("generated_at"),
+                **qa_stamp(chapter_text),
+                "findings": [f for f in (findings or []) if isinstance(f, dict)][:QA_MAX_FINDINGS],
+            }
             from datetime import UTC, datetime
 
             await (

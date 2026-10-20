@@ -96,7 +96,7 @@ function resolveHubWebhookUrl(): string {
 
 interface UnifiedAnnotation {
   id: string;
-  source: 'genre_eval' | 'drift_scan';
+  source: 'genre_eval' | 'drift_scan' | 'craft_qa';
   severity: 'high' | 'medium' | 'low' | 'info';
   message: string;
   evidence_quote: string | null;
@@ -113,7 +113,7 @@ interface UnifiedAnnotation {
 
 const ApplyAnnotationSchema = z.object({
   annotationId: z.string().min(1),
-  source: z.enum(['genre_eval', 'drift_scan']),
+  source: z.enum(['genre_eval', 'drift_scan', 'craft_qa']),
   // Optional override of the replacement text — lets the user tweak the
   // suggestion before applying.
   replacementText: z.string().min(1).max(20000).optional(),
@@ -121,8 +121,82 @@ const ApplyAnnotationSchema = z.object({
 
 const DismissAnnotationSchema = z.object({
   annotationId: z.string().min(1),
-  source: z.enum(['genre_eval', 'drift_scan']),
+  source: z.enum(['genre_eval', 'drift_scan', 'craft_qa']),
 });
+
+// Continuity defects are real defects and rare (0-4 chapters in 96 on a full book run). Craft
+// defects — pacing, flat paragraphs, prose clarity — are frequent (51 and 39 of 96) and are
+// editorial judgement, not breakage, so they must not shout at the same volume or the panel
+// becomes noise and the rare real defect gets lost in it.
+const CRAFT_DIMENSION_SEVERITY: Record<string, UnifiedAnnotation['severity']> = {
+  character_consistency: 'high',
+  character_follows_guide: 'high',
+  outline_follows_guide: 'high',
+  period_language_ok: 'high',
+  dialogue_follows_guide: 'medium',
+  prose_transparent: 'medium',
+  no_boring_paragraphs: 'low',
+  story_turn_density: 'low',
+};
+
+const CRAFT_DIMENSION_LABELS: Record<string, string> = {
+  character_consistency: 'Character consistency',
+  character_follows_guide: 'Character craft',
+  outline_follows_guide: 'Follows the outline',
+  period_language_ok: 'Period language',
+  dialogue_follows_guide: 'Dialogue',
+  prose_transparent: 'Prose clarity',
+  no_boring_paragraphs: 'Flat paragraph',
+  story_turn_density: 'Pacing — no story turn',
+};
+
+/**
+ * Build the craft-Q/A annotations for a chapter from `metadata.craft_findings`.
+ *
+ * Shared by the GET and the apply handler so a finding can never be listed with one target span and
+ * applied with another. The engine has already verified each quote against the chapter text
+ * (`anchor_findings`), and this drops any whose span is no longer present — the chapter may have
+ * been edited since the report ran, and offering an Apply that 422s on click is the failure the
+ * drift source already learned to avoid.
+ */
+function buildCraftAnnotations(
+  meta: Record<string, unknown>,
+  chapterNumber: number | null,
+  chapterText: string,
+  dismissed: Set<string>,
+): UnifiedAnnotation[] {
+  const block = (meta.craft_findings as Record<string, unknown> | undefined) || undefined;
+  const findings = Array.isArray(block?.findings) ? (block.findings as Record<string, unknown>[]) : [];
+  const out: UnifiedAnnotation[] = [];
+  for (const f of findings) {
+    const dimension = (f.dimension as string | undefined) || 'craft';
+    const quote = (f.quote as string | undefined) || null;
+    const replacement = (f.replacement as string | undefined) || null;
+    const problem = (f.problem as string | undefined) || '';
+    const fix = (f.fix as string | undefined) || '';
+    // A quote that is no longer in the chapter is stale, not wrong — the author has already edited
+    // there. Keep the note, drop the one-click fix.
+    const anchored = quote && chapterText.includes(quote) ? quote : null;
+    const label = CRAFT_DIMENSION_LABELS[dimension] || dimension;
+    const aid = buildAnnotationId('craft_qa', chapterNumber, anchored || `${dimension}:${problem}`, dimension);
+    out.push({
+      id: aid,
+      source: 'craft_qa',
+      severity: CRAFT_DIMENSION_SEVERITY[dimension] || 'low',
+      message: problem ? `${label}: ${problem}` : label,
+      evidence_quote: anchored,
+      evidence_context: fix || null,
+      chapter_number: chapterNumber,
+      suggestion:
+        anchored && replacement
+          ? { action: 'replace', target_text: anchored, replacement_text: replacement }
+          : { action: 'note' },
+      dismissed: dismissed.has(aid),
+      raw: f,
+    });
+  }
+  return out;
+}
 
 /**
  * Build the deterministic ID for an annotation so the same flag re-fetched
@@ -275,6 +349,11 @@ contentActionsRouter.get('/:id/annotations', async (req: Request, res: Response)
       }
     }
 
+    // ---- Source 3: craft_qa (the Q/A findings, pinned to their verified spans) ----
+    annotations.push(
+      ...buildCraftAnnotations(meta, chapter.chapter_number, chapter.content_text || '', dismissed),
+    );
+
     res.json({
       success: true,
       annotations,
@@ -284,6 +363,7 @@ contentActionsRouter.get('/:id/annotations', async (req: Request, res: Response)
         by_source: {
           genre_eval: annotations.filter((a) => a.source === 'genre_eval').length,
           drift_scan: annotations.filter((a) => a.source === 'drift_scan').length,
+          craft_qa: annotations.filter((a) => a.source === 'craft_qa').length,
         },
       },
     });
@@ -392,6 +472,16 @@ contentActionsRouter.post(
               break outer;
             }
           }
+        }
+      } else if (source === 'craft_qa') {
+        // Rebuilt through the same function the GET uses, so the span that is applied is by
+        // construction the span that was shown.
+        const built = buildCraftAnnotations(meta, chapter.chapter_number, chapter.content_text || '', dismissed);
+        const hit = built.find((a) => a.id === annotationId);
+        const sug = hit?.suggestion;
+        if (sug?.action === 'replace' && sug.target_text) {
+          const replacement = replacementText || sug.replacement_text;
+          if (replacement) target = { target_text: sug.target_text, replacement_text: replacement };
         }
       }
 

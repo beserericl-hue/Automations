@@ -2,10 +2,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../../lib/api';
 
 // S12-13 — shared report-comment surface for chapter editors. Renders
-// merged annotations from genre_eval (S12-11) and drift_scan (S12-12)
-// pinned to spans in the current chapter, with apply/dismiss actions.
+// merged annotations from genre_eval (S12-11), drift_scan (S12-12) and the
+// craft Q/A, pinned to spans in the current chapter, with apply/dismiss actions.
+//
+// craft_qa is here because every attempt to fix craft defects by regenerating prose damaged the
+// book: whole-chapter revision came back at 48-80% of the original across six attempts, and
+// section-wise revision with deletion forbidden inflated chapters to 123-144% and scored WORSE on
+// the dimensions it targeted. Apply does a literal span replacement, so a chapter cannot shrink or
+// balloon — the author sees both versions and decides. That is the whole point of routing craft
+// findings through this surface instead of a repair loop.
 
-type AnnotationSource = 'genre_eval' | 'drift_scan';
+type AnnotationSource = 'genre_eval' | 'drift_scan' | 'craft_qa';
 type Severity = 'high' | 'medium' | 'low' | 'info';
 
 interface UnifiedAnnotation {
@@ -115,14 +122,16 @@ export default function AnnotationsPanel({ contentId }: AnnotationsPanelProps) {
   if (active.length === 0) {
     return (
       <div className="rounded-lg border border-gray-200 px-4 py-3 text-sm text-gray-500 dark:border-gray-700">
-        No active review annotations for this chapter. Run a genre evaluation or character-drift scan from the chat to populate.
+        No active review annotations for this chapter. Run the Q/A check from the Q/A tab, or a genre evaluation or character-drift scan from the chat, to populate.
       </div>
     );
   }
 
   // Group by source for stable ordering: drift_scan first (concrete fixes),
-  // genre_eval second (craft suggestions).
+  // craft_qa second (the common case — pacing and prose, with a suggested replacement),
+  // genre_eval last (craft suggestions).
   const driftAnnotations = active.filter((a) => a.source === 'drift_scan');
+  const craftAnnotations = active.filter((a) => a.source === 'craft_qa');
   const genreAnnotations = active.filter((a) => a.source === 'genre_eval');
 
   return (
@@ -138,7 +147,8 @@ export default function AnnotationsPanel({ contentId }: AnnotationsPanelProps) {
           </span>
         </div>
         <span className="text-xs text-gray-500">
-          drift {data.counts.by_source.drift_scan} · genre {data.counts.by_source.genre_eval}
+          drift {data.counts.by_source.drift_scan} · craft {data.counts.by_source.craft_qa} · genre{' '}
+          {data.counts.by_source.genre_eval}
         </span>
       </div>
 
@@ -148,6 +158,17 @@ export default function AnnotationsPanel({ contentId }: AnnotationsPanelProps) {
             title="Character drift"
             description="Names that don't match the canonical roster."
             annotations={driftAnnotations}
+            onApply={(a) => apply.mutate({ contentId, annotationId: a.id, source: a.source })}
+            onDismiss={(a) => dismiss.mutate({ contentId, annotationId: a.id, source: a.source })}
+            applyState={apply}
+            dismissState={dismiss}
+          />
+        )}
+        {craftAnnotations.length > 0 && (
+          <SourceSection
+            title="Craft Q/A"
+            description="Pacing, flat paragraphs and prose clarity — each pinned to the passage it refers to. Apply swaps that passage only; undo from the Versions tab."
+            annotations={craftAnnotations}
             onApply={(a) => apply.mutate({ contentId, annotationId: a.id, source: a.source })}
             onDismiss={(a) => dismiss.mutate({ contentId, annotationId: a.id, source: a.source })}
             applyState={apply}

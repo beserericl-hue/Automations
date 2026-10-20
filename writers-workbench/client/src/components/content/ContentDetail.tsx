@@ -360,11 +360,17 @@ export default function ContentDetail() {
   const qaFlagged = qaReport?.checks?.filter((c) => c.status && c.status !== 'PASS').length ?? 0;
   const driftReport = meta.drift_report as { aligned?: boolean } | undefined;
   const hasDrift = driftReport?.aligned === false;
+  // Badge the Review tab with the craft findings that carry an applicable span. Without a count the
+  // suggestions sit behind an unmarked tab and nobody opens it — the Q/A tab says "5/8 passed" and
+  // the actual line-level fixes for those three failures are one click away, unannounced. Only
+  // findings with a quote are counted: those are the ones with something to accept.
+  const craftFindings = meta.craft_findings as { findings?: { quote?: string }[] } | undefined;
+  const craftAnchored = craftFindings?.findings?.filter((f) => f.quote).length ?? 0;
   const tabs: { id: 'qa' | 'annotations' | 'sources' | 'versions'; label: string; badge?: number; warn?: boolean }[] = [
     ...(isChapter
       ? ([
           { id: 'qa', label: 'Q/A', badge: qaFlagged || undefined, warn: qaFlagged > 0 || hasDrift },
-          { id: 'annotations', label: 'Review' },
+          { id: 'annotations', label: 'Review', badge: craftAnchored || undefined },
         ] as const)
       : []),
     { id: 'sources', label: 'Sources' },
