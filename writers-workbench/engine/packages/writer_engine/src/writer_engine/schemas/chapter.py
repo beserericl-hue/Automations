@@ -205,7 +205,15 @@ class ChapterCraftQa(BaseModel):
     # Places the chapter asserts a historical/period fact that should be researched/verified, or where
     # a researched detail would deepen the scene. Each: a short phrase. Drives "add research if needed".
     research_gaps: list[str] = Field(default_factory=list)
-    findings: list[dict[str, str]] = Field(default_factory=list)
+    # `Any` rather than `str` for the values. Two things legitimately put non-strings in here and
+    # both were breaking a whole chapter's scores:
+    #   * the QA prompt tells the model to leave `quote`/`replacement` EMPTY when a finding is about
+    #     the chapter as a whole rather than a passage — it answers `null`, and a `dict[str, str]`
+    #     rejects that, failing validation for all eight scores over a correctly-formed finding.
+    #   * `anchor_findings` stamps a boolean `quote_verified` after the model has answered.
+    # Observed scoring 91 chapters in one run: one chapter lost every score to
+    # `findings.5.quote Input should be a valid string [input_value=None]`.
+    findings: list[dict[str, Any]] = Field(default_factory=list)
 
     @model_validator(mode="before")
     @classmethod

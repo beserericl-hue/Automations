@@ -28,8 +28,20 @@ interface ExportDialogProps {
   onClose: () => void;
 }
 
+// Two exports with genuinely different jobs, which is why they are one dialog with a format switch
+// rather than two buttons that look alike:
+//   .docx  — the KDP print deliverable. Approved chapters only; shipping a draft to a printer is a
+//            mistake, so the server enforces that.
+//   .epub  — the PRE-PUBLISH read. The point is to put the manuscript on a Kindle and read it as a
+//            reader would BEFORE deciding to approve it, so it includes drafts by default and marks
+//            them in the text. Restricting it to approved chapters would make it useless at exactly
+//            the moment it exists for.
+type ExportFormat = 'docx' | 'epub';
+
 export default function ExportDialog({ projectId, projectTitle, open, onClose }: ExportDialogProps) {
+  const [format, setFormat] = useState<ExportFormat>('docx');
   const [pageSize, setPageSize] = useState('6x9');
+  const [onlyApproved, setOnlyApproved] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
 
@@ -43,16 +55,17 @@ export default function ExportDialog({ projectId, projectTitle, open, onClose }:
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
 
-      const response = await fetch('/api/export/docx', {
+      const response = await fetch(`/api/export/${format}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({
-          project_id: projectId,
-          page_size: pageSize,
-        }),
+        body: JSON.stringify(
+          format === 'docx'
+            ? { project_id: projectId, page_size: pageSize }
+            : { project_id: projectId, only_approved: onlyApproved, mark_drafts: true },
+        ),
       });
 
       if (!response.ok) {
@@ -68,7 +81,8 @@ export default function ExportDialog({ projectId, projectTitle, open, onClose }:
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${projectTitle.replace(/[^a-zA-Z0-9]/g, '_')}_KDP.docx`;
+      const safe = projectTitle.replace(/[^a-zA-Z0-9]/g, '_');
+      a.download = format === 'docx' ? `${safe}_KDP.docx` : `${safe}.epub`;
       a.click();
       URL.revokeObjectURL(url);
       onClose();
@@ -84,10 +98,34 @@ export default function ExportDialog({ projectId, projectTitle, open, onClose }:
       <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900" onClick={e => e.stopPropagation()}>
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Export to Word</h2>
-          <p className="mt-1 text-sm text-gray-500">Generate a KDP-formatted .docx for "{projectTitle}"</p>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Export "{projectTitle}"</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            {format === 'docx'
+              ? 'A KDP-formatted .docx for print. Approved chapters only.'
+              : 'An .epub to read on a Kindle or in Books before you approve — the pre-publish read.'}
+          </p>
 
-          <div className="mt-4">
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            {([
+              { id: 'docx', label: 'Word (.docx)', note: 'For KDP print' },
+              { id: 'epub', label: 'ePub', note: 'Read it as a book' },
+            ] as const).map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setFormat(f.id)}
+                className={`rounded-lg border px-3 py-2 text-left text-sm transition ${
+                  format === f.id
+                    ? 'border-brand-500 bg-brand-50 text-brand-800 dark:bg-brand-900/30 dark:text-brand-200'
+                    : 'border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800'
+                }`}
+              >
+                <span className="block font-medium">{f.label}</span>
+                <span className="block text-xs opacity-70">{f.note}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className={`mt-4 ${format === 'docx' ? '' : 'hidden'}`}>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Page Size</label>
             <select
               value={pageSize}
@@ -100,6 +138,24 @@ export default function ExportDialog({ projectId, projectTitle, open, onClose }:
             </select>
           </div>
 
+          {format === 'epub' && (
+            <label className="mt-4 flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input
+                type="checkbox"
+                checked={onlyApproved}
+                onChange={(e) => setOnlyApproved(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                Approved chapters only
+                <span className="block text-xs text-gray-500">
+                  Off by default — unapproved chapters are included and marked "Draft" in the text, so
+                  you can read the whole book before approving any of it.
+                </span>
+              </span>
+            </label>
+          )}
+
           {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
           <div className="mt-6 flex justify-end gap-3">
@@ -111,7 +167,7 @@ export default function ExportDialog({ projectId, projectTitle, open, onClose }:
               disabled={exporting}
               className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
             >
-              {exporting ? 'Generating...' : 'Download .docx'}
+              {exporting ? 'Generating...' : format === 'docx' ? 'Download .docx' : 'Download .epub'}
             </button>
           </div>
         </div>

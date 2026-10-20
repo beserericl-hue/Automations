@@ -19,6 +19,8 @@ Citations to the course are inline as ``[Follett § N]``.
 
 from __future__ import annotations
 
+import re
+
 from writer_engine.prompt_store.store import get_prompt_store
 
 # The Prime Directive, distilled (the five load-bearing sentences from the Writing Craft index).
@@ -506,12 +508,56 @@ def load_follett_seeds() -> int:
     return len(FOLLETT_SEEDS)
 
 
+SEED_PLACEHOLDER_FALLBACKS = {
+    "period": "the period given below",
+    "place": "the setting given below",
+    "locked_character_roster": "the CHARACTER ROSTER given below",
+    "specific_question": "the research question given below",
+}
+"""Neutral stand-ins for the `{...}` slots the seeds carry.
+
+The seeds are written as fill-in templates (`This manuscript is set in {period}.`,
+`{locked_character_roster}`) but nothing ever substituted them, so every composed system prompt
+shipped with literal braces in it. Usually the model ignores them, because the real period and
+roster are supplied in the user message a few lines later. Occasionally it does not: scoring 91
+chapters in one run, one came back with
+
+    "I need to fill in the template variables before proceeding. The prompt contains `{period}` and
+     `{locked_character_roster}` as unfilled placeholders"
+
+instead of JSON, on both the first attempt and the retry — so that chapter lost all eight scores.
+One failure in 91 is the kind of rate that only shows up at book scale and then looks like a fluke.
+
+Substituting a real value when the caller has one is better; pointing at where the value actually is
+removes the trigger when it does not. Leaving a literal `{period}` in a prompt is the only option
+that is wrong in every case."""
+
+_PLACEHOLDER = re.compile(r"\{([a-z_]+)\}")
+
+
+def fill_seed_placeholders(text: str, values: dict[str, str] | None = None) -> str:
+    """Substitute the seeds' `{...}` slots: caller-supplied values first, then neutral fallbacks.
+
+    Only known placeholder names are touched, so prose that legitimately contains braces is left
+    alone."""
+    supplied = {k: v for k, v in (values or {}).items() if str(v).strip()}
+
+    def swap(m: re.Match[str]) -> str:
+        name = m.group(1)
+        if name in supplied:
+            return str(supplied[name])
+        return SEED_PLACEHOLDER_FALLBACKS.get(name, m.group(0))
+
+    return _PLACEHOLDER.sub(swap, text)
+
+
 def compose_craft_system(
     *,
     seed_keys: list[str],
     genre_block: str = "",
     arc_block: str = "",
     include_prime_directive: bool = True,
+    placeholders: dict[str, str] | None = None,
 ) -> str:
     """Assemble a system prompt from the craft layers: prime directive + genre + arc + chosen seeds.
 
@@ -530,4 +576,4 @@ def compose_craft_system(
         parts.append(arc_block.strip())
     for key in seed_keys:
         parts.append(store.get(key))
-    return "\n\n".join(p for p in parts if p.strip())
+    return fill_seed_placeholders("\n\n".join(p for p in parts if p.strip()), placeholders)

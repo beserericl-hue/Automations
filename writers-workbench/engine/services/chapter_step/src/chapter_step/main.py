@@ -2213,10 +2213,16 @@ async def _revise_chapter(
     return resp.text.strip()
 
 
-def _build_qa_system() -> str:
+def _build_qa_system(period: str = "", roster_text: str = "") -> str:
     """Pure: the craft-QA system prompt — score the chapter against the Follett guide rubrics +
-    character consistency + research gaps."""
+    character consistency + research gaps.
+
+    `period` and `roster_text` fill the seeds' own `{period}` / `{locked_character_roster}` slots.
+    Nothing filled them before, so the composed prompt shipped with literal braces and one chapter
+    in 91 answered "I need to fill in the template variables before proceeding" instead of JSON —
+    on both attempts, losing all eight of its scores."""
     return compose_craft_system(
+        placeholders={"period": period, "locked_character_roster": roster_text},
         seed_keys=[
             "follett_seeds.scene.turn_density",
             "follett_seeds.prose.no_boring",
@@ -2416,8 +2422,8 @@ async def _score_chapter(
     # retry is worth it because the common failure is a model wrapping JSON in prose or running
     # long, both of which a reminder fixes — and the alternative is throwing away eight scores.
     attempts = (
-        _build_qa_system(),
-        _build_qa_system()
+        _build_qa_system(period, roster_text),
+        _build_qa_system(period, roster_text)
         + "\n\nYour previous answer could not be parsed. Reply with ONE JSON object and no prose, "
         "no markdown fence, and no commentary. Keep every string short.",
     )

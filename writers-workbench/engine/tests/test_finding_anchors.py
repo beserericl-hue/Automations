@@ -126,3 +126,39 @@ class TestEdges:
         anchor_findings([original], CHAPTER)
         assert original["quote"] == "not in the chapter"
         assert original["replacement"] == "x"
+
+
+class TestTheSchemaToleratesWhatThePromptAsksFor:
+    """The QA prompt tells the model to leave `quote` and `replacement` EMPTY for a finding about
+    the chapter as a whole. The model answers `null`, and `findings: list[dict[str, str]]` rejected
+    it — failing validation for the WHOLE object, so one correctly-formed finding cost a chapter all
+    eight of its scores. Seen once in a 91-chapter run:
+    `findings.5.quote Input should be a valid string [input_value=None]`.
+    """
+
+    def test_a_null_quote_validates(self) -> None:
+        from writer_engine.schemas.chapter import ChapterCraftQa
+
+        qa = ChapterCraftQa.model_validate(
+            {
+                "story_turn_density": 0.6,
+                "findings": [
+                    {"dimension": "story_turn_density", "problem": "flat", "quote": None, "replacement": None}
+                ],
+            }
+        )
+        assert qa.story_turn_density == 0.6
+        assert qa.findings[0]["quote"] is None
+
+    def test_a_null_quote_survives_anchoring_as_a_note(self) -> None:
+        got = anchor_findings([{"dimension": "d", "problem": "p", "quote": None}], CHAPTER)
+        assert "quote" not in got[0]
+        assert got[0]["problem"] == "p"
+
+    def test_the_boolean_verification_flag_round_trips(self) -> None:
+        """`anchor_findings` stamps a bool into the same dict, which a str-valued mapping also
+        rejected — silently, as a serializer warning, until something downstream read it."""
+        from writer_engine.schemas.chapter import ChapterCraftQa
+
+        qa = ChapterCraftQa(findings=anchor_findings([_f(quote="nowhere")], CHAPTER))
+        assert qa.model_dump()["findings"][0]["quote_verified"] is False

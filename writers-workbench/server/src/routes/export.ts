@@ -5,6 +5,8 @@ import { validateBody } from '../middleware/validate.js';
 import { requireAuth, requireTierFeature } from '../middleware/auth.js';
 import { ExportRequestSchema } from '../schemas.js';
 import { logger } from '../lib/logger.js';
+import { z } from 'zod';
+import { buildEpub, epubFilename, type EpubChapter } from '../lib/epub.js';
 
 export const exportRouter = Router();
 
@@ -268,3 +270,118 @@ function parseContentToParagraphs(content: string): Paragraph[] {
 
   return paragraphs;
 }
+
+// =====================================================================
+// EPUB — the pre-publish read
+// =====================================================================
+// Different purpose from /docx, and therefore a different rule about what goes in it.
+//
+// /docx is the KDP print deliverable, so it exports only approved or published chapters: shipping a
+// draft to a printer is a mistake. The EPUB exists so an author can read the manuscript as a reader
+// will — on a Kindle, in Books — BEFORE deciding whether to approve it. Restricting it to approved
+// chapters would make it useless for exactly the moment it is for: today The Ossuary has 96 chapters
+// and zero approved, so an approved-only EPUB is an empty file and a confusing error.
+//
+// So it defaults to everything and marks unapproved chapters in the text, which keeps the draft
+// read honest without making it impossible. `only_approved: true` gives the /docx behaviour for
+// anyone who wants the final article.
+
+const EpubRequestSchema = z.object({
+  project_id: z.string().uuid('project_id must be a valid UUID'),
+  only_approved: z.boolean().optional().default(false),
+  /** Default true: an unmarked draft read is how a draft gets mistaken for the final book. */
+  mark_drafts: z.boolean().optional().default(true),
+});
+
+/**
+ * @openapi
+ * /export/epub:
+ *   post:
+ *     tags: [Export]
+ *     summary: Export a project as an EPUB for pre-publish reading
+ *     description: |
+ *       Builds an EPUB 3 of the project's chapters in order. Unlike `/export/docx` this includes
+ *       draft chapters by default — the point is to read the manuscript before approving it — and
+ *       marks them in the text unless `mark_drafts` is false.
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: EPUB file download }
+ *       400: { description: No chapters with text }
+ *       404: { description: Project not found }
+ */
+exportRouter.post(
+  '/epub',
+  requireAuth,
+  requireTierFeature('kdp_export'),
+  validateBody(EpubRequestSchema),
+  async (req, res) => {
+    const { project_id, only_approved, mark_drafts } = req.body as z.infer<typeof EpubRequestSchema>;
+    const user_id = req.userId!;
+    try {
+      const { data: project, error: projError } = await getSupabaseAdmin()
+        .from('writing_projects_v2')
+        .select('title, genre_slug')
+        .eq('id', project_id)
+        .eq('user_id', user_id)
+        .single();
+      if (projError || !project) {
+        res.status(404).json({ error: 'Project not found' });
+        return;
+      }
+
+      // Paged: PostgREST caps a response at 1000 rows, and a book can exceed that in theory. More
+      // importantly `data.length` is a page size, not a count — a trap this codebase has hit before.
+      const chapters: EpubChapter[] = [];
+      for (let page = 0; ; page += 1) {
+        let q = getSupabaseAdmin()
+          .from('published_content_v2')
+          .select('title, chapter_number, content_text, status')
+          .eq('project_id', project_id)
+          .eq('user_id', user_id)
+          .eq('content_type', 'chapter')
+          .is('deleted_at', null)
+          .order('chapter_number', { ascending: true })
+          .range(page * 1000, page * 1000 + 999);
+        if (only_approved) q = q.in('status', ['approved', 'published']);
+        const { data, error } = await q;
+        if (error) {
+          res.status(500).json({ error: 'Failed to fetch chapters' });
+          return;
+        }
+        chapters.push(...((data || []) as unknown as EpubChapter[]));
+        if ((data || []).length < 1000) break;
+      }
+
+      if (chapters.length === 0) {
+        res.status(400).json({
+          error: only_approved
+            ? 'No approved or published chapters found for this project'
+            : 'This project has no chapters yet',
+        });
+        return;
+      }
+
+      const buffer = await buildEpub({
+        title: project.title as string,
+        chapters,
+        markDrafts: mark_drafts,
+      });
+
+      const filename = epubFilename(project.title as string);
+      logger.info(
+        { userId: user_id, project_id, chapters: chapters.length, bytes: buffer.length },
+        'epub export',
+      );
+      res.setHeader('Content-Type', 'application/epub+zip');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+    } catch (err) {
+      if (err instanceof Error && err.message === 'NO_CHAPTERS') {
+        res.status(400).json({ error: 'No chapters with text to export' });
+        return;
+      }
+      logger.error({ err, userId: user_id, project_id }, 'epub export failed');
+      res.status(500).json({ error: 'Failed to generate EPUB' });
+    }
+  },
+);
