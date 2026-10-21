@@ -2645,16 +2645,32 @@ def _character_name_consistency(text: str, roster: list[dict]) -> dict:
     seen: set[str] = set()
     # Candidates come from the ORIGINAL text (an ASCII-only regex, so a "found" word stays a real span
     # for Apply Fix); we only de-accent the roster tokens they're compared against.
-    for w in Counter(re.findall(r"\b[A-Z][a-z]{3,}\b", text)):  # >= 4-letter capitalised words only
+    counts = Counter(re.findall(r"\b[A-Z][a-z]{3,}\b", text))
+    for w in counts:
         wl = w.lower()
         if wl in seen or wl in roster_tokens or wl in _NAME_STOP:
             continue
         for rt in roster_tokens:
             maxd = 1 if len(rt) < 7 else 2
-            if 0 < _edit_distance(wl, rt) <= maxd and abs(len(wl) - len(rt)) <= 1:
-                renames.append({"found": w, "closest_roster_name": rt})
-                seen.add(wl)
-                break
+            if not (0 < _edit_distance(wl, rt) <= maxd and abs(len(wl) - len(rt)) <= 1):
+                continue
+            # A PLURAL OR POSSESSIVE of a roster name is not a rename. "the Tayacs" is ordinary
+            # English about a family, and it sits exactly one edit from "Tayac" with a length
+            # difference of one, so the distance guard waves it straight through. Found on two
+            # chapters whose one-click fix offered to turn "the Tayacs" into "the Marcus".
+            if wl in {f"{rt}s", f"{rt}es", f"{rt}'s"}:
+                continue
+            # A name the chapter USES is not a typo of a different name. A rename slip appears once
+            # or twice; an era's own character appears throughout. Measured on a 12,000-year book
+            # whose 6-entry roster is all modern: "Koss", a deep-time character, sat one edit from
+            # "Voss" and was offered as a correction to it. Requiring the suspected drift to be
+            # RARER than the name it supposedly drifted from is what separates the two.
+            canon_uses = sum(c for word, c in counts.items() if word.lower() == rt)
+            if counts[w] >= 3 and counts[w] > canon_uses:
+                continue
+            renames.append({"found": w, "closest_roster_name": rt})
+            seen.add(wl)
+            break
     return {
         "consistent": not renames,
         "roster": roster_full,
@@ -2751,7 +2767,14 @@ def _drift_scan_from_namecheck(
         if not variant or not token:
             continue
         canonical = next((n for n in roster if token in n.lower().split()), token.capitalize())
-        replacement = canonical.split()[0] if canonical else token.capitalize()
+        # The replacement is the canonical form of the token that MATCHED, not the first word of the
+        # full name. `canonical.split()[0]` offered "Dr." for a surname drift of "Dr. Renata Voss"
+        # and "Marcus" for one of "Marcus Tayac" — an Apply that would have written "the Marcus"
+        # into the prose. One-click means the suggestion has to be right.
+        replacement = next(
+            (w for w in canonical.split() if w.lower().strip(".,'") == token.lower()),
+            canonical.split()[0] if canonical else token.capitalize(),
+        )
         idx = chapter_text.find(variant)
         context = chapter_text[max(0, idx - 30) : idx + len(variant) + 30] if idx >= 0 else variant
         chars.append(
