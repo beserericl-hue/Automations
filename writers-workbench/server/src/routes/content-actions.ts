@@ -1107,13 +1107,21 @@ contentActionsRouter.post('/:id/lifecycle', validateBody(LifecycleSchema), async
 // hypothetical: a repair pass rewrote four chapters and left their reports
 // twelve minutes stale, under a "5/8 passed" badge.
 
+// FACTUAL defects only. A failure here means something is wrong: a character is named
+// inconsistently, the chapter does not do what its outline said it would, or the prose contains an
+// anachronism — which in historical fiction is an error, not a preference.
+//
+// Everything else is EDITORIAL JUDGEMENT and advises instead. The first version of this gate also
+// blocked prose clarity, dialogue and character craft, and the justification was frequency: pacing
+// fails in a third of chapters so gating on it would stop most of the book, while prose clarity
+// failed in ten. That is an argument about how many, not about what kind, and it produced a gate
+// that stopped a book for exactly the sort of thing it waved through elsewhere. Measured on a
+// 96-chapter book: 13 chapters blocked, 10 of them on prose clarity alone, every one carrying a
+// line-level suggestion the author could have accepted in a click.
 const BLOCKING_CHECKS = new Set([
-  'Character craft',
   'Character consistency',
   'Follows the outline',
   'Period language',
-  'Dialogue',
-  'Prose clarity',
 ]);
 
 /** First 16 hex of the SHA-256 — the same fingerprint the engine stamps on a report. */

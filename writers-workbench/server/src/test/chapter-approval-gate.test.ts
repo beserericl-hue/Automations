@@ -73,11 +73,22 @@ describe('approval gate — what blocks', () => {
     expect(v.blockers.join(' ')).toContain('Character consistency');
   });
 
-  it.each(['Character craft', 'Follows the outline', 'Period language', 'Dialogue', 'Prose clarity'])(
-    'blocks on %s',
+  it.each(['Follows the outline', 'Period language'])('blocks on %s — a factual defect', (name) => {
+    const checks = ALL_PASS.map((c) => (c.name === name ? check(name, 'NEEDS_REVIEW') : c));
+    expect(assessChapter(chapter({ checks })).eligible).toBe(false);
+  });
+
+  // Craft is advisory, however rare the failure. The first version of this gate blocked prose
+  // clarity because it failed in only 10 of 96 chapters while pacing failed in 51 — an argument
+  // about how many, not about what kind. Ten chapters were stopped for something the same gate
+  // waved through elsewhere, each carrying a suggestion the author could have accepted in a click.
+  it.each(['Prose clarity', 'Dialogue', 'Character craft'])(
+    'does NOT block on %s — an editorial judgement',
     (name) => {
       const checks = ALL_PASS.map((c) => (c.name === name ? check(name, 'NEEDS_REVIEW') : c));
-      expect(assessChapter(chapter({ checks })).eligible).toBe(false);
+      const v = assessChapter(chapter({ checks }));
+      expect(v.eligible).toBe(true);
+      expect(v.advisories.join(' ')).toContain(name);
     },
   );
 
@@ -97,13 +108,16 @@ describe('approval gate — what blocks', () => {
     expect(v.advisories).toHaveLength(1);
   });
 
-  it('reports both at once without confusing them', () => {
+  it('reports a blocker and an advisory at once without confusing them', () => {
     const checks = ALL_PASS.map((c) =>
-      c.name === 'Dialogue' || c.name === 'No flat paragraphs' ? check(c.name, 'NEEDS_REVIEW') : c,
+      c.name === 'Period language' || c.name === 'No flat paragraphs'
+        ? check(c.name, 'NEEDS_REVIEW')
+        : c,
     );
     const v = assessChapter(chapter({ checks }));
     expect(v.blockers).toHaveLength(1);
     expect(v.advisories).toHaveLength(1);
+    expect(v.eligible).toBe(false);
   });
 });
 
