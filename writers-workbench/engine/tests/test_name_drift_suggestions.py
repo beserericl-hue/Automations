@@ -119,3 +119,35 @@ class TestNoFlagsNoScan:
         nc = _character_name_consistency(text, ROSTER)
         assert nc["names_missing"], "they really are absent"
         assert nc["consistent"] is True, "but absence is not inconsistency"
+
+
+PRIEST = [{"name": "Father Declan Murtagh"}, {"name": "Marcus Tayac"}]
+
+
+class TestHonorificsAreNotNames:
+    """ "Father Declan Murtagh" contributed the roster token "father", which sits one edit from the
+    ordinary word "Feather" — so a chapter using that word was flagged as character drift and
+    blocked from approval, with a one-click fix offering to rewrite it. A title is not a name."""
+
+    def test_an_ordinary_word_near_a_title_is_not_drift(self) -> None:
+        text = "A Feather lay on the stone where the bird had been. Marcus Tayac picked it up."
+        got = _character_name_consistency(text, PRIEST)
+        assert [r["found"] for r in got["possible_renames"]] == []
+        assert got["consistent"] is True
+
+    def test_the_real_name_tokens_are_still_matched(self) -> None:
+        """Dropping "father" must not drop "Declan" or "Murtagh" — the actual name.
+
+        Shaped like a real slip: the correct spelling throughout and the wrong one once. (Written
+        the other way round first, which the frequency guard correctly suppressed — a name used
+        three times with the canonical absent is the chapter's own name, not a typo.)"""
+        text = (
+            "Murtagh came up the path. Murtagh had the folder. Marcus Tayac waited for Murtagh, "
+            "and Murtagh sat down. The note was signed Murtagj."
+        )
+        found = [r["found"] for r in _character_name_consistency(text, PRIEST)["possible_renames"]]
+        assert "Murtagj" in found
+
+    def test_a_roster_that_is_only_a_title_yields_no_tokens(self) -> None:
+        got = _character_name_consistency("The Doctor arrived. The Doctor left.", [{"name": "Doctor"}])
+        assert got["possible_renames"] == []

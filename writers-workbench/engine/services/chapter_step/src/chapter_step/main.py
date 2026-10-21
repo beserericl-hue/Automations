@@ -2616,6 +2616,46 @@ def _deaccent(s: str) -> str:
     return "".join(ch for ch in unicodedata.normalize("NFKD", s) if not unicodedata.combining(ch))
 
 
+_HONORIFICS = frozenset(
+    {
+        "father",
+        "mother",
+        "doctor",
+        "mister",
+        "missus",
+        "sister",
+        "brother",
+        "uncle",
+        "aunt",
+        "lord",
+        "lady",
+        "madam",
+        "miss",
+        "captain",
+        "colonel",
+        "major",
+        "general",
+        "sergeant",
+        "reverend",
+        "pastor",
+        "bishop",
+        "chief",
+        "elder",
+        "grandmother",
+        "grandfather",
+        "professor",
+        "president",
+        "governor",
+        "senator",
+        "judge",
+        "sheriff",
+        "deacon",
+        "widow",
+    }
+)
+"""Titles that appear inside roster entries and must never be matched against as names."""
+
+
 def _character_name_consistency(text: str, roster: list[dict]) -> dict:
     """Deterministic character-name cross-check (R119): which roster names appear, and any capitalized
     word in the prose that is a near-miss of a roster name (a likely rename, e.g. Mara→Meara).
@@ -2633,7 +2673,15 @@ def _character_name_consistency(text: str, roster: list[dict]) -> dict:
     # De-accent before tokenising: "Tomás" → "Tomas" (a 5-char token). Without this the accented "á"
     # split the name into "Tom"+"s" (both < 4 chars → no token), so the scanner was BLIND to any
     # accented character — a real drift like "Thomas" for canonical "Tomás" went uncaught.
-    roster_tokens = {t.lower() for n in roster_full for t in re.findall(r"[A-Za-z]{4,}", _deaccent(n))}
+    # Honorifics are not names. "Father Declan Murtagh" contributed the token "father", which sits
+    # one edit from the ordinary word "Feather" — so a chapter using that word was flagged as
+    # character drift and blocked from approval, with a one-click fix offering to rewrite it.
+    roster_tokens = {
+        t.lower()
+        for n in roster_full
+        for t in re.findall(r"[A-Za-z]{4,}", _deaccent(n))
+        if t.lower() not in _HONORIFICS
+    }
     low = _deaccent(text).lower()
     present = [
         n for n in roster_full if n and re.search(rf"\b{re.escape(_deaccent(n.split()[0]).lower())}\b", low)
