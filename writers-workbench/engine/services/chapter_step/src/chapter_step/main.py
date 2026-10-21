@@ -2976,8 +2976,20 @@ async def _op_qa(payload: dict) -> dict:
         }
     scores = qa.model_dump(mode="json")
     findings = scores.pop("findings", [])
-    # Persist qa_report (→ QAReportPanel) + character drift (→ AnnotationsPanel) so the UI shows results.
-    persisted = await _persist_qa_artifacts(payload, scores, findings, name_check, chapter_text)
+    # Persist qa_report (→ QAReportPanel) + character drift (→ AnnotationsPanel) so the UI shows
+    # results — UNLESS the caller explicitly asked not to.
+    #
+    # This used to persist unconditionally, so `persist: false` was accepted by the API and silently
+    # ignored. A read-only probe of the deployed engine therefore WROTE its findings over two
+    # chapters whose reports had just been corrected, re-blocking both. A flag the API accepts and
+    # disregards is worse than one it rejects: the caller believes it has done nothing.
+    #
+    # Default True: the UI's "Run Q/A" and the hub do not pass the flag and rely on persistence.
+    persisted = (
+        await _persist_qa_artifacts(payload, scores, findings, name_check, chapter_text)
+        if payload.get("persist", True) is not False
+        else None
+    )
     return {
         "chapter_id": payload.get("chapter_id"),
         "scores": scores,

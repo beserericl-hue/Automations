@@ -151,3 +151,61 @@ class TestHonorificsAreNotNames:
     def test_a_roster_that_is_only_a_title_yields_no_tokens(self) -> None:
         got = _character_name_consistency("The Doctor arrived. The Doctor left.", [{"name": "Doctor"}])
         assert got["possible_renames"] == []
+
+
+class TestQaHonoursPersistFalse:
+    """`persist: false` was accepted by the API and silently ignored by the Q/A op.
+
+    A read-only probe of the deployed engine therefore wrote its findings over two chapters whose
+    reports had just been corrected, re-blocking both for approval. A flag that is accepted and
+    disregarded is worse than one that is rejected, because the caller believes it has done nothing.
+    """
+
+    @staticmethod
+    def _run(payload_extra: dict) -> list:
+        import asyncio
+        from unittest.mock import patch
+
+        from chapter_step import main as M
+
+        wrote: list = []
+
+        async def fake_persist(payload, scores, findings, nc, text):
+            wrote.append(payload.get("chapter_number"))
+            return {"ok": True}
+
+        async def fake_resolve(payload, create=False):
+            return None
+
+        async def fake_ctx(pid, pl):
+            return {"genre_slug": "g", "title": "t", "outline": {"chapters": []}, "roster": []}
+
+        async def fake_score(text, period, roster_text="", beat=""):
+            from writer_engine.schemas.chapter import ChapterCraftQa
+
+            return ChapterCraftQa()
+
+        body = {
+            "project_id": "11111111-2222-3333-4444-555555555555",
+            "chapter_number": 7,
+            "chapter_text": "Some prose that is long enough to score.",
+            **payload_extra,
+        }
+        with (
+            patch.object(M, "_persist_qa_artifacts", fake_persist),
+            patch.object(M, "_resolve_project_for_payload", fake_resolve),
+            patch.object(M, "_load_context", fake_ctx),
+            patch.object(M, "_score_chapter", fake_score),
+        ):
+            asyncio.run(M._op_qa(body))
+        return wrote
+
+    def test_persist_false_writes_nothing(self) -> None:
+        assert self._run({"persist": False}) == []
+
+    def test_persist_true_writes(self) -> None:
+        assert self._run({"persist": True}) == [7]
+
+    def test_the_default_still_writes(self) -> None:
+        """The UI's Run Q/A and the hub do not pass the flag and rely on persistence."""
+        assert self._run({}) == [7]
