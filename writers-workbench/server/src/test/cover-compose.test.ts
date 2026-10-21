@@ -25,20 +25,28 @@ import { buildEpub } from '../lib/epub.js';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FONT = join(HERE, '../../assets/fonts/Raleway-Variable.ttf');
 
+// sharp is typed as a namespace under this module resolution, so the callable form is reached
+// through a loose local type — the same shape the composer itself uses.
+type SharpFn = (input?: Buffer | Record<string, unknown>) => {
+  png(): { toBuffer(): Promise<Buffer> };
+  metadata(): Promise<{ width?: number; height?: number; format?: string }>;
+};
+
+async function loadSharp(): Promise<SharpFn> {
+  const mod = (await import('sharp')) as unknown as { default?: SharpFn };
+  return (mod.default ?? (mod as unknown as SharpFn)) as SharpFn;
+}
+
 /** A small square image standing in for generated cover art. */
 async function squareArt(): Promise<Buffer> {
-  const sharpMod = (await import('sharp')) as unknown as { default: typeof import('sharp') };
-  const sharp = sharpMod.default ?? (sharpMod as unknown as typeof import('sharp'));
-  return sharp({
-    create: { width: 1024, height: 1024, channels: 3, background: '#7a4a24' },
-  })
+  const sharp = await loadSharp();
+  return sharp({ create: { width: 1024, height: 1024, channels: 3, background: '#7a4a24' } })
     .png()
     .toBuffer();
 }
 
 async function dimensions(buf: Buffer) {
-  const sharpMod = (await import('sharp')) as unknown as { default: typeof import('sharp') };
-  const sharp = sharpMod.default ?? (sharpMod as unknown as typeof import('sharp'));
+  const sharp = await loadSharp();
   const m = await sharp(buf).metadata();
   return { width: m.width, height: m.height, format: m.format };
 }

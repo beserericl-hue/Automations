@@ -101,6 +101,22 @@ function chapterLabel(n: number | null, index: number): string {
   return `Chapter ${n ?? index + 1}`;
 }
 
+/**
+ * Should the label be printed above the title?
+ *
+ * Not when the title already opens with it. Chapter 0 of a real book is titled "Prologue: The
+ * Surface", and the heading rendered as "Prologue / Prologue: The Surface". The label exists to say
+ * where you are; when the title already says it, it is just a stutter.
+ */
+export function labelIsRedundant(label: string, title: string): boolean {
+  const l = label.trim().toLowerCase();
+  const t = title.trim().toLowerCase();
+  if (!l || !t) return false;
+  // "Prologue" vs "Prologue: The Surface" or plain "Prologue" — but NOT "Chapter 1" vs
+  // "Chapter and Verse", which is a different word that merely starts the same way.
+  return t === l || t.startsWith(`${l}:`) || t.startsWith(`${l} —`) || t.startsWith(`${l} -`);
+}
+
 export async function buildEpub(opts: EpubOptions): Promise<Buffer> {
   const { title, author, markDrafts = true } = opts;
   const chapters = (opts.chapters || []).filter((c) => (c.content_text || '').trim().length > 0);
@@ -145,8 +161,9 @@ export async function buildEpub(opts: EpubOptions): Promise<Buffer> {
     const chTitle = (c.title || label).trim();
     const isDraft = c.status !== 'approved' && c.status !== 'published';
     const draftNote = markDrafts && isDraft ? '<p class="draft">Draft — not yet approved</p>\n' : '';
+    const showLabel = !labelIsRedundant(label, chTitle);
     const body =
-      `<h1><span class="num">${esc(label)}</span>${esc(chTitle)}</h1>\n` +
+      `<h1>${showLabel ? `<span class="num">${esc(label)}</span>` : ''}${esc(chTitle)}</h1>\n` +
       draftNote +
       proseToXhtml(c.content_text || '');
     docs.push({ name, xhtml: xhtmlDoc(`${label} — ${chTitle}`, body) });

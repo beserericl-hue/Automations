@@ -191,3 +191,36 @@ describe('filename', () => {
     expect(epubFilename('')).toBe('book.epub');
   });
 });
+
+describe('the chapter label does not stutter', () => {
+  // Chapter 0 of a real book is titled "Prologue: The Surface", and the heading came out as
+  // "Prologue / Prologue: The Surface". The label says where you are; when the title already says
+  // it, printing both is noise.
+  it('drops the label when the title already opens with it', async () => {
+    const { zip } = await openEpub([ch({ chapter_number: 0, title: 'Prologue: The Surface' })]);
+    const page = await zip.file('OEBPS/ch000.xhtml')!.async('string');
+    const h1 = page.match(/<h1>.*?<\/h1>/s)![0];
+    expect(h1).not.toContain('class="num"');
+    expect(h1).toContain('Prologue: The Surface');
+  });
+
+  it('drops it for a bare repeat too', async () => {
+    const { zip } = await openEpub([ch({ chapter_number: 0, title: 'Prologue' })]);
+    expect((await zip.file('OEBPS/ch000.xhtml')!.async('string')).match(/<h1>.*?<\/h1>/s)![0])
+      .not.toContain('class="num"');
+  });
+
+  it('keeps the label for an ordinary chapter', async () => {
+    const { zip } = await openEpub([ch({ chapter_number: 4, title: 'The Petition' })]);
+    const h1 = (await zip.file('OEBPS/ch004.xhtml')!.async('string')).match(/<h1>.*?<\/h1>/s)![0];
+    expect(h1).toContain('Chapter 4');
+    expect(h1).toContain('The Petition');
+  });
+
+  it('does not confuse a title that merely begins with the same word', async () => {
+    // "Chapter 1" vs "Chapter and Verse" — same opening word, different meaning. The label stays.
+    const { zip } = await openEpub([ch({ chapter_number: 1, title: 'Chapter and Verse' })]);
+    expect((await zip.file('OEBPS/ch001.xhtml')!.async('string')).match(/<h1>.*?<\/h1>/s)![0])
+      .toContain('class="num"');
+  });
+});
