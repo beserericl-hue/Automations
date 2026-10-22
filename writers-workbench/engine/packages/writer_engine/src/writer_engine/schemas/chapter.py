@@ -480,3 +480,67 @@ class BookMarketing(BaseModel):
     comparable_titles: list[str] = Field(default_factory=list)
     # Author Central bio, third person.
     author_bio: str = ""
+
+
+class AuthorProfile(BaseModel):
+    """The facts a bio is built from.
+
+    A bio cannot be written from the manuscript. Everything in one — where someone lives, what they
+    did before, what connects them to the material — is a fact about a person, and a model asked for
+    a bio without them will either invent credentials or produce "This is his debut novel", which is
+    what happened. So the facts are collected, and the writer is forbidden to add any.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    name: str = ""
+    lives: str = ""  # "Baltimore, Maryland"
+    background: str = ""  # career and expertise, especially where it touches the book
+    credentials: list[str] = Field(default_factory=list)  # degrees, awards, memberships
+    prior_work: list[str] = Field(default_factory=list)  # earlier books, articles, films
+    why_this_book: str = ""  # the connection to this material
+    personal: str = ""  # the human detail that stops a bio reading as a CV
+    links: list[str] = Field(default_factory=list)  # site, socials
+
+    def is_empty(self) -> bool:
+        """Nothing to write from."""
+        return not any(
+            [
+                self.lives,
+                self.background,
+                self.credentials,
+                self.prior_work,
+                self.why_this_book,
+                self.personal,
+            ]
+        )
+
+
+class MarketingRevision(BaseModel):
+    """One round of the review loop, kept so a change can be compared and undone."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    revision: int = 1
+    instructions: str = ""  # what the author asked to change, verbatim
+    changed: list[str] = Field(default_factory=list)  # which fields the writer touched
+    note: str = ""  # one line on what was done and why
+
+
+class BioOnly(BaseModel):
+    """Just the bio. Its own schema so the bio writer cannot wander into the blurb."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    author_bio: str = ""
+
+
+class RevisedMarketing(BookMarketing):
+    """A revision of the listing copy, carrying its own audit trail.
+
+    `changed` and `note` are read by the author to see whether the writer understood the
+    instruction — which matters more than the copy itself on the first pass round a review loop.
+    """
+
+    changed: list[str] = Field(default_factory=list)
+    note: str = ""

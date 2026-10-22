@@ -9,6 +9,7 @@ the service boots and tests run without live keys.
 from __future__ import annotations
 
 import asyncio
+import json
 import re
 import unicodedata
 from typing import Any, NamedTuple
@@ -21,14 +22,17 @@ from writer_engine.llm import ProviderNotRegistered, complete_structured, get_ro
 from writer_engine.prompt_store import compose_craft_system, seed_default_prompts
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
 from writer_engine.schemas.chapter import (
+    AuthorProfile,
     BibleEntry,
     BibleExtract,
+    BioOnly,
     BookMarketing,
     ChapterCraftQa,
     DriftFinding,
     DriftReport,
     DriftScanResult,
     GenreEval,
+    RevisedMarketing,
     SubChapterBrief,
     SubChapterPlan,
     VolumeEndingJudgement,
@@ -4067,6 +4071,115 @@ def _build_marketing_system(genre: str, volume_note: str) -> str:
     )
 
 
+def _build_bio_system() -> str:
+    """The bio writer.
+
+    Separated from the blurb writer because the rules are opposite: a blurb is written FROM the
+    manuscript, and a bio can only be written from facts about a person. Asked for a bio with no
+    facts, a model either invents a career or produces "This is his debut novel" — and the first is
+    worse than the second, because it is a false claim printed in a book.
+    """
+    return (
+        "You write an author bio for the back of a novel and for an Amazon Author Central page.\n\n"
+        "ABSOLUTE RULE: use ONLY the facts supplied. Invent nothing — no degrees, no awards, no "
+        "prior books, no professions, no place of residence. If a fact is not given, the bio simply "
+        "does not contain it. A fabricated credential is a false claim printed in a book.\n\n"
+        "Third person. Two to four sentences. Lead with what connects this author to THIS book, "
+        "because that is what a reader at the back cover wants to know. End with the human detail "
+        "if one is supplied — it is what stops a bio reading as a CV.\n\n"
+        "No 'award-winning' unless an award is named. No 'acclaimed'. No 'passionate about'. If the "
+        "supplied facts are thin, write a short honest bio rather than padding it.\n\n"
+        'Reply with strict JSON: {"author_bio": "..."}.'
+    )
+
+
+def _build_marketing_revision_system(genre: str) -> str:
+    """Revise an existing draft against the author's instructions.
+
+    Deliberately a REVISION rather than a regeneration. Asked to write it again, a model returns a
+    different blurb and the author loses the parts they had already approved — which turns a review
+    loop into a slot machine. So the previous draft is the baseline and the instructions are a diff.
+    """
+    return (
+        "You are revising the Amazon listing copy for a novel, working from a previous draft and "
+        "the author's instructions.\n\n"
+        f"GENRE: {genre or 'literary fiction'}\n\n"
+        "HOW TO REVISE:\n"
+        "- The previous draft is the baseline. CHANGE ONLY WHAT THE INSTRUCTIONS ASK FOR.\n"
+        "- Any field the instructions do not mention comes back unchanged, character for character. "
+        "The author has already approved it.\n"
+        "- If an instruction is ambiguous, make the smaller change.\n"
+        "- If an instruction cannot be followed — it asks for a claim the manuscript does not "
+        "support, or a credential that was not supplied — do not follow it. Say so in `note`.\n\n"
+        "`changed` lists exactly the field names you altered. `note` is one sentence on what you "
+        "did. Both are read by the author to see whether you understood.\n\n"
+        "Keywords stay at exactly 7 phrases, categories at most 3.\n\n"
+        'Reply with strict JSON matching BookMarketing plus {changed: [...], note: "..."}.'
+    )
+
+
+async def _op_author_bio(payload: dict) -> dict:
+    """Write the bio from supplied facts, and say plainly what is missing.
+
+    Returns `gaps` so the UI can ask for the facts rather than letting a model invent them.
+    """
+    from writer_engine.config import get_settings
+
+    profile = AuthorProfile.model_validate(payload.get("profile") or {})
+    gaps: list[str] = []
+    if not profile.name.strip():
+        gaps.append("name — the bio has nothing to call you")
+    if not profile.background.strip():
+        gaps.append("background — what you did before this book, especially if it touches the material")
+    if not profile.why_this_book.strip():
+        gaps.append("why this book — your connection to the subject; this is the sentence readers want")
+    if not profile.lives.strip():
+        gaps.append("where you live (optional, conventional)")
+    if not profile.personal.strip():
+        gaps.append("one human detail (optional) — it stops the bio reading as a CV")
+
+    if profile.is_empty():
+        return {
+            "ok": False,
+            "reason": "no facts supplied — a bio cannot be written from the manuscript",
+            "gaps": gaps,
+            "author_bio": "",
+        }
+
+    facts = [f"NAME: {profile.name}"]
+    for label, value in (
+        ("LIVES", profile.lives),
+        ("BACKGROUND", profile.background),
+        ("CONNECTION TO THIS BOOK", profile.why_this_book),
+        ("PERSONAL DETAIL", profile.personal),
+    ):
+        if value.strip():
+            facts.append(f"{label}: {value.strip()}")
+    if profile.credentials:
+        facts.append("CREDENTIALS: " + "; ".join(profile.credentials))
+    if profile.prior_work:
+        facts.append("PRIOR WORK: " + "; ".join(profile.prior_work))
+
+    router = get_router(service=STEP_NAME)
+    try:
+        bio, _resp = await complete_structured(
+            router,
+            provider="anthropic",
+            model=get_settings().model_default,
+            system=_build_bio_system()
+            + (f"\n\nThe author asks: {payload['instructions']}" if payload.get("instructions") else ""),
+            prompt="\n".join(facts),
+            schema=BioOnly,
+            max_tokens=700,
+        )
+    except ProviderNotRegistered:
+        return {"ok": False, "reason": "no provider", "gaps": gaps}
+    except ValueError as exc:
+        return {"ok": False, "reason": f"unparseable: {str(exc)[:160]}", "gaps": gaps}
+
+    return {"ok": True, "author_bio": bio.author_bio, "gaps": gaps, "facts_used": len(facts)}
+
+
 async def _op_marketing(payload: dict) -> dict:
     """Draft the listing copy from the manuscript itself.
 
@@ -4126,22 +4239,53 @@ async def _op_marketing(payload: dict) -> dict:
             "delivers.\n"
         )
 
+    # REVISION vs FIRST DRAFT. With a previous draft and instructions, this is a diff: the baseline
+    # comes back unchanged except where the author asked for a change. Regenerating instead loses
+    # the parts they had already approved, which turns a review loop into a slot machine.
+    previous = payload.get("previous") if isinstance(payload.get("previous"), dict) else None
+    instructions = str(payload.get("instructions") or "").strip()
+    revising = bool(previous and instructions)
+
     router = get_router(service=STEP_NAME)
+    # Both branches produce listing copy; the revision subclass only adds its audit trail.
+    marketing: BookMarketing
     try:
-        marketing, _resp = await complete_structured(
-            router,
-            provider="anthropic",
-            model=get_settings().model_default,
-            system=_build_marketing_system(str(ctx.get("genre_slug") or ""), volume_note),
-            prompt=(
-                f"TITLE: {ctx.get('title') or ''}\n"
-                f"AUTHOR: {author or '(not supplied — leave the bio generic)'}\n"
-                f"CHAPTERS: {len(rows)}, {sum(len(str(x.get('content_text') or '').split()) for x in rows):,} words\n\n"
-                + "\n\n".join(parts)
-            ),
-            schema=BookMarketing,
-            max_tokens=4096,
-        )
+        if revising:
+            marketing, _resp = await complete_structured(
+                router,
+                provider="anthropic",
+                model=get_settings().model_default,
+                system=_build_marketing_revision_system(str(ctx.get("genre_slug") or "")) + volume_note,
+                prompt=(
+                    "PREVIOUS DRAFT (the baseline — return fields unchanged unless the instructions "
+                    "ask otherwise):\n"
+                    + json.dumps(
+                        {k: v for k, v in (previous or {}).items() if k in BookMarketing.model_fields},
+                        indent=1,
+                    )
+                    + "\n\nTHE AUTHOR'S INSTRUCTIONS:\n"
+                    + instructions
+                    + "\n\nFor reference, the opening and closing of the manuscript:\n\n"
+                    + "\n\n".join(parts)
+                ),
+                schema=RevisedMarketing,
+                max_tokens=4096,
+            )
+        else:
+            marketing, _resp = await complete_structured(
+                router,
+                provider="anthropic",
+                model=get_settings().model_default,
+                system=_build_marketing_system(str(ctx.get("genre_slug") or ""), volume_note),
+                prompt=(
+                    f"TITLE: {ctx.get('title') or ''}\n"
+                    f"AUTHOR: {author or '(not supplied — leave the bio generic)'}\n"
+                    f"CHAPTERS: {len(rows)}, {sum(len(str(x.get('content_text') or '').split()) for x in rows):,} words\n\n"
+                    + "\n\n".join(parts)
+                ),
+                schema=BookMarketing,
+                max_tokens=4096,
+            )
     except ProviderNotRegistered:
         return {"ok": False, "reason": "no provider"}
     except ValueError as exc:
@@ -4149,6 +4293,9 @@ async def _op_marketing(payload: dict) -> dict:
         return {"ok": False, "reason": "could not parse the copywriter's answer"}
 
     out = marketing.model_dump(mode="json")
+    out["revised"] = revising
+    if revising:
+        out["instructions"] = instructions
     # KDP gives exactly seven keyword slots. Fewer wastes them; more are silently dropped.
     out["keywords"] = [k for k in out.get("keywords", []) if str(k).strip()][:7]
     out["keyword_slots_used"] = len(out["keywords"])
@@ -4192,6 +4339,7 @@ OPS = {
     "plan": _op_plan,
     "plan-volumes": _op_plan_volumes,
     "marketing": _op_marketing,
+    "author-bio": _op_author_bio,
     "rewrite": _op_rewrite,
     "repair": _op_repair,
     "qa": _op_qa,
