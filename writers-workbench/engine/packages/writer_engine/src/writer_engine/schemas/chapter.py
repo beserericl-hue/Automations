@@ -494,6 +494,10 @@ class AuthorProfile(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     name: str = ""
+    # How the bio refers to this author. Empty is a real answer, not a missing one: the writer then
+    # uses the surname rather than picking a pronoun, because guessing one is wrong about who
+    # somebody is, printed on a cover.
+    pronouns: str = ""
     lives: str = ""  # "Baltimore, Maryland"
     background: str = ""  # career and expertise, especially where it touches the book
     credentials: list[str] = Field(default_factory=list)  # degrees, awards, memberships

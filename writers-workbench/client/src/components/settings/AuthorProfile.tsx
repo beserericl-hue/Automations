@@ -18,6 +18,7 @@ import { useToast } from '../../contexts/ToastContext';
 
 interface Profile {
   pen_name: string;
+  pronouns: string;
   lives: string;
   background: string;
   credentials: string[];
@@ -33,6 +34,7 @@ interface Profile {
 
 const EMPTY: Profile = {
   pen_name: '',
+  pronouns: '',
   lives: '',
   background: '',
   credentials: [],
@@ -54,7 +56,10 @@ export default function AuthorProfile() {
     queryKey: ['author-profile'],
     queryFn: async () => {
       const res = await apiFetch<ApiEnvelope<Profile>>('/api/author/profile');
-      return res.data ?? EMPTY;
+      // Filled out against EMPTY rather than trusted as-is. A client deployed ahead of its server
+      // asks for a field the server does not send yet, and one undefined string takes the whole
+      // page down on the first .trim(). The form should be missing a box, not blank.
+      return { ...EMPTY, ...(res.data ?? {}) };
     },
     // Retrying a missing table just repeats the same answer slower.
     retry: (count, err) => (err as ApiError)?.code !== 'MIGRATION_PENDING' && count < 2,
@@ -100,6 +105,7 @@ export default function AuthorProfile() {
       a.length === b.length && a.every((v, i) => same(v, b[i]));
     return !(
       same(form.pen_name, data.pen_name) &&
+      same(form.pronouns, data.pronouns) &&
       same(form.lives, data.lives) &&
       same(form.background, data.background) &&
       same(form.why_this_book, data.why_this_book) &&
@@ -124,6 +130,7 @@ export default function AuthorProfile() {
         method: 'PUT',
         body: JSON.stringify({
           pen_name: form.pen_name,
+          pronouns: form.pronouns,
           lives: form.lives,
           background: form.background,
           credentials: form.credentials,
@@ -136,7 +143,7 @@ export default function AuthorProfile() {
       return res.data!;
     },
     onSuccess: (saved) => {
-      setForm((f) => ({ ...saved, bio: f.bio || saved.bio }));
+      setForm((f) => ({ ...EMPTY, ...saved, bio: f.bio || saved.bio }));
       void queryClient.invalidateQueries({ queryKey: ['author-profile'] });
       // Confirmed in place as well as in a toast. A toast is gone in four seconds and is easy to
       // miss while reading the form, which leaves the author unsure whether anything happened.
@@ -178,7 +185,7 @@ export default function AuthorProfile() {
       return res.data!;
     },
     onSuccess: (saved) => {
-      setForm(saved);
+      setForm({ ...EMPTY, ...saved });
       setDraft(null);
       setAsGenerated(null);
       void queryClient.invalidateQueries({ queryKey: ['author-profile'] });
@@ -232,6 +239,17 @@ export default function AuthorProfile() {
       <Section title="The byline">
         <Field label="Name to publish under" hint="A pen name is fine. This is what goes on the cover, the copyright page and the KDP listing.">
           <input value={form.pen_name} onChange={(e) => set('pen_name', e.target.value)} className={inputClass} placeholder="Eric L Beser" />
+        </Field>
+        <Field
+          label="Pronouns"
+          hint="How the bio refers to you. Leave it blank and the bio uses your surname throughout rather than guessing — a bio is third person, so without this it would have to pick one."
+        >
+          <input
+            value={form.pronouns}
+            onChange={(e) => set('pronouns', e.target.value)}
+            className={inputClass}
+            placeholder="he/him · she/her · they/them"
+          />
         </Field>
         <Field label="Where you live" hint="Conventional in a bio, and optional.">
           <input value={form.lives} onChange={(e) => set('lives', e.target.value)} className={inputClass} placeholder="Baltimore, Maryland" />

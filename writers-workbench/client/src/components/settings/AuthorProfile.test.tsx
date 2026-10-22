@@ -25,6 +25,7 @@ const mockFetch = vi.mocked(apiFetch);
 /** A profile with everything filled in except the one optional human detail — the real case. */
 const ALMOST_COMPLETE = {
   pen_name: 'Eric L Beser',
+  pronouns: '',
   lives: 'Owings Mills, Maryland',
   background: 'Thirty years in signal processing, and two years researching this subject.',
   credentials: ['MSW Social Work, University of Maryland, 1974'],
@@ -170,5 +171,36 @@ describe('what is still missing', () => {
     renderWithProviders(<AuthorProfile />);
     expect(await screen.findByRole('button', { name: 'Write my bio' })).toBeDisabled();
     expect(screen.getByText(/a name on its own is not enough/)).toBeInTheDocument();
+  });
+});
+
+describe('pronouns', () => {
+  it('offers the field, and says what happens when it is left blank', async () => {
+    renderWithProviders(<AuthorProfile />);
+    expect(await screen.findByText('Pronouns')).toBeInTheDocument();
+    expect(screen.getByText(/uses your surname throughout rather than guessing/)).toBeInTheDocument();
+  });
+
+  it('sends them with the rest of the facts', async () => {
+    renderWithProviders(<AuthorProfile />);
+    const box = await screen.findByPlaceholderText('he/him · she/her · they/them');
+    fireEvent.change(box, { target: { value: 'they/them' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save facts' }));
+    await waitFor(() => {
+      const put = mockFetch.mock.calls.find(([, o]) => (o as { method?: string })?.method === 'PUT');
+      expect(JSON.parse(String((put![1] as { body: string }).body)).pronouns).toBe('they/them');
+    });
+  });
+});
+
+describe('a server older than this client', () => {
+  it('renders the form instead of a blank page when a field is missing from the response', async () => {
+    // Exactly what a rolling deploy produces for a minute: the client asks for a field the server
+    // does not send yet. One undefined string used to take the whole page down on its first trim().
+    const { pronouns: _dropped, ...withoutPronouns } = ALMOST_COMPLETE;
+    serve(withoutPronouns);
+    renderWithProviders(<AuthorProfile />);
+    expect(await screen.findByDisplayValue('Eric L Beser')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save facts' })).toBeEnabled();
   });
 });

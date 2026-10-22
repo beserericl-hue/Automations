@@ -4093,6 +4093,10 @@ def _build_bio_system() -> str:
         "ABSOLUTE RULE: use ONLY the facts supplied. Invent nothing — no degrees, no awards, no "
         "prior books, no professions, no place of residence. If a fact is not given, the bio simply "
         "does not contain it. A fabricated credential is a false claim printed in a book.\n\n"
+        "PRONOUNS ARE A FACT LIKE ANY OTHER. Use the ones supplied. If none are supplied, use NO "
+        "third-person pronoun for the author anywhere in the bio — repeat the surname instead. "
+        "Across two to four sentences that reads perfectly well. Guessing is not wrong about what "
+        "somebody did, it is wrong about who they are, and it goes on the cover.\n\n"
         "Third person. Two to four sentences. Lead with what connects this author to THIS book, "
         "because that is what a reader at the back cover wants to know. End with the human detail "
         "if one is supplied — it is what stops a bio reading as a CV.\n\n"
@@ -4139,7 +4143,10 @@ async def _load_author_profile(user_id: str) -> dict | None:
         client = await get_supabase_admin()
         r = (
             await client.table("author_profiles_v2")
-            .select("pen_name,lives,background,credentials,prior_work,why_this_book,personal,links")
+            .select(
+                "pen_name,pronouns,lives,background,credentials,prior_work,"
+                "why_this_book,personal,links"
+            )
             .eq("user_id", user_id)
             .limit(1)
             .execute()
@@ -4153,6 +4160,7 @@ async def _load_author_profile(user_id: str) -> dict | None:
     row = rows[0]
     return {
         "name": row.get("pen_name") or "",
+        "pronouns": row.get("pronouns") or "",
         "lives": row.get("lives") or "",
         "background": row.get("background") or "",
         "credentials": row.get("credentials") or [],
@@ -4199,6 +4207,7 @@ async def _op_author_bio(payload: dict) -> dict:
 
     facts = [f"NAME: {profile.name}"]
     for label, value in (
+        ("PRONOUNS", profile.pronouns),
         ("LIVES", profile.lives),
         ("BACKGROUND", profile.background),
         ("CONNECTION TO THIS BOOK", profile.why_this_book),

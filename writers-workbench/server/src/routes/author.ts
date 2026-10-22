@@ -35,6 +35,7 @@ const TABLE = 'author_profiles_v2';
 /** The columns the client may write. `bio*` is deliberately absent — it has its own endpoint. */
 const FACT_COLUMNS = [
   'pen_name',
+  'pronouns',
   'lives',
   'background',
   'credentials',
@@ -49,6 +50,7 @@ const list = z.array(z.string().min(1).max(500)).max(25).optional();
 
 const ProfileSchema = z.object({
   pen_name: z.string().max(200).optional(),
+  pronouns: z.string().max(40).optional(),
   lives: z.string().max(300).optional(),
   background: text,
   credentials: list,
@@ -77,6 +79,7 @@ const BioApproveSchema = z.object({
 /** An empty profile is a valid state, not an error — the UI needs a form either way. */
 const EMPTY = {
   pen_name: '',
+  pronouns: '',
   lives: '',
   background: '',
   credentials: [] as string[],
@@ -137,6 +140,7 @@ function shape(row: ProfileRow): typeof EMPTY {
   const arr = (k: string): string[] => (Array.isArray(row[k]) ? (row[k] as string[]) : []);
   return {
     pen_name: str('pen_name'),
+    pronouns: str('pronouns'),
     lives: str('lives'),
     background: str('background'),
     credentials: arr('credentials'),
@@ -191,6 +195,11 @@ function gapsIn(p: typeof EMPTY): string[] {
   }
   if (!p.why_this_book.trim()) {
     gaps.push('why this book — your connection to the subject; this is the sentence readers want');
+  }
+  if (!p.pronouns.trim()) {
+    gaps.push(
+      'pronouns (optional) — without them the bio uses your surname throughout rather than guessing',
+    );
   }
   if (!p.lives.trim()) gaps.push('where you live (optional, conventional)');
   if (!p.personal.trim()) gaps.push('one human detail (optional) — it stops the bio reading as a CV');
@@ -332,6 +341,7 @@ authorRouter.post('/bio', validateBody(BioDraftSchema), async (req, res) => {
       instructions: instructions || undefined,
       profile: {
         name: profile.pen_name,
+        pronouns: profile.pronouns,
         lives: profile.lives,
         background: profile.background,
         credentials: profile.credentials,
