@@ -507,9 +507,11 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
       </Section>
 
       {/* 3. Listing copy */}
+      {/* Named for what it is rather than where it goes. "Amazon listing copy" is precise and it is
+          not what anyone searches a page for; "marketing" is the word people arrive with. */}
       <Section
-        title="Amazon listing copy"
-        subtitle="Written from the manuscript, then reviewed. Ask for a change in words, or edit any field yourself."
+        title="Marketing copy"
+        subtitle="The book's description, back cover, hook, keywords and categories — what Amazon shows a buyer. Written from the manuscript, then reviewed: ask for a change in words, or edit any field yourself."
       >
         {volumeCount > 1 ? (
           <div className="flex gap-1">

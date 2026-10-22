@@ -85,6 +85,26 @@ describe('a synchronous engine write-tool call', () => {
     expect(result.reason).toBe('no facts supplied');
   });
 
+  it('reads the sentence out of an object-shaped error, not [object Object]', async () => {
+    // media.social-posts answers this way. A caller that assumes a string shows the user
+    // "[object Object]" in place of the explanation the engine actually wrote.
+    respondWith({
+      status: 'error',
+      payload: {},
+      error: { code: 'insufficient_context', message: 'Tell me what the post is about.' },
+    });
+    await expect(callEngineWriteToolSync('media', { op: 'social-posts' })).rejects.toThrow(
+      'Tell me what the post is about.',
+    );
+  });
+
+  it('falls back to the code when an object error carries no message', async () => {
+    respondWith({ status: 'error', payload: {}, error: { code: 'insufficient_context' } });
+    await expect(callEngineWriteToolSync('media', { op: 'social-posts' })).rejects.toThrow(
+      'insufficient_context',
+    );
+  });
+
   it('surfaces a transport failure', async () => {
     respondWith({ detail: 'missing or invalid X-Service-Secret' }, false, 403);
     await expect(callEngineWriteToolSync('chapter', { op: 'author-bio' })).rejects.toThrow(/403/);

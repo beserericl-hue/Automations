@@ -724,3 +724,137 @@ publishingRouter.get('/project/:projectId/readiness', async (req, res, next) => 
 });
 
 export { marketingKey, publishingOf, PUBLISHING_DEFAULTS, type Publishing };
+
+// ------------------------------------------------------------------------------------------------
+// Promotion: the writing ABOUT the book, as opposed to the book
+// ------------------------------------------------------------------------------------------------
+//
+// Both of these existed in the engine and could only be reached by asking Eve in conversation. The
+// Social tab listed the results and said "use the chat"; the blog writer had no screen at all. That
+// is fine as a second way in and hopeless as the only one — a composer with a platform picker and
+// the book's own hook already in the box is a different proposition from remembering the sentence
+// that makes a router choose the right tool.
+
+const SOCIAL_PLATFORMS = ['twitter', 'linkedin', 'facebook', 'instagram'] as const;
+
+const SocialSchema = z.object({
+  platforms: z.array(z.enum(SOCIAL_PLATFORMS)).min(1).max(4),
+  /** What the post is about. Empty falls back to the listing copy, then to the title. */
+  about: z.string().max(4000).optional(),
+});
+
+const BlogSchema = z.object({
+  topic: z.string().min(8, 'Say what the post is about').max(500),
+  keywords: z.string().max(500).optional(),
+  target_length: z.number().int().min(300).max(5000).optional(),
+});
+
+/** The book in one paragraph, for a writer that has not read it. */
+function bookSummary(project: ProjectRow, outline: Outline): string {
+  const m = (outline[marketingKey(1)] as Record<string, unknown> | undefined) ?? {};
+  const parts = [
+    project.title,
+    String(m.hook ?? '').trim(),
+    String(m.back_cover ?? m.blurb ?? '').trim(),
+  ].filter(Boolean);
+  return parts.join('\n\n');
+}
+
+/**
+ * @openapi
+ * /publishing/project/{projectId}/social:
+ *   post:
+ *     tags: [Publishing]
+ *     summary: Write social posts about this book
+ *     description: |
+ *       Defaults to the book's own hook and back-cover copy, so the posts promise what the listing
+ *       promises. Async; the results land in the project's Social tab.
+ *     security: [{ bearerAuth: [] }]
+ */
+publishingRouter.post('/project/:projectId/social', validateBody(SocialSchema), async (req, res) => {
+  const project = await loadProject(req, res);
+  if (!project) return;
+  const body = req.body as z.infer<typeof SocialSchema>;
+  const outline = project.outline ?? {};
+  const about = (body.about ?? '').trim() || bookSummary(project, outline);
+
+  if (about.length < 3) {
+    res.status(400).json({
+      success: false,
+      error: {
+        code: 'NOTHING_TO_SAY',
+        message:
+          'Say what the post should be about, or write the listing copy first — a post generated ' +
+          'from a title alone is filler.',
+      },
+    });
+    return;
+  }
+
+  try {
+    const job = await callEngineWriteTool('media', {
+      op: 'social-posts',
+      project_id: project.id,
+      user_id: req.userId!,
+      title: project.title,
+      platforms: body.platforms,
+      summary: about,
+      async: true,
+    });
+    logger.info(
+      { userId: req.userId, projectId: project.id, platforms: body.platforms, jobId: job.job_id },
+      'publishing: social posts queued',
+    );
+    res.status(202).json({ success: true, jobId: job.job_id, engineJob: true, status: job.status ?? 'queued' });
+  } catch (err) {
+    logger.error({ err, projectId: project.id }, 'publishing: social posts failed');
+    res.status(502).json({
+      success: false,
+      error: { code: 'ENGINE_UNREACHABLE', message: err instanceof Error ? err.message : 'Engine error' },
+    });
+  }
+});
+
+/**
+ * @openapi
+ * /publishing/project/{projectId}/blog:
+ *   post:
+ *     tags: [Publishing]
+ *     summary: Write a blog post about this book or its subject
+ *     description: |
+ *       Researched and SEO-structured, in the project's genre. Async; the result lands in the
+ *       Content Library under Blog Posts.
+ *     security: [{ bearerAuth: [] }]
+ */
+publishingRouter.post('/project/:projectId/blog', validateBody(BlogSchema), async (req, res) => {
+  const project = await loadProject(req, res);
+  if (!project) return;
+  const body = req.body as z.infer<typeof BlogSchema>;
+
+  try {
+    const job = await callEngineWriteTool('chapter', {
+      op: 'blog',
+      project_id: project.id,
+      user_id: req.userId!,
+      topic: body.topic.trim(),
+      genre_slug: project.genre_slug ?? '',
+      keywords: body.keywords?.trim() || '',
+      target_length: body.target_length ?? 1500,
+      persist: true,
+      async: true,
+    });
+    logger.info(
+      { userId: req.userId, projectId: project.id, jobId: job.job_id },
+      'publishing: blog post queued',
+    );
+    res.status(202).json({ success: true, jobId: job.job_id, engineJob: true, status: job.status ?? 'queued' });
+  } catch (err) {
+    logger.error({ err, projectId: project.id }, 'publishing: blog post failed');
+    res.status(502).json({
+      success: false,
+      error: { code: 'ENGINE_UNREACHABLE', message: err instanceof Error ? err.message : 'Engine error' },
+    });
+  }
+});
+
+export { bookSummary, SOCIAL_PLATFORMS };

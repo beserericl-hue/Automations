@@ -102,7 +102,19 @@ export interface EngineStepEnvelope<T> {
   step_name?: string;
   status?: string;
   payload?: { op?: string; result?: T };
-  error?: string | null;
+  /**
+   * A string from some steps, a `{code, message, details}` object from others. Both shapes are real
+   * — `media.social-posts` returns the object form — so a caller that assumes one gets
+   * "[object Object]" in front of the user instead of the sentence the engine wrote.
+   */
+  error?: string | { code?: string; message?: string; details?: unknown } | null;
+}
+
+/** The engine's error, as a sentence worth showing someone. */
+export function engineErrorMessage(error: EngineStepEnvelope<unknown>['error']): string {
+  if (!error) return '';
+  if (typeof error === 'string') return error;
+  return error.message || error.code || 'engine error';
 }
 
 /**
@@ -126,8 +138,9 @@ export async function callEngineWriteToolSync<T>(
     async: false,
   })) as EngineStepEnvelope<T>;
   if (envelope.error) {
+    const message = engineErrorMessage(envelope.error);
     logger.error({ tool, op: body.op, error: envelope.error }, 'engine-hub: sync write tool errored');
-    throw new Error(String(envelope.error));
+    throw new Error(message);
   }
   if (envelope.payload?.result === undefined) {
     logger.error(

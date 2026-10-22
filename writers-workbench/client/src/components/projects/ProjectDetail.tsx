@@ -6,6 +6,7 @@ import { useUser } from '../../contexts/UserContext';
 import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import ExportDialog from '../export/ExportDialog';
 import PublishingPanel from '../publishing/PublishingPanel';
+import PromotionComposer from '../publishing/PromotionComposer';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import ProjectEditForm from './ProjectEditForm';
 import ImageGallery from '../images/ImageGallery';
@@ -30,7 +31,7 @@ const tabLabels: Record<Tab, string> = {
   qa: 'Q/A',
   bible: 'Story Bible',
   art: 'Art',
-  social: 'Social',
+  social: 'Promotion',
   research: 'Research',
   cost: 'Cost',
   export: 'Export',
@@ -432,7 +433,22 @@ export default function ProjectDetail() {
         {activeTab === 'qa' && <QATab chapters={chapters} qaByChapter={qaByChapter} userId={userId!} />}
         {activeTab === 'bible' && <BibleTab entries={bibleEntries} projectId={id!} />}
         {activeTab === 'art' && <ArtTab projectId={id!} />}
-        {activeTab === 'social' && <SocialTab projectId={id!} />}
+        {activeTab === 'social' && (
+          <SocialTab
+            projectId={id!}
+            projectTitle={project.title}
+            userId={userId}
+            // The listing copy lives on the outline under a reserved key the typed shape does not
+            // describe, because it is written by the engine rather than by the outline editor.
+            marketing={
+              ((outline as unknown as Record<string, unknown> | null)?._marketing as {
+                hook?: string;
+                back_cover?: string;
+                blurb?: string;
+              }) ?? null
+            }
+          />
+        )}
         {activeTab === 'research' && <ResearchTab reports={researchReports} />}
         {activeTab === 'cost' && <CostDashboard projectId={id} />}
         {activeTab === 'export' && (
@@ -1577,13 +1593,36 @@ function ArtTab({ projectId }: { projectId: string }) {
   );
 }
 
-function SocialTab({ projectId }: { projectId: string }) {
+// Was a read-only list that told you to go and use the chat. The composer is the missing half: the
+// engine could always write these, and nothing on the page could ask it to.
+function SocialTab({
+  projectId,
+  projectTitle,
+  userId,
+  marketing,
+}: {
+  projectId: string;
+  projectTitle: string;
+  userId?: string;
+  marketing?: { hook?: string; back_cover?: string; blurb?: string } | null;
+}) {
+  const defaultAbout = [marketing?.hook, marketing?.back_cover || marketing?.blurb]
+    .map((s) => (s ?? '').trim())
+    .filter(Boolean)
+    .join('\n\n');
+
   return (
-    <div>
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Social Media Posts</h3>
+    <div className="space-y-5">
+      <PromotionComposer
+        projectId={projectId}
+        projectTitle={projectTitle}
+        userId={userId}
+        defaultAbout={defaultAbout || undefined}
+      />
+      <div>
+        <h3 className="mb-3 text-lg font-semibold text-gray-900 dark:text-white">Posts so far</h3>
+        <SocialMediaPanel projectId={projectId} />
       </div>
-      <SocialMediaPanel projectId={projectId} />
     </div>
   );
 }
