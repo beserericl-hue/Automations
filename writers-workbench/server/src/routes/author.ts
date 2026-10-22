@@ -157,6 +157,32 @@ function shape(row: ProfileRow): typeof EMPTY {
  * author is the only one who can close these gaps. The engine returns its own list; this one is for
  * the form, before anything is generated.
  */
+/**
+ * Is there anything here a bio could actually be written from?
+ *
+ * The name is excluded on purpose, and this mirrors `AuthorProfile.is_empty()` in the engine. A bio
+ * built from a name alone is a bio about nobody, and the gap gets filled with a plausible career —
+ * which is exactly the failure this whole screen exists to prevent. Exported so the rule has one
+ * definition and the UI can disable the button for the same reason the server would refuse.
+ */
+export function hasSubstantiveFacts(p: {
+  lives: string;
+  background: string;
+  why_this_book: string;
+  personal: string;
+  credentials: string[];
+  prior_work: string[];
+}): boolean {
+  return Boolean(
+    p.lives.trim() ||
+      p.background.trim() ||
+      p.why_this_book.trim() ||
+      p.personal.trim() ||
+      p.credentials.length ||
+      p.prior_work.length,
+  );
+}
+
 function gapsIn(p: typeof EMPTY): string[] {
   const gaps: string[] = [];
   if (!p.pen_name.trim()) gaps.push('the name to publish under — the bio has nothing to call you');
@@ -275,23 +301,18 @@ authorRouter.post('/bio', validateBody(BioDraftSchema), async (req, res) => {
       if (override) whyThisBook = override;
     }
 
-    const hasAnyFact = Boolean(
-      profile.pen_name.trim() ||
-        profile.lives.trim() ||
-        profile.background.trim() ||
-        whyThisBook.trim() ||
-        profile.personal.trim() ||
-        profile.credentials.length ||
-        profile.prior_work.length,
-    );
-    if (!hasAnyFact) {
+    // A NAME IS NOT A FACT. Deliberately excluded, matching the engine's own rule: given only a
+    // name, a bio writer has nothing to say about the person and fills the gap with a career. So
+    // the gate is the same on both sides — otherwise the button is enabled, the request is sent,
+    // and the engine refuses it, which reads as a bug rather than as the answer it is.
+    if (!hasSubstantiveFacts({ ...profile, why_this_book: whyThisBook })) {
       res.status(400).json({
         success: false,
         error: {
           code: 'NO_FACTS',
           message:
-            'A bio cannot be written from the manuscript. Fill in at least your name and what ' +
-            'connects you to this book.',
+            'A bio cannot be written from the manuscript, and a name on its own is not enough to ' +
+            'write one from. Add your background or what connects you to this book.',
         },
         data: { gaps: gapsIn(profile) },
       });

@@ -166,10 +166,14 @@ export default function AuthorProfile() {
     );
   }
 
+  // A name is not a fact — the same rule the server and the engine both apply. A bio written from
+  // a name alone is a bio about nobody, and the gap gets filled with a career. So the button stays
+  // disabled for the reason the request would be refused, rather than refusing after the click.
   const hasFacts = Boolean(
-    form.pen_name.trim() ||
+    form.lives.trim() ||
       form.background.trim() ||
       form.why_this_book.trim() ||
+      form.personal.trim() ||
       form.credentials.length ||
       form.prior_work.length,
   );
@@ -320,7 +324,8 @@ export default function AuthorProfile() {
           </button>
           {!hasFacts ? (
             <span className="text-xs text-gray-500 dark:text-gray-400">
-              Fill in your name and why this book first — a bio cannot be written from the manuscript.
+              Fill in your background or why this book first. A bio cannot be written from the
+              manuscript, and a name on its own is not enough to write one from.
             </span>
           ) : null}
         </div>

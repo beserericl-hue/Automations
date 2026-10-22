@@ -15,6 +15,7 @@ import { describe, it, expect } from 'vitest';
 import JSZip from 'jszip';
 import { buildKdpPackage, listingText, type PackageSettings } from '../lib/kdp-package.js';
 import { spineWidthInches } from '../lib/cover.js';
+import { hasSubstantiveFacts } from '../routes/author.js';
 import {
   assessReadiness,
   marketingKey,
@@ -380,5 +381,36 @@ describe('readiness — what stops an upload and what only costs reach', () => {
     const v = assessReadiness({ ...READY, outline: { _marketing: READY.outline._marketing } });
     expect(v.gaps.join(' ')).toContain('volume plan');
     expect(v.volume_count).toBe(1);
+  });
+});
+
+describe('what counts as enough to write a bio from', () => {
+  const none = {
+    lives: '',
+    background: '',
+    why_this_book: '',
+    personal: '',
+    credentials: [] as string[],
+    prior_work: [] as string[],
+  };
+
+  it('a name on its own is not enough — that is where invented careers come from', () => {
+    // The name is not even a parameter here, which is the point: it cannot tip the answer.
+    expect(hasSubstantiveFacts(none)).toBe(false);
+  });
+
+  it.each([
+    ['lives', { ...none, lives: 'Baltimore, Maryland' }],
+    ['background', { ...none, background: 'Thirty years in signal processing.' }],
+    ['why this book', { ...none, why_this_book: 'He grew up a mile from the mound.' }],
+    ['a human detail', { ...none, personal: 'He keeps bees.' }],
+    ['a credential', { ...none, credentials: ['MS, Johns Hopkins'] }],
+    ['prior work', { ...none, prior_work: ['The Burial Mound (2024)'] }],
+  ])('any one real fact is: %s', (_label, facts) => {
+    expect(hasSubstantiveFacts(facts)).toBe(true);
+  });
+
+  it('whitespace is not a fact', () => {
+    expect(hasSubstantiveFacts({ ...none, background: '   \n  ' })).toBe(false);
   });
 });
