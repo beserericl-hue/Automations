@@ -3916,6 +3916,7 @@ async def _op_plan_volumes(payload: dict) -> dict:
     from writer_engine.supabase.client import get_supabase_admin
     from writer_engine.volumes import (
         ChapterInfo,
+        compare_trims,
         minimum_volumes,
         plan_volumes,
         split_candidates,
@@ -3990,6 +3991,9 @@ async def _op_plan_volumes(payload: dict) -> dict:
     plan = plan_volumes(chapters, trim=trim, volume_count=int(requested) if requested else None)
     out = plan.as_dict()
     out["judged_candidates"] = judged
+    # Every trim and what it costs, so the choice is made with the consequence visible rather than
+    # inherited from a default. Trim decides how many books this becomes.
+    out["trim_options"] = compare_trims(chapters)
 
     if payload.get("persist") and plan.volumes:
         try:

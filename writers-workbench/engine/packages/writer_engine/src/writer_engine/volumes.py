@@ -170,6 +170,32 @@ class VolumePlan:
         }
 
 
+def compare_trims(chapters: list[ChapterInfo], *, cap: int = SAFE_MAX_PAGES) -> list[dict[str, Any]]:
+    """Every trim size, with what it costs: total pages, how many volumes, pages per volume.
+
+    Trim is the author's choice and it is not only an aesthetic one — it decides how many books
+    this becomes. A 600,000-word manuscript is three volumes at 6x9 and may be two at 6.69x9.61,
+    and that is a decision about the shape of the series, not about paper. So the planner shows the
+    consequence rather than quietly defaulting.
+    """
+    words = sum(c.words for c in chapters)
+    out: list[dict[str, Any]] = []
+    for trim in WORDS_PER_PAGE:
+        total = estimate_pages(words, len(chapters), trim)
+        vols = minimum_volumes(chapters, trim, cap)
+        out.append(
+            {
+                "trim": trim,
+                "words_per_page": words_per_page(trim),
+                "total_pages_if_one_volume": total,
+                "minimum_volumes": vols,
+                "approx_pages_per_volume": int(total / vols) if vols else total,
+                "fits_one_volume": total <= KDP_MAX_PAGES,
+            }
+        )
+    return sorted(out, key=lambda r: (r["minimum_volumes"], r["trim"]))
+
+
 def minimum_volumes(chapters: list[ChapterInfo], trim: str, cap: int = SAFE_MAX_PAGES) -> int:
     """Fewest volumes the page cap allows. One is the answer for most books."""
     total = estimate_pages(sum(c.words for c in chapters), len(chapters), trim)
@@ -334,6 +360,7 @@ __all__ = [
     "ChapterInfo",
     "Volume",
     "VolumePlan",
+    "compare_trims",
     "estimate_pages",
     "minimum_volumes",
     "plan_volumes",

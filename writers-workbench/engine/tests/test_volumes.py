@@ -13,7 +13,9 @@ from itertools import pairwise
 from writer_engine.volumes import (
     KDP_MAX_PAGES,
     SAFE_MAX_PAGES,
+    WORDS_PER_PAGE,
     ChapterInfo,
+    compare_trims,
     estimate_pages,
     minimum_volumes,
     plan_volumes,
@@ -142,3 +144,25 @@ class TestCandidateShortlist:
         cands = split_candidates(chapters, trim="6x9", volume_count=3)
         assert 0 < len(cands) < 60
         assert all(0 <= i < len(chapters) for i in cands)
+
+
+class TestTrimIsAChoiceWithAConsequence:
+    """Trim is not only an aesthetic decision — it decides how many books the manuscript becomes."""
+
+    def test_it_reports_every_trim(self) -> None:
+        rows = compare_trims([ch(i) for i in range(1, 97)])
+        assert {r["trim"] for r in rows} == set(WORDS_PER_PAGE)
+
+    def test_a_larger_trim_needs_fewer_or_equal_volumes(self) -> None:
+        rows = {r["trim"]: r for r in compare_trims([ch(i) for i in range(1, 97)])}
+        assert rows["6.69x9.61"]["minimum_volumes"] <= rows["5x8"]["minimum_volumes"]
+
+    def test_it_says_outright_whether_one_volume_is_possible(self) -> None:
+        long_book = compare_trims([ch(i) for i in range(1, 97)])
+        assert all(r["fits_one_volume"] is False for r in long_book)
+        short_book = compare_trims([ch(i, 4000) for i in range(1, 16)])
+        assert any(r["fits_one_volume"] for r in short_book)
+
+    def test_fewest_volumes_is_listed_first(self) -> None:
+        rows = compare_trims([ch(i) for i in range(1, 97)])
+        assert rows[0]["minimum_volumes"] <= rows[-1]["minimum_volumes"]
