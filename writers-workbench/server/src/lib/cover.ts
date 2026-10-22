@@ -145,6 +145,57 @@ function glyphPath(
   return { data: '', font };
 }
 
+/**
+ * One line of copy as glyph outlines, laid out A CHARACTER AT A TIME.
+ *
+ * Two separate opentype.js faults are avoided here, both found by bisecting real copy:
+ *
+ *  1. WHOLE-STRING layout breaks on this variable font past roughly 47 characters — it emits a
+ *     non-finite coordinate, librsvg stops parsing at it, and the rest of the cover silently
+ *     vanishes. Per-character layout does not. (The front of the jacket has always been
+ *     per-character, which is why it worked while the back-cover blurb lost two of three lines.)
+ *  2. FRACTIONAL x positions trigger the same fault on individual glyphs: laying out three real
+ *     lines of blurb, 8 of 187 glyphs came back non-finite at positions like x=967.10, and none at
+ *     all once x was rounded. So the pen position is rounded at every glyph. At 300dpi that moves a
+ *     letter by 1/300 of an inch, which is nothing, and it removes the fault completely.
+ */
+function lineToPaths(font: Glyphable, text: string, x: number, y: number, size: number): string[] {
+  const out: string[] = [];
+  let cursor = x;
+  const baseline = Math.round(y);
+  for (const ch of text) {
+    if (ch !== ' ') {
+      const d = font.getPath(ch, Math.round(cursor), baseline, size).toPathData(2);
+      if (!BAD_COORD.test(d)) out.push(d);
+    }
+    cursor += font.getAdvanceWidth(ch, size);
+  }
+  return out;
+}
+
+/**
+ * A FRESHLY PARSED font instance.
+ *
+ * opentype.js carries state between calls on a variable font, and mixing sizes across calls on one
+ * instance intermittently yields a non-finite coordinate. The front-of-jacket composer solved that
+ * by parsing per line; the back-cover copy did not, and two of its three blurb lines were dropped
+ * by the guard — a cover that printed with no blurb on it. One helper now, used by both.
+ */
+function newFontInstance(): Glyphable | null {
+  if (!parseCache || !fontBytes) return fontCache ?? null;
+  try {
+    const g = parseCache(new Uint8Array(fontBytes).buffer);
+    try {
+      g.variation?.set({ wght: 300 });
+    } catch {
+      /* a non-variable build renders heavier, not broken */
+    }
+    return g;
+  } catch {
+    return fontCache ?? null;
+  }
+}
+
 /** Glyph outlines for one centred, letter-spaced line. Returns SVG path data. */
 function trackedLine(
   fontRef: { current: Glyphable },
@@ -316,6 +367,220 @@ export async function composeCover(opts: ComposeCoverOptions): Promise<Buffer | 
   } catch (err) {
     // Never fail an export over the cover.
     logger.warn({ err }, 'cover: composition failed, falling back to raw art');
+    return null;
+  }
+}
+
+// =====================================================================
+// The print cover wrap
+// =====================================================================
+// A paperback cover is ONE image: back cover, spine and front cover laid side by side, with bleed
+// on all four outside edges. Three separate files is the commonest thing a first-time KDP uploader
+// gets wrong.
+//
+// Two numbers decide whether it prints correctly, and both are unforgiving:
+//
+//  - SPINE WIDTH = page count x paper thickness. It cannot be estimated, because being 2mm out puts
+//    the title off-centre on a physical object. This is why the interior PDF is generated first: its
+//    page count is the input here.
+//  - THE BARCODE ZONE. KDP prints a barcode into a 2" x 1.2" area at the bottom right of the back
+//    cover. Anything underneath it is covered up, so that rectangle is left clear deliberately
+//    rather than by luck.
+
+/** Paper thickness per page, in inches. KDP's published figures. */
+export const PAPER_THICKNESS = {
+  white: 0.002252,
+  cream: 0.0025,
+  colour: 0.0037,
+} as const;
+
+export type PaperStock = keyof typeof PAPER_THICKNESS;
+
+export const BLEED_IN = 0.125;
+/** KDP's reserved barcode area, bottom right of the back cover. */
+export const BARCODE_W_IN = 2.0;
+export const BARCODE_H_IN = 1.2;
+/** Clearance KDP wants around the barcode and the trim edges. */
+export const SAFE_MARGIN_IN = 0.25;
+
+export function spineWidthInches(pageCount: number, paper: PaperStock = 'white'): number {
+  return pageCount * PAPER_THICKNESS[paper];
+}
+
+/**
+ * KDP will not print text on the spine of a book under this many pages.
+ *
+ * Stated in PAGES because that is how the rule is stated — an earlier version of this expressed it
+ * as an inch threshold and got it wrong by half, which would have put type on a spine too thin to
+ * carry it.
+ */
+export const MIN_SPINE_TEXT_PAGES = 100;
+
+export interface CoverWrapOptions {
+  art: Buffer;
+  title: string;
+  author: string;
+  /** From the generated interior. Never an estimate. */
+  pageCount: number;
+  trimWidthIn: number;
+  trimHeightIn: number;
+  paper?: PaperStock;
+  /** Back-cover copy. Blank lines separate paragraphs. */
+  blurb?: string;
+  /** One line under the blurb. */
+  authorBio?: string;
+  volumeLabel?: string;
+}
+
+export interface CoverWrapResult {
+  png: Buffer;
+  widthIn: number;
+  heightIn: number;
+  spineIn: number;
+  spineCarriesText: boolean;
+  dpi: number;
+}
+
+/**
+ * Compose the full wrap at 300dpi.
+ *
+ * Returned as PNG: KDP accepts PDF or JPEG for covers, and a lossless raster is the honest
+ * intermediate — the caller wraps it in a PDF at the exact trim so no scaling happens anywhere.
+ */
+export async function composeCoverWrap(opts: CoverWrapOptions): Promise<CoverWrapResult | null> {
+  const {
+    art, title, author, pageCount, trimWidthIn, trimHeightIn, paper = 'white',
+  } = opts;
+  if (!art?.length || pageCount <= 0) return null;
+  const DPI = 300;
+  const spineIn = spineWidthInches(pageCount, paper);
+  const widthIn = trimWidthIn * 2 + spineIn + BLEED_IN * 2;
+  const heightIn = trimHeightIn + BLEED_IN * 2;
+  const W = Math.round(widthIn * DPI);
+  const H = Math.round(heightIn * DPI);
+  const px = (inches: number) => Math.round(inches * DPI);
+
+  try {
+    type SharpFn = (input?: Buffer | Record<string, unknown>) => {
+      resize: (w: number, h: number, o?: Record<string, unknown>) => { toBuffer(): Promise<Buffer> };
+      composite: (c: Record<string, unknown>[]) => { png: () => { toBuffer(): Promise<Buffer> } };
+    };
+    const mod = (await import('sharp')) as unknown as { default?: SharpFn };
+    const sharp = (mod.default ?? (mod as unknown as SharpFn)) as SharpFn;
+    const font = await loadFont();
+    if (!font) return null;
+
+    const frontLeft = px(BLEED_IN + trimWidthIn + spineIn);
+    const frontW = px(trimWidthIn);
+    // The front of the wrap is the SAME jacket as the ebook cover — title, author and all. Placing
+    // the raw art here produced a paperback whose front carried no title, while the ebook of the
+    // same book did. Falling back to the art is better than no cover, but it is a fallback.
+    const jacket = await composeCover({
+      art,
+      title: opts.volumeLabel ? `${title}` : title,
+      author,
+    });
+    const artBuf = await sharp(jacket ?? art)
+      .resize(frontW, px(trimHeightIn), { fit: 'cover' })
+      .toBuffer();
+
+    // Back-cover text, set as glyph outlines for the same reason the front is: no system fonts.
+    const safe = px(SAFE_MARGIN_IN + BLEED_IN);
+    const backW = px(trimWidthIn) - safe * 2;
+    const paras = (opts.blurb || '').split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+    const lines: string[] = [];
+    const SIZE = 34;
+    for (const p of paras) {
+      const words = p.split(/\s+/);
+      let line = '';
+      for (const w of words) {
+        const trial = line ? `${line} ${w}` : w;
+        if (font.getAdvanceWidth(trial, SIZE) > backW) {
+          lines.push(line);
+          line = w;
+        } else line = trial;
+      }
+      if (line) lines.push(line);
+      lines.push('');
+    }
+    // The barcode zone is a hard floor for the text block.
+    const barcodeTop = H - px(BLEED_IN + SAFE_MARGIN_IN + BARCODE_H_IN) - px(0.15);
+    const maxLines = Math.max(0, Math.floor((barcodeTop - px(BLEED_IN + 1.2)) / (SIZE * 1.42)));
+    const shown = lines.slice(0, maxLines);
+
+    const paths: string[] = [];
+    let dropped = 0;
+    // Its OWN instance. By this point the shared one has laid out the jacket at 190, 132 and 76pt,
+    // and mixing sizes across a single opentype.js instance is what corrupts its variable-font
+    // state. The back cover is a different size again, so it starts clean.
+    const backFont = newFontInstance() ?? font;
+    let y = px(BLEED_IN + 1.2);
+    for (const line of shown) {
+      if (line) {
+        const glyphs = lineToPaths(backFont, line, safe, y, SIZE);
+        const expected = [...line].filter((c) => c !== ' ').length;
+        if (glyphs.length < expected) dropped += expected - glyphs.length;
+        paths.push(...glyphs);
+      }
+      y += SIZE * 1.42;
+    }
+    if (opts.authorBio?.trim()) {
+      const bio = opts.authorBio.trim().slice(0, 120);
+      const glyphs = lineToPaths(newFontInstance() ?? font, bio, safe, barcodeTop - SIZE, SIZE * 0.82);
+      const expected = [...bio].filter((c) => c !== ' ').length;
+      if (glyphs.length < expected) dropped += expected - glyphs.length;
+      paths.push(...glyphs);
+    }
+    // A back cover missing half its blurb is worse than one with none: it looks like a printing
+    // fault rather than a choice. Refuse, and let the caller fall back.
+    if (dropped > 0) {
+      logger.warn({ dropped, title }, 'cover wrap: back-cover copy lost lines, refusing the wrap');
+      return null;
+    }
+
+    // Spine type only when the spine is thick enough to carry it.
+    const spineCarriesText = pageCount >= MIN_SPINE_TEXT_PAGES;
+    const spineX = px(BLEED_IN + trimWidthIn);
+    const spineCentre = spineX + px(spineIn) / 2;
+    let spineSvg = '';
+    if (spineCarriesText) {
+      // Title, volume, then author — the order a reader scans a shelf in.
+      const label =
+        `${title}${opts.volumeLabel ? `  ·  ${opts.volumeLabel}` : ''}` +
+        `${author ? `  ·  ${author}` : ''}`;
+      const size = Math.min(px(spineIn) * 0.42, 46);
+      const sf = newFontInstance() ?? font;
+      const w = [...label].reduce((a, c) => a + sf.getAdvanceWidth(c, size), 0);
+      const d = lineToPaths(sf, label, 0, 0, size).join(' ');
+      if (d) {
+        // Rotated 90deg: spine type runs top-to-bottom on an English-language book.
+        spineSvg =
+          `<g transform="translate(${spineCentre + size * 0.35}, ${H / 2 - w / 2}) rotate(90)">` +
+          `<path d="${d}" fill="${INK}"/></g>`;
+      }
+    }
+
+    const overlay = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">` +
+        `<rect width="${W}" height="${H}" fill="none"/>` +
+        (paths.length ? `<path d="${paths.join(' ')}" fill="${INK}"/>` : '') +
+        spineSvg +
+        '</svg>',
+    );
+
+    const png = await sharp({
+      create: { width: W, height: H, channels: 3, background: BG },
+    })
+      .composite([
+        { input: artBuf, top: px(BLEED_IN), left: frontLeft },
+        { input: overlay, top: 0, left: 0 },
+      ])
+      .png()
+      .toBuffer();
+
+    return { png, widthIn, heightIn, spineIn, spineCarriesText, dpi: DPI };
+  } catch (err) {
+    logger.warn({ err }, 'cover wrap: composition failed');
     return null;
   }
 }
