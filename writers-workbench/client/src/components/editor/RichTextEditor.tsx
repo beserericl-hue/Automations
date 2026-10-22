@@ -2,10 +2,11 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState, forwardRef, useImperativeHandle } from 'react';
 import { UNSAFE_DataRouterContext } from 'react-router-dom';
 import { useContext } from 'react';
 import EditorToolbar from './EditorToolbar';
+import { findInDoc, RevealHighlight, revealPluginKey, REVEAL_CLASS } from './RevealHighlight';
 
 interface RichTextEditorProps {
   content: string;
@@ -14,7 +15,21 @@ interface RichTextEditorProps {
   placeholder?: string;
 }
 
-export default function RichTextEditor({ content, onChange, editable = true, placeholder = 'Start writing...' }: RichTextEditorProps) {
+/** What a review panel can ask the editor to do: show me this passage. */
+export interface RichTextEditorHandle {
+  /**
+   * Scroll a quoted passage into view and mark it. Returns 'exact' when the quote was found
+   * character for character, 'approximate' when only its opening matched — the chapter has been
+   * edited since the quote was taken — and 'missing' when it is not there at all.
+   */
+  reveal: (quote: string) => 'exact' | 'approximate' | 'missing';
+  clearReveal: () => void;
+}
+
+const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(function RichTextEditor(
+  { content, onChange, editable = true, placeholder = 'Start writing...' },
+  ref,
+) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [wordCount, setWordCount] = useState(0);
   const [isDirty, setIsDirty] = useState(false);
@@ -29,6 +44,7 @@ export default function RichTextEditor({ content, onChange, editable = true, pla
         openOnClick: false,
         HTMLAttributes: { class: 'text-brand-600 underline hover:text-brand-700' },
       }),
+      RevealHighlight,
     ],
     content,
     editable,
@@ -103,6 +119,44 @@ export default function RichTextEditor({ content, onChange, editable = true, pla
     };
   }, []);
 
+  /**
+   * Show a passage.
+   *
+   * The transaction carries only decoration metadata, so `docChanged` stays false: the chapter does
+   * not go dirty and the two-second auto-save is not armed by looking at something.
+   *
+   * The scroll waits a frame because the decoration's element does not exist until ProseMirror has
+   * rendered the new decoration set.
+   */
+  const reveal = useCallback(
+    (quote: string): 'exact' | 'approximate' | 'missing' => {
+      if (!editor || !quote.trim()) return 'missing';
+      const hit = findInDoc(editor.state.doc, quote);
+      if (!hit) {
+        editor.view.dispatch(editor.state.tr.setMeta(revealPluginKey, null));
+        return 'missing';
+      }
+      editor.view.dispatch(
+        editor.state.tr.setMeta(revealPluginKey, { from: hit.from, to: hit.to }),
+      );
+      requestAnimationFrame(() => {
+        const el = editor.view.dom.querySelector(`.${REVEAL_CLASS}`);
+        // `center` rather than `start`: the whole point is reading the sentence against the ones
+        // around it, and a passage pinned to the top of the pane has no "before" to read.
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+      return hit.exact ? 'exact' : 'approximate';
+    },
+    [editor],
+  );
+
+  const clearReveal = useCallback(() => {
+    if (!editor) return;
+    editor.view.dispatch(editor.state.tr.setMeta(revealPluginKey, null));
+  }, [editor]);
+
+  useImperativeHandle(ref, () => ({ reveal, clearReveal }), [reveal, clearReveal]);
+
   const saveNow = useCallback(() => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
@@ -128,4 +182,6 @@ export default function RichTextEditor({ content, onChange, editable = true, pla
       </div>
     </div>
   );
-}
+});
+
+export default RichTextEditor;

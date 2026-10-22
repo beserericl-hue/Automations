@@ -35,3 +35,29 @@
   pointer-events: none;
   height: 0;
 }
+
+/* The passage a review finding points at, marked while it is being read.
+   A decoration, not a mark: it is never part of the document and never reaches the export.
+   Warm and low-contrast on purpose — the prose has to stay readable through it, because the whole
+   reason for scrolling here is to judge the flagged sentence against the ones around it. */
+.ProseMirror .reveal-highlight {
+  background-color: rgba(250, 204, 21, 0.28);
+  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.28);
+  border-radius: 2px;
+  animation: reveal-pulse 1.1s ease-out 1;
+}
+
+:is(.dark) .ProseMirror .reveal-highlight {
+  background-color: rgba(250, 204, 21, 0.22);
+  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.22);
+}
+
+/* One pulse on arrival, so a second click on the same finding still reads as a response. */
+@keyframes reveal-pulse {
+  0%   { background-color: rgba(250, 204, 21, 0.70); }
+  100% { background-color: rgba(250, 204, 21, 0.28); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ProseMirror .reveal-highlight { animation: none; }
+}

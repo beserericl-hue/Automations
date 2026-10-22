@@ -48,8 +48,17 @@ interface AnnotationsResponse {
   };
 }
 
+/** What the editor pane can be asked to do with a quoted passage. */
+export type RevealResult = 'exact' | 'approximate' | 'missing';
+
 interface AnnotationsPanelProps {
   contentId: string;
+  /**
+   * Scroll the manuscript to a quoted passage and mark it. Optional, because the panel is also
+   * rendered in places with no editor beside it — without one, the rows are simply not clickable
+   * rather than clickable and inert.
+   */
+  onReveal?: (quote: string) => RevealResult;
 }
 
 // Sprint 8: routes through apiFetch so the X-Impersonate-User header is
@@ -87,8 +96,20 @@ async function dismissAnnotation(args: {
   });
 }
 
-export default function AnnotationsPanel({ contentId }: AnnotationsPanelProps) {
+export default function AnnotationsPanel({ contentId, onReveal }: AnnotationsPanelProps) {
   const queryClient = useQueryClient();
+  // Which finding the manuscript is currently showing, and how well its quote matched.
+  const [shown, setShown] = useState<{ id: string; result: RevealResult } | null>(null);
+
+  const reveal = (a: UnifiedAnnotation): void => {
+    if (!onReveal) return;
+    const quote = a.evidence_quote || a.suggestion?.target_text || '';
+    if (!quote.trim()) {
+      setShown({ id: a.id, result: 'missing' });
+      return;
+    }
+    setShown({ id: a.id, result: onReveal(quote) });
+  };
   const { data, isLoading, error } = useQuery({
     queryKey: ['chapter-annotations', contentId],
     queryFn: () => fetchAnnotations(contentId),
@@ -171,6 +192,8 @@ export default function AnnotationsPanel({ contentId }: AnnotationsPanelProps) {
             onDismiss={(a) => dismiss.mutate({ contentId, annotationId: a.id, source: a.source })}
             applyState={apply}
             dismissState={dismiss}
+            onReveal={onReveal ? reveal : undefined}
+            shown={shown}
           />
         )}
         {craftAnnotations.length > 0 && (
@@ -184,6 +207,8 @@ export default function AnnotationsPanel({ contentId }: AnnotationsPanelProps) {
             onDismiss={(a) => dismiss.mutate({ contentId, annotationId: a.id, source: a.source })}
             applyState={apply}
             dismissState={dismiss}
+            onReveal={onReveal ? reveal : undefined}
+            shown={shown}
           />
         )}
         {genreAnnotations.length > 0 && (
@@ -197,6 +222,8 @@ export default function AnnotationsPanel({ contentId }: AnnotationsPanelProps) {
             onDismiss={(a) => dismiss.mutate({ contentId, annotationId: a.id, source: a.source })}
             applyState={apply}
             dismissState={dismiss}
+            onReveal={onReveal ? reveal : undefined}
+            shown={shown}
           />
         )}
       </div>
@@ -212,6 +239,8 @@ function SourceSection({
   onDismiss,
   applyState,
   dismissState,
+  onReveal,
+  shown,
 }: {
   title: string;
   description: string;
@@ -220,6 +249,8 @@ function SourceSection({
   onDismiss: (a: UnifiedAnnotation) => void;
   applyState: { isPending: boolean; isError: boolean; error: unknown; variables?: { annotationId?: string } };
   dismissState: { isPending: boolean; variables?: { annotationId?: string } };
+  onReveal?: (a: UnifiedAnnotation) => void;
+  shown: { id: string; result: RevealResult } | null;
 }) {
   return (
     <div>
@@ -237,6 +268,8 @@ function SourceSection({
             applyPending={applyState.isPending && applyState.variables?.annotationId === a.id}
             applyError={applyState.isError && applyState.variables?.annotationId === a.id ? (applyState.error as Error)?.message : undefined}
             dismissPending={dismissState.isPending && dismissState.variables?.annotationId === a.id}
+            onReveal={onReveal ? () => onReveal(a) : undefined}
+            revealed={shown?.id === a.id ? shown.result : null}
           />
         ))}
       </ul>
@@ -251,6 +284,8 @@ function AnnotationRow({
   applyPending,
   applyError,
   dismissPending,
+  onReveal,
+  revealed,
 }: {
   annotation: UnifiedAnnotation;
   onApply: (replacementText?: string) => void;
@@ -258,6 +293,8 @@ function AnnotationRow({
   applyPending: boolean;
   applyError?: string;
   dismissPending: boolean;
+  onReveal?: () => void;
+  revealed: RevealResult | null;
 }) {
   const canApply = annotation.suggestion?.action === 'replace' && !!annotation.suggestion.target_text;
   // null = not editing. The draft starts from the model's wording when there is one, otherwise from
@@ -267,8 +304,15 @@ function AnnotationRow({
   const suggested = annotation.suggestion?.replacement_text ?? '';
   const delta = draft !== null ? draft.length - target.length : 0;
 
+  const quote = annotation.evidence_quote || target;
+  const canReveal = Boolean(onReveal && quote.trim());
+
   return (
-    <li className="px-4 py-3">
+    <li
+      className={`px-4 py-3 transition-colors ${
+        revealed ? 'bg-amber-50/60 dark:bg-amber-950/20' : ''
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-xs">
@@ -278,10 +322,56 @@ function AnnotationRow({
             )}
           </div>
           <p className="mt-1 text-sm text-gray-800 dark:text-gray-200">{annotation.message}</p>
+          {/* The quote IS the link. A suggested sentence cannot be judged on its own — the question
+              is whether it still joins up with the sentences on either side — and those are in the
+              editor pane, not here. Clicking takes you to them. */}
           {annotation.evidence_quote && (
-            <blockquote className="mt-2 border-l-2 border-gray-300 pl-3 text-xs italic text-gray-600 dark:border-gray-600 dark:text-gray-400">
+            <blockquote
+              onClick={canReveal ? onReveal : undefined}
+              onKeyDown={
+                canReveal
+                  ? (e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onReveal?.();
+                      }
+                    }
+                  : undefined
+              }
+              role={canReveal ? 'button' : undefined}
+              tabIndex={canReveal ? 0 : undefined}
+              title={canReveal ? 'Show this passage in the manuscript' : undefined}
+              className={`mt-2 border-l-2 pl-3 text-xs italic text-gray-600 dark:text-gray-400 ${
+                canReveal
+                  ? 'cursor-pointer rounded-r border-brand-400 hover:bg-brand-50/60 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-brand-600 dark:hover:bg-brand-950/30'
+                  : 'border-gray-300 dark:border-gray-600'
+              }`}
+            >
               {annotation.evidence_quote}
             </blockquote>
+          )}
+          {canReveal && (
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px]">
+              <button
+                onClick={onReveal}
+                className="rounded border border-gray-300 px-2 py-0.5 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
+              >
+                {revealed ? 'Show again' : 'Show in manuscript'}
+              </button>
+              {/* The three outcomes are said plainly. "Approximate" is the one that matters: the
+                  chapter has been edited since the report was written, so the suggestion may be
+                  answering a sentence that no longer exists. */}
+              {revealed === 'approximate' && (
+                <span className="text-amber-700 dark:text-amber-400">
+                  only the opening matched — this passage has changed since the report was written
+                </span>
+              )}
+              {revealed === 'missing' && (
+                <span className="text-red-600 dark:text-red-400">
+                  not found in the current text — re-run the Q/A check for this chapter
+                </span>
+              )}
+            </div>
           )}
           {annotation.suggestion?.action === 'replace' && annotation.suggestion.replacement_text && (
             <div className="mt-2 rounded bg-green-50 px-2 py-1 text-xs text-green-800 dark:bg-green-900/30 dark:text-green-300">
@@ -361,7 +451,13 @@ function AnnotationRow({
                 {applyPending ? 'Applying…' : 'Apply Fix'}
               </button>
               <button
-                onClick={() => setDraft(suggested || target)}
+                onClick={() => {
+                  setDraft(suggested || target);
+                  // Reveal on the way in. Rewriting a sentence is the moment you most need to see
+                  // the two it sits between, so opening the box without scrolling there would make
+                  // the author do the lookup by hand anyway.
+                  onReveal?.();
+                }}
                 className="rounded-lg border border-brand-300 px-3 py-1 text-xs text-brand-700 hover:bg-brand-50 dark:border-brand-700 dark:text-brand-300 dark:hover:bg-brand-950/40"
               >
                 Edit first

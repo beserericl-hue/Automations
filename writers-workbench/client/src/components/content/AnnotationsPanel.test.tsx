@@ -143,3 +143,65 @@ describe('applying a craft suggestion', () => {
     expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe(TARGET);
   });
 });
+
+describe('showing a finding in the manuscript', () => {
+  it('sends the evidence quote up when the quote is clicked', async () => {
+    const onReveal = vi.fn().mockReturnValue('exact');
+    renderWithProviders(<AnnotationsPanel contentId="c1" onReveal={onReveal} />);
+    fireEvent.click(await screen.findByText(TARGET));
+    expect(onReveal).toHaveBeenCalledWith(TARGET);
+  });
+
+  it('is reachable from the keyboard', async () => {
+    const onReveal = vi.fn().mockReturnValue('exact');
+    renderWithProviders(<AnnotationsPanel contentId="c1" onReveal={onReveal} />);
+    fireEvent.keyDown(await screen.findByText(TARGET), { key: 'Enter' });
+    expect(onReveal).toHaveBeenCalledWith(TARGET);
+  });
+
+  it('warns when only the opening matched — the suggestion may answer a sentence that is gone', async () => {
+    const onReveal = vi.fn().mockReturnValue('approximate');
+    renderWithProviders(<AnnotationsPanel contentId="c1" onReveal={onReveal} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Show in manuscript' }));
+    expect(await screen.findByText(/only the opening matched/)).toBeInTheDocument();
+  });
+
+  it('says plainly when the passage is no longer in the text', async () => {
+    const onReveal = vi.fn().mockReturnValue('missing');
+    renderWithProviders(<AnnotationsPanel contentId="c1" onReveal={onReveal} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Show in manuscript' }));
+    expect(await screen.findByText(/not found in the current text/)).toBeInTheDocument();
+  });
+
+  it('scrolls there on the way into the edit box, where the context is most needed', async () => {
+    const onReveal = vi.fn().mockReturnValue('exact');
+    renderWithProviders(<AnnotationsPanel contentId="c1" onReveal={onReveal} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit first' }));
+    expect(onReveal).toHaveBeenCalledWith(TARGET);
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
+  });
+
+  it('is inert, not broken, where there is no editor beside the panel', async () => {
+    renderWithProviders(<AnnotationsPanel contentId="c1" />);
+    await screen.findByText(TARGET);
+    expect(screen.queryByRole('button', { name: 'Show in manuscript' })).not.toBeInTheDocument();
+    // The quote is still readable — it just is not a link to anywhere.
+    expect(screen.getByText(TARGET)).not.toHaveAttribute('role', 'button');
+  });
+
+  it('falls back to the flagged span when a finding carries no quote of its own', async () => {
+    const onReveal = vi.fn().mockReturnValue('exact');
+    mockFetch.mockImplementation(async (path: string) => {
+      if (path.endsWith('/annotations')) {
+        return {
+          ...RESPONSE,
+          annotations: [{ ...ANNOTATION, evidence_quote: null }],
+        } as never;
+      }
+      return { success: true } as never;
+    });
+    renderWithProviders(<AnnotationsPanel contentId="c1" onReveal={onReveal} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Show in manuscript' }));
+    expect(onReveal).toHaveBeenCalledWith(TARGET);
+  });
+});

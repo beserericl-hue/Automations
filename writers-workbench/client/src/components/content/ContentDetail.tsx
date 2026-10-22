@@ -4,7 +4,7 @@ import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
 import { apiFetch, type ApiEnvelope } from '../../lib/api';
-import RichTextEditor from '../editor/RichTextEditor';
+import RichTextEditor, { type RichTextEditorHandle } from '../editor/RichTextEditor';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import VersionHistory from './VersionHistory';
 import ImageGallery from '../images/ImageGallery';
@@ -329,6 +329,22 @@ export default function ContentDetail() {
   // Must be before early returns to maintain consistent hook order
   const editorContent = useMemo(() => contentToHtml(item?.content_text ?? null), [item?.content_text]);
 
+  /**
+   * Clicking a review finding scrolls the manuscript to the passage it is about and marks it.
+   *
+   * A suggested replacement cannot be judged on its own — the question is always whether it still
+   * joins up with the sentences on either side of it, and those are in the editor pane. Reading the
+   * quote out of the panel and then hunting for it in six hundred pages is the step this removes.
+   *
+   * Full-screen editing hides the review rail, so the reveal drops out of it first; otherwise the
+   * panel scrolls a pane nobody can see.
+   */
+  const editorRef = useRef<RichTextEditorHandle>(null);
+  const revealInEditor = useCallback((quote: string) => {
+    setFocusMode(false);
+    return editorRef.current?.reveal(quote) ?? 'missing';
+  }, []);
+
   if (isLoading) {
     return <div className="flex items-center justify-center h-64 text-sm text-gray-500">Loading...</div>;
   }
@@ -652,7 +668,7 @@ export default function ContentDetail() {
             </button>
           </div>
           <div className="flex-1 min-h-0 overflow-hidden">
-            <RichTextEditor content={editorContent} onChange={handleSave} />
+            <RichTextEditor ref={editorRef} content={editorContent} onChange={handleSave} />
           </div>
         </div>
 
@@ -704,7 +720,9 @@ export default function ContentDetail() {
                   />
                 </>
               )}
-              {currentTab === 'annotations' && isChapter && <AnnotationsPanel contentId={id!} />}
+              {currentTab === 'annotations' && isChapter && (
+                <AnnotationsPanel contentId={id!} onReveal={revealInEditor} />
+              )}
               {currentTab === 'sources' && <ProvenancePanel contentId={id!} />}
               {currentTab === 'versions' && (
                 <VersionHistory
