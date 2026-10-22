@@ -24,7 +24,7 @@ import { z } from 'zod';
 import { validateBody } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
-import { callEngineWriteTool } from '../lib/engine-hub.js';
+import { callEngineWriteToolSync } from '../lib/engine-hub.js';
 import { logger } from '../lib/logger.js';
 
 export const authorRouter = Router();
@@ -319,10 +319,16 @@ authorRouter.post('/bio', validateBody(BioDraftSchema), async (req, res) => {
       return;
     }
 
-    const result = await callEngineWriteTool('chapter', {
+    // Sync, and unwrapped: the orchestrator answers a synchronous call with a step envelope, so
+    // reading `ok` off the raw response yields undefined and every bio looks like a refusal.
+    const result = await callEngineWriteToolSync<{
+      ok?: boolean;
+      author_bio?: string;
+      reason?: string;
+      gaps?: string[];
+    }>('chapter', {
       op: 'author-bio',
       user_id: userId,
-      async: false,
       instructions: instructions || undefined,
       profile: {
         name: profile.pen_name,

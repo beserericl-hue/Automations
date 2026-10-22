@@ -89,6 +89,56 @@ export async function callEngineWriteTool(
   return (await resp.json()) as { job_id?: string; status?: string };
 }
 
+/**
+ * The shape a SYNCHRONOUS write-tool call comes back in.
+ *
+ * The orchestrator answers a sync call with a step envelope, not with the op's own return value:
+ * the data is under `payload.result`, and `error` is where a failure lands. An async call is the
+ * other shape entirely — `{job_id, status}` at the top level — which is why one function cannot
+ * usefully type both.
+ */
+export interface EngineStepEnvelope<T> {
+  execution_id?: string;
+  step_name?: string;
+  status?: string;
+  payload?: { op?: string; result?: T };
+  error?: string | null;
+}
+
+/**
+ * Call a write tool and hand back what the op actually returned.
+ *
+ * WHY THIS EXISTS. `callEngineWriteTool` returns the raw envelope, so reading `result.ok` off it
+ * silently yields undefined — the op's real answer is one level down. That is not hypothetical: the
+ * author-bio route did exactly this and reported "there is not enough here to write a bio from" on
+ * a profile the engine had just written a full bio from. Every other sync call site unwraps it by
+ * hand with a cast, which is how the next one gets it wrong too.
+ *
+ * Throws when the engine reports an error, so a caller cannot mistake a failed step for an op that
+ * returned nothing.
+ */
+export async function callEngineWriteToolSync<T>(
+  tool: string,
+  body: Record<string, unknown>,
+): Promise<T> {
+  const envelope = (await callEngineWriteTool(tool, {
+    ...body,
+    async: false,
+  })) as EngineStepEnvelope<T>;
+  if (envelope.error) {
+    logger.error({ tool, op: body.op, error: envelope.error }, 'engine-hub: sync write tool errored');
+    throw new Error(String(envelope.error));
+  }
+  if (envelope.payload?.result === undefined) {
+    logger.error(
+      { tool, op: body.op, status: envelope.status, keys: Object.keys(envelope) },
+      'engine-hub: sync write tool returned no result',
+    );
+    throw new Error(`engine ${tool}.${String(body.op ?? '')} returned no result`);
+  }
+  return envelope.payload.result;
+}
+
 /** Poll an engine async job (queued load-bearing op). */
 export async function getEngineJob(jobId: string): Promise<{ status: string; result?: unknown; error?: string }> {
   const url = `${engineGatewayUrl()}/internal/write/jobs/${encodeURIComponent(jobId)}`;
