@@ -217,7 +217,7 @@ export function backMatter(o: BookMatterOptions): MatterSection[] {
   if (o.authorsNote?.trim()) {
     sections.push({
       kind: 'authors-note',
-      heading: "Author's Note",
+      heading: "Author\u2019s Note",
       blocks: para(o.authorsNote),
       front: false,
       inToc: true,

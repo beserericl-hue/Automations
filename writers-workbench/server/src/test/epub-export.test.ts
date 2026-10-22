@@ -10,6 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import JSZip from 'jszip';
 import { buildEpub, proseToXhtml, epubFilename, type EpubChapter } from '../lib/epub.js';
+import { bookMatter } from '../lib/bookmatter.js';
 
 const FIXED = { now: new Date('2026-10-20T12:00:00Z'), bookId: 'urn:uuid:test' };
 
@@ -222,5 +223,62 @@ describe('the chapter label does not stutter', () => {
     const { zip } = await openEpub([ch({ chapter_number: 1, title: 'Chapter and Verse' })]);
     expect((await zip.file('OEBPS/ch001.xhtml')!.async('string')).match(/<h1>.*?<\/h1>/s)![0])
       .toContain('class="num"');
+  });
+});
+
+describe('the ebook is a book, not a manuscript', () => {
+  // Wired after the print interior already had it. The first attempt passed the sections through an
+  // `as any` cast to a builder that did not accept them, so the generated ebook shipped with no
+  // copyright page and no author's note while the paperback of the same book had both — and
+  // nothing failed, because nothing was checking.
+  const matter = () =>
+    bookMatter({
+      title: 'The Ossuary',
+      author: 'Eric L Beser',
+      publisher: 'Independently published',
+      dedication: 'For the ones who were not asked.',
+      epigraph: { text: 'The dead are still here.', attribution: 'Marcus Tayac' },
+      authorsNote: 'The four ossuaries are real.\n\nEvery named character is invented.',
+      aboutTheAuthor: 'Eric L Beser writes from Maryland.',
+      fiction: true,
+    });
+
+  it('carries a copyright page with the rights line and the fiction disclaimer', async () => {
+    const m = matter();
+    const { zip } = await openEpub([ch()], { frontMatter: m.front, backMatter: m.back });
+    const pages = Object.keys(zip.files).filter((n) => /front\d+\.xhtml$/.test(n));
+    expect(pages.length).toBeGreaterThanOrEqual(3);
+    const all = (await Promise.all(pages.map((n) => zip.file(n)!.async('string')))).join('\n');
+    expect(all).toContain('All rights reserved');
+    expect(all).toContain('work of fiction');
+    expect(all).toContain('Eric L Beser');
+  });
+
+  it('carries the author’s note at the back', async () => {
+    const m = matter();
+    const { zip } = await openEpub([ch()], { frontMatter: m.front, backMatter: m.back });
+    const backs = Object.keys(zip.files).filter((n) => /back\d+\.xhtml$/.test(n));
+    const all = (await Promise.all(backs.map((n) => zip.file(n)!.async('string')))).join('\n');
+    expect(all).toContain('ossuaries are real');
+  });
+
+  it('lists the back matter in the table of contents but not the copyright page', async () => {
+    const m = matter();
+    const { zip } = await openEpub([ch()], { frontMatter: m.front, backMatter: m.back });
+    const nav = await zip.file('OEBPS/nav.xhtml')!.async('string');
+    expect(nav).toContain("Author’s Note");
+    expect(nav).not.toContain('Copyright');
+  });
+
+  it('does not emit two title pages', async () => {
+    // The generated title page is replaced by the real one, not stacked on top of it.
+    const m = matter();
+    const { zip } = await openEpub([ch()], { frontMatter: m.front, backMatter: m.back });
+    expect(zip.file('OEBPS/title.xhtml')).toBeNull();
+  });
+
+  it('still works with no matter supplied', async () => {
+    const { zip } = await openEpub([ch()]);
+    expect(zip.file('OEBPS/title.xhtml')).toBeTruthy();
   });
 });

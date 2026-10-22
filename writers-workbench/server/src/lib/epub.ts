@@ -20,6 +20,7 @@
  */
 
 import JSZip from 'jszip';
+import type { MatterSection } from './bookmatter.js';
 
 export interface EpubChapter {
   chapter_number: number | null;
@@ -39,6 +40,10 @@ export interface EpubOptions {
   bookId?: string;
   /** Cover image bytes. Declared three ways below because readers disagree about which they honour. */
   cover?: { data: Buffer; ext: 'jpg' | 'png' } | null;
+  /** Half title, title page, copyright, dedication, epigraph — the pages that make it a book. */
+  frontMatter?: MatterSection[];
+  /** Author's note, acknowledgements, about the author, also-by. */
+  backMatter?: MatterSection[];
 }
 
 const CSS = `@page { margin: 5%; }
@@ -54,6 +59,14 @@ nav ol { list-style: none; padding-left: 0; line-height: 1.9; }
 .title-page { text-align: center; margin-top: 25%; }
 .title-page h1 { font-size: 2.2em; text-align: center; }
 .title-page .sub { color: #666; font-style: italic; }
+.matter { margin-top: 12%; }
+.matter p { text-indent: 0; text-align: left; margin: 0 0 0.8em; }
+.matter h1 { text-align: center; font-size: 1.3em; font-weight: normal; margin-bottom: 1.4em; }
+.m-title { font-size: 2em; text-align: center; margin-bottom: 0.4em; }
+.m-author { font-size: 1.2em; text-align: center; letter-spacing: 0.06em; margin: 1.2em 0; }
+.m-centre { text-align: center; }
+.m-italic { font-style: italic; text-align: center; }
+.m-small { font-size: 0.8em; color: #555; }
 `;
 
 function esc(s: string): string {
@@ -94,6 +107,24 @@ function xhtmlDoc(title: string, body: string, isNav = false): string {
     '<link rel="stylesheet" type="text/css" href="style.css"/></head>\n' +
     `<body${isNav ? ' epub:type="toc"' : ''}>\n${body}\n</body>\n</html>`
   );
+}
+
+/**
+ * One front- or back-matter page.
+ *
+ * The same sections the print interior renders, set for a screen instead of a page. Writing them
+ * twice — once per format — is how the copyright line in the paperback stops matching the ebook's,
+ * so both formats read the one structure.
+ */
+function matterDoc(section: MatterSection): string {
+  const body = section.blocks
+    .map((b) => {
+      const cls = b.style && b.style !== 'left' ? ` class="m-${b.style}"` : '';
+      return `<p${cls}>${esc(b.text).replace(/\n/g, '<br/>')}</p>`;
+    })
+    .join('\n');
+  const heading = section.heading ? `<h1>${esc(section.heading)}</h1>\n` : '';
+  return `<div class="matter matter-${section.kind}">\n${heading}${body}\n</div>`;
 }
 
 function chapterLabel(n: number | null, index: number): string {
@@ -143,7 +174,20 @@ export async function buildEpub(opts: EpubOptions): Promise<Buffer> {
     });
   }
 
-  docs.push({
+  const front = opts.frontMatter ?? [];
+  const back = opts.backMatter ?? [];
+
+  // When real front matter is supplied it REPLACES the generated title page — otherwise the book
+  // opens with two different title pages, which is what happened the first time this was wired.
+  if (front.length) {
+    front.forEach((section, i) => {
+      const name = `front${String(i + 1).padStart(2, '0')}.xhtml`;
+      docs.push({ name, xhtml: xhtmlDoc(section.heading || title, matterDoc(section)) });
+      if (section.inToc) navItems.push(`<li><a href="${name}">${esc(section.heading)}</a></li>`);
+    });
+  }
+
+  if (!front.length) docs.push({
     name: 'title.xhtml',
     xhtml: xhtmlDoc(
       title,
@@ -168,6 +212,12 @@ export async function buildEpub(opts: EpubOptions): Promise<Buffer> {
       proseToXhtml(c.content_text || '');
     docs.push({ name, xhtml: xhtmlDoc(`${label} — ${chTitle}`, body) });
     navItems.push(`<li><a href="${name}">${esc(label)}. ${esc(chTitle)}</a></li>`);
+  });
+
+  back.forEach((section, i) => {
+    const name = `back${String(i + 1).padStart(2, '0')}.xhtml`;
+    docs.push({ name, xhtml: xhtmlDoc(section.heading || title, matterDoc(section)) });
+    if (section.inToc) navItems.push(`<li><a href="${name}">${esc(section.heading)}</a></li>`);
   });
 
   const navDoc = xhtmlDoc(
