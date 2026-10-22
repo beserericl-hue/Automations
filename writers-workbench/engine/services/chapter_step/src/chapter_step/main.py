@@ -23,6 +23,7 @@ from writer_engine.schemas import StepInput, StepOutput, StepStatus
 from writer_engine.schemas.chapter import (
     BibleEntry,
     BibleExtract,
+    BookMarketing,
     ChapterCraftQa,
     DriftFinding,
     DriftReport,
@@ -4024,10 +4025,173 @@ async def _op_plan_volumes(payload: dict) -> dict:
     return out
 
 
+# ----------------------------------------------------------------------------------------------
+# The marketing layer: the copy that lives in the KDP dashboard, not in the book
+# ----------------------------------------------------------------------------------------------
+
+MARKETING_SAMPLE_CHAPTERS = 6
+"""How many chapters to read. The opening carries the promise, the end carries the payoff."""
+
+MARKETING_CHARS_PER_CHAPTER = 6000
+
+
+def _build_marketing_system(genre: str, volume_note: str) -> str:
+    """The copywriter. Deliberately not the craft reviewer — a different job with different rules."""
+    return (
+        "You write the Amazon listing copy for a novel. You have read the manuscript. Your job is to "
+        "make the right reader buy it and to make the wrong reader skip it, because a one-star "
+        "review from somebody who wanted a different book costs more than a missing sale.\n\n"
+        f"GENRE: {genre or 'literary fiction'}\n"
+        f"{volume_note}"
+        "\nRULES THAT MATTER:\n"
+        "- Write from what is ON THE PAGE. Do not promise a book the manuscript does not deliver.\n"
+        "- `blurb`: the Amazon description. Open with a line that creates a question, give the "
+        "set-up in two or three short paragraphs, stop before the answer. Under 1,200 characters "
+        "reads better than the 4,000 KDP allows. No spoilers past the first act.\n"
+        "- `back_cover`: shorter and harder. It is read standing up in a shop, so it is the hook, "
+        "the situation and the stakes in under 600 characters.\n"
+        "- `hook`: one sentence, under 120 characters.\n"
+        "- `keywords`: EXACTLY 7, and each is a PHRASE a reader would actually type into Amazon — "
+        "'historical fiction native american', not 'history'. No single words. Do not repeat the "
+        "title or the author; those are already indexed.\n"
+        "- `categories`: up to 3, written the way Amazon states them, e.g. "
+        "'Fiction > Historical > General'.\n"
+        "- `comparable_titles`: 2-4 published books a reader of this one would already own. Real "
+        "titles with authors. This is how a listing finds its shelf.\n"
+        "- `author_bio`: third person, 2-3 sentences, no invented credentials — if you do not know "
+        "something about the author, leave it out rather than inventing it.\n\n"
+        "No marketing throat-clearing: no 'a sweeping saga', no 'a tour de force', no 'readers will "
+        "be unable to put it down'. Concrete nouns from the actual book.\n\n"
+        "Reply with strict JSON matching BookMarketing {blurb, back_cover, hook, keywords, "
+        "categories, comparable_titles, author_bio}."
+    )
+
+
+async def _op_marketing(payload: dict) -> dict:
+    """Draft the listing copy from the manuscript itself.
+
+    Reads the opening and closing chapters rather than the outline: an outline says what was
+    planned, and a blurb has to promise what is on the page.
+    """
+    from writer_engine.config import get_settings
+    from writer_engine.supabase.client import get_supabase_admin
+
+    project_id = str(payload.get("project_id") or "")
+    if not project_id:
+        return {"ok": False, "reason": "project_id required"}
+    ctx = await _load_context(project_id, payload)
+    author = str(payload.get("author") or "")
+    volume = payload.get("volume")
+
+    client = await get_supabase_admin()
+    rows: list[dict] = []
+    page = 0
+    while True:
+        q = (
+            client.table("published_content_v2")
+            .select("chapter_number,title,content_text")
+            .eq("project_id", project_id)
+            .eq("content_type", "chapter")
+            .is_("deleted_at", None)
+            .order("chapter_number")
+            .range(page * 1000, page * 1000 + 999)
+        )
+        r = await q.execute()
+        batch = getattr(r, "data", None) or []
+        rows.extend(batch)
+        if len(batch) < 1000:
+            break
+        page += 1
+    rows = [x for x in rows if str(x.get("content_text") or "").strip()]
+    if not rows:
+        return {"ok": False, "reason": "no chapters with text"}
+
+    # Volume-scoped when asked: volume two's blurb must not promise volume one's opening.
+    if isinstance(volume, dict) and volume.get("first_chapter") is not None:
+        lo, hi = int(volume["first_chapter"]), int(volume.get("last_chapter", 10**9))
+        rows = [x for x in rows if lo <= _coerce_chapter_number(x.get("chapter_number"), -1) <= hi]
+
+    half = max(1, MARKETING_SAMPLE_CHAPTERS // 2)
+    sample = rows[:half] + rows[-half:] if len(rows) > MARKETING_SAMPLE_CHAPTERS else rows
+    parts: list[str] = []
+    for x in sample:
+        body = str(x.get("content_text") or "")[:MARKETING_CHARS_PER_CHAPTER]
+        parts.append(f"--- CHAPTER {x.get('chapter_number')}: {x.get('title')} ---\n{body}")
+
+    volume_note = ""
+    if isinstance(volume, dict) and volume.get("index"):
+        volume_note = (
+            f"This is VOLUME {volume['index']} of {volume.get('total', '?')}. The blurb sells THIS "
+            "volume and must not resolve what it leaves open, nor promise what a later volume "
+            "delivers.\n"
+        )
+
+    router = get_router(service=STEP_NAME)
+    try:
+        marketing, _resp = await complete_structured(
+            router,
+            provider="anthropic",
+            model=get_settings().model_default,
+            system=_build_marketing_system(str(ctx.get("genre_slug") or ""), volume_note),
+            prompt=(
+                f"TITLE: {ctx.get('title') or ''}\n"
+                f"AUTHOR: {author or '(not supplied — leave the bio generic)'}\n"
+                f"CHAPTERS: {len(rows)}, {sum(len(str(x.get('content_text') or '').split()) for x in rows):,} words\n\n"
+                + "\n\n".join(parts)
+            ),
+            schema=BookMarketing,
+            max_tokens=4096,
+        )
+    except ProviderNotRegistered:
+        return {"ok": False, "reason": "no provider"}
+    except ValueError as exc:
+        logger.error("marketing.unparseable", error=str(exc)[:300])
+        return {"ok": False, "reason": "could not parse the copywriter's answer"}
+
+    out = marketing.model_dump(mode="json")
+    # KDP gives exactly seven keyword slots. Fewer wastes them; more are silently dropped.
+    out["keywords"] = [k for k in out.get("keywords", []) if str(k).strip()][:7]
+    out["keyword_slots_used"] = len(out["keywords"])
+    out["categories"] = out.get("categories", [])[:3]
+
+    if payload.get("persist"):
+        try:
+            pr = (
+                await client.table("writing_projects_v2")
+                .select("outline")
+                .eq("id", project_id)
+                .limit(1)
+                .execute()
+            )
+            prows = getattr(pr, "data", None) or []
+            outline = dict((prows or [{}])[0].get("outline") or {})
+            key = (
+                f"_marketing_v{volume['index']}"
+                if isinstance(volume, dict) and volume.get("index")
+                else "_marketing"
+            )
+            outline[key] = out
+            from writer_engine.persist_helpers import touch
+
+            await (
+                client.table("writing_projects_v2")
+                .update({"outline": outline, **touch()})
+                .eq("id", project_id)
+                .execute()
+            )
+            out["persisted"] = True
+        except Exception as exc:
+            logger.warning("marketing.persist_failed", error=str(exc)[:200])
+            out["persisted"] = False
+    out["ok"] = True
+    return out
+
+
 OPS = {
     "write": _op_write,
     "plan": _op_plan,
     "plan-volumes": _op_plan_volumes,
+    "marketing": _op_marketing,
     "rewrite": _op_rewrite,
     "repair": _op_repair,
     "qa": _op_qa,

@@ -454,3 +454,29 @@ class VolumeEndingJudgement(BaseModel):
     # True when the chapter ties things off — the signal that this is a BAD volume break even if the
     # chapter itself is strong.
     resolves: bool = False
+
+
+class BookMarketing(BaseModel):
+    """The copy that sells the book, which lives in the KDP dashboard rather than in the file.
+
+    Written from the manuscript rather than from the outline on purpose: an outline describes what
+    was planned, and a blurb has to promise what is actually on the page. The two drift, and a blurb
+    that promises the outline is how a book earns its first one-star review.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    # The Amazon description. KDP allows 4,000 characters; good ones are far shorter.
+    blurb: str = ""
+    # A shorter, harder cut for the back of the paperback — it is read standing up, in a shop.
+    back_cover: str = ""
+    # One line for the top of the listing.
+    hook: str = ""
+    # KDP gives exactly seven slots, and they are PHRASES a reader would type, not single words.
+    keywords: list[str] = Field(default_factory=list)
+    # Up to three BISAC categories, as Amazon states them.
+    categories: list[str] = Field(default_factory=list)
+    # Comparable published titles, which is how a listing finds its shelf.
+    comparable_titles: list[str] = Field(default_factory=list)
+    # Author Central bio, third person.
+    author_bio: str = ""
