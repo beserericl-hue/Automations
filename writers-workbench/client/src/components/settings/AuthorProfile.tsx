@@ -74,6 +74,8 @@ export default function AuthorProfile() {
    * definition.
    */
   const [asGenerated, setAsGenerated] = useState<string | null>(null);
+  /** Set when the draft calls the author something they never told us. Shown above the draft. */
+  const [pronounWarning, setPronounWarning] = useState<string | null>(null);
   const [instructions, setInstructions] = useState('');
   /** When the last save landed, so the confirmation can sit on the page rather than in a toast. */
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -158,7 +160,15 @@ export default function AuthorProfile() {
 
   const writeBio = useMutation({
     mutationFn: async () => {
-      const res = await apiFetch<ApiEnvelope<{ ok: boolean; bio: string; reason: string | null; gaps: string[] }>>(
+      const res = await apiFetch<
+        ApiEnvelope<{
+          ok: boolean;
+          bio: string;
+          reason: string | null;
+          gaps: string[];
+          pronoun_warning: string | null;
+        }>
+      >(
         '/api/author/bio',
         { method: 'POST', body: JSON.stringify({ instructions: instructions.trim() || undefined }) },
       );
@@ -171,6 +181,7 @@ export default function AuthorProfile() {
       }
       setDraft(result.bio);
       setAsGenerated(result.bio);
+      setPronounWarning(result.pronoun_warning ?? null);
       setInstructions('');
     },
     onError: (err: Error) => addToast(err.message || 'Could not write the bio', 'error'),
@@ -188,6 +199,7 @@ export default function AuthorProfile() {
       setForm({ ...EMPTY, ...saved });
       setDraft(null);
       setAsGenerated(null);
+      setPronounWarning(null);
       void queryClient.invalidateQueries({ queryKey: ['author-profile'] });
       void queryClient.invalidateQueries({ queryKey: ['publishing'] });
       addToast('Bio saved', 'success');
@@ -354,6 +366,11 @@ export default function AuthorProfile() {
             <p className="text-xs font-medium text-brand-700 dark:text-brand-300">
               Draft — edit it here if you want, then save. Nothing is stored until you do.
             </p>
+            {pronounWarning ? (
+              <p className="rounded bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
+                {pronounWarning}
+              </p>
+            ) : null}
             <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={5} className={inputClass} />
             <div className="flex flex-wrap gap-2">
               <button
@@ -372,6 +389,7 @@ export default function AuthorProfile() {
                 onClick={() => {
                   setDraft(null);
                   setAsGenerated(null);
+                  setPronounWarning(null);
                 }}
                 className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
               >

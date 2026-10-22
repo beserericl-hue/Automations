@@ -204,3 +204,44 @@ describe('a server older than this client', () => {
     expect(screen.getByRole('button', { name: 'Save facts' })).toBeEnabled();
   });
 });
+
+describe('a bio that calls you something you never said', () => {
+  function serveBio(extra: Record<string, unknown>) {
+    mockFetch.mockImplementation(async (path: string, opts?: { method?: string }) => {
+      if (path === '/api/author/bio' && opts?.method === 'POST') {
+        return {
+          success: true,
+          data: { ok: true, bio: 'He lives in Owings Mills.', reason: null, gaps: [], ...extra },
+        } as never;
+      }
+      return { success: true, data: ALMOST_COMPLETE } as never;
+    });
+  }
+
+  it('shows the warning above the draft rather than letting it through quietly', async () => {
+    serveBio({
+      pronoun_warning:
+        'This bio refers to you as he/his, which you have not told us. Set your pronouns, or edit the bio, before publishing.',
+    });
+    renderWithProviders(<AuthorProfile />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Write my bio' }));
+    expect(await screen.findByText(/refers to you as he\/his/)).toBeInTheDocument();
+  });
+
+  it('says nothing when there is nothing to warn about', async () => {
+    serveBio({ pronoun_warning: null });
+    renderWithProviders(<AuthorProfile />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Write my bio' }));
+    await screen.findByDisplayValue('He lives in Owings Mills.');
+    expect(screen.queryByText(/which you have not told us/)).not.toBeInTheDocument();
+  });
+
+  it('drops the warning when the draft is discarded', async () => {
+    serveBio({ pronoun_warning: 'This bio refers to you as he/his, which you have not told us.' });
+    renderWithProviders(<AuthorProfile />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Write my bio' }));
+    await screen.findByText(/refers to you as he\/his/);
+    fireEvent.click(screen.getByRole('button', { name: 'Discard' }));
+    expect(screen.queryByText(/refers to you as he\/his/)).not.toBeInTheDocument();
+  });
+});

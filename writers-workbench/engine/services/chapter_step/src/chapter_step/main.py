@@ -4131,6 +4131,22 @@ def _build_marketing_revision_system(genre: str) -> str:
     )
 
 
+_THIRD_PERSON = re.compile(
+    r"\b(he|him|his|she|her|hers|they|them|their|theirs)\b", re.IGNORECASE
+)
+"""Third-person pronouns, for checking a bio written without any supplied.
+
+Deliberately includes they/them. The rule is not "avoid gendered words", it is "state nothing about
+this person that they did not state themselves" — and a bio that calls someone `they` when they use
+`she` is wrong in the same way, just less often noticed.
+"""
+
+
+def _third_person_pronouns(text: str) -> list[str]:
+    """Every third-person pronoun in a bio. Empty is the only acceptable answer when none were given."""
+    return _THIRD_PERSON.findall(text or "")
+
+
 async def _load_author_profile(user_id: str) -> dict | None:
     """Read the author's stored facts, mapping the column names onto the schema's field names.
 
@@ -4220,24 +4236,65 @@ async def _op_author_bio(payload: dict) -> dict:
     if profile.prior_work:
         facts.append("PRIOR WORK: " + "; ".join(profile.prior_work))
 
-    router = get_router(service=STEP_NAME)
-    try:
-        bio, _resp = await complete_structured(
-            router,
-            provider="anthropic",
-            model=get_settings().model_default,
-            system=_build_bio_system()
-            + (f"\n\nThe author asks: {payload['instructions']}" if payload.get("instructions") else ""),
-            prompt="\n".join(facts),
-            schema=BioOnly,
-            max_tokens=700,
+    want_no_pronouns = not profile.pronouns.strip()
+    if want_no_pronouns:
+        # Repeated beside the facts, not only in the system prompt. Asked once at the top, the rule
+        # holds for a short bio and quietly lapses on a long one — measured, not assumed: a
+        # four-fact profile came back clean and a seven-fact profile came back full of "he".
+        facts.append(
+            "PRONOUNS: NOT SUPPLIED. Use NO third-person pronoun for the author anywhere in this "
+            "bio — no he, him, his, she, her, hers, they, them or their. Write the surname instead "
+            "every time you would have used one."
         )
+
+    router = get_router(service=STEP_NAME)
+    system = _build_bio_system() + (
+        f"\n\nThe author asks: {payload['instructions']}" if payload.get("instructions") else ""
+    )
+
+    async def draft(extra: str = "") -> BioOnly:
+        return (
+            await complete_structured(
+                router,
+                provider="anthropic",
+                model=get_settings().model_default,
+                system=system,
+                prompt="\n".join(facts) + extra,
+                schema=BioOnly,
+                max_tokens=700,
+            )
+        )[0]
+
+    try:
+        bio = await draft()
+        # CHECKED, NOT ASKED. A pronoun the author never gave is a claim about who they are, and it
+        # is going on a cover, so the instruction is verified rather than trusted. One corrective
+        # pass naming the offending words; if that also fails, the bio comes back with the warning
+        # attached rather than silently carrying the guess.
+        offenders = _third_person_pronouns(bio.author_bio) if want_no_pronouns else []
+        if offenders:
+            logger.info("author_bio.pronoun_retry", found=sorted(set(offenders)))
+            bio = await draft(
+                "\n\nYour previous draft used "
+                + ", ".join(sorted({w.lower() for w in offenders}))
+                + ". The author has not told us their pronouns, so none of those words may appear. "
+                "Rewrite it using the surname in place of every one."
+            )
+            offenders = _third_person_pronouns(bio.author_bio)
     except ProviderNotRegistered:
         return {"ok": False, "reason": "no provider", "gaps": gaps}
     except ValueError as exc:
         return {"ok": False, "reason": f"unparseable: {str(exc)[:160]}", "gaps": gaps}
 
-    return {"ok": True, "author_bio": bio.author_bio, "gaps": gaps, "facts_used": len(facts)}
+    out = {"ok": True, "author_bio": bio.author_bio, "gaps": gaps, "facts_used": len(facts)}
+    if want_no_pronouns and offenders:
+        logger.warning("author_bio.pronoun_guess_survived", found=sorted(set(offenders)))
+        out["pronoun_warning"] = (
+            "This bio refers to you as "
+            + "/".join(sorted({w.lower() for w in offenders}))
+            + ", which you have not told us. Set your pronouns, or edit the bio, before publishing."
+        )
+    return out
 
 
 async def _op_marketing(payload: dict) -> dict:

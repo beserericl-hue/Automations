@@ -335,6 +335,7 @@ authorRouter.post('/bio', validateBody(BioDraftSchema), async (req, res) => {
       author_bio?: string;
       reason?: string;
       gaps?: string[];
+      pronoun_warning?: string;
     }>('chapter', {
       op: 'author-bio',
       user_id: userId,
@@ -377,6 +378,10 @@ authorRouter.post('/bio', validateBody(BioDraftSchema), async (req, res) => {
         bio,
         reason,
         gaps: Array.isArray(result.gaps) ? result.gaps : gapsIn(profile),
+        // Set when the writer referred to the author by a pronoun they never supplied and a
+        // corrective pass did not remove it. Passed through rather than swallowed: the author is
+        // the only one who can say whether it is right, and it is headed for a cover.
+        pronoun_warning: result.pronoun_warning ?? null,
         why_this_book_used: whyThisBook,
       },
     });
