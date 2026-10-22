@@ -11,7 +11,7 @@
  * are different states for a paragraph that will be printed in a book.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, type ApiEnvelope, type ApiError } from '../../lib/api';
 import { useToast } from '../../contexts/ToastContext';
@@ -70,6 +70,9 @@ export default function AuthorProfile() {
    */
   const [asGenerated, setAsGenerated] = useState<string | null>(null);
   const [instructions, setInstructions] = useState('');
+  /** When the last save landed, so the confirmation can sit on the page rather than in a toast. */
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Load once. Re-syncing on every refetch would overwrite what the author is in the middle of
   // typing, which is the classic way a form throws away an edit.
@@ -82,6 +85,38 @@ export default function AuthorProfile() {
 
   const set = <K extends keyof Profile>(key: K, value: Profile[K]): void =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  /**
+   * Is there typing here that is not in the database?
+   *
+   * Compared against what the server last returned, not against a flag set on every keystroke, so
+   * typing a word and deleting it again does not count as a change. These are paragraphs somebody
+   * wrote by hand; losing them to a stray click is not a small failure.
+   */
+  const dirty = useMemo(() => {
+    if (!data) return false;
+    const same = (a: string, b: string): boolean => a.trim() === b.trim();
+    const sameList = (a: string[], b: string[]): boolean =>
+      a.length === b.length && a.every((v, i) => same(v, b[i]));
+    return !(
+      same(form.pen_name, data.pen_name) &&
+      same(form.lives, data.lives) &&
+      same(form.background, data.background) &&
+      same(form.why_this_book, data.why_this_book) &&
+      same(form.personal, data.personal) &&
+      sameList(form.credentials, data.credentials) &&
+      sameList(form.prior_work, data.prior_work) &&
+      sameList(form.links, data.links)
+    );
+  }, [form, data]);
+
+  // The browser's own guard. Without it a stray cmd-W drops everything typed since the last save.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent): void => e.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
 
   const saveFacts = useMutation({
     mutationFn: async () => {
@@ -103,9 +138,15 @@ export default function AuthorProfile() {
     onSuccess: (saved) => {
       setForm((f) => ({ ...saved, bio: f.bio || saved.bio }));
       void queryClient.invalidateQueries({ queryKey: ['author-profile'] });
+      // Confirmed in place as well as in a toast. A toast is gone in four seconds and is easy to
+      // miss while reading the form, which leaves the author unsure whether anything happened.
+      setSavedAt(Date.now());
       addToast('Saved', 'success');
     },
-    onError: (err: Error) => addToast(err.message || 'Could not save', 'error'),
+    onError: (err: Error) => {
+      setSaveError(err.message || 'Could not save');
+      addToast(err.message || 'Could not save', 'error');
+    },
   });
 
   const writeBio = useMutation({
@@ -233,19 +274,47 @@ export default function AuthorProfile() {
         />
       </Section>
 
-      <div className="flex items-center gap-3">
+      {/* NOTHING ON THIS PAGE IS REQUIRED, and the save button has to say so. An earlier version
+          put a bare "1 field still empty" right here, which beside a Save button reads as the
+          reason it will not save — so it was read as a validation error on a form that had in fact
+          saved. The count stayed; what it means is now spelled out, and a successful save is
+          confirmed in place rather than only in a toast that is gone in four seconds. */}
+      <div className="flex flex-wrap items-center gap-3">
         <button
-          onClick={() => saveFacts.mutate()}
+          onClick={() => {
+            setSaveError(null);
+            saveFacts.mutate();
+          }}
           disabled={saveFacts.isPending}
           className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
         >
           {saveFacts.isPending ? 'Saving…' : 'Save facts'}
         </button>
-        {data?.gaps?.length ? (
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            {data.gaps.length} field{data.gaps.length === 1 ? '' : 's'} still empty
-          </span>
-        ) : null}
+        {/* A live region: whether the work is stored is exactly the kind of change a screen reader
+            has to be told about without the user going looking for it. */}
+        <span role="status" aria-live="polite">
+          {dirty && !saveFacts.isPending ? (
+            <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
+              Unsaved changes
+            </span>
+          ) : null}
+          {!dirty && savedAt && !saveFacts.isPending && !saveError ? (
+            <span className="text-xs font-medium text-green-600 dark:text-green-400">
+              Saved at {new Date(savedAt).toLocaleTimeString()}
+            </span>
+          ) : null}
+          {saveError ? (
+            <span className="text-xs font-medium text-red-600 dark:text-red-400">{saveError}</span>
+          ) : null}
+        </span>
+        <span className="text-xs text-gray-500 dark:text-gray-400">
+          Every field is optional
+          {data?.gaps?.length
+            ? ` — ${data.gaps.length} still empty, which only means the bio will not mention ${
+                data.gaps.length === 1 ? 'it' : 'them'
+              }.`
+            : '.'}
+        </span>
       </div>
 
       {/* The bio: draft, read, accept or rewrite. */}
@@ -330,17 +399,43 @@ export default function AuthorProfile() {
           ) : null}
         </div>
 
+        {/* Amber only while something is missing that would actually change the bio. Once all that
+            is left is optional, the same list in a warning colour says "you have a problem" about a
+            form that is finished. */}
         {data?.gaps?.length ? (
-          <div className="rounded-lg bg-amber-50 p-3 dark:bg-amber-950/20">
-            <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
-              The bio has no way of knowing:
-            </p>
-            <ul className="mt-1 list-disc pl-4 text-xs text-amber-700 dark:text-amber-400 space-y-0.5">
-              {data.gaps.map((g) => (
-                <li key={g}>{g}</li>
-              ))}
-            </ul>
-          </div>
+          (() => {
+            const optionalOnly = data.gaps.every((g) => g.includes('(optional'));
+            return (
+              <div
+                className={`rounded-lg p-3 ${
+                  optionalOnly ? 'bg-gray-50 dark:bg-gray-800/50' : 'bg-amber-50 dark:bg-amber-950/20'
+                }`}
+              >
+                <p
+                  className={`text-xs font-medium ${
+                    optionalOnly
+                      ? 'text-gray-600 dark:text-gray-300'
+                      : 'text-amber-800 dark:text-amber-300'
+                  }`}
+                >
+                  {optionalOnly
+                    ? 'You could still add, though the bio reads fine without:'
+                    : 'The bio has no way of knowing:'}
+                </p>
+                <ul
+                  className={`mt-1 list-disc pl-4 text-xs space-y-0.5 ${
+                    optionalOnly
+                      ? 'text-gray-600 dark:text-gray-400'
+                      : 'text-amber-700 dark:text-amber-400'
+                  }`}
+                >
+                  {data.gaps.map((g) => (
+                    <li key={g}>{g}</li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })()
         ) : null}
       </Section>
     </div>
