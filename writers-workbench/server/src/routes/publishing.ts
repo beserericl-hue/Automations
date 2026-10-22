@@ -832,10 +832,19 @@ publishingRouter.post('/project/:projectId/blog', validateBody(BlogSchema), asyn
   const body = req.body as z.infer<typeof BlogSchema>;
 
   try {
+    // The author's own name goes with it. Without the book's facts the writer invented a novel to
+    // match the title — including an author who does not exist — and published it to the project.
+    const { data: authorProfile } = await getSupabaseAdmin()
+      .from('author_profiles_v2')
+      .select('pen_name')
+      .eq('user_id', req.userId!)
+      .maybeSingle();
+
     const job = await callEngineWriteTool('chapter', {
       op: 'blog',
       project_id: project.id,
       user_id: req.userId!,
+      author: String(authorProfile?.pen_name ?? ''),
       topic: body.topic.trim(),
       genre_slug: project.genre_slug ?? '',
       keywords: body.keywords?.trim() || '',

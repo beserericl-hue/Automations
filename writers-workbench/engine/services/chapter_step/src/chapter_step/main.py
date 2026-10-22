@@ -3603,6 +3603,49 @@ async def _persist_simple(
         return {"persisted": False, "error": str(exc)[:200]}
 
 
+async def _book_facts(project_id: str, author: str) -> str:
+    """What is actually true about this book, for anything writing ABOUT it.
+
+    WHY THIS EXISTS. Asked for "the research behind The Ossuary" with nothing but the title and a
+    genre, the blogger researched the phrase, found nothing, and invented a novel to match — a
+    different plot, a different subject, and an author named David E. Landry who does not exist. It
+    was published to the project as a draft. A title is not a book; without the facts, a model fills
+    the gap with a plausible one.
+    """
+    from writer_engine.supabase.client import get_supabase_admin
+
+    if not project_id:
+        return ""
+    try:
+        client = await get_supabase_admin()
+        r = (
+            await client.table("writing_projects_v2")
+            .select("title,genre_slug,outline")
+            .eq("id", project_id)
+            .limit(1)
+            .execute()
+        )
+        rows = getattr(r, "data", None) or []
+    except Exception as exc:
+        logger.warning("blog.book_facts_unreadable", error=str(exc)[:200])
+        return ""
+    if not rows:
+        return ""
+    row = rows[0]
+    outline = row.get("outline") or {}
+    marketing = outline.get("_marketing") or {}
+    lines = [f"TITLE: {row.get('title') or ''}"]
+    if author:
+        lines.append(f"AUTHOR: {author}")
+    for label, key in (("HOOK", "hook"), ("DESCRIPTION", "blurb"), ("BACK COVER", "back_cover")):
+        value = str(marketing.get(key) or "").strip()
+        if value:
+            lines.append(f"{label}: {value}")
+    if row.get("genre_slug"):
+        lines.append(f"GENRE: {row['genre_slug']}")
+    return "\n".join(lines)
+
+
 async def _op_blog(payload: dict) -> dict:
     """One-shot blog post (n8n write_blog_post parity): genre-aware, researched, SEO-structured."""
     from writer_engine.config import get_settings
@@ -3613,16 +3656,39 @@ async def _op_blog(payload: dict) -> dict:
     keywords = payload.get("keywords") or ""
     target = _coerce_int(payload.get("target_length"), 1500)  # G6: router may pass "1500 words"
     genre_name, guidelines = await _load_genre_guidelines(genre_slug)
+    book = await _book_facts(str(payload.get("project_id") or ""), str(payload.get("author") or ""))
+    # The research is for the SUBJECT, not for the book. Searching on a book's own title finds
+    # nothing when it is unpublished, and "nothing found" is where the invention starts — so the
+    # focus is pinned to the subject matter and the book's own facts come from the database.
     research, _ = (
         await _chapter_research(
-            topic, period="contemporary", title=topic, focus=f"Genre: {genre_slug}. Blog topic: {topic}"
+            topic,
+            period="contemporary",
+            title=topic,
+            focus=(
+                f"Genre: {genre_slug}. Blog topic: {topic}. Research the SUBJECT MATTER only — "
+                "background a reader would need. Do not research the book or its author."
+            ),
         )
         if topic
         else ("", [])
     )
     model = _polish_model(payload, settings)
+    # ABOUT-THE-BOOK posts get the book. Everything else is unchanged.
+    book_rule = (
+        "\n\n## The book this post is about\n"
+        f"{book}\n\n"
+        "ABSOLUTE RULE: every statement you make about this book or its author must come from the "
+        "facts above. Do not invent a plot, a setting, a character, a publication date, or anything "
+        "the author did or researched. If the facts above do not cover something, write about the "
+        "SUBJECT instead — that is what the research context is for. An invented author is a false "
+        "claim published under the author's own name.\n"
+        if book
+        else ""
+    )
     system = (
-        f"You are a world-class blogger specializing in {genre_name}.\n\n## Genre Guidelines\n{guidelines}\n\n"
+        f"You are a world-class blogger specializing in {genre_name}.\n\n## Genre Guidelines\n{guidelines}\n"
+        f"{book_rule}\n"
         f"## Writing Prime Directive\n{_PRIME_DIRECTIVE}\n\n## Requirements\n- Attention-grabbing headline\n"
         "- Hook opening paragraph\n- 3-5 subheadings for scannability\n- Relevant book/film recommendations\n"
         "- End with a discussion prompt\n- SEO-optimized without keyword stuffing\n\n"
