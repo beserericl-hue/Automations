@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../../lib/api';
 
@@ -11,6 +12,11 @@ import { apiFetch } from '../../lib/api';
 // the dimensions it targeted. Apply does a literal span replacement, so a chapter cannot shrink or
 // balloon — the author sees both versions and decides. That is the whole point of routing craft
 // findings through this surface instead of a repair loop.
+//
+// A suggestion can also be EDITED before it is applied. The server has always accepted a
+// `replacementText` of the caller's choosing; nothing in the UI ever offered it, so the only two
+// answers available were "take the model's wording" and "do nothing". The third answer — the
+// author's own words, in the exact span the finding pins — is the one that actually fixes prose.
 
 type AnnotationSource = 'genre_eval' | 'drift_scan' | 'craft_qa';
 type Severity = 'high' | 'medium' | 'low' | 'info';
@@ -159,7 +165,9 @@ export default function AnnotationsPanel({ contentId }: AnnotationsPanelProps) {
             title="Character drift"
             description="Names that don't match the canonical roster."
             annotations={driftAnnotations}
-            onApply={(a) => apply.mutate({ contentId, annotationId: a.id, source: a.source })}
+            onApply={(a, replacementText) =>
+              apply.mutate({ contentId, annotationId: a.id, source: a.source, replacementText })
+            }
             onDismiss={(a) => dismiss.mutate({ contentId, annotationId: a.id, source: a.source })}
             applyState={apply}
             dismissState={dismiss}
@@ -170,7 +178,9 @@ export default function AnnotationsPanel({ contentId }: AnnotationsPanelProps) {
             title="Craft Q/A"
             description="Pacing, flat paragraphs and prose clarity — each pinned to the passage it refers to. Apply swaps that passage only; undo from the Versions tab."
             annotations={craftAnnotations}
-            onApply={(a) => apply.mutate({ contentId, annotationId: a.id, source: a.source })}
+            onApply={(a, replacementText) =>
+              apply.mutate({ contentId, annotationId: a.id, source: a.source, replacementText })
+            }
             onDismiss={(a) => dismiss.mutate({ contentId, annotationId: a.id, source: a.source })}
             applyState={apply}
             dismissState={dismiss}
@@ -181,7 +191,9 @@ export default function AnnotationsPanel({ contentId }: AnnotationsPanelProps) {
             title="Genre compliance"
             description="Per-rule scores, evidence quotes, and rewrite suggestions."
             annotations={genreAnnotations}
-            onApply={(a) => apply.mutate({ contentId, annotationId: a.id, source: a.source })}
+            onApply={(a, replacementText) =>
+              apply.mutate({ contentId, annotationId: a.id, source: a.source, replacementText })
+            }
             onDismiss={(a) => dismiss.mutate({ contentId, annotationId: a.id, source: a.source })}
             applyState={apply}
             dismissState={dismiss}
@@ -204,7 +216,7 @@ function SourceSection({
   title: string;
   description: string;
   annotations: UnifiedAnnotation[];
-  onApply: (a: UnifiedAnnotation) => void;
+  onApply: (a: UnifiedAnnotation, replacementText?: string) => void;
   onDismiss: (a: UnifiedAnnotation) => void;
   applyState: { isPending: boolean; isError: boolean; error: unknown; variables?: { annotationId?: string } };
   dismissState: { isPending: boolean; variables?: { annotationId?: string } };
@@ -220,7 +232,7 @@ function SourceSection({
           <AnnotationRow
             key={a.id}
             annotation={a}
-            onApply={() => onApply(a)}
+            onApply={(replacementText) => onApply(a, replacementText)}
             onDismiss={() => onDismiss(a)}
             applyPending={applyState.isPending && applyState.variables?.annotationId === a.id}
             applyError={applyState.isError && applyState.variables?.annotationId === a.id ? (applyState.error as Error)?.message : undefined}
@@ -241,13 +253,20 @@ function AnnotationRow({
   dismissPending,
 }: {
   annotation: UnifiedAnnotation;
-  onApply: () => void;
+  onApply: (replacementText?: string) => void;
   onDismiss: () => void;
   applyPending: boolean;
   applyError?: string;
   dismissPending: boolean;
 }) {
   const canApply = annotation.suggestion?.action === 'replace' && !!annotation.suggestion.target_text;
+  // null = not editing. The draft starts from the model's wording when there is one, otherwise from
+  // the passage itself, because rewriting a sentence is easier than typing it out again first.
+  const [draft, setDraft] = useState<string | null>(null);
+  const target = annotation.suggestion?.target_text ?? '';
+  const suggested = annotation.suggestion?.replacement_text ?? '';
+  const delta = draft !== null ? draft.length - target.length : 0;
+
   return (
     <li className="px-4 py-3">
       <div className="flex items-start justify-between gap-3">
@@ -286,19 +305,68 @@ function AnnotationRow({
               )}
             </div>
           )}
+          {/* Edit the fix before taking it. What replaces the passage is whatever is in this box —
+              the model's wording, the author's, or the model's with one word changed. */}
+          {canApply && draft !== null && (
+            <div className="mt-2 space-y-1.5 rounded border border-brand-200 bg-brand-50/40 p-2 dark:border-brand-800 dark:bg-brand-950/20">
+              <p className="text-[11px] font-medium text-brand-700 dark:text-brand-300">
+                This text will replace the quoted passage exactly.
+              </p>
+              <textarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                rows={Math.min(10, Math.max(2, Math.ceil(draft.length / 70)))}
+                className="block w-full rounded border border-gray-300 px-2 py-1 text-xs shadow-sm focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => onApply(draft)}
+                  disabled={applyPending || !draft.trim()}
+                  className="rounded bg-brand-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {applyPending ? 'Applying…' : 'Apply my version'}
+                </button>
+                <button
+                  onClick={() => setDraft(null)}
+                  className="rounded border border-gray-300 px-2 py-1 text-[11px] text-gray-600 dark:border-gray-600 dark:text-gray-400"
+                >
+                  Cancel
+                </button>
+                {suggested && draft !== suggested && (
+                  <button
+                    onClick={() => setDraft(suggested)}
+                    className="text-[11px] text-gray-500 underline hover:text-gray-700 dark:text-gray-400"
+                  >
+                    reset to suggestion
+                  </button>
+                )}
+                <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                  {delta === 0 ? 'same length' : `${delta > 0 ? '+' : '−'}${Math.abs(delta)} characters`}
+                </span>
+              </div>
+            </div>
+          )}
           {applyError && (
             <p className="mt-1 text-xs text-red-500">{applyError}</p>
           )}
         </div>
         <div className="flex shrink-0 flex-col gap-1.5">
-          {canApply && (
-            <button
-              onClick={onApply}
-              disabled={applyPending}
-              className="rounded-lg bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-            >
-              {applyPending ? 'Applying…' : 'Apply Fix'}
-            </button>
+          {canApply && draft === null && (
+            <>
+              <button
+                onClick={() => onApply()}
+                disabled={applyPending}
+                className="rounded-lg bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              >
+                {applyPending ? 'Applying…' : 'Apply Fix'}
+              </button>
+              <button
+                onClick={() => setDraft(suggested || target)}
+                className="rounded-lg border border-brand-300 px-3 py-1 text-xs text-brand-700 hover:bg-brand-50 dark:border-brand-700 dark:text-brand-300 dark:hover:bg-brand-950/40"
+              >
+                Edit first
+              </button>
+            </>
           )}
           <button
             onClick={onDismiss}

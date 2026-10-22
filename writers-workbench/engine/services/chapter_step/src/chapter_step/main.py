@@ -4039,7 +4039,7 @@ MARKETING_SAMPLE_CHAPTERS = 6
 MARKETING_CHARS_PER_CHAPTER = 6000
 
 
-def _build_marketing_system(genre: str, volume_note: str) -> str:
+def _build_marketing_system(genre: str, volume_note: str, bio_supplied: bool = False) -> str:
     """The copywriter. Deliberately not the craft reviewer — a different job with different rules."""
     return (
         "You write the Amazon listing copy for a novel. You have read the manuscript. Your job is to "
@@ -4062,8 +4062,17 @@ def _build_marketing_system(genre: str, volume_note: str) -> str:
         "'Fiction > Historical > General'.\n"
         "- `comparable_titles`: 2-4 published books a reader of this one would already own. Real "
         "titles with authors. This is how a listing finds its shelf.\n"
-        "- `author_bio`: third person, 2-3 sentences, no invented credentials — if you do not know "
-        "something about the author, leave it out rather than inventing it.\n\n"
+        + (
+            "- `author_bio`: the author's own bio is supplied in the prompt. Return it VERBATIM. "
+            "Do not improve it, shorten it or add to it — it has been approved by the person it "
+            "describes, and a word you add is a claim nobody checked.\n\n"
+            if bio_supplied
+            else "- `author_bio`: third person, 2-3 sentences, no invented credentials — if you do "
+            "not know something about the author, leave it out rather than inventing it. With no "
+            "facts about the author at all, return an empty string rather than a plausible "
+            "career.\n\n"
+        )
+        +
         "No marketing throat-clearing: no 'a sweeping saga', no 'a tour de force', no 'readers will "
         "be unable to put it down'. Concrete nouns from the actual book.\n\n"
         "Reply with strict JSON matching BookMarketing {blurb, back_cover, hook, keywords, "
@@ -4118,6 +4127,42 @@ def _build_marketing_revision_system(genre: str) -> str:
     )
 
 
+async def _load_author_profile(user_id: str) -> dict | None:
+    """Read the author's stored facts, mapping the column names onto the schema's field names.
+
+    `pen_name` is a column of its own rather than reusing `users_v2.name`: a pen name is not the name
+    on the account, and the byline has to be whichever the author chose.
+    """
+    from writer_engine.supabase.client import get_supabase_admin
+
+    try:
+        client = await get_supabase_admin()
+        r = (
+            await client.table("author_profiles_v2")
+            .select("pen_name,lives,background,credentials,prior_work,why_this_book,personal,links")
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+        rows = getattr(r, "data", None) or []
+    except Exception as exc:
+        logger.warning("author_bio.profile_unreadable", error=str(exc)[:200])
+        return None
+    if not rows:
+        return None
+    row = rows[0]
+    return {
+        "name": row.get("pen_name") or "",
+        "lives": row.get("lives") or "",
+        "background": row.get("background") or "",
+        "credentials": row.get("credentials") or [],
+        "prior_work": row.get("prior_work") or [],
+        "why_this_book": row.get("why_this_book") or "",
+        "personal": row.get("personal") or "",
+        "links": row.get("links") or [],
+    }
+
+
 async def _op_author_bio(payload: dict) -> dict:
     """Write the bio from supplied facts, and say plainly what is missing.
 
@@ -4125,7 +4170,13 @@ async def _op_author_bio(payload: dict) -> dict:
     """
     from writer_engine.config import get_settings
 
-    profile = AuthorProfile.model_validate(payload.get("profile") or {})
+    supplied = payload.get("profile")
+    if not supplied and payload.get("user_id"):
+        # The hub and voice paths carry no profile — "Eve, write my bio" arrives with a user and
+        # nothing else. The facts have a home (author_profiles_v2, migration 032), so read them
+        # rather than treating the request as factless, which is what makes a model invent a career.
+        supplied = await _load_author_profile(str(payload["user_id"]))
+    profile = AuthorProfile.model_validate(supplied or {})
     gaps: list[str] = []
     if not profile.name.strip():
         gaps.append("name — the bio has nothing to call you")
@@ -4195,6 +4246,10 @@ async def _op_marketing(payload: dict) -> dict:
     ctx = await _load_context(project_id, payload)
     author = str(payload.get("author") or "")
     volume = payload.get("volume")
+    # The author's APPROVED bio, when there is one. Handed over so the copywriter has no reason to
+    # write a bio at all — every bio a model writes without facts is a fabricated credential, and
+    # this one has already been read and signed off by the person it describes.
+    approved_bio = str(payload.get("author_bio") or "").strip()
 
     client = await get_supabase_admin()
     rows: list[dict] = []
@@ -4276,11 +4331,19 @@ async def _op_marketing(payload: dict) -> dict:
                 router,
                 provider="anthropic",
                 model=get_settings().model_default,
-                system=_build_marketing_system(str(ctx.get("genre_slug") or ""), volume_note),
+                system=_build_marketing_system(
+                    str(ctx.get("genre_slug") or ""), volume_note, bool(approved_bio)
+                ),
                 prompt=(
                     f"TITLE: {ctx.get('title') or ''}\n"
                     f"AUTHOR: {author or '(not supplied — leave the bio generic)'}\n"
-                    f"CHAPTERS: {len(rows)}, {sum(len(str(x.get('content_text') or '').split()) for x in rows):,} words\n\n"
+                    + (
+                        f"THE AUTHOR'S OWN BIO (return it in `author_bio` EXACTLY as written; it is "
+                        f"already approved):\n{approved_bio}\n"
+                        if approved_bio
+                        else ""
+                    )
+                    + f"CHAPTERS: {len(rows)}, {sum(len(str(x.get('content_text') or '').split()) for x in rows):,} words\n\n"
                     + "\n\n".join(parts)
                 ),
                 schema=BookMarketing,

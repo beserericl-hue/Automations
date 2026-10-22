@@ -32,8 +32,12 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { logger } from './logger.js';
 
-const WIDTH = 1600;
-const HEIGHT = 2560; // 1:1.6, the standard ebook cover ratio
+/** The ebook jacket's exact pixel size. Exported so a caller can validate what it was handed
+ *  rather than assume it — the fallback path returns raw art at an unknown size. */
+export const EBOOK_COVER_W = 1600;
+export const EBOOK_COVER_H = 2560; // 1:1.6, the standard ebook cover ratio
+const WIDTH = EBOOK_COVER_W;
+const HEIGHT = EBOOK_COVER_H;
 const ART_TOP = 860; // leaves a title block above the artwork
 const BG = '#130c07'; // dark earth; the art's own darkest tone, so the join is invisible
 const INK = '#dcd7d0'; // pale warm grey — sits back from the artwork instead of competing

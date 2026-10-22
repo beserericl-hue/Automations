@@ -5,6 +5,7 @@ import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
 import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import ExportDialog from '../export/ExportDialog';
+import PublishingPanel from '../publishing/PublishingPanel';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import ProjectEditForm from './ProjectEditForm';
 import ImageGallery from '../images/ImageGallery';
@@ -19,7 +20,7 @@ import { useToast } from '../../contexts/ToastContext';
 import type { WritingProject, PublishedContent, StoryBibleEntry, ResearchReport, GenreConfig, StoryArc, OutlineCharacter, OutlineChapter, ChapterOutline, SubChapter } from '../../types/database';
 import { normalizeOutlineChapter } from '../../types/database';
 
-const TABS = ['overview', 'outline', 'chapters', 'qa', 'bible', 'art', 'social', 'research', 'cost', 'export'] as const;
+const TABS = ['overview', 'outline', 'chapters', 'qa', 'bible', 'art', 'social', 'research', 'cost', 'export', 'publish'] as const;
 type Tab = typeof TABS[number];
 
 const tabLabels: Record<Tab, string> = {
@@ -33,6 +34,9 @@ const tabLabels: Record<Tab, string> = {
   research: 'Research',
   cost: 'Cost',
   export: 'Export',
+  // Distinct from Export: Export hands you a manuscript to read, Publish hands you the files and
+  // the copy Amazon asks for.
+  publish: 'Publish',
 };
 
 export default function ProjectDetail() {
@@ -441,6 +445,7 @@ export default function ProjectDetail() {
             setExportOpen={setExportOpen}
           />
         )}
+        {activeTab === 'publish' && <PublishingPanel projectId={id!} userId={userId!} />}
       </div>
 
       {/* Dialogs */}

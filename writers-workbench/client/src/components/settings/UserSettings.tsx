@@ -150,6 +150,21 @@ export default function UserSettings() {
         </Field>
       </Section>
 
+      {/* Author Profile. A separate screen rather than more fields here: these are the facts a bio
+          and a copyright page are built from, and they are the author's, not the account's. */}
+      <Section title="Author Profile">
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          The name you publish under, your background, and the bio printed on the back cover and on
+          Amazon. Your bio is written from these facts and from nothing else.
+        </p>
+        <button
+          onClick={() => navigate('/settings/author')}
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
+        >
+          Open Author Profile
+        </button>
+      </Section>
+
       {/* Email Delivery */}
       <Section title="Email Delivery">
         <Field label="Recipient Email">

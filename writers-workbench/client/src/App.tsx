@@ -32,6 +32,10 @@ const SourceBrowser = lazyRetry(() => import('./components/content/SourceBrowser
 const SuperuserPanel = lazyRetry(() => import('./components/superuser/SuperuserPanel'));
 const CreditsPage = lazyRetry(() => import('./components/credits/CreditsPage'));
 
+// Publishing — the author's own facts, and the KDP path for a finished book.
+const AuthorProfile = lazyRetry(() => import('./components/settings/AuthorProfile'));
+const ProjectPublishing = lazyRetry(() => import('./components/publishing/ProjectPublishing'));
+
 // Compose Newsletter 2a (S4) — newsletter route stubs. S6/S7/S8 fill in the
 // Generate / Execution Status / Approvals real pages; the rest stay stubs
 // until Phase 2b.
@@ -82,6 +86,7 @@ export default function App() {
                     <Route path="projects" element={<ProjectList />} />
                     <Route path="projects/:id" element={<ProjectDetail />} />
                     <Route path="projects/:id/bible" element={<StoryBiblePanel />} />
+                    <Route path="projects/:id/publish" element={<ProjectPublishing />} />
                     <Route path="trash" element={<TrashView />} />
                     <Route path="library" element={<ContentLibrary />} />
                     {/* Legacy routes redirect to Content Library with filter */}
@@ -101,6 +106,7 @@ export default function App() {
                     <Route path="cost" element={<CostDashboard />} />
                     <Route path="sources" element={<SourceBrowser />} />
                     <Route path="settings" element={<UserSettings />} />
+                    <Route path="settings/author" element={<AuthorProfile />} />
                     <Route path="admin/*" element={<AdminPanel />} />
                     <Route path="superuser/*" element={<SuperuserPanel />} />
                     <Route path="credits" element={<CreditsPage />} />
