@@ -24,6 +24,44 @@ const platformColors: Record<string, string> = {
   facebook: 'bg-blue-600 text-white',
 };
 
+/** Published limits. Over one of these, the post cannot be posted at all. */
+const PLATFORM_LIMITS: Record<string, number> = {
+  twitter: 280,
+  x: 280,
+  bluesky: 300,
+  mastodon: 500,
+  threads: 500,
+  instagram: 2200,
+  linkedin: 3000,
+  facebook: 5000,
+};
+
+/**
+ * The character count against the platform's limit.
+ *
+ * A limit is a publish blocker, not a style note — at 281 characters X refuses the post outright,
+ * and the generator has produced a 309-character one. So the number is on the card rather than
+ * left for the author to discover when they paste it somewhere.
+ */
+function PostLength({ platform, text }: { platform: string; text: string }) {
+  const limit = PLATFORM_LIMITS[(platform || '').toLowerCase()];
+  if (!limit) return <span>{text.length.toLocaleString()} characters</span>;
+  const over = text.length > limit;
+  return (
+    <span
+      className={
+        over
+          ? 'rounded px-1.5 py-0.5 font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+          : ''
+      }
+      title={over ? `Too long for ${platform} — rejected above ${limit} characters` : undefined}
+    >
+      {text.length.toLocaleString()} / {limit.toLocaleString()}
+      {over ? ' — too long to post' : ''}
+    </span>
+  );
+}
+
 function getImageUrl(storagePath: string): string {
   const { data } = supabase.storage.from('social-images').getPublicUrl(storagePath);
   return data.publicUrl;
@@ -183,8 +221,12 @@ export default function SocialMediaPanel({ projectId }: SocialMediaPanelProps) {
                     )}
 
                     {/* Footer */}
-                    <div className="mt-2 flex items-center gap-3 text-xs text-gray-500">
+                    <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500">
                       <span>{new Date(post.created_at).toLocaleDateString()}</span>
+                      {/* A platform limit is a publish blocker, not a style note — at 281 characters
+                          X refuses the post outright. So the count is on the card rather than left
+                          for the author to discover in the compose box. */}
+                      <PostLength platform={post.platform} text={post.post_text ?? ''} />
                       <span className={`rounded px-1.5 py-0.5 ${
                         post.status === 'published' ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400' :
                         post.status === 'scheduled' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400' :

@@ -249,14 +249,33 @@ async def _op_cover_art(payload: dict) -> dict:
     }
 
 
+# Published limits, so a humanized post that cannot be posted is never kept. Generous where the
+# platform is generous — the cap exists to catch a runaway rewrite, not to re-impose house style.
+_PLATFORM_LIMITS = {
+    "twitter": 280,
+    "x": 280,
+    "bluesky": 300,
+    "mastodon": 500,
+    "threads": 500,
+    "instagram": 2200,
+    "linkedin": 3000,
+    "facebook": 5000,
+}
+
+
 def _social_system() -> str:
     """Craft-composed voice for social copy — transparent prose + snappy, no-fluff lines."""
     return compose_craft_system(
         seed_keys=["follett_seeds.prose.transparent", "follett_seeds.prose.dialogue"]
     ) + (
-        "\n\nWrite ONE social post per requested platform promoting the work. Match each platform's "
-        "norms (length, tone). Transparent, concrete, hook-first. Return strict JSON: an object "
-        "mapping each platform name to its post string."
+        "\n\nWrite ONE social post per requested platform promoting the work. Transparent, "
+        "concrete, hook-first. Return strict JSON: an object mapping each platform name to its "
+        "post string.\n\n"
+        "LENGTH IS A HARD LIMIT, NOT A STYLE NOTE. A post over its platform's limit cannot be "
+        "posted at all. Count the characters and stay under:\n"
+        + "\n".join(f"- {name}: {limit} characters" for name, limit in sorted(_PLATFORM_LIMITS.items()))
+        + "\nFor the short ones, aim ten percent under — a hashtag or a link added later still has "
+        "to fit."
     )
 
 
@@ -302,18 +321,55 @@ async def _persist_social_posts(payload: dict, posts: dict) -> dict | None:
         return {"persisted": False, "error": str(exc)[:200]}
 
 
-# Published limits, so a humanized post that cannot be posted is never kept. Generous where the
-# platform is generous — the cap exists to catch a runaway rewrite, not to re-impose house style.
-_PLATFORM_LIMITS = {
-    "twitter": 280,
-    "x": 280,
-    "bluesky": 300,
-    "mastodon": 500,
-    "threads": 500,
-    "instagram": 2200,
-    "linkedin": 3000,
-    "facebook": 5000,
-}
+def _over_limit(posts: dict[str, str]) -> dict[str, dict[str, int]]:
+    """Which posts cannot be posted, and by how much.
+
+    A platform limit is the one piece of social-media guidance that is not a matter of taste: at
+    281 characters X simply refuses the post. So it is measured rather than requested.
+    """
+    out: dict[str, dict[str, int]] = {}
+    for platform, text in posts.items():
+        limit = _PLATFORM_LIMITS.get(platform.lower())
+        if limit and len(text) > limit:
+            out[platform] = {"chars": len(text), "limit": limit}
+    return out
+
+
+async def _shorten_to_fit(
+    posts: dict[str, str], offenders: dict[str, dict[str, int]], summary: str
+) -> dict[str, str]:
+    """One corrective pass over the posts that are too long, naming the count and the target.
+
+    Only the offenders are rewritten; a post that already fits is left exactly as it was, because
+    regenerating the set to fix one of them loses the others.
+    """
+    router = get_router(service=STEP_NAME)
+    fixed = dict(posts)
+    for platform, info in offenders.items():
+        try:
+            resp = await router.complete(
+                provider="anthropic",
+                model=get_settings().model_cheap,
+                system=(
+                    "You shorten social posts. Keep the hook, the concrete nouns and the voice. "
+                    "Cut qualifiers and subordinate clauses first. Return ONLY the shortened post, "
+                    "with no quotation marks around it and no commentary."
+                ),
+                prompt=(
+                    f"This {platform} post is {info['chars']} characters and the limit is "
+                    f"{info['limit']}. Rewrite it to at most {int(info['limit'] * 0.95)} "
+                    f"characters.\n\nPOST:\n{posts[platform]}"
+                ),
+                max_tokens=600,
+            )
+            candidate = resp.text.strip().strip('"')
+            # Only taken if it actually helped. A "shortened" version that is still over, or that
+            # has been cut to nothing, is worse than the original.
+            if 40 <= len(candidate) <= info["limit"]:
+                fixed[platform] = candidate
+        except (ProviderNotRegistered, ValueError):
+            continue
+    return fixed
 
 
 async def _humanize_posts(posts: dict[str, str], payload: dict) -> tuple[dict[str, str], dict | None]:
@@ -392,9 +448,28 @@ async def _op_social_posts(payload: dict) -> dict:
     # is the exact condition under which this model behaved worst in testing — on a 29-word passage
     # it replaced a character's name with a pronoun, where at 1431 words it kept every name. So the
     # per-post protect list is extracted from the post itself and the result is length-checked.
+    # CHECKED, NOT ASKED. The prompt states every limit, and a prompt is not a guarantee: a post
+    # measured at 309 characters against X's 280 went out of here publishable-looking and
+    # unpublishable. One corrective pass over the offenders, before humanizing, so the humanizer's
+    # own length guard has something in-limit to protect.
+    offenders = _over_limit(posts)
+    if offenders:
+        logger.info("social.over_limit_retry", offenders=offenders)
+        posts = await _shorten_to_fit(posts, offenders, summary)
+
     posts, humanize_report = await _humanize_posts(posts, payload)
+
+    # Measured again at the end: the humanizer keeps the original when its rewrite would not fit,
+    # so a post that was over before is still over now.
+    still_over = _over_limit(posts)
+    if still_over:
+        logger.warning("social.over_limit_kept", offenders=still_over)
+
     persisted = await _persist_social_posts(payload, posts)
-    return {**posts, "humanize": humanize_report, "persist": persisted}
+    out = {**posts, "humanize": humanize_report, "persist": persisted}
+    if still_over:
+        out["over_limit"] = still_over
+    return out
 
 
 async def _op_scrape_url(payload: dict) -> dict:
