@@ -337,16 +337,29 @@ authorRouter.post('/bio', validateBody(BioDraftSchema), async (req, res) => {
       project_title: projectTitle || undefined,
     });
 
+    // An empty bio is NOT a success, whatever the engine reported. Asked for a bio from facts too
+    // thin to say anything with, the writer is told to stay short rather than pad — and it can come
+    // back with nothing at all. Reporting that as ok would tell the screen the operation worked
+    // while handing it a blank paragraph to display.
+    const bio = String(result.author_bio ?? '').trim();
+    const ok = result.ok !== false && bio.length > 0;
+    const reason =
+      (result.reason as string | undefined) ??
+      (ok
+        ? null
+        : 'There is not enough here to write a bio from. Add your background, or what connects ' +
+          'you to this book.');
+
     logger.info(
-      { userId, projectId, ok: result.ok, revised: Boolean(instructions) },
+      { userId, projectId, ok, chars: bio.length, revised: Boolean(instructions) },
       'author: bio drafted',
     );
     res.json({
       success: true,
       data: {
-        ok: result.ok !== false,
-        bio: String(result.author_bio ?? ''),
-        reason: result.reason ?? null,
+        ok,
+        bio,
+        reason,
         gaps: Array.isArray(result.gaps) ? result.gaps : gapsIn(profile),
         why_this_book_used: whyThisBook,
       },
