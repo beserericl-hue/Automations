@@ -4003,9 +4003,13 @@ async def _op_plan_volumes(payload: dict) -> dict:
             prows = getattr(pr, "data", None) or []
             outline = dict((prows or [{}])[0].get("outline") or {})
             outline["_volume_plan"] = out
+            # touch() stamps updated_at. An outline write that leaves it alone is invisible to the
+            # freshness probe's cheapest signal, so nothing reindexes against the change.
+            from writer_engine.persist_helpers import touch
+
             await (
                 client.table("writing_projects_v2")
-                .update({"outline": outline})
+                .update({"outline": outline, **touch()})
                 .eq("id", project_id)
                 .execute()
             )
