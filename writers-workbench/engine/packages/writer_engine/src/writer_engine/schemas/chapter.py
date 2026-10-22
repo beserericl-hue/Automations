@@ -432,3 +432,25 @@ class ResearchPlan(BaseModel):
             if isinstance(qs, list):
                 data = {**data, "questions": [{"question": q} if isinstance(q, str) else q for q in qs]}
         return data
+
+
+class VolumeEndingJudgement(BaseModel):
+    """How well a chapter works as the LAST chapter of a printed volume.
+
+    Not "how dramatic is this chapter" — those are different questions, and conflating them is how a
+    trilogy's first volume ends on its most spectacular scene and still leaves the reader with no
+    reason to buy the second. A chapter that resolves everything can be the best in the book and the
+    worst possible place to stop.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    # 0-1: would a reader, closing the book here, need the next volume?
+    cliffhanger: float = Field(default=0.5, ge=0.0, le=1.0)
+    # What is left open. One sentence. Empty when nothing is.
+    unresolved: str = ""
+    # Why it does or does not work as an ending. One sentence.
+    reason: str = ""
+    # True when the chapter ties things off — the signal that this is a BAD volume break even if the
+    # chapter itself is strong.
+    resolves: bool = False

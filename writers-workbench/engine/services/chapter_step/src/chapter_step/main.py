@@ -30,6 +30,7 @@ from writer_engine.schemas.chapter import (
     GenreEval,
     SubChapterBrief,
     SubChapterPlan,
+    VolumeEndingJudgement,
     WriteChapterRequest,
     WriteChapterResponse,
 )
@@ -3844,9 +3845,181 @@ async def _op_short_story(payload: dict) -> dict:
     }
 
 
+# ----------------------------------------------------------------------------------------------
+# Volume planning: where does a 600,000-word manuscript become three printed books?
+# ----------------------------------------------------------------------------------------------
+
+VOLUME_ENDING_TAIL_WORDS = 1200
+"""How much of a chapter's close to judge. The question is what the last pages do, not the chapter."""
+
+
+def _build_volume_ending_system() -> str:
+    """The reviewer that decides whether a chapter can END A VOLUME."""
+    return (
+        "You are deciding whether a chapter can be the LAST CHAPTER OF A PRINTED VOLUME in a "
+        "multi-volume novel. The reader will close the book here and must choose whether to buy the "
+        "next one.\n\n"
+        "This is NOT the question 'is this a good chapter'. A chapter can be the best in the book and "
+        "the worst possible place to stop, because it finishes things. Judge only the ending.\n\n"
+        "SCORE HIGH (0.8-1.0) when the closing pages leave a reader unable to stop: a question asked "
+        "and not answered, a reversal whose cost has not yet been paid, a decision taken but not "
+        "acted on, someone arriving, a threat already in motion, a discovery that reframes what came "
+        "before.\n"
+        "SCORE LOW (0.0-0.3) when the closing pages tie off: a resolution, a summary, a farewell, a "
+        "character at peace, a time-skip that releases tension, any sentence that functions as 'and "
+        "so it was finished'.\n"
+        "MIDDLE (0.4-0.7) for an ending that is merely a stopping place — nothing resolved, but "
+        "nothing pulling either.\n\n"
+        "Set `resolves` true when the passage ties things off, even if it is otherwise strong — that "
+        "is the signal that this is the wrong place to break a volume.\n"
+        "`unresolved` names in ONE sentence what is left hanging, or is empty if nothing is.\n"
+        "`reason` is one sentence on why it does or does not work as an ending.\n\n"
+        "Reply with strict JSON matching VolumeEndingJudgement "
+        "{cliffhanger, unresolved, reason, resolves}."
+    )
+
+
+async def _judge_volume_ending(tail: str, chapter_number: int, title: str) -> VolumeEndingJudgement | None:
+    """Judge one candidate ending. None when it could not be scored."""
+    from writer_engine.config import get_settings
+
+    if not tail.strip():
+        return None
+    router = get_router(service=STEP_NAME)
+    try:
+        judgement, _resp = await complete_structured(
+            router,
+            provider="anthropic",
+            model=get_settings().model_default,
+            system=_build_volume_ending_system(),
+            prompt=(f"CHAPTER {chapter_number} — {title}\n\nThese are its CLOSING pages:\n\n{tail}"),
+            schema=VolumeEndingJudgement,
+            max_tokens=1024,
+        )
+        return judgement
+    except ProviderNotRegistered:
+        return None
+    except ValueError as exc:
+        logger.warning("volume.ending_unparseable", chapter=chapter_number, error=str(exc)[:200])
+        return None
+
+
+async def _op_plan_volumes(payload: dict) -> dict:
+    """Split a project into printed volumes, choosing breaks on story rather than page count.
+
+    The page cap is a CONSTRAINT (KDP stops at 828 pages); ending strength is the OBJECTIVE. Only
+    chapters inside a feasible split window are sent to the judge — scoring all 96 to decide two
+    boundaries would be most of a book's worth of calls.
+
+    `persist` writes the plan to the project outline under `_volume_plan`, where the export reads it.
+    """
+    from writer_engine.supabase.client import get_supabase_admin
+    from writer_engine.volumes import (
+        ChapterInfo,
+        minimum_volumes,
+        plan_volumes,
+        split_candidates,
+    )
+
+    project_id = str(payload.get("project_id") or "")
+    if not project_id:
+        return {"planned": False, "reason": "project_id required"}
+    trim = str(payload.get("trim") or "6x9")
+    requested = payload.get("volume_count")
+    judge = payload.get("judge_endings", True) is not False
+
+    client = await get_supabase_admin()
+    rows: list[dict] = []
+    page = 0
+    while True:
+        r = await (
+            client.table("published_content_v2")
+            .select("chapter_number,title,content_text")
+            .eq("project_id", project_id)
+            .eq("content_type", "chapter")
+            .is_("deleted_at", None)
+            .order("chapter_number")
+            .range(page * 1000, page * 1000 + 999)
+            .execute()
+        )
+        batch = getattr(r, "data", None) or []
+        rows.extend(batch)
+        if len(batch) < 1000:
+            break
+        page += 1
+    rows = [x for x in rows if str(x.get("content_text") or "").strip()]
+    if not rows:
+        return {"planned": False, "reason": "no chapters with text"}
+
+    chapters: list[ChapterInfo] = []
+    for x in rows:
+        text = str(x.get("content_text") or "")
+        words = text.split()
+        chapters.append(
+            ChapterInfo(
+                number=_coerce_chapter_number(x.get("chapter_number"), 0),
+                title=str(x.get("title") or ""),
+                words=len(words),
+                tail=" ".join(words[-VOLUME_ENDING_TAIL_WORDS:]),
+            )
+        )
+
+    n_vol = int(requested) if requested else minimum_volumes(chapters, trim)
+    judged = 0
+    if judge and n_vol > 1:
+        candidates = split_candidates(chapters, trim=trim, volume_count=n_vol)
+        # The last chapter is the end of the BOOK; it is allowed to resolve, and is never a break.
+        candidates = [i for i in candidates if i < len(chapters) - 1]
+        sem = asyncio.Semaphore(6)
+
+        async def judge_one(idx: int) -> None:
+            nonlocal judged
+            info = chapters[idx]
+            async with sem:
+                verdict = await _judge_volume_ending(info.tail, info.number, info.title)
+            if verdict is None:
+                return
+            # A chapter that ties things off is a bad break however strong it reads.
+            info.cliffhanger = min(verdict.cliffhanger, 0.25) if verdict.resolves else verdict.cliffhanger
+            info.cliffhanger_reason = verdict.reason or verdict.unresolved
+            judged += 1
+
+        await asyncio.gather(*[judge_one(i) for i in candidates])
+        logger.info("volume.endings_judged", candidates=len(candidates), judged=judged)
+
+    plan = plan_volumes(chapters, trim=trim, volume_count=int(requested) if requested else None)
+    out = plan.as_dict()
+    out["judged_candidates"] = judged
+
+    if payload.get("persist") and plan.volumes:
+        try:
+            pr = (
+                await client.table("writing_projects_v2")
+                .select("outline")
+                .eq("id", project_id)
+                .limit(1)
+                .execute()
+            )
+            prows = getattr(pr, "data", None) or []
+            outline = dict((prows or [{}])[0].get("outline") or {})
+            outline["_volume_plan"] = out
+            await (
+                client.table("writing_projects_v2")
+                .update({"outline": outline})
+                .eq("id", project_id)
+                .execute()
+            )
+            out["persisted"] = True
+        except Exception as exc:
+            logger.warning("volume.persist_failed", error=str(exc)[:200])
+            out["persisted"] = False
+    return out
+
+
 OPS = {
     "write": _op_write,
     "plan": _op_plan,
+    "plan-volumes": _op_plan_volumes,
     "rewrite": _op_rewrite,
     "repair": _op_repair,
     "qa": _op_qa,
