@@ -3603,6 +3603,88 @@ async def _persist_simple(
         return {"persisted": False, "error": str(exc)[:200]}
 
 
+BLOG_RESEARCH_BUDGET = 48_000
+"""How much of the project's own research to put in front of the blogger, in characters.
+
+The Ossuary carries 201 reports and 655,000 characters of it. All of it will not fit and most of it
+is not relevant to any one post, so the reports are ranked against the topic and taken until the
+budget runs out.
+"""
+
+
+def _relevance(text: str, terms: set[str]) -> int:
+    """How many of the topic's terms this report actually mentions.
+
+    Distinct terms rather than total occurrences: a report that says "Piscataway" forty times and
+    touches nothing else is about one thing, and a report that covers four of the five terms is the
+    one worth reading.
+    """
+    low = text.lower()
+    return sum(1 for t in terms if t in low)
+
+
+async def _project_research(user_id: str, project_title: str, topic: str, keywords: str) -> str:
+    """The project's OWN research, ranked against the topic.
+
+    WHY NOT A FRESH SEARCH. This is the material the book was written from — cited, period-specific
+    and already checked. A blog post about the research behind a book should be built from the
+    research behind the book, not from whatever a search engine returns for its title today.
+    """
+    from writer_engine.supabase.client import get_supabase_admin
+
+    if not user_id or not project_title:
+        return ""
+    try:
+        client = await get_supabase_admin()
+        r = (
+            await client.table("research_reports_v2")
+            .select("topic,content,created_at")
+            .eq("user_id", user_id)
+            .like("topic", f"{project_title}%")
+            .is_("deleted_at", None)
+            .order("created_at", desc=True)
+            .limit(300)
+            .execute()
+        )
+        rows = getattr(r, "data", None) or []
+    except Exception as exc:
+        logger.warning("blog.project_research_unreadable", error=str(exc)[:200])
+        return ""
+    if not rows:
+        return ""
+
+    terms = {
+        w.strip(".,;:\"'").lower()
+        for w in f"{topic} {keywords}".split()
+        if len(w.strip(".,;:\"'")) > 4
+    }
+    seen: set[str] = set()
+    scored: list[tuple[int, int, str, str]] = []
+    for row in rows:
+        content = str(row.get("content") or "").strip()
+        if len(content) < 200:
+            continue
+        # The same chapter is researched more than once; the near-duplicates add nothing but bulk.
+        fingerprint = content[:300]
+        if fingerprint in seen:
+            continue
+        seen.add(fingerprint)
+        scored.append((_relevance(content, terms), len(content), str(row.get("topic") or ""), content))
+
+    scored.sort(key=lambda x: (-x[0], -x[1]))
+    parts: list[str] = []
+    used = 0
+    for _score, _size, report_topic, content in scored:
+        if used + len(content) > BLOG_RESEARCH_BUDGET:
+            continue
+        parts.append(f"--- {report_topic} ---\n{content}")
+        used += len(content)
+        if used >= BLOG_RESEARCH_BUDGET * 0.9:
+            break
+    logger.info("blog.project_research", reports=len(parts), chars=used, available=len(rows))
+    return "\n\n".join(parts)
+
+
 async def _book_facts(project_id: str, author: str) -> str:
     """What is actually true about this book, for anything writing ABOUT it.
 
@@ -3656,7 +3738,17 @@ async def _op_blog(payload: dict) -> dict:
     keywords = payload.get("keywords") or ""
     target = _coerce_int(payload.get("target_length"), 1500)  # G6: router may pass "1500 words"
     genre_name, guidelines = await _load_genre_guidelines(genre_slug)
-    book = await _book_facts(str(payload.get("project_id") or ""), str(payload.get("author") or ""))
+    project_id = str(payload.get("project_id") or "")
+    user_id = str(payload.get("user_id") or "")
+    author = str(payload.get("author") or "")
+    book = await _book_facts(project_id, author)
+    # The author, in their own words, for a post that says who wrote this and why. Same rule as the
+    # bio: what is not here does not go in.
+    profile = await _load_author_profile(user_id) if user_id else None
+    # And the project's own research — the material the book was written from.
+    project_research = await _project_research(
+        user_id, str(payload.get("project_title") or ""), topic, str(keywords)
+    )
     # The research is for the SUBJECT, not for the book. Searching on a book's own title finds
     # nothing when it is unpublished, and "nothing found" is where the invention starts — so the
     # focus is pinned to the subject matter and the book's own facts come from the database.
@@ -3675,6 +3767,34 @@ async def _op_blog(payload: dict) -> dict:
     )
     model = _polish_model(payload, settings)
     # ABOUT-THE-BOOK posts get the book. Everything else is unchanged.
+    author_facts = ""
+    if profile:
+        bits = [
+            f"NAME: {profile.get('name') or author}",
+            f"BACKGROUND: {profile.get('background') or ''}",
+            f"WHY THIS BOOK: {profile.get('why_this_book') or ''}",
+            f"LIVES: {profile.get('lives') or ''}",
+        ]
+        if profile.get("credentials"):
+            bits.append("CREDENTIALS: " + "; ".join(profile["credentials"]))
+        if profile.get("prior_work"):
+            bits.append("PRIOR WORK: " + "; ".join(profile["prior_work"]))
+        kept = [b for b in bits if b.split(": ", 1)[-1].strip()]
+        if kept:
+            pronoun_rule = (
+                ""
+                if (profile.get("pronouns") or "").strip()
+                else " The author has NOT supplied pronouns: use the surname, never he/she/they."
+            )
+            author_facts = (
+                "\n\n## The author\n"
+                + "\n".join(kept)
+                + f"\nPRONOUNS: {profile.get('pronouns') or '(not supplied)'}"
+                + "\nUse these facts and no others about this person."
+                + pronoun_rule
+                + "\n"
+            )
+
     book_rule = (
         "\n\n## The book this post is about\n"
         f"{book}\n\n"
@@ -3685,7 +3805,7 @@ async def _op_blog(payload: dict) -> dict:
         "claim published under the author's own name.\n"
         if book
         else ""
-    )
+    ) + author_facts
     system = (
         f"You are a world-class blogger specializing in {genre_name}.\n\n## Genre Guidelines\n{guidelines}\n"
         f"{book_rule}\n"
@@ -3694,9 +3814,24 @@ async def _op_blog(payload: dict) -> dict:
         "- End with a discussion prompt\n- SEO-optimized without keyword stuffing\n\n"
         "Return strict JSON: {title, meta_description, body_markdown, tags}."
     )
+    required_title = str(payload.get("title") or "").strip()
     prompt = (
-        f"Write a blog post about: {topic}\nTarget length: {target} words\nSEO keywords: {keywords}\n\n"
-        f"## Research Context\n{research}"
+        f"Write a blog post about: {topic}\nTarget length: {target} words\nSEO keywords: {keywords}\n"
+        + (
+            f'\nUSE EXACTLY THIS TITLE, character for character: "{required_title}"\n'
+            if required_title
+            else ""
+        )
+        + (
+            "\n## The research this book was actually written from\n"
+            "These are the project's own cited research notes. PREFER THEM over the general context "
+            "below: they are specific, sourced, and already checked. Name the real places, people, "
+            "dates and institutions they contain rather than writing around them.\n\n"
+            f"{project_research}\n"
+            if project_research
+            else ""
+        )
+        + f"\n## General research context\n{research}"
     )
     try:
         resp = await get_router(service=STEP_NAME).complete(
@@ -3706,11 +3841,12 @@ async def _op_blog(payload: dict) -> dict:
         return {"written": False, "reason": "no provider"}
     import json as _json
 
-    title, body, meta = (topic[:80] or "Untitled Blog Post"), resp.text.strip(), {}
+    title, body, meta = (required_title or topic[:80] or "Untitled Blog Post"), resp.text.strip(), {}
     try:
         m = re.search(r"\{.*\}", resp.text, re.S)
         data = _json.loads(m.group(0)) if m else {}
-        title = data.get("title") or title
+        # A requested title wins over whatever the model chose: the author asked for that headline.
+        title = required_title or data.get("title") or title
         body = data.get("body_markdown") or body
         meta = {"meta_description": data.get("meta_description"), "tags": data.get("tags")}
     except Exception:

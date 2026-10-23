@@ -42,6 +42,7 @@ export default function PromotionComposer({ projectId, projectTitle, userId, def
   const [about, setAbout] = useState('');
   const [topic, setTopic] = useState('');
   const [keywords, setKeywords] = useState('');
+  const [headline, setHeadline] = useState('');
   const [length, setLength] = useState(1500);
 
   const socialRunning = stateOf(`${projectId}:social`) === 'queued';
@@ -69,6 +70,7 @@ export default function PromotionComposer({ projectId, projectTitle, userId, def
         method: 'POST',
         body: JSON.stringify({
           topic: topic.trim(),
+          title: headline.trim() || undefined,
           keywords: keywords.trim() || undefined,
           target_length: length,
         }),
@@ -79,6 +81,7 @@ export default function PromotionComposer({ projectId, projectTitle, userId, def
       if (!jobId) return;
       trackJob(`${projectId}:blog`, jobId, [['content-list']]);
       setTopic('');
+      setHeadline('');
       addToast('Writing the post — it lands in Content Library → Blog Posts', 'info');
     },
     onError: (err: Error) => addToast(err.message || 'Could not start', 'error'),
@@ -183,6 +186,17 @@ export default function PromotionComposer({ projectId, projectTitle, userId, def
             </button>
           ))}
         </div>
+        <Field
+          label="Headline"
+          hint="Optional. Given one, it is used exactly as written; left blank, the post titles itself."
+        >
+          <input
+            value={headline}
+            onChange={(e) => setHeadline(e.target.value)}
+            className={inputClass}
+            placeholder={`Digging up the truth: the research behind ${projectTitle}`}
+          />
+        </Field>
         <div className="flex flex-wrap items-end gap-4">
           <Field label="Search keywords" hint="Optional, comma separated.">
             <input

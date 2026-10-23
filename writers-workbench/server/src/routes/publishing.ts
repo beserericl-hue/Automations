@@ -747,6 +747,8 @@ const BlogSchema = z.object({
   topic: z.string().min(8, 'Say what the post is about').max(500),
   keywords: z.string().max(500).optional(),
   target_length: z.number().int().min(300).max(5000).optional(),
+  /** A headline the author has already decided on. Used verbatim when given. */
+  title: z.string().max(300).optional(),
 });
 
 /** The book in one paragraph, for a writer that has not read it. */
@@ -845,7 +847,11 @@ publishingRouter.post('/project/:projectId/blog', validateBody(BlogSchema), asyn
       project_id: project.id,
       user_id: req.userId!,
       author: String(authorProfile?.pen_name ?? ''),
+      // The title is how the engine finds this project's research reports: they are filed by
+      // topic ("<title> — Chapter N research"), not by a project_id column.
+      project_title: project.title,
       topic: body.topic.trim(),
+      title: body.title?.trim() || undefined,
       genre_slug: project.genre_slug ?? '',
       keywords: body.keywords?.trim() || '',
       target_length: body.target_length ?? 1500,
