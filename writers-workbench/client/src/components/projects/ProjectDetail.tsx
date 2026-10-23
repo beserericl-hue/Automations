@@ -7,6 +7,7 @@ import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import ExportDialog from '../export/ExportDialog';
 import PublishingPanel from '../publishing/PublishingPanel';
 import PromotionComposer from '../publishing/PromotionComposer';
+import ProjectBlogPosts from '../publishing/ProjectBlogPosts';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import ProjectEditForm from './ProjectEditForm';
 import ImageGallery from '../images/ImageGallery';
@@ -1620,7 +1621,11 @@ function SocialTab({
         defaultAbout={defaultAbout || undefined}
       />
       <div>
-        <h3 className="mb-3 text-lg font-semibold text-gray-900 dark:text-white">Posts so far</h3>
+        <h3 className="mb-3 text-lg font-semibold text-gray-900 dark:text-white">Blog posts</h3>
+        <ProjectBlogPosts projectId={projectId} />
+      </div>
+      <div>
+        <h3 className="mb-3 text-lg font-semibold text-gray-900 dark:text-white">Social posts</h3>
         <SocialMediaPanel projectId={projectId} />
       </div>
     </div>
