@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
@@ -8,6 +8,7 @@ import ExportDialog from '../export/ExportDialog';
 import PublishingPanel from '../publishing/PublishingPanel';
 import PromotionComposer from '../publishing/PromotionComposer';
 import ProjectBlogPosts from '../publishing/ProjectBlogPosts';
+import ArchiveImageSearch from '../publishing/ArchiveImageSearch';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import ProjectEditForm from './ProjectEditForm';
 import ImageGallery from '../images/ImageGallery';
@@ -342,6 +343,42 @@ export default function ProjectDetail() {
   }
 
   const outline = project.outline;
+
+  /**
+   * Subjects an archive might actually hold pictures of, taken from the book's own premise.
+   *
+   * The project's CHARACTERS are deliberately excluded. They are invented, and offering "Marcus
+   * Tayac" as an archive search would send the author looking for a photograph of someone who does
+   * not exist — the same failure as the blog post that invented an author, arrived at from the
+   * other direction. What is left is the real places, peoples and institutions the book is set
+   * among, which is what a catalogue can answer.
+   */
+  const photoSubjects = useMemo(() => {
+    const premise = String((outline as { premise?: string } | null)?.premise ?? '');
+    const invented = new Set(
+      (bibleEntries ?? [])
+        .filter((e) => (e.entry_type ?? '') === 'character')
+        .flatMap((e) => String(e.name ?? '').split(/\s+/))
+        .map((w) => w.toLowerCase())
+        .filter(Boolean),
+    );
+    const phrases = premise.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g) ?? [];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const phrase of phrases) {
+      const words = phrase.split(/\s+/);
+      // A phrase is dropped if ANY of its words names a character: "Marcus Tayac" and the bare
+      // "Tayac" alike, since the surname is the character's too.
+      if (words.some((w) => invented.has(w.toLowerCase()))) continue;
+      if (words.length === 1 && phrase.length < 5) continue;
+      const key = phrase.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(phrase);
+      if (out.length >= 6) break;
+    }
+    return out;
+  }, [outline, bibleEntries]);
   const writtenChapters = chapters?.length ?? 0;
   const outlinedChapters = outline?.chapters?.length ?? 0;
 
@@ -433,7 +470,15 @@ export default function ProjectDetail() {
         {activeTab === 'chapters' && <ChaptersTab chapters={chapters} qaByChapter={qaByChapter} projectId={id!} projectTitle={project.title} projectType={project.project_type} genreSlug={project.genre_slug} userId={userId!} />}
         {activeTab === 'qa' && <QATab chapters={chapters} qaByChapter={qaByChapter} userId={userId!} />}
         {activeTab === 'bible' && <BibleTab entries={bibleEntries} projectId={id!} />}
-        {activeTab === 'art' && <ArtTab projectId={id!} />}
+        {activeTab === 'art' && (
+          <ArtTab
+            projectId={id!}
+            projectTitle={project.title}
+            // Drawn from the book itself: its characters and its subject are what an archive would
+            // actually hold pictures of. A blank search box is where this stops being used.
+            photoSubjects={photoSubjects}
+          />
+        )}
         {activeTab === 'social' && (
           <SocialTab
             projectId={id!}
@@ -1583,13 +1628,36 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
-function ArtTab({ projectId }: { projectId: string }) {
+// Two kinds of picture live here, and the difference matters enough to label. Everything the
+// gallery holds was invented by a model; the search below finds photographs that were actually
+// taken, and saves them into the same archive with the institution and licence attached.
+function ArtTab({
+  projectId,
+  projectTitle,
+  photoSubjects,
+}: {
+  projectId: string;
+  projectTitle: string;
+  photoSubjects: string[];
+}) {
   return (
-    <div>
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Cover Art & Images</h3>
+    <div className="space-y-6">
+      <div>
+        <h3 className="mb-1 text-lg font-semibold text-gray-900 dark:text-white">
+          Archival photographs
+        </h3>
+        <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
+          Real pictures from named collections, for research and for the book. Saved ones join the
+          image archive below with their provenance.
+        </p>
+        <ArchiveImageSearch projectId={projectId} suggestions={photoSubjects} />
       </div>
-      <ImageGallery projectId={projectId} />
+      <div>
+        <h3 className="mb-3 text-lg font-semibold text-gray-900 dark:text-white">
+          Image archive — {projectTitle}
+        </h3>
+        <ImageGallery projectId={projectId} />
+      </div>
     </div>
   );
 }

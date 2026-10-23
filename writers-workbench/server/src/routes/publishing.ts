@@ -19,6 +19,7 @@
  * revision that comes back worse can be read against what it replaced.
  */
 
+import crypto from 'crypto';
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { validateBody } from '../middleware/validate.js';
@@ -28,6 +29,7 @@ import { callEngineWriteTool } from '../lib/engine-hub.js';
 import { logger } from '../lib/logger.js';
 import { TRIM_SIZES } from '../lib/print-pdf.js';
 import { PAPER_THICKNESS } from '../lib/cover.js';
+import { searchArchives } from '../lib/image-archives.js';
 
 export const publishingRouter = Router();
 publishingRouter.use(requireAuth);
@@ -875,3 +877,187 @@ publishingRouter.post('/project/:projectId/blog', validateBody(BlogSchema), asyn
 });
 
 export { bookSummary, SOCIAL_PLATFORMS };
+
+// ------------------------------------------------------------------------------------------------
+// Reference photographs: real pictures, from named archives, into the project's image archive
+// ------------------------------------------------------------------------------------------------
+
+const ImageSearchSchema = z.object({
+  q: z.string().min(2).max(300),
+  sources: z.array(z.enum(['wikimedia', 'loc', 'smithsonian'])).optional(),
+});
+
+const SaveImageSchema = z.object({
+  source: z.enum(['wikimedia', 'loc', 'smithsonian']),
+  source_id: z.string().max(500),
+  image_url: z.string().url(),
+  title: z.string().max(500),
+  description: z.string().max(2000).optional(),
+  creator: z.string().max(500).optional(),
+  date_taken: z.string().max(200).optional(),
+  institution: z.string().max(500).optional(),
+  collection_ref: z.string().max(500).optional(),
+  license: z.string().max(300),
+  license_url: z.string().max(500).optional(),
+  source_page_url: z.string().max(1000).optional(),
+  reuse: z.enum(['open', 'check']),
+});
+
+/** 25MB. An archival master can be enormous and this is a reference copy, not a print file. */
+const MAX_PHOTO_BYTES = 25 * 1024 * 1024;
+
+/**
+ * @openapi
+ * /publishing/project/{projectId}/image-search:
+ *   post:
+ *     tags: [Publishing]
+ *     summary: Search named archives for real photographs
+ *     description: |
+ *       Not image generation — a catalogue search. Every result carries the holding institution,
+ *       the catalogue reference, the photographer, the date and the licence, plus the record page
+ *       where a human can check all of it. Archives that failed are reported as failed rather than
+ *       silently returning nothing.
+ *     security: [{ bearerAuth: [] }]
+ */
+publishingRouter.post(
+  '/project/:projectId/image-search',
+  validateBody(ImageSearchSchema),
+  async (req, res) => {
+    const project = await loadProject(req, res);
+    if (!project) return;
+    const { q, sources } = req.body as z.infer<typeof ImageSearchSchema>;
+    try {
+      const result = await searchArchives({ query: q, sources });
+      logger.info(
+        { userId: req.userId, projectId: project.id, q, found: result.images.length },
+        'publishing: archive image search',
+      );
+      res.json({ success: true, data: result });
+    } catch (err) {
+      logger.error({ err, projectId: project.id, q }, 'publishing: image search failed');
+      res.status(502).json({
+        success: false,
+        error: { code: 'ARCHIVE_UNREACHABLE', message: err instanceof Error ? err.message : 'Search failed' },
+      });
+    }
+  },
+);
+
+/**
+ * @openapi
+ * /publishing/project/{projectId}/images:
+ *   post:
+ *     tags: [Publishing]
+ *     summary: Save an archival photograph into the project's image archive
+ *     description: |
+ *       Downloads the file and stores it beside the project's other images, with its provenance in
+ *       metadata. Refuses anything not clearly public domain or openly licensed: saving a row means
+ *       holding a copy, and holding a copy of something whose rights are unclear is a decision for
+ *       the author to make with the archive, not one to take on their behalf.
+ *     security: [{ bearerAuth: [] }]
+ */
+publishingRouter.post('/project/:projectId/images', validateBody(SaveImageSchema), async (req, res) => {
+  const project = await loadProject(req, res);
+  if (!project) return;
+  const body = req.body as z.infer<typeof SaveImageSchema>;
+
+  if (body.reuse !== 'open') {
+    res.status(400).json({
+      success: false,
+      error: {
+        code: 'RIGHTS_UNCLEAR',
+        message:
+          `This record does not state an open licence (${body.license || 'no licence given'}). ` +
+          'Ask the holding institution for permission, then add it with the licence they give you. ' +
+          'The catalogue link is kept so you can cite it meanwhile.',
+      },
+    });
+    return;
+  }
+
+  try {
+    const supabase = getSupabaseAdmin();
+    const resp = await fetch(body.image_url, {
+      headers: { 'user-agent': 'WritersWorkbench/1.0 (archival image research)' },
+    });
+    if (!resp.ok) {
+      res.status(502).json({
+        success: false,
+        error: { code: 'DOWNLOAD_FAILED', message: `The archive returned ${resp.status} for that file` },
+      });
+      return;
+    }
+    const bytes = Buffer.from(await resp.arrayBuffer());
+    if (bytes.length > MAX_PHOTO_BYTES) {
+      res.status(413).json({
+        success: false,
+        error: {
+          code: 'TOO_LARGE',
+          message: `That file is ${(bytes.length / 1024 / 1024).toFixed(1)}MB; the limit is 25MB.`,
+        },
+      });
+      return;
+    }
+    const contentType = resp.headers.get('content-type') ?? 'image/jpeg';
+    const ext = /png/.test(contentType) ? 'png' : /tiff/.test(contentType) ? 'tiff' : 'jpg';
+    const storagePath = `${req.userId}/${project.id}/reference/${crypto.randomUUID()}.${ext}`;
+
+    const upload = await supabase.storage
+      .from('cover-images')
+      .upload(storagePath, bytes, { contentType, upsert: false });
+    if (upload.error) {
+      logger.error({ err: upload.error, projectId: project.id }, 'publishing: photo upload failed');
+      res.status(500).json({ success: false, error: { code: 'UPLOAD_FAILED', message: upload.error.message } });
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('generated_images_v2')
+      .insert({
+        user_id: req.userId!,
+        project_id: project.id,
+        image_type: 'reference_photo',
+        storage_path: storagePath,
+        image_format: ext,
+        file_size_bytes: bytes.length,
+        // NOT a prompt — nothing generated this. The field is reused to record what it is.
+        original_prompt: body.title,
+        // Honest about origin: this is an archival retrieval, not a model's output.
+        generation_model: `archive:${body.source}`,
+        genre_slug: project.genre_slug ?? null,
+        metadata: {
+          reference: true,
+          source: body.source,
+          source_id: body.source_id,
+          title: body.title,
+          description: body.description ?? '',
+          creator: body.creator ?? '',
+          date_taken: body.date_taken ?? '',
+          institution: body.institution ?? '',
+          collection_ref: body.collection_ref ?? '',
+          license: body.license,
+          license_url: body.license_url ?? '',
+          source_page_url: body.source_page_url ?? '',
+          retrieved_at: new Date().toISOString(),
+        },
+      })
+      .select('id')
+      .single();
+    if (error) {
+      res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: error.message } });
+      return;
+    }
+
+    logger.info(
+      { userId: req.userId, projectId: project.id, source: body.source, bytes: bytes.length },
+      'publishing: reference photo saved',
+    );
+    res.status(201).json({ success: true, data: { id: data.id, storage_path: storagePath } });
+  } catch (err) {
+    logger.error({ err, projectId: project.id }, 'publishing: save photo failed');
+    res.status(502).json({
+      success: false,
+      error: { code: 'SAVE_FAILED', message: err instanceof Error ? err.message : 'Could not save' },
+    });
+  }
+});
