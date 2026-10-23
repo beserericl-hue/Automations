@@ -862,6 +862,8 @@ publishingRouter.post('/project/:projectId/blog', validateBody(BlogSchema), asyn
       { userId: req.userId, projectId: project.id, jobId: job.job_id },
       'publishing: blog post queued',
     );
+    // The job's own result carries `pronoun_warning` when the post refers to the author by a
+    // pronoun they never set; the client reads it off the completed job.
     res.status(202).json({ success: true, jobId: job.job_id, engineJob: true, status: job.status ?? 'queued' });
   } catch (err) {
     logger.error({ err, projectId: project.id }, 'publishing: blog post failed');

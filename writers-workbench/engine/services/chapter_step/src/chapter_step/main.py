@@ -3603,6 +3603,37 @@ async def _persist_simple(
         return {"persisted": False, "error": str(exc)[:200]}
 
 
+def _author_pronoun_sentences(text: str, author: str) -> list[str]:
+    """Passages that call the AUTHOR he/she/they when no pronouns were supplied.
+
+    Scoped to PARAGRAPHS, which is the unit a pronoun's antecedent actually lives in. A sentence
+    scope was tried first and was wrong both ways: it missed every real case, because the paragraph
+    names the author once and then says "He earned an MSW" in the sentences after, and it flagged
+    the headline, because a markdown heading has no full stop and ran into the paragraph below it.
+
+    Paragraphs that never name the author are left alone. A 1,700-word article about a Piscataway
+    town is full of legitimate third-person pronouns — characters, archaeologists, a man recorded in
+    1697 — and flagging those is how a real warning gets ignored.
+    """
+    surname = (author or "").split()[-1] if author else ""
+    if not surname:
+        return []
+    pronoun = re.compile(r"\b(he|him|his|she|her|hers|they|them|their)\b", re.IGNORECASE)
+    out: list[str] = []
+    for para in re.split(r"\n\s*\n", text or ""):
+        stripped = para.strip()
+        # Headings carry the title, which carries the author's name, and no prose.
+        if not stripped or stripped.startswith("#"):
+            continue
+        if surname.lower() not in stripped.lower():
+            continue
+        for match in pronoun.finditer(stripped):
+            start = max(0, match.start() - 60)
+            out.append(stripped[start : match.end() + 60].replace("\n", " ").strip())
+            break
+    return out
+
+
 BLOG_RESEARCH_BUDGET = 48_000
 """How much of the project's own research to put in front of the blogger, in characters.
 
@@ -3851,6 +3882,15 @@ async def _op_blog(payload: dict) -> dict:
         meta = {"meta_description": data.get("meta_description"), "tags": data.get("tags")}
     except Exception:
         pass
+    # The no-pronoun rule holds in a four-sentence bio and lapses across 1,700 words, so it is
+    # measured here too. Not rewritten: a corrective pass over a whole researched article to fix
+    # four words risks the 26 sourced facts in it. Reported instead, with the fix named.
+    pronoun_slips: list[str] = []
+    if profile is not None and not (profile.get("pronouns") or "").strip():
+        pronoun_slips = _author_pronoun_sentences(body, profile.get("name") or author)
+        if pronoun_slips:
+            logger.warning("blog.author_pronoun_guess", count=len(pronoun_slips))
+
     body = _strip_em_dashes(body)
     # E6: humanize NON-FICTION before it is persisted, so what is stored is what would publish.
     # Blog and newsletter only — never a chapter or a short story. See writer_engine.humanize.
@@ -3863,7 +3903,7 @@ async def _op_blog(payload: dict) -> dict:
         genre_slug=genre_slug,
         metadata={**meta, **({"humanize": humanize_report} if humanize_report else {})},
     )
-    return {
+    out = {
         "written": True,
         "title": title,
         "content_text": body,
@@ -3871,6 +3911,13 @@ async def _op_blog(payload: dict) -> dict:
         "humanize": humanize_report,
         "persist": persist,
     }
+    if pronoun_slips:
+        out["pronoun_warning"] = (
+            f"{len(pronoun_slips)} sentence(s) refer to you by a pronoun you have not set. "
+            "Set your pronouns on the Author Profile and regenerate, or edit them here."
+        )
+        out["pronoun_sentences"] = pronoun_slips
+    return out
 
 
 async def _op_newsletter(payload: dict) -> dict:
