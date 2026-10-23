@@ -158,3 +158,77 @@ describe('searching the archives', () => {
     expect(r.images).toHaveLength(0);
   });
 });
+
+describe('the Smithsonian, which is narrower than it sounds', () => {
+  const SI_ROW = (unit: string, title: string) => ({
+    id: `si-${unit}-${title}`,
+    title,
+    content: {
+      descriptiveNonRepeating: {
+        unit_code: unit,
+        data_source: unit,
+        record_link: `https://si.edu/object/${title}`,
+        online_media: { media: [{ content: 'https://ids.si.edu/x.jpg', thumbnail: 'https://ids.si.edu/t.jpg' }] },
+      },
+      freetext: {},
+      indexedStructured: { usage_flag: [] },
+    },
+  });
+
+  function stubSi(rows: unknown[]) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const u = String(url);
+        if (u.includes('api.si.edu')) {
+          lastSiUrl = u;
+          return { ok: true, status: 200, json: async () => ({ response: { rows } }) };
+        }
+        return { ok: true, status: 200, json: async () => ({ query: { pages: {} }, results: [] }) };
+      }),
+    );
+  }
+  let lastSiUrl = '';
+
+  it('asks only for records that actually have an image', async () => {
+    process.env.SMITHSONIAN_API_KEY = 'test-key';
+    stubSi([]);
+    await searchArchives({ query: 'Piscataway', sources: ['smithsonian'] });
+    // Verified against the live API: this filter takes "Piscataway" from 684 records to 188.
+    expect(decodeURIComponent(lastSiUrl)).toContain('online_media_type:"Images"');
+    delete process.env.SMITHSONIAN_API_KEY;
+  });
+
+  it('drops natural-history specimens, which match on the place name', async () => {
+    process.env.SMITHSONIAN_API_KEY = 'test-key';
+    stubSi([
+      SI_ROW('NMNHBOTANY', 'Salix nigra Marshall'),
+      SI_ROW('NMNHBIRDS', 'Euphagus carolinus'),
+      SI_ROW('NMNHENTO', 'A beetle from Piscataway Creek'),
+      SI_ROW('NMAI', 'Dried eel skin used for healing'),
+      SI_ROW('NMNHANTHRO', 'Piscataway pottery sherd'),
+    ]);
+    const r = await searchArchives({ query: 'Piscataway', sources: ['smithsonian'] });
+    const titles = r.images.map((i) => i.title);
+    expect(titles).toEqual(['Dried eel skin used for healing', 'Piscataway pottery sherd']);
+    delete process.env.SMITHSONIAN_API_KEY;
+  });
+
+  it('marks a record with no CC0 flag as needing permission', async () => {
+    process.env.SMITHSONIAN_API_KEY = 'test-key';
+    stubSi([SI_ROW('NMAI', 'Eel trap')]);
+    const r = await searchArchives({ query: 'x', sources: ['smithsonian'] });
+    expect(r.images[0].reuse).toBe('check');
+    expect(r.images[0].license).toMatch(/not stated/);
+    delete process.env.SMITHSONIAN_API_KEY;
+  });
+
+  it('warns that the archives are absent, not just that a key is missing', async () => {
+    delete process.env.SMITHSONIAN_API_KEY;
+    stubSi([]);
+    const r = await searchArchives({ query: 'Turkey Tayac' });
+    const note = r.sources.find((s) => s.source === 'smithsonian')!.note!;
+    expect(note).toMatch(/sova\.si\.edu/);
+    expect(note).toMatch(/not in this API/);
+  });
+});

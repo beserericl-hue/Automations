@@ -19,8 +19,14 @@
  *   - Wikimedia Commons — no key, and its `extmetadata` carries licence, author, date and credit
  *     per file, which is exactly the shape this needs.
  *   - Library of Congress — no key, and holds the American documentary photography collections.
- *   - Smithsonian Open Access — needs a free api.data.gov key. Worth supporting because the
- *     National Anthropological Archives is where photographs of the Piscataway actually are.
+ *   - Smithsonian Open Access — needs a free api.data.gov key, and is narrower than it sounds.
+ *     Its search index serves MUSEUM OBJECT and SPECIMEN records. The Smithsonian's archives are
+ *     not in it: unit_code:NAA, EEPA, HSFA and AAA all return zero, while NMAI returns 237,752 and
+ *     NMNHANTHRO 529,665. So the National Anthropological Archives photo lots — which is where the
+ *     photographs of Turkey Tayac actually are — cannot be reached this way at all. They are
+ *     catalogued on SOVA, which blocks automated requests. What the key does buy is the museum
+ *     collections, and those are not a consolation prize: the same search returns the eel skin
+ *     Turkey Tayac made and used around 1960, NMAI catalogue 26/2957.
  */
 
 import { logger } from './logger.js';
@@ -240,15 +246,40 @@ interface SiRow {
   };
 }
 
+/**
+ * Natural-history divisions, excluded from an image search about people and places.
+ *
+ * They match on PLACE NAMES and swamp everything else: "Piscataway" returns 684 records of which
+ * entomology, herpetology, botany and birds account for the largest share — beetles and sedges
+ * collected at Piscataway Creek, not anything to do with the Piscataway people. A specimen record
+ * is a real record; it is just never the answer to "is there a photograph of these people".
+ */
+const SPECIMEN_UNITS = new Set([
+  'NMNHBIRDS',
+  'NMNHBOTANY',
+  'NMNHENTO',
+  'NMNHFISHES',
+  'NMNHHERPS',
+  'NMNHINV',
+  'NMNHMAMMALS',
+  'NMNHMINSCI',
+  'NMNHPALEO',
+]);
+
 async function searchSmithsonian(query: string, limit: number, apiKey: string): Promise<ArchiveImage[]> {
+  // `AND online_media_type:"Images"` is honoured and halves the noise — on "Piscataway" it takes
+  // 684 records down to 188, all of them with a picture attached. Verified against the live API;
+  // the neighbouring `online_visual_material:true` is NOT the same filter and returns specimens.
+  const q = `${query} AND online_media_type:"Images"`;
   const url =
     'https://api.si.edu/openaccess/api/v1.0/search?' +
-    `q=${encodeURIComponent(query)}&rows=${limit}&api_key=${encodeURIComponent(apiKey)}`;
+    `q=${encodeURIComponent(q)}&rows=${limit}&api_key=${encodeURIComponent(apiKey)}`;
   const body = (await getJson(url, 25_000)) as { response?: { rows?: SiRow[] } };
   const out: ArchiveImage[] = [];
   for (const row of body.response?.rows ?? []) {
     const d = row.content?.descriptiveNonRepeating;
     const f = row.content?.freetext;
+    if (SPECIMEN_UNITS.has(String(d?.unit_code ?? ''))) continue;
     const media = d?.online_media?.media?.[0];
     // CC0 is the Smithsonian's own flag for its open-access material. Everything else — which is
     // most of the National Anthropological Archives — is a catalogue reference, not a usable file.
@@ -329,8 +360,10 @@ export async function searchArchives(opts: SearchOptions): Promise<ArchiveSearch
       () => searchSmithsonian(query, perSource, siKey),
       siKey
         ? undefined
-        : 'no SMITHSONIAN_API_KEY set — the National Anthropological Archives holds the Piscataway ' +
-          'photographs and cannot be searched without one (free at api.data.gov)',
+        : 'no SMITHSONIAN_API_KEY set — museum collections cannot be searched without one ' +
+          '(free at api.data.gov/signup). Note that the Smithsonian ARCHIVES, including the ' +
+          'National Anthropological Archives photo lots, are not in this API at all and have to ' +
+          'be searched by hand at sova.si.edu.',
     ),
   ]);
 

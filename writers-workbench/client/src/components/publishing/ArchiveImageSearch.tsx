@@ -178,6 +178,27 @@ export default function ArchiveImageSearch({
         )}
       </div>
 
+      {/* A standing caveat, not a per-search one. The Smithsonian's search API serves museum
+          objects and specimens; its ARCHIVES — where photographs of people usually are — are not in
+          it, with or without a key. Saying so here saves the author concluding a photograph does
+          not exist when it does. */}
+      {result?.sources.some((s) => s.source === 'smithsonian' && s.searched) && (
+        <p className="rounded-lg bg-gray-50 p-3 text-xs text-gray-600 dark:bg-gray-800/50 dark:text-gray-400">
+          The Smithsonian results above are <strong>museum objects</strong>. Its archives — the
+          National Anthropological Archives, the Eliot Elisofon Photographic Archives, the Human
+          Studies Film Archives — are not in this API and have to be searched by hand at{' '}
+          <a
+            href="https://sova.si.edu"
+            target="_blank"
+            rel="noreferrer"
+            className="text-brand-600 underline dark:text-brand-400"
+          >
+            sova.si.edu
+          </a>
+          . That is where photo lots of people generally live.
+        </p>
+      )}
+
       {result && result.images.length === 0 && (
         <p className="text-sm text-gray-500 dark:text-gray-400">
           Nothing in those archives matched. That is an answer about the archives, not about the
