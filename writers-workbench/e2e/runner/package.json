@@ -1,0 +1,9 @@
+{
+  "name": "writer-e2e-runner",
+  "private": true,
+  "description": "Runs the Writers Workbench E2E suite against DEV, on Railway.",
+  "dependencies": {
+    "@playwright/test": "1.59.1",
+    "dotenv": "^16.5.0"
+  }
+}
