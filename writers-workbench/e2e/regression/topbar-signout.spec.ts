@@ -23,6 +23,7 @@ test.describe('TopBar sign-out (isolated — ends the session)', () => {
 
     // Session cleared → app routes an unauthenticated user to /login.
     await expect(page).toHaveURL(/\/login/, { timeout: 20_000 });
-    await expect(page.getByRole('button', { name: /sign in/i }).first()).toBeVisible({ timeout: 15_000 });
+    // The passwordless login form: an email, then a code. There is no "Sign in" button on this step.
+    await expect(page.getByRole('button', { name: /email me a code/i })).toBeVisible({ timeout: 15_000 });
   });
 });

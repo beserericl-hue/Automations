@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
@@ -21,8 +20,12 @@ interface ProvenanceSource {
   scraped_at: string | null;
 }
 
+/**
+ * The sources this content was written from. Shown in the Sources tab of the review rail, which is
+ * its open/close: it used to be a collapsed toggle of its own, so the tab opened onto a second
+ * "Sources" button to click before anything showed.
+ */
 export default function ProvenancePanel({ contentId }: ProvenancePanelProps) {
-  const [expanded, setExpanded] = useState(false);
   const { profile, isImpersonating } = useUser();
   const userId = profile?.user_id;
 
@@ -77,10 +80,7 @@ export default function ProvenancePanel({ contentId }: ProvenancePanelProps) {
 
   return (
     <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800/50 transition"
-      >
+      <div className="flex w-full items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2">
           <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-3.032a4.5 4.5 0 00-1.242-7.244l4.5-4.5a4.5 4.5 0 016.364 6.364l-1.757 1.757" />
@@ -92,16 +92,9 @@ export default function ProvenancePanel({ contentId }: ProvenancePanelProps) {
             </span>
           )}
         </div>
-        <svg
-          className={`h-4 w-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
-          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+      </div>
 
-      {expanded && (
-        <div className="border-t border-gray-200 dark:border-gray-700">
+      <div className="border-t border-gray-200 dark:border-gray-700">
           {isLoading ? (
             <div className="px-4 py-6 text-center text-sm text-gray-400">Loading sources...</div>
           ) : !hasData ? (
@@ -145,8 +138,7 @@ export default function ProvenancePanel({ contentId }: ProvenancePanelProps) {
               ))}
             </div>
           )}
-        </div>
-      )}
+      </div>
     </div>
   );
 }

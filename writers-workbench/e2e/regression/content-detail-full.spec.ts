@@ -351,14 +351,14 @@ test.describe('ContentDetail — Provenance panel (result-asserting)', () => {
     if (contentId) { await deleteContent(contentId); contentId = ''; }
   });
 
-  test('Sources toggle expands and shows the empty state (no tracked sources)', async ({ page }) => {
+  test('the Sources tab shows the empty state (no tracked sources)', async ({ page }) => {
     await page.goto(`/content/${contentId}`);
-    const toggle = page.getByRole('button', { name: /Sources/ });
-    await expect(toggle).toBeVisible({ timeout: 20_000 });
-    // Collapsed: empty state not shown yet.
+    const tab = page.getByRole('button', { name: 'Sources', exact: true });
+    await expect(tab).toBeVisible({ timeout: 20_000 });
+    // Another tab first: the sources are not on screen until their tab is chosen.
     await expect(page.getByText(/No sources tracked/i)).toHaveCount(0);
-    await toggle.click();
-    // Expanded: this disposable chapter has no content_usage_v2 rows → empty state renders.
+    await tab.click();
+    // One click: this disposable chapter has no content_usage_v2 rows → empty state renders.
     await expect(page.getByText(/No sources tracked/i)).toBeVisible({ timeout: 15_000 });
   });
 });

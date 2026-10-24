@@ -144,7 +144,7 @@ test.describe('Core app screens', () => {
     await page.goto(`/content/${ID.content}`, { waitUntil: 'domcontentloaded' });
     await expect(page.locator('.ProseMirror, [contenteditable="true"]').first()).toBeVisible({ timeout: 20_000 });
     await page.getByRole('button', { name: /^Review/ }).first().click();
-    await expectScreen(page, page.getByText(/Craft Q\/A|Character drift|Genre compliance/));
+    await expectScreen(page, page.getByText('Review Annotations'));
   });
 
   test('Image detail /images/:id', async ({ page }) => {
