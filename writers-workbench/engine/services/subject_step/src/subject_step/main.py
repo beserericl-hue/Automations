@@ -16,6 +16,19 @@ seed_default_prompts()
 DEFAULT_MODEL = "claude-haiku-4-5"
 
 
+# The live brief came from n8n, where a parser node turned prose into fields, and it ends with a
+# "Final Deliverable Structure" of a statement, a reasoning breakdown, then "Subject Line: ...".
+# Here the reply is parsed as JSON, and a model that follows the brief to the letter writes an
+# essay that does not parse. This says where each part of that deliverable goes instead.
+_OUTPUT_FORMAT = (
+    "\n\n---\n# Output format (this replaces the Final Deliverable Structure above)\n"
+    "Reply with ONE JSON object and nothing else:\n"
+    '{"subject_line": "...", "pre_header_text": "...", "additional_subject_lines": ["...", "...", "..."], '
+    '"subject_line_reasoning": "your statement of consideration and reasoning for the subject line", '
+    '"pre_header_text_reasoning": "your reasoning for the pre-header"}'
+)
+
+
 def _fixture(stories: list[dict]) -> SubjectLineProposal:
     titles = ", ".join(s.get("title", "") for s in stories[:3]) or "today's news"
     return SubjectLineProposal(
@@ -59,6 +72,7 @@ async def _write(
     )
     if feedback:
         user += f"\n\nOperator feedback from prior round: {feedback}"
+    user += _OUTPUT_FORMAT
     proposal, _ = await complete_structured(
         router,
         provider="anthropic",
