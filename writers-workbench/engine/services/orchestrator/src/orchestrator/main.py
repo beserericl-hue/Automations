@@ -17,7 +17,7 @@ from fastapi import status as http_status
 
 from writer_engine.alerting import LEVEL_WARNING, Alert, clear_alert, send_alert
 from writer_engine.auth import require_admin_token, require_service_secret
-from writer_engine.cadence import INTERVAL_DAYS, is_due
+from writer_engine.cadence import INTERVAL_DAYS, is_due, latest_baseline
 from writer_engine.config import get_settings
 from writer_engine.health import (
     probe_arq_worker,
@@ -575,6 +575,31 @@ def build_app() -> FastAPI:
         if not provided or provided != expected:
             raise HTTPException(http_status.HTTP_401_UNAUTHORIZED, detail="missing or invalid X-Cron-Secret")
 
+    # The tick's own record of starting an edition's run, so a run that fails before it opens an
+    # approval still counts as this period's run and is not restarted on the next tick. Redis, like
+    # the saga state itself; if it is lost, the approvals and sends still bound the next start.
+    _CADENCE_STARTED_KEY = "newsletter:cadence:started:{}"
+    _CADENCE_STARTED_TTL = 60 * 24 * 3600
+
+    async def _cadence_started(edition_id: str) -> str | None:
+        try:
+            from writer_engine.redis_client import client as redis_module
+
+            raw = await (await redis_module.get_redis()).get(_CADENCE_STARTED_KEY.format(edition_id))
+        except Exception:
+            return None
+        return raw.decode() if isinstance(raw, bytes) else raw
+
+    async def _mark_cadence_started(edition_id: str, when: Any) -> None:
+        try:
+            from writer_engine.redis_client import client as redis_module
+
+            await (await redis_module.get_redis()).set(
+                _CADENCE_STARTED_KEY.format(edition_id), when.isoformat(), ex=_CADENCE_STARTED_TTL
+            )
+        except Exception as exc:
+            logger.warning("cron.cadence.mark_failed", edition=edition_id, error=str(exc)[:120])
+
     async def _cadence_tick() -> dict[str, Any]:
         """The cadence cron's body, callable without an HTTP request.
 
@@ -624,10 +649,28 @@ def build_app() -> FastAPI:
                 .execute()
             )
             last_rows = list(getattr(last, "data", None) or [])
-            baseline_iso = last_rows[0]["created_at"] if last_rows else ed.get("created_at")
+            # When did this edition last RUN, not just last send? A run sits at the stories approval
+            # gate until someone answers it and writes its send only at the end, so a send-only
+            # baseline made an unanswered edition due again on every tick (a new run every 15
+            # minutes). An opened approval and the tick's own start marker both count as a run.
+            gate = await (
+                client.table("newsletter_approvals_v2")
+                .select("created_at")
+                .eq("edition_id", ed.get("id"))
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            gate_rows = list(getattr(gate, "data", None) or [])
+            started = await _cadence_started(str(ed.get("id")))
+            baseline = latest_baseline(
+                last_rows[0]["created_at"] if last_rows else None,
+                gate_rows[0]["created_at"] if gate_rows else None,
+                started,
+            ) or ed.get("created_at")
             due, reason = is_due(
                 cadence=str(ed.get("cadence") or ""),
-                baseline=baseline_iso,
+                baseline=baseline,
                 send_time=ed.get("cadence_send_time"),
                 timezone=zone,
                 now=now,
@@ -659,6 +702,7 @@ def build_app() -> FastAPI:
                     )
                 else:
                     await driver.advance(eid)
+                await _mark_cadence_started(str(edition_id), now)
                 enqueued.append(str(eid))
             except Exception as exc:
                 skipped.append({"edition_id": edition_id, "error": str(exc)[:120]})

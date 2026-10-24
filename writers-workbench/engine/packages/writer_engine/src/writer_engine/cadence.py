@@ -178,6 +178,20 @@ def next_due_at(
     return datetime.combine(due_date, at, tzinfo=zone)
 
 
+def latest_baseline(*candidates: object) -> datetime | None:
+    """The most recent readable timestamp among ``candidates``, or None if none can be read.
+
+    The cadence baseline is "when this edition last ran", and a completed send is not the only
+    evidence of that. A run pauses at the stories approval gate and only writes its send at the very
+    end, so measuring from the last SEND alone made an edition whose gate nobody answered due again on
+    every tick: The Wasteland Wire, weekly, started a new run every 15 minutes for five days. The
+    tick passes the last send, the last approval the edition's run opened, and the last time the tick
+    itself started a run; whichever is newest is when it last ran.
+    """
+    parsed = [p for p in (parse_baseline(c) for c in candidates if c) if p is not None]
+    return max(parsed) if parsed else None
+
+
 def is_due(
     *,
     cadence: str,
