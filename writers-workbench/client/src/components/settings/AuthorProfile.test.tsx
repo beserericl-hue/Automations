@@ -245,3 +245,23 @@ describe('a bio that calls you something you never said', () => {
     expect(screen.queryByText(/refers to you as he\/his/)).not.toBeInTheDocument();
   });
 });
+
+describe('the author photo', () => {
+  it('uploads the chosen file as soon as it is picked, without the Save button', async () => {
+    renderWithProviders(<AuthorProfile />);
+    const file = new File(['png'], 'headshot.png', { type: 'image/png' });
+    fireEvent.change(await screen.findByLabelText('Author photo file'), { target: { files: [file] } });
+    await waitFor(() => {
+      const call = mockFetch.mock.calls.find(([p]) => p === '/api/author/photo');
+      expect(call?.[1]?.method).toBe('PUT');
+      expect((call?.[1]?.body as FormData).get('photo')).toBe(file);
+    });
+  });
+
+  it('shows the saved photo', async () => {
+    serve({ ...ALMOST_COMPLETE, photo_url: 'https://x/author/headshot-1.png' });
+    renderWithProviders(<AuthorProfile />);
+    expect(await screen.findByAltText('Author photo')).toHaveAttribute('src', 'https://x/author/headshot-1.png');
+    expect(screen.getByText('Replace photo')).toBeInTheDocument();
+  });
+});

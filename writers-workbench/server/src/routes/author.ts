@@ -17,9 +17,11 @@
  *   PUT  /api/author/profile   — save the facts
  *   POST /api/author/bio       — draft a bio from them (optionally with an instruction)
  *   PUT  /api/author/bio       — approve the bio, generated or hand-written
+ *   PUT  /api/author/photo     — upload the author's photograph
  */
 
 import { Router, type Response } from 'express';
+import multer from 'multer';
 import { z } from 'zod';
 import { validateBody } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -74,6 +76,75 @@ const BioApproveSchema = z.object({
   bio: z.string().max(4000),
   /** 'edited' when the author changed a word of it. The difference matters at publish time. */
   source: z.enum(['generated', 'edited']).default('edited'),
+});
+
+// ------------------------------------------------------------------------------------------------
+// The author's photograph
+// ------------------------------------------------------------------------------------------------
+
+/**
+ * The photo lives in storage, not in a column: one public file per user under `<user>/author/`, in
+ * the same public bucket as the covers, because the only places it is shown are public anyway (a
+ * sales page, a book's about-the-author). Each upload gets a new name, so a replaced photo is never
+ * served from a CDN cache under the old one's URL.
+ */
+const PHOTO_BUCKET = 'cover-images';
+const PHOTO_TYPES: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+
+const photoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_PHOTO_BYTES },
+  fileFilter: (_req, file, cb) => cb(null, file.mimetype in PHOTO_TYPES),
+});
+
+async function authorPhotoFiles(userId: string): Promise<string[]> {
+  const { data } = await getSupabaseAdmin().storage.from(PHOTO_BUCKET).list(`${userId}/author`, {
+    sortBy: { column: 'name', order: 'desc' },
+  });
+  return (data ?? []).filter((f) => f.name.startsWith('headshot-')).map((f) => `${userId}/author/${f.name}`);
+}
+
+/** The author's photo, or null. Exported for the landing page, which shows it beside the bio. */
+export async function authorPhotoUrl(userId: string): Promise<string | null> {
+  const [latest] = await authorPhotoFiles(userId);
+  if (!latest) return null;
+  return getSupabaseAdmin().storage.from(PHOTO_BUCKET).getPublicUrl(latest).data.publicUrl;
+}
+
+/**
+ * @openapi
+ * /author/photo:
+ *   put:
+ *     tags: [Author]
+ *     summary: Upload the author's photograph (JPEG, PNG or WebP, up to 5MB)
+ *     security: [{ bearerAuth: [] }]
+ */
+authorRouter.put('/photo', photoUpload.single('photo'), async (req, res, next) => {
+  try {
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'NO_PHOTO', message: 'Attach a JPEG, PNG or WebP image of up to 5MB.' },
+      });
+      return;
+    }
+    const userId = req.userId!;
+    const storage = getSupabaseAdmin().storage.from(PHOTO_BUCKET);
+    const previous = await authorPhotoFiles(userId);
+    const path = `${userId}/author/headshot-${Date.now()}.${PHOTO_TYPES[file.mimetype]}`;
+    const upload = await storage.upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
+    if (upload.error) {
+      res.status(500).json({ success: false, error: { code: 'UPLOAD_FAILED', message: upload.error.message } });
+      return;
+    }
+    if (previous.length) await storage.remove(previous);
+    logger.info({ userId, bytes: file.size }, 'author: photo uploaded');
+    res.json({ success: true, data: { photo_url: storage.getPublicUrl(path).data.publicUrl } });
+  } catch (err) {
+    next(err);
+  }
 });
 
 /** An empty profile is a valid state, not an error — the UI needs a form either way. */
@@ -217,7 +288,8 @@ function gapsIn(p: typeof EMPTY): string[] {
 authorRouter.get('/profile', async (req, res, next) => {
   try {
     const profile = shape(await loadProfile(req.userId!));
-    res.json({ success: true, data: { ...profile, gaps: gapsIn(profile) } });
+    const photo_url = await authorPhotoUrl(req.userId!);
+    res.json({ success: true, data: { ...profile, photo_url, gaps: gapsIn(profile) } });
   } catch (err) {
     if (!handleProfileError(err, res)) next(err);
   }
