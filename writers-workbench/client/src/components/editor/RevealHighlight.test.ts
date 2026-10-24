@@ -11,17 +11,31 @@
  * by agreeing with the implementation about an offset that is wrong.
  */
 
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { findInDoc, RevealHighlight, revealPluginKey, REVEAL_CLASS } from './RevealHighlight';
 
-function docOf(html: string) {
+// Every editor is destroyed after its test. A live ProseMirror view keeps a DOM-observer timer, and
+// one left running fires after the test environment is torn down ("document is not defined"),
+// which fails the whole run on timing alone.
+const editors: Editor[] = [];
+afterEach(() => {
+  while (editors.length) editors.pop()!.destroy();
+});
+
+function makeEditor(html: string): Editor {
   const editor = new Editor({
     extensions: [StarterKit.configure({ heading: { levels: [1, 2, 3] } }), RevealHighlight],
     content: html,
   });
-  return editor.state.doc;
+  editors.push(editor);
+  return editor;
+}
+
+function docOf(html: string) {
+  // The document is immutable, so it outlives the editor that parsed it.
+  return makeEditor(html).state.doc;
 }
 
 /** What the found range actually covers, with whitespace normalised as the matcher sees it. */
@@ -122,12 +136,7 @@ describe('finding the passage a finding points at', () => {
 });
 
 describe('revealing does not touch the manuscript', () => {
-  function editorOf(html: string) {
-    return new Editor({
-      extensions: [StarterKit.configure({ heading: { levels: [1, 2, 3] } }), RevealHighlight],
-      content: html,
-    });
-  }
+  const editorOf = makeEditor;
 
   it('leaves the document unchanged and never fires onUpdate', () => {
     const editor = editorOf(CHAPTER);
