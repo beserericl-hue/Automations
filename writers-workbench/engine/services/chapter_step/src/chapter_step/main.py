@@ -13,7 +13,7 @@ import json
 import re
 import unicodedata
 from typing import Any, NamedTuple
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from writer_engine import outline_keys
 from writer_engine.humanize import humanize_draft
@@ -130,12 +130,27 @@ def _coerce_chapter_number(value: Any, default: int = 1) -> int:
     return _coerce_int(value, default)
 
 
+def _is_uuid(value: object) -> bool:
+    try:
+        UUID(str(value))
+    except ValueError:
+        return False
+    return True
+
+
 async def _resolve_project_for_payload(payload: dict, *, create: bool) -> dict | None:
     """G9: resolve (or create) ``project_id`` from ``project_title`` in place on the payload so the
     chapter ops work from chat/voice, where only a title is ever supplied. Returns the resolved project
     row (with its outline/genre) when a match/creation happened, else None. No-op without Supabase."""
     from writer_engine.config import get_settings
 
+    # A project_id that is not a UUID came from the router reading the sentence, not from a row:
+    # for "write Chapter 1 of E2E Plan 1792860711965" it supplied the title's number as the id, and
+    # every such write died in validation. Drop it and resolve from the title like any other
+    # title-only request. A book called "1984" would have failed the same way.
+    if payload.get("project_id") and not _is_uuid(payload["project_id"]):
+        logger.info("chapter.project_id_not_uuid", project_id=str(payload["project_id"])[:40])
+        payload.pop("project_id")
     if payload.get("project_id") or not payload.get("project_title"):
         return None
     settings = get_settings()
