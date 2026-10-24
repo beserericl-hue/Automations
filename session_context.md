@@ -1,3 +1,107 @@
+# Session Context — Writer's Workbench
+
+_Last updated: 2026-10-24. Branch: `develop` (all work committed + pushed, deployed to DEV)._
+
+---
+
+# LATEST SESSION (2026-10-22 → 10-24) — Publishing, promotion and archival images, all into the UI
+
+Driven by one standing instruction from the user: **"Everything needs to be accessed from the UI.
+Everything needs to be persistent."** Sixteen commits, `c8341ea` → `d05c742`, all on `develop`, all
+deployed to DEV and verified against the live services.
+
+## The pattern this session kept finding
+
+The engine could already do almost all of this. What was missing was a way in and a place to keep
+the answer. The bio generator had a schema and no form, so its facts were being typed into a scratch
+script by hand — which is how the first bio it produced contained an invented career. The blog
+writer had no screen at all. The Social tab listed results and told you to use the chat. Each gap
+produced the same class of failure: **given a name and no facts, a model supplies the facts.**
+
+The second pattern: **a prompt instruction is not a guarantee.** Three separate rules held on short
+output and lapsed on long, and each needed verifying in code rather than asking:
+pronouns in a bio, platform length on a tweet, and the book's own identity in a blog post.
+
+## What was built
+
+**Storage.** Migration **032** `author_profiles_v2` (the facts a bio is written from, one row per
+user, plus the approved bio and `bio_source`); **033** adds `pronouns`; **034** adds
+`reference_photo` to the `generated_images_v2` type CHECK. All three applied + verified on DEV.
+Everything else persists on `writing_projects_v2.outline` under reserved keys — `_publishing`,
+`_volume_plan`, `_marketing` / `_marketing_v{n}`, `_marketing_history` — deliberately NOT a second
+table, since the engine already writes the plan and the copy there.
+
+**Screens.** Settings → **Author Profile** (own sidebar entry). Project → **Publish** tab (trim with
+its consequence in pages/volumes, volume planner, marketing copy with a revision loop and restorable
+history, front/back matter, readiness split into blockers vs gaps, one-click KDP package).
+Project → **Promotion** tab, formerly Social (social-post composer defaulting to the book's hook,
+blog composer with topics drawn from the book, and lists of both). Project → **Art** tab gains
+archival photograph search. Craft Q/A suggestions are now editable before applying, and clicking one
+scrolls the manuscript to the passage and marks it (a ProseMirror decoration — a mark would dirty
+the chapter and bake the highlight into the EPUB).
+
+**KDP package** verified end to end on The Ossuary volume 1: 8.0MB zip, interior 591pp at 6x9
+(page tree agrees), wrap 4118x2775px = exactly `6*2 + 591*0.0025 + 0.125*2` on cream, EPUB with
+copyright page and disclaimer, listing.txt with 7/7 keywords. `X-Kdp-Blocking: 0`.
+
+**Archival images** (new, `server/src/lib/image-archives.ts` — server-side, no queue, it is three
+JSON APIs): Wikimedia Commons + Library of Congress (no key) + Smithsonian (key set on DEV).
+Every result carries institution, collection ref, photographer, date, licence and record URL. Only
+clearly-open licences can be saved; the classifier is narrow on purpose ("no known restrictions" is
+not a licence, CC-BY-NC is unusable in a book for sale). Saved photos land in the project's own
+image archive as `reference_photo` with provenance in metadata.
+
+## Bugs found and fixed, with the lesson
+
+- **Sync engine calls return `{payload:{result}}`, async return `{job_id}` flat.** Reading a sync
+  response as flat yields `undefined` for every field and does not throw — the bio route told the
+  author "not enough here to write a bio from" about a profile the engine had just written a full
+  bio from. Use **`callEngineWriteToolSync<T>()`**. Engine `error` also has two shapes (string, or
+  `{code,message}` from media) — `engineErrorMessage()` handles both.
+- **309-character tweet.** `_PLATFORM_LIMITS` was only applied to the humanizer's rewrite. Now
+  stated in the prompt, measured after generation, one corrective shorten of the offenders only,
+  measured again, count shown on the card. Re-ran: 247 chars.
+- **Blog invented the book.** Given only a topic and a genre it searched the title, found nothing
+  (unpublished), and produced a novel by "David E. Landry" with a stolen limestone box. Fixed with
+  `_book_facts()` + the project's own research (`_project_research()`: 201 reports → 98 after
+  dedupe → best 8 at ~46k chars, ranked by topic-term coverage). The regenerated post's 26 specific
+  claims all trace to the user's research.
+- **Bio pronouns.** Now a stored field; blank means the writer uses the surname and never guesses.
+
+## MY OWN ERRORS THIS SESSION (do not repeat)
+
+- **Reported a stale read as a finding.** I ran the blog's pronoun detector BY HAND, outside the
+  guard that only runs it when pronouns are unset, and told the user the system had flagged a
+  problem. Their pronouns (`he/him`) had been set 13 hours earlier. **Re-query state before
+  asserting a user's data is missing.**
+- **Told the user a Smithsonian key would unlock the NAA photo lots.** It does not:
+  `unit_code:NAA` / `EEPA` / `HSFA` / `AAA` all return **0** from the Open Access search API, which
+  serves museum objects and specimens only. The archives are on SOVA (blocks automated requests).
+  Corrected in code and UI.
+- **Double-counted tests.** Reported 846 server tests; a stale compiled `dist/` was being collected
+  alongside the sources. The real figure is **594 server / 361 client**. `rm -rf server/dist` before
+  trusting a count.
+
+## State at hand-off
+
+- Tests: **594 server, 361 client**, engine suite green, schema governance OK, both builds clean.
+- DEV deploy `d05c742`. Migrations 032/033/034 applied to DEV **only** — PROD untouched.
+- The Ossuary: 96 chapters, 601,985 words, 3-volume plan (6x9), marketing copy for all 3 volumes,
+  2 blog posts, 12 social posts, 1 archival photo (Billy Tayac, CC BY 2.0, 2012 recognition).
+- Author profile populated: pen name "Eric L Beser", pronouns he/him, Owings Mills, MSW 1974.
+
+## Carry-forward
+
+- **PROD cutover of 032/033/034 + the publishing feature is NOT done** and needs explicit approval.
+- `SMITHSONIAN_API_KEY` is set on DEV WritersWorkbench only. The key was pasted in chat; regenerate
+  at api.data.gov if that matters.
+- The three Turkey Tayac NAA photo lots (79-45, 81-47, R79-22) still need a human at sova.si.edu
+  and an email to the NAA — not reachable programmatically.
+- Posts written through the chat without a project do not appear on a project page (no `project_id`).
+  Offered to make them attachable after the fact; user has not asked for it.
+
+---
+
 # Session Context — Writer's Workbench Engine (Path B) parity + cutover
 
 _Last updated: 2026-07-02. Branch: `develop` (all work committed + pushed)._
