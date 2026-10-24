@@ -85,17 +85,18 @@ jobs:
           VITE_N8N_WEBHOOK_URL: https://placeholder.example.com/webhook
           VITE_ELEVENLABS_AGENT_ID: placeholder-agent-id
 
-  e2e-tests:
-    name: E2E Tests (Chromium)
+  # E2E runs against the DEV deployment, never against a copy of the app built here, and with no
+  # credentials: nothing secret is kept in GitHub. This job runs the specs that need no key (login
+  # screen, route guards, public book-page 404) once DEV is serving this commit. The specs that need
+  # DEV's database keys run on Railway, in the writer-e2e service (e2e/runner/), which reads its keys
+  # from Railway and emails the result.
+  e2e-dev:
+    name: E2E against DEV (no credentials)
     runs-on: ubuntu-latest
     needs: build
-    if: github.event_name == 'pull_request'
-    # Job-level so the authenticated step's `if:` can see them: a step's own `env:` is not in scope
-    # for its `if:`, which is why that step's old `env.E2E_TEST_EMAIL != ''` guard was always false
-    # and the authenticated suite never ran in CI.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     env:
-      E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
-      E2E_DEV_SUPABASE_URL: ${{ secrets.E2E_DEV_SUPABASE_URL }}
+      E2E_BASE_URL: https://writersworkbench-develop.up.railway.app
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -105,43 +106,18 @@ jobs:
           cache-dependency-path: writers-workbench/package-lock.json
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run build
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_N8N_WEBHOOK_URL: ${{ secrets.VITE_N8N_WEBHOOK_URL }}
-          VITE_ELEVENLABS_AGENT_ID: ${{ secrets.VITE_ELEVENLABS_AGENT_ID }}
-      - run: npx playwright test --project=chromium-noauth
-        env:
-          CI: true
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_N8N_WEBHOOK_URL: ${{ secrets.VITE_N8N_WEBHOOK_URL }}
-          VITE_ELEVENLABS_AGENT_ID: ${{ secrets.VITE_ELEVENLABS_AGENT_ID }}
-      # The authenticated suite, against the DEV deployment it was written for: it seeds and deletes
-      # its own data there and mints its session with the service key (login is passwordless, so
-      # there is no test password). Light pass only (Pass A); the engine-heavy Pass B runs by hand.
-      # Runs only when the DEV secrets exist, and refuses anything that is not DEV.
-      - name: Authenticated E2E against DEV (light pass)
-        if: env.E2E_TEST_EMAIL != '' && contains(env.E2E_DEV_SUPABASE_URL, 'gvbvwcnmjkdpclcisqrr')
-        env:
-          CI: true
-          E2E_BASE_URL: https://writersworkbench-develop.up.railway.app
-          E2E_PASSES: A
-          E2E_RETRIES: 1
-          SUPABASE_URL: ${{ secrets.E2E_DEV_SUPABASE_URL }}
-          E2E_SUPA_URL: ${{ secrets.E2E_DEV_SUPABASE_URL }}
-          VITE_SUPABASE_URL: ${{ secrets.E2E_DEV_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.E2E_DEV_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_DEV_SUPABASE_SERVICE_ROLE_KEY }}
-          E2E_SUPA_SERVICE_KEY: ${{ secrets.E2E_DEV_SUPABASE_SERVICE_ROLE_KEY }}
-          E2E_USER_ID: '+14105914612'
+      - name: Wait for DEV to serve this commit
         run: |
-          npx playwright test --project=chromium-noauth --reporter=line
-          bash e2e/run-regression.sh
-      - name: Authenticated E2E skipped
-        if: env.E2E_TEST_EMAIL == '' || !contains(env.E2E_DEV_SUPABASE_URL, 'gvbvwcnmjkdpclcisqrr')
-        run: echo "::notice::Authenticated E2E not run - set E2E_TEST_EMAIL and the E2E_DEV_SUPABASE_* secrets (DEV only) to enable it."
+          for i in $(seq 1 120); do
+            v=$(curl -s -m 10 "$E2E_BASE_URL/api/health" | jq -r '.version // empty')
+            if [ "$v" = "$GITHUB_SHA" ]; then echo "DEV is serving $GITHUB_SHA"; exit 0; fi
+            sleep 15
+          done
+          echo "::error::DEV did not serve $GITHUB_SHA within 30 minutes (serving: ${v:-unknown})"
+          exit 1
+      - run: npx playwright test --project=chromium-noauth --reporter=line
+        env:
+          CI: true
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

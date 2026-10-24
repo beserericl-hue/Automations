@@ -11,8 +11,9 @@
 # E2E_SUPA_SERVICE_KEY or SUPABASE_SERVICE_ROLE_KEY, E2E_TEST_EMAIL, VITE_SUPABASE_ANON_KEY,
 # E2E_USER_ID). There is no password: sessions are minted (auth.setup.ts).
 #
-# E2E_PASSES picks the passes (default "ABC"). CI runs "A" on every pull request, plus the
-# unauthenticated project; B is minutes of real engine work per spec and runs by hand.
+# E2E_PASSES picks the passes (default "ABC"). The writer-e2e Railway service (e2e/runner/) runs
+# "A" plus the unauthenticated project on every DEV deploy; B is minutes of real engine work per
+# spec, opt-in by setting E2E_PASSES=ABC on that service. Nothing here runs from GitHub with keys.
 # NEVER point these at PROD (faklx...) — DEV is gvbvwcnmjkdpclcisqrr.
 #
 set -uo pipefail

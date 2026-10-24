@@ -1,0 +1,14 @@
+# Railway config-as-code for the writer-e2e service (DEV environment only).
+#
+#   Root Directory  = /writers-workbench
+#   Config file     = e2e/runner/railway.toml
+#
+# One deploy is one run: the container waits for DEV to be serving this commit, runs the suite,
+# emails the result, and exits. NEVER restart — a restart would run the suite again.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "e2e/runner/Dockerfile"
+
+[deploy]
+restartPolicyType = "NEVER"
