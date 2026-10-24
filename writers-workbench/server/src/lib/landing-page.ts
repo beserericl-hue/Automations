@@ -544,7 +544,64 @@ function paras(s: string): string {
  * The page as intended. It is what the GHL build is compared with by eye, and it can be pasted
  * into GHL's Custom HTML element unchanged if Build with AI will not keep the copy.
  */
-export function renderPreviewHtml(copy: LandingCopy, plan: SectionPlan[] = planSections()): string {
+/** Set when the page is served publicly rather than shown as a preview. */
+export interface PublicPageOptions {
+  /** Where the form posts. Without it the form is inert, as in the preview. */
+  formAction: string;
+  /** The page's own address, for the canonical link and the share card. */
+  canonicalUrl: string;
+  /** Shown above the form after a reservation. */
+  notice?: string;
+}
+
+/** The form field each label posts as. Anything else is not a field the server reads. */
+const FIELD_NAMES: Record<string, { name: string; type: string; required: boolean }> = {
+  'First name': { name: 'first_name', type: 'text', required: false },
+  Email: { name: 'email', type: 'email', required: true },
+};
+
+/** "The Ossuary" -> "the-ossuary". The public address of a book's page. */
+export function slugify(title: string): string {
+  const slug = title
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60)
+    .replace(/-+$/, '');
+  return slug || 'book';
+}
+
+/** One CSV cell, RFC 4180, and a leading = + - @ is quoted with a ' so a spreadsheet does not run it. */
+export function csvCell(v: string): string {
+  const safe = /^[=+\-@]/.test(v) ? `'${v}` : v;
+  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+}
+
+function formHtml(copy: LandingCopy, pub?: PublicPageOptions): string {
+  const fields = copy.form.fields.map((label) => {
+    const f = FIELD_NAMES[label] ?? { name: slugify(label).replace(/-/g, '_'), type: 'text', required: false };
+    return `<input name="${f.name}" type="${f.type}" placeholder="${esc(label)}" aria-label="${esc(label)}"${f.required ? ' required' : ''} maxlength="${f.type === 'email' ? 320 : 100}">`;
+  });
+  if (!pub) {
+    return `<form onsubmit="return false">
+    ${fields.join('\n    ')}
+    <button type="submit">${esc(copy.form.button)}</button>
+  </form>`;
+  }
+  // The hidden "website" field is for bots: a person never sees it, so a value in it means the
+  // submission is discarded.
+  return `${pub.notice ? `<p class="notice" role="status">${esc(pub.notice)}</p>` : ''}
+  <form method="post" action="${esc(pub.formAction)}">
+    ${fields.join('\n    ')}
+    <input name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+    <button type="submit">${esc(copy.form.button)}</button>
+  </form>`;
+}
+
+export function renderPreviewHtml(copy: LandingCopy, plan: SectionPlan[] = planSections(), pub?: PublicPageOptions): string {
   const cover = copy.images.find((i) => i.role === 'cover');
   const author = copy.images.find((i) => i.role === 'author');
   const references = copy.images.filter((i) => i.role === 'reference');
@@ -577,10 +634,7 @@ export function renderPreviewHtml(copy: LandingCopy, plan: SectionPlan[] = planS
     offer: `<section id="reserve">
   <h2>${esc(copy.form.heading)}</h2>
   <p>${esc(copy.form.lede)}</p>
-  <form onsubmit="return false">
-    ${copy.form.fields.map((f) => `<input placeholder="${esc(f)}" aria-label="${esc(f)}">`).join('\n    ')}
-    <button type="submit">${esc(copy.form.button)}</button>
-  </form>`,
+  ${formHtml(copy, pub)}`,
     author: `<section class="author">
   <h2>About the author</h2>
   ${author ? `<img src="${esc(author.url)}" alt="${esc(author.alt)}">` : ''}
@@ -597,6 +651,16 @@ export function renderPreviewHtml(copy: LandingCopy, plan: SectionPlan[] = planS
 <title>${esc(copy.seo.title)}</title>
 <meta name="description" content="${esc(copy.seo.description)}">
 <meta name="keywords" content="${esc(copy.seo.keywords.join(', '))}">
+${
+  pub
+    ? `<link rel="canonical" href="${esc(pub.canonicalUrl)}">
+<meta property="og:type" content="book">
+<meta property="og:title" content="${esc(copy.seo.title)}">
+<meta property="og:description" content="${esc(copy.seo.description)}">
+<meta property="og:url" content="${esc(pub.canonicalUrl)}">
+${cover ? `<meta property="og:image" content="${esc(cover.url)}">\n<meta name="twitter:card" content="summary_large_image">` : ''}`
+    : ''
+}
 <style>
   :root { --ink:#2b211b; --paper:#f6f0e6; --dusk:#8e2f1f; --river:#2f4a5e; --rule:#d9ccb8; }
   * { box-sizing:border-box; }
@@ -620,6 +684,8 @@ export function renderPreviewHtml(copy: LandingCopy, plan: SectionPlan[] = planS
   button { font:16px system-ui, sans-serif; background:var(--dusk); color:#fff; border:0; padding:14px; }
   .author img { width:180px; height:180px; object-fit:cover; border-radius:50%; float:left; margin:0 24px 12px 0; }
   .author::after { content:''; display:block; clear:both; }
+  .hp { position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden; }
+  .notice { background:#e7efe4; border-left:3px solid #4d7a45; padding:10px 14px; }
   figure { margin:24px 0; } figure img { max-width:100%; } figcaption { font-size:14px; color:var(--river); }
   footer { max-width:760px; margin:0 auto; padding:32px 16px; font-size:14px; }
 </style>

@@ -15,6 +15,8 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': 'http://localhost:3001',
+      // Public book landing pages are server-rendered, not client routes.
+      '/books': 'http://localhost:3001',
     },
   },
   test: {
