@@ -876,7 +876,7 @@ publishingRouter.post('/project/:projectId/blog', validateBody(BlogSchema), asyn
   }
 });
 
-export { bookSummary, SOCIAL_PLATFORMS };
+export { bookSummary, SOCIAL_PLATFORMS, loadProject, saveOutline };
 
 // ------------------------------------------------------------------------------------------------
 // Reference photographs: real pictures, from named archives, into the project's image archive

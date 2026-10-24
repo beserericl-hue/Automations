@@ -3684,11 +3684,7 @@ async def _project_research(user_id: str, project_title: str, topic: str, keywor
     if not rows:
         return ""
 
-    terms = {
-        w.strip(".,;:\"'").lower()
-        for w in f"{topic} {keywords}".split()
-        if len(w.strip(".,;:\"'")) > 4
-    }
+    terms = {w.strip(".,;:\"'").lower() for w in f"{topic} {keywords}".split() if len(w.strip(".,;:\"'")) > 4}
     seen: set[str] = set()
     scored: list[tuple[int, int, str, str]] = []
     for row in rows:
@@ -4321,8 +4317,7 @@ def _build_marketing_system(genre: str, volume_note: str, bio_supplied: bool = F
             "facts about the author at all, return an empty string rather than a plausible "
             "career.\n\n"
         )
-        +
-        "No marketing throat-clearing: no 'a sweeping saga', no 'a tour de force', no 'readers will "
+        + "No marketing throat-clearing: no 'a sweeping saga', no 'a tour de force', no 'readers will "
         "be unable to put it down'. Concrete nouns from the actual book.\n\n"
         "Reply with strict JSON matching BookMarketing {blurb, back_cover, hook, keywords, "
         "categories, comparable_titles, author_bio}."
@@ -4380,9 +4375,7 @@ def _build_marketing_revision_system(genre: str) -> str:
     )
 
 
-_THIRD_PERSON = re.compile(
-    r"\b(he|him|his|she|her|hers|they|them|their|theirs)\b", re.IGNORECASE
-)
+_THIRD_PERSON = re.compile(r"\b(he|him|his|she|her|hers|they|them|their|theirs)\b", re.IGNORECASE)
 """Third-person pronouns, for checking a bio written without any supplied.
 
 Deliberately includes they/them. The rule is not "avoid gendered words", it is "state nothing about
@@ -4408,10 +4401,7 @@ async def _load_author_profile(user_id: str) -> dict | None:
         client = await get_supabase_admin()
         r = (
             await client.table("author_profiles_v2")
-            .select(
-                "pen_name,pronouns,lives,background,credentials,prior_work,"
-                "why_this_book,personal,links"
-            )
+            .select("pen_name,pronouns,lives,background,credentials,prior_work,why_this_book,personal,links")
             .eq("user_id", user_id)
             .limit(1)
             .execute()

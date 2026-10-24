@@ -29,6 +29,8 @@ interface Profile {
   bio: string;
   bio_source: 'generated' | 'edited' | null;
   bio_updated_at: string | null;
+  /** Public URL of the author's photograph, or null. Saved on upload, not with the form. */
+  photo_url: string | null;
   gaps: string[];
 }
 
@@ -45,6 +47,7 @@ const EMPTY: Profile = {
   bio: '',
   bio_source: null,
   bio_updated_at: null,
+  photo_url: null,
   gaps: [],
 };
 
@@ -266,6 +269,7 @@ export default function AuthorProfile() {
         <Field label="Where you live" hint="Conventional in a bio, and optional.">
           <input value={form.lives} onChange={(e) => set('lives', e.target.value)} className={inputClass} placeholder="Baltimore, Maryland" />
         </Field>
+        <AuthorPhoto url={data?.photo_url ?? null} />
       </Section>
 
       <Section title="What you bring to the work">
@@ -480,6 +484,58 @@ export default function AuthorProfile() {
 
 const inputClass =
   'block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white';
+
+/**
+ * The author's photograph, for the about-the-author section of a sales page.
+ *
+ * Saved the moment it is chosen rather than with the form below: it is a file, not a fact, and a
+ * photo that waits for a Save button is a photo lost to the first navigation away.
+ */
+function AuthorPhoto({ url }: { url: string | null }) {
+  const queryClient = useQueryClient();
+  const { addToast } = useToast();
+  const upload = useMutation({
+    mutationFn: async (file: File) => {
+      const body = new FormData();
+      body.append('photo', file);
+      return apiFetch<ApiEnvelope<{ photo_url: string }>>('/api/author/photo', { method: 'PUT', body });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['author-profile'] });
+      addToast('Photo saved', 'success');
+    },
+    onError: (err) => addToast((err as Error).message || 'Upload failed', 'error'),
+  });
+
+  return (
+    <Field label="Author photo" hint="Shown beside your bio on the book's landing page. JPEG, PNG or WebP, up to 5MB. Saved as soon as you choose it.">
+      <div className="flex items-center gap-4">
+        {url ? (
+          <img src={url} alt="Author photo" className="h-20 w-20 rounded-full object-cover" />
+        ) : (
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gray-100 text-xs text-gray-400 dark:bg-gray-800">
+            No photo
+          </div>
+        )}
+        <label className="cursor-pointer rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800">
+          {upload.isPending ? 'Uploading…' : url ? 'Replace photo' : 'Upload photo'}
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="sr-only"
+            aria-label="Author photo file"
+            disabled={upload.isPending}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) upload.mutate(file);
+              e.target.value = '';
+            }}
+          />
+        </label>
+      </div>
+    </Field>
+  );
+}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (

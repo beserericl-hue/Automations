@@ -8,6 +8,7 @@ import ExportDialog from '../export/ExportDialog';
 import PublishingPanel from '../publishing/PublishingPanel';
 import PromotionComposer from '../publishing/PromotionComposer';
 import ProjectBlogPosts from '../publishing/ProjectBlogPosts';
+import LandingPageComposer from '../publishing/LandingPageComposer';
 import ArchiveImageSearch from '../publishing/ArchiveImageSearch';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import ProjectEditForm from './ProjectEditForm';
@@ -327,23 +328,6 @@ export default function ProjectDetail() {
     setShowDeleteConfirm(true);
   };
 
-  if (isLoading) {
-    return <div className="flex items-center justify-center h-64 text-sm text-gray-500">Loading...</div>;
-  }
-  if (isError) {
-    return <div className="flex items-center justify-center h-64 text-sm text-red-600 dark:text-red-400">Failed to load project: {error?.message}</div>;
-  }
-  if (!project) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 gap-2">
-        <p className="text-sm text-gray-500">Project not found.</p>
-        <button onClick={() => navigate('/projects')} className="text-sm text-brand-600">Back to projects</button>
-      </div>
-    );
-  }
-
-  const outline = project.outline;
-
   /**
    * Subjects an archive might actually hold pictures of, taken from the book's own premise.
    *
@@ -352,9 +336,12 @@ export default function ProjectDetail() {
    * not exist — the same failure as the blog post that invented an author, arrived at from the
    * other direction. What is left is the real places, peoples and institutions the book is set
    * among, which is what a catalogue can answer.
+   *
+   * Declared above the loading returns: a hook after an early return runs on some renders and not
+   * others, and React takes the whole page down for it (error #310).
    */
   const photoSubjects = useMemo(() => {
-    const premise = String((outline as { premise?: string } | null)?.premise ?? '');
+    const premise = String((project?.outline as { premise?: string } | null | undefined)?.premise ?? '');
     const invented = new Set(
       (bibleEntries ?? [])
         .filter((e) => (e.entry_type ?? '') === 'character')
@@ -378,7 +365,25 @@ export default function ProjectDetail() {
       if (out.length >= 6) break;
     }
     return out;
-  }, [outline, bibleEntries]);
+  }, [project?.outline, bibleEntries]);
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-64 text-sm text-gray-500">Loading...</div>;
+  }
+  if (isError) {
+    return <div className="flex items-center justify-center h-64 text-sm text-red-600 dark:text-red-400">Failed to load project: {error?.message}</div>;
+  }
+  if (!project) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-2">
+        <p className="text-sm text-gray-500">Project not found.</p>
+        <button onClick={() => navigate('/projects')} className="text-sm text-brand-600">Back to projects</button>
+      </div>
+    );
+  }
+
+  const outline = project.outline;
+
   const writtenChapters = chapters?.length ?? 0;
   const outlinedChapters = outline?.chapters?.length ?? 0;
 
@@ -1688,6 +1693,7 @@ function SocialTab({
         userId={userId}
         defaultAbout={defaultAbout || undefined}
       />
+      <LandingPageComposer projectId={projectId} />
       <div>
         <h3 className="mb-3 text-lg font-semibold text-gray-900 dark:text-white">Blog posts</h3>
         <ProjectBlogPosts projectId={projectId} />
