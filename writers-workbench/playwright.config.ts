@@ -42,7 +42,8 @@ export default defineConfig({
     // Unauthenticated tests (login page, redirects)
     {
       name: 'chromium-noauth',
-      testMatch: /login\.spec\.ts|sprint2-navigation\.spec\.ts/,
+      // auth-otp skips itself without a service key (as in CI); locally it drives the real code login.
+      testMatch: /login\.spec\.ts|sprint2-navigation\.spec\.ts|auth-otp\.spec\.ts|book-page\.spec\.ts/,
       use: { ...devices['Desktop Chrome'] },
     },
     // Authenticated tests — depend on setup, reuse saved auth state

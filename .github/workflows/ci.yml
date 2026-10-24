@@ -90,6 +90,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name == 'pull_request'
+    # Job-level so the authenticated step's `if:` can see them: a step's own `env:` is not in scope
+    # for its `if:`, which is why that step's old `env.E2E_TEST_EMAIL != ''` guard was always false
+    # and the authenticated suite never ran in CI.
+    env:
+      E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+      E2E_DEV_SUPABASE_URL: ${{ secrets.E2E_DEV_SUPABASE_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -112,14 +118,30 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_N8N_WEBHOOK_URL: ${{ secrets.VITE_N8N_WEBHOOK_URL }}
           VITE_ELEVENLABS_AGENT_ID: ${{ secrets.VITE_ELEVENLABS_AGENT_ID }}
-      - run: npx playwright test --project=setup --project=chromium
-        if: ${{ env.E2E_TEST_EMAIL != '' }}
+      # The authenticated suite, against the DEV deployment it was written for: it seeds and deletes
+      # its own data there and mints its session with the service key (login is passwordless, so
+      # there is no test password). Light pass only (Pass A); the engine-heavy Pass B runs by hand.
+      # Runs only when the DEV secrets exist, and refuses anything that is not DEV.
+      - name: Authenticated E2E against DEV (light pass)
+        if: env.E2E_TEST_EMAIL != '' && contains(env.E2E_DEV_SUPABASE_URL, 'gvbvwcnmjkdpclcisqrr')
         env:
           CI: true
-          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
-          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          E2E_BASE_URL: https://writersworkbench-develop.up.railway.app
+          E2E_PASSES: A
+          E2E_RETRIES: 1
+          SUPABASE_URL: ${{ secrets.E2E_DEV_SUPABASE_URL }}
+          E2E_SUPA_URL: ${{ secrets.E2E_DEV_SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.E2E_DEV_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.E2E_DEV_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_DEV_SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_SUPA_SERVICE_KEY: ${{ secrets.E2E_DEV_SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_USER_ID: '+14105914612'
+        run: |
+          npx playwright test --project=chromium-noauth --reporter=line
+          bash e2e/run-regression.sh
+      - name: Authenticated E2E skipped
+        if: env.E2E_TEST_EMAIL == '' || !contains(env.E2E_DEV_SUPABASE_URL, 'gvbvwcnmjkdpclcisqrr')
+        run: echo "::notice::Authenticated E2E not run - set E2E_TEST_EMAIL and the E2E_DEV_SUPABASE_* secrets (DEV only) to enable it."
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

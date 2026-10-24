@@ -27,9 +27,15 @@ test.describe('Credits (result-asserting)', () => {
 
     const purchase = page.getByRole('button', { name: 'Purchase', exact: true });
     if (!(await purchase.isVisible().catch(() => false))) {
-      // Comp/free_full tiers don't offer credit purchase — that's correct behavior, not a skip.
-      // Assert the purchase section is genuinely absent (not a broken/hidden control) and stop.
+      // No purchase offered: either the tier has none (comp/free_full), or no payment provider is
+      // configured and the server refuses every purchase — in which case the page must say so
+      // rather than offer a button that can only fail. Either way the control is genuinely absent.
       await expect(purchase).toHaveCount(0);
+      const pricing = await (await apiClient()).get('/api/credits/pricing');
+      const p = (await pricing.json())?.data;
+      if (p && p.purchases_available === false) {
+        await expect(page.getByText(/Credit purchases are not available yet/)).toBeVisible();
+      }
       return;
     }
     const preset10 = page.getByRole('button', { name: '10', exact: true });

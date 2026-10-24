@@ -265,10 +265,9 @@ test.describe('ContentDetail — Version History View/Restore/Compare (result-as
     const editor = page.locator('.ProseMirror').first();
     await expect(editor).toBeVisible({ timeout: 20_000 });
 
-    // Open History first (no versions yet → empty state; Compare not rendered).
-    await page.getByRole('button', { name: 'History', exact: true }).click();
+    // Open the Versions tab first (no versions yet → empty state; Compare not rendered).
+    await page.getByRole('button', { name: 'Versions', exact: true }).click();
     await expect(page.getByText(/No version history yet/i)).toBeVisible({ timeout: 15_000 });
-    await page.getByRole('button', { name: 'Close', exact: true }).first().click();
 
     // Edit #1 → version 1 (content contains V1 marker).
     await editor.click();
@@ -286,11 +285,10 @@ test.describe('ContentDetail — Version History View/Restore/Compare (result-as
     // (which is cached from the earlier empty open) refetches the current version list.
     await page.reload();
     await expect(page.locator('.ProseMirror').first()).toBeVisible({ timeout: 20_000 });
-    await page.getByRole('button', { name: 'History', exact: true }).click();
+    await page.getByRole('button', { name: 'Versions', exact: true }).click();
     const compareEarly = page.getByRole('button', { name: /Compare versions/i });
     await expect(compareEarly).toBeVisible({ timeout: 10_000 });
     await expect(compareEarly, 'Compare must be disabled with <2 versions').toBeDisabled();
-    await page.getByRole('button', { name: 'Close', exact: true }).first().click();
 
     // Edit #2 → version 2 (content now also contains V2). This is the CURRENT text.
     await editor.click();
@@ -307,11 +305,11 @@ test.describe('ContentDetail — Version History View/Restore/Compare (result-as
     const versionsBeforeRestore =
       (await supaGet('content_versions_v2', `content_id=eq.${contentId}&select=id`)).length;
 
-    // Open History — now with ≥2 versions, Compare is ENABLED. Reload so the panel query refetches the
+    // Open the Versions tab — now with ≥2 versions, Compare is ENABLED. Reload so the panel query refetches the
     // current (2-version) list rather than serving the cached 1-version result.
     await page.reload();
     await expect(page.locator('.ProseMirror').first()).toBeVisible({ timeout: 20_000 });
-    await page.getByRole('button', { name: 'History', exact: true }).click();
+    await page.getByRole('button', { name: 'Versions', exact: true }).click();
     const compare = page.getByRole('button', { name: /Compare versions/i });
     await expect(compare).toBeVisible({ timeout: 10_000 });
     await expect(compare).toBeEnabled();

@@ -55,8 +55,10 @@ test.describe('TopBar (result-asserting)', () => {
       await input.fill(title);
 
       // The result button carries the seeded title; clicking it must navigate to the project detail page.
+      // Found inside the header's search dropdown: the dashboard behind it has a Recent row with the
+      // same title, and page-wide that row is the first match.
       const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const result = page.getByRole('button', { name: new RegExp(escaped) });
+      const result = page.locator('header').getByRole('button', { name: new RegExp(escaped) });
       await expect(result.first()).toBeVisible({ timeout: 15_000 });
       await result.first().click();
 

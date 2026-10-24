@@ -108,7 +108,7 @@ test.describe('ProjectDetail tabs (result-asserting)', () => {
     void bibleId; // asserted via DOM (row backed by the seeded DB entry)
   });
 
-  test('Social tab: platform filter buttons + per-post Copy', async ({ page, context, browserName }) => {
+  test('Promotion tab: social post filter buttons + per-post Copy', async ({ page, context, browserName }) => {
     // Grant clipboard permission (Chromium) so navigator.clipboard.writeText resolves in the handler.
     if (browserName === 'chromium') {
       await context.grantPermissions(['clipboard-read', 'clipboard-write']);
@@ -116,16 +116,20 @@ test.describe('ProjectDetail tabs (result-asserting)', () => {
     await page.goto(`/projects/${projectId}?tab=social`);
     await expect(page.getByText(SOCIAL_TEXT).first()).toBeVisible({ timeout: 20_000 });
 
+    // The Promotion tab also has a post composer whose platform picker has a "LinkedIn" button, so the
+    // filters are found inside the "Social posts" section, not page-wide.
+    const posts = page.locator('div').filter({ has: page.getByRole('heading', { name: 'Social posts', exact: true }) }).last();
+
     // Filter to Twitter/X → the twitter post stays; filter to LinkedIn → it disappears (empty state).
-    await page.getByRole('button', { name: 'Twitter / X' }).click();
+    await posts.getByRole('button', { name: 'Twitter / X' }).click();
     await expect(page.getByText(SOCIAL_TEXT).first()).toBeVisible({ timeout: 10_000 });
-    await page.getByRole('button', { name: 'LinkedIn' }).click();
+    await posts.getByRole('button', { name: 'LinkedIn' }).click();
     await expect(page.getByText(SOCIAL_TEXT)).toHaveCount(0);
     await expect(page.getByText('No social posts yet')).toBeVisible({ timeout: 10_000 });
 
     // Back to All Platforms → Copy the post. Result: the checkmark (copied) icon appears and the
     // clipboard holds the post text + hashtags.
-    await page.getByRole('button', { name: 'All Platforms' }).click();
+    await posts.getByRole('button', { name: 'All Platforms' }).click();
     await expect(page.getByText(SOCIAL_TEXT).first()).toBeVisible({ timeout: 10_000 });
     await page.getByRole('button', { name: 'Copy to clipboard' }).first().click();
     if (browserName === 'chromium') {

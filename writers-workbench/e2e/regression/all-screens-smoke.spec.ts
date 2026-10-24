@@ -68,31 +68,23 @@ test.describe('Auth screens (unauthenticated)', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test('Login /login', async ({ page }) => {
-    // PASS: email input + "Sign in" button render. FAIL: either missing / redirected away.
+    // PASS: the passwordless form — an email input and "Email me a code", no password field.
+    // FAIL: either missing / redirected away / a password field reappears.
     await page.goto('/login', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /email me a code/i })).toBeVisible();
+    await expect(page.locator('input[type="password"]')).toHaveCount(0);
   });
 
-  test('Signup /signup', async ({ page }) => {
-    // PASS: "Create your account" + email input. FAIL: missing / crash.
-    await page.goto('/signup', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByText(/create your account/i).first()).toBeVisible({ timeout: 20_000 });
-    await expect(page.locator('input[type="email"]')).toBeVisible();
-  });
-
-  test('Forgot password /forgot-password', async ({ page }) => {
-    // PASS: "Reset your password" heading + "Send reset link" submit. FAIL: missing / crash.
-    await page.goto('/forgot-password', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { name: /reset your password/i })).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByRole('button', { name: /send reset link/i })).toBeVisible();
-  });
-
-  test('Reset password /reset-password', async ({ page }) => {
-    // PASS: "Set new password" heading OR the reset form. FAIL: crash / blank.
-    await page.goto('/reset-password', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByText(/set new password|reset your password|password/i).first()).toBeVisible({ timeout: 20_000 });
-  });
+  // Login is passwordless: one form serves new and returning users, so the old sign-up and
+  // password-recovery addresses redirect to it rather than rendering screens of their own.
+  for (const path of ['/signup', '/forgot-password', '/reset-password']) {
+    test(`${path} lands on the one login form`, async ({ page }) => {
+      await page.goto(path, { waitUntil: 'domcontentloaded' });
+      await expect(page).toHaveURL(/\/login$/, { timeout: 20_000 });
+      await expect(page.getByRole('button', { name: /email me a code/i })).toBeVisible();
+    });
+  }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -120,11 +112,12 @@ test.describe('Core app screens', () => {
   });
 
   test('Project detail /projects/:id', async ({ page }) => {
-    // PASS: project title + the 9 tab labels present.
+    // PASS: project title + every tab label present. ("Social" was renamed "Promotion" when it
+    // gained the post, blog and landing-page composers.)
     await page.goto(`/projects/${ID.project}`, { waitUntil: 'domcontentloaded' });
     await expectScreen(page, page.getByRole('heading', { name: /The Last Signal/ }));
     // Tab labels may carry counts ("Chapters (3)", "Story Bible (120)") — match by prefix.
-    for (const tab of ['Overview', 'Outline', 'Chapters', 'Story Bible', 'Art', 'Social', 'Research', 'Cost', 'Export']) {
+    for (const tab of ['Overview', 'Outline', 'Chapters', 'Q/A', 'Story Bible', 'Art', 'Promotion', 'Research', 'Cost', 'Export', 'Publish']) {
       await expect(page.getByText(new RegExp(`${tab}`)).first()).toBeVisible();
     }
   });
@@ -146,10 +139,12 @@ test.describe('Core app screens', () => {
   });
 
   test('Content detail /content/:id (editor + annotations)', async ({ page }) => {
-    // PASS: chapter renders with the TipTap editor AND the Review Annotations panel.
+    // PASS: chapter renders with the TipTap editor AND the review rail, whose Review tab holds the
+    // annotations (drift, craft Q/A, genre compliance).
     await page.goto(`/content/${ID.content}`, { waitUntil: 'domcontentloaded' });
-    await expectScreen(page, page.getByText(/Review Annotations/i));
-    await expect(page.locator('.ProseMirror, [contenteditable="true"]').first()).toBeVisible();
+    await expect(page.locator('.ProseMirror, [contenteditable="true"]').first()).toBeVisible({ timeout: 20_000 });
+    await page.getByRole('button', { name: /^Review/ }).first().click();
+    await expectScreen(page, page.getByText(/Craft Q\/A|Character drift|Genre compliance/));
   });
 
   test('Image detail /images/:id', async ({ page }) => {

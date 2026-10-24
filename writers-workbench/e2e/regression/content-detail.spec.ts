@@ -39,16 +39,15 @@ test.describe('ContentDetail — editor, history, lifecycle, rewrite modal', () 
     await expect(anyLifecycle.first()).toBeVisible({ timeout: 15_000 });
   });
 
-  test('Version History opens and closes', async ({ page }) => {
+  test('the Versions tab shows the version history', async ({ page }) => {
+    // The review rail is tabbed; Versions is the tab, so there is no separate History button or Close.
     const wb = new WorkbenchPage(page);
     const id = await wb.openAChapter();
     test.skip(!id, 'no chapter content available');
-    const historyBtn = page.getByRole('button', { name: 'History', exact: true });
-    await expect(historyBtn).toBeVisible({ timeout: 15_000 });
-    await historyBtn.click();
-    await expect(page.getByRole('button', { name: 'Close', exact: true }).first()).toBeVisible({ timeout: 10_000 });
-    await page.getByRole('button', { name: 'Close', exact: true }).first().click();
-    await expect(historyBtn).toBeVisible({ timeout: 10_000 });
+    const versionsTab = page.getByRole('button', { name: 'Versions', exact: true });
+    await expect(versionsTab).toBeVisible({ timeout: 15_000 });
+    await versionsTab.click();
+    await expect(page.getByRole('heading', { name: 'Version History' })).toBeVisible({ timeout: 10_000 });
   });
 
   test('Rewrite with research modal opens, validates min length, and cancels', async ({ page }) => {
