@@ -380,7 +380,10 @@ export function paragraphs(s: string): string[] {
 
 /** Every passage the published page must carry unchanged, labelled for the report. */
 export function verbatimBlocks(copy: LandingCopy): { label: string; text: string }[] {
-  const blocks: { label: string; text: string }[] = [{ label: 'hero heading (hook)', text: copy.hook }];
+  const blocks: { label: string; text: string }[] = [
+    { label: 'title', text: copy.title },
+    { label: 'tagline (hook)', text: copy.hook },
+  ];
   paragraphs(copy.blurb).forEach((text, i) => blocks.push({ label: `blurb paragraph ${i + 1}`, text }));
   copy.facts.forEach((f, i) => blocks.push({ label: `history fact ${i + 1}`, text: f.text }));
   for (const v of copy.volumes) blocks.push({ label: `volume ${v.index} hook`, text: v.hook });
@@ -437,7 +440,13 @@ function promptSection(kind: SectionKind, copy: LandingCopy): { title: string; l
     case 'hero':
       return {
         title: 'Hero',
-        lines: ['   Heading:', verbatim(copy.hook), `   Subheading: A novel by ${copy.author}`, ...imageLines(cover)],
+        lines: [
+          `   Heading (the book's title): ${copy.title}`,
+          '   Tagline, under the heading:',
+          verbatim(copy.hook),
+          `   Byline: A novel by ${copy.author}`,
+          ...imageLines(cover),
+        ],
       };
     case 'story':
       return { title: 'The novel', lines: ['   Heading: The novel', verbatim(copy.blurb)] };
@@ -608,7 +617,8 @@ export function renderPreviewHtml(copy: LandingCopy, plan: SectionPlan[] = planS
   const cta = `<p class="cta"><a href="#reserve">${esc(CTA_LABEL)}</a></p>`;
   const body: Record<SectionKind, string> = {
     hero: `<section class="hero">
-  <h1>${esc(copy.hook)}</h1>
+  <h1>${esc(copy.title)}</h1>
+  <p class="tagline">${esc(copy.hook)}</p>
   <p class="byline">A novel by ${esc(copy.author)}</p>
   ${cover ? `<img src="${esc(cover.url)}" alt="${esc(cover.alt)}">` : ''}`,
     story: `<section>
@@ -667,10 +677,11 @@ ${cover ? `<meta property="og:image" content="${esc(cover.url)}">\n<meta name="t
   body { margin:0; background:var(--paper); color:var(--ink); font:18px/1.65 Georgia, 'Times New Roman', serif; }
   section { max-width:760px; margin:0 auto; padding:56px 16px; border-bottom:1px solid var(--rule); }
   h1, h2 { font-weight:normal; line-height:1.25; }
-  h1 { font-size:clamp(28px, 5vw, 42px); margin:0 0 12px; }
+  h1 { font-size:clamp(40px, 8vw, 64px); margin:0 0 12px; letter-spacing:.01em; }
   h2 { font-size:28px; color:var(--river); }
   .hero { text-align:center; }
-  .hero img { width:100%; max-width:520px; border-radius:4px; margin:24px 0; }
+  .hero img { width:100%; max-width:340px; border-radius:2px; margin:24px 0; box-shadow:0 10px 30px rgba(43,33,27,.35); }
+  .tagline { font-size:clamp(19px, 3vw, 24px); line-height:1.4; margin:0 auto 12px; max-width:620px; }
   .byline { font-style:italic; color:var(--river); }
   .cta a { display:inline-block; background:var(--dusk); color:#fff; text-decoration:none; padding:14px 28px; border-radius:3px; font-family:system-ui, sans-serif; font-size:16px; }
   .facts { list-style:none; padding:0; }
