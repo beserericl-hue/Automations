@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { supaGet } from '../pages/api';
+import { deleteProject, seedContent, seedProject } from '../pages/api';
 
 /**
  * Q/A tab + "Rewrite to fix Q/A" — the feature added after a user found the Q/A Consistency Report had
@@ -11,47 +11,65 @@ import { supaGet } from '../pages/api';
  *
  * The full multi-minute rewrite completion is not awaited here (dispatch is the data-path proof); the
  * heavy content-change is covered by the chapter.repair path in content-repair.spec.ts.
+ *
+ * Its own data. It used to point at The Last Signal's chapter 3 and click the fix there — which
+ * started a real rewrite of that chapter, which fixed the flagged check, so the next run found
+ * nothing flagged and failed. A test that consumes its fixture passes once. Each run now seeds a
+ * disposable project and chapter with one flagged check, and deletes both.
  */
-const PROJECT_ID = 'dd10c1c3-e025-4cd7-854d-21db32a2e4da'; // The Last Signal
+const FLAGGED_REPORT = {
+  qa_report: {
+    generated_at: new Date(Date.now() - 3600_000).toISOString(),
+    checks: [
+      { name: 'Character consistency', status: 'PASS', details: 'seeded' },
+      { name: 'Timeline continuity', status: 'FAIL', details: 'seeded: the dates in scene two contradict chapter one' },
+    ],
+  },
+};
 
 test.describe('Project Q/A tab + Rewrite to fix Q/A', () => {
-  test('Q/A tab lists chapters with craft-QA and a fix button for flagged chapters', async ({ page }) => {
-    await page.goto(`/projects/${PROJECT_ID}?tab=qa`, { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { name: /The Last Signal/ })).toBeVisible({ timeout: 20_000 });
+  test.describe.configure({ mode: 'serial' });
+  let projectId = '';
+  let contentId = '';
+  const title = `E2E QA Fix ${Date.now()}`;
 
-    // The Q/A tab exists and is selectable.
-    const qaTab = page.getByText(/^Q\/A$/).first();
-    await expect(qaTab).toBeVisible({ timeout: 20_000 });
-    await qaTab.click();
+  test.beforeAll(async () => {
+    projectId = await seedProject({ title });
+    contentId = await seedContent({
+      title: 'Chapter 1 — The Relay',
+      content_type: 'chapter',
+      status: 'draft',
+      chapter_number: 1,
+      project_id: projectId,
+      content_text: 'Mara climbed to the relay at dusk and listened for the voice that had no business being there. '.repeat(25),
+      metadata: FLAGGED_REPORT,
+    });
+  });
 
-    // The grid renders chapters (column headers + at least one chapter row with a craft-QA score).
-    await expect(page.getByText(/Craft QA/i).first()).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText(/Consistency report/i).first()).toBeVisible();
-    // A chapter row links into the chapter.
-    await expect(page.getByRole('link', { name: /The Wasteland's Rules|The Frequency|The Guide and the Deal/ }).first())
-      .toBeVisible({ timeout: 20_000 });
-
-    // The Wasteland's Rules (ch3) has a flagged consistency check → a "Rewrite to fix Q/A" button.
-    const fixBtn = page.getByRole('button', { name: /Rewrite to fix Q\/A/i }).first();
-    await expect(fixBtn).toBeVisible({ timeout: 20_000 });
-
-    // Clicking it dispatches an engine job (button flips to Rewriting…). We don't await the full rewrite.
-    await fixBtn.click();
-    await expect(page.getByRole('button', { name: /Rewriting…/i }).first()).toBeVisible({ timeout: 20_000 });
+  test.afterAll(async () => {
+    if (projectId) await deleteProject(projectId);
   });
 
   test('the Q/A Consistency Report panel on a chapter exposes the fix action', async ({ page }) => {
-    const CONTENT_ID = 'd681e643-2984-4ebc-83c1-f125a1c6fade'; // The Wasteland's Rules (has a flagged check)
-    // Only meaningful if a report exists with a flagged check.
-    const rows = await supaGet<{ metadata: { qa_report?: { checks?: Array<{ status?: string }> } } | null }>(
-      'published_content_v2', `id=eq.${CONTENT_ID}&select=metadata`,
-    ).catch(() => []);
-    const checks = rows[0]?.metadata?.qa_report?.checks ?? [];
-    const flagged = checks.filter((c) => String(c.status).toUpperCase() !== 'PASS').length;
-    test.skip(!flagged, 'no flagged Q/A check on this chapter to fix');
-
-    await page.goto(`/content/${CONTENT_ID}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/content/${contentId}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByText(/Q\/A Consistency Report/i)).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole('button', { name: /Rewrite to fix Q\/A/i }).first()).toBeVisible({ timeout: 20_000 });
+  });
+
+  test('Q/A tab lists chapters with their report and a fix button for a flagged chapter', async ({ page }) => {
+    await page.goto(`/projects/${projectId}?tab=qa`, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: title })).toBeVisible({ timeout: 20_000 });
+
+    // The grid renders the seeded chapter with its consistency result.
+    await expect(page.getByText(/Craft QA/i).first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('1/2 passed · 1 flagged')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole('link', { name: 'Chapter 1 — The Relay' })).toBeVisible();
+
+    // Clicking the fix dispatches an engine job (button flips to Rewriting…). The rewrite itself is
+    // not awaited; it runs on this disposable chapter, which is deleted afterwards.
+    const fixBtn = page.getByRole('button', { name: /Rewrite to fix Q\/A/i }).first();
+    await expect(fixBtn).toBeVisible({ timeout: 20_000 });
+    await fixBtn.click();
+    await expect(page.getByRole('button', { name: /Rewriting…/i }).first()).toBeVisible({ timeout: 20_000 });
   });
 });
