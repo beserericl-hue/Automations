@@ -415,11 +415,9 @@ export default function ContentDetail() {
         </div>
 
         {/* Status + actions */}
+        {/* Save status lives on the editor bar, which is also visible in full-screen mode. It was
+            shown here too, so every save announced itself twice. */}
         <div className="flex items-center gap-2 shrink-0">
-          {saveStatus === 'saving' && <span className="text-xs text-gray-400">Saving...</span>}
-          {saveStatus === 'saved' && <span className="text-xs text-green-500">Saved</span>}
-          {saveStatus === 'error' && <span className="text-xs text-red-500">Save failed</span>}
-
           <StatusBadge status={item.status} />
 
           {statusActions.map((action) => (

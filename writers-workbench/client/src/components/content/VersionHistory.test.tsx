@@ -1,9 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-import { renderWithProviders, screen, fireEvent } from '../../test/test-utils';
+import { renderWithProviders, screen } from '../../test/test-utils';
 import VersionHistory from './VersionHistory';
 
 /**
  * Sprint 1 QA Tests — S1-5: Version History Viewer
+ *
+ * It is shown inside the Versions tab, which is its open/close, so it renders open: no "History"
+ * button to click first and no Close of its own.
  */
 describe('S1-5: Version History Viewer', () => {
   const defaultProps = {
@@ -11,33 +14,15 @@ describe('S1-5: Version History Viewer', () => {
     onRestore: vi.fn(),
   };
 
-  it('QA: renders History button when collapsed', () => {
+  it('QA: renders the version panel straight away', () => {
     renderWithProviders(<VersionHistory {...defaultProps} />);
-    expect(screen.getByText('History')).toBeInTheDocument();
+    expect(screen.getByText('Version History')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'History' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
   });
 
-  it('QA: clicking History opens the version panel', async () => {
+  it('QA: shows the empty state when there are no versions', async () => {
     renderWithProviders(<VersionHistory {...defaultProps} />);
-    fireEvent.click(screen.getByText('History'));
-    expect(screen.getByText('Version History')).toBeInTheDocument();
-    expect(screen.getByText('Close')).toBeInTheDocument();
-  });
-
-  it('QA: open panel shows loading state then empty state', async () => {
-    renderWithProviders(<VersionHistory {...defaultProps} />);
-    fireEvent.click(screen.getByText('History'));
-    // Should show loading or empty state (mock returns empty array)
-    // After mock resolves, should show "No version history yet."
-    expect(screen.getByText('Version History')).toBeInTheDocument();
-  });
-
-  it('QA: Close button collapses the panel back to button', () => {
-    renderWithProviders(<VersionHistory {...defaultProps} />);
-    fireEvent.click(screen.getByText('History'));
-    expect(screen.getByText('Version History')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByText('Close'));
-    expect(screen.queryByText('Version History')).not.toBeInTheDocument();
-    expect(screen.getByText('History')).toBeInTheDocument();
+    expect(await screen.findByText(/No version history yet/i)).toBeInTheDocument();
   });
 });
