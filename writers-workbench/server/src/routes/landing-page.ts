@@ -45,6 +45,7 @@ import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import { logger } from '../lib/logger.js';
 import { loadProject, saveOutline, marketingKey } from './publishing.js';
 import { authorPhotoUrl } from './author.js';
+import { composeCover } from '../lib/cover.js';
 import type { ValidationResult } from '../lib/kdp-validate.js';
 import {
   SECTION_KINDS,
@@ -273,6 +274,7 @@ interface Inputs {
   author: string;
   bio: string;
   cover: PageImage | null;
+  coverPath: string | null;
   authorPhoto: string | null;
   referencePhotos: ReferencePhoto[];
   reports: ResearchReport[];
@@ -339,10 +341,35 @@ async function gatherInputs(userId: string, project: { id: string; title: string
     cover: coverRow
       ? { role: 'cover', url: publicUrl(coverRow.storage_path), alt: `Cover art for ${project.title}` }
       : null,
+    coverPath: coverRow?.storage_path ?? null,
     authorPhoto,
     referencePhotos,
     reports: (reports ?? []) as ResearchReport[],
   };
+}
+
+/**
+ * The book's front cover — title and author set on the cover art, the same composition as the
+ * ebook cover in the KDP package — stored where the page can show it. The page shows a book, so it
+ * shows the cover a reader would see, not the painting underneath it. Null when it cannot be
+ * built; the caller falls back to the art and says so.
+ */
+async function bookCoverImage(
+  userId: string,
+  project: { id: string; title: string },
+  author: string,
+  artPath: string,
+): Promise<PageImage | null> {
+  const storage = getSupabaseAdmin().storage.from('cover-images');
+  const dl = await storage.download(artPath);
+  if (!dl.data) return null;
+  const composed = await composeCover({ art: Buffer.from(await dl.data.arrayBuffer()), title: project.title, author });
+  if (!composed) return null;
+  // A new name per build, so a regenerated cover is never served from a CDN cache under the old URL.
+  const path = `${userId}/${project.id}/landing/book-cover-${Date.now()}.jpg`;
+  const up = await storage.upload(path, composed, { contentType: 'image/jpeg', upsert: false });
+  if (up.error) throw new Error(`could not store the book cover: ${up.error.message}`);
+  return { role: 'cover', url: publicUrl(path), alt: `${project.title} by ${author}, front cover` };
 }
 
 function shrink(s: string, max: number): string {
@@ -503,7 +530,14 @@ landingPageRouter.post('/project/:projectId', validateBody(GenerateSchema), asyn
     ]);
 
     const chosen = inputs.referencePhotos.filter((p) => body.reference_photo_ids?.includes(p.id));
-    const images: PageImage[] = [inputs.cover!];
+    const bookCover = inputs.coverPath
+      ? await bookCoverImage(userId, project, inputs.author, inputs.coverPath).catch((err: Error) => {
+          logger.warn({ err, projectId: project.id }, 'landing-page: book cover not composed');
+          return null;
+        })
+      : null;
+    if (!bookCover) warnings.push('The front cover could not be built, so the cover art is shown without its title.');
+    const images: PageImage[] = [bookCover ?? inputs.cover!];
     if (inputs.authorPhoto) images.push({ role: 'author', url: inputs.authorPhoto, alt: `${inputs.author}, author` });
     else warnings.push('No author photo. Add one in Settings, Author Profile, and generate again.');
     for (const p of chosen) images.push({ role: 'reference', url: p.url, alt: p.title, credit: creditFor(p) });

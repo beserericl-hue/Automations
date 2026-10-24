@@ -94,7 +94,9 @@ test.describe('a published book page', () => {
     expect(slug).toBe(title.toLowerCase().replace(/ /g, '-'));
     const res = await page.goto(`/books/${slug}`);
     expect(res?.status()).toBe(200);
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText(HOOK);
+    // The book's title is the headline; the hook is its tagline underneath.
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(title);
+    await expect(page.locator('.tagline')).toHaveText(HOOK);
     await expect(page).toHaveTitle(`${title}: a novel by E2E Author`);
     // Server-rendered: none of the app's bundle is on this page.
     expect(await page.locator('script').count()).toBe(0);

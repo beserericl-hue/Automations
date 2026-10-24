@@ -315,3 +315,15 @@ describe('the public page', () => {
     expect(csvCell('@me')).toBe("'@me");
   });
 });
+
+describe('the hero', () => {
+  it('leads with the book title, with the hook as its tagline', () => {
+    const html = renderPreviewHtml(copy());
+    expect(html).toContain('<h1>The Ossuary</h1>');
+    expect(html).toContain('<p class="tagline">A thousand people in four boxes. Twenty-six names.</p>');
+    expect(html.indexOf('<h1>')).toBeLessThan(html.indexOf('class="tagline"'));
+    const prompt = buildGhlPrompt(copy());
+    expect(prompt).toContain("Heading (the book's title): The Ossuary");
+    expect(verbatimBlocks(copy())[0]).toEqual({ label: 'title', text: 'The Ossuary' });
+  });
+});
