@@ -41,8 +41,32 @@ async function seedCode(email: string, code: string): Promise<void> {
   if (!res.ok) throw new Error(`could not seed a login code: ${res.status} ${await res.text()}`);
 }
 
+/** Make the newest code for this email the given one, already consumed — the state a used code is in. */
+async function markNewestUsed(email: string, code: string): Promise<void> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/user_login_tokens_v2`, {
+    method: 'POST',
+    headers: {
+      apikey: SERVICE_KEY!,
+      authorization: `Bearer ${SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify({
+      email: email.toLowerCase(),
+      code_hash: createHash('sha256').update(code, 'utf8').digest('hex'),
+      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      consumed_at: new Date().toISOString(),
+      request_ip: 'e2e',
+    }),
+  });
+  if (!res.ok) throw new Error(`could not seed a used code: ${res.status} ${await res.text()}`);
+}
+
 test.describe('passwordless sign-in', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
+  // One email, and /otp/verify checks the NEWEST code for it. In parallel, one test's "Email me a
+  // code" lands after another's seeded code and makes it stale, so these must run one at a time.
+  test.describe.configure({ mode: 'serial' });
 
   test.beforeEach(() => {
     test.skip(!configured, 'Needs E2E_TEST_EMAIL, SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY');
@@ -104,13 +128,26 @@ test.describe('passwordless sign-in', () => {
     await page.getByRole('button', { name: /^sign in$/i }).click();
     await expect(page.locator('text=Dashboard')).toBeVisible({ timeout: 30_000 });
 
-    // Sign out, then try the same code a second time.
+    // The sign-in consumed it: its row is marked used.
+    const hash = createHash('sha256').update(code, 'utf8').digest('hex');
+    const rows = (await (
+      await fetch(`${SUPABASE_URL}/rest/v1/user_login_tokens_v2?code_hash=eq.${hash}&select=consumed_at`, {
+        headers: { apikey: SERVICE_KEY!, authorization: `Bearer ${SERVICE_KEY}` },
+      })
+    ).json()) as Array<{ consumed_at: string | null }>;
+    expect(rows.length).toBe(1);
+    expect(rows[0].consumed_at).not.toBeNull();
+
+    // Sign out, then try the same code again. Re-seed it as the newest code first: otherwise the
+    // "Email me a code" below makes a fresh code the newest, and the old one is refused for being
+    // stale rather than for being used — which would pass even if codes were not single-use.
     await page.context().clearCookies();
     await page.evaluate(() => window.localStorage.clear());
     await page.goto('/login');
     await page.getByLabel('Email').fill(EMAIL!);
     await page.getByRole('button', { name: /email me a code/i }).click();
     await expect(page.getByLabel('6-digit code')).toBeVisible({ timeout: 15_000 });
+    await markNewestUsed(EMAIL!, code);
     await page.getByLabel('6-digit code').fill(code);
     await page.getByRole('button', { name: /^sign in$/i }).click();
     await expect(page.getByText(/that code is not valid/i)).toBeVisible({ timeout: 15_000 });
