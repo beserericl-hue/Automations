@@ -14,7 +14,16 @@ const failed = status !== '0';
 const strip = (s) => s.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
 const lines = logs.flatMap((f) => (fs.existsSync(f) ? strip(fs.readFileSync(f, 'utf8')).split('\n') : []));
 const counts = lines.filter((l) => /^\s+\d+ (passed|failed|flaky|skipped|did not run)\b/.test(l) || /^=== Pass /.test(l));
-const named = [...new Set(lines.filter((l) => /^\s+\d+\) \[/.test(l)).map((l) => l.replace(/\s─+$/, '').trim()))];
+// Playwright's end-of-run summary lists each failed / flaky test on an indented "[project] › ..."
+// line under its "N failed" / "N flaky" heading. (Progress lines start "[n/m]", not indented.)
+const named = [];
+let heading = '';
+for (const l of lines) {
+  const h = /^\s+\d+ (failed|flaky)\b/.exec(l);
+  if (h) { heading = h[1]; continue; }
+  if (/^\s+\d+ (passed|skipped|did not run)\b/.test(l) || /^=== /.test(l)) { heading = ''; continue; }
+  if (heading && /^\s+\[[\w-]+\] › /.test(l)) named.push(`${heading}: ${l.trim()}`);
+}
 
 const summary = [
   `Writers Workbench E2E on DEV — ${failed ? 'FAILED' : 'passed'} — commit ${commit || 'unknown'}`,
