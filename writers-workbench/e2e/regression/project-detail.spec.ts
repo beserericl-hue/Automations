@@ -3,7 +3,7 @@ import { WorkbenchPage } from '../pages/workbench.page';
 import { RegressionPage } from '../pages/regression.page';
 
 /**
- * ProjectDetail regression — opens a real project and exercises all 9 tabs + the non-destructive
+ * ProjectDetail regression — opens a real project and exercises every tab + the non-destructive
  * controls (Edit form open/cancel, Export dialog open/cancel or correctly-disabled). Destructive
  * actions (Delete Project) are asserted present + open-the-confirm-then-cancel only; never committed.
  *
@@ -15,10 +15,13 @@ const TAB_MARKERS: Record<string, RegExp> = {
   Chapters: /No chapters written yet|QA|Rewrite|prev|Chapter/i,
   'Story Bible': /No story bible entries yet|Characters|Locations|Events/i,
   Art: /Cover Art|No images yet|All Types/i,
-  Social: /Social Media|No social posts yet|All Platforms/i,
+  // Renamed from "Social" when it gained the post, blog and landing-page composers.
+  Promotion: /Landing page|Blog posts|Social posts/,
+  'Q/A': /Consistency report|Craft QA|No chapters/i,
   Research: /No research reports yet|Expand all|Research/i,
   Cost: /Cost|Total Cost|No usage data yet/i,
   Export: /Choose Page Size|No chapters are approved|Export/i,
+  Publish: /Trim size|Marketing copy|Volumes/,
 };
 
 test.describe('ProjectDetail — all tabs + controls', () => {

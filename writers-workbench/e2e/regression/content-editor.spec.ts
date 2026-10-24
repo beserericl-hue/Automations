@@ -48,7 +48,7 @@ test.describe('ContentDetail editor + versions (result-asserting)', () => {
       .toBeGreaterThan(versionsBefore);
   });
 
-  test('Version History opens and lists the saved version(s)', async ({ page }) => {
+  test('the Versions tab lists the saved version(s)', async ({ page }) => {
     await page.goto(`/content/${contentId}`);
     const editor = page.locator('.ProseMirror').first();
     await expect(editor).toBeVisible({ timeout: 20_000 });
@@ -61,9 +61,8 @@ test.describe('ContentDetail editor + versions (result-asserting)', () => {
         { timeout: 20_000 })
       .toBeGreaterThan(0);
 
-    await page.getByRole('button', { name: 'History', exact: true }).click();
-    // The panel opens with a "View"/"Restore" affordance per version (proves versions rendered).
+    await page.getByRole('button', { name: 'Versions', exact: true }).click();
+    // The tab lists a "View"/"Restore" affordance per version (proves versions rendered).
     await expect(page.getByRole('button', { name: /^(View|Restore)$/ }).first()).toBeVisible({ timeout: 10_000 });
-    await page.getByRole('button', { name: 'Close', exact: true }).first().click();
   });
 });

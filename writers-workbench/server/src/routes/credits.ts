@@ -74,6 +74,8 @@ creditsRouter.get('/pricing', (req: Request, res: Response) => {
       tier_name: tier.name,
       tier_display_name: tier.display_name,
       price_per_credit_cents: tier.credit_purchase_price_cents,
+      purchases_available: purchasesAvailable(),
+      unavailable_reason: purchasesAvailable() ? null : PURCHASES_UNAVAILABLE,
     },
   });
 });
@@ -158,6 +160,18 @@ function paymentsConfigured(): boolean {
   return Boolean((process.env.STRIPE_SECRET_KEY || '').trim());
 }
 
+/**
+ * Would POST /purchase go through? The same two checks it makes, so the credits page can say so
+ * instead of offering a Purchase button that can only end in a 503.
+ */
+export function purchasesAvailable(): boolean {
+  return paymentsConfigured() && Boolean(process.env.STRIPE_WEBHOOK_SECRET);
+}
+
+/** Shown in place of the purchase form, and returned by the route when it refuses. */
+export const PURCHASES_UNAVAILABLE =
+  'Credit purchases are not available yet. Your plan\'s monthly credits still apply, and an administrator can add credits to your account.';
+
 creditsRouter.post('/purchase', validateBody(CreditPurchaseSchema), async (req: Request, res: Response) => {
   if (!paymentsConfigured()) {
     logger.warn({ userId: req.userId }, 'credits/purchase refused: no payment provider configured');
@@ -165,8 +179,7 @@ creditsRouter.post('/purchase', validateBody(CreditPurchaseSchema), async (req: 
       success: false,
       error: {
         code: 'PAYMENTS_NOT_CONFIGURED',
-        message:
-          'Credit purchases are not available yet. Your plan\'s monthly credits still apply, and an administrator can add credits to your account.',
+        message: PURCHASES_UNAVAILABLE,
       },
     });
     return;

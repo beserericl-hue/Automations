@@ -8,6 +8,10 @@
  *
  * GHL's builder may still reword what it is given, so the last step is a check: paste the URL of
  * the page GHL published and every passage that changed is named.
+ *
+ * The other way out is not to use GHL at all: publish the same page on the Workbench, at
+ * /books/<title>, where anyone can read it without logging in and its form stores reservations
+ * the author can download.
  */
 
 import { useState } from 'react';
@@ -58,8 +62,22 @@ interface ReferencePhoto {
   credit: string;
 }
 
+interface PublicPage {
+  slug: string;
+  url: string;
+  published_at: string;
+}
+
+interface Reservation {
+  first_name: string;
+  email: string;
+  created_at: string;
+}
+
 interface LandingState {
   current: SavedScript | null;
+  public: PublicPage | null;
+  reservations: { rows: Reservation[]; count: number };
   history: { id: string; created_at: string; sample_url: string | null; prompt: string }[];
   inputs: {
     missing: string[];
@@ -137,6 +155,32 @@ export default function LandingPageComposer({ projectId }: { projectId: string }
     onError: (err) => addToast((err as Error).message || 'Could not check the page', 'error'),
   });
 
+  const publish = useMutation({
+    mutationFn: async (on: boolean) =>
+      apiFetch<ApiEnvelope<PublicPage | null>>(`/api/landing-page/project/${projectId}/publish`, {
+        method: on ? 'POST' : 'DELETE',
+      }),
+    onSuccess: (_res, on) => {
+      queryClient.invalidateQueries({ queryKey });
+      addToast(on ? 'Page published' : 'Page taken down', 'success');
+    },
+    onError: (err) => addToast((err as Error).message || 'Could not change the page', 'error'),
+  });
+
+  const downloadReservations = async () => {
+    try {
+      const csv = await apiFetch<string>(`/api/landing-page/project/${projectId}/reservations.csv`);
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'reservations.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      addToast((err as Error).message || 'Could not download', 'error');
+    }
+  };
+
   const copyText = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -157,6 +201,8 @@ export default function LandingPageComposer({ projectId }: { projectId: string }
 
   if (isLoading || !data) return <p className="text-sm text-gray-500 dark:text-gray-400">Loading…</p>;
   const { current, inputs, history } = data;
+  const page = data.public;
+  const reservations = data.reservations ?? { rows: [], count: 0 };
   const lastCheck = current?.last_check;
 
   return (
@@ -293,6 +339,82 @@ export default function LandingPageComposer({ projectId }: { projectId: string }
               </ul>
             </div>
           ) : null}
+
+          <div className="space-y-2 rounded-lg border border-gray-200 p-3 dark:border-gray-700" data-testid="public-page">
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Your page on the Workbench</p>
+            {page ? (
+              <>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Live. Anyone with the link can read it, no login needed. It always shows the current script, so
+                  generating a new one updates the page.
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <a
+                    href={page.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="break-all text-sm text-brand-600 underline dark:text-brand-400"
+                  >
+                    {page.url}
+                  </a>
+                  <button
+                    onClick={() => copyText(page.url)}
+                    className="rounded-lg border border-gray-300 px-3 py-1 text-xs text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                  >
+                    Copy link
+                  </button>
+                  <button
+                    onClick={() => publish.mutate(false)}
+                    disabled={publish.isPending}
+                    className="rounded-lg border border-gray-300 px-3 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                  >
+                    Take down
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Instead of building it in GHL, publish this page here, at an address made from the book's title.
+                  Anyone with the link can read it and reserve a copy; no login needed.
+                </p>
+                <button
+                  onClick={() => publish.mutate(true)}
+                  disabled={publish.isPending}
+                  className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {publish.isPending ? 'Publishing…' : 'Publish page'}
+                </button>
+              </div>
+            )}
+            {page || reservations.count ? (
+              <div>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                    {reservations.count} reservation{reservations.count === 1 ? '' : 's'}
+                  </p>
+                  {reservations.count ? (
+                    <button onClick={downloadReservations} className="text-xs text-brand-600 underline dark:text-brand-400">
+                      Download CSV
+                    </button>
+                  ) : null}
+                </div>
+                {reservations.rows.length ? (
+                  <ul className="mt-1 divide-y divide-gray-100 text-xs text-gray-600 dark:divide-gray-800 dark:text-gray-400">
+                    {reservations.rows.slice(0, 20).map((r) => (
+                      <li key={r.email} className="flex justify-between gap-2 py-1">
+                        <span>
+                          {r.first_name ? `${r.first_name} · ` : ''}
+                          {r.email}
+                        </span>
+                        <span>{new Date(r.created_at).toLocaleDateString()}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
 
           <div>
             <div className="flex items-center justify-between">

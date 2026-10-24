@@ -144,8 +144,13 @@ export default function CreditsPage() {
   );
 }
 
-function PurchaseSection({ onPurchase }: { onPurchase: () => Promise<void> }) {
-  const [pricing, setPricing] = useState<{ price_per_credit_cents: number; tier_display_name: string } | null>(null);
+export function PurchaseSection({ onPurchase }: { onPurchase: () => Promise<void> }) {
+  const [pricing, setPricing] = useState<{
+    price_per_credit_cents: number;
+    tier_display_name: string;
+    purchases_available?: boolean;
+    unavailable_reason?: string | null;
+  } | null>(null);
   const [amount, setAmount] = useState(25);
   const [loading, setLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -155,7 +160,12 @@ function PurchaseSection({ onPurchase }: { onPurchase: () => Promise<void> }) {
   useEffect(() => {
     void (async () => {
       try {
-        interface Pricing { price_per_credit_cents: number; tier_display_name: string }
+        interface Pricing {
+          price_per_credit_cents: number;
+          tier_display_name: string;
+          purchases_available?: boolean;
+          unavailable_reason?: string | null;
+        }
         const res = await apiFetch<ApiEnvelope<Pricing>>('/api/credits/pricing');
         if (res.data) setPricing(res.data);
       } catch {
@@ -165,6 +175,19 @@ function PurchaseSection({ onPurchase }: { onPurchase: () => Promise<void> }) {
   }, []);
 
   if (!pricing) return null;
+
+  // The server refuses every purchase until a payment provider is wired up. Offering the button
+  // anyway let people pick an amount, confirm, and only then be told no.
+  if (pricing.purchases_available === false) {
+    return (
+      <section className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Buy more credits</h2>
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          {pricing.unavailable_reason ?? 'Credit purchases are not available yet.'}
+        </p>
+      </section>
+    );
+  }
 
   const totalCents = amount * pricing.price_per_credit_cents;
 

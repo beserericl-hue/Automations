@@ -266,7 +266,7 @@ test.describe('VersionHistory View + Compare (result-asserting)', () => {
   test('View renders the selected version\'s HTML', async ({ page }) => {
     await seedTwoVersions(page);
 
-    await page.getByRole('button', { name: 'History', exact: true }).click();
+    await page.getByRole('button', { name: 'Versions', exact: true }).click();
     await expect(page.getByRole('button', { name: 'View', exact: true }).first()).toBeVisible({ timeout: 10_000 });
 
     // The newest version (v-highest, listed first) contains BOTH markers (M1 then M2 were appended).
@@ -282,7 +282,7 @@ test.describe('VersionHistory View + Compare (result-asserting)', () => {
   test('Compare enables with >=2 versions and renders a diff', async ({ page }) => {
     await seedTwoVersions(page);
 
-    await page.getByRole('button', { name: 'History', exact: true }).click();
+    await page.getByRole('button', { name: 'Versions', exact: true }).click();
     const compareBtn = page.getByRole('button', { name: 'Compare versions', exact: true });
     await expect(compareBtn).toBeVisible({ timeout: 10_000 });
     await expect(compareBtn).toBeEnabled(); // >=2 versions -> not disabled

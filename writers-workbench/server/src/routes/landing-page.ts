@@ -18,10 +18,18 @@
  * WHERE IT IS STORED. On the project outline, like the listing copy: `_landing_page` is the current
  * script, `_landing_page_history` what it replaced.
  *
+ * THE PAGE ITSELF. The same copy can instead be published as a page on the Workbench, at
+ * /books/<slug> (book-pages.ts), with a working pre-order form. Publishing records the slug under
+ * `_landing_page_public`; the page always shows the current script, so regenerating updates it.
+ * Reservations are rows in `landing_page_reservations_v2` (migration 035).
+ *
  * Routes:
- *   GET  /api/landing-page/project/:projectId        — the saved script, its preview, and the inputs
- *   POST /api/landing-page/project/:projectId        — generate and save a new script
- *   POST /api/landing-page/project/:projectId/check  — compare the page GHL published with the script
+ *   GET    /api/landing-page/project/:projectId                   — the saved script, its preview, the inputs
+ *   POST   /api/landing-page/project/:projectId                   — generate and save a new script
+ *   POST   /api/landing-page/project/:projectId/check             — compare a published page with the script
+ *   POST   /api/landing-page/project/:projectId/publish           — publish it at /books/<slug>
+ *   DELETE /api/landing-page/project/:projectId/publish           — take it down
+ *   GET    /api/landing-page/project/:projectId/reservations.csv  — everyone who reserved a copy
  */
 
 import crypto from 'crypto';
@@ -54,6 +62,8 @@ import {
   samplePrompt,
   selectFacts,
   skippedMechanics,
+  slugify,
+  csvCell,
   stripTracking,
   validateCopy,
   type LandingCopy,
@@ -344,6 +354,53 @@ function currentOf(outline: Outline | null): SavedLandingPage | null {
   return (outline?._landing_page as SavedLandingPage | undefined) ?? null;
 }
 
+export interface PublicState {
+  slug: string;
+  published_at: string;
+}
+
+function publicOf(outline: Outline | null): PublicState | null {
+  return (outline?._landing_page_public as PublicState | undefined) ?? null;
+}
+
+/** The public address, on whichever host the author is using the Workbench from. */
+function pageUrl(req: { protocol: string; get(name: string): string | undefined }, slug: string): string {
+  const host = req.get('x-forwarded-host') ?? req.get('host') ?? '';
+  const proto = req.get('x-forwarded-proto')?.split(',')[0] ?? req.protocol;
+  return `${proto}://${host}/books/${slug}`;
+}
+
+/** Is this slug already another project's page? */
+async function slugTaken(slug: string, projectId: string): Promise<boolean> {
+  const { data } = await getSupabaseAdmin()
+    .from('writing_projects_v2')
+    .select('id')
+    .eq('outline->_landing_page_public->>slug', slug)
+    .neq('id', projectId)
+    .is('deleted_at', null)
+    .limit(1);
+  return (data ?? []).length > 0;
+}
+
+interface ReservationRow {
+  first_name: string;
+  email: string;
+  created_at: string;
+}
+
+async function reservationsFor(userId: string, projectId: string): Promise<{ rows: ReservationRow[]; count: number }> {
+  const { data, count } = await getSupabaseAdmin()
+    .from('landing_page_reservations_v2')
+    .select('first_name, email, created_at', { count: 'exact' })
+    .eq('user_id', userId)
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false })
+    .limit(500);
+  return { rows: (data ?? []) as ReservationRow[], count: count ?? 0 };
+}
+
+
+
 // ------------------------------------------------------------------------------------------------
 // Routes
 // ------------------------------------------------------------------------------------------------
@@ -368,10 +425,14 @@ landingPageRouter.get('/project/:projectId', async (req, res, next) => {
       sample_url: h.sample_url,
       prompt: h.prompt,
     }));
+    const pub = publicOf(project.outline);
+    const reservations = await reservationsFor(req.userId!, project.id);
     res.json({
       success: true,
       data: {
         current: current ? { ...current, preview_html: renderPreviewHtml(current.copy, current.plan) } : null,
+        public: pub ? { ...pub, url: pageUrl(req, pub.slug) } : null,
+        reservations,
         history,
         inputs: {
           missing: inputs.missing,
@@ -561,4 +622,67 @@ landingPageRouter.post('/project/:projectId/check', validateBody(CheckSchema), a
   await saveOutline(project.id, req.userId!, outline);
   logger.info({ userId: req.userId, projectId: project.id, ok: result.ok, findings: result.findings.length }, 'landing-page: checked');
   res.json({ success: true, data: result });
+});
+
+/**
+ * @openapi
+ * /landing-page/project/{projectId}/publish:
+ *   post:
+ *     tags: [Publishing]
+ *     summary: Publish the landing page at /books/<slug>, with no login needed to read it
+ *     description: |
+ *       The slug comes from the project title and is kept once chosen, so the address does not
+ *       move if the title is edited. The page always shows the current script.
+ *     security: [{ bearerAuth: [] }]
+ */
+landingPageRouter.post('/project/:projectId/publish', async (req, res) => {
+  const project = await loadProject(req, res);
+  if (!project) return;
+  if (!currentOf(project.outline)) {
+    res.status(400).json({ success: false, error: { code: 'NO_SCRIPT', message: 'Generate the landing page first.' } });
+    return;
+  }
+  try {
+    let pub = publicOf(project.outline);
+    if (!pub) {
+      let slug = slugify(project.title);
+      if (await slugTaken(slug, project.id)) slug = `${slug}-${project.id.slice(0, 6)}`;
+      pub = { slug, published_at: new Date().toISOString() };
+      const outline = { ...(project.outline ?? {}), _landing_page_public: pub };
+      await saveOutline(project.id, req.userId!, outline);
+      logger.info({ userId: req.userId, projectId: project.id, slug }, 'landing-page: published');
+    }
+    res.json({ success: true, data: { ...pub, url: pageUrl(req, pub.slug) } });
+  } catch (err) {
+    logger.error({ err, projectId: project.id }, 'landing-page: publish failed');
+    res.status(500).json({ success: false, error: { code: 'PUBLISH_FAILED', message: err instanceof Error ? err.message : 'Could not publish' } });
+  }
+});
+
+landingPageRouter.delete('/project/:projectId/publish', async (req, res) => {
+  const project = await loadProject(req, res);
+  if (!project) return;
+  const outline = { ...(project.outline ?? {}) };
+  delete outline._landing_page_public;
+  await saveOutline(project.id, req.userId!, outline);
+  logger.info({ userId: req.userId, projectId: project.id }, 'landing-page: unpublished');
+  res.json({ success: true, data: null });
+});
+
+/**
+ * @openapi
+ * /landing-page/project/{projectId}/reservations.csv:
+ *   get:
+ *     tags: [Publishing]
+ *     summary: Everyone who reserved a copy through the public page, as CSV
+ *     security: [{ bearerAuth: [] }]
+ */
+landingPageRouter.get('/project/:projectId/reservations.csv', async (req, res) => {
+  const project = await loadProject(req, res);
+  if (!project) return;
+  const { rows } = await reservationsFor(req.userId!, project.id);
+  const lines = ['first_name,email,reserved_at', ...rows.map((r) => [r.first_name, r.email, r.created_at].map(csvCell).join(','))];
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${slugify(project.title)}-reservations.csv"`);
+  res.send(`${lines.join('\r\n')}\r\n`);
 });

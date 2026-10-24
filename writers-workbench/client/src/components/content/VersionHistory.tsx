@@ -13,11 +13,17 @@ interface VersionHistoryProps {
 
 type ViewMode = 'list' | 'view' | 'compare';
 
+/**
+ * The content's saved versions: list, view one, compare two, restore.
+ *
+ * Shown inside the Versions tab of the review rail, so the tab is the open/close. It used to be a
+ * "History" button that opened a fixed-width panel with its own Close, from before the rail had
+ * tabs: inside the tab that meant clicking twice to see a list, and Close left a lone button.
+ */
 export default function VersionHistory({ contentId, onRestore }: VersionHistoryProps) {
   const { profile, isImpersonating } = useUser();
   const userId = profile?.user_id;
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectedVersion, setSelectedVersion] = useState<ContentVersion | null>(null);
   const [compareVersions, setCompareVersions] = useState<[string, string]>(['', '']);
@@ -37,7 +43,6 @@ export default function VersionHistory({ contentId, onRestore }: VersionHistoryP
       if (error) throw error;
       return data as ContentVersion[];
     },
-    enabled: open,
   });
 
   const restoreMutation = useMutation({
@@ -76,18 +81,6 @@ export default function VersionHistory({ contentId, onRestore }: VersionHistoryP
     },
   });
 
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
-      >
-        <HistoryIcon />
-        History
-      </button>
-    );
-  }
-
   const renderDiff = (oldText: string, newText: string) => {
     // Strip HTML tags for cleaner diff
     const strip = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -122,17 +115,11 @@ export default function VersionHistory({ contentId, onRestore }: VersionHistoryP
   };
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 w-80 shrink-0">
-      <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+    <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+      <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
           Version History
         </h3>
-        <button
-          onClick={() => { setOpen(false); setViewMode('list'); }}
-          className="text-xs text-gray-400 hover:text-gray-600"
-        >
-          Close
-        </button>
       </div>
 
       <div className="p-3 max-h-[600px] overflow-y-auto">
@@ -267,10 +254,3 @@ export default function VersionHistory({ contentId, onRestore }: VersionHistoryP
   );
 }
 
-function HistoryIcon() {
-  return (
-    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  );
-}

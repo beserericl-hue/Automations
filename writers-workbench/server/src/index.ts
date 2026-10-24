@@ -31,6 +31,7 @@ import { contentActionsRouter } from './routes/content-actions.js';
 import { authorRouter } from './routes/author.js';
 import { publishingRouter } from './routes/publishing.js';
 import { landingPageRouter } from './routes/landing-page.js';
+import { bookPagesRouter } from './routes/book-pages.js';
 import { creditsRouter } from './routes/credits.js';
 import { superuserRouter } from './routes/superuser.js';
 import { tiersRouter } from './routes/tiers.js';
@@ -101,6 +102,11 @@ app.use(
     },
   }),
 );
+
+// Public book landing pages (/books/<slug>): no login, server-rendered, with a form that posts back
+// to itself. Mounted BEFORE CORS — the form submission carries an Origin header, and the page must
+// accept it from whatever host serves it rather than only the app's whitelist.
+app.use('/books', bookPagesRouter);
 
 // CORS with origin whitelist
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')

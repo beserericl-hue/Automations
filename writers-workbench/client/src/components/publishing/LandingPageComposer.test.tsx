@@ -177,3 +177,43 @@ describe('the saved script', () => {
     expect(screen.getByTestId('landing-check-result')).toHaveTextContent('11/12 passages unchanged');
   });
 });
+
+describe('the page on the Workbench', () => {
+  const live = { slug: 'the-ossuary', url: 'https://ww.example/books/the-ossuary', published_at: '2026-10-24T12:00:00Z' };
+
+  it('publishes the page', async () => {
+    mockFetch.mockImplementation(async (_p, o) => ((o as { method?: string })?.method === 'POST' ? { success: true, data: live } : state({}, SCRIPT)) as never);
+    renderWithProviders(<LandingPageComposer projectId="p1" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Publish page' }));
+    await waitFor(() =>
+      expect(mockFetch.mock.calls.some(([p, o]) => String(p).endsWith('/publish') && (o as { method?: string })?.method === 'POST')).toBe(true),
+    );
+  });
+
+  it('shows the live address and takes it down', async () => {
+    mockFetch.mockImplementation(async () => ({ success: true, data: { ...state({}, SCRIPT).data, public: live } }) as never);
+    renderWithProviders(<LandingPageComposer projectId="p1" />);
+    expect(await screen.findByRole('link', { name: live.url })).toHaveAttribute('href', live.url);
+    fireEvent.click(screen.getByRole('button', { name: 'Take down' }));
+    await waitFor(() =>
+      expect(mockFetch.mock.calls.some(([p, o]) => String(p).endsWith('/publish') && (o as { method?: string })?.method === 'DELETE')).toBe(true),
+    );
+  });
+
+  it('lists the reservations and downloads them', async () => {
+    const reservations = { count: 2, rows: [
+      { first_name: 'Ada', email: 'ada@example.com', created_at: '2026-10-24T12:00:00Z' },
+      { first_name: '', email: 'b@example.com', created_at: '2026-10-24T12:01:00Z' },
+    ] };
+    mockFetch.mockImplementation(async (p) =>
+      (String(p).endsWith('.csv') ? 'first_name,email,reserved_at\r\n' : { success: true, data: { ...state({}, SCRIPT).data, public: live, reservations } }) as never,
+    );
+    globalThis.URL.createObjectURL = vi.fn(() => 'blob:x');
+    globalThis.URL.revokeObjectURL = vi.fn();
+    renderWithProviders(<LandingPageComposer projectId="p1" />);
+    expect(await screen.findByText('2 reservations')).toBeInTheDocument();
+    expect(screen.getByText('Ada · ada@example.com')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Download CSV' }));
+    await waitFor(() => expect(mockFetch.mock.calls.some(([p]) => String(p).endsWith('/reservations.csv'))).toBe(true));
+  });
+});

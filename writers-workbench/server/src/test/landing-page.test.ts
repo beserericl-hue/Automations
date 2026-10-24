@@ -11,6 +11,7 @@ import {
   buildGhlPrompt,
   checkPublishedPage,
   creditFor,
+  csvCell,
   forbiddenClaims,
   isFetchableUrl,
   normalize,
@@ -20,6 +21,7 @@ import {
   researchTerms,
   selectFacts,
   skippedMechanics,
+  slugify,
   stripTracking,
   validateCopy,
   verbatimBlocks,
@@ -265,5 +267,51 @@ describe('checking the page GHL published', () => {
     const r = checkPublishedPage('<html><body><div id="app"></div><script>render()</script></body></html>', copy());
     expect(r.findings.map((f) => f.code)).toEqual(['page_text_missing']);
     expect(r.ok).toBe(false);
+  });
+});
+
+describe('the public page', () => {
+  const pub = { formAction: '/books/the-ossuary/reserve', canonicalUrl: 'https://ww.example/books/the-ossuary' };
+
+  it('takes its address from the title', () => {
+    expect(slugify('The Ossuary')).toBe('the-ossuary');
+    expect(slugify("  Ōsaka & the Sea: Vol. 2!  ")).toBe('osaka-and-the-sea-vol-2');
+    expect(slugify('!!!')).toBe('book');
+    expect(slugify('a'.repeat(80)).length).toBe(60);
+  });
+
+  it('has a form that posts, with named fields, a required email and a bot trap', () => {
+    const html = renderPreviewHtml(copy(), planSections(), pub);
+    expect(html).toContain('<form method="post" action="/books/the-ossuary/reserve">');
+    expect(html).toMatch(/<input name="email" type="email"[^>]* required/);
+    expect(html).toContain('name="first_name"');
+    expect(html).toContain('name="website" class="hp"');
+    expect(html).not.toContain('<script');
+  });
+
+  it('carries a share card and its canonical address', () => {
+    const html = renderPreviewHtml(copy(), planSections(), pub);
+    expect(html).toContain('<link rel="canonical" href="https://ww.example/books/the-ossuary">');
+    expect(html).toContain(`<meta property="og:image" content="${copy().images[0].url}">`);
+  });
+
+  it('shows the thank-you above the form', () => {
+    const html = renderPreviewHtml(copy(), planSections(), { ...pub, notice: 'Thank you.' });
+    expect(html.indexOf('Thank you.')).toBeLessThan(html.indexOf('<form method="post"'));
+  });
+
+  it('is the page the author approved: the same copy as the preview, passing the check', () => {
+    const html = renderPreviewHtml(copy(), planSections(), pub);
+    expect(checkPublishedPage(html, copy()).ok).toBe(true);
+    const preview = renderPreviewHtml(copy());
+    expect(preview).toContain('onsubmit="return false"');
+    expect(preview).not.toContain('og:image');
+  });
+
+  it('writes reservations to CSV that a spreadsheet will not execute', () => {
+    expect(csvCell('Eric')).toBe('Eric');
+    expect(csvCell('Smith, Jr')).toBe('"Smith, Jr"');
+    expect(csvCell('=HYPERLINK("x")')).toBe(`"'=HYPERLINK(""x"")"`);
+    expect(csvCell('@me')).toBe("'@me");
   });
 });

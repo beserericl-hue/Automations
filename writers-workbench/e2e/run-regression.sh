@@ -8,7 +8,11 @@
 #   Pass C — topbar-signout: its own project (revokes the shared Supabase session).
 #
 # Requires the DEV E2E env to be sourced first (E2E_BASE_URL, E2E_SUPA_URL,
-# E2E_SUPA_SERVICE_KEY, E2E_TEST_EMAIL/PASSWORD, VITE_SUPABASE_ANON_KEY, E2E_USER_ID).
+# E2E_SUPA_SERVICE_KEY or SUPABASE_SERVICE_ROLE_KEY, E2E_TEST_EMAIL, VITE_SUPABASE_ANON_KEY,
+# E2E_USER_ID). There is no password: sessions are minted (auth.setup.ts).
+#
+# E2E_PASSES picks the passes (default "ABC"). CI runs "A" on every pull request, plus the
+# unauthenticated project; B is minutes of real engine work per spec and runs by hand.
 # NEVER point these at PROD (faklx...) — DEV is gvbvwcnmjkdpclcisqrr.
 #
 set -uo pipefail
@@ -47,18 +51,26 @@ done
 # result-assert flow). They absorb (a) concurrency-timing flakes in Pass A and
 # (b) external engine/KIE.AI job flakiness in Pass B — not weakened assertions.
 RETRIES="${E2E_RETRIES:-2}"
+PASSES="${E2E_PASSES:-ABC}"
+A=0; B=0; C=0
 
+if [[ "$PASSES" == *A* ]]; then
 echo "=== Pass A: ${#LIGHT[@]} light specs @ workers=3, retries=$RETRIES ==="
 npx playwright test --project=chromium --workers=3 --retries="$RETRIES" --reporter=line "${LIGHT[@]}"
 A=$?
+fi
 
+if [[ "$PASSES" == *B* ]]; then
 echo "=== Pass B: ${#HEAVY[@]} heavy engine specs @ workers=1, retries=$RETRIES ==="
 npx playwright test --project=chromium --workers=1 --retries="$RETRIES" --reporter=line "${HEAVY[@]}"
 B=$?
+fi
 
+if [[ "$PASSES" == *C* ]]; then
 echo "=== Pass C: topbar-signout (isolated session) ==="
 npx playwright test --project=signout --workers=1 --retries="$RETRIES" --reporter=line
 C=$?
+fi
 
 echo "=== RESULT: passA=$A passB=$B passC=$C ==="
 [ $A -eq 0 ] && [ $B -eq 0 ] && [ $C -eq 0 ]

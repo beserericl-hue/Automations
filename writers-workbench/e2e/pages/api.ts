@@ -5,12 +5,12 @@ import { request as pwRequest, type APIRequestContext } from '@playwright/test';
  *
  * Every UI test proves the backing data actually changed, and isolates its own data (create a disposable
  * row, assert, hard-delete in teardown). These helpers give tests:
- *   - a bearer token for the demo user (Supabase password grant) to call the real /api routes,
+ *   - a bearer token for the demo user (a minted session; no password) to call the real /api routes,
  *   - a thin /api client,
  *   - direct Supabase REST (service key) to read/verify rows and to hard-delete disposable data
  *     (the /api DELETE for editions is only a SOFT delete, so teardown goes straight to the DB).
  *
- * Env (see e2e/pages README / session_context): E2E_BASE_URL, E2E_TEST_EMAIL, E2E_TEST_PASSWORD,
+ * Env (see e2e/pages README / session_context): E2E_BASE_URL, E2E_TEST_EMAIL,
  * SUPABASE_URL, VITE_SUPABASE_ANON_KEY, E2E_SUPA_SERVICE_KEY (or SUPABASE_SERVICE_ROLE_KEY), E2E_USER_ID.
  */
 export const DEMO_USER_ID = process.env.E2E_USER_ID || '+14105914612';
@@ -21,23 +21,36 @@ const ANON = process.env.VITE_SUPABASE_ANON_KEY || '';
 
 let _token: string | null = null;
 
-/** Supabase password-grant access token for the demo user (cached per run). */
+/**
+ * An access token for the demo user (cached per run).
+ *
+ * Minted, not logged in: the product is passwordless and the stored passwords were rotated to random
+ * values, so the password grant this used to call can no longer succeed. Same two calls as
+ * auth.setup.ts — generate_link (service key, sends no email) then verify (anon key) — which is the
+ * mechanism the server's own /otp/verify uses.
+ */
 export async function getToken(): Promise<string> {
   if (_token) return _token;
   const email = process.env.E2E_TEST_EMAIL;
-  const password = process.env.E2E_TEST_PASSWORD;
-  if (!email || !password || !SUPA_URL || !ANON) {
-    throw new Error('getToken needs E2E_TEST_EMAIL/PASSWORD + SUPABASE_URL + VITE_SUPABASE_ANON_KEY');
+  if (!email || !SUPA_URL || !ANON || !SUPA_SERVICE) {
+    throw new Error('getToken needs E2E_TEST_EMAIL + SUPABASE_URL + VITE_SUPABASE_ANON_KEY + SUPABASE_SERVICE_ROLE_KEY');
   }
-  const ctx = await pwRequest.newContext();
-  const res = await ctx.post(`${SUPA_URL}/auth/v1/token?grant_type=password`, {
-    headers: { apikey: ANON, 'Content-Type': 'application/json' },
-    data: { email, password },
+  // Node fetch, not Playwright's request context: see the note on supaGet about secret keys.
+  const link = await fetch(`${SUPA_URL}/auth/v1/admin/generate_link`, {
+    method: 'POST',
+    headers: { ...supaHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'magiclink', email }),
   });
-  if (!res.ok()) throw new Error(`password grant failed: ${res.status()} ${await res.text()}`);
-  const j = await res.json();
-  await ctx.dispose();
-  _token = j.access_token as string;
+  if (!link.ok) throw new Error(`generate_link failed: ${link.status} ${await link.text()}`);
+  const { hashed_token } = (await link.json()) as { hashed_token?: string };
+  if (!hashed_token) throw new Error('generate_link returned no hashed_token');
+  const verify = await fetch(`${SUPA_URL}/auth/v1/verify`, {
+    method: 'POST',
+    headers: { apikey: ANON, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'magiclink', token_hash: hashed_token }),
+  });
+  if (!verify.ok) throw new Error(`verify failed: ${verify.status} ${await verify.text()}`);
+  _token = ((await verify.json()) as { access_token: string }).access_token;
   return _token;
 }
 

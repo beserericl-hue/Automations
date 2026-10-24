@@ -68,14 +68,7 @@ function estimateWordCount(text: string | null): number | null {
   return text.split(/\s+/).filter(Boolean).length;
 }
 
-const TYPE_PATHS: Record<string, string> = {
-  chapter: '/library?type=chapter',
-  short_story: '/library?type=short_story',
-  blog_post: '/library?type=blog_post',
-  newsletter: '/library?type=newsletter',
-};
-
-function buildRecentFromPayload(p: ImpersonationDashboardPayload): RecentItem[] {
+export function buildRecentFromPayload(p: ImpersonationDashboardPayload): RecentItem[] {
   const items: RecentItem[] = [];
 
   for (const c of p.contentRows) {
@@ -91,7 +84,8 @@ function buildRecentFromPayload(p: ImpersonationDashboardPayload): RecentItem[] 
       chapter_number: c.chapter_number,
       project_title: proj?.title ?? null,
       updated_at: c.updated_at,
-      path: TYPE_PATHS[c.content_type] || '/',
+      // The row says "View <title>", so it opens that item, not the list it belongs to.
+      path: `/content/${c.id}`,
     });
   }
   for (const proj of p.projectRows) {
@@ -106,7 +100,7 @@ function buildRecentFromPayload(p: ImpersonationDashboardPayload): RecentItem[] 
       chapter_number: null,
       project_title: null,
       updated_at: proj.updated_at,
-      path: '/projects',
+      path: `/projects/${proj.id}`,
     });
   }
   for (const r of p.researchRows) {
@@ -121,7 +115,7 @@ function buildRecentFromPayload(p: ImpersonationDashboardPayload): RecentItem[] 
       chapter_number: null,
       project_title: null,
       updated_at: r.updated_at,
-      path: '/research',
+      path: `/research/${r.id}`,
     });
   }
 
