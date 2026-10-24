@@ -11,6 +11,7 @@ import type { AddressInfo } from 'net';
 interface Edition { id: string; user_id: string; cadence: string; cadence_send_time: string | null; created_at: string }
 let editionsRows: Edition[] = [];
 let lastSendByEdition: Record<string, { created_at: string } | null> = {};
+let lastGateByEdition: Record<string, { created_at: string } | null> = {};
 
 vi.mock('../services/supabase-admin.js', () => {
   const makeBuilder = (table: string) => {
@@ -34,6 +35,10 @@ vi.mock('../services/supabase-admin.js', () => {
           const eid = filters['edition_id'] as string;
           return Promise.resolve({ data: lastSendByEdition[eid] ?? null, error: null });
         }
+        if (table === 'newsletter_approvals_v2') {
+          const eid = filters['edition_id'] as string;
+          return Promise.resolve({ data: lastGateByEdition[eid] ?? null, error: null });
+        }
         return Promise.resolve({ data: null, error: null });
       },
     };
@@ -56,6 +61,7 @@ const WEBHOOK_URL = 'https://n8n.example/webhook/compose-newsletter-dev';
 beforeEach(() => {
   editionsRows = [];
   lastSendByEdition = {};
+  lastGateByEdition = {};
   enqueueCalls = [];
   process.env.INGESTION_SECRET = SECRET;
   process.env.NEWSLETTER_SERVICE_URL = ENGINE_URL;
@@ -139,5 +145,28 @@ describe('POST /cron/editions/run-due (F2-9)', () => {
       expect(j.due).toBe(0);
       expect(j.enqueued).toBe(0);
     });
+  });
+});
+
+describe('one run per period, even when nobody answers the approval gate', () => {
+  it('is not due while the last run is waiting at its gate, though no send was ever written', async () => {
+    process.env.NEWSLETTER_BACKEND = 'python';
+    editionsRows = [{ id: 'wasteland-wire', user_id: '+1', cadence: 'weekly', cadence_send_time: '09:00', created_at: longAgo }];
+    lastGateByEdition = { 'wasteland-wire': { created_at: new Date(Date.now() - 3600_000).toISOString() } };
+    await withServer(async (base) => {
+      const r = await fetch(`${base}/api/newsletter/cron/editions/run-due`, {
+        method: 'POST', headers: { 'X-Ingestion-Secret': SECRET },
+      });
+      const j = await r.json() as { due: number; enqueued: number };
+      expect(j.due).toBe(0);
+      expect(j.enqueued).toBe(0);
+      expect(enqueueCalls.filter((c) => c.url.includes('/internal/newsletter/generate') || c.url === WEBHOOK_URL)).toEqual([]);
+    });
+  });
+
+  it('latestTimestamp takes the newest readable moment', async () => {
+    const { latestTimestamp } = await import('../routes/newsletter-edition-extras.js');
+    expect(latestTimestamp('2026-10-19T09:00:00Z', null, 'junk', '2026-10-24T16:00:00Z')).toBe('2026-10-24T16:00:00Z');
+    expect(latestTimestamp(undefined, null)).toBeNull();
   });
 });

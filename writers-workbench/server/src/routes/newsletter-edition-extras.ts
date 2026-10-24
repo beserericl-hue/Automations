@@ -531,6 +531,16 @@ interface DueEdition {
   days_since_last: number;
 }
 
+/** The newest readable ISO timestamp among the arguments, or null. */
+export function latestTimestamp(...values: Array<string | null | undefined>): string | null {
+  let best: string | null = null;
+  for (const v of values) {
+    if (!v || Number.isNaN(Date.parse(v))) continue;
+    if (best === null || Date.parse(v) > Date.parse(best)) best = v;
+  }
+  return best;
+}
+
 // Shared "which editions are due?" computation, used by both the read-only
 // GET /editions/due (n8n cron polls it) and the engine-aware POST /editions/run-due.
 async function computeDueEditions(): Promise<DueEdition[]> {
@@ -557,7 +567,17 @@ async function computeDueEditions(): Promise<DueEdition[]> {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
-    const baseline = lastSend?.created_at ?? ed.created_at;
+    // A run waits at its stories approval gate and writes its send only at the end, so the last SEND
+    // alone left an edition whose gate nobody answered due on every poll — The Wasteland Wire started
+    // a run every 15 minutes for five days. An approval the edition's run opened counts as a run too.
+    const { data: lastGate } = await supabase
+      .from('newsletter_approvals_v2')
+      .select('created_at')
+      .eq('edition_id', ed.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const baseline = latestTimestamp(lastSend?.created_at, lastGate?.created_at) ?? ed.created_at;
     const elapsedDays = (now - new Date(baseline).getTime()) / (24 * 60 * 60 * 1000);
     if (elapsedDays >= days) {
       due.push({ edition_id: ed.id, user_id: ed.user_id, days_since_last: Math.floor(elapsedDays) });
