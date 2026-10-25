@@ -26,7 +26,9 @@ export type MatterKind =
   | 'authors-note'
   | 'acknowledgements'
   | 'about-the-author'
-  | 'also-by';
+  | 'also-by'
+  | 'series'
+  | 'excerpt';
 
 export interface MatterBlock {
   text: string;
@@ -52,6 +54,17 @@ export interface VolumeInfo {
   subtitle?: string;
   firstChapter?: number;
   lastChapter?: number;
+  /**
+   * A SERIES rather than one book in parts: the series is named, and each book can carry its own
+   * title. When `bookTitle` is set it is the book's title everywhere — cover, title page, copyright
+   * page, listing — and the series is the line under it ("Book One of The Ossuary").
+   */
+  seriesName?: string;
+  bookTitle?: string;
+  /** Every book of the series, in reading order, for the series page. */
+  books?: { index: number; title: string; hook?: string }[];
+  /** The opening chapter of the next book, printed after this one ends. */
+  excerpt?: { bookIndex: number; bookTitle: string; ownTitle?: boolean; chapterTitle: string; text: string };
 }
 
 export interface BookMatterOptions {
@@ -94,9 +107,19 @@ export function volumeLabel(index: number): string {
   return `Volume ${ROMAN[index] ?? index}`;
 }
 
-/** "The Ossuary: Volume Two" — what goes on the spine, the cover and the KDP title field. */
+export function bookLabel(index: number): string {
+  return `Book ${ROMAN[index] ?? index}`;
+}
+
+/**
+ * What goes on the cover, the title page and the KDP title field: the book's own title in a
+ * series, otherwise "The Ossuary: Volume Two".
+ */
 export function volumeTitle(title: string, volume?: VolumeInfo): string {
   if (!volume || volume.total <= 1) return title;
+  if (volume.bookTitle?.trim()) return volume.bookTitle.trim();
+  // A series book with no title chosen yet: "The Ossuary: Book One", not "Volume One".
+  if (volume.seriesName?.trim()) return `${volume.seriesName.trim()}: ${bookLabel(volume.index)}`;
   const sub = volume.subtitle?.trim();
   return sub ? `${title}: ${sub}` : `${title}: ${volumeLabel(volume.index)}`;
 }
@@ -108,6 +131,15 @@ export function volumeTitle(title: string, volume?: VolumeInfo): string {
  * exists for: it has to separate the invented individuals from the documented community without
  * disclaiming the history itself.
  */
+/**
+ * "Book One of The Ossuary" — the series line under a series book's own title. Empty for a volume,
+ * and for a series book with no title yet, whose title already says it ("The Ossuary: Book One").
+ */
+export function seriesLine(volume?: VolumeInfo): string {
+  if (!volume || volume.total <= 1 || !volume.seriesName?.trim() || !volume.bookTitle?.trim()) return '';
+  return `${bookLabel(volume.index)} of ${volume.seriesName.trim()}`;
+}
+
 const FICTION_DISCLAIMER =
   'This is a work of fiction. While it draws on documented history, the characters and the events ' +
   'of their lives are the product of the author’s imagination. Any resemblance to actual ' +
@@ -117,6 +149,7 @@ function copyrightBlocks(o: BookMatterOptions): MatterBlock[] {
   const year = o.copyrightYear ?? new Date().getUTCFullYear();
   const blocks: MatterBlock[] = [
     { text: volumeTitle(o.title, o.volume), style: 'italic' },
+    ...(seriesLine(o.volume) ? [{ text: seriesLine(o.volume), style: 'small' as const }] : []),
     { text: `Copyright © ${year} by ${o.author}`, style: 'small' },
     { text: 'All rights reserved.', style: 'small' },
     {
@@ -143,11 +176,15 @@ function copyrightBlocks(o: BookMatterOptions): MatterBlock[] {
  */
 export function frontMatter(o: BookMatterOptions): MatterSection[] {
   const full = volumeTitle(o.title, o.volume);
+  const series = seriesLine(o.volume);
+  const isSeries = Boolean(o.volume && o.volume.total > 1 && o.volume.seriesName);
+  // A series book's half title and title page carry ITS title, with the series beneath. A volume
+  // of one book keeps the book's title and names the volume.
   const sections: MatterSection[] = [
     {
       kind: 'half-title',
       heading: '',
-      blocks: [{ text: o.title, style: 'title' }],
+      blocks: [{ text: isSeries ? full : o.title, style: 'title' }],
       front: true,
       inToc: false,
     },
@@ -155,15 +192,19 @@ export function frontMatter(o: BookMatterOptions): MatterSection[] {
       kind: 'title',
       heading: '',
       blocks: [
-        { text: o.title, style: 'title' },
-        ...(o.volume && o.volume.total > 1
-          ? [
-              {
-                text: o.volume.subtitle?.trim() || volumeLabel(o.volume.index),
-                style: 'italic' as const,
-              },
-            ]
-          : []),
+        { text: isSeries ? full : o.title, style: 'title' },
+        ...(isSeries
+          ? series
+            ? [{ text: series, style: 'italic' as const }]
+            : []
+          : o.volume && o.volume.total > 1
+            ? [
+                {
+                  text: o.volume.subtitle?.trim() || volumeLabel(o.volume.index),
+                  style: 'italic' as const,
+                },
+              ]
+            : []),
         { text: o.author, style: 'author' },
         ...(o.publisher ? [{ text: o.publisher, style: 'small' as const }] : []),
       ],
@@ -241,10 +282,22 @@ export function backMatter(o: BookMatterOptions): MatterSection[] {
       inToc: true,
     });
   }
-  // A volume's siblings are listed automatically — three books that do not mention each other are
-  // three books nobody finishes.
   const others = [...(o.alsoBy ?? [])];
-  if (o.volume && o.volume.total > 1) {
+  const seriesBooks = o.volume && o.volume.total > 1 && o.volume.seriesName ? o.volume.books ?? [] : [];
+  if (seriesBooks.length) {
+    // The series page: every book in reading order, this one marked. It is what tells a reader who
+    // has just finished that there is more, and in what order.
+    const blocks: MatterBlock[] = [];
+    for (const b of seriesBooks) {
+      const here = b.index === o.volume!.index ? '  (this book)' : '';
+      const name = b.title?.trim();
+      blocks.push({ text: `${bookLabel(b.index)}${name ? `: ${name}` : ''}${here}`, style: 'centre' });
+      if (b.hook?.trim()) blocks.push({ text: b.hook.trim(), style: 'small' });
+    }
+    sections.push({ kind: 'series', heading: o.volume!.seriesName!.trim(), blocks, front: false, inToc: true });
+  } else if (o.volume && o.volume.total > 1) {
+    // A volume's siblings are listed automatically — three books that do not mention each other are
+    // three books nobody finishes.
     for (let i = 1; i <= o.volume.total; i += 1) {
       if (i === o.volume.index) continue;
       others.push(volumeTitle(o.title, { ...o.volume, index: i, subtitle: undefined }));
@@ -255,6 +308,26 @@ export function backMatter(o: BookMatterOptions): MatterSection[] {
       kind: 'also-by',
       heading: `Also by ${o.author}`,
       blocks: others.map((t) => ({ text: t, style: 'centre' as const })),
+      front: false,
+      inToc: true,
+    });
+  }
+  // Last of all, the first chapter of the next book: the reader who reached the end wanted more,
+  // and this is where they get it.
+  const ex = o.volume?.excerpt;
+  if (ex?.text?.trim()) {
+    const next = o.volume && ex.ownTitle ? { ...o.volume, index: ex.bookIndex, bookTitle: ex.bookTitle } : undefined;
+    sections.push({
+      kind: 'excerpt',
+      heading: `Read on: ${ex.bookTitle}`,
+      blocks: [
+        ...(seriesLine(next) ? [{ text: seriesLine(next), style: 'italic' as const }] : []),
+        ...(ex.chapterTitle ? [{ text: ex.chapterTitle, style: 'centre' as const }] : []),
+        // A scene break in the manuscript ("---" on its own line) prints as a centred "* * *".
+        ...para(ex.text.replace(/^[ \t]*-{3,}[ \t]*$/gm, '* * *')).map((b) =>
+          b.text === '* * *' ? { ...b, style: 'centre' as const } : b,
+        ),
+      ],
       front: false,
       inToc: true,
     });

@@ -23,6 +23,7 @@ import { supabase } from '../../config/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { useEngineJobQueue } from '../../hooks/useEngineJobQueue';
 import PrintCopies from './PrintCopies';
+import SeriesPanel, { type SeriesView } from './SeriesPanel';
 
 interface Settings {
   trim: string;
@@ -97,6 +98,7 @@ interface PublishingState {
   project: { id: string; title: string; genre_slug: string | null };
   settings: Settings;
   volume_plan: VolumePlan | null;
+  series?: SeriesView;
   marketing: Record<string, Marketing | null>;
   marketing_history: HistoryEntry[];
   author: { pen_name: string; bio: string; bio_source: string | null; profile_why_this_book: string };
@@ -370,7 +372,7 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
                 {detail ? (
                   <span className="block text-[11px] opacity-80">
                     {detail.total_pages_if_one_volume.toLocaleString()} pp →{' '}
-                    {detail.minimum_volumes} volume{detail.minimum_volumes === 1 ? '' : 's'}
+                    {detail.minimum_volumes} book{detail.minimum_volumes === 1 ? '' : 's'}
                   </span>
                 ) : null}
               </button>
@@ -379,7 +381,7 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
         </div>
         {!trimOptions.length ? (
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Run the planner to see what each trim costs in pages and volumes.
+            Run the planner to see what each trim costs in pages and books.
           </p>
         ) : null}
         <div className="flex flex-wrap items-end gap-4">
@@ -407,7 +409,7 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
               className={inputClass}
             />
           </Field>
-          <Field label="Volumes" hint="Blank lets the planner decide from the page cap.">
+          <Field label="Books" hint="Blank lets the planner decide from the page cap.">
             <input
               type="number"
               min={1}
@@ -439,73 +441,23 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
         </div>
       </Section>
 
-      {/* 2. Volumes */}
-      <Section
-        title="Volumes"
-        subtitle="Breaks are chosen where the story leaves the reader hanging; the page cap is the limit, not the reason."
-      >
-        <button
-          onClick={() => planVolumes.mutate()}
-          disabled={planning || planVolumes.isPending}
-          className="rounded-lg border border-brand-300 px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50 dark:border-brand-700 dark:text-brand-300 dark:hover:bg-brand-950/40"
-        >
-          {planning ? 'Planning…' : plan ? 'Re-run the planner' : 'Plan the volumes'}
-        </button>
-
-        {plan ? (
-          <div className="space-y-2">
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {plan.volume_count} volume{plan.volume_count === 1 ? '' : 's'} at {plan.trim}″ ·{' '}
-              {plan.total_words.toLocaleString()} words
-              {plan.judged_candidates ? ` · ${plan.judged_candidates} endings read` : ''}
-            </p>
-            {plan.volumes.map((v) => (
-              <div
-                key={v.index}
-                className="rounded-lg border border-gray-200 p-3 text-xs dark:border-gray-800"
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    Volume {v.index} — chapters {v.first_chapter}–{v.last_chapter}
-                  </span>
-                  <span className="text-gray-500 dark:text-gray-400">
-                    {v.words.toLocaleString()} words · ~{v.estimated_pages} pages
-                  </span>
-                </div>
-                <p className="mt-1 text-gray-600 dark:text-gray-400">
-                  Ends on{' '}
-                  <span
-                    className={
-                      v.ending_score >= 0.6
-                        ? 'font-medium text-green-700 dark:text-green-400'
-                        : v.ending_score >= 0.4
-                          ? 'text-amber-700 dark:text-amber-400'
-                          : 'text-gray-500'
-                    }
-                  >
-                    {v.ending_score.toFixed(2)}
-                  </span>
-                  {v.ending_title ? ` · “${v.ending_title}”` : ''}
-                </p>
-                {v.ending_reason ? (
-                  <p className="mt-1 italic text-gray-500 dark:text-gray-400">{v.ending_reason}</p>
-                ) : null}
-              </div>
-            ))}
-            {plan.warnings?.length ? (
-              <ul className="list-disc pl-4 text-xs text-amber-700 dark:text-amber-400">
-                {plan.warnings.map((w) => (
-                  <li key={w}>{w}</li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-        ) : (
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            No plan yet. Until there is one this is treated as a single volume.
-          </p>
-        )}
-      </Section>
+      {/* 2. Series */}
+      <SeriesPanel
+        projectId={projectId}
+        series={data.series}
+        planned={Boolean(plan)}
+        planning={planning || planVolumes.isPending}
+        onPlan={() => planVolumes.mutate()}
+        warnings={plan?.warnings}
+        summary={
+          plan
+            ? `${plan.volume_count} book${plan.volume_count === 1 ? '' : 's'} at ${plan.trim}″ · ${plan.total_words.toLocaleString()} words${
+                plan.judged_candidates ? ` · ${plan.judged_candidates} endings read` : ''
+              }`
+            : undefined
+        }
+        stateKey={stateKey}
+      />
 
       {/* 3. Listing copy */}
       {/* Named for what it is rather than where it goes. "Amazon listing copy" is precise and it is
@@ -529,7 +481,7 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
                     : 'border border-gray-300 text-gray-600 dark:border-gray-700 dark:text-gray-400'
                 }`}
               >
-                Volume {i}
+                Book {i}
                 {data.marketing[String(i)] ? '' : ' ·'}
               </button>
             ))}
@@ -819,7 +771,7 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
             disabled={downloading}
             className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
           >
-            {downloading ? 'Building…' : volumeCount > 1 ? `Download all ${volumeCount} volumes` : 'Download the package'}
+            {downloading ? 'Building…' : volumeCount > 1 ? `Download all ${volumeCount} books` : 'Download the package'}
           </button>
           {volumeCount > 1
             ? Array.from({ length: volumeCount }, (_, i) => i + 1).map((i) => (
@@ -829,13 +781,13 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
                   disabled={downloading}
                   className="rounded-lg border border-gray-300 px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
                 >
-                  Volume {i} only
+                  Book {i} only
                 </button>
               ))
             : null}
         </div>
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          Each volume folder: the paperback interior at {settings.trim}″, the cover wrap with the spine
+          Each book’s folder: the paperback interior at {settings.trim}″, the cover wrap with the spine
           measured from that interior's real page count, the Kindle EPUB and its cover, the listing copy
           laid out field by field, and a pre-flight report.
         </p>
@@ -847,7 +799,7 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
                 : 'text-green-700 dark:text-green-400'
             }`}
           >
-            {lastPackage.volumes} volume{lastPackage.volumes === 1 ? '' : 's'} built ·{' '}
+            {lastPackage.volumes} book{lastPackage.volumes === 1 ? '' : 's'} built ·{' '}
             {lastPackage.blocking} blocking · {lastPackage.warnings} worth a look
           </p>
         ) : null}

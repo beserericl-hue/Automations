@@ -46,6 +46,7 @@ const RULE = '#6d5740';
 const TITLE_SIZE = 190;
 const TITLE_SMALL = 132; // for a leading article on its own line ("THE")
 const AUTHOR_SIZE = 76;
+const SERIES_SIZE = 42;
 // Wide tracking is the most characteristic part of this style. Without it the same words in the
 // same face read as a generic paperback.
 const TITLE_TRACKING = 0.17;
@@ -260,6 +261,8 @@ export interface ComposeCoverOptions {
   art: Buffer;
   title: string;
   author?: string;
+  /** "Book One of The Ossuary", set small under the title rule on a series book. */
+  seriesLine?: string;
 }
 
 /**
@@ -269,6 +272,7 @@ export interface ComposeCoverOptions {
 export async function composeCover(opts: ComposeCoverOptions): Promise<Buffer | null> {
   const { art, title, author } = opts;
   if (!art?.length) return null;
+  const seriesText = (opts.seriesLine || '').trim().toUpperCase();
   try {
     // Imported dynamically and typed loosely on purpose: both are optional at runtime, and a
     // missing or unloadable native binary must degrade to "no composed cover", not a build error.
@@ -312,6 +316,16 @@ export async function composeCover(opts: ComposeCoverOptions): Promise<Buffer | 
       trackedLine({ current: freshFont() }, parseCache, main, mainSize, TITLE_TRACKING, mainY),
       authorText
         ? trackedLine({ current: freshFont() }, parseCache, authorText, authorSize, AUTHOR_TRACKING, HEIGHT - 190)
+        : null,
+      seriesText
+        ? trackedLine(
+            { current: freshFont() },
+            parseCache,
+            seriesText,
+            fitSize(font, seriesText, SERIES_SIZE, AUTHOR_TRACKING),
+            AUTHOR_TRACKING,
+            ruleY + 78,
+          )
         : null,
     ].filter((l): l is { data: string; dropped: number } => l !== null);
 
@@ -453,6 +467,8 @@ export interface CoverWrapOptions {
   volumeLabel?: string;
   /** The printer's geometry. Without it the wrap is laid out for KDP. */
   layout?: WrapLayout;
+  /** A series book's series line, for the front. */
+  seriesLine?: string;
   /** Dust-jacket flap copy: the front flap carries the description, the back flap the author. */
   flaps?: { front?: string; back?: string };
 }
@@ -545,11 +561,7 @@ export async function composeCoverWrap(opts: CoverWrapOptions): Promise<CoverWra
     // The front of the wrap is the SAME jacket as the ebook cover — title, author and all. Placing
     // the raw art here produced a paperback whose front carried no title, while the ebook of the
     // same book did. Falling back to the art is better than no cover, but it is a fallback.
-    const jacket = await composeCover({
-      art,
-      title: opts.volumeLabel ? `${title}` : title,
-      author,
-    });
+    const jacket = await composeCover({ art, title, author, seriesLine: opts.seriesLine });
     const artBuf = await sharp(jacket ?? art)
       .resize(frontW, px(L.panelHIn), { fit: 'cover' })
       .toBuffer();

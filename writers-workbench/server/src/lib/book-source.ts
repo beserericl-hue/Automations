@@ -87,8 +87,15 @@ export async function loadBookSource(projectId: string, userId: string): Promise
     marketing[String(i)] = outline[marketingKey(i)] ?? null;
   }
 
+  const stored = (outline._series as { name?: string; books?: Record<string, { title?: string }> } | undefined) ?? {};
+  const titles = Object.fromEntries(
+    Object.entries(stored.books ?? {}).map(([k, b]) => [k, String(b?.title ?? '').trim()]),
+  );
+
   return {
     title: String(project.title ?? ''),
+    // The series exists as soon as there is more than one book; its name defaults to the title.
+    series: { name: String(stored.name ?? '').trim() || String(project.title ?? ''), titles },
     author: authorName,
     authorBio: String(authorProfile?.bio ?? ''),
     chapters,

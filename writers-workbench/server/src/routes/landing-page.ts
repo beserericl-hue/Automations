@@ -36,6 +36,7 @@ import crypto from 'crypto';
 import dns from 'dns/promises';
 import net from 'net';
 import { parseWith } from '../lib/claude-structured.js';
+import { seriesName, storedSeries } from '../lib/series.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { validateBody } from '../middleware/validate.js';
@@ -243,7 +244,8 @@ function publicUrl(path: string): string {
 interface Inputs {
   missing: string[];
   marketing: Marketing;
-  volumes: { index: number; hook: string }[];
+  volumes: { index: number; hook: string; title?: string }[];
+  series?: LandingCopy['series'];
   author: string;
   bio: string;
   cover: PageImage | null;
@@ -259,9 +261,19 @@ async function gatherInputs(userId: string, project: { id: string; title: string
   const marketing = (outline[marketingKey(1)] as Marketing | undefined) ?? {};
   const plan = outline._volume_plan as { volumes?: { index: number }[] } | undefined;
   const indexes = plan?.volumes?.map((v) => v.index) ?? [1];
+  const stored = storedSeries(outline);
   const volumes = indexes
-    .map((index) => ({ index, hook: String((outline[marketingKey(index)] as Marketing | undefined)?.hook ?? '').trim() }))
+    .map((index) => ({
+      index,
+      hook: String((outline[marketingKey(index)] as Marketing | undefined)?.hook ?? '').trim(),
+      ...(stored.books?.[String(index)]?.title ? { title: stored.books[String(index)].title } : {}),
+    }))
     .filter((v) => v.hook);
+  // The series pitch is used once it has been written; until then the lineup is the volumes.
+  const series =
+    indexes.length > 1 && stored.description?.text?.trim()
+      ? { name: seriesName(outline, project.title), description: stored.description.text.trim(), tagline: stored.description.tagline }
+      : undefined;
 
   const [{ data: profile }, { data: images }, { data: reports }, authorPhoto] = await Promise.all([
     supabase.from('author_profiles_v2').select('pen_name, bio, bio_source').eq('user_id', userId).maybeSingle(),
@@ -309,6 +321,7 @@ async function gatherInputs(userId: string, project: { id: string; title: string
     missing,
     marketing,
     volumes,
+    series,
     author: String(profile?.pen_name ?? '').trim(),
     bio: String(profile?.bio ?? '').trim(),
     cover: coverRow
@@ -522,6 +535,7 @@ landingPageRouter.post('/project/:projectId', validateBody(GenerateSchema), asyn
       blurb: inputs.marketing.blurb!.trim(),
       backCover: inputs.marketing.back_cover!.trim(),
       volumes: inputs.volumes,
+      ...(inputs.series ? { series: inputs.series } : {}),
       bio: inputs.bio,
       facts: facts.kept,
       images,

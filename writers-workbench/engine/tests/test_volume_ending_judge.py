@@ -1,8 +1,9 @@
-"""The judge that decides where a volume can end.
+"""The judge that decides where one book of a series can end.
 
-The distinction this exists to enforce: "is this a good chapter" and "can a volume end here" are
-different questions, and conflating them is how a trilogy's first volume closes on its most
-spectacular scene and still gives the reader no reason to buy the second.
+A series book has to do two things at its end: settle the story it promised, and hand the reader a
+larger question only the next book answers. The planner used to reward the opposite of the first —
+it scored a mid-scene stop ("the box is on the table, unlocked") as the best break in the book —
+which sells a book that reads as if its last pages were torn out.
 """
 
 from __future__ import annotations
@@ -10,9 +11,12 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import patch
 
+import pytest
 from chapter_step import main as M
+from pydantic import ValidationError
 
-from writer_engine.schemas.chapter import VolumeEndingJudgement
+from writer_engine.schemas.chapter import SeriesEndingJudgement
+from writer_engine.volumes import MID_SCENE_CAP, ChapterInfo, series_ending_score
 
 
 class TestTheReviewerIsAskedTheRightQuestion:
@@ -20,61 +24,54 @@ class TestTheReviewerIsAskedTheRightQuestion:
     def _system() -> str:
         return M._build_volume_ending_system()
 
-    def test_it_separates_a_good_chapter_from_a_good_ending(self) -> None:
+    def test_it_is_about_a_series_book_not_a_good_chapter(self) -> None:
         s = self._system()
+        assert "ONE BOOK IN A SERIES" in s
         assert "NOT the question" in s
-        assert "best in the book and the worst possible place to stop" in s
 
-    def test_it_names_what_scores_high(self) -> None:
+    def test_it_scores_closing_and_opening_separately(self) -> None:
         s = self._system()
-        for signal in ("not answered", "has not yet been paid", "arriving", "already in motion"):
-            assert signal in s
+        assert "`closes`" in s and "`opens`" in s
+        assert "SETTLE" in s and "LARGER question" in s
 
-    def test_it_names_what_scores_low(self) -> None:
+    def test_it_names_a_mid_scene_stop_as_a_cut_not_an_ending(self) -> None:
         s = self._system()
-        for signal in ("resolution", "farewell", "at peace", "time-skip"):
-            assert signal in s
+        assert "`mid_scene`" in s
+        assert "a cut, not an ending" in s
+        assert "box on the table" in s
 
-    def test_it_asks_for_the_resolves_flag(self) -> None:
-        """The flag is what catches a strong chapter that is nonetheless the wrong break."""
-        assert "resolves" in self._system()
+    def test_it_asks_for_what_is_settled_and_what_is_carried(self) -> None:
+        s = self._system()
+        assert "`resolved`" in s and "`carried`" in s
 
 
-class TestResolutionDemotesAStrongChapter:
-    """A chapter can read as a 0.9 and still tie everything off. When it does, it must not be
-    chosen as a volume break — that is the single most expensive mistake this planner can make."""
+class TestTheScore:
+    def test_both_halves_are_needed(self) -> None:
+        assert series_ending_score(0.9, 0.9, False) == pytest.approx(0.9)
+        # Settles everything, opens nothing: no reason to buy on.
+        assert series_ending_score(1.0, 0.1, False) < 0.35
+        # Opens everything, settles nothing: a cliffhanger.
+        assert series_ending_score(0.1, 1.0, False) < 0.35
 
-    @staticmethod
-    def _run(verdict: VolumeEndingJudgement):
-        from writer_engine.volumes import ChapterInfo
+    def test_a_mid_scene_stop_is_capped_however_strong(self) -> None:
+        assert series_ending_score(0.95, 0.95, True) == MID_SCENE_CAP
 
-        info = ChapterInfo(number=30, title="t", words=6000, tail="…closing pages…")
-
-        async def fake_judge(tail: str, n: int, title: str):
-            return verdict
-
-        # Mirrors the demotion in _op_plan_volumes.
-        async def apply() -> None:
-            v = await fake_judge(info.tail, info.number, info.title)
-            info.cliffhanger = min(v.cliffhanger, 0.25) if v.resolves else v.cliffhanger
-            info.cliffhanger_reason = v.reason or v.unresolved
-
-        asyncio.run(apply())
-        return info
-
-    def test_a_resolving_chapter_is_demoted_however_strong(self) -> None:
-        info = self._run(VolumeEndingJudgement(cliffhanger=0.9, resolves=True, reason="ties off"))
-        assert info.cliffhanger <= 0.25
-
-    def test_an_open_chapter_keeps_its_score(self) -> None:
-        info = self._run(
-            VolumeEndingJudgement(cliffhanger=0.88, resolves=False, reason="she is still out there")
+    def test_the_verdict_is_applied_with_the_judges_words(self) -> None:
+        info = ChapterInfo(number=30, title="Winifred", words=6000, tail="…")
+        M._apply_ending_verdict(
+            info,
+            SeriesEndingJudgement(
+                closes=0.8,
+                opens=0.8,
+                resolved="Marcus decides to open the box.",
+                carried="What the box holds will change the petition.",
+                reason="lands the decision and points past it",
+            ),
         )
-        assert info.cliffhanger == 0.88
-
-    def test_the_reason_is_carried_through_for_the_author_to_read(self) -> None:
-        info = self._run(VolumeEndingJudgement(cliffhanger=0.8, unresolved="the bundle is still missing"))
-        assert "bundle" in info.cliffhanger_reason
+        assert info.judged == pytest.approx(0.8)
+        assert info.resolves == "Marcus decides to open the box."
+        assert "petition" in info.carries
+        assert info.ending_score == pytest.approx(0.8)
 
 
 class TestTheJudgeDegrades:
@@ -91,15 +88,28 @@ class TestTheJudgeDegrades:
         ):
             assert asyncio.run(M._judge_volume_ending("some prose", 4, "t")) is None
 
+    def test_the_leading_chapters_reach_the_judge(self) -> None:
+        seen: dict[str, str] = {}
+
+        async def fake(router, **k):
+            seen["prompt"] = k["prompt"]
+            return SeriesEndingJudgement(), None
+
+        with (
+            patch.object(M, "complete_structured", fake),
+            patch.object(M, "get_router", lambda service=None: object()),
+        ):
+            asyncio.run(
+                M._judge_volume_ending("closing prose", 30, "Winifred", ["28. The box", "29. The lock"])
+            )
+        assert "28. The box" in seen["prompt"] and "CLOSING pages" in seen["prompt"]
+
 
 class TestTheSchemaDefaultsAreSafe:
-    def test_a_missing_score_is_neutral_not_perfect(self) -> None:
-        """A blank answer must not nominate a chapter as the best break in the book."""
-        assert VolumeEndingJudgement().cliffhanger == 0.5
+    def test_a_blank_answer_is_neutral_not_perfect(self) -> None:
+        j = SeriesEndingJudgement()
+        assert series_ending_score(j.closes, j.opens, j.mid_scene) == pytest.approx(0.5)
 
     def test_scores_are_clamped(self) -> None:
-        import pytest
-        from pydantic import ValidationError
-
         with pytest.raises(ValidationError):
-            VolumeEndingJudgement(cliffhanger=1.8)
+            SeriesEndingJudgement(closes=1.8)

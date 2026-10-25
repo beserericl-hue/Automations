@@ -7,7 +7,7 @@
  */
 
 import { composeCoverWrap } from './cover.js';
-import { buildInterior, plannedVolumes, volumeParts, type VolumeParts } from './kdp-package.js';
+import { buildInterior, plannedVolumes, volumeParts, wrapTitling, type VolumeParts } from './kdp-package.js';
 import { TRIM_SIZES } from './print-pdf.js';
 import {
   RPI_MAX_PAGES,
@@ -103,7 +103,6 @@ export async function buildPrintFiles(source: BookSource, edition: Edition, volu
   const geometry = await coverGeometry(edition, pages);
   const wrap = await composeCoverWrap({
     art: source.art,
-    title: source.title,
     author: source.author,
     // RPI pads an odd interior with a blank page, and the spine is measured on the padded count.
     pageCount: rpiPageCount(pages),
@@ -111,7 +110,7 @@ export async function buildPrintFiles(source: BookSource, edition: Edition, volu
     trimHeightIn: trim.h,
     blurb: parts.marketing?.back_cover || parts.marketing?.blurb || undefined,
     authorBio: parts.bio || undefined,
-    volumeLabel: parts.volume ? `Volume ${parts.volume.index}` : undefined,
+    ...wrapTitling(source.title, parts.volume),
     layout: geometry,
     flaps:
       edition.outside === 'jacket'

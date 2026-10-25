@@ -226,7 +226,7 @@ export default function PrintCopies({ projectId, volumeCount }: { projectId: str
         </div>
         {volumeCount > 1 ? (
           <label className="block text-xs text-gray-600 dark:text-gray-400">
-            Volume{' '}
+            Book{' '}
             <select
               value={volume}
               onChange={(e) => setVolume(Number(e.target.value))}
@@ -403,7 +403,7 @@ export default function PrintCopies({ projectId, volumeCount }: { projectId: str
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium text-gray-800 dark:text-gray-200">
                     {o.quantity} × {o.edition_label}
-                    {volumeCount > 1 ? `, volume ${o.volume_index}` : ''}
+                    {volumeCount > 1 ? `, book ${o.volume_index}` : ''}
                   </span>
                   <span className="rounded-full bg-gray-100 px-2 py-0.5 font-mono text-[11px] text-gray-700 dark:bg-gray-800 dark:text-gray-300">
                     {o.status}

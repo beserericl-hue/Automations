@@ -16,7 +16,7 @@
  */
 
 import JSZip from 'jszip';
-import { bookMatter, volumeTitle, type VolumeInfo } from './bookmatter.js';
+import { bookLabel, bookMatter, seriesLine, volumeTitle, type VolumeInfo } from './bookmatter.js';
 import { buildPrintPdf, gutterInches, TRIM_SIZES, type PrintChapter } from './print-pdf.js';
 import {
   composeCover,
@@ -91,6 +91,11 @@ export interface BuildPackageOptions {
   marketing?: Record<string, Marketing | null>;
   /** Draft chapters are included by default — but then they are marked, not hidden. */
   onlyApproved?: boolean;
+  /**
+   * The series, when the volumes are books of one: its name and each book's chosen title, keyed
+   * by book index as a string. Without it a multi-volume book is printed as "Volume Two".
+   */
+  series?: { name: string; titles: Record<string, string> };
 }
 
 export interface VolumeArtifact {
@@ -145,7 +150,7 @@ export function listingText(
   lines.push(`KDP LISTING — ${volumeTitle(title, volume)}`, '='.repeat(60), '');
   push('TITLE', volumeTitle(title, volume));
   if (volume && volume.total > 1) {
-    push('SERIES', `${title}  (book ${volume.index} of ${volume.total})`);
+    push('SERIES', `${volume.seriesName?.trim() || title}  (book ${volume.index} of ${volume.total})`);
   }
   push('AUTHOR', author);
   push('DESCRIPTION  (paste into "Description")', m?.blurb ?? '');
@@ -196,15 +201,55 @@ export function plannedVolumes(opts: Pick<BuildPackageOptions, 'volumes'>, all: 
       ];
 }
 
+/** The opening chapter of the book after `v`, to print after `v` ends. None after the last book. */
+function nextBookExcerpt(
+  planned: PlannedVolume[],
+  all: PackageChapter[],
+  v: PlannedVolume,
+  titleOf: (i: number) => string,
+  seriesName: string,
+): VolumeInfo['excerpt'] {
+  const next = planned.find((p) => p.index === v.index + 1);
+  if (!next) return undefined;
+  const first = all.find((c) => Number(c.chapter_number ?? -1) >= next.first_chapter);
+  if (!first?.content_text?.trim()) return undefined;
+  return {
+    bookIndex: next.index,
+    bookTitle: titleOf(next.index) || `${seriesName}: ${bookLabel(next.index)}`,
+    ownTitle: Boolean(titleOf(next.index)),
+    chapterTitle: String(first.title ?? '').trim(),
+    text: first.content_text,
+  };
+}
+
 export function volumeParts(
   opts: BuildPackageOptions,
   planned: PlannedVolume[],
   all: PackageChapter[],
   v: PlannedVolume,
 ): VolumeParts {
+  const series = planned.length > 1 && opts.series?.name?.trim() ? opts.series : undefined;
+  const titleOf = (i: number) => series?.titles?.[String(i)]?.trim() ?? '';
   const volume: VolumeInfo | undefined =
     planned.length > 1
-      ? { index: v.index, total: planned.length, firstChapter: v.first_chapter, lastChapter: v.last_chapter }
+      ? {
+          index: v.index,
+          total: planned.length,
+          firstChapter: v.first_chapter,
+          lastChapter: v.last_chapter,
+          ...(series
+            ? {
+                seriesName: series.name.trim(),
+                bookTitle: titleOf(v.index) || undefined,
+                books: planned.map((p) => ({
+                  index: p.index,
+                  title: titleOf(p.index),
+                  hook: opts.marketing?.[String(p.index)]?.hook ?? undefined,
+                })),
+                excerpt: nextBookExcerpt(planned, all, v, titleOf, series.name.trim()),
+              }
+            : {}),
+        }
       : undefined;
   const label = planned.length > 1 ? `volume-${v.index}` : 'book';
   let rows = all;
@@ -286,6 +331,26 @@ export async function buildInterior(o: {
   return interior;
 }
 
+/**
+ * What the cover says. A series book's front carries its own title with the series line beneath
+ * and its spine says "Book 2"; a volume keeps the project title and "Volume 2".
+ */
+export function wrapTitling(
+  projectTitle: string,
+  volume: VolumeInfo | undefined,
+): { title: string; volumeLabel?: string; seriesLine?: string } {
+  if (!volume || volume.total <= 1) return { title: projectTitle };
+  if (volume.seriesName) {
+    return {
+      title: volume.bookTitle?.trim() || projectTitle,
+      volumeLabel: `Book ${volume.index}`,
+      // Untitled yet: the front still says which book it is.
+      seriesLine: seriesLine(volume) || bookLabel(volume.index),
+    };
+  }
+  return { title: projectTitle, volumeLabel: `Volume ${volume.index}` };
+}
+
 /** Build the whole package. Throws only on something unrecoverable; everything else is a finding. */
 export async function buildKdpPackage(opts: BuildPackageOptions): Promise<PackageResult> {
   const trimName = TRIM_SIZES[opts.settings.trim] ? opts.settings.trim : '6x9';
@@ -345,7 +410,6 @@ export async function buildKdpPackage(opts: BuildPackageOptions): Promise<Packag
     if (opts.art?.length) {
       const wrap = await composeCoverWrap({
         art: opts.art,
-        title: opts.title,
         author: opts.author,
         pageCount: interior.pageCount,
         trimWidthIn: trim.w,
@@ -353,7 +417,7 @@ export async function buildKdpPackage(opts: BuildPackageOptions): Promise<Packag
         paper,
         blurb: marketing?.back_cover || marketing?.blurb || undefined,
         authorBio: bio || undefined,
-        volumeLabel: volume ? `Volume ${volume.index}` : undefined,
+        ...wrapTitling(opts.title, volume),
       });
       if (wrap) {
         spineIn = wrap.spineIn;
@@ -388,7 +452,8 @@ export async function buildKdpPackage(opts: BuildPackageOptions): Promise<Packag
     }));
     let ebookCover: { data: Buffer; ext: 'jpg' | 'png' } | null = null;
     if (opts.art?.length) {
-      const jacket = await composeCover({ art: opts.art, title: opts.title, author: opts.author });
+      const t = wrapTitling(opts.title, volume);
+      const jacket = await composeCover({ art: opts.art, title: t.title, author: opts.author, seriesLine: t.seriesLine });
       ebookCover = jacket ? { data: jacket, ext: 'jpg' } : { data: opts.art, ext: 'png' };
       dir.file(`${slug(fullTitle)}-ebook-cover.${ebookCover.ext}`, ebookCover.data);
       files.push(`${label}/${slug(fullTitle)}-ebook-cover.${ebookCover.ext}`);

@@ -82,31 +82,31 @@ class TestTheCapIsAConstraint:
 
 class TestTheStoryIsTheObjective:
     def test_it_ends_a_volume_on_the_stronger_hook(self) -> None:
-        """Two legal split points, one of which is a cliffhanger. It must choose the cliffhanger."""
+        """Two legal split points, one of which is a strong series ending. It must choose that one."""
         chapters = [ch(i, 6000, turn=0.4) for i in range(1, 61)]
-        chapters[29].cliffhanger = 0.95  # chapter 30 — a real hook
-        chapters[31].cliffhanger = 0.10  # chapter 32 — resolves everything
+        chapters[29].judged = 0.95  # chapter 30 — a real hook
+        chapters[31].judged = 0.10  # chapter 32 — resolves everything
         plan = plan_volumes(chapters, trim="6x9", volume_count=2)
         assert plan.volumes[0].last_chapter == 30
 
     def test_it_will_take_an_uneven_split_to_get_a_better_ending(self) -> None:
         """A reader forgives a shorter volume; they do not forgive stopping mid-scene."""
         chapters = [ch(i, 6000, turn=0.4) for i in range(1, 61)]
-        chapters[23].cliffhanger = 0.99  # chapter 24: well off-centre, but the right place to stop
+        chapters[23].judged = 0.99  # chapter 24: well off-centre, but the right place to stop
         plan = plan_volumes(chapters, trim="6x9", volume_count=2)
         assert plan.volumes[0].last_chapter == 24
 
     def test_but_not_an_absurdly_uneven_one(self) -> None:
         """Balance still has a vote — a hook in chapter 3 does not make a 3-chapter volume."""
         chapters = [ch(i, 6000, turn=0.4) for i in range(1, 61)]
-        chapters[2].cliffhanger = 0.99
+        chapters[2].judged = 0.99
         plan = plan_volumes(chapters, trim="6x9", volume_count=2)
         assert plan.volumes[0].last_chapter > 10
 
     def test_a_weak_final_hook_is_flagged(self) -> None:
         chapters = [ch(i, 6000, turn=0.2) for i in range(1, 61)]
         for c in chapters:
-            c.cliffhanger = 0.2
+            c.judged = 0.2
         plan = plan_volumes(chapters, trim="6x9", volume_count=2)
         assert any("weak hook" in w for w in plan.warnings)
 
@@ -114,8 +114,8 @@ class TestTheStoryIsTheObjective:
         """The end of the book is allowed to be an ending."""
         chapters = [ch(i, 6000, turn=0.2) for i in range(1, 61)]
         for c in chapters:
-            c.cliffhanger = 0.9
-        chapters[-1].cliffhanger = 0.05
+            c.judged = 0.9
+        chapters[-1].judged = 0.05
         plan = plan_volumes(chapters, trim="6x9", volume_count=2)
         assert not any("weak hook" in w for w in plan.warnings)
 
@@ -133,7 +133,7 @@ class TestEndingHeuristic:
     def test_the_llm_judgement_overrides_the_heuristic(self) -> None:
         c = ch(1, turn=0.1, tail="It was over. Finally, peace.")
         assert c.heuristic_ending_score < 0.4
-        c.cliffhanger = 0.9
+        c.judged = 0.9
         assert c.ending_score == 0.9
 
 

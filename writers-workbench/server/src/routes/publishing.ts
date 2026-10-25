@@ -30,6 +30,7 @@ import { logger } from '../lib/logger.js';
 import { TRIM_SIZES } from '../lib/print-pdf.js';
 import { PAPER_THICKNESS } from '../lib/cover.js';
 import { searchArchives } from '../lib/image-archives.js';
+import { seriesView } from '../lib/series.js';
 
 export const publishingRouter = Router();
 publishingRouter.use(requireAuth);
@@ -224,6 +225,7 @@ publishingRouter.get('/project/:projectId', async (req, res, next) => {
         project: { id: project.id, title: project.title, genre_slug: project.genre_slug },
         settings: publishing,
         volume_plan: plan,
+        series: seriesView(outline, project.title),
         marketing,
         marketing_history: (outline._marketing_history as unknown[]) ?? [],
         author: {
