@@ -12,6 +12,8 @@ import { contentToHtml } from '../../lib/content-utils';
 import QAReportPanel from './QAReportPanel';
 import AnnotationsPanel from './AnnotationsPanel';
 import ProvenancePanel from './ProvenancePanel';
+import CharactersPanel from './CharactersPanel';
+import HumanizerPanel, { type HumanizerSeed } from './HumanizerPanel';
 import RewriteWithResearchModal from './RewriteWithResearchModal';
 import { useToast } from '../../contexts/ToastContext';
 import { useChapterRepair } from '../../hooks/useChapterRepair';
@@ -35,7 +37,8 @@ export default function ContentDetail() {
   // Layout: the review panels (Q/A, drift, annotations, sources, versions) live in a tabbed side rail
   // so only one is on screen at a time and each scrolls on its own — instead of stacking vertically and
   // pushing the editor off-screen. `focusMode` pops the editor into a full-screen overlay.
-  const [activeTab, setActiveTab] = useState<'qa' | 'annotations' | 'sources' | 'versions'>('qa');
+  const [activeTab, setActiveTab] = useState<'qa' | 'annotations' | 'characters' | 'humanize' | 'sources' | 'versions'>('qa');
+  const [humanizerSeed, setHumanizerSeed] = useState<HumanizerSeed | null>(null);
   const [focusMode, setFocusMode] = useState(false);
   const { addToast } = useToast();
 
@@ -382,13 +385,16 @@ export default function ContentDetail() {
   // findings with a quote are counted: those are the ones with something to accept.
   const craftFindings = meta.craft_findings as { findings?: { quote?: string }[] } | undefined;
   const craftAnchored = craftFindings?.findings?.filter((f) => f.quote).length ?? 0;
-  const tabs: { id: 'qa' | 'annotations' | 'sources' | 'versions'; label: string; badge?: number; warn?: boolean }[] = [
+  const tabs: { id: 'qa' | 'annotations' | 'characters' | 'humanize' | 'sources' | 'versions'; label: string; badge?: number; warn?: boolean }[] = [
     ...(isChapter
       ? ([
           { id: 'qa', label: 'Q/A', badge: qaFlagged || undefined, warn: qaFlagged > 0 || hasDrift },
           { id: 'annotations', label: 'Review', badge: craftAnchored || undefined },
         ] as const)
       : []),
+    // Characters across the whole book, and the humanizer for a selected passage.
+    { id: 'characters', label: 'Characters' },
+    { id: 'humanize', label: 'Humanizer' },
     { id: 'sources', label: 'Sources' },
     { id: 'versions', label: 'Versions' },
   ];
@@ -719,7 +725,22 @@ export default function ContentDetail() {
                 </>
               )}
               {currentTab === 'annotations' && isChapter && (
-                <AnnotationsPanel contentId={id!} onReveal={revealInEditor} />
+                <AnnotationsPanel
+                  contentId={id!}
+                  onReveal={revealInEditor}
+                  onHumanize={(text, passage) => {
+                    setHumanizerSeed({ text, passage, nonce: Date.now() });
+                    setActiveTab('humanize');
+                  }}
+                />
+              )}
+              {currentTab === 'characters' && <CharactersPanel contentId={id!} onReveal={revealInEditor} />}
+              {currentTab === 'humanize' && (
+                <HumanizerPanel
+                  contentId={id!}
+                  getSelection={() => editorRef.current?.getSelectedText() ?? ''}
+                  seed={humanizerSeed}
+                />
               )}
               {currentTab === 'sources' && <ProvenancePanel contentId={id!} />}
               {currentTab === 'versions' && (

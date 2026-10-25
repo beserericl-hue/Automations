@@ -24,6 +24,8 @@ export interface RichTextEditorHandle {
    */
   reveal: (quote: string) => 'exact' | 'approximate' | 'missing';
   clearReveal: () => void;
+  /** The text the author has selected, paragraphs separated by a blank line; '' when none. */
+  getSelectedText: () => string;
 }
 
 const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(function RichTextEditor(
@@ -155,7 +157,13 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
     editor.view.dispatch(editor.state.tr.setMeta(revealPluginKey, null));
   }, [editor]);
 
-  useImperativeHandle(ref, () => ({ reveal, clearReveal }), [reveal, clearReveal]);
+  const getSelectedText = useCallback((): string => {
+    if (!editor) return '';
+    const { from, to } = editor.state.selection;
+    return from === to ? '' : editor.state.doc.textBetween(from, to, '\n\n').trim();
+  }, [editor]);
+
+  useImperativeHandle(ref, () => ({ reveal, clearReveal, getSelectedText }), [reveal, clearReveal, getSelectedText]);
 
   const saveNow = useCallback(() => {
     if (debounceRef.current) {

@@ -35,8 +35,7 @@
 import crypto from 'crypto';
 import dns from 'dns/promises';
 import net from 'net';
-import Anthropic from '@anthropic-ai/sdk';
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
+import { parseWith } from '../lib/claude-structured.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { validateBody } from '../middleware/validate.js';
@@ -78,7 +77,6 @@ import {
 export const landingPageRouter = Router();
 landingPageRouter.use(requireAuth);
 
-const MODEL = 'claude-opus-5-5';
 const HISTORY_LIMIT = 10;
 /** Enough research for the model to choose from; the ranking puts the relevant reports first. */
 const RESEARCH_BUDGET_CHARS = 60_000;
@@ -171,18 +169,6 @@ async function fetchPublicPage(raw: string): Promise<string> {
 // The two model calls
 // ------------------------------------------------------------------------------------------------
 
-function anthropic(): Anthropic {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
-  // An account-level key (sk-ant-usr-...) must name its workspace; a workspace key must not.
-  // Same rule as brainstorm.ts and the engine's client.
-  const workspaceId = process.env.ANTHROPIC_WORKSPACE_ID?.trim();
-  return new Anthropic({
-    apiKey,
-    ...(workspaceId ? { defaultHeaders: { 'anthropic-workspace-id': workspaceId } } : {}),
-  });
-}
-
 const SampleOutput = z.object({
   sections: z.array(
     z.object({
@@ -197,19 +183,6 @@ const SampleOutput = z.object({
 const FactsOutput = z.object({
   facts: z.array(z.object({ text: z.string(), quote: z.string(), report_id: z.string() })),
 });
-
-async function parseWith<T extends z.ZodType>(schema: T, prompt: string): Promise<z.infer<T>> {
-  const response = await anthropic().messages.parse({
-    model: MODEL,
-    max_tokens: 16000,
-    output_config: { effort: 'medium', format: zodOutputFormat(schema) },
-    messages: [{ role: 'user', content: prompt }],
-  });
-  if (response.stop_reason === 'refusal') throw new Error('The model declined this request.');
-  if (response.stop_reason === 'max_tokens') throw new Error('The model ran out of room before finishing.');
-  if (!response.parsed_output) throw new Error('The model did not return the expected structure.');
-  return response.parsed_output as z.infer<T>;
-}
 
 async function analyseSample(url: string): Promise<SampleStructure> {
   const text = htmlToText(await fetchPublicPage(url));
