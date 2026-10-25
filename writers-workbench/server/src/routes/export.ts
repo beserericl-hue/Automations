@@ -8,8 +8,8 @@ import { logger } from '../lib/logger.js';
 import { z } from 'zod';
 import { buildEpub, epubFilename, type EpubChapter } from '../lib/epub.js';
 import { composeCover } from '../lib/cover.js';
-import { buildKdpPackage, type PackageChapter, type PackageSettings } from '../lib/kdp-package.js';
-import { marketingKey, publishingOf } from './publishing.js';
+import { buildKdpPackage } from '../lib/kdp-package.js';
+import { loadBookSource } from '../lib/book-source.js';
 
 export const exportRouter = Router();
 
@@ -477,96 +477,21 @@ exportRouter.post(
     const { project_id, volume_index, only_approved } = req.body as z.infer<typeof KdpPackageSchema>;
     const user_id = req.userId!;
     try {
-      const supabase = getSupabaseAdmin();
-      const { data: project, error: projError } = await supabase
-        .from('writing_projects_v2')
-        .select('id, title, outline')
-        .eq('id', project_id)
-        .eq('user_id', user_id)
-        .is('deleted_at', null)
-        .maybeSingle();
-      if (projError || !project) {
+      let source;
+      try {
+        source = await loadBookSource(project_id, user_id);
+      } catch {
+        res.status(500).json({ error: 'Failed to fetch chapters' });
+        return;
+      }
+      if (!source) {
         res.status(404).json({ error: 'Project not found' });
         return;
       }
-      const outline = (project.outline as Record<string, unknown> | null) ?? {};
-      const settings = publishingOf(outline) as unknown as PackageSettings;
-
-      // Paged. PostgREST caps a response at 1000 rows and `data.length` is a page size, not a
-      // count — reading it as one is a mistake this codebase has already paid for.
-      const chapters: PackageChapter[] = [];
-      for (let page = 0; ; page += 1) {
-        const { data, error } = await supabase
-          .from('published_content_v2')
-          .select('title, chapter_number, content_text, status')
-          .eq('project_id', project_id)
-          .eq('user_id', user_id)
-          .eq('content_type', 'chapter')
-          .is('deleted_at', null)
-          .order('chapter_number', { ascending: true })
-          .range(page * 1000, page * 1000 + 999);
-        if (error) {
-          res.status(500).json({ error: 'Failed to fetch chapters' });
-          return;
-        }
-        chapters.push(...((data || []) as unknown as PackageChapter[]));
-        if ((data || []).length < 1000) break;
-      }
-
-      const { data: authorProfile } = await supabase
-        .from('author_profiles_v2')
-        .select('pen_name, bio')
-        .eq('user_id', user_id)
-        .maybeSingle();
-      let authorName = String(authorProfile?.pen_name ?? '').trim();
-      if (!authorName) {
-        const { data: account } = await supabase
-          .from('users_v2')
-          .select('name')
-          .eq('user_id', user_id)
-          .maybeSingle();
-        authorName = String(account?.name ?? '').trim();
-      }
-
-      let art: Buffer | null = null;
-      try {
-        const { data: coverArt } = await supabase
-          .from('generated_images_v2')
-          .select('storage_path')
-          .eq('project_id', project_id)
-          .eq('image_type', 'cover_art')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (coverArt?.storage_path) {
-          const dl = await supabase.storage
-            .from('cover-images')
-            .download(coverArt.storage_path as string);
-          if (dl.data) art = Buffer.from(await dl.data.arrayBuffer());
-        }
-      } catch (err) {
-        logger.warn({ err, project_id }, 'kdp package: cover art unavailable');
-      }
-
-      const plan = outline._volume_plan as
-        | { volumes?: { index: number; first_chapter: number; last_chapter: number }[] }
-        | undefined;
-      const volumeCount = Math.max(1, plan?.volumes?.length ?? 1);
-      const marketing: Record<string, ReturnType<typeof Object> | null> = {};
-      for (let i = 1; i <= volumeCount; i += 1) {
-        marketing[String(i)] = (outline[marketingKey(i)] as never) ?? null;
-      }
 
       const pkg = await buildKdpPackage({
-        title: String(project.title ?? ''),
-        author: authorName,
-        authorBio: String(authorProfile?.bio ?? ''),
-        chapters,
-        settings,
-        volumes: plan?.volumes,
+        ...source,
         onlyVolume: volume_index ?? null,
-        art,
-        marketing: marketing as never,
         onlyApproved: only_approved,
       });
 

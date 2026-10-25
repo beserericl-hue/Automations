@@ -79,6 +79,13 @@ export interface PrintPdfOptions {
   estimatedPages?: number;
   bodySize?: number;
   leading?: number;
+  /**
+   * Bleed on every edge, in inches. 0 (the default) is a KDP interior: pages at the trim size. A
+   * printer whose product is full-bleed wants each page larger than the trim by this much on all
+   * sides, with a TrimBox saying where the knife falls. The text block does not move relative to
+   * the trim, so the page count, and with it the spine, is the same either way.
+   */
+  bleedIn?: number;
 }
 
 export interface PrintPdfResult {
@@ -130,18 +137,23 @@ export async function buildPrintPdf(opts: PrintPdfOptions): Promise<PrintPdfResu
   const gutter = gutterInches(opts.estimatedPages ?? 400);
   const pageW = trim.w * POINTS_PER_INCH;
   const pageH = trim.h * POINTS_PER_INCH;
-  const topM = TOP_MARGIN_IN * POINTS_PER_INCH;
-  const botM = BOTTOM_MARGIN_IN * POINTS_PER_INCH;
-  const insideM = gutter * POINTS_PER_INCH;
-  const outsideM = OUTSIDE_MARGIN_IN * POINTS_PER_INCH;
-  const textW = pageW - insideM - outsideM;
+  // Every margin is measured from the page edge, so with bleed each grows by the bleed and the text
+  // block stays exactly where it was relative to the trim.
+  const bleed = Math.max(0, opts.bleedIn ?? 0) * POINTS_PER_INCH;
+  const fullW = pageW + bleed * 2;
+  const fullH = pageH + bleed * 2;
+  const topM = TOP_MARGIN_IN * POINTS_PER_INCH + bleed;
+  const botM = BOTTOM_MARGIN_IN * POINTS_PER_INCH + bleed;
+  const insideM = gutter * POINTS_PER_INCH + bleed;
+  const outsideM = OUTSIDE_MARGIN_IN * POINTS_PER_INCH + bleed;
+  const textW = fullW - insideM - outsideM;
 
   const { default: PDFDocument } = await import('pdfkit');
   const serif = loadFont('EBGaramond-Variable.ttf');
   const sans = loadFont('Raleway-Variable.ttf');
 
   const doc = new PDFDocument({
-    size: [pageW, pageH],
+    size: [fullW, fullH],
     margins: { top: topM, bottom: botM, left: insideM, right: outsideM },
     autoFirstPage: false,
     bufferPages: true,
@@ -161,12 +173,59 @@ export async function buildPrintPdf(opts: PrintPdfOptions): Promise<PrintPdfResu
 
   const isRecto = () => physical % 2 === 1; // page 1 is a recto
 
-  function newPage(): void {
-    doc.addPage();
-    physical += 1;
+  // PAGES PDFKIT ADDS BY ITSELF. A paragraph that runs past the bottom margin is continued on a
+  // page pdfkit creates — not through newPage() — and pdfkit sets its lines at the x the paragraph
+  // STARTED at. Unhandled, that page was not counted (so every later recto/verso decision was off
+  // by the number of such pages, and a chapter could open on a verso), and a verso continuing a
+  // recto's paragraph had its gutter on the outside edge. So every page, however it was added, is
+  // counted and margined here, and a continued paragraph is shifted onto the correct side.
+  let inNewPage = false;
+  let flowStartX = 0;
+  let shift = 0; // translation applied to the current page for a continued paragraph
+  // A page a paragraph ran THROUGH (it continued again onto the next) is left translated; the
+  // folio pass draws on it later and has to take that back.
+  const residual = new Map<number, number>();
+  doc.on('pageAdded', () => {
+    if (shift) residual.set(physical, shift);
+    physical = doc.bufferedPageRange().count;
+    shift = 0; // a new page starts with a fresh coordinate system
     // Mirrored margins: the gutter is on the left of a recto and the right of a verso.
-    if (isRecto()) doc.page.margins.left = insideM, (doc.page.margins.right = outsideM);
-    else doc.page.margins.left = outsideM, (doc.page.margins.right = insideM);
+    const recto = isRecto();
+    doc.page.margins.left = recto ? insideM : outsideM;
+    doc.page.margins.right = recto ? outsideM : insideM;
+    if (bleed > 0) {
+      // Where the knife falls. A preflight that finds no TrimBox measures the page as the trim
+      // and calls it oversized.
+      const dict = doc.page.dictionary.data;
+      dict.TrimBox = [bleed, bleed, bleed + pageW, bleed + pageH];
+      dict.BleedBox = [0, 0, fullW, fullH];
+    }
+    if (!inNewPage) {
+      bodyPages.add(physical);
+      const dx = (recto ? insideM : outsideM) - flowStartX;
+      if (dx) {
+        doc.translate(dx, 0);
+        shift = dx;
+      }
+    }
+  });
+  // Every text call records where its lines start, and undoes a continuation's shift when it ends,
+  // so whatever is drawn next on that page — the next paragraph, a folio — lands where it says.
+  const rawText = doc.text.bind(doc);
+  doc.text = ((text: string, x?: number, y?: number, options?: Parameters<typeof rawText>[3]) => {
+    flowStartX = typeof x === 'number' ? x : doc.x;
+    rawText(text, x, y, options);
+    if (shift) {
+      doc.translate(-shift, 0);
+      shift = 0;
+    }
+    return doc;
+  }) as typeof doc.text;
+
+  function newPage(): void {
+    inNewPage = true;
+    doc.addPage();
+    inNewPage = false;
   }
 
   /** Start a page that must be on the right-hand side, leaving a blank verso if needed. */
@@ -218,7 +277,7 @@ export async function buildPrintPdf(opts: PrintPdfOptions): Promise<PrintPdfResu
     doc.font('body').fontSize(bodySize).fillColor('#000');
     let first = true;
     for (const block of paragraphsOf(ch.text || '')) {
-      if (doc.y > pageH - botM - leading * 2) {
+      if (doc.y > fullH - botM - leading * 2) {
         newPage();
         bodyPages.add(physical);
         y = topM;
@@ -288,7 +347,7 @@ export async function buildPrintPdf(opts: PrintPdfOptions): Promise<PrintPdfResu
     doc.page.margins.top = 0;
     doc.page.margins.bottom = 0;
     const recto = pageNo % 2 === 1;
-    const left = recto ? insideM : outsideM;
+    const left = (recto ? insideM : outsideM) - (residual.get(pageNo) ?? 0);
     doc.font('display').fontSize(8).fillColor('#555');
     // Verso carries the author, recto the title — the convention, and it tells a reader which book
     // they are holding when a volume has been put down for a week.
@@ -299,7 +358,7 @@ export async function buildPrintPdf(opts: PrintPdfOptions): Promise<PrintPdfResu
       lineBreak: false,
     });
     doc.fontSize(9).fillColor('#000');
-    doc.text(String(pageNo), left, pageH - botM + 16, {
+    doc.text(String(pageNo), left, fullH - botM + 16, {
       width: textW,
       align: 'center',
       lineBreak: false,

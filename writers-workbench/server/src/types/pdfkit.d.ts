@@ -25,8 +25,11 @@ declare module 'pdfkit' {
       bufferPages?: boolean;
       info?: Record<string, string>;
     });
-    page: { margins: PageMargins };
+    /** `dictionary.data` is the raw page dictionary: where TrimBox and BleedBox are set. */
+    page: { margins: PageMargins; dictionary: { data: Record<string, unknown> } };
+    x: number;
     y: number;
+    translate(x: number, y: number): this;
     addPage(): this;
     registerFont(name: string, src: Buffer | string): this;
     font(name: string): this;
@@ -34,10 +37,12 @@ declare module 'pdfkit' {
     fillColor(color: string): this;
     text(text: string, x?: number, y?: number, options?: TextOptions): this;
     moveDown(lines?: number): this;
+    image(src: Buffer, x?: number, y?: number, options?: { width?: number; height?: number }): this;
     bufferedPageRange(): { start: number; count: number };
     switchToPage(n: number): this;
     on(event: 'data', cb: (chunk: Buffer) => void): this;
     on(event: 'end', cb: () => void): this;
+    on(event: 'pageAdded', cb: () => void): this;
     end(): void;
   }
   export default PDFDocument;
