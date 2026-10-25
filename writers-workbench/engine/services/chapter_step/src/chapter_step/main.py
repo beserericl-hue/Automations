@@ -4717,6 +4717,45 @@ async def _op_marketing(payload: dict) -> dict:
     return out
 
 
+# A passage the author selected in the editor, not a chapter: big enough for a scene, small enough
+# that a stray select-all cannot bill a novel's worth of words. The API itself caps at 3000.
+HUMANIZE_PASSAGE_MAX_WORDS = 1500
+
+
+async def _op_humanize_passage(payload: dict) -> dict:
+    """Run one selected passage through StealthGPT, for the editor's Humanizer tab.
+
+    The author decides afterwards whether the result reads better; nothing is written here. The
+    same protections as the chapter pass apply (humanize.humanize_text): the passage's own names
+    are protected and a rewrite that drops one is rejected, the em-dash ban is re-applied, and a
+    failure keeps the original. ``detectability`` is StealthGPT's own howLikelyToBeDetected —
+    lower is better, and on a short passage it means little.
+    """
+    from writer_engine import humanize as H
+
+    text = str(payload.get("text") or "").strip()
+    words = len(text.split())
+    if not text:
+        return {"skipped": "There is no passage to humanize."}
+    if words > HUMANIZE_PASSAGE_MAX_WORDS:
+        return {
+            "skipped": f"That passage is {words} words; the humanizer takes up to {HUMANIZE_PASSAGE_MAX_WORDS} at a time."
+        }
+    if not H.enabled():
+        return {"skipped": "The humanizer is not configured on this server (no StealthGPT key)."}
+    protect = H.extract_protected_terms(text, extra=[str(t) for t in payload.get("protect") or []])
+    result = await H.humanize_text(text, protect=protect)
+    out = result.text.strip()
+    return {
+        "original": text,
+        "text": out,
+        "changed": out != text,
+        "words": words,
+        "protected_terms": protect,
+        **result.as_report(),
+    }
+
+
 OPS = {
     "write": _op_write,
     "plan": _op_plan,
@@ -4733,6 +4772,7 @@ OPS = {
     "blog": _op_blog,
     "newsletter": _op_newsletter,
     "short-story": _op_short_story,
+    "humanize-passage": _op_humanize_passage,
 }
 
 

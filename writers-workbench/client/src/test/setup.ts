@@ -2,8 +2,13 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
 
-afterEach(() => {
+afterEach(async () => {
   cleanup();
+  // Engine jobs live in a module-level store saved to the session (useEngineJobQueue), so a job
+  // queued in one test would still be "queued" in the next. Each test starts a fresh session.
+  const { resetEngineJobs } = await import('../hooks/useEngineJobQueue');
+  resetEngineJobs();
+  try { window.sessionStorage.clear(); } catch { /* jsdom always has it */ }
 });
 
 // Mock Supabase client — prevents real API calls during tests

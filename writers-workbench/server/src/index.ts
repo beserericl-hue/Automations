@@ -28,6 +28,7 @@ import { editionExtrasRouter, editionExtrasCronRouter } from './routes/newslette
 import { genresRouter, adminGenreUrlsRouter } from './routes/genres.js';
 import { jobsRouter } from './routes/jobs.js';
 import { contentActionsRouter } from './routes/content-actions.js';
+import { contentToolsRouter } from './routes/content-tools.js';
 import { authorRouter } from './routes/author.js';
 import { publishingRouter } from './routes/publishing.js';
 import { landingPageRouter } from './routes/landing-page.js';
@@ -251,6 +252,7 @@ app.use('/api/jobs', generalLimiter);
 app.use('/api/jobs', jobsRouter);
 app.use('/api/content', generalLimiter);
 app.use('/api/content', contentActionsRouter);
+app.use('/api/content', contentToolsRouter);
 app.use('/api/author', generalLimiter);
 app.use('/api/author', authorRouter);
 app.use('/api/publishing', generalLimiter);

@@ -53,7 +53,9 @@ export default function QAReportPanel({ metadata, contentId, userId, contentText
 
   // Queue the Q/A op so the click returns immediately; the content refetches when the engine job
   // completes (and the panel shows the new report). The hook also handles a sync engine response.
-  const jobQueue = useEngineJobQueue(userId);
+  // Scoped to this chapter, so its jobs survive the panel unmounting (a tab switch) and never
+  // collide with another chapter's.
+  const jobQueue = useEngineJobQueue(userId, contentId);
   const qaState = jobQueue.stateOf('qa');
   const qaRunning = qaState === 'queued';
   const qaError = qaState === 'error';
@@ -90,7 +92,7 @@ export default function QAReportPanel({ metadata, contentId, userId, contentText
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
       const body = (await res.json()) as { jobId?: string };
-      if (body.jobId) jobQueue.trackJob('qa-fix', body.jobId, [['content-detail', contentId]]);
+      if (body.jobId) jobQueue.trackJob('qa-fix', body.jobId, [['content-detail', contentId], ['content-versions', contentId]]);
     } catch {
       /* button re-enables on next render */
     }

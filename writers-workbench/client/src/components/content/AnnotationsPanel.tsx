@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../../lib/api';
+import { aiTells, summarizeTells } from '../../lib/aiTells';
 
 // S12-13 — shared report-comment surface for chapter editors. Renders
 // merged annotations from genre_eval (S12-11), drift_scan (S12-12) and the
@@ -59,6 +60,8 @@ interface AnnotationsPanelProps {
    * rather than clickable and inert.
    */
   onReveal?: (quote: string) => RevealResult;
+  /** Send a suggested replacement to the Humanizer tab, to replace the passage it would fix. */
+  onHumanize?: (text: string, passage: string) => void;
 }
 
 // Sprint 8: routes through apiFetch so the X-Impersonate-User header is
@@ -96,7 +99,7 @@ async function dismissAnnotation(args: {
   });
 }
 
-export default function AnnotationsPanel({ contentId, onReveal }: AnnotationsPanelProps) {
+export default function AnnotationsPanel({ contentId, onReveal, onHumanize }: AnnotationsPanelProps) {
   const queryClient = useQueryClient();
   // Which finding the manuscript is currently showing, and how well its quote matched.
   const [shown, setShown] = useState<{ id: string; result: RevealResult } | null>(null);
@@ -193,6 +196,7 @@ export default function AnnotationsPanel({ contentId, onReveal }: AnnotationsPan
             applyState={apply}
             dismissState={dismiss}
             onReveal={onReveal ? reveal : undefined}
+            onHumanize={onHumanize}
             shown={shown}
           />
         )}
@@ -208,6 +212,7 @@ export default function AnnotationsPanel({ contentId, onReveal }: AnnotationsPan
             applyState={apply}
             dismissState={dismiss}
             onReveal={onReveal ? reveal : undefined}
+            onHumanize={onHumanize}
             shown={shown}
           />
         )}
@@ -223,6 +228,7 @@ export default function AnnotationsPanel({ contentId, onReveal }: AnnotationsPan
             applyState={apply}
             dismissState={dismiss}
             onReveal={onReveal ? reveal : undefined}
+            onHumanize={onHumanize}
             shown={shown}
           />
         )}
@@ -240,6 +246,7 @@ function SourceSection({
   applyState,
   dismissState,
   onReveal,
+  onHumanize,
   shown,
 }: {
   title: string;
@@ -250,6 +257,7 @@ function SourceSection({
   applyState: { isPending: boolean; isError: boolean; error: unknown; variables?: { annotationId?: string } };
   dismissState: { isPending: boolean; variables?: { annotationId?: string } };
   onReveal?: (a: UnifiedAnnotation) => void;
+  onHumanize?: (text: string, passage: string) => void;
   shown: { id: string; result: RevealResult } | null;
 }) {
   return (
@@ -269,6 +277,7 @@ function SourceSection({
             applyError={applyState.isError && applyState.variables?.annotationId === a.id ? (applyState.error as Error)?.message : undefined}
             dismissPending={dismissState.isPending && dismissState.variables?.annotationId === a.id}
             onReveal={onReveal ? () => onReveal(a) : undefined}
+            onHumanize={onHumanize}
             revealed={shown?.id === a.id ? shown.result : null}
           />
         ))}
@@ -285,6 +294,7 @@ function AnnotationRow({
   applyError,
   dismissPending,
   onReveal,
+  onHumanize,
   revealed,
 }: {
   annotation: UnifiedAnnotation;
@@ -294,6 +304,7 @@ function AnnotationRow({
   applyError?: string;
   dismissPending: boolean;
   onReveal?: () => void;
+  onHumanize?: (text: string, passage: string) => void;
   revealed: RevealResult | null;
 }) {
   const canApply = annotation.suggestion?.action === 'replace' && !!annotation.suggestion.target_text;
@@ -393,6 +404,11 @@ function AnnotationRow({
                   {Math.abs(annotation.suggestion.delta_chars).toLocaleString()} characters
                 </span>
               )}
+              {/* Every suggestion is written by a model; say so, and say what gives it away. */}
+              <AiWrittenFlag
+                text={annotation.suggestion.replacement_text}
+                onHumanize={onHumanize && target ? () => onHumanize(annotation.suggestion!.replacement_text!, target) : undefined}
+              />
             </div>
           )}
           {/* Edit the fix before taking it. What replaces the passage is whatever is in this box —
@@ -474,6 +490,32 @@ function AnnotationRow({
         </div>
       </div>
     </li>
+  );
+}
+
+function AiWrittenFlag({ text, onHumanize }: { text: string; onHumanize?: () => void }) {
+  const tells = aiTells(text);
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-gray-700 dark:text-gray-300" data-testid="ai-written-flag">
+      <span className="rounded bg-violet-100 px-1.5 py-0.5 font-medium text-violet-800 dark:bg-violet-900/40 dark:text-violet-200">
+        AI-written
+      </span>
+      {tells.length ? (
+        <span className="text-amber-800 dark:text-amber-300" title={tells.flatMap((t) => t.examples).join('\n')}>
+          reads as machine-written: {summarizeTells(tells)}
+        </span>
+      ) : (
+        <span className="text-gray-500 dark:text-gray-400">no common tells found</span>
+      )}
+      {onHumanize ? (
+        <button
+          onClick={onHumanize}
+          className="rounded border border-violet-300 px-2 py-0.5 text-violet-700 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-300 dark:hover:bg-violet-950/30"
+        >
+          Open in Humanizer
+        </button>
+      ) : null}
+    </div>
   );
 }
 
