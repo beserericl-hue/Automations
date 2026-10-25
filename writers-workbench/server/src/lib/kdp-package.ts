@@ -169,6 +169,123 @@ export function listingText(
   return lines.join('\n');
 }
 
+
+/** Everything one volume's files are built from: its chapters, its matter, its copy. */
+export interface VolumeParts {
+  volume: VolumeInfo | undefined;
+  label: string;
+  fullTitle: string;
+  rows: PackageChapter[];
+  printChapters: PrintChapter[];
+  matter: ReturnType<typeof bookMatter>;
+  marketing: Marketing | null;
+  isbn: string;
+  bio: string;
+}
+
+/** The planned volumes, or the whole book as one when there is no plan. */
+export function plannedVolumes(opts: Pick<BuildPackageOptions, 'volumes'>, all: PackageChapter[]): PlannedVolume[] {
+  return opts.volumes && opts.volumes.length
+    ? opts.volumes
+    : [
+        {
+          index: 1,
+          first_chapter: Number(all[0]?.chapter_number ?? 0),
+          last_chapter: Number(all[all.length - 1]?.chapter_number ?? all.length),
+        },
+      ];
+}
+
+export function volumeParts(
+  opts: BuildPackageOptions,
+  planned: PlannedVolume[],
+  all: PackageChapter[],
+  v: PlannedVolume,
+): VolumeParts {
+  const volume: VolumeInfo | undefined =
+    planned.length > 1
+      ? { index: v.index, total: planned.length, firstChapter: v.first_chapter, lastChapter: v.last_chapter }
+      : undefined;
+  const label = planned.length > 1 ? `volume-${v.index}` : 'book';
+  let rows = all;
+  if (volume) {
+    rows = all.filter((c) => {
+      const n = Number(c.chapter_number ?? -1);
+      return n >= v.first_chapter && n <= v.last_chapter;
+    });
+  }
+  if (opts.onlyApproved) {
+    rows = rows.filter((c) => ['approved', 'published'].includes(String(c.status ?? '')));
+  }
+  const marketing = opts.marketing?.[String(v.index)] ?? null;
+  const isbn = String(opts.settings.isbns?.[String(v.index)] ?? '');
+  // The bio printed in the book is the author's approved one. The copywriter's version is a
+  // suggestion for Author Central; it is not allowed to become a fact on the back cover.
+  const bio = opts.authorBio.trim() || String(marketing?.author_bio ?? '').trim();
+  const matter = bookMatter({
+    title: opts.title,
+    author: opts.author,
+    publisher: opts.settings.publisher || undefined,
+    isbn: isbn || undefined,
+    dedication: opts.settings.dedication || undefined,
+    epigraph: opts.settings.epigraph
+      ? { text: opts.settings.epigraph, attribution: opts.settings.epigraph_attribution || undefined }
+      : undefined,
+    authorsNote: opts.settings.authors_note || undefined,
+    acknowledgements: opts.settings.acknowledgements || undefined,
+    aboutTheAuthor: bio || undefined,
+    volume,
+    fiction: true,
+  });
+  return {
+    volume,
+    label,
+    fullTitle: volumeTitle(opts.title, volume),
+    rows,
+    printChapters: rows.map((c) => ({ number: c.chapter_number, title: c.title, text: c.content_text })),
+    matter,
+    marketing,
+    isbn,
+    bio,
+  };
+}
+
+/**
+ * The paperback interior, at the gutter its own page count requires.
+ *
+ * Pass one for a real page count, then rebuild at the gutter that count requires — and keep going
+ * until the two agree, because widening the gutter shortens the lines and so adds pages, which can
+ * cross the next threshold. It settles in two passes in practice; the cap is there so a
+ * pathological book cannot spin.
+ */
+export async function buildInterior(o: {
+  title: string;
+  author: string;
+  chapters: PrintChapter[];
+  matter: ReturnType<typeof bookMatter>;
+  trim: string;
+  bodySize?: number;
+  bleedIn?: number;
+}): Promise<Awaited<ReturnType<typeof buildPrintPdf>>> {
+  const base = {
+    title: o.title,
+    author: o.author,
+    chapters: o.chapters,
+    front: o.matter.front,
+    back: o.matter.back,
+    trim: o.trim,
+    bodySize: o.bodySize,
+    bleedIn: o.bleedIn,
+  };
+  let interior = await buildPrintPdf(base);
+  for (let pass = 0; pass < 3; pass += 1) {
+    const required = gutterInches(interior.pageCount);
+    if (required === interior.gutterInches) break;
+    interior = await buildPrintPdf({ ...base, estimatedPages: interior.pageCount });
+  }
+  return interior;
+}
+
 /** Build the whole package. Throws only on something unrecoverable; everything else is a finding. */
 export async function buildKdpPackage(opts: BuildPackageOptions): Promise<PackageResult> {
   const trimName = TRIM_SIZES[opts.settings.trim] ? opts.settings.trim : '6x9';
@@ -178,16 +295,7 @@ export async function buildKdpPackage(opts: BuildPackageOptions): Promise<Packag
   const all = opts.chapters.filter((c) => String(c.content_text ?? '').trim());
   if (!all.length) throw new Error('NO_CHAPTERS');
 
-  const planned: PlannedVolume[] =
-    opts.volumes && opts.volumes.length
-      ? opts.volumes
-      : [
-          {
-            index: 1,
-            first_chapter: Number(all[0].chapter_number ?? 0),
-            last_chapter: Number(all[all.length - 1].chapter_number ?? all.length),
-          },
-        ];
+  const planned = plannedVolumes(opts, all);
   const wanted = opts.onlyVolume
     ? planned.filter((v) => v.index === opts.onlyVolume)
     : planned;
@@ -199,90 +307,23 @@ export async function buildKdpPackage(opts: BuildPackageOptions): Promise<Packag
   const warnings: string[] = [];
 
   for (const v of wanted) {
-    const volume: VolumeInfo | undefined =
-      planned.length > 1
-        ? {
-            index: v.index,
-            total: planned.length,
-            firstChapter: v.first_chapter,
-            lastChapter: v.last_chapter,
-          }
-        : undefined;
-    const label = planned.length > 1 ? `volume-${v.index}` : 'book';
-    const fullTitle = volumeTitle(opts.title, volume);
+    const parts = volumeParts(opts, planned, all, v);
+    const { volume, label, fullTitle, marketing, isbn, bio } = parts;
     const dir = zip.folder(label)!;
-
-    let rows = all;
-    if (volume) {
-      rows = all.filter((c) => {
-        const n = Number(c.chapter_number ?? -1);
-        return n >= v.first_chapter && n <= v.last_chapter;
-      });
-    }
-    if (opts.onlyApproved) {
-      rows = rows.filter((c) => ['approved', 'published'].includes(String(c.status ?? '')));
-    }
-    if (!rows.length) {
+    if (!parts.rows.length) {
       errors.push(`${label}: no chapters with text in this volume`);
       continue;
     }
+    const rows = parts.rows;
 
-    const marketing = opts.marketing?.[String(v.index)] ?? null;
-    const isbn = String(opts.settings.isbns?.[String(v.index)] ?? '');
-
-    // The bio printed in the book is the author's approved one. The copywriter's version is a
-    // suggestion for Author Central; it is not allowed to become a fact on the back cover.
-    const bio = opts.authorBio.trim() || String(marketing?.author_bio ?? '').trim();
-
-    const matter = bookMatter({
+    const interior = await buildInterior({
       title: opts.title,
       author: opts.author,
-      publisher: opts.settings.publisher || undefined,
-      isbn: isbn || undefined,
-      dedication: opts.settings.dedication || undefined,
-      epigraph: opts.settings.epigraph
-        ? { text: opts.settings.epigraph, attribution: opts.settings.epigraph_attribution || undefined }
-        : undefined,
-      authorsNote: opts.settings.authors_note || undefined,
-      acknowledgements: opts.settings.acknowledgements || undefined,
-      aboutTheAuthor: bio || undefined,
-      volume,
-      fiction: true,
-    });
-
-    const printChapters: PrintChapter[] = rows.map((c) => ({
-      number: c.chapter_number,
-      title: c.title,
-      text: c.content_text,
-    }));
-
-    // Pass one for a real page count, then rebuild at the gutter that count requires — and keep
-    // going until the two agree, because widening the gutter shortens the lines and so adds pages,
-    // which can cross the next threshold. It settles in two passes in practice; the cap is there so
-    // a pathological book cannot spin.
-    let interior = await buildPrintPdf({
-      title: opts.title,
-      author: opts.author,
-      chapters: printChapters,
-      front: matter.front,
-      back: matter.back,
+      chapters: parts.printChapters,
+      matter: parts.matter,
       trim: trimName,
       bodySize: opts.settings.body_size,
     });
-    for (let pass = 0; pass < 3; pass += 1) {
-      const required = gutterInches(interior.pageCount);
-      if (required === interior.gutterInches) break;
-      interior = await buildPrintPdf({
-        title: opts.title,
-        author: opts.author,
-        chapters: printChapters,
-        front: matter.front,
-        back: matter.back,
-        trim: trimName,
-        bodySize: opts.settings.body_size,
-        estimatedPages: interior.pageCount,
-      });
-    }
 
     dir.file(`${slug(fullTitle)}-interior-${trimName}.pdf`, interior.pdf);
     const files = [`${label}/${slug(fullTitle)}-interior-${trimName}.pdf`];
@@ -372,8 +413,8 @@ export async function buildKdpPackage(opts: BuildPackageOptions): Promise<Packag
       author: opts.author,
       markDrafts: !opts.onlyApproved,
       cover: ebookCover,
-      frontMatter: matter.front,
-      backMatter: matter.back,
+      frontMatter: parts.matter.front,
+      backMatter: parts.matter.back,
     });
     dir.file(`${slug(fullTitle)}.epub`, epub);
     files.push(`${label}/${slug(fullTitle)}.epub`);

@@ -22,6 +22,7 @@ import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import { supabase } from '../../config/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { useEngineJobQueue } from '../../hooks/useEngineJobQueue';
+import PrintCopies from './PrintCopies';
 
 interface Settings {
   trim: string;
@@ -855,6 +856,9 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
           before uploading — KDP runs its own and refuses the file rather than saying what is wrong.
         </p>
       </Section>
+
+      {/* 5. Printed copies */}
+      <PrintCopies projectId={projectId} volumeCount={volumeCount} />
     </div>
   );
 }

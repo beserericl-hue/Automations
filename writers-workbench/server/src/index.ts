@@ -33,6 +33,7 @@ import { authorRouter } from './routes/author.js';
 import { publishingRouter } from './routes/publishing.js';
 import { landingPageRouter } from './routes/landing-page.js';
 import { bookPagesRouter } from './routes/book-pages.js';
+import { printRouter, printWebhookRouter } from './routes/print.js';
 import { creditsRouter } from './routes/credits.js';
 import { superuserRouter } from './routes/superuser.js';
 import { tiersRouter } from './routes/tiers.js';
@@ -182,6 +183,10 @@ app.use('/api/admin', generalLimiter);
 
 // 30 MB: newsletter ingestion uploads can carry markdown up to 10 MB + html up
 // to 10 MB (see IngestionUploadSchema) plus metadata, plus any future headroom.
+// RPI Print's status webhooks. Before the JSON parser: the signature is over the raw bytes, and a
+// parsed-then-reserialised body no longer matches it.
+app.use('/api/print/webhook', generalLimiter, printWebhookRouter);
+
 app.use(express.json({ limit: '30mb' }));
 
 // API documentation
@@ -257,6 +262,8 @@ app.use('/api/author', generalLimiter);
 app.use('/api/author', authorRouter);
 app.use('/api/publishing', generalLimiter);
 app.use('/api/publishing', publishingRouter);
+app.use('/api/print', generalLimiter);
+app.use('/api/print', printRouter);
 app.use('/api/landing-page', generalLimiter);
 app.use('/api/landing-page', landingPageRouter);
 app.use('/api/credits', generalLimiter);

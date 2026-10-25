@@ -420,6 +420,23 @@ export function spineWidthInches(pageCount: number, paper: PaperStock = 'white')
  */
 export const MIN_SPINE_TEXT_PAGES = 100;
 
+/**
+ * A printer's own cover geometry, read from its template for one product and page count. Absent
+ * means KDP's paperback rules: bleed on the outside edges, panels at the trim, spine from paper.
+ */
+export interface WrapLayout {
+  widthIn: number;
+  heightIn: number;
+  /** What lies outside the panels on every edge: bleed, or on a case-bound cover the board wrap. */
+  edgeIn: number;
+  /** One cover panel, front or back. On a hardcover it is larger than the trim (board overhang). */
+  panelWIn: number;
+  panelHIn: number;
+  spineIn: number;
+  /** Each flap of a dust jacket. 0 for a cover. */
+  flapIn: number;
+}
+
 export interface CoverWrapOptions {
   art: Buffer;
   title: string;
@@ -434,6 +451,10 @@ export interface CoverWrapOptions {
   /** One line under the blurb. */
   authorBio?: string;
   volumeLabel?: string;
+  /** The printer's geometry. Without it the wrap is laid out for KDP. */
+  layout?: WrapLayout;
+  /** Dust-jacket flap copy: the front flap carries the description, the back flap the author. */
+  flaps?: { front?: string; back?: string };
 }
 
 export interface CoverWrapResult {
@@ -443,6 +464,40 @@ export interface CoverWrapResult {
   spineIn: number;
   spineCarriesText: boolean;
   dpi: number;
+}
+
+/**
+ * As many whole sentences from the start of `text` as fit in `max` characters; '' when even the
+ * first one does not. Never a cut word.
+ */
+export function leadingSentences(text: string, max: number): string {
+  const sentences = text.trim().replace(/\s+/g, ' ').match(/[^.!?]+[.!?]+(?=\s|$)/g) ?? [];
+  let out = '';
+  for (const s of sentences) {
+    const next = `${out} ${s.trim()}`.trim();
+    if (next.length > max) break;
+    out = next;
+  }
+  return out;
+}
+
+/** Greedy line-fill at one size. Blank lines separate paragraphs, and each paragraph ends with ''. */
+function wrapLines(font: Glyphable, text: string, width: number, size: number): string[] {
+  const lines: string[] = [];
+  const paras = (text || '').split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  for (const p of paras) {
+    let line = '';
+    for (const w of p.split(/\s+/)) {
+      const trial = line ? `${line} ${w}` : w;
+      if (font.getAdvanceWidth(trial, size) > width) {
+        lines.push(line);
+        line = w;
+      } else line = trial;
+    }
+    if (line) lines.push(line);
+    lines.push('');
+  }
+  return lines;
 }
 
 /**
@@ -457,9 +512,17 @@ export async function composeCoverWrap(opts: CoverWrapOptions): Promise<CoverWra
   } = opts;
   if (!art?.length || pageCount <= 0) return null;
   const DPI = 300;
-  const spineIn = spineWidthInches(pageCount, paper);
-  const widthIn = trimWidthIn * 2 + spineIn + BLEED_IN * 2;
-  const heightIn = trimHeightIn + BLEED_IN * 2;
+  const kdpSpine = spineWidthInches(pageCount, paper);
+  const L: WrapLayout = opts.layout ?? {
+    widthIn: trimWidthIn * 2 + kdpSpine + BLEED_IN * 2,
+    heightIn: trimHeightIn + BLEED_IN * 2,
+    edgeIn: BLEED_IN,
+    panelWIn: trimWidthIn,
+    panelHIn: trimHeightIn,
+    spineIn: kdpSpine,
+    flapIn: 0,
+  };
+  const { widthIn, heightIn, spineIn } = L;
   const W = Math.round(widthIn * DPI);
   const H = Math.round(heightIn * DPI);
   const px = (inches: number) => Math.round(inches * DPI);
@@ -474,8 +537,11 @@ export async function composeCoverWrap(opts: CoverWrapOptions): Promise<CoverWra
     const font = await loadFont();
     if (!font) return null;
 
-    const frontLeft = px(BLEED_IN + trimWidthIn + spineIn);
-    const frontW = px(trimWidthIn);
+    // Left to right: edge, back flap, back panel, spine, front panel, front flap, edge.
+    const backLeftIn = L.edgeIn + L.flapIn;
+    const spineLeftIn = backLeftIn + L.panelWIn;
+    const frontLeft = px(spineLeftIn + spineIn);
+    const frontW = px(L.panelWIn);
     // The front of the wrap is the SAME jacket as the ebook cover — title, author and all. Placing
     // the raw art here produced a paperback whose front carried no title, while the ebook of the
     // same book did. Falling back to the art is better than no cover, but it is a fallback.
@@ -485,55 +551,84 @@ export async function composeCoverWrap(opts: CoverWrapOptions): Promise<CoverWra
       author,
     });
     const artBuf = await sharp(jacket ?? art)
-      .resize(frontW, px(trimHeightIn), { fit: 'cover' })
+      .resize(frontW, px(L.panelHIn), { fit: 'cover' })
       .toBuffer();
 
     // Back-cover text, set as glyph outlines for the same reason the front is: no system fonts.
-    const safe = px(SAFE_MARGIN_IN + BLEED_IN);
-    const backW = px(trimWidthIn) - safe * 2;
-    const paras = (opts.blurb || '').split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
-    const lines: string[] = [];
+    const backX = px(backLeftIn + SAFE_MARGIN_IN);
+    const backW = px(L.panelWIn) - px(SAFE_MARGIN_IN + BLEED_IN) * 2;
     const SIZE = 34;
-    for (const p of paras) {
-      const words = p.split(/\s+/);
-      let line = '';
-      for (const w of words) {
-        const trial = line ? `${line} ${w}` : w;
-        if (font.getAdvanceWidth(trial, SIZE) > backW) {
-          lines.push(line);
-          line = w;
-        } else line = trial;
-      }
-      if (line) lines.push(line);
-      lines.push('');
-    }
     // The barcode zone is a hard floor for the text block.
-    const barcodeTop = H - px(BLEED_IN + SAFE_MARGIN_IN + BARCODE_H_IN) - px(0.15);
-    const maxLines = Math.max(0, Math.floor((barcodeTop - px(BLEED_IN + 1.2)) / (SIZE * 1.42)));
+    const barcodeTop = H - px(L.edgeIn + SAFE_MARGIN_IN + BARCODE_H_IN) - px(0.15);
+    // The author line above the barcode: whole sentences only. A fixed character cut printed
+    // "…the Maryland Historical Society brough" on a back cover. A jacket carries the full bio on
+    // its back flap, so its back cover leaves the line out.
+    const bioSize = SIZE * 0.82;
+    const bioFont = newFontInstance() ?? font;
+    let bioLines: string[] = [];
+    // Fewer whole sentences until it fits in four lines; never a line cut off the end.
+    for (let max = L.flapIn > 0 ? 0 : 400; max > 0; ) {
+      const bio = leadingSentences(opts.authorBio ?? '', max);
+      if (!bio) break;
+      const wrapped = wrapLines(bioFont, bio, backW, bioSize).filter(Boolean);
+      if (wrapped.length <= 4) {
+        bioLines = wrapped;
+        break;
+      }
+      max = bio.length - 1;
+    }
+    const bioTop = barcodeTop - bioSize - Math.max(0, bioLines.length - 1) * bioSize * 1.42;
+    // The blurb stops a line above the bio, so the two never overlap however long either is.
+    const blurbFloor = bioLines.length ? bioTop - SIZE * 1.42 * 1.5 : barcodeTop;
+    const lines = wrapLines(font, opts.blurb || '', backW, SIZE);
+    const maxLines = Math.max(0, Math.floor((blurbFloor - px(L.edgeIn + 1.2)) / (SIZE * 1.42)));
     const shown = lines.slice(0, maxLines);
 
     const paths: string[] = [];
     let dropped = 0;
+    const setLine = (f: Glyphable, line: string, x: number, y: number, size: number): void => {
+      const glyphs = lineToPaths(f, line, x, y, size);
+      const expected = [...line].filter((c) => c !== ' ').length;
+      if (glyphs.length < expected) dropped += expected - glyphs.length;
+      paths.push(...glyphs);
+    };
     // Its OWN instance. By this point the shared one has laid out the jacket at 190, 132 and 76pt,
     // and mixing sizes across a single opentype.js instance is what corrupts its variable-font
     // state. The back cover is a different size again, so it starts clean.
     const backFont = newFontInstance() ?? font;
-    let y = px(BLEED_IN + 1.2);
+    let y = px(L.edgeIn + 1.2);
     for (const line of shown) {
-      if (line) {
-        const glyphs = lineToPaths(backFont, line, safe, y, SIZE);
-        const expected = [...line].filter((c) => c !== ' ').length;
-        if (glyphs.length < expected) dropped += expected - glyphs.length;
-        paths.push(...glyphs);
-      }
+      if (line) setLine(backFont, line, backX, y, SIZE);
       y += SIZE * 1.42;
     }
-    if (opts.authorBio?.trim()) {
-      const bio = opts.authorBio.trim().slice(0, 120);
-      const glyphs = lineToPaths(newFontInstance() ?? font, bio, safe, barcodeTop - SIZE, SIZE * 0.82);
-      const expected = [...bio].filter((c) => c !== ' ').length;
-      if (glyphs.length < expected) dropped += expected - glyphs.length;
-      paths.push(...glyphs);
+    let by = bioTop;
+    for (const line of bioLines) {
+      setLine(bioFont, line, backX, by, bioSize);
+      by += bioSize * 1.42;
+    }
+
+    // Dust-jacket flaps. Text that does not fit is cut at a whole line and counted, not squeezed.
+    let flapOverflow = 0;
+    if (L.flapIn > 0) {
+      const FLAP = 30;
+      const flapW = px(L.flapIn - SAFE_MARGIN_IN * 2);
+      const top = px(L.edgeIn + 1.0);
+      const floor = H - px(L.edgeIn + SAFE_MARGIN_IN);
+      const flap = (text: string | undefined, leftIn: number): void => {
+        if (!text?.trim()) return;
+        const f = newFontInstance() ?? font;
+        const all = wrapLines(f, text, flapW, FLAP);
+        const room = Math.max(0, Math.floor((floor - top) / (FLAP * 1.42)));
+        flapOverflow += Math.max(0, all.filter(Boolean).length - all.slice(0, room).filter(Boolean).length);
+        let fy = top;
+        for (const line of all.slice(0, room)) {
+          if (line) setLine(f, line, px(leftIn + SAFE_MARGIN_IN), fy, FLAP);
+          fy += FLAP * 1.42;
+        }
+      };
+      flap(opts.flaps?.back, L.edgeIn);
+      flap(opts.flaps?.front, L.edgeIn + L.flapIn + L.panelWIn * 2 + spineIn);
+      if (flapOverflow) logger.warn({ flapOverflow, title }, 'cover wrap: flap copy cut to fit');
     }
     // A back cover missing half its blurb is worse than one with none: it looks like a printing
     // fault rather than a choice. Refuse, and let the caller fall back.
@@ -544,8 +639,7 @@ export async function composeCoverWrap(opts: CoverWrapOptions): Promise<CoverWra
 
     // Spine type only when the spine is thick enough to carry it.
     const spineCarriesText = pageCount >= MIN_SPINE_TEXT_PAGES;
-    const spineX = px(BLEED_IN + trimWidthIn);
-    const spineCentre = spineX + px(spineIn) / 2;
+    const spineCentre = px(spineLeftIn) + px(spineIn) / 2;
     let spineSvg = '';
     if (spineCarriesText) {
       // Title, volume, then author — the order a reader scans a shelf in.
@@ -576,7 +670,7 @@ export async function composeCoverWrap(opts: CoverWrapOptions): Promise<CoverWra
       create: { width: W, height: H, channels: 3, background: BG },
     })
       .composite([
-        { input: artBuf, top: px(BLEED_IN), left: frontLeft },
+        { input: artBuf, top: px(L.edgeIn), left: frontLeft },
         { input: overlay, top: 0, left: 0 },
       ])
       .png()
