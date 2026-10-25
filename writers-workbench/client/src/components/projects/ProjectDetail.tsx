@@ -684,7 +684,8 @@ function OutlineTab({ outline, storyArc, projectId, projectTitle, genreSlug, use
   const [dialogConfig, setDialogConfig] = useState<{ title: string; description: string; sendLabel: string; buildCommand: (notes: string) => string; invalidate: ReadonlyArray<readonly unknown[]> } | null>(null);
   // Queue heavy generation (chapter outline / write / rewrite) so the click returns immediately and
   // the UI is freed to fan out other jobs; results refetch when each engine job completes.
-  const jobQueue = useEngineJobQueue(userId);
+  // Scoped to the project: the keys here are chapter numbers, which repeat across books.
+  const jobQueue = useEngineJobQueue(userId, projectId);
 
   if (!outline?.chapters?.length) {
     return <EmptyState message="No outline yet. Use the chat or Eve to brainstorm one." />;
@@ -1170,7 +1171,7 @@ function ChaptersTab({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogConfig, setDialogConfig] = useState<{ title: string; description: string; sendLabel: string; buildCommand: (notes: string) => string; invalidate: ReadonlyArray<readonly unknown[]> } | null>(null);
   // Queue chapter rewrites so the click returns immediately; results refetch when the job completes.
-  const jobQueue = useEngineJobQueue(userId);
+  const jobQueue = useEngineJobQueue(userId, projectId);
   // Per-chapter artwork generation → generated_images_v2 (image_type=chapter_art, associated with the
   // project so it appears in the Art tab). Reuses the proven /api/images pipeline.
   const artGen = useImageGenerator();
