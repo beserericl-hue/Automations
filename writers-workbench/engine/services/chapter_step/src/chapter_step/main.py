@@ -26,6 +26,7 @@ from writer_engine.schemas.chapter import (
     BibleEntry,
     BibleExtract,
     BioOnly,
+    BookEndingDraft,
     BookMarketing,
     ChapterCraftQa,
     DriftFinding,
@@ -33,9 +34,11 @@ from writer_engine.schemas.chapter import (
     DriftScanResult,
     GenreEval,
     RevisedMarketing,
+    SeriesDescription,
+    SeriesEndingJudgement,
+    SeriesTitles,
     SubChapterBrief,
     SubChapterPlan,
-    VolumeEndingJudgement,
     WriteChapterRequest,
     WriteChapterResponse,
 )
@@ -4119,46 +4122,58 @@ VOLUME_ENDING_TAIL_WORDS = 1200
 
 
 def _build_volume_ending_system() -> str:
-    """The reviewer that decides whether a chapter can END A VOLUME."""
+    """The reviewer that decides whether a chapter can END ONE BOOK OF A SERIES."""
     return (
-        "You are deciding whether a chapter can be the LAST CHAPTER OF A PRINTED VOLUME in a "
-        "multi-volume novel. The reader will close the book here and must choose whether to buy the "
-        "next one.\n\n"
-        "This is NOT the question 'is this a good chapter'. A chapter can be the best in the book and "
-        "the worst possible place to stop, because it finishes things. Judge only the ending.\n\n"
-        "SCORE HIGH (0.8-1.0) when the closing pages leave a reader unable to stop: a question asked "
-        "and not answered, a reversal whose cost has not yet been paid, a decision taken but not "
-        "acted on, someone arriving, a threat already in motion, a discovery that reframes what came "
-        "before.\n"
-        "SCORE LOW (0.0-0.3) when the closing pages tie off: a resolution, a summary, a farewell, a "
-        "character at peace, a time-skip that releases tension, any sentence that functions as 'and "
-        "so it was finished'.\n"
-        "MIDDLE (0.4-0.7) for an ending that is merely a stopping place — nothing resolved, but "
-        "nothing pulling either.\n\n"
-        "Set `resolves` true when the passage ties things off, even if it is otherwise strong — that "
-        "is the signal that this is the wrong place to break a volume.\n"
-        "`unresolved` names in ONE sentence what is left hanging, or is empty if nothing is.\n"
-        "`reason` is one sentence on why it does or does not work as an ending.\n\n"
-        "Reply with strict JSON matching VolumeEndingJudgement "
-        "{cliffhanger, unresolved, reason, resolves}."
+        "You are deciding whether a chapter can be the LAST CHAPTER OF ONE BOOK IN A SERIES. Each "
+        "book is sold on its own: the reader closes it here and decides whether to buy the next "
+        "one.\n\n"
+        "This is NOT the question 'is this a good chapter'. Judge only how the book would END here.\n\n"
+        "A series book has to do TWO things at its end, and you score them separately:\n"
+        "`closes` (0-1): does the ending SETTLE the question or conflict this book has been driving "
+        "towards: a decision made AND acted on, a discovery whose meaning lands, a confrontation "
+        "that reaches its outcome, a relationship that turns. High when a reader would say 'that "
+        "story is told'. Low when the main thread is left mid-air.\n"
+        "`opens` (0-1): does it OPEN or sharpen a LARGER question that only the next book can "
+        "answer: a consequence now unavoidable, a new truth that changes what the whole series is "
+        "about, a cost still to be paid, a threat or a promise that reaches past this book. High "
+        "when the reader closes the book wanting the next one, not wanting the missing pages of "
+        "this one.\n\n"
+        "Set `mid_scene` true when the pages stop INSIDE a scene with its action suspended: a box "
+        "on the table not yet opened, a sentence of dialogue not yet answered, men already loading "
+        "their guns. That is a cut, not an ending, and it reads to a buyer as a book with its last "
+        "pages torn out. An ending can be open without being mid-scene.\n\n"
+        "`resolved`: ONE sentence, what this ending settles (empty if nothing).\n"
+        "`carried`: ONE sentence, the question the reader takes into the next book (empty if none).\n"
+        "`reason`: ONE sentence on why it does or does not work as the end of a series book.\n\n"
+        "Reply with strict JSON matching SeriesEndingJudgement "
+        "{closes, opens, mid_scene, resolved, carried, reason}."
     )
 
 
-async def _judge_volume_ending(tail: str, chapter_number: int, title: str) -> VolumeEndingJudgement | None:
-    """Judge one candidate ending. None when it could not be scored."""
+async def _judge_volume_ending(
+    tail: str, chapter_number: int, title: str, leading_titles: list[str] | None = None
+) -> SeriesEndingJudgement | None:
+    """Judge one candidate ending. None when it could not be scored.
+
+    `leading_titles` are the chapters before it, so the judge can tell what this book has been
+    building towards from more than its last pages.
+    """
     from writer_engine.config import get_settings
 
     if not tail.strip():
         return None
     router = get_router(service=STEP_NAME)
+    context = ""
+    if leading_titles:
+        context = "The chapters leading up to it:\n" + "\n".join(f"- {t}" for t in leading_titles) + "\n\n"
     try:
         judgement, _resp = await complete_structured(
             router,
             provider="anthropic",
             model=get_settings().model_default,
             system=_build_volume_ending_system(),
-            prompt=(f"CHAPTER {chapter_number} — {title}\n\nThese are its CLOSING pages:\n\n{tail}"),
-            schema=VolumeEndingJudgement,
+            prompt=(f"{context}CHAPTER {chapter_number} — {title}\n\nThese are its CLOSING pages:\n\n{tail}"),
+            schema=SeriesEndingJudgement,
             max_tokens=1024,
         )
         return judgement
@@ -4167,6 +4182,16 @@ async def _judge_volume_ending(tail: str, chapter_number: int, title: str) -> Vo
     except ValueError as exc:
         logger.warning("volume.ending_unparseable", chapter=chapter_number, error=str(exc)[:200])
         return None
+
+
+def _apply_ending_verdict(info: Any, verdict: SeriesEndingJudgement) -> None:
+    """Score a chapter as the end of a series book, and keep the judge's words for the author."""
+    from writer_engine.volumes import series_ending_score
+
+    info.judged = series_ending_score(verdict.closes, verdict.opens, verdict.mid_scene)
+    info.judged_reason = verdict.reason
+    info.resolves = verdict.resolved
+    info.carries = verdict.carried
 
 
 async def _op_plan_volumes(payload: dict) -> dict:
@@ -4241,13 +4266,12 @@ async def _op_plan_volumes(payload: dict) -> dict:
         async def judge_one(idx: int) -> None:
             nonlocal judged
             info = chapters[idx]
+            leading = [f"{c.number}. {c.title}" for c in chapters[max(0, idx - 15) : idx]]
             async with sem:
-                verdict = await _judge_volume_ending(info.tail, info.number, info.title)
+                verdict = await _judge_volume_ending(info.tail, info.number, info.title, leading)
             if verdict is None:
                 return
-            # A chapter that ties things off is a bad break however strong it reads.
-            info.cliffhanger = min(verdict.cliffhanger, 0.25) if verdict.resolves else verdict.cliffhanger
-            info.cliffhanger_reason = verdict.reason or verdict.unresolved
+            _apply_ending_verdict(info, verdict)
             judged += 1
 
         await asyncio.gather(*[judge_one(i) for i in candidates])
@@ -4722,6 +4746,337 @@ async def _op_marketing(payload: dict) -> dict:
 HUMANIZE_PASSAGE_MAX_WORDS = 1500
 
 
+# ----------------------------------------------------------------------------------------------
+# Series: one manuscript sold as several books, each with its own title and its own ending
+# ----------------------------------------------------------------------------------------------
+
+SERIES_TITLE_MAX_CHARS = 60
+SERIES_SAMPLE_CHARS = 3500
+"""How much of a book's opening and close the title and description writers read."""
+
+BOOK_ENDING_NEXT_OPENING_CHARS = 6000
+BOOK_ENDING_MIN_WORDS = 300
+BOOK_ENDING_MAX_WORDS = 1800
+
+
+_CURLY_QUOTES = str.maketrans({0x2018: "'", 0x2019: "'", 0x201C: '"', 0x201D: '"'})
+
+
+def _norm_text(s: str) -> str:
+    """Lower-case, straight quotes, single spaces: how a verbatim quote is compared."""
+    s = s.translate(_CURLY_QUOTES)
+    return " ".join(s.split()).lower()
+
+
+def _new_names(text: str, corpus: str) -> list[str]:
+    """Proper names in `text` that never occur in `corpus`. Dates are not names."""
+    from writer_engine.humanize import extract_protected_terms
+
+    return [t for t in extract_protected_terms(text) if not any(ch.isdigit() for ch in t) and t not in corpus]
+
+
+async def _project_chapter_rows(project_id: str) -> list[dict]:
+    """Every chapter with text, in order, paged past PostgREST's 1000-row cap."""
+    from writer_engine.supabase.client import get_supabase_admin
+
+    client = await get_supabase_admin()
+    rows: list[dict] = []
+    page = 0
+    while True:
+        r = await (
+            client.table("published_content_v2")
+            .select("id,chapter_number,title,content_text")
+            .eq("project_id", project_id)
+            .eq("content_type", "chapter")
+            .is_("deleted_at", None)
+            .order("chapter_number")
+            .range(page * 1000, page * 1000 + 999)
+            .execute()
+        )
+        batch = getattr(r, "data", None) or []
+        rows.extend(batch)
+        if len(batch) < 1000:
+            break
+        page += 1
+    return [x for x in rows if str(x.get("content_text") or "").strip()]
+
+
+def _rows_of_book(rows: list[dict], book: dict) -> list[dict]:
+    lo = int(book.get("first_chapter", 0))
+    hi = int(book.get("last_chapter", 10**9))
+    return [x for x in rows if lo <= _coerce_chapter_number(x.get("chapter_number"), -1) <= hi]
+
+
+def _book_sample(rows: list[dict]) -> str:
+    """The chapter list, the opening pages and the closing pages of one book."""
+    titles = "\n".join(f"- {x.get('chapter_number')}. {x.get('title')}" for x in rows)
+    opening = str(rows[0].get("content_text") or "")[:SERIES_SAMPLE_CHARS]
+    closing = str(rows[-1].get("content_text") or "")[-SERIES_SAMPLE_CHARS:]
+    return f"CHAPTERS:\n{titles}\n\nOPENING PAGES:\n{opening}\n\nCLOSING PAGES:\n{closing}"
+
+
+async def _op_series_titles(payload: dict) -> dict:
+    """Suggest a title for each book of a series, three candidates each, from the books themselves.
+
+    Every candidate names the verbatim phrase it grew from, and a candidate whose phrase is not in
+    that book is dropped: a title that is not about this book is the one thing worse than a plain
+    "Book Two".
+    """
+    from writer_engine.config import get_settings
+
+    project_id = str(payload.get("project_id") or "")
+    books = [b for b in (payload.get("books") or []) if isinstance(b, dict)]
+    series_name = str(payload.get("series_name") or "").strip()
+    if not project_id or not books:
+        return {"ok": False, "reason": "project_id and books required"}
+    rows = await _project_chapter_rows(project_id)
+    texts: dict[int, str] = {}
+    parts: list[str] = []
+    for b in books:
+        idx = int(b.get("index", 0))
+        brows = _rows_of_book(rows, b)
+        if not brows:
+            continue
+        texts[idx] = _norm_text("\n".join(str(x.get("content_text") or "") for x in brows))
+        blurb = str(b.get("blurb") or "").strip()
+        parts.append(
+            f"=== BOOK {idx} ===\n{_book_sample(brows)}"
+            + (f"\n\nTHIS BOOK'S DESCRIPTION:\n{blurb}" if blurb else "")
+        )
+    if not parts:
+        return {"ok": False, "reason": "no chapters in those books"}
+
+    system = (
+        "You title the books of a novel series. Each book is sold on its own shelf, so each needs "
+        "its own title: specific to that book's story, memorable, and of a piece with the others "
+        "as a set.\n\n"
+        f"The series is called {series_name or '(unnamed)'}. A book title must not BE the series "
+        "name, and must not use 'Book', 'Volume' or a number.\n"
+        f"Each title is at most {SERIES_TITLE_MAX_CHARS} characters, with no subtitle and no colon.\n"
+        "Give THREE candidates per book. For each, `phrase` is the words, copied EXACTLY from that "
+        "book's supplied text, that the title grew from (3 to 15 words). A title with no phrase "
+        "from its own book will be discarded.\n"
+        "`why` is one sentence on what the title promises the reader.\n\n"
+        "Reply with strict JSON matching SeriesTitles {books: [{index, candidates: [{title, phrase, why}]}]}."
+    )
+    router = get_router(service=STEP_NAME)
+    try:
+        result, _resp = await complete_structured(
+            router,
+            provider="anthropic",
+            model=get_settings().model_default,
+            system=system,
+            prompt="\n\n".join(parts),
+            schema=SeriesTitles,
+            max_tokens=4096,
+        )
+    except ProviderNotRegistered:
+        return {"ok": False, "reason": "no provider"}
+    except ValueError as exc:
+        return {"ok": False, "reason": f"unreadable answer: {str(exc)[:120]}"}
+
+    out: list[dict] = []
+    dropped = 0
+    seen: set[str] = set()
+    for book in result.books:
+        corpus = texts.get(book.index)
+        if corpus is None:
+            continue
+        keep: list[dict] = []
+        for c in book.candidates:
+            title = _strip_em_dashes(" ".join(c.title.split())).strip(" .")
+            key = title.lower()
+            ok = (
+                bool(title)
+                and len(title) <= SERIES_TITLE_MAX_CHARS
+                and ":" not in title
+                and key != series_name.lower()
+                and key not in seen
+                and not re.search(r"\b(book|volume)\b|\d", key)
+                and len(c.phrase.split()) >= 3
+                and _norm_text(c.phrase) in corpus
+            )
+            if not ok:
+                dropped += 1
+                continue
+            seen.add(key)
+            keep.append({"title": title, "phrase": c.phrase.strip(), "why": c.why.strip()})
+        out.append({"index": book.index, "candidates": keep})
+    return {"ok": True, "books": out, "dropped": dropped}
+
+
+async def _op_series_description(payload: dict) -> dict:
+    """The series pitch, from the books' own titles and copy, with book one as the way in.
+
+    Names are checked: any proper name in the pitch that appears in none of the inputs is sent back
+    once to be removed, and a pitch that still carries one is not returned.
+    """
+    from writer_engine.config import get_settings
+
+    series_name = str(payload.get("series_name") or "").strip()
+    books = [b for b in (payload.get("books") or []) if isinstance(b, dict)]
+    if not series_name or not books:
+        return {"ok": False, "reason": "series_name and books required"}
+    lines: list[str] = []
+    for b in books:
+        lines.append(
+            f"BOOK {b.get('index')}: {b.get('title') or '(untitled)'}\n"
+            f"Hook: {b.get('hook') or ''}\nDescription: {b.get('blurb') or ''}"
+        )
+    source = f"SERIES: {series_name}\n\n" + "\n\n".join(lines)
+    system = (
+        "You write the description of a fiction SERIES for its landing pages and ads: what the "
+        "series is about across all its books, and why a reader should start with book one.\n"
+        "120 to 180 words, then a one-line `tagline` of at most 15 words.\n"
+        "Use only what the supplied descriptions say. Name no person, place or thing that is not "
+        "named in them. Do not reveal how any book ends. No em dashes.\n"
+        "Reply with strict JSON matching SeriesDescription {description, tagline}."
+    )
+    router = get_router(service=STEP_NAME)
+    prompt = source
+    for attempt in range(2):
+        try:
+            result, _resp = await complete_structured(
+                router,
+                provider="anthropic",
+                model=get_settings().model_default,
+                system=system,
+                prompt=prompt,
+                schema=SeriesDescription,
+                max_tokens=2048,
+            )
+        except ProviderNotRegistered:
+            return {"ok": False, "reason": "no provider"}
+        except ValueError as exc:
+            return {"ok": False, "reason": f"unreadable answer: {str(exc)[:120]}"}
+        description = _strip_em_dashes(result.description.strip())
+        tagline = _strip_em_dashes(result.tagline.strip())
+        unknown = _new_names(f"{description}\n{tagline}", source)
+        if not unknown:
+            return {
+                "ok": True,
+                "description": description,
+                "tagline": tagline,
+                "words": len(description.split()),
+            }
+        logger.info("series.description_unknown_names", names=unknown, attempt=attempt)
+        prompt = (
+            f"{source}\n\nYour previous draft named {', '.join(unknown)}, which the descriptions do "
+            "not. Write it again without them.\n\nPREVIOUS DRAFT:\n" + description
+        )
+    return {
+        "ok": False,
+        "reason": f"the pitch kept naming things the books' copy does not: {', '.join(unknown)}",
+    }
+
+
+async def _op_draft_book_ending(payload: dict) -> dict:
+    """Draft a revised close for one book of a series: settle this book, open the next.
+
+    For a book whose best available break does not land. The draft names the verbatim sentence it
+    replaces from, which is checked against the chapter, and any character or place it names that
+    is in neither this book nor the opening of the next is reported. Nothing is written: the author
+    reads it beside the current ending and decides.
+    """
+    from writer_engine.config import get_settings
+
+    project_id = str(payload.get("project_id") or "")
+    book = payload.get("book") if isinstance(payload.get("book"), dict) else None
+    if not project_id or not book:
+        return {"ok": False, "reason": "project_id and book required"}
+    rows = await _project_chapter_rows(project_id)
+    brows = _rows_of_book(rows, book)
+    if not brows:
+        return {"ok": False, "reason": "no chapters in that book"}
+    last = brows[-1]
+    chapter = str(last.get("content_text") or "")
+    nxt = payload.get("next_book") if isinstance(payload.get("next_book"), dict) else None
+    nrows = _rows_of_book(rows, nxt) if nxt else []
+    next_opening = str(nrows[0].get("content_text") or "")[:BOOK_ENDING_NEXT_OPENING_CHARS] if nrows else ""
+    titles = "\n".join(f"- {x.get('chapter_number')}. {x.get('title')}" for x in brows)
+    judge_note = ""
+    if payload.get("carries") or payload.get("resolves"):
+        judge_note = (
+            f"\nA reviewer read the current ending as settling: {payload.get('resolves') or 'nothing'}; "
+            f"and carrying forward: {payload.get('carries') or 'nothing'}.\n"
+        )
+    system = (
+        "You are revising the CLOSE of one book in a novel series, in the author's own voice. The "
+        "book must END: the question this book has driven towards is settled, a decision is made "
+        "and acted on, and the reader feels the story of this book is told. And it must OPEN: the "
+        "last pages turn the reader towards a larger question that only the next book answers. "
+        "Not a cliffhanger. Never stop in the middle of a scene.\n\n"
+        "Rules:\n"
+        "- `replace_from` is ONE sentence copied EXACTLY from the final chapter, in its last third. "
+        "Your `new_ending` replaces that sentence and everything after it.\n"
+        f"- `new_ending` is {BOOK_ENDING_MIN_WORDS} to {BOOK_ENDING_MAX_WORDS} words of finished prose, "
+        "matching the chapter's style, tense and point of view.\n"
+        "- Introduce no new named characters or places. Use only people and places already in the "
+        "book or in the next book's opening.\n"
+        "- Do not contradict anything the next book's opening establishes.\n"
+        "- No em dashes.\n"
+        "- `resolved` and `carried`: one sentence each, what the new ending settles and what it hands "
+        "the next book.\n"
+        "Reply with strict JSON matching BookEndingDraft {replace_from, new_ending, resolved, carried}."
+    )
+    prompt = (
+        f"THIS BOOK'S CHAPTERS:\n{titles}\n{judge_note}\n"
+        f"THE FINAL CHAPTER ({last.get('chapter_number')}. {last.get('title')}), IN FULL:\n{chapter}\n\n"
+        + (f"THE OPENING OF THE NEXT BOOK:\n{next_opening}\n" if next_opening else "This is the last book.\n")
+    )
+    router = get_router(service=STEP_NAME)
+    try:
+        draft, _resp = await complete_structured(
+            router,
+            provider="anthropic",
+            model=get_settings().model_default,
+            system=system,
+            prompt=prompt,
+            schema=BookEndingDraft,
+            max_tokens=8192,
+        )
+    except ProviderNotRegistered:
+        return {"ok": False, "reason": "no provider"}
+    except ValueError as exc:
+        return {"ok": False, "reason": f"unreadable answer: {str(exc)[:120]}"}
+
+    # Where the new ending starts, found in the chapter itself. A splice point the model paraphrased
+    # would replace from a sentence that is not there.
+    anchor = draft.replace_from.strip()
+    offset = chapter.find(anchor) if anchor else -1
+    if offset < 0:
+        return {
+            "ok": False,
+            "reason": "the draft's starting sentence is not in the chapter, so there is nowhere to put it",
+        }
+    if offset < len(chapter) * 0.5:
+        return {
+            "ok": False,
+            "reason": "the draft would replace more than half the chapter, which is a rewrite, not an ending",
+        }
+    new_ending = _strip_em_dashes(draft.new_ending.strip())
+    words = len(new_ending.split())
+    if words < BOOK_ENDING_MIN_WORDS // 2:
+        return {"ok": False, "reason": f"the draft was {words} words, too short to be an ending"}
+    corpus = "\n".join(str(x.get("content_text") or "") for x in brows) + "\n" + next_opening
+    return {
+        "ok": True,
+        "content_id": last.get("id"),
+        "chapter_number": last.get("chapter_number"),
+        "chapter_title": last.get("title"),
+        "replace_from": anchor,
+        "offset": offset,
+        "replaced_words": len(chapter[offset:].split()),
+        "current_ending": chapter[offset:],
+        "new_ending": new_ending,
+        "words": words,
+        "resolved": draft.resolved.strip(),
+        "carried": draft.carried.strip(),
+        # Shown to the author, not silently dropped: a new name might be fine, and might be a slip.
+        "new_names": _new_names(new_ending, corpus),
+    }
+
+
 async def _op_humanize_passage(payload: dict) -> dict:
     """Run one selected passage through StealthGPT, for the editor's Humanizer tab.
 
@@ -4761,6 +5116,9 @@ OPS = {
     "plan": _op_plan,
     "plan-volumes": _op_plan_volumes,
     "marketing": _op_marketing,
+    "series-titles": _op_series_titles,
+    "series-description": _op_series_description,
+    "draft-book-ending": _op_draft_book_ending,
     "author-bio": _op_author_bio,
     "rewrite": _op_rewrite,
     "repair": _op_repair,

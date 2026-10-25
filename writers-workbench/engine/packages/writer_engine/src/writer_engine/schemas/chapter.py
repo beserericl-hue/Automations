@@ -434,26 +434,29 @@ class ResearchPlan(BaseModel):
         return data
 
 
-class VolumeEndingJudgement(BaseModel):
-    """How well a chapter works as the LAST chapter of a printed volume.
+class SeriesEndingJudgement(BaseModel):
+    """How well a chapter works as the LAST chapter of one book in a series.
 
-    Not "how dramatic is this chapter" — those are different questions, and conflating them is how a
-    trilogy's first volume ends on its most spectacular scene and still leaves the reader with no
-    reason to buy the second. A chapter that resolves everything can be the best in the book and the
-    worst possible place to stop.
+    Two separate questions, because a series book has to do both: settle the story THIS book
+    promised, and hand the reader a larger question that only the next book answers. A cliffhanger
+    does the second and not the first — the reader closes the book feeling it was cut short, which
+    is what turns a series into one bad review per volume. A neat resolution does the first and not
+    the second, and gives no reason to buy on.
     """
 
     model_config = ConfigDict(extra="ignore")
 
-    # 0-1: would a reader, closing the book here, need the next volume?
-    cliffhanger: float = Field(default=0.5, ge=0.0, le=1.0)
-    # What is left open. One sentence. Empty when nothing is.
-    unresolved: str = ""
-    # Why it does or does not work as an ending. One sentence.
+    # 0-1: does the ending settle the question or conflict this book has been driving towards?
+    closes: float = Field(default=0.5, ge=0.0, le=1.0)
+    # 0-1: does it open or sharpen a larger question that carries into the next book?
+    opens: float = Field(default=0.5, ge=0.0, le=1.0)
+    # True when the pages stop inside a scene with its action suspended (a cut, not an ending).
+    mid_scene: bool = False
+    # One sentence each: what this ending settles; the question the reader carries forward.
+    resolved: str = ""
+    carried: str = ""
+    # Why it does or does not work as the end of a series book. One sentence.
     reason: str = ""
-    # True when the chapter ties things off — the signal that this is a BAD volume break even if the
-    # chapter itself is strong.
-    resolves: bool = False
 
 
 class BookMarketing(BaseModel):
@@ -548,3 +551,49 @@ class RevisedMarketing(BookMarketing):
 
     changed: list[str] = Field(default_factory=list)
     note: str = ""
+
+
+class SeriesTitleCandidate(BaseModel):
+    """One suggested title for a book in a series, tied to the words in the book it came from."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    title: str = ""
+    # Verbatim words from the supplied text the title grew from. Checked in code: a title whose
+    # phrase is not in the book is a title about some other book.
+    phrase: str = ""
+    why: str = ""
+
+
+class SeriesTitleBook(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    index: int = 0
+    candidates: list[SeriesTitleCandidate] = Field(default_factory=list)
+
+
+class SeriesTitles(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    books: list[SeriesTitleBook] = Field(default_factory=list)
+
+
+class SeriesDescription(BaseModel):
+    """The series-level pitch: what the whole series is, with book one as the way in."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    description: str = ""
+    tagline: str = ""
+
+
+class BookEndingDraft(BaseModel):
+    """A revised close for one book of a series, for the author to accept or not."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    # A sentence copied verbatim from the chapter: the new ending replaces everything from it on.
+    replace_from: str = ""
+    new_ending: str = ""
+    resolved: str = ""
+    carried: str = ""

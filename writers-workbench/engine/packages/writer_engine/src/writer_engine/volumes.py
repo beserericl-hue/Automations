@@ -24,6 +24,7 @@ shortlist; it is not enough to choose.
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import asdict, dataclass, field
 from typing import Any
@@ -98,6 +99,23 @@ _CLOSED_SIGNALS = (
 )
 
 
+MID_SCENE_CAP = 0.3
+"""The most a mid-scene stop can score. It is a cut, not an ending, and a book that stops in the
+middle of a moment reads to its buyer as a book with its last pages missing."""
+
+
+def series_ending_score(closes: float, opens: float, mid_scene: bool) -> float:
+    """How well an ending works as the end of ONE BOOK IN A SERIES.
+
+    Both halves are required, so they are multiplied rather than added: an ending that settles the
+    book but opens nothing gives no reason to buy the next one, and an ending that opens everything
+    but settles nothing is a cliffhanger, which reads as the book being cut short. The geometric
+    mean keeps a 0.9/0.9 ending at 0.9 and puts a 1.0/0.1 ending at about 0.3.
+    """
+    score = math.sqrt(max(0.0, min(1.0, closes)) * max(0.0, min(1.0, opens)))
+    return min(score, MID_SCENE_CAP) if mid_scene else score
+
+
 @dataclass
 class ChapterInfo:
     """What the planner needs to know about one chapter."""
@@ -107,15 +125,18 @@ class ChapterInfo:
     words: int
     tail: str = ""  # the closing ~1,200 words, for judging the ending
     story_turn_density: float | None = None
-    # Filled by the LLM pass when it runs.
-    cliffhanger: float | None = None
-    cliffhanger_reason: str = ""
+    # Filled by the LLM pass when it runs: how well this chapter ENDS A BOOK IN A SERIES.
+    judged: float | None = None
+    judged_reason: str = ""
+    # What the ending settles, and the question it hands the reader for the next book.
+    resolves: str = ""
+    carries: str = ""
 
     @property
     def ending_score(self) -> float:
         """0-1. The LLM judgement when there is one, otherwise the cheap estimate."""
-        if self.cliffhanger is not None:
-            return self.cliffhanger
+        if self.judged is not None:
+            return self.judged
         return self.heuristic_ending_score
 
     @property
@@ -148,6 +169,8 @@ class Volume:
     ending_score: float
     ending_title: str = ""
     ending_reason: str = ""
+    ending_resolves: str = ""
+    ending_carries: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -241,7 +264,9 @@ def plan_volumes(
                 estimated_pages=total_pages,
                 ending_score=chapters[-1].ending_score,
                 ending_title=chapters[-1].title,
-                ending_reason=chapters[-1].cliffhanger_reason,
+                ending_reason=chapters[-1].judged_reason,
+                ending_resolves=chapters[-1].resolves,
+                ending_carries=chapters[-1].carries,
             )
         ]
         if total_pages > KDP_MAX_PAGES:
@@ -313,7 +338,9 @@ def plan_volumes(
                 estimated_pages=pages_for(i, j),
                 ending_score=round(last.ending_score, 3),
                 ending_title=last.title,
-                ending_reason=last.cliffhanger_reason,
+                ending_reason=last.judged_reason,
+                ending_resolves=last.resolves,
+                ending_carries=last.carries,
             )
         )
 

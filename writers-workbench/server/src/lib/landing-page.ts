@@ -40,7 +40,10 @@ export interface LandingCopy {
   hook: string;
   blurb: string;
   backCover: string;
-  volumes: { index: number; hook: string }[];
+  /** Each book of the series, with its own title once the author has chosen one. */
+  volumes: { index: number; hook: string; title?: string }[];
+  /** The series pitch, when the book is a series and the pitch has been written. */
+  series?: { name: string; description: string; tagline?: string };
   bio: string;
   facts: SourcedFact[];
   images: PageImage[];
@@ -386,7 +389,11 @@ export function verbatimBlocks(copy: LandingCopy): { label: string; text: string
   ];
   paragraphs(copy.blurb).forEach((text, i) => blocks.push({ label: `blurb paragraph ${i + 1}`, text }));
   copy.facts.forEach((f, i) => blocks.push({ label: `history fact ${i + 1}`, text: f.text }));
-  for (const v of copy.volumes) blocks.push({ label: `volume ${v.index} hook`, text: v.hook });
+  paragraphs(copy.series?.description ?? '').forEach((text, i) => blocks.push({ label: `series description paragraph ${i + 1}`, text }));
+  for (const v of copy.volumes) {
+    if (v.title) blocks.push({ label: `book ${v.index} title`, text: v.title });
+    blocks.push({ label: `${copy.series ? 'book' : 'volume'} ${v.index} hook`, text: v.hook });
+  }
   blocks.push({ label: 'form lede', text: copy.form.lede });
   paragraphs(copy.bio).forEach((text, i) => blocks.push({ label: `author bio paragraph ${i + 1}`, text }));
   paragraphs(copy.backCover).forEach((text, i) => blocks.push({ label: `closing paragraph ${i + 1}`, text }));
@@ -424,9 +431,13 @@ export const CTA_LABEL = 'Reserve your copy';
 
 const numeral = (n: number) => ['I', 'II', 'III', 'IV', 'V', 'VI'][n - 1] ?? String(n);
 
-/** "The Ossuary in three volumes". Not "The <title> volumes": most titles already start with "The". */
-export function lineupHeading(copy: Pick<LandingCopy, 'title' | 'volumes'>): string {
+/**
+ * "The Ossuary in three volumes", or for a series "The Ossuary series". Never "The The Ossuary":
+ * most titles already start with "The".
+ */
+export function lineupHeading(copy: Pick<LandingCopy, 'title' | 'volumes'> & { series?: LandingCopy['series'] }): string {
   const n = copy.volumes.length;
+  if (copy.series?.name) return /^the\s/i.test(copy.series.name) ? `${copy.series.name} series` : `The ${copy.series.name} series`;
   if (n < 2) return copy.title;
   return `${copy.title} in ${['two', 'three', 'four', 'five', 'six'][n - 2] ?? n} volumes`;
 }
@@ -465,9 +476,13 @@ function promptSection(kind: SectionKind, copy: LandingCopy): { title: string; l
         title: lineupHeading(copy),
         lines: [
           `   Heading: ${lineupHeading(copy)}`,
-          `   One card per volume. Only Volume I has cover art${cover ? ` (${cover.url})` : ''}; show the`,
+          ...(copy.series?.description ? ['   Under the heading, the series description:', verbatim(copy.series.description)] : []),
+          `   One card per ${copy.series ? 'book' : 'volume'}. Only the first has cover art${cover ? ` (${cover.url})` : ''}; show the`,
           '   others as text cards and do not create cover images for them.',
-          ...copy.volumes.flatMap((v) => [`   Volume ${numeral(v.index)}:`, verbatim(v.hook)]),
+          ...copy.volumes.flatMap((v) => [
+            copy.series ? `   Book ${numeral(v.index)}${v.title ? `: ${v.title}` : ''}` : `   Volume ${numeral(v.index)}:`,
+            verbatim(v.hook),
+          ]),
         ],
       };
     case 'offer':
@@ -634,10 +649,14 @@ export function renderPreviewHtml(copy: LandingCopy, plan: SectionPlan[] = planS
     .join('\n  ')}`,
     lineup: `<section>
   <h2>${esc(lineupHeading(copy))}</h2>
+  ${paragraphs(copy.series?.description ?? '').map((t) => `<p>${esc(t)}</p>`).join('\n  ')}
   <div class="volumes">
     ${copy.volumes
       .map(
-        (v) => `<div class="volume">${v.index === 1 && cover ? `<img src="${esc(cover.url)}" alt="${esc(cover.alt)}">` : ''}<h3>Volume ${numeral(v.index)}</h3><p>${esc(v.hook)}</p></div>`,
+        (v) =>
+          `<div class="volume">${v.index === 1 && cover ? `<img src="${esc(cover.url)}" alt="${esc(cover.alt)}">` : ''}<h3>${
+            copy.series ? `Book ${numeral(v.index)}${v.title ? `: ${esc(v.title)}` : ''}` : `Volume ${numeral(v.index)}`
+          }</h3><p>${esc(v.hook)}</p></div>`,
       )
       .join('\n    ')}
   </div>`,
