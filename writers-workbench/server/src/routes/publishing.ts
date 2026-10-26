@@ -30,7 +30,7 @@ import { logger } from '../lib/logger.js';
 import { TRIM_SIZES } from '../lib/print-pdf.js';
 import { PAPER_THICKNESS } from '../lib/cover.js';
 import { searchArchives } from '../lib/image-archives.js';
-import { seriesView } from '../lib/series.js';
+import { bookTitle, seriesName, seriesView } from '../lib/series.js';
 
 export const publishingRouter = Router();
 publishingRouter.use(requireAuth);
@@ -429,6 +429,9 @@ publishingRouter.post(
             total: plan.volume_count ?? plan.volumes.length,
             first_chapter: v.first_chapter,
             last_chapter: v.last_chapter,
+            // A series book is sold under its own title, as one of a series.
+            series_name: seriesName(outline, project.title),
+            book_title: bookTitle(outline, volumeIndex) || undefined,
           };
         }
       }
