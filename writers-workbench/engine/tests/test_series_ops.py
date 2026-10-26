@@ -363,3 +363,5 @@ class TestMarketingGetsTheDatesFromTheRecord:
         system = M._build_marketing_system("ancient-history", "", True)
         assert "A span stays a span" in system and "1935 to 1951" in system
         assert "No dashes of any kind" in system
+        # Book 1's copy sold a Book 3 scene (Winifred at the 1935 dig, chapter 76) taken from the record.
+        assert "a scene from a later book is a promise this one does not keep" in system

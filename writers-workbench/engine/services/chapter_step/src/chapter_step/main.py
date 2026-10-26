@@ -4349,6 +4349,9 @@ def _build_marketing_system(genre: str, volume_note: str, bio_supplied: bool = F
         "- Dates: take every year, decade and span from THE RECORD when one is given. A span stays a "
         "span: an excavation that ran 1935 to 1951 was not 'in the 1930s'. If you are not sure of a "
         "date, leave it out; a wrong date in a listing is read as a wrong book.\n"
+        "- THE RECORD covers the whole series, not this book. Use it only to get a date right. Every "
+        "scene, event and character moment you describe must be in the chapters shown: a scene from "
+        "a later book is a promise this one does not keep.\n"
         "- No dashes of any kind between clauses (no em dash, no en dash, no double hyphen). Where you "
         "would reach for one, use a colon or end the sentence.\n"
         "- `keywords`: EXACTLY 7, and each is a PHRASE a reader would actually type into Amazon — "
@@ -4720,8 +4723,9 @@ def _canon_dates_block(lines: list[str]) -> str:
     if not lines:
         return ""
     return (
-        "THE RECORD (dated events from the story bible — canon: any year, decade or span in the copy "
-        "must agree with these):\n" + "\n".join(lines) + "\n\n"
+        "THE RECORD (dated events from the story bible for the whole series — canon for dates only: "
+        "any year, decade or span in the copy must agree with these, but describe only scenes that "
+        "are in the chapters below):\n" + "\n".join(lines) + "\n\n"
     )
 
 
