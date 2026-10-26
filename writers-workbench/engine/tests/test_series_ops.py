@@ -239,3 +239,34 @@ class TestMarketingKnowsItIsASeriesBook:
 
     def test_without_a_series_it_is_still_a_volume(self) -> None:
         assert M._series_book_note({"index": 2, "total": 3}).startswith("This is VOLUME 2 of 3.")
+
+
+ROSTER = [
+    {
+        "name": "Marcus Tayac",
+        "description": "Piscataway Historic Preservation Officer, drives the repatriation effort.",
+    },
+    {"name": "Sylvia Runningwater", "description": "Dine contract archaeologist and ceramicist."},
+]
+
+
+class TestMarketingKeepsTheCastStraight:
+    def test_catches_a_job_given_to_the_wrong_person(self) -> None:
+        text = "Archaeologist Marcus Tayac has spent years trying to bring the dead home."
+        assert M._role_mismatches(text, ROSTER) == [
+            "Marcus Tayac is called an archaeologist, which the cast list does not say"
+        ]
+
+    def test_catches_an_appositive(self) -> None:
+        assert M._role_mismatches("Marcus Tayac, a museum curator, signs.", ROSTER)
+
+    def test_leaves_correct_roles_and_other_peoples_jobs_alone(self) -> None:
+        text = (
+            "Sylvia Runningwater, a contract archaeologist, maps the bluff while Marcus, the tribe's "
+            "preservation officer, fights the petition."
+        )
+        assert M._role_mismatches(text, ROSTER) == []
+
+    def test_the_cast_reaches_the_copywriter(self) -> None:
+        block = M._cast_block(ROSTER)
+        assert "never give one person another's job" in block and "Marcus Tayac: Piscataway" in block
