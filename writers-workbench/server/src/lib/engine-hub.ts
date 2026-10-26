@@ -35,7 +35,12 @@ async function privateAddresses(host: string): Promise<string[]> {
   let addrs: string[] = [];
   try {
     const { lookup } = await import('node:dns/promises');
-    addrs = [...new Set((await lookup(host, { all: true })).map((a) => a.address))].sort();
+    // One family only. Each replica answers on an IPv4 and an IPv6 address and the engine binds
+    // 0.0.0.0, so an IPv6 pick was refused (21 of 30 calls failed on DEV the first time this shipped).
+    const all = await lookup(host, { all: true });
+    const v4 = all.filter((a) => a.family === 4).map((a) => a.address);
+    const v6 = all.filter((a) => a.family === 6).map((a) => a.address);
+    addrs = [...new Set(v4.length ? v4 : v6)].sort();
   } catch {
     addrs = [];
   }
@@ -66,6 +71,22 @@ export async function engineGatewayTarget(): Promise<string> {
   const ip = addrs[Math.floor(Math.random() * addrs.length)];
   u.hostname = ip.includes(':') ? `[${ip}]` : ip;
   return u.toString().replace(/\/$/, '');
+}
+
+/**
+ * fetch() against the gateway, on a replica picked by engineGatewayTarget. A connection failure on
+ * the picked address is retried once by hostname (the path that existed before spreading), so an
+ * address that stops answering costs a retry, never a failed call.
+ */
+export async function engineFetch(path: string, init?: RequestInit): Promise<Response> {
+  const target = await engineGatewayTarget();
+  try {
+    return await fetch(`${target}${path}`, init);
+  } catch (err) {
+    const base = engineGatewayUrl();
+    if (target === base || (init?.signal && init.signal.aborted)) throw err;
+    return fetch(`${base}${path}`, init);
+  }
 }
 
 /** How many gateway addresses this server can see (0 if the name does not resolve). */
@@ -100,8 +121,7 @@ export async function callEngineHub(args: {
   context?: Record<string, unknown>;
   source?: 'chat' | 'voice';
 }): Promise<HubResponse> {
-  const url = `${await engineGatewayTarget()}/internal/hub`;
-  const resp = await fetch(url, {
+  const resp = await engineFetch('/internal/hub', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-service-secret': serviceSecret() },
     body: JSON.stringify({
@@ -128,8 +148,7 @@ export async function callEngineWriteTool(
   tool: string,
   body: Record<string, unknown>,
 ): Promise<{ job_id?: string; status?: string; [k: string]: unknown }> {
-  const url = `${await engineGatewayTarget()}/internal/write/${encodeURIComponent(tool)}`;
-  const resp = await fetch(url, {
+  const resp = await engineFetch(`/internal/write/${encodeURIComponent(tool)}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-service-secret': serviceSecret() },
     body: JSON.stringify(body),
@@ -207,8 +226,7 @@ export async function callEngineWriteToolSync<T>(
 
 /** Poll an engine async job (queued load-bearing op). */
 export async function getEngineJob(jobId: string): Promise<{ status: string; result?: unknown; error?: string }> {
-  const url = `${await engineGatewayTarget()}/internal/write/jobs/${encodeURIComponent(jobId)}`;
-  const resp = await fetch(url, { headers: { 'x-service-secret': serviceSecret() } });
+  const resp = await engineFetch(`/internal/write/jobs/${encodeURIComponent(jobId)}`, { headers: { 'x-service-secret': serviceSecret() } });
   if (!resp.ok) {
     return { status: 'error', error: `engine job poll ${resp.status}` };
   }
@@ -221,8 +239,7 @@ export async function getEngineJob(jobId: string): Promise<{ status: string; res
  * runs, a running job is cancelled at its next await. Idempotent: a finished job returns aborted:false.
  */
 export async function abortEngineJob(jobId: string): Promise<{ aborted: boolean; error?: string }> {
-  const url = `${await engineGatewayTarget()}/internal/write/jobs/${encodeURIComponent(jobId)}/abort`;
-  const resp = await fetch(url, {
+  const resp = await engineFetch(`/internal/write/jobs/${encodeURIComponent(jobId)}/abort`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-service-secret': serviceSecret() },
   });
@@ -239,7 +256,7 @@ export async function abortEngineJob(jobId: string): Promise<{ aborted: boolean;
  * the whole fleet whichever replica answers. Also reports which gateway replica served the call.
  */
 export async function getEngineFleet(): Promise<{ fleet: Record<string, unknown>; gateway: string | null; gatewayAddresses: number }> {
-  const resp = await fetch(`${await engineGatewayTarget()}/internal/fleet`, {
+  const resp = await engineFetch('/internal/fleet', {
     headers: { 'x-service-secret': serviceSecret() },
     signal: AbortSignal.timeout(15_000),
   });

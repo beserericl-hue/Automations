@@ -360,3 +360,28 @@ def test_resolution_is_cached_and_a_failed_lookup_is_empty() -> None:
     B._cache.clear()
     assert asyncio.run(B.addresses("does-not-exist.invalid", 80)) == []
     assert ("does-not-exist.invalid", 80) in B._cache
+
+
+def test_only_one_address_family_is_picked(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each Railway replica has an IPv4 and an IPv6 address and the engine binds 0.0.0.0: picking
+    the IPv6 one was refused (21 of 30 calls on DEV)."""
+    import socket as _s
+
+    from writer_engine import balancing as B
+
+    B._cache.clear()
+
+    async def fake_getaddrinfo(host: str, port: int, **_k: Any) -> list[Any]:
+        return [
+            (_s.AF_INET6, _s.SOCK_STREAM, 6, "", ("fd12::a", port, 0, 0)),
+            (_s.AF_INET, _s.SOCK_STREAM, 6, "", ("10.0.0.1", port)),
+            (_s.AF_INET6, _s.SOCK_STREAM, 6, "", ("fd12::b", port, 0, 0)),
+            (_s.AF_INET, _s.SOCK_STREAM, 6, "", ("10.0.0.2", port)),
+        ]
+
+    async def go() -> list[str]:
+        loop = asyncio.get_running_loop()
+        monkeypatch.setattr(loop, "getaddrinfo", fake_getaddrinfo)
+        return await B.addresses("svc.railway.internal", 8001)
+
+    assert asyncio.run(go()) == ["10.0.0.1", "10.0.0.2"]

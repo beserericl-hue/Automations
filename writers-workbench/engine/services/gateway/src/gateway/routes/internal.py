@@ -344,17 +344,17 @@ async def _forward(
     # C1: pick a runtime replica ourselves. The private name has no load balancer behind it, so
     # without this every call went to the same replica.
     target = await spread(url)
+    headers = {"x-service-secret": settings.service_shared_secret, "content-type": "application/json"}
     async with httpx.AsyncClient(timeout=timeout_s) as client:
         try:
-            resp = await client.request(
-                method,
-                target,
-                headers={
-                    "x-service-secret": settings.service_shared_secret,
-                    "content-type": "application/json",
-                },
-                json=json,
-            )
+            try:
+                resp = await client.request(method, target, headers=headers, json=json)
+            except httpx.ConnectError:
+                if target == url:
+                    raise
+                # The picked address did not answer: fall back to the name, which is the old path.
+                logger.warning("gateway.spread_connect_failed", target=target[:80])
+                resp = await client.request(method, url, headers=headers, json=json)
         except httpx.HTTPError as exc:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY, detail=f"orchestrator unreachable: {exc}"

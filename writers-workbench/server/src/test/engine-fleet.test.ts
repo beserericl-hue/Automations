@@ -37,14 +37,30 @@ describe('engineGatewayTarget', () => {
   it('picks one of the private name\'s addresses per call, and leaves other URLs alone', async () => {
     vi.resetModules();
     vi.doMock('node:dns/promises', () => ({
-      lookup: async () => [{ address: 'fd12::a', family: 6 }, { address: 'fd12::b', family: 6 }],
+      lookup: async () => [
+        { address: 'fd12::a', family: 6 }, { address: '10.0.0.1', family: 4 },
+        { address: 'fd12::b', family: 6 }, { address: '10.0.0.2', family: 4 },
+      ],
     }));
     vi.stubEnv('ENGINE_GATEWAY_URL', 'http://writer-engine-gateway.railway.internal:8000');
     const hub = await import('../lib/engine-hub.js');
     const seen = new Set<string>();
     for (let i = 0; i < 40; i++) seen.add(await hub.engineGatewayTarget());
-    expect([...seen].sort()).toEqual(['http://[fd12::a]:8000', 'http://[fd12::b]:8000']);
+    // IPv4 only: the engine binds 0.0.0.0, and an IPv6 pick was refused on DEV.
+    expect([...seen].sort()).toEqual(['http://10.0.0.1:8000', 'http://10.0.0.2:8000']);
     expect(await hub.engineGatewayAddressCount()).toBe(2);
+
+    // A picked address that refuses the connection is retried once by hostname.
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (u: string) => {
+      calls.push(u);
+      if (!u.includes('railway.internal')) throw new TypeError('fetch failed');
+      return new Response('{}', { status: 200 });
+    }));
+    const r = await hub.engineFetch('/internal/write/jobs/j1');
+    expect(r.status).toBe(200);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]).toBe('http://writer-engine-gateway.railway.internal:8000/internal/write/jobs/j1');
 
     vi.stubEnv('ENGINE_GATEWAY_URL', 'https://writer-engine-gateway-develop.up.railway.app');
     expect(await hub.engineGatewayTarget()).toBe('https://writer-engine-gateway-develop.up.railway.app');
