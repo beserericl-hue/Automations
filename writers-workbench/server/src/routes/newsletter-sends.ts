@@ -58,7 +58,7 @@ const requireIngestionSecret = requireSharedSecret('X-Ingestion-Secret', 'INGEST
  *               scheduled_send_at: { type: string, format: date-time, nullable: true }
  *               metadata:          { type: object, nullable: true }
  *     responses:
- *       200: { description: Upserted — returns {success, id, scheduled_send_at, status} }
+ *       200: { description: "Upserted — returns {success, id, scheduled_send_at, status}" }
  *       400: { description: Validation or FK failure }
  *       401: { description: Missing or invalid X-Ingestion-Secret }
  *       500: { description: DB error }

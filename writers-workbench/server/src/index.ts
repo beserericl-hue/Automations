@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { logger } from './lib/logger.js';
+import { logger, redactUrl } from './lib/logger.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { healthRouter } from './routes/health.js';
 import { chatRouter } from './routes/chat.js';
@@ -52,12 +52,22 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const app = express();
+// Requests reach the app through two proxies: Railway's edge, then its internal router. Trusting
+// exactly those two makes req.ip the reader's own address (so every rate limit is per person, not
+// per proxy) and req.protocol https. Trusting more would let a client choose its own IP by sending
+// an X-Forwarded-For header.
+app.set('trust proxy', 2);
 const PORT = parseInt(process.env.PORT || '3001', 10);
 
 // Request logging with request ID
 app.use(pinoHttp({
   logger,
   genReqId: (req) => req.headers['x-request-id'] || crypto.randomUUID(),
+  // Headers are redacted by the logger (REDACT_PATHS); the token in a URL's query string is not a
+  // header, so the url is cleaned here.
+  serializers: {
+    req: (req: { url?: string }) => ({ ...req, url: redactUrl(req.url) }),
+  },
   autoLogging: {
     ignore: (req) => req.url === '/api/health',
   },

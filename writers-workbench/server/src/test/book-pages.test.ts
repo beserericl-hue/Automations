@@ -58,6 +58,8 @@ vi.mock('../services/supabase-admin.js', () => ({
 async function withServer<T>(fn: (base: string) => Promise<T>): Promise<T> {
   const { bookPagesRouter } = await import('../routes/book-pages.js');
   const app = express();
+  // As in index.ts: Railway's edge and router are trusted, so req.ip is the client.
+  app.set('trust proxy', 2);
   app.use('/books', bookPagesRouter);
   const server = app.listen(0);
   try {
@@ -71,7 +73,8 @@ function reserve(base: string, fields: Record<string, string>, ip = '203.0.113.1
   return fetch(`${base}/books/the-ossuary/reserve`, {
     method: 'POST',
     redirect: 'manual',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Forwarded-For': ip },
+    // The client as Railway's edge reports it, followed by the edge itself.
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Forwarded-For': `${ip}, 152.233.30.104` },
     body: new URLSearchParams(fields).toString(),
   });
 }
