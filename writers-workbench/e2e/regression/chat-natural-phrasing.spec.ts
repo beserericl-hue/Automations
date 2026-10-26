@@ -4,9 +4,10 @@
  * the intent correctly. This is the class of gap that shipped the orphaned "(fixture)" social post
  * (bug 2026-07-05): the parser only understood the documented phrasing.
  *
- * It asserts the jobType badge the ChatDrawer renders on each queued job (server classification), so
- * it's fast (classification happens on send) and doesn't wait for heavy completion. Sending does
- * dispatch the job — that's intentional: the whole point is exercising the live parse path.
+ * It asserts the jobType badge the ChatDrawer renders (the server's classification). Every request
+ * goes through the real UI and the real server classifier with `dry_run` added, so nothing is
+ * started: before, every E2E run started two social posts, two cover arts, a full newsletter run and
+ * a humanized blog post, and left their drafts and approvals behind on DEV.
  *
  * PASS: each natural prompt shows the correct jobType badge. FAIL: wrong/missing jobType (a parse gap).
  */
@@ -33,6 +34,11 @@ test.describe('Chat natural phrasing → correct router classification', () => {
     await page.addInitScript(() => {
       try { window.localStorage.removeItem('writers-workbench-chat-history'); } catch { /* ignore */ }
     });
+    // Classify, start nothing.
+    await page.route('**/api/chat/proxy', async (route) => {
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      await route.continue({ postData: JSON.stringify({ ...body, dry_run: true }) });
+    });
   });
 
   for (const [prompt, expectedJobType] of CASES) {
@@ -52,6 +58,8 @@ test.describe('Chat natural phrasing → correct router classification', () => {
         .toBeVisible({ timeout: 30_000 });
       // And it must NOT have fallen through to the generic catch-all.
       await expect(page.getByText('chat_generic', { exact: true })).toHaveCount(0);
+      // And nothing was started.
+      await expect(page.getByText('Dry run: nothing was started.', { exact: false })).toBeVisible();
     });
   }
 });

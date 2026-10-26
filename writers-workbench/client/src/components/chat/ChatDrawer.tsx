@@ -352,11 +352,13 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
       } else {
         const payload = data?.data ?? data;
         const assistantContent =
-          payload?.output || payload?.text || payload?.message || JSON.stringify(payload);
+          payload?.output || payload?.text || payload?.message || data?.assistantMessage || JSON.stringify(payload);
         addMessage({
           role: 'assistant',
           content: assistantContent,
           timestamp: new Date().toISOString(),
+          // What the request was understood as, for replies that started nothing too.
+          jobType: data?.classification?.jobType,
         });
       }
     } catch (err) {

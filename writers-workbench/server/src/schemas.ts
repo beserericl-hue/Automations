@@ -14,6 +14,12 @@ export const ExportRequestSchema = z.object({
 export const ChatProxySchema = z.object({
   user_message_request: z.string().min(1, 'Message is required').max(5000, 'Message too long (max 5000 chars)'),
   user_id: z.string().min(1, 'user_id is required'),
+  /**
+   * Classify only: say what the message would start, and start nothing. The E2E suite checks the
+   * router's reading of natural phrasing through the real chat UI; without this every run started
+   * paid jobs (two social posts, two cover arts, a full newsletter run, a humanized blog post).
+   */
+  dry_run: z.boolean().optional(),
 });
 
 export const BrainstormParseSchema = z.object({

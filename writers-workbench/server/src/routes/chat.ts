@@ -76,6 +76,17 @@ chatRouter.post('/proxy', requireAuth, validateBody(ChatProxySchema), async (req
   const classification = classifyJob(message);
   const userId = req.userId!;
 
+  if (req.body.dry_run === true) {
+    res.json({
+      mode: 'sync',
+      dryRun: true,
+      classification: { tier: classification.tier, queue: classification.queue, jobType: classification.jobType },
+      assistantMessage: `Understood as ${classification.jobType}. Dry run: nothing was started.`,
+      creditsCharged: 0,
+    });
+    return;
+  }
+
   // Sprint 8: pre-flight credit check. Cost is dynamic per jobType, sourced
   // from app_config_v2 with hard-coded defaults. Superusers/admins bypass.
   // Users with NO subscription record (e.g. mid-onboarding, test fixtures) are
