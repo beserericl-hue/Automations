@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { supaGet } from '../pages/api';
+import { supaDelete, supaGet, supaRemoveObject } from '../pages/api';
 
 /**
  * Cover-art modal FULL data path: from the project's Outline tab, "Generate Cover Art" opens the
@@ -14,10 +14,24 @@ import { supaGet } from '../pages/api';
  */
 const PROJECT_ID = 'dd10c1c3-e025-4cd7-854d-21db32a2e4da'; // The Last Signal
 const HAS_KEY = !!(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.E2E_SUPA_SERVICE_KEY);
+const PROMPT = 'Lone radio scout silhouetted against a rust-red wasteland sky, vintage vacuum tubes glowing';
 
 test.describe('Cover-art modal (data path)', () => {
   test.skip(!HAS_KEY, 'requires service key');
   test.setTimeout(4 * 60_000);
+
+  // The image this test makes is a real one in a real project's gallery. Without this, every run left
+  // another copy in The Last Signal's Art tab (27 of them by 2026-10-26).
+  test.afterAll(async () => {
+    const made = await supaGet<{ id: string; storage_path: string; thumbnail_path: string | null }>(
+      'generated_images_v2',
+      `project_id=eq.${PROJECT_ID}&original_prompt=eq.${encodeURIComponent(PROMPT)}&select=id,storage_path,thumbnail_path`,
+    ).catch(() => []);
+    for (const img of made) {
+      for (const p of [img.storage_path, img.thumbnail_path]) if (p) await supaRemoveObject('cover-images', p);
+      await supaDelete('generated_images_v2', `id=eq.${img.id}`);
+    }
+  });
 
   test('Generate Cover Art → modal → submit → cover_art image created and displayed', async ({ page }) => {
     const startIso = new Date(Date.now() - 5_000).toISOString();
@@ -42,7 +56,7 @@ test.describe('Cover-art modal (data path)', () => {
     await expect(page.getByRole('heading', { name: /Generate cover art/i })).toBeVisible({ timeout: 10_000 });
     const promptBox = page.getByPlaceholder(/Describe the cover art/i);
     await expect(promptBox).toBeVisible();
-    await promptBox.fill('Lone radio scout silhouetted against a rust-red wasteland sky, vintage vacuum tubes glowing');
+    await promptBox.fill(PROMPT);
 
     // Submit the modal's Generate.
     await page.getByRole('button', { name: /^Generate$/ }).click();

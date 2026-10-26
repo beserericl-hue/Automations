@@ -39,6 +39,7 @@ import { seriesRouter } from './routes/series.js';
 import { blogPagesRouter, blogWebRouter } from './routes/blog-pages.js';
 import { chapterActionsRouter } from './routes/chapter-actions.js';
 import { researchRunRouter } from './routes/research-run.js';
+import { startHealthWatch } from './lib/health-watch.js';
 import { creditsRouter } from './routes/credits.js';
 import { superuserRouter } from './routes/superuser.js';
 import { tiersRouter } from './routes/tiers.js';
@@ -360,6 +361,7 @@ app.get('*', (_req, res) => {
 });
 
 const server = app.listen(PORT, () => {
+  startHealthWatch();
   logger.info(`The Writers Workbench API running on http://localhost:${PORT}`);
 });
 
