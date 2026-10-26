@@ -17,6 +17,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import ReaderFollowUp, { type Mailing } from './ReaderFollowUp';
 import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -72,12 +73,16 @@ interface Reservation {
   first_name: string;
   email: string;
   created_at: string;
+  unsubscribed_at?: string | null;
 }
 
 interface LandingState {
   current: SavedScript | null;
   public: PublicPage | null;
   reservations: { rows: Reservation[]; count: number };
+  subscribed?: number;
+  buy?: { url: string; label: string } | null;
+  mailings?: Mailing[];
   history: { id: string; created_at: string; sample_url: string | null; prompt: string }[];
   inputs: {
     missing: string[];
@@ -93,7 +98,7 @@ const SECTION_LABELS: Record<string, string> = {
   hero: 'Hero',
   story: 'The novel',
   proof: 'History',
-  lineup: 'Volumes',
+  lineup: 'The books',
   offer: 'Pre-order form',
   author: 'Author',
   closing: 'Closing',
@@ -406,6 +411,7 @@ export default function LandingPageComposer({ projectId }: { projectId: string }
                         <span>
                           {r.first_name ? `${r.first_name} · ` : ''}
                           {r.email}
+                          {r.unsubscribed_at ? ' · unsubscribed' : ''}
                         </span>
                         <span>{new Date(r.created_at).toLocaleDateString()}</span>
                       </li>
@@ -413,6 +419,16 @@ export default function LandingPageComposer({ projectId }: { projectId: string }
                   </ul>
                 ) : null}
               </div>
+            ) : null}
+            {page ? (
+              <ReaderFollowUp
+                projectId={projectId}
+                published={Boolean(page)}
+                subscribed={data.subscribed ?? reservations.count}
+                buy={data.buy ?? null}
+                mailings={data.mailings ?? []}
+                queryKey={queryKey}
+              />
             ) : null}
           </div>
 

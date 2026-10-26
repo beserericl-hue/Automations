@@ -37,6 +37,8 @@ import dns from 'dns/promises';
 import net from 'net';
 import { parseWith } from '../lib/claude-structured.js';
 import { seriesName, storedSeries } from '../lib/series.js';
+import { renderMailing } from '../lib/landing-mail.js';
+import { sendEmail } from '../lib/email.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { validateBody } from '../middleware/validate.js';
@@ -60,6 +62,7 @@ import {
   planSections,
   rankResearch,
   renderPreviewHtml,
+  safeBuyUrl,
   samplePrompt,
   selectFacts,
   skippedMechanics,
@@ -67,6 +70,7 @@ import {
   csvCell,
   stripTracking,
   validateCopy,
+  type BuyLink,
   type LandingCopy,
   type PageImage,
   type ResearchReport,
@@ -372,6 +376,12 @@ export interface PublicState {
   published_at: string;
 }
 
+/** Where to buy the book, once it is on sale. Kept apart from publishing, so unpublishing keeps it. */
+export function buyOf(outline: Outline | null): BuyLink | null {
+  const b = outline?._landing_page_buy as BuyLink | undefined;
+  return b?.url ? { url: b.url, label: b.label || 'Buy the book' } : null;
+}
+
 function publicOf(outline: Outline | null): PublicState | null {
   return (outline?._landing_page_public as PublicState | undefined) ?? null;
 }
@@ -399,12 +409,14 @@ interface ReservationRow {
   first_name: string;
   email: string;
   created_at: string;
+  unsubscribed_at?: string | null;
+  last_emailed_at?: string | null;
 }
 
 async function reservationsFor(userId: string, projectId: string): Promise<{ rows: ReservationRow[]; count: number }> {
   const { data, count } = await getSupabaseAdmin()
     .from('landing_page_reservations_v2')
-    .select('first_name, email, created_at', { count: 'exact' })
+    .select('first_name, email, created_at, unsubscribed_at, last_emailed_at', { count: 'exact' })
     .eq('user_id', userId)
     .eq('project_id', projectId)
     .order('created_at', { ascending: false })
@@ -440,12 +452,22 @@ landingPageRouter.get('/project/:projectId', async (req, res, next) => {
     }));
     const pub = publicOf(project.outline);
     const reservations = await reservationsFor(req.userId!, project.id);
+    const { data: mailings } = await getSupabaseAdmin()
+      .from('landing_page_mailings_v2')
+      .select('id, subject, recipients, sent, failed, buy_url, created_at, finished_at')
+      .eq('user_id', req.userId!)
+      .eq('project_id', project.id)
+      .order('created_at', { ascending: false })
+      .limit(20);
     res.json({
       success: true,
       data: {
         current: current ? { ...current, preview_html: renderPreviewHtml(current.copy, current.plan) } : null,
         public: pub ? { ...pub, url: pageUrl(req, pub.slug) } : null,
         reservations,
+        subscribed: reservations.rows.filter((r) => !r.unsubscribed_at).length,
+        buy: buyOf(project.outline),
+        mailings: mailings ?? [],
         history,
         inputs: {
           missing: inputs.missing,
@@ -706,4 +728,164 @@ landingPageRouter.get('/project/:projectId/reservations.csv', async (req, res) =
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${slugify(project.title)}-reservations.csv"`);
   res.send(`${lines.join('\r\n')}\r\n`);
+});
+
+// ------------------------------------------------------------------------------------------------
+// Buy link, and writing to the people who reserved a copy
+// ------------------------------------------------------------------------------------------------
+
+const BuySchema = z.object({
+  url: z.string().trim().max(2000).nullable(),
+  label: z.string().trim().max(60).optional(),
+});
+
+/**
+ * @openapi
+ * /landing-page/project/{projectId}/buy-link:
+ *   put:
+ *     tags: [Publishing]
+ *     summary: Set (or clear, with url null) where readers buy the book
+ *     description: Once set, the page's calls to action go there, and the form becomes "hear about the next book".
+ *     security: [{ bearerAuth: [] }]
+ */
+landingPageRouter.put('/project/:projectId/buy-link', validateBody(BuySchema), async (req, res, next) => {
+  try {
+    const project = await loadProject(req, res);
+    if (!project) return;
+    const { url, label } = req.body as z.infer<typeof BuySchema>;
+    const outline = { ...(project.outline ?? {}) };
+    if (!url) {
+      delete outline._landing_page_buy;
+    } else {
+      const safe = safeBuyUrl(url);
+      if (!safe) {
+        res.status(400).json({ success: false, error: { code: 'BAD_URL', message: 'The buy link must be a full https:// address.' } });
+        return;
+      }
+      outline._landing_page_buy = { url: safe, label: label || 'Buy the book', updated_at: new Date().toISOString() };
+    }
+    await saveOutline(project.id, req.userId!, outline);
+    res.json({ success: true, data: { buy: buyOf(outline) } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const MailingSchema = z.object({
+  subject: z.string().trim().min(1).max(200),
+  body: z.string().trim().min(1).max(20000),
+  /** A test goes to the author alone, and is not recorded as a mailing. */
+  test: z.boolean().optional().default(false),
+});
+
+/** Addresses in the links a reader gets: the public page and their unsubscribe link. */
+function publicBase(req: { protocol: string; get(name: string): string | undefined }): string {
+  const configured = process.env.PUBLIC_APP_URL?.trim();
+  if (configured) return configured.replace(/\/$/, '');
+  const host = req.get('x-forwarded-host') ?? req.get('host') ?? '';
+  const proto = req.get('x-forwarded-proto')?.split(',')[0] ?? req.protocol;
+  return `${proto}://${host}`;
+}
+
+/**
+ * @openapi
+ * /landing-page/project/{projectId}/mailings:
+ *   post:
+ *     tags: [Publishing]
+ *     summary: Email everyone who reserved a copy (or, with test, only the author)
+ *     description: |
+ *       One email per reader, addressed by first name, with their own unsubscribe link and a line
+ *       saying why they are getting it. Unsubscribed addresses are skipped. Replies go to the author.
+ *     security: [{ bearerAuth: [] }]
+ */
+landingPageRouter.post('/project/:projectId/mailings', validateBody(MailingSchema), async (req, res) => {
+  const project = await loadProject(req, res);
+  if (!project) return;
+  const pub = publicOf(project.outline);
+  if (!pub) {
+    res.status(400).json({ success: false, error: { code: 'NOT_PUBLISHED', message: 'Publish the page first: the email links to it.' } });
+    return;
+  }
+  const { subject, body, test } = req.body as z.infer<typeof MailingSchema>;
+  const supabase = getSupabaseAdmin();
+  const buy = buyOf(project.outline) ?? undefined;
+  const base = publicBase(req);
+  const pageUrl_ = `${base}/books/${pub.slug}`;
+  const [{ data: profile }, { data: account }] = await Promise.all([
+    supabase.from('author_profiles_v2').select('pen_name').eq('user_id', req.userId!).maybeSingle(),
+    supabase.from('users_v2').select('email, name').eq('user_id', req.userId!).maybeSingle(),
+  ]);
+  const author = String(profile?.pen_name ?? account?.name ?? '').trim();
+  const authorEmail = String(account?.email ?? '').trim();
+  const mail = (to: { first_name?: string; email: string; unsubscribe_token?: string }, subj: string) => {
+    const { html, text } = renderMailing({
+      title: project.title,
+      author,
+      subject: subj,
+      body,
+      firstName: to.first_name,
+      buy,
+      pageUrl: pageUrl_,
+      unsubscribeUrl: to.unsubscribe_token ? `${pageUrl_}/unsubscribe?t=${to.unsubscribe_token}` : pageUrl_,
+    });
+    return sendEmail({ to: to.email, subject: subj, html, text, replyTo: authorEmail || undefined });
+  };
+
+  try {
+    if (test) {
+      if (!authorEmail) {
+        res.status(400).json({ success: false, error: { code: 'NO_AUTHOR_EMAIL', message: 'Your account has no email address to send the test to.' } });
+        return;
+      }
+      const r = await mail({ first_name: author.split(' ')[0], email: authorEmail }, `[Test] ${subject}`);
+      res.json({ success: true, data: { test: true, to: authorEmail, ok: r.ok, mode: r.mode, error: r.error ?? null } });
+      return;
+    }
+
+    const recipients: { id: string; first_name: string; email: string; unsubscribe_token: string }[] = [];
+    for (let page = 0; ; page += 1) {
+      const { data, error } = await supabase
+        .from('landing_page_reservations_v2')
+        .select('id, first_name, email, unsubscribe_token')
+        .eq('user_id', req.userId!)
+        .eq('project_id', project.id)
+        .is('unsubscribed_at', null)
+        .order('created_at', { ascending: true })
+        .range(page * 1000, page * 1000 + 999);
+      if (error) throw new Error(error.message);
+      recipients.push(...((data ?? []) as typeof recipients));
+      if ((data ?? []).length < 1000) break;
+    }
+    if (!recipients.length) {
+      res.status(400).json({ success: false, error: { code: 'NO_RECIPIENTS', message: 'Nobody on the list to write to yet.' } });
+      return;
+    }
+
+    const id = crypto.randomUUID();
+    await supabase.from('landing_page_mailings_v2').insert({
+      id, project_id: project.id, user_id: req.userId!, subject, body, buy_url: buy?.url ?? null, recipients: recipients.length,
+    });
+    let sent = 0;
+    let failed = 0;
+    // A few at a time: fast enough for a list of hundreds, gentle enough on the mail server.
+    for (let i = 0; i < recipients.length; i += 4) {
+      const batch = recipients.slice(i, i + 4);
+      const results = await Promise.all(batch.map((r) => mail(r, subject).catch(() => ({ ok: false }))));
+      const ok = batch.filter((_, k) => results[k].ok);
+      sent += ok.length;
+      failed += batch.length - ok.length;
+      if (ok.length) {
+        await supabase
+          .from('landing_page_reservations_v2')
+          .update({ last_emailed_at: new Date().toISOString() })
+          .in('id', ok.map((r) => r.id));
+      }
+    }
+    await supabase.from('landing_page_mailings_v2').update({ sent, failed, finished_at: new Date().toISOString() }).eq('id', id);
+    logger.info({ userId: req.userId, projectId: project.id, mailingId: id, sent, failed }, 'landing-page: mailing sent');
+    res.json({ success: true, data: { id, recipients: recipients.length, sent, failed } });
+  } catch (err) {
+    logger.error({ err, projectId: project.id }, 'landing-page: mailing failed');
+    res.status(500).json({ success: false, error: { code: 'MAILING_FAILED', message: err instanceof Error ? err.message : 'Could not send' } });
+  }
 });

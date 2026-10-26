@@ -576,6 +576,28 @@ export interface PublicPageOptions {
   canonicalUrl: string;
   /** Shown above the form after a reservation. */
   notice?: string;
+  /** Once the book is on sale: where to buy it. The call to action goes there instead of the form. */
+  buy?: BuyLink;
+}
+
+export interface BuyLink {
+  url: string;
+  label: string;
+}
+
+/**
+ * A buy link that is safe to put on a public page and in an email: https, a real host, no
+ * credentials in it. Null for anything else, so a typo or a `javascript:` URL never reaches a reader.
+ */
+export function safeBuyUrl(raw: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(raw.trim());
+  } catch {
+    return null;
+  }
+  if (u.protocol !== 'https:' || !u.hostname.includes('.') || u.username || u.password) return null;
+  return u.toString();
 }
 
 /** The form field each label posts as. Anything else is not a field the server reads. */
@@ -604,7 +626,7 @@ export function csvCell(v: string): string {
   return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
-function formHtml(copy: LandingCopy, pub?: PublicPageOptions): string {
+function formHtml(copy: LandingCopy, pub?: PublicPageOptions, button = copy.form.button): string {
   const fields = copy.form.fields.map((label) => {
     const f = FIELD_NAMES[label] ?? { name: slugify(label).replace(/-/g, '_'), type: 'text', required: false };
     return `<input name="${f.name}" type="${f.type}" placeholder="${esc(label)}" aria-label="${esc(label)}"${f.required ? ' required' : ''} maxlength="${f.type === 'email' ? 320 : 100}">`;
@@ -612,7 +634,7 @@ function formHtml(copy: LandingCopy, pub?: PublicPageOptions): string {
   if (!pub) {
     return `<form onsubmit="return false">
     ${fields.join('\n    ')}
-    <button type="submit">${esc(copy.form.button)}</button>
+    <button type="submit">${esc(button)}</button>
   </form>`;
   }
   // The hidden "website" field is for bots: a person never sees it, so a value in it means the
@@ -621,7 +643,7 @@ function formHtml(copy: LandingCopy, pub?: PublicPageOptions): string {
   <form method="post" action="${esc(pub.formAction)}">
     ${fields.join('\n    ')}
     <input name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
-    <button type="submit">${esc(copy.form.button)}</button>
+    <button type="submit">${esc(button)}</button>
   </form>`;
 }
 
@@ -629,7 +651,11 @@ export function renderPreviewHtml(copy: LandingCopy, plan: SectionPlan[] = planS
   const cover = copy.images.find((i) => i.role === 'cover');
   const author = copy.images.find((i) => i.role === 'author');
   const references = copy.images.filter((i) => i.role === 'reference');
-  const cta = `<p class="cta"><a href="#reserve">${esc(CTA_LABEL)}</a></p>`;
+  // On sale: every call to action goes to the shop. Before that, to the reservation form.
+  const buy = pub?.buy;
+  const cta = buy
+    ? `<p class="cta"><a href="${esc(buy.url)}" rel="noopener">${esc(buy.label)}</a></p>`
+    : `<p class="cta"><a href="#reserve">${esc(CTA_LABEL)}</a></p>`;
   const body: Record<SectionKind, string> = {
     hero: `<section class="hero">
   <h1>${esc(copy.title)}</h1>
@@ -660,7 +686,13 @@ export function renderPreviewHtml(copy: LandingCopy, plan: SectionPlan[] = planS
       )
       .join('\n    ')}
   </div>`,
-    offer: `<section id="reserve">
+    offer: buy
+      ? `<section id="reserve">
+  <h2>${esc(buy.label)}</h2>
+  <p class="cta"><a href="${esc(buy.url)}" rel="noopener">${esc(buy.label)}</a></p>
+  <p>Want to hear when the next book is out? Leave your name and email.</p>
+  ${formHtml(copy, pub, 'Keep me posted')}`
+      : `<section id="reserve">
   <h2>${esc(copy.form.heading)}</h2>
   <p>${esc(copy.form.lede)}</p>
   ${formHtml(copy, pub)}`,
