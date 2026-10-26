@@ -32,6 +32,8 @@ export interface FleetQueue {
 export interface EngineFleetData {
   served_by?: string;
   gateway_served_by?: string | null;
+  server_sees_gateway_addresses?: number;
+  gateway_sees_runtime_addresses?: number;
   instances: FleetInstance[];
   instance_counts?: Record<string, number>;
   verdict: string;
@@ -96,6 +98,12 @@ export default function EngineFleet({ load }: { load: () => Promise<EngineFleetD
       <p className="text-sm text-gray-600 dark:text-gray-300">
         {VERDICT_TEXT[data.verdict] ?? data.verdict}
         {data.reason && data.reason !== 'within capacity' ? <span className="text-gray-500"> {data.reason}</span> : null}
+      </p>
+
+      <p className="text-xs text-gray-500" data-testid="fleet-spread">
+        Calls are spread across {data.server_sees_gateway_addresses ?? '?'} gateway address(es) and{' '}
+        {data.gateway_sees_runtime_addresses ?? '?'} runtime address(es) on the private network. A count of 1 means
+        every call goes to one replica.
       </p>
 
       <section className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">

@@ -27,6 +27,10 @@ test.describe('Engine fleet (result-asserting)', () => {
       // Every runtime replica runs one worker per queue, so slots scale with the replicas.
       expect(q.instances).toBe(counts.orchestrator);
     }
+    // Calls on the private network are spread by the callers, which only works if they can see
+    // more than one address for each hop.
+    expect(data.server_sees_gateway_addresses).toBeGreaterThanOrEqual(2);
+    expect(data.gateway_sees_runtime_addresses).toBeGreaterThanOrEqual(2);
     expect(['scale_out', 'backlog', 'tpm_bound', 'hold', 'scale_in', 'unknown']).toContain(data.verdict);
   });
 

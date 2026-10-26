@@ -315,3 +315,48 @@ def test_scan_pattern_matches_what_redis_matches() -> None:
     pattern = f"{KEY}:{QUEUE_HEAVY}:*"
     assert fnmatch.fnmatch(f"{KEY}:{QUEUE_HEAVY}:replica-a", pattern)
     assert not fnmatch.fnmatch(f"{KEY}:{QUEUE_INTERACTIVE}:replica-a", pattern)
+
+
+# --- spreading calls across replicas on the private network -------------------------------------
+
+
+def test_a_private_name_is_spread_across_its_replicas(monkeypatch: pytest.MonkeyPatch) -> None:
+    from writer_engine import balancing as B
+
+    B._cache.clear()
+
+    async def fake_resolve(host: str, port: int) -> list[str]:
+        return ["fd12::a", "fd12::b"] if host.endswith(".railway.internal") else []
+
+    monkeypatch.setattr(B, "addresses", fake_resolve)
+
+    async def go() -> set[str]:
+        return {
+            await B.spread("http://writer-engine-runtime.railway.internal:8001/pipelines/x?y=1")
+            for _ in range(40)
+        }
+
+    assert asyncio.run(go()) == {
+        "http://[fd12::a]:8001/pipelines/x?y=1",
+        "http://[fd12::b]:8001/pipelines/x?y=1",
+    }
+    assert asyncio.run(B.replica_count("http://writer-engine-runtime.railway.internal:8001")) == 2
+
+
+def test_other_urls_and_single_replicas_are_left_alone(monkeypatch: pytest.MonkeyPatch) -> None:
+    from writer_engine import balancing as B
+
+    async def one(host: str, port: int) -> list[str]:
+        return ["fd12::a"]
+
+    monkeypatch.setattr(B, "addresses", one)
+    assert asyncio.run(B.spread("http://localhost:8001/x")) == "http://localhost:8001/x"
+    assert asyncio.run(B.spread("http://svc.railway.internal:8001/x")) == "http://svc.railway.internal:8001/x"
+
+
+def test_resolution_is_cached_and_a_failed_lookup_is_empty() -> None:
+    from writer_engine import balancing as B
+
+    B._cache.clear()
+    assert asyncio.run(B.addresses("does-not-exist.invalid", 80)) == []
+    assert ("does-not-exist.invalid", 80) in B._cache

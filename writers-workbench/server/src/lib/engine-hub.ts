@@ -24,6 +24,59 @@ export function engineGatewayUrl(): string {
   );
 }
 
+const PRIVATE_SUFFIX = '.railway.internal';
+const RESOLVE_CACHE_MS = 5_000;
+const resolved = new Map<string, { at: number; addrs: string[] }>();
+
+/** Every address a private hostname resolves to, cached for a few seconds. */
+async function privateAddresses(host: string): Promise<string[]> {
+  const hit = resolved.get(host);
+  if (hit && Date.now() - hit.at < RESOLVE_CACHE_MS) return hit.addrs;
+  let addrs: string[] = [];
+  try {
+    const { lookup } = await import('node:dns/promises');
+    addrs = [...new Set((await lookup(host, { all: true })).map((a) => a.address))].sort();
+  } catch {
+    addrs = [];
+  }
+  resolved.set(host, { at: Date.now(), addrs });
+  return addrs;
+}
+
+/**
+ * The gateway base URL with one replica picked at random (CR-010 C1).
+ *
+ * Railway balances a service's public domain across its replicas, but `<service>.railway.internal`
+ * has no balancer: it resolves to the replicas' addresses, and fetch connects to the first and keeps
+ * that socket. Measured on DEV with two gateway replicas: 30 of 30 calls went to the same one. So we
+ * resolve the name and pick an address per call. A public URL, localhost, a failed lookup or a single
+ * address leaves the URL unchanged.
+ */
+export async function engineGatewayTarget(): Promise<string> {
+  const base = engineGatewayUrl();
+  let u: URL;
+  try {
+    u = new URL(base);
+  } catch {
+    return base;
+  }
+  if (!u.hostname.endsWith(PRIVATE_SUFFIX)) return base;
+  const addrs = await privateAddresses(u.hostname);
+  if (addrs.length < 2) return base;
+  const ip = addrs[Math.floor(Math.random() * addrs.length)];
+  u.hostname = ip.includes(':') ? `[${ip}]` : ip;
+  return u.toString().replace(/\/$/, '');
+}
+
+/** How many gateway addresses this server can see (0 if the name does not resolve). */
+export async function engineGatewayAddressCount(): Promise<number> {
+  try {
+    return (await privateAddresses(new URL(engineGatewayUrl()).hostname)).length;
+  } catch {
+    return 0;
+  }
+}
+
 function serviceSecret(): string {
   return process.env.ENGINE_SERVICE_SECRET || process.env.SERVICE_SHARED_SECRET || '';
 }
@@ -47,7 +100,7 @@ export async function callEngineHub(args: {
   context?: Record<string, unknown>;
   source?: 'chat' | 'voice';
 }): Promise<HubResponse> {
-  const url = `${engineGatewayUrl()}/internal/hub`;
+  const url = `${await engineGatewayTarget()}/internal/hub`;
   const resp = await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-service-secret': serviceSecret() },
@@ -75,7 +128,7 @@ export async function callEngineWriteTool(
   tool: string,
   body: Record<string, unknown>,
 ): Promise<{ job_id?: string; status?: string; [k: string]: unknown }> {
-  const url = `${engineGatewayUrl()}/internal/write/${encodeURIComponent(tool)}`;
+  const url = `${await engineGatewayTarget()}/internal/write/${encodeURIComponent(tool)}`;
   const resp = await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-service-secret': serviceSecret() },
@@ -154,7 +207,7 @@ export async function callEngineWriteToolSync<T>(
 
 /** Poll an engine async job (queued load-bearing op). */
 export async function getEngineJob(jobId: string): Promise<{ status: string; result?: unknown; error?: string }> {
-  const url = `${engineGatewayUrl()}/internal/write/jobs/${encodeURIComponent(jobId)}`;
+  const url = `${await engineGatewayTarget()}/internal/write/jobs/${encodeURIComponent(jobId)}`;
   const resp = await fetch(url, { headers: { 'x-service-secret': serviceSecret() } });
   if (!resp.ok) {
     return { status: 'error', error: `engine job poll ${resp.status}` };
@@ -168,7 +221,7 @@ export async function getEngineJob(jobId: string): Promise<{ status: string; res
  * runs, a running job is cancelled at its next await. Idempotent: a finished job returns aborted:false.
  */
 export async function abortEngineJob(jobId: string): Promise<{ aborted: boolean; error?: string }> {
-  const url = `${engineGatewayUrl()}/internal/write/jobs/${encodeURIComponent(jobId)}/abort`;
+  const url = `${await engineGatewayTarget()}/internal/write/jobs/${encodeURIComponent(jobId)}/abort`;
   const resp = await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-service-secret': serviceSecret() },
@@ -185,8 +238,8 @@ export async function abortEngineJob(jobId: string): Promise<{ aborted: boolean;
  * scaling verdict and the autoscaler's last decision. Built by the orchestrator from Redis, so it is
  * the whole fleet whichever replica answers. Also reports which gateway replica served the call.
  */
-export async function getEngineFleet(): Promise<{ fleet: Record<string, unknown>; gateway: string | null }> {
-  const resp = await fetch(`${engineGatewayUrl()}/internal/fleet`, {
+export async function getEngineFleet(): Promise<{ fleet: Record<string, unknown>; gateway: string | null; gatewayAddresses: number }> {
+  const resp = await fetch(`${await engineGatewayTarget()}/internal/fleet`, {
     headers: { 'x-service-secret': serviceSecret() },
     signal: AbortSignal.timeout(15_000),
   });
@@ -194,5 +247,6 @@ export async function getEngineFleet(): Promise<{ fleet: Record<string, unknown>
   return {
     fleet: (await resp.json()) as Record<string, unknown>,
     gateway: resp.headers.get('x-engine-instance'),
+    gatewayAddresses: await engineGatewayAddressCount(),
   };
 }

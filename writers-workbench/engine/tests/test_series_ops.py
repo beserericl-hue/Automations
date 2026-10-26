@@ -270,3 +270,81 @@ class TestMarketingKeepsTheCastStraight:
     def test_the_cast_reaches_the_copywriter(self) -> None:
         block = M._cast_block(ROSTER)
         assert "never give one person another's job" in block and "Marcus Tayac: Piscataway" in block
+
+
+class TestMarketingGetsTheDatesFromTheRecord:
+    """Book 1's copy said "excavated in the 1930s" for a dig the bible records as 1935-1951."""
+
+    def _bible(self, monkeypatch: pytest.MonkeyPatch, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        calls: list[dict[str, Any]] = []
+
+        class _Q:
+            def __init__(self) -> None:
+                self.f: dict[str, Any] = {}
+
+            def select(self, *_a: Any) -> _Q:
+                return self
+
+            def eq(self, k: str, v: Any) -> _Q:
+                self.f[k] = v
+                return self
+
+            def is_(self, *_a: Any) -> _Q:
+                return self
+
+            def limit(self, *_a: Any) -> _Q:
+                return self
+
+            async def execute(self) -> Any:
+                calls.append(self.f)
+                return type("R", (), {"data": rows})()
+
+        class _C:
+            def table(self, _t: str) -> _Q:
+                return _Q()
+
+        async def admin() -> _C:
+            return _C()
+
+        import writer_engine.supabase.client as sc
+
+        monkeypatch.setattr(sc, "get_supabase_admin", admin)
+        return calls
+
+    def test_only_dated_events_oldest_first(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        calls = self._bible(
+            monkeypatch,
+            [
+                {
+                    "name": "1942 Deed of Gift Transfer",
+                    "description": "Dorothy Voss transferred the collection.",
+                },
+                {"name": "The burning of the longhouse", "description": "No date given."},
+                {"name": "1935\u20131951 Excavation of 18PR8", "description": "Sixteen-year excavation."},
+                {"name": "Ferguson's season", "description": "Fieldwork at 18PR8 in 1940."},
+            ],
+        )
+        lines = asyncio.run(M._load_canon_dates("p1"))
+        assert calls[0] == {"project_id": "p1", "entry_type": "event"}
+        assert [ln.split(":")[0] for ln in lines] == [
+            "- 1935\u20131951 Excavation of 18PR8",
+            "- Ferguson's season",
+            "- 1942 Deed of Gift Transfer",
+        ]
+        block = M._canon_dates_block(lines)
+        assert block.startswith("THE RECORD") and "1935\u20131951" in block
+
+    def test_an_unreadable_bible_is_not_a_failure(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import writer_engine.supabase.client as sc
+
+        async def boom() -> Any:
+            raise RuntimeError("supabase down")
+
+        monkeypatch.setattr(sc, "get_supabase_admin", boom)
+        assert asyncio.run(M._load_canon_dates("p1")) == []
+        assert M._canon_dates_block([]) == ""
+
+    def test_the_copywriter_is_told_a_span_stays_a_span_and_to_use_no_dashes(self) -> None:
+        system = M._build_marketing_system("ancient-history", "", True)
+        assert "A span stays a span" in system and "1935 to 1951" in system
+        assert "No dashes of any kind" in system
