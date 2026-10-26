@@ -179,3 +179,20 @@ export async function abortEngineJob(jobId: string): Promise<{ aborted: boolean;
   const body = (await resp.json()) as { aborted?: boolean };
   return { aborted: Boolean(body.aborted) };
 }
+
+/**
+ * The engine fleet (CR-010 C1/C4): every live gateway and runtime replica, the fleet-wide queues, the
+ * scaling verdict and the autoscaler's last decision. Built by the orchestrator from Redis, so it is
+ * the whole fleet whichever replica answers. Also reports which gateway replica served the call.
+ */
+export async function getEngineFleet(): Promise<{ fleet: Record<string, unknown>; gateway: string | null }> {
+  const resp = await fetch(`${engineGatewayUrl()}/internal/fleet`, {
+    headers: { 'x-service-secret': serviceSecret() },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!resp.ok) throw new Error(`engine fleet ${resp.status}`);
+  return {
+    fleet: (await resp.json()) as Record<string, unknown>,
+    gateway: resp.headers.get('x-engine-instance'),
+  };
+}

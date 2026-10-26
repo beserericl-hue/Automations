@@ -18,6 +18,7 @@ from uuid import UUID, uuid4
 from arq.connections import RedisSettings
 
 from writer_engine.config import get_settings
+from writer_engine.fleet import instance_id
 from writer_engine.idempotency import RunClaim, claim_run, complete_run, fail_run
 from writer_engine.queues import (
     HEAVY,
@@ -258,6 +259,12 @@ def build_redis_settings() -> RedisSettings:
 ARQ_HEALTH_CHECK_KEY = "engine:arq:health-check"
 
 
+def instance_health_key(queue: str) -> str:
+    """This replica's heartbeat key for ``queue``. The worker and the orchestrator share a container,
+    so they agree on the instance id."""
+    return f"{ARQ_HEALTH_CHECK_KEY}:{queue}:{instance_id()}"
+
+
 def _build_worker_settings(profile: QueueProfile) -> type:
     """One arq Worker class per queue (B4/B5).
 
@@ -289,7 +296,9 @@ def _build_worker_settings(profile: QueueProfile) -> type:
         keep_result = profile.keep_result
         on_startup = staticmethod(_on_startup)
         # Per-queue heartbeat key so /admin/ready can tell WHICH worker is down, not just that one is.
-        health_check_key = f"{ARQ_HEALTH_CHECK_KEY}:{profile.name}"
+        # Per instance too (C1): two replicas on one key overwrote each other, and the sampler sums
+        # `<key>:*` to get the fleet.
+        health_check_key = instance_health_key(profile.name)
         # arq defaults to 3600s, which would let a dead worker look alive for an hour — useless as a
         # heartbeat. 30s means /admin/ready notices a stopped worker within ~a minute.
         health_check_interval = 30

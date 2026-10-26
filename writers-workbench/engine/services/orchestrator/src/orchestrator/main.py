@@ -15,10 +15,12 @@ from arq import create_pool
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi import status as http_status
 
+from writer_engine import autoscale, fleet
 from writer_engine.alerting import LEVEL_WARNING, Alert, clear_alert, send_alert
 from writer_engine.auth import require_admin_token, require_service_secret
 from writer_engine.cadence import INTERVAL_DAYS, is_due, latest_baseline
 from writer_engine.config import get_settings
+from writer_engine.drain import is_draining
 from writer_engine.health import (
     probe_arq_worker,
     probe_drain,
@@ -64,7 +66,7 @@ from writer_engine.workbench_cron import run_lifecycle
 from .library_orch import LibraryRetrieveOrchestrator
 from .newsletter_orch import NewsletterOrchestrator, resolution_hook_installed
 from .newsletter_saga import NewsletterSagaDriver
-from .worker import ARQ_HEALTH_CHECK_KEY, build_redis_settings
+from .worker import ARQ_HEALTH_CHECK_KEY, build_redis_settings, instance_health_key
 from .write_tools import ALL_STEP_URLS, is_async, resolve_step_url
 
 # When set, the durable saga driver enqueues advance via this arq pool. Tests set it to None and drive
@@ -94,8 +96,10 @@ async def _readiness_with_verdict() -> tuple[dict[str, Any], bool]:
     # One probe per queue (B4): with two workers, "a worker is alive" is not the question — a dead
     # interactive worker leaves every Q/A queued while heavy work looks fine.
     probes += [
+        # This instance's own worker (C1): with replicas, "some worker is alive" would let a replica
+        # whose worker died keep passing readiness on its sibling's heartbeat.
         probe_arq_worker(
-            health_check_key=f"{ARQ_HEALTH_CHECK_KEY}:{queue}",
+            health_check_key=instance_health_key(queue),
             name=f"arq_worker:{queue}",
             required=False,
         )
@@ -150,7 +154,15 @@ async def lifespan(app: FastAPI) -> Any:
     app.state.scheduler = None
     app.state.scheduler_task = None
     jobs = list(getattr(app.state, "cron_jobs", []) or [])
-    scheduler = Scheduler(jobs)
+    # C1: with replicas, each runs this loop; the lock makes a singleton job run on one of them per
+    # interval. No pool means no Redis, and then there is nothing to coordinate with — run locally.
+    pool_for_lock = app.state.arq_pool
+
+    async def _lock(name: str, ttl_s: float) -> bool:
+        return await fleet.run_once(pool_for_lock, name, ttl_s=ttl_s)
+
+    scheduler = Scheduler(jobs, lock=_lock if pool_for_lock is not None else None)
+    fleet.mark_instance(SERVICE)
     if scheduler.jobs:
         app.state.scheduler = scheduler
         app.state.scheduler_task = scheduler_start(scheduler)
@@ -190,6 +202,8 @@ def build_app() -> FastAPI:
         HTTP_REQUESTS.labels(
             service=SERVICE, route=route, method=method, status=str(response.status_code)
         ).inc()
+        # Which replica answered — how the load balancing across replicas is checked from outside.
+        response.headers["X-Engine-Instance"] = fleet.instance_id()
         return response
 
     @app.get("/admin/health")
@@ -859,6 +873,14 @@ def build_app() -> FastAPI:
             return {"sampled": 0, "reason": "no arq pool"}
         samples = await sample_all(pool, health_key_for=_health_key_for)
         advice = scaling_advice(samples, stalls=await budget_stalls(pool))
+        # Per instance, which is why this job is not a singleton: every replica records itself and
+        # sets its own gauges. The alert below is debounced in Redis, so N replicas still send one.
+        await fleet.register(
+            pool,
+            SERVICE,
+            draining=is_draining(),
+            running={s.queue: s.running for s in samples},
+        )
         verdict = str(advice["verdict"])
         reason = str(advice["reason"])
         if verdict in {"scale_out", "tpm_bound"}:
@@ -890,6 +912,51 @@ def build_app() -> FastAPI:
             for stale in ("scale_out", "tpm_bound"):
                 await clear_alert(f"{KEY_QUEUE_CAPACITY}:{stale}")
         return {"sampled": len(samples), "verdict": verdict}
+
+    async def _autoscale_tick() -> dict[str, Any]:
+        """C4: one autoscaler pass. A singleton job, so one replica decides for the fleet."""
+        pool = getattr(app.state, "arq_pool", None)
+        if pool is None:
+            return {"acted": False, "action": "refused", "reason": "no arq pool"}
+        samples = await sample_all(pool, health_key_for=_health_key_for)
+        advice = scaling_advice(samples, stalls=await budget_stalls(pool))
+        return await autoscale.tick(pool, advice)
+
+    async def _fleet_view() -> dict[str, Any]:
+        """Every live instance, the fleet-wide queues, the verdict, and what the autoscaler did."""
+        pool = getattr(app.state, "arq_pool", None)
+        cfg = autoscale.AutoscaleConfig.from_env()
+        out: dict[str, Any] = {
+            "served_by": fleet.instance_id(),
+            "autoscale": {"config": cfg.public(), "refusal": cfg.refusal() or None},
+        }
+        if pool is None:
+            return {**out, "instances": [], "verdict": "unknown", "reason": "no arq pool", "queues": []}
+        samples = await sample_all(pool, health_key_for=_health_key_for)
+        stalls = await budget_stalls(pool)
+        instances = await fleet.read_fleet(pool)
+        state = await autoscale.load_state(pool)
+        out["autoscale"]["state"] = state.__dict__
+        return {
+            **out,
+            "instances": instances,
+            "instance_counts": {
+                svc: sum(1 for i in instances if i.get("service") == svc)
+                for svc in sorted({str(i.get("service")) for i in instances})
+            },
+            **scaling_advice(samples, stalls=stalls),
+            "budget_stalls_last_minute": stalls,
+        }
+
+    @app.get("/admin/fleet", dependencies=[Depends(require_admin_token)])
+    async def admin_fleet() -> dict[str, Any]:
+        return await _fleet_view()
+
+    @app.get("/internal/fleet", dependencies=[Depends(require_service_secret)])
+    async def internal_fleet() -> dict[str, Any]:
+        """The same view for the Workbench admin page, which holds the service secret, not the
+        engine admin token."""
+        return await _fleet_view()
 
     @app.get("/admin/queues", dependencies=[Depends(require_admin_token)])
     async def admin_queues() -> dict[str, Any]:
@@ -952,6 +1019,15 @@ def build_app() -> FastAPI:
             name="queue-metrics",
             interval_s=settings_for_jobs.queue_metrics_poll_seconds,
             run=_queue_metrics_tick,
+            # Every replica samples, registers itself and sets its own gauges.
+            singleton=False,
+        ),
+        CronJob(
+            name="autoscale",
+            interval_s=settings_for_jobs.autoscale_poll_seconds
+            if autoscale.AutoscaleConfig.from_env().enabled
+            else 0,
+            run=_autoscale_tick,
         ),
         CronJob(
             name="workbench-lifecycle",

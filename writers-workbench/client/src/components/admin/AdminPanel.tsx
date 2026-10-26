@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import EngineFleet, { type EngineFleetData } from './EngineFleet';
 import { useUser } from '../../contexts/UserContext';
 import { useToast } from '../../contexts/ToastContext';
 import { supabase } from '../../config/supabase';
@@ -78,7 +79,7 @@ async function adminFetch<T>(path: string, options?: RequestInit): Promise<T> {
   return json.data;
 }
 
-type AdminTab = 'users' | 'subscriptions' | 'revenue' | 'metrics' | 'workflows' | 'queues' | 'bounces';
+type AdminTab = 'users' | 'subscriptions' | 'revenue' | 'metrics' | 'workflows' | 'queues' | 'fleet' | 'bounces';
 
 const TAB_LABELS: Record<AdminTab, string> = {
   users: 'User Management',
@@ -87,6 +88,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   metrics: 'System Metrics',
   workflows: 'Workflows',
   queues: 'Queues',
+  fleet: 'Engine Fleet',
   bounces: 'Email Bounces',
 };
 
@@ -128,6 +130,7 @@ export default function AdminPanel() {
       {activeTab === 'metrics' && <SystemMetrics />}
       {activeTab === 'workflows' && <WorkflowStatus />}
       {activeTab === 'queues' && <QueueStatus />}
+      {activeTab === 'fleet' && <EngineFleet load={() => adminFetch<EngineFleetData>('/engine-fleet')} />}
       {activeTab === 'bounces' && <BounceStatus />}
     </div>
   );

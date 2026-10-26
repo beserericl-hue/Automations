@@ -101,6 +101,8 @@ class QueueSample:
     completed: int | None
     failed: int | None
     error: str = ""
+    instances: int = 0
+    """Workers on this queue with a live heartbeat. ``max_jobs`` is per instance times this."""
 
     def as_dict(self) -> dict[str, Any]:
         out = asdict(self)
@@ -109,12 +111,44 @@ class QueueSample:
         return out
 
 
+async def read_heartbeats(redis: Any, health_key: str) -> list[dict[str, int]]:
+    """Every live worker heartbeat for one queue: ``<health_key>:<instance>`` per replica (C1), plus
+    the bare ``<health_key>`` an instance on the previous release still writes until it is replaced.
+
+    With one key per queue, two replicas overwrote each other and the fleet looked like whichever one
+    wrote last — half its real size, or double its real load, depending on timing.
+    """
+    from writer_engine.fleet import scan_keys
+
+    keys = [health_key, *sorted(await scan_keys(redis, f"{health_key}:*"))]
+    beats: list[dict[str, int]] = []
+    for key in keys:
+        health = parse_health(await redis.get(key))
+        if health:
+            beats.append(health)
+    return beats
+
+
+def _total(beats: list[dict[str, int]], field: str) -> int | None:
+    values = [b[field] for b in beats if field in b]
+    return sum(values) if values else None
+
+
 async def sample_queue(redis: Any, queue: str, *, health_key: str) -> QueueSample:
-    """Sample one queue in three round trips. Never raises — a metrics read must not break a page."""
+    """Sample one queue across every instance. Never raises — a metrics read must not break a page.
+
+    Two round trips plus one per live worker: ZCARD, SCAN for the per-instance heartbeats, a GET for
+    each, and ZRANGE for the oldest item.
+    """
     profile = profile_for(queue)
     try:
         depth = int(await redis.zcard(queue) or 0)
-        health = parse_health(await redis.get(health_key))
+        beats = await read_heartbeats(redis, health_key)
+        health: dict[str, int] = {}
+        for field in ("j_ongoing", "j_complete", "j_failed"):
+            total = _total(beats, field)
+            if total is not None:
+                health[field] = total
         oldest: float | None = None
         if depth:
             head = await redis.zrange(queue, 0, 0, withscores=True)
@@ -140,17 +174,20 @@ async def sample_queue(redis: Any, queue: str, *, health_key: str) -> QueueSampl
 
     running = health.get("j_ongoing")
     waiting = max(0, depth - running) if running is not None else None
-    saturation = (running / profile.max_jobs) if running is not None and profile.max_jobs else None
+    # Slots are per worker, so the fleet has one profile's worth per live instance.
+    fleet_slots = profile.max_jobs * max(1, len(beats))
+    saturation = (running / fleet_slots) if running is not None and fleet_slots else None
     return QueueSample(
         queue=queue,
         depth=depth,
         running=running,
         waiting=waiting,
-        max_jobs=profile.max_jobs,
+        max_jobs=fleet_slots,
         saturation=round(saturation, 3) if saturation is not None else None,
         oldest_wait_s=round(oldest, 1) if oldest is not None else None,
         completed=health.get("j_complete"),
         failed=health.get("j_failed"),
+        instances=len(beats),
     )
 
 

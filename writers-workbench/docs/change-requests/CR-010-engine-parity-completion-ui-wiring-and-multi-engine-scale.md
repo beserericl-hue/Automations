@@ -99,6 +99,8 @@ CR-003 already **wired the core**: stateless gateway, arq-on-Redis queue, a **Re
 
 ### C1 — Run more than one of each (the actual horizontal scale)
 
+> **DEV status 2026-10-26:** 2 gateway and 2 runtime replicas on DEV. Per-instance arq heartbeats are summed into fleet totals, and scheduled jobs are locked to one replica. The fleet registry is shown at `/internal/fleet` and Admin → Engine Fleet. PROD (4 replicas) waits for the cutover. See `engine/docs/deployment.md`.
+
 - **Gateway replicas behind a load balancer** — gateway is stateless; set Railway replica count > 1 and confirm the LB health-checks `/admin/health`. (Today: single instance.)
 - **Multiple runtime/worker instances** — each connects to the same Redis; verify arq workers across instances don't double-run a job (arq is single-delivery, but confirm `job_id` dedupe on re-enqueue).
 - **Graceful drain on deploy** — readiness probe flips unready, worker finishes in-flight jobs before SIGTERM (avoid killing a 90-min chapter mid-flight). `allow_abort_jobs=True` (shipped `dae99d7`) means an explicit cross-instance Cancel already works via Redis.
@@ -115,7 +117,7 @@ The shared budget today covers Anthropic only. Multi-instance fan-out will 429 t
 ### C4 — Resilience + observability (the gap the PROD Redis outage exposed)
 
 - **Redis is the single stateful hinge and a SPOF.** A silent Redis death broke BullMQ+SSE for 9 days (see `project_prod_redis_outage_risk`). Move to managed/HA Redis and add **uptime + queue-depth alerting** (none today).
-- **Autoscaling policy** — scale worker instances on queue depth / oldest-job-age, not guesswork.
+- **Autoscaling policy** — scale worker instances on queue depth / oldest-job-age, not guesswork. *(DEV 2026-10-26: `writer_engine/autoscale.py`. It works from the B12 verdict, holds on `tpm_bound`, waits for an empty heavy queue before scaling in, and uses a Railway project token scoped to develop.)*
 - **Per-instance + fleet metrics** — jobs in flight, queue depth, budget utilization per provider, LLM 429 counts; a dashboard so "add an instance" is data-driven (CR-003's capacity math made actionable).
 
 ---

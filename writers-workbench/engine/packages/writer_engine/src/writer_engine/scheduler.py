@@ -22,9 +22,12 @@ Design, deliberately the same shape as :mod:`writer_engine.watchdog`:
   that dies on a bad feed is how you lose a month of ingestion without noticing.
 * **ticks never overlap.** Each job awaits its own previous run; a 40-minute ingestion tick on a
   30-minute interval delays the next one rather than running two at once against the same feeds.
-* **it is advisory, not exactly-once.** Two engine instances would each run the loop. That is safe
-  because the work claims itself: ``claim_due_feeds`` stamps ``last_fetched_at`` before fetching and
-  the cadence cron checks ``next_due_at``, so the loser of a race finds nothing to do.
+* **one replica per tick (C1).** Every replica runs the loop, and that used to be called safe
+  because ingestion and the cadence cron claim their own rows. The scheduled publisher does not: two
+  replicas reading the same due post both enqueued it, a double publish and a double email. So a job
+  is ``singleton`` by default and takes a Redis lock (``fleet.run_once``) whose TTL is just under its
+  interval: whichever replica ticks first runs it, the rest skip. Per-instance jobs (the queue-metrics
+  sampler, which publishes this process's own gauges) opt out.
 """
 
 from __future__ import annotations
@@ -36,6 +39,13 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from writer_engine.telemetry.logging import get_logger
+
+Lock = Callable[[str, float], Awaitable[bool]]
+"""``lock(name, ttl_s) -> bool``: True if this replica should run the job now."""
+
+LOCK_TTL_FRACTION = 0.95
+"""A singleton's lock lives for this share of its interval, so runs stay at least that far apart
+across the fleet while the next interval's tick, on any replica, can still take it."""
 
 logger = get_logger("scheduler")
 
@@ -55,6 +65,7 @@ class Job:
     name: str
     interval_s: float
     run: Callable[[], Awaitable[object]]
+    singleton: bool = True
 
     @property
     def enabled(self) -> bool:
@@ -64,11 +75,19 @@ class Job:
 class Scheduler:
     """Runs a set of :class:`Job` s on their own intervals inside one asyncio task."""
 
-    def __init__(self, jobs: list[Job], *, startup_delay_s: float = STARTUP_DELAY_S) -> None:
+    def __init__(
+        self,
+        jobs: list[Job],
+        *,
+        startup_delay_s: float = STARTUP_DELAY_S,
+        lock: Lock | None = None,
+    ) -> None:
         self.jobs = [j for j in jobs if j.enabled]
         self.startup_delay_s = max(0.0, startup_delay_s)
+        self.lock = lock
         self._last_run: dict[str, datetime] = {}
         self._ticks: dict[str, int] = {}
+        self._skipped: dict[str, int] = {}
         self._errors: dict[str, str] = {}
 
     def status(self) -> dict[str, object]:
@@ -78,7 +97,10 @@ class Scheduler:
                 {
                     "name": j.name,
                     "interval_s": j.interval_s,
+                    "singleton": j.singleton,
                     "ticks": self._ticks.get(j.name, 0),
+                    # Ticks another replica took. Non-zero on every replica but one is the lock working.
+                    "skipped": self._skipped.get(j.name, 0),
                     "last_run": self._last_run[j.name].isoformat() if j.name in self._last_run else None,
                     "last_error": self._errors.get(j.name),
                 }
@@ -87,7 +109,14 @@ class Scheduler:
         }
 
     async def tick(self, job: Job) -> None:
-        """Run one job once, swallowing everything it throws."""
+        """Run one job once, swallowing everything it throws. A singleton another replica holds is
+        skipped."""
+        if job.singleton and self.lock is not None:
+            ttl = max(MIN_INTERVAL_S, job.interval_s) * LOCK_TTL_FRACTION
+            if not await self.lock(job.name, ttl):
+                self._skipped[job.name] = self._skipped.get(job.name, 0) + 1
+                logger.debug("scheduler.skipped", job=job.name, reason="another replica holds it")
+                return
         started = datetime.now(UTC)
         self._ticks[job.name] = self._ticks.get(job.name, 0) + 1
         try:
@@ -137,4 +166,13 @@ async def stop(task: asyncio.Task[None] | None) -> None:
         await task
 
 
-__all__ = ["MIN_INTERVAL_S", "STARTUP_DELAY_S", "Job", "Scheduler", "start", "stop"]
+__all__ = [
+    "LOCK_TTL_FRACTION",
+    "MIN_INTERVAL_S",
+    "STARTUP_DELAY_S",
+    "Job",
+    "Lock",
+    "Scheduler",
+    "start",
+    "stop",
+]

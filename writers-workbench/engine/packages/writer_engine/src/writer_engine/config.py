@@ -250,6 +250,11 @@ class EngineSettings(BaseSettings):
     # sample slower than the thing it measures cannot: an interactive job's whole budget wait is
     # 300s. Three Redis round trips per queue, so the cost of this cadence is negligible.
     queue_metrics_poll_seconds: float = Field(default=30.0, alias="QUEUE_METRICS_POLL_SECONDS")
+    # The runtime replica autoscaler (C4). Only scheduled when AUTOSCALE_ENABLED is true; the rest of
+    # its settings (floor, ceiling, cooldown, the Railway token) are read by `autoscale.AutoscaleConfig`.
+    # A minute, so that two consecutive scale_out samples (the default streak) mean two minutes of
+    # interactive work queueing before a replica is added.
+    autoscale_poll_seconds: float = Field(default=60.0, alias="AUTOSCALE_POLL_SECONDS")
     # The Workbench's own lifecycle crons (trial expiry, monthly credit reset, trial warnings). They
     # existed and correct since Sprint 8 and NOTHING had ever called them: CRON_SECRET was unset so
     # they answered 500, and nothing was scheduled against them. On DEV that meant trials never
