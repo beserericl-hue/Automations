@@ -75,6 +75,26 @@ function messageOf(err: unknown): string {
 
 const money = (n: number | null | undefined) => (n == null ? '—' : `$${n.toFixed(2)}`);
 
+/** RPI's order states in words an author reads. The raw state stays in the tooltip. */
+const PRINT_STATUS_LABELS: Record<string, string> = {
+  QUEUED: 'Queued',
+  RECEIVED: 'Received by RPI',
+  VALID_AWAITING_PAYMENT: 'Awaiting payment',
+  VALID_HOLDING_BIN: 'Paid, in the holding bin',
+  PRINTING: 'Sent to the printer',
+  RECEIVED_BY_PRINTER: 'Accepted by the printer',
+  IN_PRODUCTION: 'Printing',
+  READY_TO_SHIP: 'Printed, ready to ship',
+  SHIPPED: 'Shipped',
+  CANCELLED: 'Cancelled',
+  FAILED: 'Failed',
+  REJECTED: 'Rejected',
+};
+
+export function printStatusLabel(status: string): string {
+  return PRINT_STATUS_LABELS[status] ?? status.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
+}
+
 export default function PrintCopies({ projectId, volumeCount }: { projectId: string; volumeCount: number }) {
   const queryClient = useQueryClient();
   const { addToast } = useToast();
@@ -405,8 +425,11 @@ export default function PrintCopies({ projectId, volumeCount }: { projectId: str
                     {o.quantity} × {o.edition_label}
                     {volumeCount > 1 ? `, book ${o.volume_index}` : ''}
                   </span>
-                  <span className="rounded-full bg-gray-100 px-2 py-0.5 font-mono text-[11px] text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                    {o.status}
+                  <span
+                    title={o.status}
+                    className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                  >
+                    {printStatusLabel(o.status)}
                   </span>
                   {o.mode === 'sandbox' ? <span className="text-amber-700 dark:text-amber-400">sandbox</span> : null}
                   <span className="text-gray-500">
