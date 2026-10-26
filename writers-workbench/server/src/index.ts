@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import { rateKey } from './lib/rate-key.js';
 import pinoHttp from 'pino-http';
 import crypto from 'crypto';
 import path from 'path';
@@ -143,28 +144,38 @@ app.use(
   })
 );
 
-// Rate limiters
-const chatLimiter = rateLimit({
+// Rate limiters. The app's own limits count per signed-in user (rateKey), so one author's tabs and
+// polls share a budget sized for real use. A per-IP backstop bounds anything without a session.
+const perUser = { standardHeaders: true, legacyHeaders: false, keyGenerator: rateKey, validate: { keyGeneratorIpFallback: false } } as const;
+
+const ipBackstop = rateLimit({
   windowMs: 60_000,
-  max: 30,
-  standardHeaders: true,
+  max: 3000,
+  standardHeaders: false,
   legacyHeaders: false,
+  message: { error: 'Too many requests from this address, please try again later' },
+});
+
+const chatLimiter = rateLimit({
+  ...perUser,
+  windowMs: 60_000,
+  max: 60,
   message: { error: 'Too many chat requests, please try again later' },
 });
 
 const exportLimiter = rateLimit({
+  ...perUser,
   windowMs: 60_000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
+  max: 20,
   message: { error: 'Too many export requests, please try again later' },
 });
 
+// 1200/min: the E2E suite (three browsers as one user) peaks at ~560/min, mostly
+// /api/credits/balance on every page; an author with several tabs open is well under it.
 const generalLimiter = rateLimit({
+  ...perUser,
   windowMs: 60_000,
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
+  max: 1200,
   message: { error: 'Too many requests, please try again later' },
 });
 
@@ -182,14 +193,14 @@ const authLimiter = rateLimit({
 });
 
 const brainstormLimiter = rateLimit({
+  ...perUser,
   windowMs: 60_000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
+  max: 10,
   message: { error: 'Too many brainstorm requests, please try again later' },
 });
 
 // Apply rate limits
+app.use('/api', ipBackstop);
 app.use('/api/chat', chatLimiter);
 app.use('/api/export', exportLimiter);
 app.use('/api/brainstorm', brainstormLimiter);
