@@ -273,9 +273,11 @@ export interface CreateOrder {
   quantity: number;
   itemDescription: string;
   files: OrderItemFiles;
+  /** The interior's page count. The estimate needs it on each item; creating reads it from the file. */
+  pageCount: number;
 }
 
-function orderBody(o: CreateOrder) {
+function orderBody(o: CreateOrder, withPageCount = false) {
   return {
     customerOrderId: o.customerOrderId,
     payload: o.payload,
@@ -284,7 +286,12 @@ function orderBody(o: CreateOrder) {
     shippingClassification: o.shippingClassification,
     destination: o.destination,
     orderItems: [
-      { sku: o.sku, quantity: o.quantity, itemDescription: o.itemDescription.slice(0, 200), product: o.files },
+      {
+        sku: o.sku,
+        quantity: o.quantity,
+        itemDescription: o.itemDescription.slice(0, 200),
+        product: withPageCount ? { ...o.files, pageCount: rpiPageCount(o.pageCount) } : o.files,
+      },
     ],
   };
 }
@@ -298,7 +305,9 @@ export interface FullEstimate {
 }
 
 export function estimateOrder(o: CreateOrder) {
-  return call<FullEstimate>('POST', '/orders/pricing/estimate', orderBody(o));
+  // RPI refuses an estimate without the page count ("pageCount must be provided for each order item
+  // product"): unlike an order, it has no file to count the pages of.
+  return call<FullEstimate>('POST', '/orders/pricing/estimate', orderBody(o, true));
 }
 
 export function createOrder(o: CreateOrder) {
