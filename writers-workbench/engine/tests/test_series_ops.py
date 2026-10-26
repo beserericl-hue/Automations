@@ -311,28 +311,43 @@ class TestMarketingGetsTheDatesFromTheRecord:
         monkeypatch.setattr(sc, "get_supabase_admin", admin)
         return calls
 
-    def test_only_dated_events_oldest_first(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_events_the_book_mentions_win_over_older_ones(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Oldest-first handed over 25 events ending in 1680; the 1935-1951 dig never made it."""
+        monkeypatch.setattr(M, "CANON_DATE_LIMIT", 2)
         calls = self._bible(
             monkeypatch,
             [
-                {
-                    "name": "1942 Deed of Gift Transfer",
-                    "description": "Dorothy Voss transferred the collection.",
-                },
-                {"name": "The burning of the longhouse", "description": "No date given."},
+                {"name": "The Paleoindian crossing", "description": "Around 1100 BC, a hunter."},
+                {"name": "1608 Smith's voyage", "description": "Smith maps the Potomac."},
                 {"name": "1935\u20131951 Excavation of 18PR8", "description": "Sixteen-year excavation."},
-                {"name": "Ferguson's season", "description": "Fieldwork at 18PR8 in 1940."},
+                {"name": "The burning of the longhouse", "description": "No date given."},
             ],
         )
-        lines = asyncio.run(M._load_canon_dates("p1"))
+        lines, evidence = asyncio.run(
+            M._load_canon_dates("p1", book_text="Four ossuaries, excavated between 1935 and 1951.")
+        )
         assert calls[0] == {"project_id": "p1", "entry_type": "event"}
+        # The on-page event is kept, the slot left goes to the oldest, and the list reads in order.
         assert [ln.split(":")[0] for ln in lines] == [
+            "- The Paleoindian crossing",
             "- 1935\u20131951 Excavation of 18PR8",
-            "- Ferguson's season",
-            "- 1942 Deed of Gift Transfer",
         ]
+        assert "1608 Smith" in evidence  # every dated event is evidence, even one not handed over
         block = M._canon_dates_block(lines)
         assert block.startswith("THE RECORD") and "1935\u20131951" in block
+
+    def test_book_ones_invented_span_and_squeezed_decades_are_caught(self) -> None:
+        book = "Four ossuaries, excavated between 1935 and 1951. The deed was signed in 1942. In 1668 the boundary."
+        copy = (
+            "Dorothy Voss excavated them in the 1930s and 1940s. The colonial record arrives in 1668. "
+            "The 344-year span Marcus tracks begins there. Under 1,200 characters."
+        )
+        assert M._unsupported_numbers(copy, book) == [
+            '"1930s" is not in the book or the record',
+            '"1940s" is not in the book or the record',
+            '"344" is not in the book or the record',
+        ]
+        assert M._unsupported_numbers("Excavated between 1935 and 1951, a sixteen-year dig.", book) == []
 
     def test_an_unreadable_bible_is_not_a_failure(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import writer_engine.supabase.client as sc
@@ -341,7 +356,7 @@ class TestMarketingGetsTheDatesFromTheRecord:
             raise RuntimeError("supabase down")
 
         monkeypatch.setattr(sc, "get_supabase_admin", boom)
-        assert asyncio.run(M._load_canon_dates("p1")) == []
+        assert asyncio.run(M._load_canon_dates("p1")) == ([], "")
         assert M._canon_dates_block([]) == ""
 
     def test_the_copywriter_is_told_a_span_stays_a_span_and_to_use_no_dashes(self) -> None:
