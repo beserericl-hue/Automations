@@ -287,9 +287,12 @@ def _is_junk_bible_name(name: str, entry_type: str) -> bool:
     if len(n) < 2:
         return True
     low = n.lower()
-    if "'s " in low or low.endswith("'s"):  # possessive -> a relation, not a character
-        return True
     if entry_type == "character":
+        # A possessive CHARACTER is a relation, not a person ("Tayak's grandmother"). A possessive
+        # place, object or event is an ordinary name ("Heater's Island", "Thomas Franklin's Pocket
+        # Watch", "Turkey Tayac's burial"), and rejecting those dropped real canon on every write.
+        if "'s " in low or low.endswith("'s"):
+            return True
         if low.startswith(("the ", "a ", "an ")):  # "The clerk", "A delegate"
             return True
         # generic role with no proper name (all lowercase, e.g. "commission chair", "constable")

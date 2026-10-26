@@ -117,6 +117,11 @@ def test_bible_junk_filter_rejects_pollution() -> None:
     assert j("Marcus Redcloud", "character") is False
     assert j("Nora Moyaone", "character") is False
     assert j("cord-marked pottery", "concept") is False
+    # A possessive is a relation only for a character. Places, objects and events keep theirs: the
+    # rule used to apply to every type and dropped canon like these on every chapter write.
+    assert j("Heater's Island", "place") is False
+    assert j("Thomas Franklin's Pocket Watch", "object") is False
+    assert j("Turkey Tayac's burial", "event") is False
 
 
 # --------------------------------------------------------------------------- CR-006 research link
