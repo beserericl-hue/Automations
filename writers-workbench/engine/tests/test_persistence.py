@@ -296,7 +296,11 @@ class TestCharacterVariants:
                 project_id="p",
                 user_id="u",
                 entries=[
-                    {"entry_type": "character", "name": "Osei", "description": "the surveyor who mapped the grid"},
+                    {
+                        "entry_type": "character",
+                        "name": "Osei",
+                        "description": "the surveyor who mapped the grid",
+                    },
                     {"entry_type": "character", "name": "Renata Voss", "description": "anthropologist"},
                 ],
             )
