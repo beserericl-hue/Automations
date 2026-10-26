@@ -12,6 +12,7 @@ import { describe, it, expect } from 'vitest';
 import { parseTemplateGeometry, rpiPageCount, verifyWebhook } from '../lib/rpi-print.js';
 import { buildPrintPdf } from '../lib/print-pdf.js';
 import { leadingSentences } from '../lib/cover.js';
+import { outsidePdf } from '../lib/print-files.js';
 
 // The labels as RPI's templates print them (IDML story text, 592 pages).
 const SOFTCOVER =
@@ -115,5 +116,16 @@ describe('author line on the back cover', () => {
     expect(leadingSentences(bio, 30)).toBe('He lives in Maryland.');
     expect(leadingSentences(bio, 85)).toBe('He lives in Maryland. He wrote two books about archives and the people in them.');
     expect(leadingSentences('One very long sentence with no end in sight at all.', 10)).toBe('');
+  });
+});
+
+describe('cover PDF', () => {
+  it('is one page at the template size, trimmed at the edge, with the image’s rendering intent set', async () => {
+    const sharp = (await import('sharp')).default;
+    const png = await sharp({ create: { width: 300, height: 200, channels: 3, background: '#130c07' } }).png().toBuffer();
+    const pdf = (await outsidePdf(png, { widthIn: 13.75, heightIn: 9.25, edgeIn: 0.125, panelWIn: 6, panelHIn: 9, spineIn: 1.5, flapIn: 0 })).toString('latin1');
+    expect(pdf).toContain('/MediaBox [0 0 990 666]');
+    expect(pdf).toContain('/TrimBox [9 9 981 657]');
+    expect(pdf).toMatch(/\/Subtype \/Image[\s\S]*?\/Intent \/RelativeColorimetric/);
   });
 });

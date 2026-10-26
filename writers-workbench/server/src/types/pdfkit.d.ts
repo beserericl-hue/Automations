@@ -30,6 +30,8 @@ declare module 'pdfkit' {
     x: number;
     y: number;
     translate(x: number, y: number): this;
+    /** A new indirect object. Plain strings in `data` are written as PDF names. */
+    ref(data?: Record<string, unknown>): unknown;
     addPage(): this;
     registerFont(name: string, src: Buffer | string): this;
     font(name: string): this;
