@@ -90,7 +90,7 @@ describe('PrintCopies', () => {
     fireEvent.click(screen.getByText('rush'));
     fireEvent.click(screen.getByRole('button', { name: 'Place sandbox order' }));
     await waitFor(() => expect(bodyOf('/submit')).toMatchObject({ quantity: 2, shipping_classification: 'rush' }));
-    expect(await screen.findByTestId('print-orders')).toHaveTextContent('RECEIVED');
+    expect(await screen.findByTestId('print-orders')).toHaveTextContent('Received by RPI');
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
 
@@ -101,5 +101,14 @@ describe('PrintCopies', () => {
     renderWithProviders(<PrintCopies projectId="p1" volumeCount={1} />);
     expect(await screen.findByText(/no RPI API key/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Build the print files' })).toBeDisabled();
+  });
+});
+
+describe('printStatusLabel', () => {
+  it('says what RPI\'s state means, and falls back to readable words for one it adds later', async () => {
+    const { printStatusLabel } = await import('./PrintCopies');
+    expect(printStatusLabel('RECEIVED_BY_PRINTER')).toBe('Accepted by the printer');
+    expect(printStatusLabel('VALID_HOLDING_BIN')).toBe('Paid, in the holding bin');
+    expect(printStatusLabel('ON_HOLD_FOR_REVIEW')).toBe('On hold for review');
   });
 });
