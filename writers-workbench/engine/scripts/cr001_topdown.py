@@ -44,7 +44,9 @@ PREMISE = (
 
 def _http(method: str, url: str, *, headers: dict[str, str], body: Any = None, timeout: float = 120) -> Any:
     data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(url, data=data, method=method, headers={"content-type": "application/json", **headers})
+    req = urllib.request.Request(
+        url, data=data, method=method, headers={"content-type": "application/json", **headers}
+    )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read() or b"null")
 
@@ -56,7 +58,9 @@ class Engine:
 
     def call(self, tool: str, body: dict[str, Any], *, wait_s: float = 1800) -> dict[str, Any]:
         """Run one write tool. Async jobs are polled to completion; returns the step result."""
-        out = _http("POST", f"{self.gateway}/internal/write/{tool}", headers=self.headers, body=body, timeout=600)
+        out = _http(
+            "POST", f"{self.gateway}/internal/write/{tool}", headers=self.headers, body=body, timeout=600
+        )
         job_id = out.get("job_id") if isinstance(out, dict) else None
         if job_id:
             deadline = time.time() + wait_s
@@ -101,33 +105,71 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     report["stages"]["create"] = round(time.time() - t0)
 
     t0 = time.time()
-    eng.call("brainstorm", {**base, "op": "story", "project_id": project_id, "title": title,
-                            "premise": PREMISE, "target_chapter_count": n, "async": True})
+    eng.call(
+        "brainstorm",
+        {
+            **base,
+            "op": "story",
+            "project_id": project_id,
+            "title": title,
+            "premise": PREMISE,
+            "target_chapter_count": n,
+            "async": True,
+        },
+    )
     report["stages"]["outline"] = round(time.time() - t0)
 
     t0 = time.time()
     for ch in range(1, n + 1):
-        eng.call("chapter", {**base, "op": "plan", "project_id": project_id, "project_title": title,
-                             "chapter_number": ch, "async": True})
+        eng.call(
+            "chapter",
+            {
+                **base,
+                "op": "plan",
+                "project_id": project_id,
+                "project_title": title,
+                "chapter_number": ch,
+                "async": True,
+            },
+        )
     report["stages"]["plans"] = round(time.time() - t0)
 
     t0 = time.time()
-    eng.call("research", {**base, "op": "run", "project_id": project_id,
-                          "topic": f"{title}: Piscataway ossuary burial practice on the Potomac", "async": True})
+    eng.call(
+        "research",
+        {
+            **base,
+            "op": "run",
+            "project_id": project_id,
+            "topic": f"{title}: Piscataway ossuary burial practice on the Potomac",
+            "async": True,
+        },
+    )
     report["stages"]["research"] = round(time.time() - t0)
 
     t0 = time.time()
     for ch in range(1, n + 1):
-        eng.call("chapter", {**base, "op": "write", "project_id": project_id, "project_title": title,
-                             "chapter_number": ch, "async": True})
+        eng.call(
+            "chapter",
+            {
+                **base,
+                "op": "write",
+                "project_id": project_id,
+                "project_title": title,
+                "chapter_number": ch,
+                "async": True,
+            },
+        )
     report["stages"]["chapters"] = round(time.time() - t0)
 
     # --- read everything back ----------------------------------------------------------------
     proj = db.get("writing_projects_v2", f"id=eq.{project_id}&select=outline")
     chapters = ((proj[0] if proj else {}).get("outline") or {}).get("chapters") or []
     planned = [c for c in chapters if ((c.get("chapter_outline") or {}).get("sub_chapters"))]
-    written = db.get("published_content_v2",
-                     f"project_id=eq.{project_id}&content_type=eq.chapter&deleted_at=is.null&select=id,chapter_number,content_text")
+    written = db.get(
+        "published_content_v2",
+        f"project_id=eq.{project_id}&content_type=eq.chapter&deleted_at=is.null&select=id,chapter_number,content_text",
+    )
     words = {int(r["chapter_number"]): len(str(r.get("content_text") or "").split()) for r in written}
     ids = ",".join(str(r["id"]) for r in written) or "00000000-0000-0000-0000-000000000000"
     versions = db.get("content_versions_v2", f"content_id=in.({ids})&select=content_id")
@@ -144,8 +186,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     checks["bible_has_characters"] = sum(1 for b in bible if b.get("entry_type") == "character") >= 1
     checks["research_linked_to_project"] = len(links) >= 1
     report["counts"] = {
-        "outline_chapters": len(chapters), "planned": len(planned), "outline_snapshots": len(snapshots),
-        "words": words, "versions": len(versions), "bible": len(bible), "research_links": len(links),
+        "outline_chapters": len(chapters),
+        "planned": len(planned),
+        "outline_snapshots": len(snapshots),
+        "words": words,
+        "versions": len(versions),
+        "bible": len(bible),
+        "research_links": len(links),
     }
     report["passed"] = all(checks.values())
     return report
