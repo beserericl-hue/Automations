@@ -588,7 +588,10 @@ async def _persist_chapter_outline(
                 .execute()
             )
         except Exception as exc:
+            # No history, no overwrite: the brainstorm path already refuses, and a chapter outline the
+            # author cannot get back is worse than one that was not updated (CR-001 audit).
             logger.warning("plan.snapshot_failed", error=str(exc)[:160])
+            return {"persisted": False, "reason": "could not snapshot the outline first"}
         found = False
         for ch in chapters:
             if isinstance(ch, dict) and str(ch.get("chapter_number")) == str(chapter_number):
@@ -2074,6 +2077,7 @@ async def _persist_chapter_if_requested(
                 topic=f"{project_title} — Chapter {chapter_number} research",
                 content=research_used,
                 genre_slug=genre,
+                replace_same_topic=True,
             )
             # A6: the duplicate `research` story-bible write is GONE. persist_research above already
             # stores the full research text in research_reports_v2 (linked to the project by

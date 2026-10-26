@@ -71,6 +71,9 @@ def test_persist_chapter_merges_metadata_preserving_qa_report() -> None:
         def eq(self, *_a, **_k):
             return self
 
+        def is_(self, *_a, **_k):
+            return self
+
         def order(self, *_a, **_k):
             return self
 
@@ -112,3 +115,131 @@ def test_persist_chapter_merges_metadata_preserving_qa_report() -> None:
     assert md.get("dismissed_annotations") == ["drift_scan:3:name_variant:Meara"]
     # refreshed:
     assert md["craft_qa"]["prose_transparent"] == 0.9 and md["word_count"] == 200
+
+
+class _Table:
+    """Just enough of a Supabase table for persist_chapter: filters, order, limit, insert, update."""
+
+    def __init__(self, db: dict, name: str) -> None:
+        self.db, self.name = db, name
+        self.filters: list = []
+        self._order: tuple | None = None
+        self._limit: int | None = None
+        self._op: tuple | None = None
+
+    def select(self, *_a, **_k):
+        return self
+
+    def eq(self, k, v):
+        self.filters.append(lambda r: r.get(k) == v)
+        return self
+
+    def is_(self, k, v):
+        self.filters.append(lambda r: r.get(k) is None)
+        return self
+
+    def order(self, k, desc=False):
+        self._order = (k, desc)
+        return self
+
+    def limit(self, n):
+        self._limit = n
+        return self
+
+    def insert(self, row):
+        self._op = ("insert", row)
+        return self
+
+    def update(self, row):
+        self._op = ("update", row)
+        return self
+
+    async def execute(self):
+        rows = self.db.setdefault(self.name, [])
+        if self._op and self._op[0] == "insert":
+            row = {"id": f"{self.name}-{len(rows) + 1}", "deleted_at": None, **self._op[1]}
+            rows.append(row)
+            return type("R", (), {"data": [row]})()
+        hit = [r for r in rows if all(f(r) for f in self.filters)]
+        if self._op and self._op[0] == "update":
+            for r in hit:
+                r.update(self._op[1])
+            return type("R", (), {"data": hit})()
+        if self._order:
+            hit = sorted(hit, key=lambda r: r.get(self._order[0]) or 0, reverse=self._order[1])
+        return type("R", (), {"data": hit[: self._limit] if self._limit else hit})()
+
+
+class _Db:
+    def __init__(self, data: dict) -> None:
+        self.data = data
+
+    def table(self, name):
+        return _Table(self.data, name)
+
+
+def _write(db: _Db, text: str) -> str:
+    from writer_engine.persist_helpers import persist_chapter
+
+    return asyncio.run(
+        persist_chapter(db, project_id="p", user_id="u", chapter_number=4, title="Ch 4", content_text=text)
+    )
+
+
+def test_a_rewrite_keeps_the_hand_edited_text_it_replaces() -> None:
+    """CR-001 audit: versions held only engine writes, so a chapter last edited by hand was overwritten
+    with no copy of what the author had written."""
+    db = _Db({"published_content_v2": [], "content_versions_v2": []})
+    cid = _write(db, "engine draft one")
+    db.data["published_content_v2"][0]["content_text"] = "the author's own edit"  # a hand edit, no version
+    assert _write(db, "engine draft two") == cid
+    versions = sorted(db.data["content_versions_v2"], key=lambda v: v["version_number"])
+    assert [v["content_text"] for v in versions] == [
+        "engine draft one",
+        "the author's own edit",
+        "engine draft two",
+    ]
+    assert "before the engine rewrote it" in versions[1]["change_note"]
+
+
+def test_an_unchanged_chapter_is_not_versioned_twice() -> None:
+    db = _Db({"published_content_v2": [], "content_versions_v2": []})
+    _write(db, "draft one")
+    _write(db, "draft two")
+    assert [v["content_text"] for v in db.data["content_versions_v2"]] == ["draft one", "draft two"]
+
+
+def test_a_rewrite_does_not_land_in_a_trashed_chapter() -> None:
+    db = _Db({"published_content_v2": [], "content_versions_v2": []})
+    old = _write(db, "draft one")
+    db.data["published_content_v2"][0]["deleted_at"] = "2026-10-26T00:00:00Z"
+    new = _write(db, "draft two")
+    assert new != old
+    live = [r for r in db.data["published_content_v2"] if r["deleted_at"] is None]
+    assert [r["content_text"] for r in live] == ["draft two"]
+
+
+def test_a_chapter_rewrite_updates_its_research_instead_of_adding_a_copy() -> None:
+    """114 duplicate "— Chapter N research" reports on DEV, one per rewrite."""
+    from writer_engine.persist_helpers import persist_research
+
+    db = _Db({"research_reports_v2": [], "research_report_projects_v2": []})
+
+    def go(content: str, replace: bool) -> str:
+        return asyncio.run(
+            persist_research(
+                db,
+                project_id="p",
+                user_id="u",
+                topic="X — Chapter 4 research",
+                content=content,
+                replace_same_topic=replace,
+            )
+        )
+
+    first = go("facts v1", True)
+    assert go("facts v2", True) == first
+    assert [r["content"] for r in db.data["research_reports_v2"]] == ["facts v2"]
+    assert len(db.data["research_report_projects_v2"]) == 1
+    go("a standalone report", False)  # the research screen still adds a new report every time
+    assert len(db.data["research_reports_v2"]) == 2

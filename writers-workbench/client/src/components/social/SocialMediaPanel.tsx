@@ -170,7 +170,7 @@ export default function SocialMediaPanel({ projectId }: SocialMediaPanelProps) {
           </svg>
           <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No social posts yet</h3>
           <p className="mt-1 text-sm text-gray-500">
-            Use the chat or Eve to repurpose content for social media. Try: "Repurpose [title] for social media"
+            Write posts from a project's Promotion tab, or with Generate posts on any chapter or blog post. The chat and Eve can do it too.
           </p>
         </div>
       )}
