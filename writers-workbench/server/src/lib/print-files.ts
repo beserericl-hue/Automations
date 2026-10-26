@@ -58,7 +58,17 @@ export async function outsidePdf(png: Buffer, g: CoverGeometry): Promise<Buffer>
   const e = g.edgeIn * 72;
   dict.TrimBox = [e, e, W - e, H - e];
   dict.BleedBox = [0, 0, W, H];
+  // The image's rendering intent, set as its dictionary is created: pdfkit writes an image object the
+  // moment it is embedded, so it cannot be added afterwards. RPI's preflight otherwise sets it itself
+  // and reports "Setting the image's rendering intent" on every cover. Relative colorimetric is the
+  // print default for photographic art.
+  const ref = doc.ref.bind(doc);
+  doc.ref = (data?: Record<string, unknown>) => {
+    if (data?.Subtype === 'Image') data.Intent = 'RelativeColorimetric';
+    return ref(data);
+  };
   doc.image(jpg, 0, 0, { width: W, height: H });
+  doc.ref = ref;
   doc.end();
   await done;
   return Buffer.concat(chunks);
