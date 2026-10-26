@@ -278,6 +278,8 @@ describe('the public page', () => {
     expect(slugify("  Ōsaka & the Sea: Vol. 2!  ")).toBe('osaka-and-the-sea-vol-2');
     expect(slugify('!!!')).toBe('book');
     expect(slugify('a'.repeat(80)).length).toBe(60);
+    // Cut at a word, never mid-word.
+    expect(slugify('The Forgotten Engineers of Rome: How Aqueducts Shaped an Empire')).toBe('the-forgotten-engineers-of-rome-how-aqueducts-shaped-an');
   });
 
   it('has a form that posts, with named fields, a required email and a bot trap', () => {

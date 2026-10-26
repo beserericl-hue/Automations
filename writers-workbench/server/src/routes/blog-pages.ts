@@ -146,7 +146,7 @@ blogWebRouter.post('/:id/web', async (req: Request, res: Response) => {
   try {
     let web = post.metadata?.web;
     if (!web) {
-      let slug = slugify(String(post.title ?? '')).slice(0, 80).replace(/-+$/, '') || 'post';
+      let slug = slugify(String(post.title ?? ''), 80);
       if (await slugTaken(slug, post.id)) slug = `${slug}-${post.id.slice(0, 6)}`;
       web = { slug, published_at: new Date().toISOString() };
       const { error } = await getSupabaseAdmin()

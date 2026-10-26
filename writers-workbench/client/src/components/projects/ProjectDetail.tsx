@@ -15,6 +15,7 @@ import ProjectEditForm from './ProjectEditForm';
 import ImageGallery from '../images/ImageGallery';
 import SocialMediaPanel from '../social/SocialMediaPanel';
 import CostDashboard from '../cost/CostDashboard';
+import { startChapterAction, type ChapterAction } from '../../lib/chapterActions';
 import { useEngineJobQueue } from '../../hooks/useEngineJobQueue';
 import { useChapterRepair } from '../../hooks/useChapterRepair';
 import { useImageGenerator } from '../../hooks/useImageGenerator';
@@ -681,7 +682,7 @@ function OutlineTab({ outline, storyArc, projectId, projectTitle, genreSlug, use
   const [expandedChapters, setExpandedChapters] = useState<Set<number | string>>(new Set());
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogConfig, setDialogConfig] = useState<{ title: string; description: string; sendLabel: string; buildCommand: (notes: string) => string; invalidate: ReadonlyArray<readonly unknown[]> } | null>(null);
+  const [dialogConfig, setDialogConfig] = useState<{ title: string; description: string; sendLabel: string; action: ChapterAction; chapterNumber: number; invalidate: ReadonlyArray<readonly unknown[]> } | null>(null);
   // Queue heavy generation (chapter outline / write / rewrite) so the click returns immediately and
   // the UI is freed to fan out other jobs; results refetch when each engine job completes.
   // Scoped to the project: the keys here are chapter numbers, which repeat across books.
@@ -963,7 +964,8 @@ function OutlineTab({ outline, storyArc, projectId, projectTitle, genreSlug, use
                       title: hasOutline ? `Re-outline ${chapterLabel}` : `Create outline for ${chapterLabel}`,
                       description: `${hasOutline ? 'Rewrite' : 'Create'} a detailed sub-chapter outline for "${ch.title}" with scenes, arc beats, and character assignments.`,
                       sendLabel: hasOutline ? 'Re-outline' : 'Create Outline',
-                      buildCommand: (notes) => `chapter outline for ${chapterLabel} of ${projectTitle}` + (notes ? `. ADDITIONAL INSTRUCTIONS: ${notes}` : ''),
+                      action: 'outline',
+                      chapterNumber: Number(ch.chapter_number),
                       invalidate: [['project-detail', projectId], ['outline-versions-info', projectId]],
                     });
                     setPendingAction(`${actionKey}:outline`);
@@ -984,7 +986,8 @@ function OutlineTab({ outline, storyArc, projectId, projectTitle, genreSlug, use
                         title: isWritten ? `Rewrite ${chapterLabel}` : `Write ${chapterLabel}`,
                         description: `${isWritten ? 'Rewrite' : 'Write'} "${ch.title}" based on its chapter outline and the book outline.`,
                         sendLabel: isWritten ? 'Rewrite Chapter' : 'Write Chapter',
-                        buildCommand: (notes) => `${isWritten ? 'rewrite' : 'write'} ${chapterLabel} of ${projectTitle}. IMPORTANT: Follow the chapter outline and book outline exactly — use the outlined sub-chapters, characters, arc beats, and scene briefs. Do not deviate from the outline structure.` + (notes ? ` ADDITIONAL INSTRUCTIONS: ${notes}` : ''),
+                        action: isWritten ? 'rewrite' : 'write',
+                        chapterNumber: Number(ch.chapter_number),
                         invalidate: [['project-chapters', projectId], ['project-chapter-qa', projectId], ['project-detail', projectId]],
                       });
                       setPendingAction(`${actionKey}:write`);
@@ -1076,13 +1079,14 @@ function OutlineTab({ outline, storyArc, projectId, projectTitle, genreSlug, use
           onClose={() => { setDialogOpen(false); setPendingAction(null); }}
           onSend={(notes) => {
             setDialogOpen(false);
-            const cmd = dialogConfig.buildCommand(notes);
+            const { action, chapterNumber } = dialogConfig;
             const key = pendingAction;
             const invalidate = dialogConfig.invalidate as unknown[][];
             setPendingAction(null);
             // Queue and return immediately — the job runs in the background, the row shows "Queued…",
-            // and the relevant queries refetch when the engine job completes.
-            if (key) void jobQueue.enqueue(key, cmd, invalidate);
+            // and the relevant queries refetch when the engine job completes. Sent by id, with the
+            // author's notes as notes, not as a sentence for the chat router to reparse.
+            if (key) void jobQueue.run(key, () => startChapterAction(projectId, chapterNumber, action, notes), invalidate);
           }}
           title={dialogConfig.title}
           description={dialogConfig.description}
@@ -1169,7 +1173,7 @@ function ChaptersTab({
 }) {
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogConfig, setDialogConfig] = useState<{ title: string; description: string; sendLabel: string; buildCommand: (notes: string) => string; invalidate: ReadonlyArray<readonly unknown[]> } | null>(null);
+  const [dialogConfig, setDialogConfig] = useState<{ title: string; description: string; sendLabel: string; action: ChapterAction; chapterNumber: number; invalidate: ReadonlyArray<readonly unknown[]> } | null>(null);
   // Queue chapter rewrites so the click returns immediately; results refetch when the job completes.
   const jobQueue = useEngineJobQueue(userId, projectId);
   // Per-chapter artwork generation → generated_images_v2 (image_type=chapter_art, associated with the
@@ -1246,7 +1250,8 @@ function ChaptersTab({
                           title: `Rewrite ${chapterLabel}`,
                           description: `Rewrite "${ch.title}" based on the chapter outline and book outline.`,
                           sendLabel: 'Rewrite Chapter',
-                          buildCommand: (notes) => `rewrite ${chapterLabel} of ${projectTitle}. IMPORTANT: Follow the chapter outline and book outline exactly — use the outlined sub-chapters, characters, arc beats, and scene briefs. Do not deviate from the outline structure.` + (notes ? ` ADDITIONAL INSTRUCTIONS: ${notes}` : ''),
+                          action: 'rewrite',
+                          chapterNumber: Number(ch.chapter_number),
                           invalidate: [['project-chapters', projectId], ['project-chapter-qa', projectId], ['project-detail', projectId]],
                         });
                         setPendingAction(actionKey);
@@ -1322,13 +1327,14 @@ function ChaptersTab({
           onClose={() => { setDialogOpen(false); setPendingAction(null); }}
           onSend={(notes) => {
             setDialogOpen(false);
-            const cmd = dialogConfig.buildCommand(notes);
+            const { action, chapterNumber } = dialogConfig;
             const key = pendingAction;
             const invalidate = dialogConfig.invalidate as unknown[][];
             setPendingAction(null);
             // Queue and return immediately — the job runs in the background, the row shows "Queued…",
-            // and the relevant queries refetch when the engine job completes.
-            if (key) void jobQueue.enqueue(key, cmd, invalidate);
+            // and the relevant queries refetch when the engine job completes. Sent by id, with the
+            // author's notes as notes, not as a sentence for the chat router to reparse.
+            if (key) void jobQueue.run(key, () => startChapterAction(projectId, chapterNumber, action, notes), invalidate);
           }}
           title={dialogConfig.title}
           description={dialogConfig.description}

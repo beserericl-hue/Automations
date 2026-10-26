@@ -135,3 +135,14 @@ describe('publishing a post', () => {
     });
   });
 });
+
+describe('the address', () => {
+  it('cuts a long title at a word', async () => {
+    db.published_content_v2[0].title = 'The Forgotten Engineers of Rome: How Aqueducts Shaped an Empire and the Cities That Drank From Them';
+    await withServer(async (base) => {
+      const j = await fetch(`${base}/api/content/aaaaaa11-0000-0000-0000-000000000000/web`, { method: 'POST' }).then((r) => r.json() as Promise<any>); // eslint-disable-line @typescript-eslint/no-explicit-any
+      expect(j.data.slug).toBe('the-forgotten-engineers-of-rome-how-aqueducts-shaped-an-empire-and-the-cities');
+      expect(j.data.slug.length).toBeLessThanOrEqual(80);
+    });
+  });
+});
