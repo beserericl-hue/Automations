@@ -97,6 +97,11 @@ These work only by typing in the chat drawer; add first-class buttons:
 
 CR-003 already **wired the core**: stateless gateway, arq-on-Redis queue, a **Redis-shared Anthropic budget** so N instances draw from one rate pool, `MAX_CONCURRENT_LLM` per-instance semaphore, and 429 backoff. The model is "+10 users = +1 engine instance." Remaining work to actually run multi-instance safely:
 
+> **Buttons, DEV 2026-10-26:**
+> - Research: Research this, on the Research screens and the project Research tab.
+> - Images: Generate, in the gallery.
+> - Social posts: the project Promotion tab, plus Generate posts on any chapter or blog post (`POST /api/content/:id/social`, posts linked through `source_content_id`).
+
 ### C1 — Run more than one of each (the actual horizontal scale)
 
 > **DEV status 2026-10-26:** 2 gateway and 2 runtime replicas on DEV. Per-instance arq heartbeats are summed into fleet totals, and scheduled jobs are locked to one replica. The fleet registry is shown at `/internal/fleet` and Admin → Engine Fleet. PROD (4 replicas) waits for the cutover. See `engine/docs/deployment.md`.

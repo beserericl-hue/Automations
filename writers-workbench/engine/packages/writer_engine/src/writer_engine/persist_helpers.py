@@ -199,6 +199,44 @@ async def persist_canon(client: Any, *, project_id: str, user_id: str, outline: 
         )
 
 
+async def _latest_version(client: Any, content_id: str) -> tuple[int, str | None]:
+    resp = await (
+        client.table("content_versions_v2")
+        .select("version_number, content_text")
+        .eq("content_id", content_id)
+        .order("version_number", desc=True)
+        .limit(1)
+        .execute()
+    )
+    top = (await _rows(resp) or [{}])[0]
+    return int(top.get("version_number") or 0), top.get("content_text")
+
+
+async def _snapshot_current_text(
+    client: Any, *, content_id: str, user_id: str, current: str, chapter_number: int
+) -> None:
+    """Save the chapter's current text as a version unless the newest version already holds it."""
+    if not current.strip():
+        return
+    n, latest_text = await _latest_version(client, content_id)
+    if latest_text == current:
+        return
+    await (
+        client.table("content_versions_v2")
+        .insert(
+            {
+                "user_id": user_id,
+                "content_id": content_id,
+                "version_number": n + 1,
+                "content_text": current,
+                "changed_by": "engine",
+                "change_note": f"chapter {chapter_number}: text before the engine rewrote it",
+            }
+        )
+        .execute()
+    )
+
+
 async def persist_chapter(
     client: Any,
     *,
@@ -211,13 +249,23 @@ async def persist_chapter(
     metadata: dict | None = None,
 ) -> str:
     """Idempotent (project_id, chapter_number) upsert into published_content_v2 + a content_versions_v2
-    snapshot (W3). Returns the content id."""
+    snapshot (W3). Returns the content id.
+
+    Two things a rewrite must not do (CR-001 audit, 2026-10-26):
+
+    * **lose the text it replaces.** Versions held only engine writes, so a chapter last changed by
+      hand (or by n8n) had no version of its current text, and the rewrite overwrote it for good.
+      The current text is now saved as a version first whenever the newest version differs from it.
+    * **write into a trashed row.** The lookup did not skip soft-deleted chapters, so rewriting a
+      chapter the author had deleted put the new text in the trash where the UI never shows it.
+    """
     existing = await (
         client.table("published_content_v2")
-        .select("id, metadata")
+        .select("id, metadata, content_text")
         .eq("project_id", project_id)
         .eq("content_type", "chapter")
         .eq("chapter_number", chapter_number)
+        .is_("deleted_at", None)
         .limit(1)
         .execute()
     )
@@ -235,6 +283,13 @@ async def persist_chapter(
     }
     if rows:
         content_id = str(rows[0]["id"])
+        await _snapshot_current_text(
+            client,
+            content_id=content_id,
+            user_id=user_id,
+            current=str(rows[0].get("content_text") or ""),
+            chapter_number=chapter_number,
+        )
         # MERGE metadata on a re-write (repair/rewrite): the caller passes only the write-time keys
         # (chapter_run_id, word_count, sub_chapter_count, craft_qa, drift_report). Overwriting the whole
         # metadata column here WIPED fields the rewrite doesn't own — most visibly ``qa_report`` (the Q/A
@@ -252,15 +307,7 @@ async def persist_chapter(
         ins = await client.table("published_content_v2").insert(row).execute()
         content_id = str((await _rows(ins) or [{"id": str(uuid4())}])[0]["id"])
     # version snapshot
-    vresp = await (
-        client.table("content_versions_v2")
-        .select("version_number")
-        .eq("content_id", content_id)
-        .order("version_number", desc=True)
-        .limit(1)
-        .execute()
-    )
-    n = ((await _rows(vresp) or [{}])[0].get("version_number") or 0) + 1
+    n = (await _latest_version(client, content_id))[0] + 1
     await (
         client.table("content_versions_v2")
         .insert(
@@ -328,15 +375,20 @@ async def persist_bible(
             "entry_type": entry_type,
             "name": name,
             "description": e.get("description") or "",
-            "last_chapter_seen": chapter_number,
         }
+        # Only a chapter sighting moves this; a hand-added entry must not null it out.
+        if chapter_number is not None:
+            row["last_chapter_seen"] = chapter_number
         try:
+            # Live rows only: matching a soft-deleted duplicate updated the trashed copy and left the
+            # entry the author sees stale.
             existing = await (
                 client.table("story_bible_v2")
                 .select("id")
                 .eq("project_id", project_id)
                 .eq("entry_type", entry_type)
                 .eq("name", name)
+                .is_("deleted_at", None)
                 .limit(1)
                 .execute()
             )
@@ -363,13 +415,53 @@ async def persist_bible(
 
 
 async def persist_research(
-    client: Any, *, project_id: str | None, user_id: str, topic: str, content: str, genre_slug: str = ""
+    client: Any,
+    *,
+    project_id: str | None,
+    user_id: str,
+    topic: str,
+    content: str,
+    genre_slug: str = "",
+    replace_same_topic: bool = False,
 ) -> str:
     """Insert a research report (W5) and, when a project is given, link it to that project via the
     research_report_projects_v2 meta table (CR-006) so the UI research tab can filter by project.
     research_reports_v2 itself is a base table with no project_id column, so the link lives in the
     meta table. The caller passes the topic as the user should READ it: the project id belongs in the
-    link row, not in the title."""
+    link row, not in the title.
+
+    ``replace_same_topic``: update the user's live report with this exact topic instead of adding
+    another. The chapter path uses it, because its topic names the chapter ("… — Chapter 4
+    research") and every rewrite used to add a copy: 114 duplicates across 103 chapters on DEV.
+    """
+    if replace_same_topic:
+        found = await _rows(
+            await client.table("research_reports_v2")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("topic", topic)
+            .is_("deleted_at", None)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if found:
+            from datetime import UTC, datetime
+
+            report_id = str(found[0]["id"])
+            await (
+                client.table("research_reports_v2")
+                .update(
+                    {
+                        "content": content,
+                        "genre_slug": genre_slug,
+                        "updated_at": datetime.now(UTC).isoformat(),
+                    }
+                )
+                .eq("id", report_id)
+                .execute()
+            )
+            return report_id
     resp = await (
         client.table("research_reports_v2")
         .insert(

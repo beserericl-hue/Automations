@@ -304,6 +304,13 @@ async def _persist_social_posts(payload: dict, posts: dict) -> dict | None:
             {
                 "user_id": str(user_id),
                 "project_id": project_id,
+                # The piece the posts were made from, when the caller names it (the content page's
+                # Generate posts button does). The column existed; nothing ever filled it.
+                **(
+                    {"source_content_id": str(payload["source_content_id"])}
+                    if payload.get("source_content_id")
+                    else {}
+                ),
                 "platform": p,
                 "post_text": t.strip(),
                 "status": "draft",

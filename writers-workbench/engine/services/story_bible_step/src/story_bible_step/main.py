@@ -19,14 +19,29 @@ async def _supabase_or_none():
 
 
 async def _op_add(payload: dict) -> dict:
+    """Add or update one entry, de-duped on (project_id, entry_type, name).
+
+    Was ``upsert(on_conflict="project_id,entry_type,name")``, which needs a UNIQUE constraint the
+    table does not have: on DEV every call raised 42P10, so "add X to the story bible" never saved.
+    Goes through ``persist_bible`` now, the same select-then-write the chapter path uses.
+    """
     client = await _supabase_or_none()
     entry = payload.get("entry") or {}
     if client is None:
         return {"entry": entry, "deduped": False}
-    resp = await (
-        client.table("story_bible_v2").upsert(entry, on_conflict="project_id,entry_type,name").execute()
-    )
-    return {"entry": (getattr(resp, "data", None) or [entry])[0], "deduped": True}
+    project_id = str(entry.get("project_id") or payload.get("project_id") or "")
+    user_id = str(entry.get("user_id") or payload.get("user_id") or "")
+    if not project_id or not user_id or not entry.get("name"):
+        return {
+            "entry": entry,
+            "deduped": False,
+            "saved": False,
+            "reason": "project_id, user_id and name required",
+        }
+    from writer_engine.persist_helpers import persist_bible
+
+    saved = await persist_bible(client, project_id=project_id, user_id=user_id, entries=[entry])
+    return {"entry": entry, "deduped": True, "saved": bool(saved)}
 
 
 async def _op_list(payload: dict) -> dict:
@@ -47,7 +62,13 @@ async def _op_list(payload: dict) -> dict:
                 "found": False,
                 "message": f"No project matching '{payload['project_title']}' found.",
             }
-    resp = await client.table("story_bible_v2").select("*").eq("project_id", project_id).execute()
+    resp = await (
+        client.table("story_bible_v2")
+        .select("*")
+        .eq("project_id", project_id)
+        .is_("deleted_at", None)  # trashed entries are not part of the bible
+        .execute()
+    )
     rows = getattr(resp, "data", None) or []
     return {"entries": rows, "count": len(rows), "found": bool(rows), "project_id": project_id}
 

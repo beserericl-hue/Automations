@@ -36,10 +36,20 @@ test.describe('ProjectDetail Outline + Write (result-asserting)', () => {
       .poll(async () => {
         const rows = await supaGet('writing_projects_v2', `id=eq.${projectId}&select=outline`);
         const ch = rows[0]?.outline?.chapters?.[0]?.chapter_outline;
-        const briefs = ch?.sub_chapter_briefs ?? ch?.subchapters ?? (Array.isArray(ch) ? ch : null);
-        return Array.isArray(briefs) ? briefs.length : (ch ? 1 : 0);
+        // The engine writes `sub_chapters` (chapter_step._persist_chapter_outline). Counting only that
+        // key: the old fallback `ch ? 1 : 0` passed on any object, so a plan with no beats passed too.
+        const briefs = ch?.sub_chapters;
+        return Array.isArray(briefs) ? briefs.length : 0;
       }, { timeout: 220_000, message: 'chapter.plan never persisted a chapter_outline' })
       .toBeGreaterThan(0);
+
+    // DISPLAYED (CR-001 W9): the persisted sub-chapter brief renders in the Outline tab.
+    const saved = await supaGet('writing_projects_v2', `id=eq.${projectId}&select=outline`);
+    const firstBrief = String(saved[0]?.outline?.chapters?.[0]?.chapter_outline?.sub_chapters?.[0]?.brief ?? '');
+    expect(firstBrief.length, 'the persisted sub-chapter has a brief').toBeGreaterThan(10);
+    await page.goto(`/projects/${projectId}?tab=outline`);
+    await page.getByRole('button', { name: 'Expand all' }).click();
+    await expect(page.getByText(firstBrief.slice(0, 60), { exact: false }).first()).toBeVisible({ timeout: 20_000 });
   });
 
   test('Write button runs chapter.write → a chapter with real content is persisted', async ({ page }) => {

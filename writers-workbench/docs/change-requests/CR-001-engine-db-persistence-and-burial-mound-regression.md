@@ -2,12 +2,26 @@
 
 | | |
 |---|---|
-| **Status** | Proposed |
+| **Status** | Done on DEV (audited 2026-10-26, see §0) |
 | **Opened** | 2026-06-05 |
 | **Tier** | DEV only (no PROD flip in this CR) |
 | **Owner** | Eric Beser |
 | **Depends on** | F1-A write steps (done), F1-B gate machinery (#129), chapter-outline `plan` op (#126) |
 | **Related** | F1-1 (`persist` + `chapter-orch`), F1-7 hub rewiring (separate CR) |
+
+## 0. Status (audit 2026-10-26)
+
+W1–W6 were done in code before this audit. The audit found gaps, now fixed:
+
+- **W3, a rewrite lost the text it replaced.** Versions held only engine writes, so a chapter last edited by hand or by n8n had no copy of its current text. `persist_chapter` now saves the current text as a version first when the newest version differs from it.
+- **W3, a rewrite of a trashed chapter wrote into the trash.** The lookup now skips soft-deleted rows.
+- **W4, matching trashed bible entries.** `persist_bible` matched soft-deleted duplicates and updated those. It now matches live rows only, and a hand-added entry no longer nulls `last_chapter_seen`.
+- **W4, `story_bible.add` never saved.** It used `upsert(on_conflict=…)`, but the table has no unique constraint, so every call raised 42P10 on DEV. It now goes through `persist_bible`. `story_bible.list` no longer returns trashed entries.
+- **W5, duplicate research.** Each chapter rewrite added another "— Chapter N research" report; it now updates the chapter's existing one. The 114 duplicates already on DEV were soft-deleted, with an undo list at `~/.config/writers-workbench/research-dedupe-2026-10-26.json`.
+- **W6, outline overwritten without a snapshot.** `plan` overwrote the outline even when its snapshot failed. It now refuses, as brainstorm already did.
+- **W7** works through each step's `persist` chain plus the arq run ledger (B6). There is no separate `chapter-orch` service, and dedupe is per job/run id, not per `chapter_run_id`.
+- **W8** is `engine/scripts/cr001_topdown.py`: one new project, outline → plans → research → chapters, all persisted, with a database read-back. `--chapters 84` is the full Burial Mound.
+- **W9** is `e2e/regression/engine-readback.spec.ts`, which checks that an engine-written project's outline, chapters, bible and research render. `project-plan-write.spec.ts` now also checks that the sub-chapter brief renders; its old fallback passed on any object.
 
 ## 1. Summary
 

@@ -15,6 +15,7 @@ import ProvenancePanel from './ProvenancePanel';
 import CharactersPanel from './CharactersPanel';
 import HumanizerPanel, { type HumanizerSeed } from './HumanizerPanel';
 import BlogWebPublish from './BlogWebPublish';
+import SocialFromContent from './SocialFromContent';
 import RewriteWithResearchModal from './RewriteWithResearchModal';
 import { useToast } from '../../contexts/ToastContext';
 import { useChapterRepair } from '../../hooks/useChapterRepair';
@@ -471,6 +472,10 @@ export default function ContentDetail() {
               web={(item.metadata as { web?: { slug: string; published_at: string } } | null | undefined)?.web}
               onChange={() => void queryClient.invalidateQueries({ queryKey: ['content-detail', id] })}
             />
+          )}
+
+          {['chapter', 'blog_post', 'newsletter', 'short_story', 'article'].includes(String(item.content_type)) && (
+            <SocialFromContent contentId={item.id} projectId={item.project_id} userId={userId} />
           )}
 
           <button
