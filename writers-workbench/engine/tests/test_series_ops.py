@@ -227,3 +227,15 @@ class TestBookEnding:
         )
         out = asyncio.run(M._op_draft_book_ending({"project_id": "p", "book": BOOK1}))
         assert out["ok"] is False and "rewrite" in out["reason"]
+
+
+class TestMarketingKnowsItIsASeriesBook:
+    def test_a_titled_series_book_is_sold_on_its_own(self) -> None:
+        note = M._series_book_note(
+            {"index": 2, "total": 3, "series_name": "The Ossuary", "book_title": "The Arithmetic of Release"}
+        )
+        assert '"The Arithmetic of Release", BOOK 2 of 3 in the series The Ossuary' in note
+        assert "has not read the earlier books" in note
+
+    def test_without_a_series_it_is_still_a_volume(self) -> None:
+        assert M._series_book_note({"index": 2, "total": 3}).startswith("This is VOLUME 2 of 3.")

@@ -4575,6 +4575,31 @@ async def _op_author_bio(payload: dict) -> dict:
     return out
 
 
+def _series_book_note(volume: dict) -> str:
+    """How the copywriter is told which book it is selling.
+
+    A series book is sold on its own shelf under its own title: its description has to work for a
+    reader who never saw book one, name the series and the number, and sell THIS book's story, not
+    the series' and not the next book's.
+    """
+    index, total = volume.get("index"), volume.get("total", "?")
+    series = str(volume.get("series_name") or "").strip()
+    title = str(volume.get("book_title") or "").strip()
+    if not series:
+        return (
+            f"This is VOLUME {index} of {total}. The blurb sells THIS volume and must not resolve "
+            "what it leaves open, nor promise what a later volume delivers.\n"
+        )
+    named = f'"{title}", ' if title else ""
+    return (
+        f"This is {named}BOOK {index} of {total} in the series {series}. Sell THIS book on its own: "
+        "the description must make sense to a reader who has not read the earlier books, introduce "
+        "whoever it needs to, and promise the story this book tells and settles. Mention once that "
+        f"it is book {index} of the {series} series. Do not reveal how this book ends, and do not "
+        "promise what a later book delivers.\n"
+    )
+
+
 async def _op_marketing(payload: dict) -> dict:
     """Draft the listing copy from the manuscript itself.
 
@@ -4632,11 +4657,7 @@ async def _op_marketing(payload: dict) -> dict:
 
     volume_note = ""
     if isinstance(volume, dict) and volume.get("index"):
-        volume_note = (
-            f"This is VOLUME {volume['index']} of {volume.get('total', '?')}. The blurb sells THIS "
-            "volume and must not resolve what it leaves open, nor promise what a later volume "
-            "delivers.\n"
-        )
+        volume_note = _series_book_note(volume)
 
     # REVISION vs FIRST DRAFT. With a previous draft and instructions, this is a diff: the baseline
     # comes back unchanged except where the author asked for a change. Regenerating instead loses
