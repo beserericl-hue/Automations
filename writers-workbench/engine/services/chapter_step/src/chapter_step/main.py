@@ -4575,6 +4575,79 @@ async def _op_author_bio(payload: dict) -> dict:
     return out
 
 
+_OCCUPATIONS = (
+    "archaeologist",
+    "anthropologist",
+    "ceramicist",
+    "archivist",
+    "historian",
+    "curator",
+    "professor",
+    "lawyer",
+    "attorney",
+    "judge",
+    "officer",
+    "director",
+    "advocate",
+    "researcher",
+    "scientist",
+    "doctor",
+    "nurse",
+    "priest",
+    "chief",
+    "captain",
+    "detective",
+    "journalist",
+    "ranger",
+    "teacher",
+)
+
+
+def _cast_block(roster: list[dict]) -> str:
+    """The cast as canon for the copywriter: who each person is, so no one is given another's job."""
+    rows = [f"- {c.get('name')}: {str(c.get('description') or '')[:200]}" for c in roster if c.get("name")]
+    if not rows:
+        return ""
+    return (
+        "THE CAST (canon: use these roles exactly, and never give one person another's job):\n"
+        + "\n".join(rows)
+        + "\n\n"
+    )
+
+
+def _copy_text(marketing: Any) -> str:
+    return " ".join(str(getattr(marketing, f, "") or "") for f in ("hook", "blurb", "back_cover"))
+
+
+def _role_mismatches(text: str, roster: list[dict]) -> list[str]:
+    """Jobs the copy gives a cast member that the cast list does not.
+
+    Looks only where a job is attached to the name: just before it ("archaeologist Marcus Tayac") or
+    in an appositive just after ("Marcus Tayac, a museum curator"). A job anywhere else in the
+    sentence may belong to someone else, and flagging it would send good copy back.
+    """
+    found: list[str] = []
+    for c in roster:
+        name = str(c.get("name") or "").strip()
+        first = name.split()[0] if name else ""
+        if len(first) < 3:
+            continue
+        desc = str(c.get("description") or "").lower()
+        for m in re.finditer(rf"\b{re.escape(first)}\b", text):
+            before = " ".join(re.findall(r"[\w-]+", text[max(0, m.start() - 40) : m.start()])[-2:]).lower()
+            tail = text[m.end() : m.end() + 80]
+            after = ""
+            appos = re.match(r"(?:\s+[A-Z][\w-]*)*,\s+(?:a|an|the)\s+((?:[\w-]+\s+){0,3}[\w-]+)", tail)
+            if appos:
+                after = appos.group(1).lower()
+            for occ in _OCCUPATIONS:
+                if re.search(rf"\b{occ}s?\b", f"{before} {after}") and occ not in desc:
+                    msg = f"{name} is called {'an' if occ[0] in 'aeiou' else 'a'} {occ}, which the cast list does not say"
+                    if msg not in found:
+                        found.append(msg)
+    return found
+
+
 def _series_book_note(volume: dict) -> str:
     """How the copywriter is told which book it is selling.
 
@@ -4595,8 +4668,8 @@ def _series_book_note(volume: dict) -> str:
         f"This is {named}BOOK {index} of {total} in the series {series}. Sell THIS book on its own: "
         "the description must make sense to a reader who has not read the earlier books, introduce "
         "whoever it needs to, and promise the story this book tells and settles. Mention once that "
-        f"it is book {index} of the {series} series. Do not reveal how this book ends, and do not "
-        "promise what a later book delivers.\n"
+        f"it is book {index} of the {series} series. Call it a book, never a volume. Do not reveal "
+        "how this book ends, and do not promise what a later book delivers.\n"
     )
 
 
@@ -4709,6 +4782,7 @@ async def _op_marketing(payload: dict) -> dict:
                         else ""
                     )
                     + f"CHAPTERS: {len(rows)}, {sum(len(str(x.get('content_text') or '').split()) for x in rows):,} words\n\n"
+                    + _cast_block(ctx.get("roster") or [])
                     + "\n\n".join(parts)
                 ),
                 schema=BookMarketing,
@@ -4720,7 +4794,43 @@ async def _op_marketing(payload: dict) -> dict:
         logger.error("marketing.unparseable", error=str(exc)[:300])
         return {"ok": False, "reason": "could not parse the copywriter's answer"}
 
+    # A role the copy gives someone that the cast list does not: Book 3's first series draft called
+    # Marcus Tayac an archaeologist (Sylvia is the archaeologist). Sent back once, naming the slip.
+    roster = ctx.get("roster") or []
+    mismatches = _role_mismatches(_copy_text(marketing), roster)
+    if mismatches:
+        logger.info("marketing.role_mismatch", mismatches=mismatches)
+        try:
+            fixed, _resp = await complete_structured(
+                router,
+                provider="anthropic",
+                model=get_settings().model_default,
+                system=_build_marketing_revision_system(str(ctx.get("genre_slug") or "")) + volume_note,
+                prompt=(
+                    "PREVIOUS DRAFT (the baseline — return fields unchanged unless the instructions "
+                    "ask otherwise):\n"
+                    + json.dumps(marketing.model_dump(mode="json"), indent=1)
+                    + "\n\nTHE AUTHOR'S INSTRUCTIONS:\nCorrect these roles, which contradict the cast "
+                    "list, and change nothing else:\n- "
+                    + "\n- ".join(mismatches)
+                    + "\n\n"
+                    + _cast_block(roster)
+                ),
+                schema=RevisedMarketing,
+                max_tokens=4096,
+            )
+            marketing = fixed
+        except (ProviderNotRegistered, ValueError) as exc:
+            logger.warning("marketing.role_repair_failed", error=str(exc)[:200])
+        mismatches = _role_mismatches(_copy_text(marketing), roster)
+
     out = marketing.model_dump(mode="json")
+    # The approved bio is returned exactly as written; everything else loses its em dashes.
+    for field in ("hook", "blurb", "back_cover"):
+        if isinstance(out.get(field), str):
+            out[field] = _strip_em_dashes(out[field])
+    if mismatches:
+        out["role_warnings"] = mismatches
     out["revised"] = revising
     if revising:
         out["instructions"] = instructions

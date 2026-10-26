@@ -84,6 +84,8 @@ interface Marketing {
   note?: string;
   changed?: string[];
   edited_at?: string;
+  /** Roles the copy gives someone that the cast list does not, left after one correction. */
+  role_warnings?: string[];
 }
 
 interface HistoryEntry {
@@ -505,6 +507,13 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
                   : 'Suggested — set your own in Settings → Author Profile before publishing.'
               }
             />
+            {marketing.role_warnings?.length ? (
+              <ul data-testid="role-warnings" className="list-disc rounded-lg bg-amber-50 p-2 pl-6 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+                {marketing.role_warnings.map((w) => (
+                  <li key={w}>{w}. Fix it in the copy before publishing.</li>
+                ))}
+              </ul>
+            ) : null}
             {marketing.note ? (
               <p className="rounded-lg bg-gray-50 p-2 text-xs italic text-gray-600 dark:bg-gray-800 dark:text-gray-400">
                 {marketing.note}
