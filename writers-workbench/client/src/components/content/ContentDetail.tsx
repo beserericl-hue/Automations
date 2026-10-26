@@ -14,6 +14,7 @@ import AnnotationsPanel from './AnnotationsPanel';
 import ProvenancePanel from './ProvenancePanel';
 import CharactersPanel from './CharactersPanel';
 import HumanizerPanel, { type HumanizerSeed } from './HumanizerPanel';
+import BlogWebPublish from './BlogWebPublish';
 import RewriteWithResearchModal from './RewriteWithResearchModal';
 import { useToast } from '../../contexts/ToastContext';
 import { useChapterRepair } from '../../hooks/useChapterRepair';
@@ -461,6 +462,15 @@ export default function ContentDetail() {
             >
               Rewrite with research
             </button>
+          )}
+
+          {item.content_type === 'blog_post' && (
+            <BlogWebPublish
+              contentId={item.id}
+              status={item.status ?? null}
+              web={(item.metadata as { web?: { slug: string; published_at: string } } | null | undefined)?.web}
+              onChange={() => void queryClient.invalidateQueries({ queryKey: ['content-detail', id] })}
+            />
           )}
 
           <button
