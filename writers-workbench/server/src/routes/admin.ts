@@ -380,6 +380,40 @@ adminRouter.get('/workflows', async (_req: Request, res: Response) => {
 
 /**
  * @openapi
+ * /admin/engine-fleet:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Engine replicas, fleet-wide queue load, scaling verdict and autoscaler state
+ *     description: |
+ *       Proxies the engine gateway's /internal/fleet. Lists every gateway and runtime replica that
+ *       reported in the last 90 seconds, the arq queues summed across replicas, the capacity verdict
+ *       (scale_out, backlog, tpm_bound, hold, scale_in) and what the autoscaler last decided.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Fleet snapshot.
+ *       403:
+ *         description: Not an admin.
+ *       502:
+ *         description: Engine unreachable.
+ */
+adminRouter.get('/engine-fleet', async (_req: Request, res: Response) => {
+  try {
+    const { getEngineFleet } = await import('../lib/engine-hub.js');
+    const { fleet, gateway } = await getEngineFleet();
+    res.json({ success: true, data: { ...fleet, gateway_served_by: gateway } });
+  } catch (err) {
+    logger.error({ err }, 'admin/engine-fleet: fetch failed');
+    res.status(502).json({
+      success: false,
+      error: { code: 'ENGINE_UNREACHABLE', message: err instanceof Error ? err.message : 'Engine unreachable' },
+    });
+  }
+});
+
+/**
+ * @openapi
  * /admin/queues:
  *   get:
  *     tags: [Admin]

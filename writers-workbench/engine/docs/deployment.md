@@ -77,3 +77,54 @@ Then redeploy WritersWorkbench DEV (which already has the `NEWSLETTER_BACKEND` f
 ## Splitting to per-step services (later)
 
 When traffic justifies the cost, replace `writer-engine-runtime` with one Railway service per step (`writer-engine-gather`, `writer-engine-pick`, …). Use each `services/<step>/Dockerfile`; orchestrator's `*_STEP_URL` env vars already point at the `*-step` hostnames so the change is config-only.
+
+## Replicas, the fleet view and the autoscaler (CR-010 C1/C4)
+
+**Replica counts are set per environment on Railway, not in `railway.*.toml`.** A count in the toml
+would apply to every environment that deploys the file. DEV runs **2** gateway and **2** runtime
+replicas. PROD is to run **4** of each, set at the PROD cutover and not before.
+
+Changing a count adds or removes replicas on the running deployment; the existing replicas are not
+redeployed (verified on DEV 2026-10-26). Railway spreads public traffic across replicas at random,
+and the private DNS name resolves to all of them. Each engine response carries `X-Engine-Instance`,
+so you can see which replica answered.
+
+**What multi-replica changed in the code:**
+
+- The arq heartbeat is per instance: `engine:arq:health-check:<queue>:<RAILWAY_REPLICA_ID>`.
+  - The sampler adds every instance's heartbeat together, so `running`, `max_jobs` (slots) and `saturation` are fleet totals.
+  - `/admin/ready` checks only this replica's own worker.
+- Scheduled jobs run on one replica per interval.
+  - The lock is `engine:singleton:<job>`, with a TTL of 95% of the job's interval.
+  - Before this, two replicas could both publish (and email) the same scheduled post.
+  - The queue-metrics sampler is the exception and runs on every replica.
+- Every replica records itself in `engine:fleet:<service>:<instance>` (TTL 90s). The view of that registry is:
+  - `GET /admin/fleet` on the orchestrator (admin token);
+  - `GET /internal/fleet` on the gateway (service secret);
+  - **Admin → Engine Fleet** in the Workbench.
+- New Prometheus metrics:
+  - `engine_instance_info`;
+  - `engine_fleet_instances{service}`;
+  - `engine_autoscale_current_replicas`;
+  - `engine_autoscale_target_replicas`;
+  - `engine_autoscale_decisions{action}`.
+
+**The autoscaler** (`writer_engine/autoscale.py`) runs on the runtime as a singleton job every
+`AUTOSCALE_POLL_SECONDS` (default 60). It scales only the runtime; the gateway stays at its floor.
+
+| Verdict | Action |
+|---|---|
+| `scale_out` or `backlog`, for 2 samples in a row | +1 replica |
+| `tpm_bound` | hold (another replica shares the same token budget) |
+| `scale_in`, idle for 15 minutes, no heavy job running | −1 replica |
+| below `AUTOSCALE_MIN_REPLICAS` | back to the floor at once |
+
+There is at most one change per `AUTOSCALE_COOLDOWN_SECONDS` (default 300), always one replica at a
+time, and the count stays between the floor and the ceiling.
+
+| Variable (runtime service) | DEV | Notes |
+|---|---|---|
+| `AUTOSCALE_ENABLED` | `true` | Off unless set. |
+| `RAILWAY_AUTOSCALE_TOKEN` | a Railway **project token for the develop environment** | Railway scopes it to that one environment, so it cannot change PROD. |
+| `AUTOSCALE_MIN_REPLICAS` / `AUTOSCALE_MAX_REPLICAS` | `2` / `4` | PROD at cutover: `4` / its ceiling. |
+| `AUTOSCALE_ALLOW_PRODUCTION` | unset | Required as well before it acts in an environment named `production`. |

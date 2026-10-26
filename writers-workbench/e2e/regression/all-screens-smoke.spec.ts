@@ -215,10 +215,10 @@ test.describe('Core app screens', () => {
   });
 });
 
-// Admin panel + its 7 tabs (each tab is a distinct screen surface)
+// Admin panel + its 8 tabs (each tab is a distinct screen surface)
 test.describe('Admin panel /admin', () => {
   // Real tab labels from AdminPanel.TAB_LABELS.
-  const ADMIN_TABS = ['User Management', 'Subscriptions', 'Revenue', 'System Metrics', 'Workflows', 'Queues', 'Email Bounces'];
+  const ADMIN_TABS = ['User Management', 'Subscriptions', 'Revenue', 'System Metrics', 'Workflows', 'Queues', 'Engine Fleet', 'Email Bounces'];
   test('Admin panel loads', async ({ page }) => {
     await page.goto('/admin', { waitUntil: 'domcontentloaded' });
     // PASS: Admin Panel heading (user has the role). FAIL: access-denied / crash.

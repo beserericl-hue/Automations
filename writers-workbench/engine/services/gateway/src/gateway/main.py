@@ -9,6 +9,8 @@ The gateway delegates work to the orchestrator over HTTP.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from typing import Any
@@ -16,9 +18,10 @@ from typing import Any
 from fastapi import FastAPI, Request, Response
 from fastapi import status as http_status
 
+from writer_engine import fleet
 from writer_engine.config import get_settings
 from writer_engine.health import probe_http, run_checks, summarise
-from writer_engine.redis_client.client import close_redis
+from writer_engine.redis_client.client import close_redis, get_redis
 from writer_engine.telemetry.logging import configure_logging, get_logger
 from writer_engine.telemetry.metrics import HTTP_LATENCY, HTTP_REQUESTS, metrics_app, observe_latency
 
@@ -26,16 +29,35 @@ from .routes import admin, internal, sse, v1
 
 SERVICE = "gateway"
 
+REGISTER_INTERVAL_S = 30.0
+"""How often a gateway replica records itself in the fleet registry (C1). A third of the TTL."""
+
+_served = {"requests": 0}
+
+
+async def _register_loop() -> None:
+    """Keep this replica in the fleet registry. Never raises out: the registry is observability, and a
+    Redis blip must not take the proxy down with it."""
+    while True:
+        with contextlib.suppress(Exception):
+            await fleet.register(await get_redis(), SERVICE, requests_served=_served["requests"])
+        await asyncio.sleep(REGISTER_INTERVAL_S)
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> Any:
     settings = get_settings()
     configure_logging(level=settings.log_level, service=SERVICE)
     logger = get_logger(SERVICE)
-    logger.info("gateway.startup", orchestrator_url=settings.orchestrator_url)
+    logger.info("gateway.startup", orchestrator_url=settings.orchestrator_url, instance=fleet.instance_id())
+    fleet.mark_instance(SERVICE)
+    task = asyncio.create_task(_register_loop(), name="gateway-fleet-register")
     try:
         yield
     finally:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await task
         await close_redis()
         logger.info("gateway.shutdown")
 
@@ -58,6 +80,9 @@ def build_app() -> FastAPI:
         HTTP_REQUESTS.labels(
             service=SERVICE, route=route, method=method, status=str(response.status_code)
         ).inc()
+        _served["requests"] += 1
+        # Which replica answered — how the load balancing across replicas is checked from outside.
+        response.headers["X-Engine-Instance"] = fleet.instance_id()
         return response
 
     @app.get("/admin/health")

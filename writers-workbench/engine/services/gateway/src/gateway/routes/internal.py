@@ -314,6 +314,15 @@ async def newsletter_resolve(token: str, body: dict[str, Any]) -> dict[str, Any]
     return await _forward("POST", f"{settings.orchestrator_url}/approvals/{token}/resolve", json=body)
 
 
+@router.get("/fleet")
+async def fleet_view() -> dict[str, Any]:
+    """Engine instances, fleet-wide queues, the scaling verdict and the autoscaler's last decision
+    (C1/C4). The orchestrator builds it from Redis, so it is the whole fleet whichever replica of
+    either service answers."""
+    settings = get_settings()
+    return await _forward("GET", f"{settings.orchestrator_url}/internal/fleet", timeout_s=15.0)
+
+
 @router.get("/newsletter/executions/{execution_id}/state")
 async def newsletter_state(execution_id: str) -> dict[str, Any]:
     settings = get_settings()
