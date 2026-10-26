@@ -35,6 +35,7 @@ import { landingPageRouter } from './routes/landing-page.js';
 import { bookPagesRouter } from './routes/book-pages.js';
 import { printRouter, printWebhookRouter } from './routes/print.js';
 import { seriesRouter } from './routes/series.js';
+import { blogPagesRouter, blogWebRouter } from './routes/blog-pages.js';
 import { creditsRouter } from './routes/credits.js';
 import { superuserRouter } from './routes/superuser.js';
 import { tiersRouter } from './routes/tiers.js';
@@ -110,6 +111,7 @@ app.use(
 // to itself. Mounted BEFORE CORS — the form submission carries an Origin header, and the page must
 // accept it from whatever host serves it rather than only the app's whitelist.
 app.use('/books', bookPagesRouter);
+app.use('/blog', blogPagesRouter);
 
 // CORS with origin whitelist
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
@@ -259,6 +261,7 @@ app.use('/api/jobs', jobsRouter);
 app.use('/api/content', generalLimiter);
 app.use('/api/content', contentActionsRouter);
 app.use('/api/content', contentToolsRouter);
+app.use('/api/content', blogWebRouter);
 app.use('/api/author', generalLimiter);
 app.use('/api/author', authorRouter);
 app.use('/api/publishing', generalLimiter);
