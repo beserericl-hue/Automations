@@ -90,6 +90,14 @@ export async function supaDelete(table: string, filter: string): Promise<void> {
   });
 }
 
+/** Remove an object from a storage bucket (teardown only). */
+export async function supaRemoveObject(bucket: string, path: string): Promise<void> {
+  await fetch(`${SUPA_URL}/storage/v1/object/${bucket}/${path.split('/').map(encodeURIComponent).join('/')}`, {
+    method: 'DELETE',
+    headers: supaHeaders(),
+  });
+}
+
 /** URL-encode the demo phone user id for a PostgREST eq filter (raw '+' decodes to a space → 0 rows). */
 export function eqUser(): string {
   return `user_id=eq.${encodeURIComponent(DEMO_USER_ID)}`;

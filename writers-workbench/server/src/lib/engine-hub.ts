@@ -17,7 +17,7 @@ export function hubBackend(): HubBackend {
 }
 
 /** Internal engine gateway base URL (Railway private DNS by default). */
-function engineGatewayUrl(): string {
+export function engineGatewayUrl(): string {
   return (
     process.env.ENGINE_GATEWAY_URL ||
     'http://writer-engine-gateway.railway.internal:8000'
