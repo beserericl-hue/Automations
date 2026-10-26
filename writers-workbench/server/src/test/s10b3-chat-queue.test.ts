@@ -176,6 +176,28 @@ describe('POST /api/chat/proxy', () => {
     }
   });
 
+  it('dry_run classifies and starts nothing: no n8n, no engine, no queue, no credits', async () => {
+    const { chatRouter } = await import('../routes/chat.js');
+    const app = makeApp();
+    app.use('/api/chat', chatRouter);
+    const s = startServer(app);
+    try {
+      const res = await fetch(`http://localhost:${s.port}/api/chat/proxy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer +14105551234' },
+        body: JSON.stringify({ user_message_request: 'write a blog post about ancient Egyptian bread makers', user_id: '+14105551234', dry_run: true }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { mode: string; dryRun: boolean; classification: { jobType: string }; creditsCharged: number };
+      expect(body).toMatchObject({ mode: 'sync', dryRun: true, creditsCharged: 0 });
+      expect(body.classification.jobType).toBe('write_blog');
+      expect(mocks.fetchMock).not.toHaveBeenCalled();
+      expect(mocks.queueAddMock).not.toHaveBeenCalled();
+    } finally {
+      await s.close();
+    }
+  });
+
   it('sync message ("list my projects") calls n8n directly and returns its body', async () => {
     mocks.fetchMock.mockResolvedValue(
       new Response(JSON.stringify({ output: 'here are your projects' }), { status: 200 }),
