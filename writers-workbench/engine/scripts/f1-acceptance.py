@@ -38,7 +38,9 @@ def a1_unit() -> dict:
     """Run the pytest suite; pass = exit 0."""
     proc = subprocess.run(
         [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider"],
-        cwd=Path(__file__).resolve().parents[1], capture_output=True, text=True,
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
     )
     tail = (proc.stdout or proc.stderr).strip().splitlines()[-1:] or [""]
     return {"name": "A1 unit", "pass": proc.returncode == 0, "detail": tail[0]}
@@ -53,7 +55,8 @@ def a2_system(gateway: str, secret: str) -> dict:
         body = json.dumps({"op": "__healthcheck__"}).encode()
         req = urllib.request.Request(
             f"{gateway.rstrip('/')}/internal/write/{tool}",
-            data=body, method="POST",
+            data=body,
+            method="POST",
             headers={"X-Service-Secret": secret, "Content-Type": "application/json"},
         )
         try:
@@ -74,16 +77,23 @@ def a3_regression(min_score: float) -> dict:
         return {"name": "A3 regression", "pass": None, "detail": "harness missing"}
     proc = subprocess.run(
         [sys.executable, str(script), "--limit", "6", "--min-score", str(min_score)],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
-    return {"name": "A3 regression", "pass": proc.returncode == 0,
-            "detail": (proc.stdout or proc.stderr).strip().splitlines()[-1:] or [""]}
+    return {
+        "name": "A3 regression",
+        "pass": proc.returncode == 0,
+        "detail": (proc.stdout or proc.stderr).strip().splitlines()[-1:] or [""],
+    }
 
 
 def a4_parity(shadow_scores_path: str | None) -> dict:
     if not shadow_scores_path or not Path(shadow_scores_path).exists():
-        return {"name": "A4 parity", "pass": None,
-                "detail": "skipped (no --shadow-scores; needs the >=7-day DEV shadow window)"}
+        return {
+            "name": "A4 parity",
+            "pass": None,
+            "detail": "skipped (no --shadow-scores; needs the >=7-day DEV shadow window)",
+        }
     scores = json.loads(Path(shadow_scores_path).read_text())
     summ = shadow_summary(scores if isinstance(scores, list) else scores.get("scores", []))
     return {"name": "A4 parity", "pass": summ["passes_A4"], "detail": summ}

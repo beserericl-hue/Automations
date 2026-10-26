@@ -243,3 +243,131 @@ def test_a_chapter_rewrite_updates_its_research_instead_of_adding_a_copy() -> No
     assert len(db.data["research_report_projects_v2"]) == 1
     go("a standalone report", False)  # the research screen still adds a new report every time
     assert len(db.data["research_reports_v2"]) == 2
+
+
+class TestCharacterVariants:
+    """CR-002: one person, one bible entry."""
+
+    def test_an_alias_in_brackets_is_the_same_person(self) -> None:
+        from writer_engine.persist_helpers import resolve_character_variant as R
+
+        assert R("Adaeze Okonkwo (A. Okonkwo)", ["Adaeze Okonkwo", "Osei Asante"]) == "Adaeze Okonkwo"
+        assert R("Slade (Garrett Slade)", ["Garrett Slade"]) == "Garrett Slade"
+
+    def test_a_descriptive_bracket_keeps_people_apart(self) -> None:
+        from writer_engine.persist_helpers import resolve_character_variant as R
+
+        assert R("Taya (child)", ["Taya (the first, deceased)"]) is None
+
+    def test_a_first_name_with_one_full_name_is_that_person_and_with_several_is_nobody(self) -> None:
+        from writer_engine.persist_helpers import resolve_character_variant as R
+
+        assert R("Osei", ["Osei Asante", "Delia Marsh"]) == "Osei Asante"
+        assert R("Delia", ["Delia Marsh", "Delia Swann", "Delia Okafor"]) is None
+        assert R("Marcus Tayac", ["Marcus Tayac", "Renata Voss"]) is None  # itself, not a variant
+
+    def test_a_new_full_name_takes_over_a_lone_first_name(self) -> None:
+        from writer_engine.persist_helpers import first_name_entry_to_rename as F
+
+        assert F("Osei Asante", ["Osei", "Renata Voss"]) == "Osei"
+        assert F("Delia Swann", ["Delia", "Delia Marsh"]) is None
+        assert F("Osei", ["Osei"]) is None
+
+    def test_persist_writes_a_variant_to_the_entry_it_names(self) -> None:
+        from writer_engine.persist_helpers import persist_bible
+
+        db = _Db(
+            {
+                "story_bible_v2": [
+                    {
+                        "id": "b1",
+                        "project_id": "p",
+                        "entry_type": "character",
+                        "name": "Osei Asante",
+                        "description": "Ghanaian surveyor who mapped the bluff grid",
+                        "deleted_at": None,
+                    },
+                ]
+            }
+        )
+        n = asyncio.run(
+            persist_bible(
+                db,
+                project_id="p",
+                user_id="u",
+                entries=[
+                    {"entry_type": "character", "name": "Osei", "description": "the surveyor who mapped the grid"},
+                    {"entry_type": "character", "name": "Renata Voss", "description": "anthropologist"},
+                ],
+            )
+        )
+        names = sorted(r["name"] for r in db.data["story_bible_v2"] if r["deleted_at"] is None)
+        assert n == 2 and names == ["Osei Asante", "Renata Voss"]
+        assert (
+            next(r for r in db.data["story_bible_v2"] if r["name"] == "Osei Asante")["description"]
+            == "the surveyor who mapped the grid"
+        )
+
+    def test_persist_renames_a_lone_first_name_to_the_full_name(self) -> None:
+        from writer_engine.persist_helpers import persist_bible
+
+        db = _Db(
+            {
+                "story_bible_v2": [
+                    {
+                        "id": "b1",
+                        "project_id": "p",
+                        "entry_type": "character",
+                        "name": "Osei",
+                        "description": "x",
+                        "deleted_at": None,
+                    },
+                ]
+            }
+        )
+        asyncio.run(
+            persist_bible(
+                db,
+                project_id="p",
+                user_id="u",
+                entries=[
+                    {"entry_type": "character", "name": "Osei Asante", "description": "the surveyor"},
+                ],
+            )
+        )
+        assert [r["name"] for r in db.data["story_bible_v2"]] == ["Osei Asante"]
+
+
+class TestVariantsThatAreNotTheSamePerson:
+    """Each one a wrong merge in the DEV dry run, 2026-10-26."""
+
+    def test_bearers_of_a_name_and_pairs_stay_apart(self) -> None:
+        from writer_engine.persist_helpers import resolve_character_variant as R
+
+        assert R("Kittamaquund", ["Kittamaquund (ancestor)"]) is None
+        assert R("Strikes-Twice", ["Strikes-Twice (first/original bearer)"]) is None
+        assert R("Maka", ["Maka and Maka-Small"]) is None
+        assert R("Kaia-Tayac", ["Kaia-Tayac (first)", "Kaia-Tayac Moyaone"]) is None
+
+    def test_a_surname_alone_is_nobody_in_particular(self) -> None:
+        from writer_engine.persist_helpers import resolve_character_variant as R
+
+        assert R("Voss", ["Dorothy Voss", "Renata Voss"]) is None
+        assert R("Voss", ["Voss Halloran", "Elliot Voss"]) is None
+
+    def test_a_first_name_with_an_unrelated_description_is_someone_else(self) -> None:
+        from writer_engine.persist_helpers import resolve_character_variant as R
+
+        d = {
+            "Stewart": "Co-author with Ferguson of 1940 field notes on the ossuary excavation.",
+            "Stewart Udall": "Secretary of the Interior who signed the 1960s land agreement.",
+            "Osei": "Surveyor who mapped the bluff grid.",
+            "Osei Asante": "Ghanaian surveyor; mapped the bluff grid in the spring.",
+        }
+        assert R("Stewart", ["Stewart Udall"], descriptions=d) is None
+        assert R("Osei", ["Osei Asante"], descriptions=d) == "Osei Asante"
+
+    def test_the_fullest_plain_spelling_wins(self) -> None:
+        from writer_engine.persist_helpers import resolve_character_variant as R
+
+        assert R("Kaya-Tayac (Kaya)", ["Kaya-Tayac", "Kaya"]) == "Kaya-Tayac"

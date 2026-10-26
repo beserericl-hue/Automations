@@ -105,7 +105,10 @@ async def probe_perplexity(timeout: float = 30.0) -> str:
             async with httpx.AsyncClient(timeout=timeout) as client:
                 resp = await client.post(
                     "https://api.perplexity.ai/chat/completions",
-                    headers={"authorization": f"Bearer {s.perplexity_api_key}", "content-type": "application/json"},
+                    headers={
+                        "authorization": f"Bearer {s.perplexity_api_key}",
+                        "content-type": "application/json",
+                    },
                     json={
                         "model": model,
                         "messages": [{"role": "user", "content": "ping"}],
@@ -171,7 +174,10 @@ async def probe_supabase(timeout: float = 30.0) -> str:
         resp = await client.get(
             f"{s.supabase_url}/rest/v1/content_ingestion_v2",
             params={"select": "id", "limit": "1"},
-            headers={"apikey": s.supabase_service_role_key, "authorization": f"Bearer {s.supabase_service_role_key}"},
+            headers={
+                "apikey": s.supabase_service_role_key,
+                "authorization": f"Bearer {s.supabase_service_role_key}",
+            },
         )
     resp.raise_for_status()
     rows = resp.json()
@@ -208,7 +214,9 @@ async def probe_postal(timeout: float = 15.0) -> str:
                     json=body,
                 )
                 snippet = (resp.text or "")[:60].replace("\n", " ")
-                results.append(f"{url.replace(base, '<base>')} → {resp.status_code} ({snippet}, {time.perf_counter() - t:.2f}s)")
+                results.append(
+                    f"{url.replace(base, '<base>')} → {resp.status_code} ({snippet}, {time.perf_counter() - t:.2f}s)"
+                )
             except Exception as exc:
                 results.append(f"{url.replace(base, '<base>')} → {type(exc).__name__}: {str(exc)[:80]}")
     return "\n      ".join(results)

@@ -11,6 +11,7 @@ right account in the UI. No base-table schema changes — only inserts/updates.
 from __future__ import annotations
 
 import contextlib
+import re
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -348,6 +349,169 @@ def _is_junk_bible_name(name: str, entry_type: str) -> bool:
     return False
 
 
+_TRAILING_PAREN = re.compile(r"\s*\(([^)]*)\)\s*$")
+
+
+def _clean(name: str) -> str:
+    return " ".join(re.sub(r"[\s\u2014\u2013-]+$", "", name or "").split()).lower()
+
+
+def character_keys(name: str) -> tuple[str, str]:
+    """``(key, alias_key)`` for a character name.
+
+    The key is the name without a trailing ALIAS in brackets, lower-cased: "Adaeze Okonkwo (A. Okonkwo)"
+    and "Adaeze Okonkwo" share it. Only an alias is stripped, meaning a bracket that is itself a name
+    (it starts with a capital). A descriptive bracket keeps people apart: "Taya (child)" and
+    "Taya (the first, deceased)" are two people, and each keeps its full name as its key.
+    """
+    raw = " ".join(str(name or "").split())
+    m = _TRAILING_PAREN.search(raw)
+    if m and m.group(1)[:1].isupper():
+        return _clean(raw[: m.start()]), _clean(m.group(1))
+    return _clean(raw), ""
+
+
+_SIGNIFICANT = re.compile(r"[A-Za-z][A-Za-z'-]{4,}")
+_STOP = frozenset(
+    {
+        "about",
+        "after",
+        "again",
+        "against",
+        "appears",
+        "before",
+        "being",
+        "between",
+        "chapter",
+        "character",
+        "could",
+        "described",
+        "during",
+        "every",
+        "first",
+        "known",
+        "member",
+        "members",
+        "mentioned",
+        "named",
+        "other",
+        "people",
+        "person",
+        "served",
+        "serves",
+        "staff",
+        "their",
+        "there",
+        "these",
+        "those",
+        "through",
+        "under",
+        "until",
+        "where",
+        "which",
+        "while",
+        "worked",
+        "working",
+        "works",
+        "would",
+        "years",
+    }
+)
+
+
+def _significant_words(text: str) -> set[str]:
+    return {w.lower() for w in _SIGNIFICANT.findall(text or "")} - _STOP
+
+
+def _is_person_target(name: str) -> bool:
+    """A full name another entry may be merged into: one person, with no descriptive bracket."""
+    key = character_keys(name)[0]
+    return "(" not in key and " and " not in f" {key} " and "&" not in key
+
+
+def resolve_character_variant(
+    name: str, existing: list[str], *, descriptions: dict[str, str] | None = None
+) -> str | None:
+    """The existing character entry ``name`` is another spelling of, or None (CR-002).
+
+    Only the unambiguous cases:
+
+    * the same person under a bracketed alias: "Adaeze Okonkwo (A. Okonkwo)" is "Adaeze Okonkwo",
+      and the fullest plain spelling wins ("Kaya-Tayac (Kaya)" goes to "Kaya-Tayac", not "Kaya");
+    * a first name alone when the bible holds exactly ONE full name starting with it: "Osei" is
+      "Osei Asante".
+
+    What stays apart, each found in the DEV dry run of 2026-10-26:
+
+    * a full name with a descriptive bracket: "Kittamaquund (ancestor)" is a different bearer of the
+      name than "Kittamaquund", and "Maka and Maka-Small" is two people;
+    * a bare word that is someone's SURNAME in this bible: "Voss" next to Dorothy, Renata and Elliot
+      Voss is nobody in particular;
+    * when ``descriptions`` are given, a first name whose description shares no distinctive word
+      with the full name's: "Stewart", Ferguson's 1940 co-author, is not Stewart Udall.
+    """
+    key, alias = character_keys(name)
+    if not key:
+        return None
+    others = [e for e in existing if e != name]
+    same = [e for e in others if character_keys(e)[0] in {key, alias} - {""}]
+    if same:
+        plain = [e for e in same if not _TRAILING_PAREN.search(e)] or same
+        return max(plain, key=lambda e: (len(character_keys(e)[0]), e))
+    if " " in key or "(" in key:
+        return None
+    if any(character_keys(e)[0].endswith(" " + key) for e in others):
+        return None  # a surname here, not a first name
+    fulls = [e for e in others if character_keys(e)[0].startswith(key + " ") and _is_person_target(e)]
+    if len({character_keys(e)[0] for e in fulls}) != 1:
+        return None
+    if any(character_keys(e)[0].startswith(key + " ") and not _is_person_target(e) for e in others):
+        return None  # "Kaia-Tayac" next to "Kaia-Tayac (first)": a line of bearers, not one person
+    target = ([e for e in fulls if not _TRAILING_PAREN.search(e)] or fulls)[0]
+    if descriptions is not None:
+        mine, theirs = descriptions.get(name, ""), descriptions.get(target, "")
+        # Two distinctive words in common, not one: "Priya" at the Smithsonian collections desk and
+        # Priya Mehta on the museum's legal team shared only "member".
+        if mine.strip() and theirs.strip() and len(_significant_words(mine) & _significant_words(theirs)) < 2:
+            return None
+    return target
+
+
+def first_name_entry_to_rename(name: str, existing: list[str]) -> str | None:
+    """The first-name-only entry a new full name should take over, or None.
+
+    "Osei" is in the bible and "Osei Asante" arrives: when "Osei" is the only entry with that first
+    name and no other full name starts with it, it is the same person, so the entry is renamed rather
+    than a second "character" added.
+    """
+    key, _alias = character_keys(name)
+    if " " not in key:
+        return None
+    first = key.split(" ", 1)[0]
+    singles = [e for e in existing if character_keys(e)[0] == first]
+    fulls = [
+        e for e in existing if character_keys(e)[0].startswith(first + " ") and character_keys(e)[0] != key
+    ]
+    return singles[0] if len(singles) == 1 and not fulls else None
+
+
+async def _live_character_names(client: Any, project_id: str) -> dict[str, str]:
+    """Live character entries for the project, name -> description."""
+    try:
+        resp = await (
+            client.table("story_bible_v2")
+            .select("name,description")
+            .eq("project_id", project_id)
+            .eq("entry_type", "character")
+            .is_("deleted_at", None)
+            .limit(2000)
+            .execute()
+        )
+        return {str(r["name"]): str(r.get("description") or "") for r in await _rows(resp) if r.get("name")}
+    except Exception:
+        return {}
+
+
 async def persist_bible(
     client: Any, *, project_id: str, user_id: str, entries: list[dict], chapter_number: int | None = None
 ) -> int:
@@ -362,6 +526,7 @@ async def persist_bible(
     """
     count = 0
     failures: list[str] = []
+    characters: dict[str, str] | None = None
     for e in entries:
         name = e.get("name")
         if not name:
@@ -369,6 +534,32 @@ async def persist_bible(
         entry_type = e.get("entry_type") or "concept"
         if _is_junk_bible_name(str(name), entry_type):
             continue
+        if entry_type == "character":
+            # CR-002: "Osei" and "Osei Asante" were kept as two characters, and the writer's roster
+            # then had two people where the book has one. A variant is written to the entry it names.
+            if characters is None:
+                characters = await _live_character_names(client, project_id)
+            descriptions = {**characters, str(name): str(e.get("description") or "")}
+            canonical = resolve_character_variant(str(name), list(characters), descriptions=descriptions)
+            if canonical:
+                name = canonical
+            else:
+                short = first_name_entry_to_rename(str(name), list(characters))
+                if short:
+                    # The bible knew this person only by first name; give that entry the full name
+                    # rather than adding a second person.
+                    with contextlib.suppress(Exception):
+                        await (
+                            client.table("story_bible_v2")
+                            .update({"name": name})
+                            .eq("project_id", project_id)
+                            .eq("entry_type", "character")
+                            .eq("name", short)
+                            .is_("deleted_at", None)
+                            .execute()
+                        )
+                        characters[str(name)] = characters.pop(short, "")
+                characters.setdefault(str(name), str(e.get("description") or ""))
         row = {
             "user_id": user_id,
             "project_id": project_id,
