@@ -349,6 +349,17 @@ class TestMarketingGetsTheDatesFromTheRecord:
         ]
         assert M._unsupported_numbers("Excavated between 1935 and 1951, a sixteen-year dig.", book) == []
 
+    def test_a_decade_is_checked_against_the_record_not_loose_dialogue(self) -> None:
+        """Book 3: dialogue said "the 1930s excavation", so "in the 1930s and 1940s" slipped through."""
+        book = "He knew the 1930s excavation, the 1940s transfer. Excavated between 1935 and 1951."
+        record = "1935\u20131951 Excavation of 18PR8 Sixteen-year excavation. 1942 Deed of Gift Transfer"
+        assert M._unsupported_numbers("She dug in the 1930s and 1940s.", book, record=record) == [
+            '"1930s" is not in the book or the record',
+            '"1940s" is not in the book or the record',
+        ]
+        # Without a record the chapters are the only evidence, as before.
+        assert M._unsupported_numbers("She dug in the 1930s and 1940s.", book) == []
+
     def test_an_unreadable_bible_is_not_a_failure(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import writer_engine.supabase.client as sc
 

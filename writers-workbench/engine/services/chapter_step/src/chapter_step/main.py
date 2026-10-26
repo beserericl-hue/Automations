@@ -4692,13 +4692,14 @@ _COPY_NUMBER_RE = re.compile(_NUM_START + r"(\d{3,4})(s?)" + _NUM_END)
 _SPAN_RE = re.compile(_NUM_START + r"(\d[\d,]*)[- ]year\b", re.IGNORECASE)
 
 
-def _unsupported_numbers(copy: str, evidence: str) -> list[str]:
+def _unsupported_numbers(copy: str, evidence: str, *, record: str = "") -> list[str]:
     """Years, decades and "N-year" spans in the copy that neither the book nor the record contains.
 
     Book 1's copy closed on "The 344-year span Marcus tracks begins there." No chapter says 344 and
     no bible entry does: the number was made up, and a reader who checks it finds a wrong book.
-    A decade ("the 1940s") counts only if the evidence uses that decade, so a dig recorded as
-    1935-1951 cannot be retold as "the 1930s and 1940s".
+    A decade ("the 1940s") is checked against ``record`` (the bible's dated events) when there is
+    one, not against the chapters: a character's loose "the 1930s excavation" in dialogue let Book 3's
+    copy say Dorothy dug "in the 1930s and 1940s", when the record gives 1935-1951.
     """
     found: list[str] = []
     seen: set[str] = set()
@@ -4707,7 +4708,8 @@ def _unsupported_numbers(copy: str, evidence: str) -> list[str]:
         if token in seen:
             continue
         seen.add(token)
-        if not re.search(_NUM_START + re.escape(token) + _NUM_END, evidence):
+        against = record if (m.group(2) and record.strip()) else evidence
+        if not re.search(_NUM_START + re.escape(token) + _NUM_END, against):
             found.append(f'"{token}" is not in the book or the record')
     for m in _SPAN_RE.finditer(copy):
         n = m.group(1).replace(",", "")
@@ -4947,7 +4949,7 @@ async def _op_marketing(payload: dict) -> dict:
     # A date or number the book does not contain: Book 1's "344-year span" was invented, and "the
     # 1930s and 1940s" compressed a dig the record gives as 1935-1951. Sent back once, naming each.
     evidence = book_text + "\n" + canon_evidence
-    unsupported = _unsupported_numbers(_copy_text(marketing), evidence)
+    unsupported = _unsupported_numbers(_copy_text(marketing), evidence, record=canon_evidence)
     if unsupported:
         logger.info("marketing.unsupported_numbers", found=unsupported)
         try:
@@ -4970,7 +4972,7 @@ async def _op_marketing(payload: dict) -> dict:
             marketing = fixed
         except (ProviderNotRegistered, ValueError) as exc:
             logger.warning("marketing.number_repair_failed", error=str(exc)[:200])
-        unsupported = _unsupported_numbers(_copy_text(marketing), evidence)
+        unsupported = _unsupported_numbers(_copy_text(marketing), evidence, record=canon_evidence)
 
     out = marketing.model_dump(mode="json")
     # The approved bio is returned exactly as written; everything else loses its em dashes.
