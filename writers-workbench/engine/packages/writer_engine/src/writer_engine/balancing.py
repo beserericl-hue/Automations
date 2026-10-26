@@ -13,7 +13,8 @@ calls (hub routing, sync tools, job polls) were: one replica of each service too
 So the caller picks a replica: it resolves the private name, picks one address at random and
 connects to it directly. Resolution is cached for a few seconds, so a replica added by the autoscaler
 starts taking calls within that window, and one removed stops being picked once its address is gone.
-Anything that is not a ``*.railway.internal`` name (localhost, docker-compose, a public URL) is
+Callers retry once by hostname on a connection error, so an address that stops answering costs a
+retry, never a failed call. Anything that is not a ``*.railway.internal`` name (localhost, docker-compose, a public URL) is
 returned unchanged, as is everything when the lookup fails or finds only one address.
 """
 
@@ -44,7 +45,12 @@ async def addresses(host: str, port: int) -> list[str]:
         return hit[1]
     try:
         infos = await asyncio.get_running_loop().getaddrinfo(host, port, type=socket.SOCK_STREAM)
-        found = sorted({str(i[4][0]) for i in infos})
+        v4 = sorted({str(i[4][0]) for i in infos if i[0] == socket.AF_INET})
+        v6 = sorted({str(i[4][0]) for i in infos if i[0] == socket.AF_INET6})
+        # One family only. Each replica answers on an IPv4 AND an IPv6 address, and the engine binds
+        # 0.0.0.0, so an IPv6 pick was refused: 21 of 30 calls failed on DEV the first time this
+        # shipped. IPv4 when the name has any (that is what the services listen on), else IPv6.
+        found = v4 or v6
     except Exception as exc:
         logger.debug("balancing.resolve_failed", host=host, error=f"{type(exc).__name__}: {exc}"[:120])
         found = []
