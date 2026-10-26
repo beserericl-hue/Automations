@@ -607,16 +607,20 @@ const FIELD_NAMES: Record<string, { name: string; type: string; required: boolea
 };
 
 /** "The Ossuary" -> "the-ossuary". The public address of a book's page. */
-export function slugify(title: string): string {
-  const slug = title
+export function slugify(title: string, max = 60): string {
+  const full = title
     .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
     .replace(/&/g, ' and ')
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60)
-    .replace(/-+$/, '');
+    .replace(/^-+|-+$/g, '');
+  // Cut at a word, never mid-word ("…shaped-an-empi"); a single word longer than the limit is cut.
+  let slug = full;
+  if (full.length > max) {
+    const head = full.slice(0, max + 1);
+    slug = head.includes('-') ? head.replace(/-[^-]*$/, '') : full.slice(0, max);
+  }
   return slug || 'book';
 }
 

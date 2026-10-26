@@ -244,6 +244,8 @@ def _apply_ctx_overrides(ctx: dict[str, Any], payload: dict[str, Any] | None) ->
         ctx["title"] = str(payload["title"])
     if payload.get("genre_slug"):
         ctx["genre_slug"] = str(payload["genre_slug"])
+    if str(payload.get("author_notes") or "").strip():
+        ctx["author_notes"] = str(payload["author_notes"]).strip()[:4000]
     outline_override = payload.get("outline")
     if isinstance(outline_override, dict) and outline_override:
         ctx["outline"] = outline_override
@@ -385,6 +387,11 @@ def _chapter_header(ctx: dict[str, Any], roster: list, req: WriteChapterRequest)
     ]
     if req.style_directives:
         lines += ["", "STYLE DIRECTIVES:", *req.style_directives]
+    notes = str(ctx.get("author_notes") or "").strip()
+    if notes:
+        # The author's own words from the Outline / Write dialog. They used to ride inside a chat
+        # sentence the router reduced to (project, chapter), so they never reached the writer.
+        lines += ["", "THE AUTHOR'S INSTRUCTIONS FOR THIS CHAPTER (follow them):", notes]
     return "\n".join(lines)
 
 

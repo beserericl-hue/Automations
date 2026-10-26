@@ -138,14 +138,17 @@ export function useEngineJobQueue(userId: string | undefined, scope = '') {
     };
   }, [queryClient]);
 
-  /** Queue a hub command for `key`. Returns immediately; results refetch when the job completes. */
-  const enqueue = useCallback(
-    async (key: string, message: string, invalidate: QueryKey[] = []) => {
+  /**
+   * Start a job for `key` with any request that answers with an engine job id, and track it: the
+   * row shows "Queued…" at once, and the listed queries refetch when the job completes.
+   */
+  const run = useCallback(
+    async (key: string, start: () => Promise<string | undefined>, invalidate: QueryKey[] = []) => {
       if (!userId) return;
       const k = full(key);
       commit({ ...store, [k]: { state: 'queued', jobId: null, invalidate, startedAt: Date.now() } });
       try {
-        const { jobId } = await enqueueHubCommand(userId, message);
+        const jobId = await start();
         if (jobId) {
           commit({ ...store, [k]: { ...store[k], state: 'queued', jobId } });
         } else {
@@ -157,6 +160,13 @@ export function useEngineJobQueue(userId: string | undefined, scope = '') {
       }
     },
     [userId, full],
+  );
+
+  /** Queue a hub command (a chat sentence) for `key`. Returns immediately. */
+  const enqueue = useCallback(
+    async (key: string, message: string, invalidate: QueryKey[] = []) =>
+      run(key, async () => (userId ? (await enqueueHubCommand(userId, message)).jobId : undefined), invalidate),
+    [run, userId],
   );
 
   /** Track an engine job created by a dedicated endpoint (returns a job_id directly, not via a hub
@@ -186,5 +196,5 @@ export function useEngineJobQueue(userId: string | undefined, scope = '') {
 
   const stateOf = useCallback((key: string): QueuedJobState | undefined => jobsAll[full(key)]?.state, [jobsAll, full]);
 
-  return { jobs, enqueue, trackJob, clear, stateOf };
+  return { jobs, enqueue, run, trackJob, clear, stateOf };
 }
