@@ -8,6 +8,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from writer_engine.auth import require_service_secret
+from writer_engine.balancing import replica_count, spread
 from writer_engine.config import get_settings
 from writer_engine.hub import (
     HubRequest,
@@ -320,7 +321,11 @@ async def fleet_view() -> dict[str, Any]:
     (C1/C4). The orchestrator builds it from Redis, so it is the whole fleet whichever replica of
     either service answers."""
     settings = get_settings()
-    return await _forward("GET", f"{settings.orchestrator_url}/internal/fleet", timeout_s=15.0)
+    view = await _forward("GET", f"{settings.orchestrator_url}/internal/fleet", timeout_s=15.0)
+    # How many runtime replicas this gateway can see on the private network. 1 means calls cannot
+    # be spread, whatever the replica count says.
+    view["gateway_sees_runtime_addresses"] = await replica_count(settings.orchestrator_url)
+    return view
 
 
 @router.get("/newsletter/executions/{execution_id}/state")
@@ -336,11 +341,14 @@ async def _forward(
     method: str, url: str, *, json: dict[str, Any] | None = None, timeout_s: float = 30.0
 ) -> dict[str, Any]:
     settings = get_settings()
+    # C1: pick a runtime replica ourselves. The private name has no load balancer behind it, so
+    # without this every call went to the same replica.
+    target = await spread(url)
     async with httpx.AsyncClient(timeout=timeout_s) as client:
         try:
             resp = await client.request(
                 method,
-                url,
+                target,
                 headers={
                     "x-service-secret": settings.service_shared_secret,
                     "content-type": "application/json",

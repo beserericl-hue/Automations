@@ -401,8 +401,8 @@ adminRouter.get('/workflows', async (_req: Request, res: Response) => {
 adminRouter.get('/engine-fleet', async (_req: Request, res: Response) => {
   try {
     const { getEngineFleet } = await import('../lib/engine-hub.js');
-    const { fleet, gateway } = await getEngineFleet();
-    res.json({ success: true, data: { ...fleet, gateway_served_by: gateway } });
+    const { fleet, gateway, gatewayAddresses } = await getEngineFleet();
+    res.json({ success: true, data: { ...fleet, gateway_served_by: gateway, server_sees_gateway_addresses: gatewayAddresses } });
   } catch (err) {
     logger.error({ err }, 'admin/engine-fleet: fetch failed');
     res.status(502).json({

@@ -7,6 +7,8 @@ const now = Math.round(Date.now() / 1000);
 const DATA: EngineFleetData = {
   served_by: 'rep-a',
   gateway_served_by: 'gw-b',
+  server_sees_gateway_addresses: 2,
+  gateway_sees_runtime_addresses: 2,
   instances: [
     { service: 'gateway', instance: 'gw-a', started_at: now - 600, last_seen: now - 5, requests_served: 42 },
     { service: 'gateway', instance: 'gw-b', started_at: now - 600, last_seen: now - 5, requests_served: 40 },
@@ -38,6 +40,7 @@ describe('EngineFleet', () => {
     expect(screen.getByText('draining')).toBeInTheDocument();
     expect(screen.getByText('42 requests')).toBeInTheDocument();
     expect(screen.getByText('2 worker(s) · 16 slots')).toBeInTheDocument();
+    expect(screen.getByTestId('fleet-spread')).toHaveTextContent('2 gateway address(es) and 2 runtime address(es)');
   });
 
   it('says why the autoscaler is off', async () => {

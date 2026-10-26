@@ -4346,6 +4346,11 @@ def _build_marketing_system(genre: str, volume_note: str, bio_supplied: bool = F
         "- `back_cover`: shorter and harder. It is read standing up in a shop, so it is the hook, "
         "the situation and the stakes in under 600 characters.\n"
         "- `hook`: one sentence, under 120 characters.\n"
+        "- Dates: take every year, decade and span from THE RECORD when one is given. A span stays a "
+        "span: an excavation that ran 1935 to 1951 was not 'in the 1930s'. If you are not sure of a "
+        "date, leave it out; a wrong date in a listing is read as a wrong book.\n"
+        "- No dashes of any kind between clauses (no em dash, no en dash, no double hyphen). Where you "
+        "would reach for one, use a colon or end the sentence.\n"
         "- `keywords`: EXACTLY 7, and each is a PHRASE a reader would actually type into Amazon — "
         "'historical fiction native american', not 'history'. No single words. Do not repeat the "
         "title or the author; those are already indexed.\n"
@@ -4622,6 +4627,59 @@ def _cast_block(roster: list[dict]) -> str:
     )
 
 
+CANON_DATE_LIMIT = 25
+"""Dated bible events handed to the copywriter. A long novel's bible holds hundreds of events; the
+ones that carry a year are the ones listing copy gets wrong, and twenty-five covers a book's spine."""
+
+_YEAR_RE = re.compile(r"\b(1[0-9]{3}|20[0-9]{2})\b")
+
+
+async def _load_canon_dates(project_id: str) -> list[str]:
+    """The story bible's dated events, oldest first, as one line each.
+
+    The copywriter reads six chapters, so it sees dates only in passing — and a character's "the
+    1930s excavation" in chapter 1 became "excavated in the 1930s" in Book 1's copy, when the record
+    is a sixteen-year dig from 1935 to 1951. The bible states the dates outright; this hands them over.
+    Never raises: copy without canon dates is the old behaviour, not a failure.
+    """
+    try:
+        from writer_engine.supabase.client import get_supabase_admin
+
+        client = await get_supabase_admin()
+        r = await (
+            client.table("story_bible_v2")
+            .select("name,description")
+            .eq("project_id", project_id)
+            .eq("entry_type", "event")
+            .is_("deleted_at", None)
+            .limit(1000)
+            .execute()
+        )
+        rows = getattr(r, "data", None) or []
+    except Exception as exc:
+        logger.warning("marketing.canon_dates_unreadable", error=str(exc)[:200])
+        return []
+    dated: list[tuple[int, str]] = []
+    for row in rows:
+        name = str(row.get("name") or "").strip()
+        desc = " ".join(str(row.get("description") or "").split())
+        years = _YEAR_RE.findall(name) or _YEAR_RE.findall(desc)
+        if not name or not years:
+            continue
+        dated.append((int(years[0]), f"- {name}: {desc[:160]}"))
+    dated.sort(key=lambda t: t[0])
+    return [line for _, line in dated[:CANON_DATE_LIMIT]]
+
+
+def _canon_dates_block(lines: list[str]) -> str:
+    if not lines:
+        return ""
+    return (
+        "THE RECORD (dated events from the story bible — canon: any year, decade or span in the copy "
+        "must agree with these):\n" + "\n".join(lines) + "\n\n"
+    )
+
+
 def _copy_text(marketing: Any) -> str:
     return " ".join(str(getattr(marketing, f, "") or "") for f in ("hook", "blurb", "back_cover"))
 
@@ -4738,6 +4796,7 @@ async def _op_marketing(payload: dict) -> dict:
     volume_note = ""
     if isinstance(volume, dict) and volume.get("index"):
         volume_note = _series_book_note(volume)
+    canon_dates = _canon_dates_block(await _load_canon_dates(project_id))
 
     # REVISION vs FIRST DRAFT. With a previous draft and instructions, this is a diff: the baseline
     # comes back unchanged except where the author asked for a change. Regenerating instead loses
@@ -4765,7 +4824,9 @@ async def _op_marketing(payload: dict) -> dict:
                     )
                     + "\n\nTHE AUTHOR'S INSTRUCTIONS:\n"
                     + instructions
-                    + "\n\nFor reference, the opening and closing of the manuscript:\n\n"
+                    + "\n\n"
+                    + canon_dates
+                    + "For reference, the opening and closing of the manuscript:\n\n"
                     + "\n\n".join(parts)
                 ),
                 schema=RevisedMarketing,
@@ -4790,6 +4851,7 @@ async def _op_marketing(payload: dict) -> dict:
                     )
                     + f"CHAPTERS: {len(rows)}, {sum(len(str(x.get('content_text') or '').split()) for x in rows):,} words\n\n"
                     + _cast_block(ctx.get("roster") or [])
+                    + canon_dates
                     + "\n\n".join(parts)
                 ),
                 schema=BookMarketing,
