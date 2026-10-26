@@ -14,6 +14,7 @@ import ConfirmDialog from '../shared/ConfirmDialog';
 import ProjectEditForm from './ProjectEditForm';
 import ImageGallery from '../images/ImageGallery';
 import SocialMediaPanel from '../social/SocialMediaPanel';
+import ResearchRunBox from '../research/ResearchRunBox';
 import CostDashboard from '../cost/CostDashboard';
 import { startChapterAction, type ChapterAction } from '../../lib/chapterActions';
 import { useEngineJobQueue } from '../../hooks/useEngineJobQueue';
@@ -501,7 +502,7 @@ export default function ProjectDetail() {
             }
           />
         )}
-        {activeTab === 'research' && <ResearchTab reports={researchReports} />}
+        {activeTab === 'research' && <ResearchTab reports={researchReports} projectId={id!} userId={userId} />}
         {activeTab === 'cost' && <CostDashboard projectId={id} />}
         {activeTab === 'export' && (
           <ExportTab
@@ -1450,11 +1451,17 @@ function BibleTab({ entries }: { entries: StoryBibleEntry[] | undefined; project
   );
 }
 
-function ResearchTab({ reports }: { reports: ResearchReport[] | undefined }) {
+function ResearchTab({ reports, projectId, userId }: { reports: ResearchReport[] | undefined; projectId: string; userId: string | undefined }) {
   const [expandedReports, setExpandedReports] = useState<Set<string>>(new Set());
+  const runBox = <ResearchRunBox userId={userId} projectId={projectId} invalidate={[['project-research', projectId]]} />;
 
   if (!reports?.length) {
-    return <EmptyState message="No research reports yet. Use the chat or Eve to request research." />;
+    return (
+      <div className="space-y-3">
+        {runBox}
+        <EmptyState message="No research reports yet. Research a topic above, or ask the chat or Eve." />
+      </div>
+    );
   }
 
   const toggleReport = (id: string) => {
@@ -1468,6 +1475,7 @@ function ResearchTab({ reports }: { reports: ResearchReport[] | undefined }) {
 
   return (
     <div className="space-y-3">
+      {runBox}
       <div className="flex items-center justify-between">
         <p className="text-xs text-gray-400">
           {reports.length} research report{reports.length !== 1 ? 's' : ''}
