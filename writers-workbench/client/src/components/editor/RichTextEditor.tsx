@@ -35,6 +35,9 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [wordCount, setWordCount] = useState(0);
   const [isDirty, setIsDirty] = useState(false);
+  // Typing not yet handed to onChange. A ref, not state, because the content effect below must see
+  // it the moment a refetch lands, not on the next render.
+  const typingRef = useRef(false);
 
   const editor = useEditor({
     extensions: [
@@ -57,10 +60,12 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
     },
     onUpdate: ({ editor }) => {
       setIsDirty(true);
+      typingRef.current = true;
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         const text = editor.getText();
         setWordCount(text.split(/\s+/).filter(Boolean).length);
+        typingRef.current = false;
         onChange(editor.getHTML());
         setIsDirty(false);
       }, 2000);
@@ -77,6 +82,10 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
   useEffect(() => {
     if (editor && content !== prevContentRef.current) {
       prevContentRef.current = content;
+      // A save refetches the chapter, and the refetched copy used to replace the document, taking
+      // with it whatever had been typed since the save: "VHMARK2" typed, "RK2" kept. While there is
+      // unsaved typing, the typing wins; it is saved in its turn.
+      if (typingRef.current) return;
       editor.commands.setContent(content, { emitUpdate: false });
       const text = editor.getText();
       setWordCount(text.split(/\s+/).filter(Boolean).length);

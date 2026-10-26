@@ -39,9 +39,14 @@ test.describe('Newsletter — editions + generate + templates + help', () => {
     await expect(editionSelect).toHaveValue(/.+/, { timeout: 15_000 });
     const fellBackTo = await editionSelect.inputValue();
     expect(values).toContain(fellBackTo);
-    // With ≥2 editions we can also prove a VALID non-default id is honoured.
-    if (values.length >= 2) {
-      const target = values[values.length - 1]; // not the default (first)
+    // With ≥2 editions we can also prove a VALID non-default id is honoured. The target must be an
+    // edition this suite did not create: newsletter-crud (run in parallel) makes an "E2E …" edition
+    // and deletes it, and when that one was picked here the reload fell back to the first edition.
+    const stable = await editionSelect.locator('option').evaluateAll((opts) =>
+      (opts as HTMLOptionElement[]).filter((o) => o.value && !/^E2E\b/i.test(o.text.trim())).map((o) => o.value),
+    );
+    if (stable.length >= 2) {
+      const target = stable[stable.length - 1]; // not the default (first)
       await page.goto(`/newsletter/generate?edition=${encodeURIComponent(target)}`);
       await expect(editionSelect).toHaveValue(target, { timeout: 15_000 });
     }

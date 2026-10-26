@@ -466,6 +466,10 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
                         : 'bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100'
                 }`}
               >
+                {msg.role === 'assistant' && !msg.jobId && msg.jobType && (
+                  // A reply that started no job still says what the request was understood as.
+                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide opacity-70">{msg.jobType}</div>
+                )}
                 {msg.role === 'assistant' && msg.jobId && (
                   <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide">
                     <span className="inline-flex items-center rounded-full bg-white/60 px-1.5 py-0.5 dark:bg-black/20">
