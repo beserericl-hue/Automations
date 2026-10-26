@@ -4627,20 +4627,26 @@ def _cast_block(roster: list[dict]) -> str:
     )
 
 
-CANON_DATE_LIMIT = 25
-"""Dated bible events handed to the copywriter. A long novel's bible holds hundreds of events; the
-ones that carry a year are the ones listing copy gets wrong, and twenty-five covers a book's spine."""
+CANON_DATE_LIMIT = 40
+"""Dated bible events handed to the copywriter. A long novel's bible holds hundreds of them (163 for
+The Ossuary); listing copy needs the ones the book being sold actually talks about."""
 
 _YEAR_RE = re.compile(r"\b(1[0-9]{3}|20[0-9]{2})\b")
 
 
-async def _load_canon_dates(project_id: str) -> list[str]:
-    """The story bible's dated events, oldest first, as one line each.
+async def _load_canon_dates(project_id: str, *, book_text: str = "") -> tuple[list[str], str]:
+    """The story bible's dated events as one line each, oldest first, and all of their text.
 
-    The copywriter reads six chapters, so it sees dates only in passing — and a character's "the
-    1930s excavation" in chapter 1 became "excavated in the 1930s" in Book 1's copy, when the record
-    is a sixteen-year dig from 1935 to 1951. The bible states the dates outright; this hands them over.
-    Never raises: copy without canon dates is the old behaviour, not a failure.
+    The copywriter reads six chapters, so it sees dates only in passing: a character's "the 1930s
+    excavation" in chapter 1 became "excavated in the 1930s" in Book 1's copy, when the record is a
+    sixteen-year dig from 1935 to 1951. The bible states the dates outright.
+
+    WHICH events: those whose year appears in ``book_text`` (the book being sold) first, then the
+    rest, up to CANON_DATE_LIMIT. Taking the oldest first instead handed over 25 events that ended
+    in 1680, and the 1935-1951 dig, the one Book 1's copy got wrong, never reached the copywriter.
+
+    The second value is every dated event's text, the evidence `_unsupported_numbers` checks the
+    copy against. Never raises: copy without canon dates is the old behaviour, not a failure.
     """
     try:
         from writer_engine.supabase.client import get_supabase_admin
@@ -4658,17 +4664,56 @@ async def _load_canon_dates(project_id: str) -> list[str]:
         rows = getattr(r, "data", None) or []
     except Exception as exc:
         logger.warning("marketing.canon_dates_unreadable", error=str(exc)[:200])
-        return []
-    dated: list[tuple[int, str]] = []
+        return [], ""
+    dated: list[tuple[bool, int, str]] = []
+    evidence: list[str] = []
     for row in rows:
         name = str(row.get("name") or "").strip()
         desc = " ".join(str(row.get("description") or "").split())
         years = _YEAR_RE.findall(name) or _YEAR_RE.findall(desc)
         if not name or not years:
             continue
-        dated.append((int(years[0]), f"- {name}: {desc[:160]}"))
-    dated.sort(key=lambda t: t[0])
-    return [line for _, line in dated[:CANON_DATE_LIMIT]]
+        evidence.append(f"{name} {desc}")
+        on_page = any(re.search(rf"\b{y}\b", book_text) for y in set(years)) if book_text else False
+        dated.append((on_page, int(years[0]), f"- {name}: {desc[:160]}"))
+    chosen = sorted(dated, key=lambda t: (not t[0], t[1]))[:CANON_DATE_LIMIT]
+    chosen.sort(key=lambda t: t[1])
+    return [line for _, _, line in chosen], "\n".join(evidence)
+
+
+# A number's edges: not part of a longer number ("1,200", "3.14"), but a full stop or comma after it
+# is just punctuation ("the 1940s.").
+_NUM_START = r"(?<!\d)(?<!\d[,.])"
+_NUM_END = r"(?!\d|[,.]\d)"
+_COPY_NUMBER_RE = re.compile(_NUM_START + r"(\d{3,4})(s?)" + _NUM_END)
+_SPAN_RE = re.compile(_NUM_START + r"(\d[\d,]*)[- ]year\b", re.IGNORECASE)
+
+
+def _unsupported_numbers(copy: str, evidence: str) -> list[str]:
+    """Years, decades and "N-year" spans in the copy that neither the book nor the record contains.
+
+    Book 1's copy closed on "The 344-year span Marcus tracks begins there." No chapter says 344 and
+    no bible entry does: the number was made up, and a reader who checks it finds a wrong book.
+    A decade ("the 1940s") counts only if the evidence uses that decade, so a dig recorded as
+    1935-1951 cannot be retold as "the 1930s and 1940s".
+    """
+    found: list[str] = []
+    seen: set[str] = set()
+    for m in _COPY_NUMBER_RE.finditer(copy):
+        token = m.group(1) + m.group(2)
+        if token in seen:
+            continue
+        seen.add(token)
+        if not re.search(_NUM_START + re.escape(token) + _NUM_END, evidence):
+            found.append(f'"{token}" is not in the book or the record')
+    for m in _SPAN_RE.finditer(copy):
+        n = m.group(1).replace(",", "")
+        if n in seen:
+            continue
+        seen.add(n)
+        if not re.search(_NUM_START + re.escape(n) + _NUM_END, evidence.replace(",", "")):
+            found.append(f'"{m.group(0)}" is not in the book or the record')
+    return found
 
 
 def _canon_dates_block(lines: list[str]) -> str:
@@ -4796,7 +4841,9 @@ async def _op_marketing(payload: dict) -> dict:
     volume_note = ""
     if isinstance(volume, dict) and volume.get("index"):
         volume_note = _series_book_note(volume)
-    canon_dates = _canon_dates_block(await _load_canon_dates(project_id))
+    book_text = "\n".join(str(x.get("content_text") or "") for x in rows)
+    canon_lines, canon_evidence = await _load_canon_dates(project_id, book_text=book_text)
+    canon_dates = _canon_dates_block(canon_lines)
 
     # REVISION vs FIRST DRAFT. With a previous draft and instructions, this is a diff: the baseline
     # comes back unchanged except where the author asked for a change. Regenerating instead loses
@@ -4893,6 +4940,34 @@ async def _op_marketing(payload: dict) -> dict:
             logger.warning("marketing.role_repair_failed", error=str(exc)[:200])
         mismatches = _role_mismatches(_copy_text(marketing), roster)
 
+    # A date or number the book does not contain: Book 1's "344-year span" was invented, and "the
+    # 1930s and 1940s" compressed a dig the record gives as 1935-1951. Sent back once, naming each.
+    evidence = book_text + "\n" + canon_evidence
+    unsupported = _unsupported_numbers(_copy_text(marketing), evidence)
+    if unsupported:
+        logger.info("marketing.unsupported_numbers", found=unsupported)
+        try:
+            fixed, _resp = await complete_structured(
+                router,
+                provider="anthropic",
+                model=get_settings().model_default,
+                system=_build_marketing_revision_system(str(ctx.get("genre_slug") or "")) + volume_note,
+                prompt=(
+                    "PREVIOUS DRAFT (the baseline — return fields unchanged unless the instructions "
+                    "ask otherwise):\n"
+                    + json.dumps(marketing.model_dump(mode="json"), indent=1)
+                    + "\n\nTHE AUTHOR'S INSTRUCTIONS:\nThese dates or numbers are not in the book or "
+                    "the record. Replace each with what THE RECORD says, or remove it, and change "
+                    "nothing else:\n- " + "\n- ".join(unsupported) + "\n\n" + canon_dates
+                ),
+                schema=RevisedMarketing,
+                max_tokens=4096,
+            )
+            marketing = fixed
+        except (ProviderNotRegistered, ValueError) as exc:
+            logger.warning("marketing.number_repair_failed", error=str(exc)[:200])
+        unsupported = _unsupported_numbers(_copy_text(marketing), evidence)
+
     out = marketing.model_dump(mode="json")
     # The approved bio is returned exactly as written; everything else loses its em dashes.
     for field in ("hook", "blurb", "back_cover"):
@@ -4900,6 +4975,8 @@ async def _op_marketing(payload: dict) -> dict:
             out[field] = _strip_em_dashes(out[field])
     if mismatches:
         out["role_warnings"] = mismatches
+    if unsupported:
+        out["date_warnings"] = unsupported
     out["revised"] = revising
     if revising:
         out["instructions"] = instructions
