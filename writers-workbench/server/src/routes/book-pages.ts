@@ -18,7 +18,7 @@ import express, { Router, type Request, type Response } from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import { logger } from '../lib/logger.js';
-import { renderPreviewHtml, type LandingCopy, type SectionPlan } from '../lib/landing-page.js';
+import { renderPreviewHtml, type BuyLink, type LandingCopy, type SectionPlan } from '../lib/landing-page.js';
 
 export const bookPagesRouter = Router();
 
@@ -48,13 +48,14 @@ interface PageRow {
   user_id: string;
   title: string;
   landing: { copy: LandingCopy; plan: SectionPlan[] } | null;
+  buy: BuyLink | null;
 }
 
 async function findPage(slug: string): Promise<PageRow | null> {
   if (!SLUG.test(slug) || slug.length > 80) return null;
   const { data, error } = await getSupabaseAdmin()
     .from('writing_projects_v2')
-    .select('id, user_id, title, landing:outline->_landing_page')
+    .select('id, user_id, title, landing:outline->_landing_page, buy:outline->_landing_page_buy')
     .eq('outline->_landing_page_public->>slug', slug)
     .is('deleted_at', null)
     .limit(1);
@@ -82,6 +83,8 @@ function notFound(res: Response): void {
 
 const NOTICES: Record<string, (title: string) => string> = {
   '1': (title) => `Thank you. You are on the list, and we will write to you when ${title} is released.`,
+  // Once the book is on sale the form is for news of the next one.
+  on_sale: () => 'Thank you. You are on the list, and we will write to you when there is news.',
   invalid: () => 'That email address does not look right. Please check it and try again.',
   wait: () => 'Too many attempts from this connection. Please wait a few minutes and try again.',
   error: () => 'Something went wrong saving your reservation. Please try again.',
@@ -92,11 +95,14 @@ bookPagesRouter.get('/:slug', async (req: Request, res: Response) => {
   try {
     const page = await findPage(slug);
     if (!page || !page.landing) return notFound(res);
-    const notice = NOTICES[String(req.query.reserved ?? '')]?.(page.title);
+    const state = String(req.query.reserved ?? '');
+    const buy = page.buy?.url ? { url: page.buy.url, label: page.buy.label || 'Buy the book' } : undefined;
+    const notice = NOTICES[state === '1' && buy ? 'on_sale' : state]?.(page.title);
     const html = renderPreviewHtml(page.landing.copy, page.landing.plan, {
       formAction: `/books/${slug}/reserve`,
       canonicalUrl: selfUrl(req, slug),
       notice,
+      buy,
     });
     // Regenerating the script changes the page; a stale copy must not outlive that.
     res.setHeader('Cache-Control', 'no-cache');
@@ -143,3 +149,37 @@ bookPagesRouter.post(
     }
   },
 );
+
+const TOKEN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function plainPage(title: string, message: string): string {
+  return (
+    '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
+    `<title>${title}</title><style>body{font:18px/1.6 Georgia,serif;max-width:560px;margin:80px auto;padding:0 16px;color:#2b211b;background:#f6f0e6}</style>` +
+    `</head><body><h1>${title}</h1><p>${message}</p></body></html>`
+  );
+}
+
+/**
+ * The link at the foot of every email. One click, no login, no form: a reader who has to work to
+ * stop the mail marks it as spam instead. An unknown or repeated token gets the same answer, so the
+ * page tells nobody whether an address is on a list.
+ */
+bookPagesRouter.get('/:slug/unsubscribe', async (req: Request, res: Response) => {
+  const token = String(req.query.t ?? '');
+  res.setHeader('Cache-Control', 'no-store');
+  if (TOKEN.test(token)) {
+    try {
+      await getSupabaseAdmin()
+        .from('landing_page_reservations_v2')
+        .update({ unsubscribed_at: new Date().toISOString() })
+        .eq('unsubscribe_token', token)
+        .is('unsubscribed_at', null);
+    } catch (err) {
+      logger.error({ err }, 'book-page: unsubscribe failed');
+      res.status(500).type('html').send(plainPage('Something went wrong', 'Please try the link again in a few minutes.'));
+      return;
+    }
+  }
+  res.type('html').send(plainPage('You will not get these emails again', 'You have been taken off the list for this book.'));
+});
