@@ -25,10 +25,13 @@ export const bookPagesRouter = Router();
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const EMAIL = /^[^\s@<>]{1,64}@[^\s@<>]{1,255}\.[^\s@<>]{2,}$/;
 
-/** The reader's own address, not the proxy's: Railway puts every request behind one. */
+/**
+ * The reader's own address. With `trust proxy` set to Railway's two hops (index.ts), req.ip is the
+ * client. The first X-Forwarded-For entry, read here before, is whatever the client sent, so a bot
+ * could choose a fresh one on every request and never be rate limited.
+ */
 function clientIp(req: Request): string {
-  const forwarded = String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim();
-  return forwarded || req.ip || 'unknown';
+  return req.ip || 'unknown';
 }
 
 const reserveLimiter = rateLimit({
