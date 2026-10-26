@@ -110,7 +110,7 @@ beforeEach(() => {
     outline: { _landing_page_public: { slug: 'the-ossuary', published_at: 'x' } },
   }];
   db.author_profiles_v2 = [{ user_id: 'u1', pen_name: 'Eric L Beser' }];
-  db.users_v2 = [{ user_id: 'u1', email: 'author@example.com', name: 'Eric' }];
+  db.users_v2 = [{ user_id: 'u1', email: 'author@example.com', display_name: 'Eric' }];
   db.landing_page_mailings_v2 = [];
   db.landing_page_reservations_v2 = [
     { id: 'r1', user_id: 'u1', project_id: 'p1', first_name: 'Ada', email: 'ada@example.com', unsubscribe_token: T1, unsubscribed_at: null },

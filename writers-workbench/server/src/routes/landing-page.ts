@@ -813,9 +813,9 @@ landingPageRouter.post('/project/:projectId/mailings', validateBody(MailingSchem
   const pageUrl_ = `${base}/books/${pub.slug}`;
   const [{ data: profile }, { data: account }] = await Promise.all([
     supabase.from('author_profiles_v2').select('pen_name').eq('user_id', req.userId!).maybeSingle(),
-    supabase.from('users_v2').select('email, name').eq('user_id', req.userId!).maybeSingle(),
+    supabase.from('users_v2').select('email, display_name').eq('user_id', req.userId!).maybeSingle(),
   ]);
-  const author = String(profile?.pen_name ?? account?.name ?? '').trim();
+  const author = String(profile?.pen_name || account?.display_name || '').trim();
   const authorEmail = String(account?.email ?? '').trim();
   const mail = (to: { first_name?: string; email: string; unsubscribe_token?: string }, subj: string) => {
     const { html, text } = renderMailing({
