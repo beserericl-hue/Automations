@@ -54,10 +54,10 @@ export async function loadBookSource(projectId: string, userId: string): Promise
   if (!authorName) {
     const { data: account } = await supabase
       .from('users_v2')
-      .select('name')
+      .select('display_name')
       .eq('user_id', userId)
       .maybeSingle();
-    authorName = String(account?.name ?? '').trim();
+    authorName = String(account?.display_name ?? '').trim();
   }
 
   let art: Buffer | null = null;

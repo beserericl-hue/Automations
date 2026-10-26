@@ -340,10 +340,12 @@ exportRouter.post(
       if (!author_name) {
         const { data: profile } = await getSupabaseAdmin()
           .from('users_v2')
-          .select('name')
+          .select('display_name')
           .eq('user_id', user_id)
           .maybeSingle();
-        author_name = ((profile?.name as string) || '').trim();
+        // `display_name`: users_v2 has no `name` column, and asking for one fails the whole query,
+        // which read as "no name" and filed the book under "Unknown Author".
+        author_name = ((profile?.display_name as string) || '').trim();
       }
 
       // Paged: PostgREST caps a response at 1000 rows, and a book can exceed that in theory. More
