@@ -165,6 +165,10 @@ describe('placing an order', () => {
       expect(product.coverUrl).toBeUndefined();
       expect(create.body.orderItems[0].quantity).toBe(2);
       expect(db.print_orders_v2[0].quote).toMatchObject({ estimate: { shippingPrice: 7.2 } });
+      // The estimate has no file to count, so it is told the padded page count; the order is not.
+      const estimate = rpiCalls.find((c) => c.path === '/orders/pricing/estimate')!;
+      expect(estimate.body.orderItems[0].product.pageCount).toBe(594);
+      expect(create.body.orderItems[0].product.pageCount).toBeUndefined();
     });
   });
 

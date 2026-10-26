@@ -366,6 +366,7 @@ printRouter.post('/orders/:orderId/submit', validateBody(SubmitSchema), async (r
       quantity,
       itemDescription: `${edition.label} — ${row.page_count} pages`,
       files,
+      pageCount: row.page_count,
     };
     // The full estimate first: it is the total the author is about to commit to, and it refuses
     // what the order would refuse, without creating anything.
