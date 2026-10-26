@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useImageGenerator } from '../../hooks/useImageGenerator';
 import { supabase } from '../../config/supabase';
 import { useUser } from '../../contexts/UserContext';
 import { apiFetch, type ApiEnvelope } from '../../lib/api';
@@ -32,6 +33,14 @@ export default function ImageGallery({ projectId, onSelectImage }: ImageGalleryP
   const navigate = useNavigate();
   const [typeFilter, setTypeFilter] = useState('');
   const [genreFilter, setGenreFilter] = useState('');
+  // Generate from the gallery itself. It used to be possible only by asking the chat or Eve.
+  const qc = useQueryClient();
+  const gen = useImageGenerator();
+  const [composing, setComposing] = useState(false);
+  const [prompt, setPrompt] = useState('');
+  const [newType, setNewType] = useState('cover_art');
+  const genState = gen.stateOf('gallery');
+  const generating = genState === 'submitting' || genState === 'polling' || genState === 'saving';
 
   const { data: images, isLoading } = useQuery({
     queryKey: ['generated-images', userId, projectId, typeFilter, genreFilter, isImpersonating],
@@ -134,8 +143,63 @@ export default function ImageGallery({ projectId, onSelectImage }: ImageGalleryP
           <span className="text-sm text-gray-400">
             {images?.length ?? 0} image{images?.length !== 1 ? 's' : ''}
           </span>
+          {!onSelectImage && (
+            <button
+              onClick={() => setComposing(!composing)}
+              disabled={generating}
+              className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+            >
+              {generating ? 'Generating…' : 'Generate an image'}
+            </button>
+          )}
         </div>
       </div>
+
+      {composing && !onSelectImage && (
+        <div data-testid="generate-image" className="mb-4 space-y-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300" htmlFor="gallery-prompt">
+            Describe the image
+          </label>
+          <textarea
+            id="gallery-prompt"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            rows={3}
+            placeholder="A lighthouse on a drowned coastline at dusk, a red lantern in the doorway. No text."
+            className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              aria-label="Image type"
+              value={newType}
+              onChange={(e) => setNewType(e.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            >
+              {IMAGE_TYPES.filter((t) => t.value).map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+            <button
+              disabled={generating || !prompt.trim()}
+              onClick={async () => {
+                const ok = await gen.generate('gallery', { prompt: prompt.trim(), projectId, imageType: newType });
+                if (ok) {
+                  setPrompt('');
+                  setComposing(false);
+                  void qc.invalidateQueries({ queryKey: ['generated-images'] });
+                }
+              }}
+              className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+            >
+              {generating ? 'Generating…' : 'Generate'}
+            </button>
+            <button onClick={() => setComposing(false)} className="text-sm text-gray-500 underline">
+              Cancel
+            </button>
+            {genState === 'error' ? <span className="text-sm text-red-600">That image could not be generated.</span> : null}
+          </div>
+        </div>
+      )}
 
       {/* Empty state */}
       {(!images || images.length === 0) && (
@@ -145,7 +209,7 @@ export default function ImageGallery({ projectId, onSelectImage }: ImageGalleryP
           </svg>
           <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No images yet</h3>
           <p className="mt-1 text-sm text-gray-500">
-            Use the chat or Eve to generate cover art, or click a chapter's cover art button.
+            Generate one above, ask the chat or Eve, or use a chapter's cover art button.
           </p>
         </div>
       )}

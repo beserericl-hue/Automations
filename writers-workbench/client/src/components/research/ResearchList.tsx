@@ -8,6 +8,7 @@ import ConfirmDialog from '../shared/ConfirmDialog';
 import Pagination from '../shared/Pagination';
 import { TableSkeleton, EmptyState } from '../shared/Skeleton';
 import type { ResearchReport } from '../../types/database';
+import ResearchRunBox from './ResearchRunBox';
 
 export default function ResearchList() {
   const { profile, isImpersonating } = useUser();
@@ -67,6 +68,7 @@ export default function ResearchList() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Research Reports</h1>
+      <ResearchRunBox userId={userId} invalidate={[['research']]} />
 
       {isLoading ? (
         <TableSkeleton rows={5} columns={5} />
