@@ -154,6 +154,10 @@ async def due_rows(client: Any, now: datetime, *, limit: int = MAX_PER_TICK) -> 
         .select("*")
         .in_("state", ["failed", "partial"])
         .lt("attempts", MAX_ATTEMPTS)
+        # History copied from n8n is a record, not a to-do list: its failures happened weeks ago,
+        # and retrying one would post a stale September post today. Found on DEV 2026-10-27, when
+        # the first tick after the import "retried" six imported failures. Requeue to post one.
+        .neq("source", "n8n_import")
         .order("scheduled_at")
         .limit(limit)
         .execute()
