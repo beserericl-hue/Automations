@@ -2,9 +2,11 @@ import { test, expect } from '@playwright/test';
 import { apiClient } from '../pages/api';
 
 /**
- * Credits — RESULT-asserting. The Purchase flow (Stripe-deferred stub) grants credits; the balance must
- * actually increase. Reads the balance via /api/credits/balance before and after. Verified against
- * credits/CreditsPage.tsx + server routes/credits.ts.
+ * Credits — RESULT-asserting. Sprint 9: Purchase no longer grants credits on the spot. It sends the
+ * user to Stripe Checkout for the chosen amount, and only the Stripe webhook adds credits once the
+ * payment clears (the full paid path, test card and all, is sprint9-billing.spec.ts). So here: the
+ * balance shown is the API's, Purchase leads to Stripe's checkout page, and the balance has NOT
+ * changed just from clicking. Verified against credits/CreditsPage.tsx + server routes/credits.ts.
  */
 async function balance(): Promise<number> {
   const api = await apiClient();
@@ -16,7 +18,7 @@ async function balance(): Promise<number> {
 }
 
 test.describe('Credits (result-asserting)', () => {
-  test('the page shows the real balance; Purchase (if offered) increases it', async ({ page }) => {
+  test('the page shows the real balance; Purchase (if offered) goes to Stripe and grants nothing until paid', async ({ page }) => {
     const before = await balance();
     expect(before, 'credits balance endpoint must return a number').not.toBeNaN();
 
@@ -42,9 +44,10 @@ test.describe('Credits (result-asserting)', () => {
     if (await preset10.isVisible().catch(() => false)) await preset10.click();
     await purchase.click();
     await expect(page.getByText(/Confirm purchase/i)).toBeVisible({ timeout: 10_000 });
-    await page.getByRole('button', { name: /^(Confirm|Processing)/ }).click();
-    await expect
-      .poll(balance, { timeout: 20_000, message: 'purchase did not increase the credit balance' })
-      .toBeGreaterThan(before);
+    await page.getByRole('button', { name: /Continue to payment/ }).click();
+    await page.waitForURL(/checkout\.stripe\.com/, { timeout: 30_000 });
+    await expect(page.getByText(/Writers Workbench credit/).first()).toBeVisible({ timeout: 30_000 });
+    // Nothing is granted until Stripe says the payment cleared.
+    expect(await balance()).toBe(before);
   });
 });
