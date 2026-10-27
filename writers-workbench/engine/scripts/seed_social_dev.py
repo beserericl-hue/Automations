@@ -199,7 +199,8 @@ def import_n8n() -> None:
             "scheduled_at": _scheduled_at(str(r["scheduledDate"])[:10], str(r.get("slot") or "")),
             # A pending n8n row is still n8n's to post: imported as cancelled so DEV never posts it too.
             "state": "cancelled" if state == "pending" else state,
-            "posted_at": r.get("postedAt") or None, "attempts": 1 if state != "pending" else 0,
+            # No retries left: an imported failure is history, never something to post again on its own.
+            "posted_at": r.get("postedAt") or None, "attempts": 3 if state == "failed" else (1 if state != "pending" else 0),
             "source": "n8n_import",
             "item_type": "video" if str(r.get("category")).upper() == "VIDEO" else ("blog" if r.get("body") else "article"),
         }

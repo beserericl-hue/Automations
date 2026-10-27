@@ -332,3 +332,13 @@ def test_summary_email_marks_dry_runs_and_problems() -> None:
     subject, html = poster.summary_email(r, NOW)
     assert subject.startswith("[DRY RUN] Scheduled posts: 1 ok, 1 NEED ATTENTION")
     assert "expired" in html and "#2" in html
+
+
+@pytest.mark.asyncio
+async def test_imported_n8n_failures_are_never_retried(db: FakeSupabase) -> None:
+    _row(db, state="failed", attempts=1, source="n8n_import", updated_at=_iso(NOW - timedelta(days=30)))
+    _row(db, state="partial", attempts=1, source="n8n_import", updated_at=_iso(NOW - timedelta(days=30)))
+    net = _Net()
+    result = await poster.run_tick(db, net.transport(), now=NOW, mode="live")
+    assert result.claimed == 0 and net.calls == []
+    assert {r["state"] for r in db.tables["social_schedule_v2"]} == {"failed", "partial"}

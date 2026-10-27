@@ -193,7 +193,14 @@ export async function seedSocialPost(fields: {
 }
 
 // --------------------------------------------------------------------------- disposable calendar posts (migration 038)
-/** A post on the calendar. `external_id` starts with `e2e-` so teardown can find what a run left. */
+/**
+ * Tags every calendar row this process makes. Teardown deletes only rows with this run's tag:
+ * the Railway E2E service runs the whole suite on every develop deploy, so a broad "delete every
+ * e2e- row" in one run deleted the row another run was waiting on (DEV, 2026-10-27).
+ */
+export const RUN_TAG = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+/** A post on the calendar. `external_id` is `e2e-<RUN_TAG>-…` so teardown finds only this run's rows. */
 export async function seedCalendarPost(fields: {
   title: string;
   scheduledDate: string;
@@ -206,7 +213,7 @@ export async function seedCalendarPost(fields: {
     method: 'POST',
     headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
     body: JSON.stringify({
-      user_id: DEMO_USER_ID, external_id: `e2e-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      user_id: DEMO_USER_ID, external_id: `e2e-${RUN_TAG}-${Math.random().toString(36).slice(2, 7)}`,
       title: fields.title, linkedin_content: fields.linkedinContent ?? `${fields.title} — e2e`, body_md: '',
       channels: fields.channels ?? ['li_personal'], scheduled_date: fields.scheduledDate, slot: fields.slot ?? 'morning',
       // The trigger recomputes this from date + slot.

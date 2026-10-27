@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { DEMO_USER_ID, deleteCalendarPost, easternToday, seedCalendarPost, supaDelete, supaGet } from '../pages/api';
+import { DEMO_USER_ID, RUN_TAG, deleteCalendarPost, easternToday, seedCalendarPost, supaDelete, supaGet } from '../pages/api';
 
 /**
  * The post calendar (migration 038, the port of the n8n scheduled_blogs queue). Result-asserting:
@@ -27,7 +27,7 @@ test.describe('Post calendar (result-asserting)', () => {
 
   test('a post made in the UI is scheduled, edited, cancelled and put back, in the DB and on screen', async ({ page }) => {
     const day = futureDay();
-    const title = `E2E calendar ${Date.now()}`;
+    const title = `E2E calendar ${RUN_TAG} ${Date.now()}`;
     await page.goto(`/newsletter/calendar?week=${day}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: 'Post calendar' })).toBeVisible({ timeout: 20_000 });
     await page.getByRole('button', { name: new RegExp(`Add a post ${day} 2:00 PM ET`) }).click();
@@ -126,7 +126,7 @@ test.describe('Post calendar (result-asserting)', () => {
 
 test.afterAll(async () => {
   if (!HAS_KEY) return;
-  // Anything a failed run left behind.
-  await supaDelete('social_schedule_v2', `user_id=eq.${USER}&title=like.E2E%20calendar%25`);
-  await supaDelete('social_schedule_v2', `user_id=eq.${USER}&external_id=like.e2e-%25`);
+  // Anything THIS run left behind, never another run's rows (several runs can overlap on DEV).
+  await supaDelete('social_schedule_v2', `user_id=eq.${USER}&title=like.E2E%20calendar%20${RUN_TAG}%25`);
+  await supaDelete('social_schedule_v2', `user_id=eq.${USER}&external_id=like.e2e-${RUN_TAG}-%25`);
 });
