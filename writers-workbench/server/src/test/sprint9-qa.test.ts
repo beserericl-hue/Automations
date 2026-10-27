@@ -228,14 +228,14 @@ describe('webhook', () => {
     expect(sub()).toMatchObject({ tier_id: '4b66a358-8593-4bbd-a4fd-8b93488a3079', status: 'active', billing_cycle: 'monthly', stripe_subscription_id: 'sub_1', credits_remaining: 500 });
     // The same event again, and invoice.paid for the same invoice: nothing granted twice.
     expect((await deliver(event)).json.duplicate).toBe(true);
-    await deliver({ id: 'evt_2', type: 'invoice.paid', data: { object: { id: 'in_1', parent: { subscription_details: { subscription: 'sub_1' } } } } });
+    await deliver({ id: 'evt_2', type: 'invoice.paid', data: { object: { id: 'in_1', billing_reason: 'subscription_create', parent: { subscription_details: { subscription: 'sub_1' } } } } });
     expect(creditTx().filter((t) => t.transaction_type === 'monthly_reset')).toHaveLength(1);
     expect(db.stripe_events_v2.map((e) => e.status)).toEqual(['processed', 'processed']);
   });
 
   it('two deliveries for the same invoice at the same moment grant once', async () => {
     Object.assign(sub(), { tier_id: '4b66a358-8593-4bbd-a4fd-8b93488a3079', stripe_subscription_id: 'sub_1', credits_remaining: 3 });
-    const paid = { id: 'evt_r1', type: 'invoice.paid', data: { object: { id: 'in_r', parent: { subscription_details: { subscription: 'sub_1' } } } } };
+    const paid = { id: 'evt_r1', type: 'invoice.paid', data: { object: { id: 'in_r', billing_reason: 'subscription_create', parent: { subscription_details: { subscription: 'sub_1' } } } } };
     const checkout = { id: 'evt_r2', type: 'checkout.session.completed', data: { object: { id: 'cs_r', mode: 'subscription', subscription: 'sub_1', metadata: { user_id: 'u1' } } } };
     currentSub = subscription({ latest_invoice: 'in_r' } as Partial<Stripe.Subscription>);
     await Promise.all([deliver(paid), deliver(checkout)]);
@@ -245,11 +245,18 @@ describe('webhook', () => {
 
   it('invoice.paid for a new period resets the credits once', async () => {
     Object.assign(sub(), { tier_id: '4b66a358-8593-4bbd-a4fd-8b93488a3079', stripe_subscription_id: 'sub_1', credits_remaining: 3 });
-    const event = { id: 'evt_3', type: 'invoice.paid', data: { object: { id: 'in_2', parent: { subscription_details: { subscription: 'sub_1' } } } } };
+    const event = { id: 'evt_3', type: 'invoice.paid', data: { object: { id: 'in_2', billing_reason: 'subscription_cycle', parent: { subscription_details: { subscription: 'sub_1' } } } } };
     await deliver(event);
     await deliver({ ...event, id: 'evt_3b' }); // a different event about the same invoice
     expect(sub().credits_remaining).toBe(500);
     expect(creditTx()).toHaveLength(1);
+  });
+
+  it('a paid proration invoice (an upgrade) does not reset the balance', async () => {
+    Object.assign(sub(), { tier_id: '4b66a358-8593-4bbd-a4fd-8b93488a3079', stripe_subscription_id: 'sub_1', credits_remaining: 725 });
+    await deliver({ id: 'evt_pr', type: 'invoice.paid', data: { object: { id: 'in_pr', billing_reason: 'subscription_update', parent: { subscription_details: { subscription: 'sub_1' } } } } });
+    expect(sub().credits_remaining).toBe(725);
+    expect(creditTx()).toHaveLength(0);
   });
 
   it('a failed payment is past_due; the third suspends the account and says so by email', async () => {

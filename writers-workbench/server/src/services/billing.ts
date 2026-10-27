@@ -188,6 +188,13 @@ export async function grantPeriodCredits(
   return { granted: true, balance };
 }
 
+/**
+ * Invoices that pay for a whole period. A proration invoice (an upgrade's difference) or a manual
+ * invoice is paid too, but it is not a new period: resetting credits on it would wipe whatever the
+ * user had bought or not yet used (seen on DEV: the upgrade's $30.00 proration reset the balance).
+ */
+export const PERIOD_BILLING_REASONS = new Set(['subscription_create', 'subscription_cycle']);
+
 /** invoice.paid: a subscription period was paid for. */
 export async function handleInvoicePaid(invoice: Stripe.Invoice): Promise<string | null> {
   const subId = invoiceSubscriptionId(invoice);
@@ -195,6 +202,7 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice): Promise<string
   const sub = await getStripeClient().subscriptions.retrieve(subId);
   const applied = await applyStripeSubscription(sub);
   if (!applied) return null;
+  if (!PERIOD_BILLING_REASONS.has(String(invoice.billing_reason ?? ''))) return applied.userId;
   await grantPeriodCredits(
     applied.userId,
     applied.tier,
