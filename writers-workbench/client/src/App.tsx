@@ -41,6 +41,9 @@ const ProjectPublishing = lazyRetry(() => import('./components/publishing/Projec
 // until Phase 2b.
 const NewsletterHome = lazyRetry(() => import('./components/newsletter/NewsletterHome'));
 const PostCalendar = lazyRetry(() => import('./components/social/PostCalendar'));
+const BillingPage = lazyRetry(() => import('./components/billing/BillingPage'));
+const BillingSuccess = lazyRetry(() => import('./components/billing/BillingPage').then((m) => ({ default: m.BillingSuccess })));
+const BillingCancel = lazyRetry(() => import('./components/billing/BillingPage').then((m) => ({ default: m.BillingCancel })));
 const RadarPanel = lazyRetry(() => import('./components/social/RadarPanel'));
 const NewsletterGenerate = lazyRetry(() => import('./components/newsletter/NewsletterGenerate'));
 const ExecutionStatus = lazyRetry(() => import('./components/newsletter/ExecutionStatus'));
@@ -112,6 +115,9 @@ export default function App() {
                     <Route path="admin/*" element={<AdminPanel />} />
                     <Route path="superuser/*" element={<SuperuserPanel />} />
                     <Route path="credits" element={<CreditsPage />} />
+                    <Route path="billing" element={<BillingPage />} />
+                    <Route path="billing/success" element={<BillingSuccess />} />
+                    <Route path="billing/cancel" element={<BillingCancel />} />
                     {/* Compose Newsletter 2a (S4) — singular /newsletter prefix.
                         Note: /newsletters (plural) above redirects to the legacy
                         Content Library filter; do not collapse the two. */}

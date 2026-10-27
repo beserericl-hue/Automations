@@ -14,8 +14,10 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ open, onToggle }: SidebarProps) {
-  const { profile, isImpersonating } = useUser();
+  const { profile, isImpersonating, subscription } = useUser();
   const { isAdmin, isSuperuser, creditsRemaining, creditsMonthly } = usePermissions();
+  // Sprint 9: Billing for every plan except the comp tier and staff, who are never charged.
+  const showBilling = subscription?.tier?.name !== 'free_full' && !isAdmin && !isSuperuser;
   const userId = profile?.user_id;
   const location = useLocation();
   const [projectsExpanded, setProjectsExpanded] = useState(true);
@@ -428,6 +430,7 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
           </div>
         )}
         <SidebarLink to="/credits" icon={CreditIcon} label="Credits" open={open} />
+        {showBilling && <SidebarLink to="/billing" icon={CreditIcon} label="Billing" open={open} />}
         {/* Its own entry rather than a button inside Settings. What is behind it — the facts a bio
             is written from — is the one thing the book cannot generate for itself, so it has to be
             findable without knowing it is filed under Settings. */}

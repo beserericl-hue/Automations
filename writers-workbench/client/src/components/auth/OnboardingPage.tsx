@@ -117,6 +117,16 @@ export default function OnboardingPage() {
     setError('');
     setSubmitting(true);
     try {
+      // Sprint 9: a paid plan is bought through Stripe Checkout. The account already has its free
+      // trial, so a cancelled checkout leaves the user on the trial, not without a plan.
+      if (billing !== 'none' && (tier.monthly_price_cents > 0 || tier.annual_price_cents > 0)) {
+        const res = await apiFetch<{ data: { checkout_url: string } }>('/api/billing/checkout', {
+          method: 'POST',
+          body: JSON.stringify({ tier_id: tier.id, billing_cycle: billing }),
+        });
+        window.location.assign(res.data.checkout_url);
+        return;
+      }
       await apiFetch('/api/account/subscribe', {
         method: 'POST',
         body: JSON.stringify({ tier_name: tier.name, billing_cycle: billing }),

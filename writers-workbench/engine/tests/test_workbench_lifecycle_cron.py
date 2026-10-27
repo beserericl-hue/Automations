@@ -31,7 +31,7 @@ def _client(handler) -> httpx.AsyncClient:
 
 
 class TestRunLifecycle:
-    def test_calls_all_three_routes_with_the_secret(self) -> None:
+    def test_calls_every_route_with_the_secret(self) -> None:
         seen: list[tuple[str, str | None]] = []
 
         def handler(request: httpx.Request) -> httpx.Response:
@@ -43,7 +43,7 @@ class TestRunLifecycle:
                 return await workbench_cron.run_lifecycle(client=c)
 
         out = asyncio.run(go())
-        assert out["called"] == 3
+        assert out["called"] == len(workbench_cron.LIFECYCLE_PATHS) == 5
         assert [p for p, _ in seen] == list(workbench_cron.LIFECYCLE_PATHS)
         assert {s for _, s in seen} == {"cron-secret-abc"}
 

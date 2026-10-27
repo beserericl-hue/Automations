@@ -5,6 +5,7 @@ import { useUser } from '../../contexts/UserContext';
 import { useToast } from '../../contexts/ToastContext';
 import { supabase } from '../../config/supabase';
 import { usePermissions } from '../../hooks/usePermissions';
+import BillingRevenue from '../billing/BillingRevenue';
 import PasswordInput from '../shared/PasswordInput';
 import type { UserProfile, SubscriptionTier } from '../../types/database';
 
@@ -94,6 +95,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
 
 export default function AdminPanel() {
   const { profile } = useUser();
+  const { isSuperuser } = usePermissions();
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
 
   if (!profile?.isAdmin) {
@@ -126,7 +128,12 @@ export default function AdminPanel() {
 
       {activeTab === 'users' && <UserManagement />}
       {activeTab === 'subscriptions' && <SubscriptionsTab />}
-      {activeTab === 'revenue' && <RevenueTab />}
+      {activeTab === 'revenue' && (
+        <div className="space-y-8">
+          <RevenueTab />
+          <BillingRevenue isSuperuser={isSuperuser} />
+        </div>
+      )}
       {activeTab === 'metrics' && <SystemMetrics />}
       {activeTab === 'workflows' && <WorkflowStatus />}
       {activeTab === 'queues' && <QueueStatus />}

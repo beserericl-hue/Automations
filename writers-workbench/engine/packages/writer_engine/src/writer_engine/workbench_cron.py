@@ -41,6 +41,10 @@ LIFECYCLE_PATHS: tuple[str, ...] = (
     "/api/cron/trial-check",
     "/api/cron/credit-reset",
     "/api/cron/trial-warnings",
+    # Sprint 9: bring Stripe-billed subscriptions back in line with Stripe (missed webhooks, ended
+    # cancellations), retry paid reader print orders RPI has not taken, and remind trials 3 days out.
+    "/api/cron/subscription-sync",
+    "/api/cron/trial-conversion-reminder",
 )
 
 

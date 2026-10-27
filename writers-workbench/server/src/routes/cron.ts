@@ -11,6 +11,10 @@ import { requireSharedSecret } from '../middleware/shared-secret.js';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import { logger } from '../lib/logger.js';
 import { sendEmail } from '../lib/email.js';
+import type Stripe from 'stripe';
+import { getStripeClient, paymentsReady, subscriptionPeriod, appUrl } from '../services/stripe.js';
+import { applyStripeSubscription, setBillingAccess } from '../services/billing.js';
+import { retryPaidReaderOrders } from '../services/reader-print.js';
 
 export const cronRouter = Router();
 
@@ -91,6 +95,9 @@ cronRouter.post('/credit-reset', async (_req: Request, res: Response) => {
     .from('user_subscriptions')
     .select('id, user_id, tier_id, billing_cycle, current_period_end, tier:subscription_tiers!inner(monthly_credits)')
     .eq('status', 'active')
+    // Sprint 9: a Stripe-billed subscription's credits are reset by invoice.paid, only once the
+    // period has actually been paid for. Resetting it here too would refill a past_due account.
+    .is('stripe_subscription_id', null)
     .not('current_period_end', 'is', null)
     .lt('current_period_end', now.toISOString());
 
@@ -290,3 +297,89 @@ function trialWarningText(key: '7d' | '3d' | '1d', days: number, trialEnd: strin
   }
   return `Your Writers Workbench trial ends in ${days} day${days === 1 ? '' : 's'} (on ${endDate}).\n\nUpgrade now to keep creating: https://writersworkbench-production.up.railway.app/credits\n\nIf you don't upgrade before then, your account will be locked. Your projects stay safe and come back when you upgrade.\n`;
 }
+
+/**
+ * Sprint 9 (S9-8): bring every Stripe-billed subscription back in line with Stripe, and suspend
+ * accounts whose cancelled plan's paid period has ended. Webhooks can be missed (a deploy, an
+ * outage); this is the net under them. Every correction is logged and returned.
+ */
+cronRouter.post('/subscription-sync', async (_req: Request, res: Response) => {
+  if (!paymentsReady()) {
+    res.json({ success: true, data: { skipped: 'payments not configured' } });
+    return;
+  }
+  const supabase = getSupabaseAdmin();
+  const { data: rows, error } = await supabase
+    .from('user_subscriptions')
+    .select('user_id, status, stripe_subscription_id, stripe_status, tier_id, current_period_end')
+    .not('stripe_subscription_id', 'is', null);
+  if (error) {
+    res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: error.message } });
+    return;
+  }
+  const corrections: Array<{ user_id: string; from: string; to: string }> = [];
+  let suspended = 0;
+  for (const row of rows ?? []) {
+    try {
+      const sub: Stripe.Subscription = await getStripeClient().subscriptions.retrieve(String(row.stripe_subscription_id));
+      const before = `${row.status}/${row.stripe_status}`;
+      await applyStripeSubscription(sub);
+      const { data: after } = await supabase.from('user_subscriptions').select('status, stripe_status').eq('user_id', row.user_id).maybeSingle();
+      const now = `${after?.status}/${after?.stripe_status}`;
+      if (before !== now) corrections.push({ user_id: String(row.user_id), from: before, to: now });
+      const end = subscriptionPeriod(sub).end;
+      if (sub.status === 'canceled') {
+        await supabase.from('user_subscriptions').update({ status: 'cancelled' }).eq('user_id', row.user_id);
+        if (end && Date.parse(end) <= Date.now()) {
+          await setBillingAccess(String(row.user_id), 'suspended', 'subscription ended');
+          suspended++;
+        }
+      }
+    } catch (err) {
+      logger.warn({ err, userId: row.user_id }, 'cron/subscription-sync: could not read subscription');
+    }
+  }
+  const reader = await retryPaidReaderOrders();
+  if (corrections.length) logger.warn({ corrections }, 'cron/subscription-sync: corrected drift');
+  res.json({ success: true, data: { checked: (rows ?? []).length, corrections, suspended, reader_orders: reader } });
+});
+
+/**
+ * Sprint 9 (S9-8): trials ending in three days get one email with a direct link to subscribe.
+ * Recorded in trial_warnings_sent as 'conversion_3d' so it is sent once.
+ */
+cronRouter.post('/trial-conversion-reminder', async (_req: Request, res: Response) => {
+  const supabase = getSupabaseAdmin();
+  const now = Date.now();
+  const from = new Date(now + 2 * 86400_000).toISOString();
+  const to = new Date(now + 3 * 86400_000).toISOString();
+  const { data, error } = await supabase
+    .from('user_subscriptions')
+    .select('id, user_id, trial_end, trial_warnings_sent, stripe_subscription_id')
+    .eq('status', 'active')
+    .is('stripe_subscription_id', null)
+    .gte('trial_end', from)
+    .lte('trial_end', to);
+  if (error) {
+    res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: error.message } });
+    return;
+  }
+  let sent = 0;
+  for (const row of data ?? []) {
+    const warnings = Array.isArray(row.trial_warnings_sent) ? (row.trial_warnings_sent as string[]) : [];
+    if (warnings.includes('conversion_3d')) continue;
+    const { data: user } = await supabase.from('users_v2').select('email, display_name').eq('user_id', row.user_id).maybeSingle();
+    if (!user?.email) continue;
+    const result = await sendEmail({
+      to: user.email,
+      subject: 'Your Writers Workbench trial ends in 3 days',
+      html: `<p>Hi${user.display_name ? ` ${String(user.display_name).split(' ')[0]}` : ''},</p>` +
+        `<p>Your free trial ends on ${new Date(String(row.trial_end)).toDateString()}. Keep your projects and credits by choosing a plan.</p>` +
+        `<p><a href="${appUrl()}/billing?plan=pro">Start the Pro plan</a> &nbsp;·&nbsp; <a href="${appUrl()}/billing">See all plans</a></p>`,
+    });
+    if (!result.ok) continue;
+    await supabase.from('user_subscriptions').update({ trial_warnings_sent: [...warnings, 'conversion_3d'] }).eq('id', row.id);
+    sent++;
+  }
+  res.json({ success: true, data: { due: (data ?? []).length, sent } });
+});

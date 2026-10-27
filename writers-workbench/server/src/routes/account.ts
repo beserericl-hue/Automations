@@ -53,6 +53,20 @@ accountRouter.delete('/', validateBody(DeleteAccountSchema), async (req, res, ne
 
     logger.info({ userId, counts }, 'Cascade impact before deletion');
 
+    // Sprint 9: a deleted account must stop being billed. Cancel any Stripe subscription first;
+    // if Stripe cannot be reached, refuse rather than delete the data and keep charging the card.
+    const { data: billed } = await supabase.from('user_subscriptions').select('stripe_subscription_id, stripe_status').eq('user_id', userId).maybeSingle();
+    if (billed?.stripe_subscription_id && billed.stripe_status !== 'canceled') {
+      try {
+        const { getStripeClient } = await import('../services/stripe.js');
+        await getStripeClient().subscriptions.cancel(String(billed.stripe_subscription_id));
+      } catch (err) {
+        logger.error({ err, userId }, 'Account deletion: could not cancel the Stripe subscription');
+        res.status(502).json({ success: false, error: { code: 'BILLING_CANCEL_FAILED', message: 'Your subscription could not be cancelled, so the account was not deleted. Please try again.' } });
+        return;
+      }
+    }
+
     // Delete from users_v2 first (cascade handles child tables)
     const { error: dbError } = await supabase
       .from('users_v2')
@@ -121,7 +135,7 @@ accountRouter.post('/subscribe', validateBody(SignupSubscribeSchema), async (req
 
     const { data: tier, error: tierErr } = await supabase
       .from('subscription_tiers')
-      .select('id, name, monthly_credits, trial_days, publicly_selectable, active')
+      .select('id, name, monthly_credits, trial_days, publicly_selectable, active, monthly_price_cents, annual_price_cents')
       .eq('name', tier_name)
       .maybeSingle();
     if (tierErr || !tier) {
@@ -131,6 +145,15 @@ accountRouter.post('/subscribe', validateBody(SignupSubscribeSchema), async (req
     // free_full is admin-provisioned only — block self-signup.
     if (!tier.publicly_selectable || !tier.active) {
       res.status(403).json({ success: false, error: { code: 'TIER_NOT_AVAILABLE', message: 'Tier is not publicly selectable' } });
+      return;
+    }
+    // Sprint 9: a paid tier is bought through Stripe Checkout and granted by the webhook. Before
+    // this check, POST /subscribe activated a paid tier for anyone, with no payment at all.
+    if ((tier.monthly_price_cents ?? 0) > 0 || (tier.annual_price_cents ?? 0) > 0) {
+      res.status(402).json({
+        success: false,
+        error: { code: 'PAYMENT_REQUIRED', message: 'Paid plans are bought through checkout.', checkout: '/api/billing/checkout', tier_id: tier.id },
+      });
       return;
     }
 

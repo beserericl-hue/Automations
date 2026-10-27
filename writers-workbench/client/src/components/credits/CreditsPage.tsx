@@ -78,6 +78,7 @@ export default function CreditsPage() {
         </div>
       </div>
 
+      <PurchaseReturn onCredited={refreshSubscription} />
       <PurchaseSection onPurchase={refreshSubscription} />
 
       {Object.keys(breakdown).length > 0 && (
@@ -196,14 +197,15 @@ export function PurchaseSection({ onPurchase }: { onPurchase: () => Promise<void
     setError(null);
     setSuccess(null);
     try {
-      const res = await apiFetch<ApiEnvelope<{ amount_purchased: number; balance_after: number; price_paid_cents: number }>>(
+      // Sprint 9: this starts a Stripe Checkout. Credits are added by the webhook once the payment
+      // clears, and PurchaseReturn shows them arriving when Stripe sends the user back here.
+      const res = await apiFetch<ApiEnvelope<{ checkout_url: string; total_cents: number }>>(
         '/api/credits/purchase',
         { method: 'POST', body: JSON.stringify({ amount }) },
       );
-      if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Purchase failed');
-      setSuccess(`Purchased ${res.data.amount_purchased} credits — new balance: ${res.data.balance_after}`);
-      await onPurchase();
-      setConfirmOpen(false);
+      if (!res.success || !res.data?.checkout_url) throw new Error(res.error?.message ?? 'Purchase failed');
+      void onPurchase;
+      window.location.assign(res.data.checkout_url);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Purchase failed');
     } finally {
@@ -262,8 +264,7 @@ export function PurchaseSection({ onPurchase }: { onPurchase: () => Promise<void
               <strong>${(totalCents / 100).toFixed(2)}</strong>.
             </p>
             <p className="mt-1 text-xs text-gray-500">
-              Note: payment processing is deferred to Sprint 9 (Stripe). This currently records the transaction
-              for admin reconciliation and updates your balance immediately.
+              You pay on the next page, through Stripe. The credits appear here as soon as the payment clears.
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button type="button" onClick={() => setConfirmOpen(false)} className="rounded border border-gray-300 px-3 py-1 text-sm">
@@ -275,12 +276,48 @@ export function PurchaseSection({ onPurchase }: { onPurchase: () => Promise<void
                 onClick={() => void handlePurchase()}
                 className="rounded bg-blue-700 px-3 py-1 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50"
               >
-                {loading ? 'Processing…' : 'Confirm'}
+                {loading ? 'Opening checkout…' : 'Continue to payment'}
               </button>
             </div>
           </div>
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * Back from Stripe Checkout (?purchase=success&session_id=…): show "Processing payment…" until the
+ * webhook has added the credits, then the new balance. ?purchase=cancelled: nothing was charged.
+ */
+export function PurchaseReturn({ onCredited }: { onCredited: () => Promise<void> }) {
+  const params = new URLSearchParams(window.location.search);
+  const state = params.get('purchase');
+  const sessionId = params.get('session_id');
+  const [credited, setCredited] = useState<number | null>(null);
+  const [tries, setTries] = useState(0);
+  useEffect(() => {
+    if (state !== 'success' || !sessionId || credited !== null || tries > 30) return;
+    const t = setTimeout(async () => {
+      try {
+        const res = await apiFetch<ApiEnvelope<{ credited: boolean; credits: number }>>(`/api/billing/credits/checkout/${encodeURIComponent(sessionId)}`);
+        if (res.data?.credited) {
+          setCredited(res.data.credits);
+          await onCredited();
+          return;
+        }
+      } catch { /* keep polling */ }
+      setTries((n) => n + 1);
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [state, sessionId, credited, tries, onCredited]);
+  if (state === 'cancelled') {
+    return <p className="rounded border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-700 dark:bg-gray-900" data-testid="purchase-cancelled">The purchase was cancelled. Nothing was charged.</p>;
+  }
+  if (state !== 'success') return null;
+  return (
+    <p className="rounded border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100" role="status" data-testid="purchase-return">
+      {credited !== null ? `Payment received: ${credited} credits added to your balance.` : tries > 30 ? 'Payment received. The credits will appear shortly.' : 'Processing payment…'}
+    </p>
   );
 }
