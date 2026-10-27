@@ -213,6 +213,18 @@ test.describe('Core app screens', () => {
     await page.goto('/credits', { waitUntil: 'domcontentloaded' });
     await expectScreen(page, page.getByRole('heading', { name: /^Credits$/ }));
   });
+
+  // Sprint 9: the demo user is staff on a comp plan, so Billing must say it is never charged.
+  test('Billing /billing', async ({ page }) => {
+    await page.goto('/billing', { waitUntil: 'domcontentloaded' });
+    await expectScreen(page, page.getByRole('heading', { name: /^Billing$/ }));
+    await expect(page.getByTestId('billing-managed')).toContainText('never charged');
+  });
+
+  test('Billing cancelled /billing/cancel', async ({ page }) => {
+    await page.goto('/billing/cancel', { waitUntil: 'domcontentloaded' });
+    await expectScreen(page, page.getByRole('heading', { name: 'No charges made' }));
+  });
 });
 
 // Admin panel + its 8 tabs (each tab is a distinct screen surface)
