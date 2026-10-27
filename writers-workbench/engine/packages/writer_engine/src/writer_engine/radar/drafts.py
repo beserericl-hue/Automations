@@ -19,7 +19,7 @@ from collections.abc import Sequence
 from datetime import datetime, timedelta
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from writer_engine.config import get_settings
 from writer_engine.llm import complete_structured, get_router
@@ -60,7 +60,8 @@ ROUNDUP_SYSTEM = (
     "- 3-5 relevant hashtags.\n"
     "Keep each UNDER 2900 characters. Always credit the source by name. Do NOT reproduce the article body or the "
     "video transcript; a short quoted phrase is fine, paragraphs are not. Never mention images.\n"
-    "Return exactly one post object per item, with i matching the item number."
+    "Return exactly one post object per item, with i matching the item number, as this JSON object:\n"
+    '{"posts": [{"i": 0, "content": "<the full post text>"}]}'
 )
 
 TREND_CHANNELS = ("website", "li_techahir", "li_agile", "li_personal")
@@ -123,11 +124,13 @@ def parse_blog(text: str) -> dict[str, str] | None:
 
 class RoundupPost(BaseModel):
     i: int
-    content: str = ""
+    # Required, so a reply that names the field anything else fails validation and gets the repair
+    # call. With a default of "" it validated as empty posts and every draft was dropped silently.
+    content: str
 
 
 class RoundupPosts(BaseModel):
-    posts: list[RoundupPost] = Field(default_factory=list)
+    posts: list[RoundupPost]
 
 
 async def draft_trend(

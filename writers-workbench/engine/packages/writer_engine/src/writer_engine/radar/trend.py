@@ -16,7 +16,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from writer_engine.config import get_settings
 from writer_engine.llm import complete_structured, get_router
@@ -130,7 +130,10 @@ SCORING_SYSTEM = (
     "concise sentence framing the angle for an entrepreneur who needs a product to pitch investors — what changed "
     "and why they need a product NOW), topicKey (short kebab-case id of the underlying story; two articles on the "
     "SAME event share it), keep (true if it belongs on our blog else false).\n"
-    "Return exactly one object per item. Output only the structured JSON."
+    "Return exactly one object per item. Output only the structured JSON, in this shape:\n"
+    '{"scores": [{"i": 0, "marketDriverScore": 92, "driverType": "demand trigger", "clientRelevance": '
+    '"MVP & startups", "demandTrigger": true, "blogAngle": "Why angels now expect a working product before '
+    'they invest — and how to ship one fast", "topicKey": "angels-want-product-not-deck", "keep": true}]}'
 )
 
 SUMMARY_SYSTEM = (
@@ -140,7 +143,8 @@ SUMMARY_SYSTEM = (
     "paragraph 2 = why it matters for an entrepreneur who needs a real, demonstrable product to show investors "
     "and customers — the demand signal and what they should do now. Use plain professional prose, no marketing "
     "fluff, no title, and do not insert links. Separate the two paragraphs with a blank line. Return exactly one "
-    "summary object per item, with i matching the ITEM number."
+    "summary object per item, with i matching the ITEM number, in this shape:\n"
+    '{"summaries": [{"i": 0, "summary": "First paragraph.\\n\\nSecond paragraph."}]}'
 )
 
 
@@ -156,16 +160,16 @@ class Score(BaseModel):
 
 
 class Scores(BaseModel):
-    scores: list[Score] = Field(default_factory=list)
+    scores: list[Score]
 
 
 class Summary(BaseModel):
     i: int
-    summary: str = ""
+    summary: str
 
 
 class Summaries(BaseModel):
-    summaries: list[Summary] = Field(default_factory=list)
+    summaries: list[Summary]
 
 
 @dataclass

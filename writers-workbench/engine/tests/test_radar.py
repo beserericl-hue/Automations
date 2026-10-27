@@ -315,3 +315,15 @@ async def test_an_outage_week_keeps_last_weeks_slate(monkeypatch: pytest.MonkeyP
         out = await run.run_radar(db, http, user_id=USER, radar="dev", now=NOW)
     assert out["status"] == "kept_previous"
     assert len(db.tables["radar_topics_v2"]) == 1
+
+
+def test_radar_replies_with_the_wrong_field_names_fail_validation_instead_of_coming_back_empty() -> None:
+    # A reply that called the field "text" validated as empty posts, and every draft was dropped.
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        drafts.RoundupPosts.model_validate({"posts": [{"i": 0, "text": "a post"}]})
+    with pytest.raises(ValidationError):
+        trend.Summaries.model_validate({"items": []})
+    assert '"posts": [{"i": 0, "content"' in drafts.ROUNDUP_SYSTEM
+    assert '"scores": [{"i": 0' in trend.SCORING_SYSTEM and '"summaries": [{"i": 0' in trend.SUMMARY_SYSTEM
