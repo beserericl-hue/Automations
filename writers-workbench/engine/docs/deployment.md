@@ -128,3 +128,34 @@ time, and the count stays between the floor and the ceiling.
 | `RAILWAY_AUTOSCALE_TOKEN` | a Railway **project token for the develop environment** | Railway scopes it to that one environment, so it cannot change PROD. |
 | `AUTOSCALE_MIN_REPLICAS` / `AUTOSCALE_MAX_REPLICAS` | `2` / `4` | PROD at cutover: `4` / its ceiling. |
 | `AUTOSCALE_ALLOW_PRODUCTION` | unset | Required as well before it acts in an environment named `production`. |
+
+## Post calendar, radars and the two editions (port of the n8n blog / LinkedIn system)
+
+Migration 038. The engine now owns what n8n's `Cron - Post Scheduled Website Blogs`, Trend Radar,
+Dev Radar, Batch Week and Roundup Batch did. Workbench: **Newsletter → Post calendar** and
+**Newsletter → Radars**. Code: `writer_engine/social/` (queue, channels, publisher, edition feed) and
+`writer_engine/radar/` (the two radars and the week drafting).
+
+Variables on `writer-engine-runtime` (never in GitHub):
+
+| Variable | What it does | Without it |
+|---|---|---|
+| `SOCIAL_POSTING_MODE` | `live` posts for real. Anything else (default `dry_run`) records each channel's exact request as a `dry_run` delivery and sends nothing. | dry run |
+| `BLOTATO_API_KEY` | LinkedIn posts via Blotato (`blotato-api-key` header), and the status check. | LinkedIn deliveries fail with "BLOTATO_API_KEY is not set" (live mode only) |
+| `TECHAHIR_BLOG_API_KEY` | The TechAhir blog API token. The header it goes in is the website channel's `auth_header` in `social_channels_v2` (default `Authorization`, sent as `Bearer …`). | website deliveries fail (live mode only) |
+| `YOUTUBE_API_KEY` | Dev Radar's YouTube search (8 queries, 800 quota units a week). | Dev Radar uses the 45-day video archive only |
+| `KIEAI_API_KEY` | Sketchnote images (already set). | posts go out without an image |
+
+Crons (engine internal timer, all US Eastern): publisher every 5 min (slots 09:00 / 14:00), radars
+hourly check (Trend Monday 06:00, Dev Sunday 06:00), one run per user, radar and week.
+
+**Cutover order — n8n is still posting the same calendar.** Turning on `SOCIAL_POSTING_MODE=live`
+while n8n's cron is active would post everything twice. Order: deactivate n8n `Cron - Post Scheduled
+Website Blogs` (Se2X0fmkLUFK6CCq), Trend Radar (q1yDjiztjdGRDblT) and Dev Radar (czBKvhON08FzFydK);
+re-run `scripts/seed_social_dev.py --import-n8n` so the last n8n posts are in; then set `live`.
+Imported n8n rows that were still `pending` are imported as `cancelled` on purpose — requeue the ones
+the engine should post.
+
+Setup on a database: `python scripts/seed_social_dev.py --seed` (channels, radar subscriptions, the
+`ai-mvp` and `ai-dev-roundup` editions with their `radar://` and `social://` sources). DEV only; it
+refuses any other Supabase URL.

@@ -125,6 +125,10 @@ HEAVY_OPS: frozenset[tuple[str, str]] = frozenset(
         # calls. Nobody is waiting on it, and it must not hold an interactive slot.
         ("ingestion", "run"),
         ("ingestion", "feed"),
+        # A radar run is ~30 feed fetches plus two 16k-token Claude calls (Trend Radar); scheduling a
+        # week is one 8k-token blog draft per topic, serially. Minutes, and nobody holds a request open.
+        ("ingestion", "radar"),
+        ("ingestion", "radar_schedule"),
         # E7: one review lens is one chapter-sized Anthropic call (~12s measured on haiku), and a
         # `panel` is four lenses plus a synthesis — serially, on the account-wide TPM that B9 showed
         # is the binding constraint. Under the B11 load conditions that can run past the interactive

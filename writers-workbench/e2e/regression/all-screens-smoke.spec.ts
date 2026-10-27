@@ -301,6 +301,16 @@ test.describe('Newsletter screens', () => {
     await expectScreen(page, page.getByRole('heading', { name: /^Sends$/ }));
   });
 
+  test('Post calendar /newsletter/calendar', async ({ page }) => {
+    await page.goto('/newsletter/calendar', { waitUntil: 'domcontentloaded' });
+    await expectScreen(page, page.getByRole('heading', { name: 'Post calendar' }));
+  });
+
+  test('Radars /newsletter/radar', async ({ page }) => {
+    await page.goto('/newsletter/radar', { waitUntil: 'domcontentloaded' });
+    await expectScreen(page, page.getByRole('heading', { name: 'Radars' }));
+  });
+
   test('Sent newsletter detail /newsletter/sends/:id', async ({ page }) => {
     test.skip(!ID.send, 'no send id resolved');
     await page.goto(`/newsletter/sends/${ID.send}`, { waitUntil: 'domcontentloaded' });

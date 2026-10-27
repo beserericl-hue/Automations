@@ -246,6 +246,17 @@ class EngineSettings(BaseSettings):
     # a post scheduled for 09:00 goes out by 09:15 rather than by 10:00, and the query is one
     # indexed read of the `scheduled` rows.
     publisher_poll_seconds: float = Field(default=900.0, alias="PUBLISHER_POLL_SECONDS")
+    # The post calendar (social_schedule_v2), the port of n8n's `Cron - Post Scheduled Website
+    # Blogs`. n8n ran at 09:00 and 14:00 ET; five minutes means a slot's posts go out by 09:05.
+    # Anything but SOCIAL_POSTING_MODE=live records what would have been sent and sends nothing:
+    # n8n is still posting the same calendar, and a second poster would publish everything twice.
+    social_poll_seconds: float = Field(default=300.0, alias="SOCIAL_POLL_SECONDS")
+    social_posting_mode: str = Field(default="dry_run", alias="SOCIAL_POSTING_MODE")
+    blotato_api_key: str = Field(default="", alias="BLOTATO_API_KEY")
+    blotato_base_url: str = Field(default="https://backend.blotato.com/v2", alias="BLOTATO_BASE_URL")
+    # The radars (Trend Radar, Dev Radar): hourly check of whether this week's run is due.
+    radar_poll_seconds: float = Field(default=3600.0, alias="RADAR_POLL_SECONDS")
+    youtube_api_key: str = Field(default="", alias="YOUTUBE_API_KEY")
     # Queue-depth sampler (B12). 30s because the gauges exist to drive a scaling decision, and a
     # sample slower than the thing it measures cannot: an interactive job's whole budget wait is
     # 300s. Three Redis round trips per queue, so the cost of this cadence is negligible.

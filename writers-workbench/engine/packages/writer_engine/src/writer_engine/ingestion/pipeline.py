@@ -259,6 +259,11 @@ async def ingest_feed(
 ) -> FeedRunResult:
     """Ingest one feed. Always returns a result; the only exception it lets out is cancellation."""
     started = now or datetime.now(UTC)
+    if feed.url_type in store.ENGINE_WRITTEN_URL_TYPES:
+        # Filled by the radar run / the post publisher, never fetched (writer_engine.social.feed).
+        return FeedRunResult(
+            feed_id=feed.id, feed_name=feed.name, error="engine-written source: nothing to fetch"
+        )
     settings = get_settings()
     # The edition's genre steers the relevance gate. Resolved here when the caller did not do it in
     # bulk, so a single-feed re-run judges by the same standard as the tick.
