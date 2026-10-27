@@ -298,6 +298,39 @@ class TestRelevanceGate:
         assert (result.items_uploaded, result.items_skipped_irrelevant) == (0, 1)
         assert wired.count(store.TABLE) == 0
 
+    @pytest.mark.asyncio
+    async def test_items_kept_because_the_gate_was_down_are_counted(
+        self, wired: FakeSupabase, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The gate fails open, so a dead Gemini key used to look exactly like a clean run.
+        async def _down(body: str, *, title: str = "", genre: str = "") -> tuple[bool, str]:
+            return True, enrich.GATE_UNAVAILABLE
+
+        monkeypatch.setattr(pipeline.enrich, "judge_relevance", _down)
+        async with _client_serving(_json_feed(_item(1), _item(2))) as client:
+            result = await pipeline.ingest_feed(_feed(), client=client, now=NOW)
+        assert (result.items_uploaded, result.items_kept_ungated) == (2, 2)
+
+    @pytest.mark.asyncio
+    async def test_a_judged_run_reports_no_ungated_items(self, wired: FakeSupabase) -> None:
+        async with _client_serving(_json_feed(_item(1))) as client:
+            result = await pipeline.ingest_feed(_feed(), client=client, now=NOW)
+        assert (result.items_uploaded, result.items_kept_ungated) == (1, 0)
+
+    @pytest.mark.asyncio
+    async def test_judge_relevance_returns_the_marker_when_the_model_fails(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async def _boom(*_a: object, **_k: object) -> object:
+            raise RuntimeError("400 API key not valid")
+
+        monkeypatch.setattr(enrich, "complete_structured", _boom)
+        monkeypatch.setattr(enrich, "get_router", lambda *_a, **_k: object())
+        assert await enrich.judge_relevance("some body", genre="post-apocalyptic") == (
+            True,
+            enrich.GATE_UNAVAILABLE,
+        )
+
 
 class TestRedditRouting:
     @staticmethod
