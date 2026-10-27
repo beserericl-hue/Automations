@@ -48,7 +48,12 @@ def test_complete_sends_system_limits_and_returns_tokens() -> None:
     assert call["model"] == "gemini-2.5-flash" and call["contents"] == "hi"
     config = call["config"]
     assert isinstance(config, types.GenerateContentConfig)
-    assert (config.system_instruction, config.max_output_tokens, config.temperature) == ("be brief", 99, 0.0)
+    # 2.5 models think inside max_output_tokens; the answer keeps the 99 it asked for.
+    assert (config.system_instruction, config.max_output_tokens, config.temperature) == (
+        "be brief",
+        99 + 8192,
+        0.0,
+    )
 
 
 def test_an_empty_response_is_empty_text_not_none() -> None:
@@ -90,3 +95,11 @@ def test_the_real_client_is_built_with_sdk_retries_off() -> None:
     adapter = GeminiAdapter(api_key="test-key")
     opts = adapter._client._api_client._http_options
     assert opts.retry_options is not None and opts.retry_options.attempts == 1
+
+
+def test_output_budget_adds_thinking_room_only_on_thinking_models() -> None:
+    from writer_engine.llm.gemini_client import output_budget
+
+    assert output_budget("gemini-2.5-pro", 8192) == 8192 + 8192
+    assert output_budget("gemini-2.5-pro", 64000) == 65536
+    assert output_budget("gemini-2.0-flash", 1000) == 1000

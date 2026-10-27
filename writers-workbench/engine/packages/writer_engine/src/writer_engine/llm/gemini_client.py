@@ -18,6 +18,21 @@ from writer_engine.telemetry.metrics import LLM_CALLS, LLM_TOKENS
 
 from .router import LLMResponse
 
+THINKING_HEADROOM = 8192
+"""Gemini 2.5 models think before they answer, and the thinking tokens count against
+``max_output_tokens``. Callers size ``max_tokens`` for the ANSWER, so on DEV 2026-10-27 a pick asking
+for 8,192 tokens got a story list cut off mid-string at ~11k characters (``Unterminated string``):
+the thinking had used the rest. The answer gets what the caller asked for; thinking gets this on top."""
+
+MAX_OUTPUT_TOKENS = 65536
+
+
+def output_budget(model: str, max_tokens: int) -> int:
+    """``max_output_tokens`` for ``model``: the caller's answer budget, plus thinking room on 2.5."""
+    if "2.5" in model:
+        return min(MAX_OUTPUT_TOKENS, max_tokens + THINKING_HEADROOM)
+    return max_tokens
+
 
 class GeminiAdapter:
     """Thin async Gemini adapter over ``google.genai.Client.aio``."""
@@ -50,7 +65,7 @@ class GeminiAdapter:
     ) -> LLMResponse:
         config = types.GenerateContentConfig(
             system_instruction=system or None,
-            max_output_tokens=max_tokens,
+            max_output_tokens=output_budget(model, max_tokens),
             temperature=temperature,
         )
 
