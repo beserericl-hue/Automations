@@ -99,9 +99,12 @@ test.describe('Newsletter FULL send (data path)', () => {
         const r = await supaGet<{ status: string; provider_message_id: string | null }>(
           'newsletter_sends_v2', `id=eq.${send!.id}&select=status,provider_message_id`,
         ).catch(() => []);
-        return r[0]?.provider_message_id || r[0]?.status;
-      }, { timeout: 3 * 60_000, message: 'send never reached a delivered/sent state' })
-      .toBeTruthy();
+        // Delivered means sent (with a Postal id when the provider reports one). The old check took
+        // ANY status as done, so "sending" passed and the next step looked for a sent row ~2 min
+        // before delivery finished (DEV 2026-10-27: sent_at 00:58:57, list checked at ~00:57).
+        return r[0]?.status === 'sent' || r[0]?.status === 'failed' ? r[0].status : null;
+      }, { timeout: 5 * 60_000, message: 'send never reached a delivered/sent state' })
+      .toBe('sent');
 
     // ── 4) DATA DISPLAYED: the sent newsletter shows on the Sends screen ──────
     // The list defaults to the 'scheduled' filter; a real user flips Status → 'sent' to see it.

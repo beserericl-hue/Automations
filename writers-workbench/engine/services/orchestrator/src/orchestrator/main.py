@@ -173,6 +173,7 @@ async def lifespan(app: FastAPI) -> Any:
         await scheduler_stop(getattr(app.state, "scheduler_task", None))
         await watchdog_stop(getattr(app.state, "watchdog_task", None))
         if getattr(app.state, "arq_pool", None) is not None:
+            await fleet.deregister(app.state.arq_pool, SERVICE)
             await app.state.arq_pool.close()
         await close_redis()
 

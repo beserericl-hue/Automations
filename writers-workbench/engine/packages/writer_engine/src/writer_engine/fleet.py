@@ -90,6 +90,19 @@ async def register(redis: Any, service: str, **extra: Any) -> None:
         logger.warning("fleet.register_failed", service=service, error=f"{type(exc).__name__}: {exc}"[:160])
 
 
+async def deregister(redis: Any, service: str) -> None:
+    """Leave the registry on shutdown, so a replaced replica is not counted for its last TTL.
+
+    Found by the fleet E2E spec, which runs right after a deploy: the old replicas were still
+    registered for up to REGISTRATION_TTL_S, so "runtime instances" read 4 while 2 workers ran.
+    Best effort: a replica that dies without shutting down still ages out by the TTL.
+    """
+    try:
+        await redis.delete(f"{FLEET_PREFIX}:{service}:{instance_id()}")
+    except Exception as exc:
+        logger.warning("fleet.deregister_failed", service=service, error=f"{type(exc).__name__}: {exc}"[:160])
+
+
 async def scan_keys(redis: Any, pattern: str) -> list[str]:
     """``SCAN MATCH`` to a list. A client without ``scan`` (a test double) yields nothing."""
     scan = getattr(redis, "scan", None)
@@ -159,6 +172,7 @@ __all__ = [
     "FLEET_PREFIX",
     "REGISTRATION_TTL_S",
     "SINGLETON_PREFIX",
+    "deregister",
     "describe",
     "instance_id",
     "mark_instance",

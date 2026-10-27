@@ -385,3 +385,16 @@ def test_only_one_address_family_is_picked(monkeypatch: pytest.MonkeyPatch) -> N
         return await B.addresses("svc.railway.internal", 8001)
 
     assert asyncio.run(go()) == ["10.0.0.1", "10.0.0.2"]
+
+
+def test_a_replica_leaves_the_registry_on_shutdown(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def go() -> list[str]:
+        r = _redis()
+        monkeypatch.setenv("RAILWAY_REPLICA_ID", "old-replica")
+        await fleet.register(r, "orchestrator")
+        await fleet.deregister(r, "orchestrator")
+        monkeypatch.setenv("RAILWAY_REPLICA_ID", "new-replica")
+        await fleet.register(r, "orchestrator")
+        return [x["instance"] for x in await fleet.read_fleet(r)]
+
+    assert asyncio.run(go()) == ["new-replica"]

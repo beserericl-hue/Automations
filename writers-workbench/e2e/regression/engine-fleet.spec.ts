@@ -24,8 +24,11 @@ test.describe('Engine fleet (result-asserting)', () => {
     const ids = new Set((data.instances ?? []).map((i: any) => `${i.service}:${i.instance}`));
     expect(ids.size).toBe((data.instances ?? []).length);
     for (const q of data.queues ?? []) {
-      // Every runtime replica runs one worker per queue, so slots scale with the replicas.
-      expect(q.instances).toBe(counts.orchestrator);
+      // Every runtime replica runs one worker per queue, so the fleet has at least two workers on
+      // each. Not "equal to the registered count": this suite starts right after a deploy, when a
+      // replaced replica can still be registered for a few seconds.
+      expect(q.instances).toBeGreaterThanOrEqual(2);
+      expect(q.instances).toBeLessThanOrEqual(counts.orchestrator);
     }
     // Calls on the private network are spread by the callers, which only works if they can see
     // more than one address for each hop.
