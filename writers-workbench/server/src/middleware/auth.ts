@@ -127,6 +127,14 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     // every authenticated path passes through, so no future route can reintroduce the hole. It runs
     // once per user: the next request finds the row and this branch is skipped.
     let creditsRemaining = subscription?.credits_remaining ?? null;
+    // A failed READ is not "no subscription". Treating it as one re-provisioned a trial over every
+    // user's real plan on every request when a schema change made the tier embed ambiguous
+    // (PGRST201, DEV 2026-10-27). Fail closed instead: no plan is changed on a lookup error.
+    if (subRes.error) {
+      logger.error({ err: subRes.error, userId: realUserId }, 'auth: subscription lookup failed');
+      res.status(503).json({ success: false, error: { code: 'SUBSCRIPTION_LOOKUP_FAILED', message: 'Your plan could not be read just now. Please try again.' } });
+      return;
+    }
     if (!subscription) {
       const provisioned = await ensureTrialSubscription(realUserId);
       if (provisioned) {

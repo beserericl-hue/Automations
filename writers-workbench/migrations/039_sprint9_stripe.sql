@@ -35,7 +35,11 @@ ALTER TABLE user_subscriptions
     ADD COLUMN IF NOT EXISTS stripe_current_period_end   TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS cancel_at_period_end        BOOLEAN NOT NULL DEFAULT false,
     -- A downgrade waits for the period end; these say what it will become and when.
-    ADD COLUMN IF NOT EXISTS pending_tier_id             UUID REFERENCES subscription_tiers(id),
+    -- pending_tier_id has NO foreign key on purpose. A second FK from user_subscriptions to
+    -- subscription_tiers makes every PostgREST embed `subscription_tiers(...)` ambiguous (PGRST201);
+    -- the auth middleware read that error as "no subscription" and re-provisioned a trial over the
+    -- user's plan on every request (DEV, 2026-10-27).
+    ADD COLUMN IF NOT EXISTS pending_tier_id             UUID,
     ADD COLUMN IF NOT EXISTS pending_billing_cycle       TEXT,
     ADD COLUMN IF NOT EXISTS pending_change_at           TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS payment_failures            INTEGER NOT NULL DEFAULT 0;
@@ -140,3 +144,12 @@ AS $$
 $$;
 REVOKE ALL ON FUNCTION credits_add_v2(TEXT, INTEGER, BOOLEAN) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION credits_add_v2(TEXT, INTEGER, BOOLEAN) TO service_role;
+
+-- The once-only grants, enforced by the database. A webhook delivered twice at the same moment
+-- (checkout.session.completed and invoice.paid arrive together) used to pass the "already granted?"
+-- check in both and write the grant twice; the grant now writes its ledger row first and backs off
+-- on this conflict.
+DROP INDEX IF EXISTS uq_credit_tx_grant_reference;
+CREATE UNIQUE INDEX uq_credit_tx_grant_reference
+    ON credit_transactions (user_id, transaction_type, reference_id)
+    WHERE reference_id IS NOT NULL AND transaction_type IN ('monthly_reset', 'trial_grant');

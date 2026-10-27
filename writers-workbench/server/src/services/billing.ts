@@ -162,17 +162,13 @@ export async function grantPeriodCredits(
   mode: 'reset' | 'atLeast' = 'reset',
 ): Promise<{ granted: boolean; balance: number | null }> {
   const sb = getSupabaseAdmin();
-  const { data: done } = await sb.from('credit_transactions').select('id').eq('user_id', userId).eq('reference_id', referenceId).limit(1);
-  if (done && done.length) return { granted: false, balance: null };
   const { data: sub } = await sb.from('user_subscriptions').select('id, credits_remaining').eq('user_id', userId).maybeSingle();
   if (!sub) return { granted: false, balance: null };
   const current = Number(sub.credits_remaining ?? 0);
   const balance = mode === 'atLeast' ? Math.max(current, tier.monthly_credits) : tier.monthly_credits;
-  const { error } = await sb.from('user_subscriptions')
-    .update({ credits_remaining: balance, ...(mode === 'reset' ? { credits_used_this_period: 0 } : {}) })
-    .eq('id', sub.id);
-  if (error) throw new Error(`billing: credit grant failed: ${error.message}`);
-  await sb.from('credit_transactions').insert({
+  // The ledger row FIRST: the unique (user, type, reference) index lets exactly one of two
+  // concurrent deliveries through; the other stops here and changes nothing.
+  const { error: txErr } = await sb.from('credit_transactions').insert({
     user_id: userId,
     amount: balance - (mode === 'reset' ? 0 : current),
     balance_after: balance,
@@ -181,6 +177,14 @@ export async function grantPeriodCredits(
     reference_id: referenceId,
     metadata: { tier: tier.name },
   });
+  if (txErr) {
+    if (/duplicate|unique/i.test(txErr.message)) return { granted: false, balance: null };
+    throw new Error(`billing: credit grant not recorded: ${txErr.message}`);
+  }
+  const { error } = await sb.from('user_subscriptions')
+    .update({ credits_remaining: balance, ...(mode === 'reset' ? { credits_used_this_period: 0 } : {}) })
+    .eq('id', sub.id);
+  if (error) throw new Error(`billing: credit grant failed: ${error.message}`);
   return { granted: true, balance };
 }
 

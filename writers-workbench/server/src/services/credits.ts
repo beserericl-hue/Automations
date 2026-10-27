@@ -329,7 +329,9 @@ export async function ensureTrialSubscription(userId: string): Promise<Provision
   const now = new Date();
   const trialEnd = new Date(now.getTime() + (tier.trial_days as number) * 24 * 3600 * 1000);
 
-  const { error: upsertErr } = await supabase.from('user_subscriptions').upsert(
+  // ignoreDuplicates: two first requests racing must not both write, and a row that exists by the
+  // time this runs (created by the other request, or a real plan) is never overwritten.
+  const { data: created, error: upsertErr } = await supabase.from('user_subscriptions').upsert(
     {
       user_id: userId,
       tier_id: tier.id,
@@ -343,22 +345,36 @@ export async function ensureTrialSubscription(userId: string): Promise<Provision
       credits_used_this_period: 0,
       auto_renew: false,
     },
-    { onConflict: 'user_id' },
-  );
+    { onConflict: 'user_id', ignoreDuplicates: true },
+  ).select('id');
 
   if (upsertErr) {
     logger.error({ err: upsertErr, userId }, 'ensureTrialSubscription: upsert failed');
     return null;
   }
 
+  if (Array.isArray(created) && created.length === 0) {
+    // Someone else's request provisioned it first; read what is there instead of granting again.
+    const { data: existing } = await supabase.from('user_subscriptions').select('credits_remaining').eq('user_id', userId).maybeSingle();
+    return existing ? {
+      credits_remaining: Number(existing.credits_remaining ?? 0),
+      tier: {
+        id: tier.id as string, name: tier.name as string, display_name: tier.display_name as string,
+        features: (tier.features ?? {}) as Record<string, unknown>, monthly_credits: tier.monthly_credits as number,
+        credit_purchase_price_cents: tier.credit_purchase_price_cents as number,
+      },
+    } : null;
+  }
+
   // Record it, so a balance that appeared on its own is explicable from the ledger rather than
-  // looking like a bug or a grant nobody remembers making.
+  // looking like a bug or a grant nobody remembers making. One per user: the reference is unique.
   await supabase.from('credit_transactions').insert({
     user_id: userId,
     amount: tier.monthly_credits,
     balance_after: tier.monthly_credits,
     transaction_type: 'trial_grant' satisfies CreditTransactionType,
     description: `Automatic ${tier.display_name} (${tier.trial_days} days)`,
+    reference_id: 'trial-grant',
   });
 
   logger.info(
