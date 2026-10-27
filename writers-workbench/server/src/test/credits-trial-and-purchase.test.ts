@@ -73,12 +73,23 @@ function builder(table: string) {
       if (table === 'credit_transactions') state.txs.push(row);
       return Promise.resolve({ data: null, error: null });
     },
-    upsert(row: SubRow) {
-      if (state.upsertFails) return Promise.resolve({ error: { message: 'upsert failed' } });
-      const i = state.subs.findIndex((s) => s.user_id === row.user_id);
-      if (i >= 0) state.subs[i] = { ...state.subs[i], ...row };
-      else state.subs.push(row);
-      return Promise.resolve({ error: null });
+    // Like PostgREST: chainable `.select()`, and `ignoreDuplicates` leaves an existing row alone and
+    // returns nothing for it.
+    upsert(row: SubRow, opts?: { ignoreDuplicates?: boolean }) {
+      let result: { data: unknown[] | null; error: { message: string } | null };
+      if (state.upsertFails) {
+        result = { data: null, error: { message: 'upsert failed' } };
+      } else {
+        const i = state.subs.findIndex((s) => s.user_id === row.user_id);
+        if (i >= 0 && opts?.ignoreDuplicates) result = { data: [], error: null };
+        else {
+          if (i >= 0) state.subs[i] = { ...state.subs[i], ...row };
+          else state.subs.push(row);
+          result = { data: [{ id: 'sub' }], error: null };
+        }
+      }
+      const done = Promise.resolve(result);
+      return Object.assign(done, { select: () => done });
     },
     maybeSingle() {
       const rows = table === 'subscription_tiers' ? state.tiers : (state.subs as unknown as Record<string, unknown>[]);

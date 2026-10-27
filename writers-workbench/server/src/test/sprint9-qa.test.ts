@@ -36,6 +36,10 @@ vi.mock('../services/supabase-admin.js', () => {
       if (op === 'insert') {
         const made: Row[] = [];
         for (const p of list) {
+          if (table === 'credit_transactions' && p.reference_id && ['monthly_reset', 'trial_grant'].includes(String(p.transaction_type))
+            && rows().some((r) => r.user_id === p.user_id && r.transaction_type === p.transaction_type && r.reference_id === p.reference_id)) {
+            throw new Error('duplicate key value violates unique constraint "uq_credit_tx_grant_reference"');
+          }
           if (table === 'credit_transactions' && p.stripe_payment_intent_id && p.transaction_type === 'purchase'
             && rows().some((r) => r.stripe_payment_intent_id === p.stripe_payment_intent_id && r.transaction_type === 'purchase')) {
             throw Object.assign(new Error('duplicate key value violates unique constraint'), { dup: true });
@@ -227,6 +231,16 @@ describe('webhook', () => {
     await deliver({ id: 'evt_2', type: 'invoice.paid', data: { object: { id: 'in_1', parent: { subscription_details: { subscription: 'sub_1' } } } } });
     expect(creditTx().filter((t) => t.transaction_type === 'monthly_reset')).toHaveLength(1);
     expect(db.stripe_events_v2.map((e) => e.status)).toEqual(['processed', 'processed']);
+  });
+
+  it('two deliveries for the same invoice at the same moment grant once', async () => {
+    Object.assign(sub(), { tier_id: '4b66a358-8593-4bbd-a4fd-8b93488a3079', stripe_subscription_id: 'sub_1', credits_remaining: 3 });
+    const paid = { id: 'evt_r1', type: 'invoice.paid', data: { object: { id: 'in_r', parent: { subscription_details: { subscription: 'sub_1' } } } } };
+    const checkout = { id: 'evt_r2', type: 'checkout.session.completed', data: { object: { id: 'cs_r', mode: 'subscription', subscription: 'sub_1', metadata: { user_id: 'u1' } } } };
+    currentSub = subscription({ latest_invoice: 'in_r' } as Partial<Stripe.Subscription>);
+    await Promise.all([deliver(paid), deliver(checkout)]);
+    expect(creditTx().filter((t) => t.transaction_type === 'monthly_reset' && t.reference_id === 'in_r')).toHaveLength(1);
+    expect(sub().credits_remaining).toBe(500);
   });
 
   it('invoice.paid for a new period resets the credits once', async () => {
