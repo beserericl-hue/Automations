@@ -385,6 +385,12 @@ describe('reader print orders', () => {
       source_order_id: 'proof-1', price_cents: 1999, currency: 'usd', enabled: true }];
   });
 
+  it('the order pages let the form go on to Stripe Checkout, under the app CSP', async () => {
+    const { withStripeFormAction } = await import('../routes/book-print.js');
+    expect(withStripeFormAction("default-src 'self';form-action 'self';img-src 'self'")).toBe("default-src 'self';form-action 'self' https://checkout.stripe.com;img-src 'self'");
+    expect(withStripeFormAction("default-src 'self'")).toContain("form-action 'self' https://checkout.stripe.com");
+  });
+
   it('the reader form is checked on the server', async () => {
     const { readForm } = await import('../routes/book-print.js');
     expect(readForm({ offer_id: 'x' }).error).toMatch(/edition/);

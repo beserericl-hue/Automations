@@ -37,6 +37,7 @@ HEAVY=(
   regression/newsletter-send-full.spec.ts
   regression/cover-art-content.spec.ts
   regression/social-publish.spec.ts
+  regression/sprint9-billing.spec.ts
 )
 
 # Light = every other regression spec (computed so new light specs are picked up automatically).
