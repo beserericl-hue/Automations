@@ -94,6 +94,9 @@ async def _pick(
             schema=PickedStories,
             max_tokens=max_tokens,
         )
+        # Logged on success too, so a run's log says which provider picked it. Without this line a
+        # healthy pick and a silent fallback looked the same until the fallback's warning appeared.
+        _log_picked(picked, provider="gemini", model=settings.picker_model, fallback=False)
         return picked
     except ProviderNotRegistered:
         raise
@@ -113,7 +116,18 @@ async def _pick(
             schema=PickedStories,
             max_tokens=max_tokens,
         )
+        _log_picked(picked, provider="anthropic", model=settings.model_default, fallback=True)
         return picked
+
+
+def _log_picked(picked: PickedStories, *, provider: str, model: str, fallback: bool) -> None:
+    logger.info(
+        "pick.done",
+        provider=provider,
+        model=model,
+        fallback=fallback,
+        stories=len(picked.top_selected_stories),
+    )
 
 
 async def _alert_gemini_failed(exc: Exception) -> None:

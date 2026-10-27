@@ -68,6 +68,9 @@ class FeedRunResult:
     means we are not reading anything today. Reporting a billing state as a bad destination is how
     62 lost items looked like a feed problem."""
     items_failed: int = 0
+    items_kept_ungated: int = 0
+    """Items kept only because the relevance gate could not run (it fails open). Non-zero means the
+    gate's model is down, not that the feed is clean."""
     error: str | None = None
     uploaded_keys: list[str] = field(default_factory=list)
 
@@ -178,6 +181,8 @@ async def _ingest_item(
             result.items_skipped_irrelevant += 1
             logger.info("ingestion.item_irrelevant", key=key, reason=reason[:120])
             return
+        if reason == enrich.GATE_UNAVAILABLE:
+            result.items_kept_ungated += 1
         await store.upload_item(
             key=key,
             user_id=feed.user_id,
@@ -219,6 +224,8 @@ async def _ingest_item(
         result.items_skipped_irrelevant += 1
         logger.info("ingestion.item_irrelevant", key=key, reason=reason[:120])
         return
+    if reason == enrich.GATE_UNAVAILABLE:
+        result.items_kept_ungated += 1
 
     external = await enrich.extract_external_sources(scraped)
     await store.upload_item(
@@ -371,6 +378,7 @@ async def ingest_feed(
         unscrapeable=result.items_skipped_unscrapeable,
         deferred_no_scraper=result.items_deferred_no_scraper,
         failed=result.items_failed,
+        ungated=result.items_kept_ungated,
     )
     return result
 

@@ -258,6 +258,11 @@ async def scrape(url: str, *, client: httpx.AsyncClient | None = None) -> Scrape
     )
 
 
+# The reason judge_relevance gives when it kept an item without judging it. The pipeline counts these
+# so a feed run shows whether the gate actually ran, instead of a dead key looking like a clean run.
+GATE_UNAVAILABLE = "relevance gate unavailable — kept"
+
+
 async def judge_relevance(body: str, *, title: str = "", genre: str = "") -> tuple[bool, str]:
     """``(keep, reason)`` for one scraped body, judged for ``genre``'s newsletter.
 
@@ -287,7 +292,7 @@ async def judge_relevance(body: str, *, title: str = "", genre: str = "") -> tup
         )
     except Exception as exc:
         logger.warning("ingestion.relevance_unavailable", error=f"{type(exc).__name__}: {exc}"[:140])
-        return True, "relevance gate unavailable — kept"
+        return True, GATE_UNAVAILABLE
     reason = (verdict.chain_of_thought or "").strip()[:200]
     return verdict.is_relevant_content, reason or (
         "relevant" if verdict.is_relevant_content else "not relevant"
@@ -343,6 +348,7 @@ __all__ = [
     "EXTERNAL_SOURCES_SHAPE",
     "FIRECRAWL_JSON_PROMPT",
     "FIRECRAWL_JSON_SCHEMA",
+    "GATE_UNAVAILABLE",
     "MAX_JUDGE_CHARS",
     "RELEVANCE_PROMPT",
     "RELEVANCE_SHAPE",

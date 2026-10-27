@@ -108,7 +108,7 @@ module = [
     "arq.*",
     "sse_starlette.*",
     "prometheus_client.*",
-    "google.generativeai.*",
+    "google.genai.*",
     "anthropic.*",
     "supabase.*",
 ]
