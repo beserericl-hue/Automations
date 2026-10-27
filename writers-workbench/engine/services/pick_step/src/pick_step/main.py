@@ -11,11 +11,13 @@ from writer_engine.prompt_store.n8n_translate import render_live_prompt
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
 from writer_engine.schemas.newsletter import PickedStories
 from writer_engine.step_service import build_step_app
+from writer_engine.telemetry.logging import get_logger
 
 PICK_KEY = "newsletter.pick_top_stories.user_template"
 
 
 STEP_NAME = "pick"
+logger = get_logger(STEP_NAME)
 seed_default_prompts()
 
 
@@ -79,18 +81,56 @@ async def _pick(
     )
     if feedback:
         user += f"\n\nOperator feedback from prior round (incorporate): {feedback}"
-    picked, _resp = await complete_structured(
-        router,
-        provider="gemini",
-        model=settings.picker_model,
-        system=system,
-        prompt=user,
-        schema=PickedStories,
-        # Output scales with max_stories (each story carries a detailed summary). Give generous
-        # headroom so the JSON is never truncated mid-string ("Unterminated string").
-        max_tokens=max(8192, 2048 * max_stories),
-    )
-    return picked
+    # Output scales with max_stories (each story carries a detailed summary). Give generous headroom
+    # so the JSON is never truncated mid-string ("Unterminated string").
+    max_tokens = max(8192, 2048 * max_stories)
+    try:
+        picked, _resp = await complete_structured(
+            router,
+            provider="gemini",
+            model=settings.picker_model,
+            system=system,
+            prompt=user,
+            schema=PickedStories,
+            max_tokens=max_tokens,
+        )
+        return picked
+    except ProviderNotRegistered:
+        raise
+    except Exception as exc:
+        # One provider's failure must not stop the newsletter. On DEV 2026-10-27 the Gemini key was
+        # rejected ("API key not valid") and every newsletter died at the pick step before its first
+        # approval gate. The same brief goes to Anthropic, and the failure is mailed once so the key
+        # gets replaced rather than the fallback quietly becoming the way it works.
+        logger.warning("pick.gemini_failed_falling_back", error=f"{type(exc).__name__}: {exc}"[:240])
+        await _alert_gemini_failed(exc)
+        picked, _resp = await complete_structured(
+            router,
+            provider="anthropic",
+            model=settings.model_default,
+            system=system,
+            prompt=user,
+            schema=PickedStories,
+            max_tokens=max_tokens,
+        )
+        return picked
+
+
+async def _alert_gemini_failed(exc: Exception) -> None:
+    try:
+        from writer_engine.alerting import LEVEL_WARNING, Alert, send_alert
+
+        await send_alert(
+            Alert(
+                key="provider:gemini:pick_failed",
+                level=LEVEL_WARNING,
+                title="Gemini failed for the newsletter story pick; Anthropic picked instead",
+                detail=f"{type(exc).__name__}: {exc}"[:400],
+                context={"service": STEP_NAME, "provider": "gemini"},
+            )
+        )
+    except Exception:
+        return
 
 
 async def handler(inp: StepInput) -> StepOutput:
