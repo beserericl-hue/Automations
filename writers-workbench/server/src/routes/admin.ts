@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { validateBody } from '../middleware/validate.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { ensureStripeCustomer, syncCustomerToStripe } from '../services/stripe-sync.js';
 import {
   AdminUserSchema,
   AdminUserUpdateSchema,
@@ -220,6 +221,8 @@ adminRouter.post('/users', validateBody(AdminUserSchema), async (req: Request, r
       throw error;
     }
 
+    // Sprint 9 (S9-2): a Stripe Customer from the start. Never blocks creating the user.
+    void ensureStripeCustomer(phone);
     res.status(201).json({ success: true, data });
   } catch (err) {
     logger.error({ err }, 'Failed to create user');
@@ -257,6 +260,7 @@ adminRouter.put('/users/:id', validateBody(AdminUserUpdateSchema), async (req: R
       return;
     }
 
+    if (display_name !== undefined || email !== undefined) void syncCustomerToStripe(String(id));
     res.json({ success: true, data });
   } catch (err) {
     logger.error({ err }, 'Failed to update user');
@@ -725,6 +729,7 @@ adminRouter.post(
         }
         throw userErr;
       }
+      void ensureStripeCustomer(phone);
 
       const periodStart = new Date();
       const periodEnd = is_free ? null : new Date(periodStart.getTime() + 30 * 24 * 3600 * 1000);

@@ -59,6 +59,19 @@ interface PrintOrder {
   submitted_at: string | null;
   cancellable: boolean;
   files: { preview?: string | null; interior?: string | null; outside?: string | null } | null;
+  order_kind?: 'author' | 'reader';
+  buyer_name?: string | null;
+  amount_total_cents?: number | null;
+  paid_at?: string | null;
+}
+
+interface PrintOffer {
+  id: string;
+  edition: string;
+  volume_index: number;
+  source_order_id: string;
+  price_cents: number;
+  enabled: boolean;
 }
 
 const EMPTY_ADDRESS = { name: '', address1: '', address2: '', city: '', regionCode: '', postal: '', country: 'US', phone: '', email: '' };
@@ -425,6 +438,12 @@ export default function PrintCopies({ projectId, volumeCount }: { projectId: str
                     {o.quantity} × {o.edition_label}
                     {volumeCount > 1 ? `, book ${o.volume_index}` : ''}
                   </span>
+                  {o.order_kind === 'reader' ? (
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200" data-testid="reader-order">
+                      reader: {o.buyer_name ?? 'unknown'}
+                      {o.amount_total_cents != null ? `, paid $${(o.amount_total_cents / 100).toFixed(2)}` : ''}
+                    </span>
+                  ) : null}
                   <span
                     title={o.status}
                     className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-700 dark:bg-gray-800 dark:text-gray-300"
@@ -465,6 +484,68 @@ export default function PrintCopies({ projectId, volumeCount }: { projectId: str
           </ul>
         </div>
       ) : null}
+
+      <ReaderOffers projectId={projectId} orders={(orders ?? []).filter((o) => o.order_kind !== 'reader')} volumeCount={volumeCount} />
+    </div>
+  );
+}
+
+/**
+ * Sprint 9: sell a prepared edition to readers from the book's public page (/books/<slug>/print).
+ * Readers pay through Stripe; the order goes to RPI once the payment clears. One price per edition.
+ */
+export function ReaderOffers({ projectId, orders, volumeCount }: { projectId: string; orders: PrintOrder[]; volumeCount: number }) {
+  const queryClient = useQueryClient();
+  const { data: offers } = useQuery({
+    queryKey: ['print-offers', projectId],
+    queryFn: async () => (await apiFetch<ApiEnvelope<{ offers: PrintOffer[] }>>(`/api/print/project/${projectId}/offers`)).data!.offers,
+  });
+  const [prices, setPrices] = useState<Record<string, string>>({});
+  const [error, setError] = useState('');
+  // The newest prepared order of each edition and book is the proof readers would get.
+  const proofs = new Map<string, PrintOrder>();
+  for (const o of orders) {
+    const key = `${o.volume_index}|${o.edition}`;
+    if (!proofs.has(key)) proofs.set(key, o);
+  }
+  const save = useMutation({
+    mutationFn: async (body: { source_order_id: string; price_cents: number; enabled: boolean }) =>
+      apiFetch(`/api/print/project/${projectId}/offers`, { method: 'PUT', body: JSON.stringify(body) }),
+    onSuccess: () => { setError(''); void queryClient.invalidateQueries({ queryKey: ['print-offers', projectId] }); },
+    onError: (err) => setError(messageOf(err)),
+  });
+  if (!proofs.size) return null;
+  return (
+    <div className="space-y-2" data-testid="reader-offers">
+      <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300">Sell printed copies to readers</h3>
+      <p className="text-xs text-gray-500">Readers order from your book page and pay through Stripe; the copy is printed and shipped by RPI from these files.</p>
+      {[...proofs.values()].map((o) => {
+        const offer = (offers ?? []).find((x) => x.edition === o.edition && x.volume_index === o.volume_index);
+        const key = `${o.volume_index}|${o.edition}`;
+        const value = prices[key] ?? (offer ? (offer.price_cents / 100).toFixed(2) : '');
+        const cents = Math.round(Number(value) * 100);
+        return (
+          <div key={key} className="flex flex-wrap items-center gap-2 text-xs" data-testid={`offer-${o.edition}`}>
+            <span className="font-medium text-gray-800 dark:text-gray-200">{o.edition_label}{volumeCount > 1 ? `, book ${o.volume_index}` : ''}</span>
+            {o.quote?.unit_price != null ? <span className="text-gray-500">costs {money(o.quote.unit_price)} to print</span> : null}
+            <label className="flex items-center gap-1">$
+              <input aria-label={`Reader price for ${o.edition_label}`} value={value} onChange={(e) => setPrices({ ...prices, [key]: e.target.value })}
+                className="w-20 rounded border border-gray-300 px-1 py-0.5 dark:border-gray-600 dark:bg-gray-800" inputMode="decimal" />
+            </label>
+            <button type="button" disabled={!(cents >= 100) || save.isPending}
+              onClick={() => save.mutate({ source_order_id: o.id, price_cents: cents, enabled: true })}
+              className="rounded bg-brand-600 px-2 py-0.5 text-white disabled:opacity-50">{offer?.enabled ? 'Update price' : 'Sell at this price'}</button>
+            {offer?.enabled ? (
+              <>
+                <span className="text-emerald-700 dark:text-emerald-300">on sale at ${(offer.price_cents / 100).toFixed(2)}</span>
+                <button type="button" onClick={() => save.mutate({ source_order_id: offer.source_order_id, price_cents: offer.price_cents, enabled: false })}
+                  className="text-red-600 hover:underline">Stop selling</button>
+              </>
+            ) : null}
+          </div>
+        );
+      })}
+      {error ? <p className="text-xs text-red-700 dark:text-red-400">{error}</p> : null}
     </div>
   );
 }

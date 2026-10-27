@@ -17,6 +17,25 @@
 import { getSupabaseAdmin } from './supabase-admin.js';
 import { logger } from '../lib/logger.js';
 
+/**
+ * Change a balance in ONE statement (migration 039's credits_add_v2), so a deduction and a credit
+ * purchase landing together cannot overwrite each other. Returns the new balance; `null` when a
+ * deduction would go below zero; `undefined` when the function is not there (server deployed
+ * ahead of the migration), in which case the caller keeps its old read-then-write path.
+ */
+export async function atomicCreditAdd(userId: string, delta: number, countUsage = false): Promise<number | null | undefined> {
+  const supabase = getSupabaseAdmin() as unknown as { rpc?: (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message: string } | null }> };
+  if (typeof supabase.rpc !== 'function') return undefined;
+  const { data, error } = await supabase.rpc('credits_add_v2', { p_user_id: userId, p_delta: delta, p_count_usage: countUsage });
+  if (error) {
+    if (/credits_add_v2|does not exist|schema cache/i.test(error.message)) return undefined;
+    throw new Error(error.message);
+  }
+  if (data === null || data === undefined || (Array.isArray(data) && data.length === 0)) return null;
+  const value = Array.isArray(data) ? (data[0] as Record<string, unknown>)?.credits_add_v2 ?? data[0] : data;
+  return Number(value);
+}
+
 export type CreditTransactionType =
   | 'monthly_reset'
   | 'usage'
@@ -83,17 +102,31 @@ export async function deductCredits(
     };
   }
 
-  const newRemaining = current - amount;
-  const newUsed = (sub.credits_used_this_period as number) + amount;
+  let newRemaining = current - amount;
+  let atomic: number | null | undefined;
+  try {
+    atomic = await atomicCreditAdd(userId, -amount, true);
+  } catch (err) {
+    logger.error({ err, userId }, 'deductCredits: atomic update failed');
+    return { ok: false, reason: 'DB_ERROR', message: err instanceof Error ? err.message : 'update failed' };
+  }
+  if (atomic === null) {
+    // Someone else spent the balance between the read above and this update.
+    return { ok: false, reason: 'INSUFFICIENT_CREDITS', message: `Insufficient credits (need ${amount})`, balance_after: current };
+  }
+  if (atomic !== undefined) {
+    newRemaining = atomic;
+  } else {
+    const newUsed = (sub.credits_used_this_period as number) + amount;
+    const { error: updateErr } = await supabase
+      .from('user_subscriptions')
+      .update({ credits_remaining: newRemaining, credits_used_this_period: newUsed })
+      .eq('id', sub.id);
 
-  const { error: updateErr } = await supabase
-    .from('user_subscriptions')
-    .update({ credits_remaining: newRemaining, credits_used_this_period: newUsed })
-    .eq('id', sub.id);
-
-  if (updateErr) {
-    logger.error({ err: updateErr, userId }, 'deductCredits: update failed');
-    return { ok: false, reason: 'DB_ERROR', message: updateErr.message };
+    if (updateErr) {
+      logger.error({ err: updateErr, userId }, 'deductCredits: update failed');
+      return { ok: false, reason: 'DB_ERROR', message: updateErr.message };
+    }
   }
 
   const { data: tx, error: txErr } = await supabase

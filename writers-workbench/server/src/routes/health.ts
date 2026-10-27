@@ -70,6 +70,22 @@ healthRouter.get('/', async (_req, res) => {
     checks.postal = 'skipped';
   }
 
+  // Sprint 9 (S9-8): Stripe reachable with this key. `skipped` when payments are not configured.
+  try {
+    const { stripeConfigured, getStripeClient } = await import('../services/stripe.js');
+    if (stripeConfigured()) {
+      await Promise.race([
+        getStripeClient().balance.retrieve(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000)),
+      ]);
+      checks.stripe = 'ok';
+    } else {
+      checks.stripe = 'skipped';
+    }
+  } catch {
+    checks.stripe = 'error';
+  }
+
   // S10b-5: active session count (comes from Redis when configured,
   // in-memory store otherwise). Shown for ops visibility. Failure to
   // read the count does not make the overall health check degraded.

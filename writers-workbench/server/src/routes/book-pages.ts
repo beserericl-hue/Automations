@@ -19,6 +19,8 @@ import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import { logger } from '../lib/logger.js';
 import { renderPreviewHtml, type BuyLink, type LandingCopy, type SectionPlan } from '../lib/landing-page.js';
+import { paymentsReady } from '../services/stripe.js';
+import { enabledOffers } from '../services/reader-print.js';
 
 export const bookPagesRouter = Router();
 
@@ -46,7 +48,7 @@ const reserveLimiter = rateLimit({
   },
 });
 
-interface PageRow {
+export interface PageRow {
   id: string;
   user_id: string;
   title: string;
@@ -54,7 +56,7 @@ interface PageRow {
   buy: BuyLink | null;
 }
 
-async function findPage(slug: string): Promise<PageRow | null> {
+export async function findPage(slug: string): Promise<PageRow | null> {
   if (!SLUG.test(slug) || slug.length > 80) return null;
   const { data, error } = await getSupabaseAdmin()
     .from('writing_projects_v2')
@@ -101,11 +103,14 @@ bookPagesRouter.get('/:slug', async (req: Request, res: Response) => {
     const state = String(req.query.reserved ?? '');
     const buy = page.buy?.url ? { url: page.buy.url, label: page.buy.label || 'Buy the book' } : undefined;
     const notice = NOTICES[state === '1' && buy ? 'on_sale' : state]?.(page.title);
+    // Printed copies sold here (Sprint 9): a link to the order page, only once payments work.
+    const offers = paymentsReady() ? await enabledOffers(page.id).catch(() => []) : [];
     const html = renderPreviewHtml(page.landing.copy, page.landing.plan, {
       formAction: `/books/${slug}/reserve`,
       canonicalUrl: selfUrl(req, slug),
       notice,
       buy,
+      print: offers.length ? { url: `/books/${slug}/print`, label: 'Order a printed copy' } : undefined,
     });
     // Regenerating the script changes the page; a stale copy must not outlive that.
     res.setHeader('Cache-Control', 'no-cache');

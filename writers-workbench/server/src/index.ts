@@ -35,6 +35,10 @@ import { publishingRouter } from './routes/publishing.js';
 import { landingPageRouter } from './routes/landing-page.js';
 import { bookPagesRouter } from './routes/book-pages.js';
 import { printRouter, printWebhookRouter } from './routes/print.js';
+import { stripeWebhookRouter } from './routes/stripe-webhook.js';
+import { billingRouter } from './routes/billing.js';
+import { billingAdminRouter, billingSuperuserRouter } from './routes/billing-admin.js';
+import { bookPrintRouter } from './routes/book-print.js';
 import { seriesRouter } from './routes/series.js';
 import { blogPagesRouter, blogWebRouter } from './routes/blog-pages.js';
 import { chapterActionsRouter } from './routes/chapter-actions.js';
@@ -126,6 +130,7 @@ app.use(
 // Public book landing pages (/books/<slug>): no login, server-rendered, with a form that posts back
 // to itself. Mounted BEFORE CORS — the form submission carries an Origin header, and the page must
 // accept it from whatever host serves it rather than only the app's whitelist.
+app.use('/books', bookPrintRouter);
 app.use('/books', bookPagesRouter);
 app.use('/blog', blogPagesRouter);
 
@@ -215,6 +220,9 @@ app.use('/api/admin', generalLimiter);
 // RPI Print's status webhooks. Before the JSON parser: the signature is over the raw bytes, and a
 // parsed-then-reserialised body no longer matches it.
 app.use('/api/print/webhook', generalLimiter, printWebhookRouter);
+// Stripe's webhooks (Sprint 9): before the JSON parser for the same reason, and not rate limited
+// by the general limiter, which a burst of Stripe retries after an outage would trip.
+app.use('/api/webhooks/stripe', stripeWebhookRouter);
 
 app.use(express.json({ limit: '30mb' }));
 
@@ -231,6 +239,7 @@ app.use('/api/health', healthRouter);
 app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/export', exportRouter);
+app.use('/api/admin/billing', billingAdminRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/brainstorm', brainstormRouter);
 app.use('/api/account', generalLimiter);
@@ -306,7 +315,10 @@ app.use('/api/landing-page', generalLimiter);
 app.use('/api/landing-page', landingPageRouter);
 app.use('/api/credits', generalLimiter);
 app.use('/api/credits', creditsRouter);
+app.use('/api/billing', generalLimiter);
+app.use('/api/billing', billingRouter);
 app.use('/api/superuser', generalLimiter);
+app.use('/api/superuser/billing', billingSuperuserRouter);
 app.use('/api/superuser', superuserRouter);
 app.use('/api/tiers', generalLimiter);
 app.use('/api/tiers', tiersRouter);

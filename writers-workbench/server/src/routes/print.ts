@@ -144,6 +144,11 @@ function view(r: Row, urls?: { preview?: string | null; interior?: string | null
     updated_at: r.updated_at,
     cancellable: CANCELLABLE_STATUSES.has(r.status),
     files: urls ?? null,
+    // Sprint 9: a reader's order from the public page, paid through Stripe.
+    order_kind: (r.order_kind as string | undefined) ?? 'author',
+    buyer_name: (r.buyer_name as string | null | undefined) ?? null,
+    amount_total_cents: (r.amount_total_cents as number | null | undefined) ?? null,
+    paid_at: (r.paid_at as string | null | undefined) ?? null,
   };
 }
 
@@ -209,6 +214,51 @@ printRouter.get('/project/:projectId/orders', async (req, res) => {
     .limit(50);
   if (error) return fail(res, 500, 'DB', 'Could not read orders');
   res.json({ success: true, data: { orders: (data as Row[]).map((r) => view(r)) } });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Sprint 9: printed copies for sale to readers. An offer is a prepared edition (its files are
+// that order's) at a price; the public page /books/<slug>/print sells it through Stripe.
+
+const OfferSchema = z.object({
+  source_order_id: z.string().uuid(),
+  price_cents: z.number().int().min(100).max(100000),
+  enabled: z.boolean().optional(),
+});
+
+printRouter.get('/project/:projectId/offers', async (req, res) => {
+  const { data, error } = await getSupabaseAdmin().from('print_offers_v2').select('*')
+    .eq('project_id', String(req.params.projectId)).eq('user_id', req.userId!).order('created_at');
+  if (error) return fail(res, 500, 'DB', 'Could not read offers');
+  res.json({ success: true, data: { offers: data ?? [] } });
+});
+
+printRouter.put('/project/:projectId/offers', validateBody(OfferSchema), async (req, res) => {
+  const projectId = String(req.params.projectId);
+  const { source_order_id, price_cents, enabled } = req.body as z.infer<typeof OfferSchema>;
+  const { data: source } = await getSupabaseAdmin().from('print_orders_v2').select('*')
+    .eq('id', source_order_id).eq('project_id', projectId).eq('user_id', req.userId!).maybeSingle();
+  if (!source) return fail(res, 404, 'NOT_FOUND', 'Prepare that edition first; readers get the files of a prepared order.');
+  const row = source as Row;
+  if ((row.order_kind as string | undefined) === 'reader') return fail(res, 400, 'NOT_A_PROOF', 'Choose one of your own prepared orders.');
+  // Never sell below what one copy costs to print: RPI bills the Workbench's account per copy.
+  const unit = Number(((row.quote as Record<string, unknown> | null)?.unit_price as number | undefined) ?? 0);
+  if (unit > 0 && price_cents < Math.ceil(unit * 100)) {
+    return fail(res, 400, 'BELOW_COST', `The price is below the $${unit.toFixed(2)} it costs to print one copy.`);
+  }
+  const { data, error } = await getSupabaseAdmin().from('print_offers_v2').upsert({
+    user_id: req.userId!, project_id: projectId, volume_index: row.volume_index, edition: row.edition,
+    source_order_id, price_cents, enabled: enabled ?? true,
+  }, { onConflict: 'project_id,volume_index,edition' }).select('*').single();
+  if (error) return fail(res, 500, 'DB', error.message);
+  res.json({ success: true, data: { offer: data } });
+});
+
+printRouter.delete('/project/:projectId/offers/:offerId', async (req, res) => {
+  const { error } = await getSupabaseAdmin().from('print_offers_v2').update({ enabled: false })
+    .eq('id', String(req.params.offerId)).eq('project_id', String(req.params.projectId)).eq('user_id', req.userId!);
+  if (error) return fail(res, 500, 'DB', error.message);
+  res.json({ success: true });
 });
 
 const PrepareSchema = z.object({
@@ -432,6 +482,9 @@ printRouter.delete('/orders/:orderId', async (req, res) => {
   const row = await loadOrder(req, res);
   if (!row) return;
   if (row.status !== 'DRAFT') return fail(res, 409, 'ALREADY_SUBMITTED', 'A placed order is cancelled, not deleted.');
+  // Its files are what readers are sold (and what past reader orders were printed from).
+  const { data: offers } = await getSupabaseAdmin().from('print_offers_v2').select('id').eq('source_order_id', row.id).limit(1);
+  if (offers && offers.length) return fail(res, 409, 'IN_USE', 'Readers buy this edition from your book page. Stop selling it first.');
   await getSupabaseAdmin().storage.from(BUCKET).remove([row.interior_path, row.outside_path, row.preview_path].filter(Boolean) as string[]);
   await getSupabaseAdmin().from('print_orders_v2').delete().eq('id', row.id);
   res.json({ success: true, data: { deleted: row.id } });

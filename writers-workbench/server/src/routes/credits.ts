@@ -4,7 +4,8 @@ import { Router, Request, Response } from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 import { CreditPurchaseSchema } from '../schemas.js';
-import { purchaseCredits } from '../services/credits.js';
+import { getStripeClient, paymentsReady, appUrl } from '../services/stripe.js';
+import { getOrCreateStripeCustomer } from '../services/stripe-sync.js';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import { logger } from '../lib/logger.js';
 
@@ -157,70 +158,54 @@ creditsRouter.get('/transactions', async (req: Request, res: Response) => {
  * `/api/admin`, which is admin-gated and records who did it.
  */
 function paymentsConfigured(): boolean {
-  return Boolean((process.env.STRIPE_SECRET_KEY || '').trim());
+  return paymentsReady();
 }
 
 /**
- * Would POST /purchase go through? The same two checks it makes, so the credits page can say so
- * instead of offering a Purchase button that can only end in a 503.
+ * Would a purchase go through? Stripe configured AND its webhook secret set, because credits are
+ * only ever added by the webhook once Stripe says the payment cleared.
  */
 export function purchasesAvailable(): boolean {
-  return paymentsConfigured() && Boolean(process.env.STRIPE_WEBHOOK_SECRET);
+  return paymentsConfigured();
 }
 
 /** Shown in place of the purchase form, and returned by the route when it refuses. */
 export const PURCHASES_UNAVAILABLE =
   'Credit purchases are not available yet. Your plan\'s monthly credits still apply, and an administrator can add credits to your account.';
 
+/**
+ * Sprint 9: this route no longer adds credits. It starts a Stripe Checkout for `amount` credits at
+ * the caller's tier price and returns its URL; the webhook adds the credits when the payment clears
+ * (routes/stripe-webhook.ts → grantPurchasedCredits). Same as POST /api/billing/credits/checkout.
+ */
 creditsRouter.post('/purchase', validateBody(CreditPurchaseSchema), async (req: Request, res: Response) => {
   if (!paymentsConfigured()) {
-    logger.warn({ userId: req.userId }, 'credits/purchase refused: no payment provider configured');
-    res.status(503).json({
-      success: false,
-      error: {
-        code: 'PAYMENTS_NOT_CONFIGURED',
-        message: PURCHASES_UNAVAILABLE,
-      },
-    });
+    logger.warn({ userId: req.userId }, 'credits/purchase refused: payments not configured');
+    res.status(503).json({ success: false, error: { code: 'PAYMENTS_NOT_CONFIGURED', message: PURCHASES_UNAVAILABLE } });
     return;
   }
-  // Reaching here means STRIPE_SECRET_KEY is set, which is the signal that the charge path below
-  // has been implemented. It has NOT been: do not add credits on the strength of a configured key.
-  if (!process.env.STRIPE_WEBHOOK_SECRET) {
-    logger.error({ userId: req.userId }, 'credits/purchase: stripe key present but no charge flow');
-    res.status(503).json({
-      success: false,
-      error: {
-        code: 'PAYMENTS_NOT_CONFIGURED',
-        message: 'Credit purchases are not available yet.',
-      },
-    });
-    return;
-  }
-
   const { amount } = req.body as { amount: number };
   const tier = req.subscriptionTier;
   if (!tier) {
     res.status(404).json({ success: false, error: { code: 'NO_SUBSCRIPTION', message: 'No active subscription tier' } });
     return;
   }
-
-  const totalCents = amount * tier.credit_purchase_price_cents;
-
-  const result = await purchaseCredits(req.userId!, amount, totalCents);
-  if (!result.ok) {
-    const status = result.reason === 'NO_SUBSCRIPTION' ? 404 : 500;
-    res.status(status).json({ success: false, error: { code: result.reason, message: result.message } });
-    return;
+  try {
+    const customer = await getOrCreateStripeCustomer(req.userId!);
+    const unit = tier.credit_purchase_price_cents;
+    const session = await getStripeClient().checkout.sessions.create({
+      mode: 'payment',
+      customer,
+      client_reference_id: req.userId!,
+      line_items: [{ quantity: amount, price_data: { currency: 'usd', unit_amount: unit, product_data: { name: 'Writers Workbench credit' } } }],
+      metadata: { kind: 'credits', user_id: req.userId!, credits: String(amount) },
+      payment_intent_data: { metadata: { kind: 'credits', user_id: req.userId!, credits: String(amount) } },
+      success_url: `${appUrl()}/credits?purchase=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appUrl()}/credits?purchase=cancelled`,
+    });
+    res.json({ success: true, data: { checkout_url: session.url, amount, total_cents: amount * unit } });
+  } catch (err) {
+    logger.error({ err, userId: req.userId }, 'credits/purchase: checkout failed');
+    res.status(502).json({ success: false, error: { code: 'STRIPE_ERROR', message: 'Could not start the purchase.' } });
   }
-
-  res.json({
-    success: true,
-    data: {
-      amount_purchased: amount,
-      price_paid_cents: totalCents,
-      balance_after: result.balance_after,
-      transaction_id: result.transaction_id,
-    },
-  });
 });

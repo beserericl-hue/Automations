@@ -578,6 +578,8 @@ export interface PublicPageOptions {
   notice?: string;
   /** Once the book is on sale: where to buy it. The call to action goes there instead of the form. */
   buy?: BuyLink;
+  /** Printed copies sold from this page (print_offers_v2): a second link beside the call to action. */
+  print?: BuyLink;
 }
 
 export interface BuyLink {
@@ -657,9 +659,10 @@ export function renderPreviewHtml(copy: LandingCopy, plan: SectionPlan[] = planS
   const references = copy.images.filter((i) => i.role === 'reference');
   // On sale: every call to action goes to the shop. Before that, to the reservation form.
   const buy = pub?.buy;
+  const printLink = pub?.print ? ` <a href="${esc(pub.print.url)}">${esc(pub.print.label)}</a>` : '';
   const cta = buy
-    ? `<p class="cta"><a href="${esc(buy.url)}" rel="noopener">${esc(buy.label)}</a></p>`
-    : `<p class="cta"><a href="#reserve">${esc(CTA_LABEL)}</a></p>`;
+    ? `<p class="cta"><a href="${esc(buy.url)}" rel="noopener">${esc(buy.label)}</a>${printLink}</p>`
+    : `<p class="cta"><a href="#reserve">${esc(CTA_LABEL)}</a>${printLink}</p>`;
   const body: Record<SectionKind, string> = {
     hero: `<section class="hero">
   <h1>${esc(copy.title)}</h1>
