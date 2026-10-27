@@ -192,6 +192,41 @@ export async function seedSocialPost(fields: {
   return ((await res.json()) as Array<{ id: string }>)[0].id;
 }
 
+// --------------------------------------------------------------------------- disposable calendar posts (migration 038)
+/** A post on the calendar. `external_id` starts with `e2e-` so teardown can find what a run left. */
+export async function seedCalendarPost(fields: {
+  title: string;
+  scheduledDate: string;
+  slot?: 'morning' | 'afternoon';
+  channels?: string[];
+  linkedinContent?: string;
+  state?: string;
+}): Promise<{ id: string; display_number: number }> {
+  const res = await fetch(`${SUPA_URL}/rest/v1/social_schedule_v2`, {
+    method: 'POST',
+    headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify({
+      user_id: DEMO_USER_ID, external_id: `e2e-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      title: fields.title, linkedin_content: fields.linkedinContent ?? `${fields.title} — e2e`, body_md: '',
+      channels: fields.channels ?? ['li_personal'], scheduled_date: fields.scheduledDate, slot: fields.slot ?? 'morning',
+      // The trigger recomputes this from date + slot.
+      scheduled_at: `${fields.scheduledDate}T12:00:00Z`, state: fields.state ?? 'pending', source: 'manual',
+    }),
+  });
+  if (!res.ok) throw new Error(`seedCalendarPost ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return ((await res.json()) as Array<{ id: string; display_number: number }>)[0];
+}
+
+export async function deleteCalendarPost(id: string): Promise<void> {
+  await supaDelete('social_schedule_v2', `id=eq.${id}`);
+}
+
+/** Today's date in US Eastern, the calendar's time zone, as yyyy-mm-dd. */
+export function easternToday(offsetDays = 0): string {
+  const d = new Date(Date.now() + offsetDays * 86_400_000);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(d);
+}
+
 // --------------------------------------------------------------------------- disposable story-bible entries
 export async function seedBibleEntry(fields: {
   projectId: string;

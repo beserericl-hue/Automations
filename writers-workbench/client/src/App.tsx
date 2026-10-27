@@ -40,6 +40,8 @@ const ProjectPublishing = lazyRetry(() => import('./components/publishing/Projec
 // Generate / Execution Status / Approvals real pages; the rest stay stubs
 // until Phase 2b.
 const NewsletterHome = lazyRetry(() => import('./components/newsletter/NewsletterHome'));
+const PostCalendar = lazyRetry(() => import('./components/social/PostCalendar'));
+const RadarPanel = lazyRetry(() => import('./components/social/RadarPanel'));
 const NewsletterGenerate = lazyRetry(() => import('./components/newsletter/NewsletterGenerate'));
 const ExecutionStatus = lazyRetry(() => import('./components/newsletter/ExecutionStatus'));
 const PendingApprovals = lazyRetry(() => import('./components/newsletter/PendingApprovals'));
@@ -119,6 +121,8 @@ export default function App() {
                     <Route path="newsletter/approvals" element={<PendingApprovals />} />
                     <Route path="newsletter/approvals/:token" element={<ApprovalDetail />} />
                     <Route path="newsletter/sends" element={<ScheduledSends />} />
+                    <Route path="newsletter/calendar" element={<PostCalendar />} />
+                    <Route path="newsletter/radar" element={<RadarPanel />} />
                     <Route path="newsletter/sends/:id" element={<NewsletterDetail />} />
                     <Route path="newsletter/ingestion" element={<IngestionBrowser />} />
                     {/* Newsletter Templates Sprint (T3) — list + editor.

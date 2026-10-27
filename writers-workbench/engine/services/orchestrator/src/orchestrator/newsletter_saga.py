@@ -161,7 +161,13 @@ class NewsletterSagaDriver:
         out = await run_step_via_http(
             _step("gather"),
             execution_id=execution_id,
-            payload={"send_date": cfg.get("send_date", ""), "user_id": cfg.get("user_id", ""), "limit": 50},
+            payload={
+                "send_date": cfg.get("send_date", ""),
+                "user_id": cfg.get("user_id", ""),
+                # Gather reads only this edition's own sources, over its cadence's window.
+                "edition_id": cfg.get("edition_id", ""),
+                "limit": 50,
+            },
         )
         articles = list(out.payload.get("articles") or [])
         if not articles:

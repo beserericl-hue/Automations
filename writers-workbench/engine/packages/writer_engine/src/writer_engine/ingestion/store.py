@@ -35,6 +35,7 @@ BUCKET = "newsletter-ingestion"
 TABLE = "content_ingestion_v2"
 FEEDS_TABLE = "newsletter_feed_sources_v2"
 RUNS_TABLE = "newsletter_ingestion_runs_v2"
+ENGINE_WRITTEN_URL_TYPES = frozenset({"radar", "social_queue"})
 
 FEED_COLUMNS = (
     "id,user_id,edition_id,name,url,url_type,item_type,active,fetch_interval_minutes,last_fetched_at"
@@ -118,7 +119,11 @@ async def claim_due_feeds(*, limit: int = 100, now: datetime | None = None) -> l
         logger.warning("ingestion.item_type_column_missing", error=f"{type(exc).__name__}: {exc}"[:140])
         candidates = await _select(FEED_COLUMNS_PRE_029)
 
-    rows = [r for r in candidates if _due(r, now=moment)]
+    # radar:// and social:// sources are written by the engine (writer_engine.social.feed) when a
+    # slate is built or a post goes out; there is nothing at those URLs to fetch.
+    rows = [
+        r for r in candidates if r.get("url_type") not in ENGINE_WRITTEN_URL_TYPES and _due(r, now=moment)
+    ]
     if not rows:
         return []
 

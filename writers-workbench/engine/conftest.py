@@ -116,6 +116,10 @@ class FakeQuery:
         self._payload = payload
         return self
 
+    def delete(self) -> FakeQuery:
+        self._op = "delete"
+        return self
+
     def upsert(self, payload: Any, on_conflict: str = "") -> FakeQuery:
         self._op = "upsert"
         self._payload = payload
@@ -141,6 +145,24 @@ class FakeQuery:
             self.predicates.append(lambda r, c=col: r.get(c) is None)
         else:
             self.filters.append((col, val))
+        return self
+
+    # Range filters compare as stored. Tests store timestamps as UTC ISO strings, which order the
+    # same way as the instants they name.
+    def lte(self, col: str, val: Any) -> FakeQuery:
+        self.predicates.append(lambda r, c=col, v=val: r.get(c) is not None and r.get(c) <= v)
+        return self
+
+    def lt(self, col: str, val: Any) -> FakeQuery:
+        self.predicates.append(lambda r, c=col, v=val: r.get(c) is not None and r.get(c) < v)
+        return self
+
+    def gte(self, col: str, val: Any) -> FakeQuery:
+        self.predicates.append(lambda r, c=col, v=val: r.get(c) is not None and r.get(c) >= v)
+        return self
+
+    def gt(self, col: str, val: Any) -> FakeQuery:
+        self.predicates.append(lambda r, c=col, v=val: r.get(c) is not None and r.get(c) > v)
         return self
 
     def like(self, col: str, pattern: str) -> FakeQuery:
@@ -197,12 +219,20 @@ class FakeQuery:
             for r in touched:
                 r.update(self._payload)
             return FakeResp([copy.deepcopy(r) for r in touched])
+        if self._op == "delete":
+            gone = self._matching()
+            self.db.tables[self.table_name] = [r for r in rows if r not in gone]
+            return FakeResp([copy.deepcopy(r) for r in gone])
         if self._op == "upsert":
             items = self._payload if isinstance(self._payload, list) else [self._payload]
-            key = self._conflict or self.db.primary_keys.get(self.table_name) or "id"
+            # `on_conflict` may name several columns ("user_id,video_id"), as PostgREST allows.
+            cols = [
+                c.strip()
+                for c in (self._conflict or self.db.primary_keys.get(self.table_name) or "id").split(",")
+            ]
             made = []
             for item in items:
-                existing = next((r for r in rows if r.get(key) == item.get(key)), None)
+                existing = next((r for r in rows if all(r.get(c) == item.get(c) for c in cols)), None)
                 if existing is not None:
                     existing.update(item)
                     made.append(copy.deepcopy(existing))

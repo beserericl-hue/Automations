@@ -860,6 +860,100 @@ def build_app() -> FastAPI:
         _require_cron_secret(request)
         return await _publisher_tick()
 
+    async def _social_tick() -> dict[str, Any]:
+        """Post due rows of the post calendar (``social_schedule_v2``) to the website and LinkedIn.
+
+        The port of n8n's ``Cron - Post Scheduled Website Blogs``. Dry run unless
+        ``SOCIAL_POSTING_MODE=live`` — see ``writer_engine.social.poster``. A live run that posted
+        anything mails a summary to ALERT_EMAIL, as the n8n cron mailed Eric.
+        """
+        import httpx
+
+        from writer_engine.social import poster
+        from writer_engine.social.feed import feed_posted_item
+        from writer_engine.supabase.client import get_supabase_admin
+
+        settings = get_settings()
+        if not (settings.supabase_url and settings.supabase_service_role_key):
+            return {"claimed": 0, "reason": "no supabase"}
+        client = await get_supabase_admin()
+        async with httpx.AsyncClient() as http:
+            result = await poster.run_tick(client, poster.Transport(http=http), after_posted=feed_posted_item)
+        if result.claimed and result.mode == "live" and settings.alert_email:
+            from datetime import UTC, datetime
+
+            from writer_engine.postal.client import send_email
+
+            subject, html = poster.summary_email(result, datetime.now(UTC))
+            try:
+                await send_email(
+                    to=[settings.alert_email],
+                    from_addr=settings.newsletter_from_address,
+                    subject=subject,
+                    html=html,
+                )
+            except Exception as exc:
+                logger.warning("cron.social.summary_failed", error=f"{type(exc).__name__}: {exc}"[:200])
+        return result.as_dict()
+
+    async def _radar_tick() -> dict[str, Any]:
+        """Start each enabled radar whose week is due (Trend Mon 06:00 ET, Dev Sun 06:00 ET).
+
+        Only enqueues: the run itself (feeds + Claude) is a heavy ingestion job, and its
+        ``radar_runs_v2`` row makes a second enqueue for the same week a no-op.
+        """
+        from datetime import UTC, datetime
+
+        from writer_engine.radar.run import RUNS, SUBSCRIPTIONS, due_at, week_of
+        from writer_engine.supabase.client import get_supabase_admin
+
+        settings = get_settings()
+        if not (settings.supabase_url and settings.supabase_service_role_key):
+            return {"enqueued": 0, "reason": "no supabase"}
+        client = await get_supabase_admin()
+        now = datetime.now(UTC)
+        week = week_of(now)
+        subs_resp = await client.table(SUBSCRIPTIONS).select("user_id,radar").eq("enabled", True).execute()
+        runs_resp = await client.table(RUNS).select("user_id,radar").eq("week_of", week.isoformat()).execute()
+        subs: list[dict[str, Any]] = list(subs_resp.data or [])  # type: ignore[arg-type]
+        runs: list[dict[str, Any]] = list(runs_resp.data or [])  # type: ignore[arg-type]
+        done = {(str(r["user_id"]), str(r["radar"])) for r in runs}
+        enqueued: list[str] = []
+        for sub in subs:
+            user_id, radar = str(sub["user_id"]), str(sub["radar"])
+            if (user_id, radar) in done or now < due_at(radar, week):
+                continue
+            body = {"op": "radar", "user_id": user_id, "radar": radar}
+            if app.state.arq_pool is not None:
+                await app.state.arq_pool.enqueue_job(
+                    "run_write_tool_job", "ingestion", body, _queue_name=queue_for("ingestion", "radar")
+                )
+            else:
+                url = resolve_step_url("ingestion", settings)
+                if url:
+                    await run_step_via_http(
+                        StepRef(name="ingestion", url=url),
+                        execution_id=uuid4(),
+                        payload=body,
+                        timeout_s=900.0,
+                    )
+            enqueued.append(f"{radar}:{user_id}")
+        if enqueued:
+            logger.info("cron.radar", week_of=week.isoformat(), enqueued=enqueued)
+        return {"week_of": week.isoformat(), "enqueued": enqueued}
+
+    @app.post("/cron/radar")
+    async def cron_radar(request: Request) -> dict[str, Any]:
+        """Start due radars now. Auth: ``X-Cron-Secret``. Also on the internal timer (hourly)."""
+        _require_cron_secret(request)
+        return await _radar_tick()
+
+    @app.post("/cron/social-publish")
+    async def cron_social_publish(request: Request) -> dict[str, Any]:
+        """Run the post-calendar publisher now. Auth: ``X-Cron-Secret``. Also on the internal timer."""
+        _require_cron_secret(request)
+        return await _social_tick()
+
     def _health_key_for(queue: str) -> str:
         return f"{ARQ_HEALTH_CHECK_KEY}:{queue}"
 
@@ -1015,6 +1109,16 @@ def build_app() -> FastAPI:
             name="publish-scheduled",
             interval_s=settings_for_jobs.publisher_poll_seconds,
             run=_publisher_tick,
+        ),
+        CronJob(
+            name="social-publish",
+            interval_s=settings_for_jobs.social_poll_seconds,
+            run=_social_tick,
+        ),
+        CronJob(
+            name="radar",
+            interval_s=settings_for_jobs.radar_poll_seconds,
+            run=_radar_tick,
         ),
         CronJob(
             name="queue-metrics",
