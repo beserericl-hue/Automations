@@ -225,8 +225,14 @@ def import_n8n() -> None:
                  "title": t.get("title") or "", "url": t.get("url") or "", "source": t.get("source") or "",
                  "item_type": "video" if t.get("type") == "video" else "article", "angle": t.get("angle") or "",
                  "category": t.get("category") or ""} for t in dev if str(t.get("rank") or "").isdigit() and t.get("url")]
-    print(f"slates: trend {upsert('radar_topics_v2', trend_rows, 'user_id,radar,week_of,rank')}, "
-          f"dev {upsert('radar_topics_v2', dev_rows, 'user_id,radar,week_of,rank')} (week of {week})")
+    # Only into a week with no slate yet: once the engine has built a week, n8n's copy must not
+    # overwrite it (a re-run of this import did exactly that on DEV, 2026-10-27).
+    def into_empty_week(radar: str, rows: list[dict[str, Any]]) -> str:
+        have = select("radar_topics_v2", f"select=id&user_id=eq.{urllib.parse.quote(USER)}&radar=eq.{radar}"
+                                         f"&week_of=eq.{week.isoformat()}&limit=1")
+        return "kept (week already has a slate)" if have else str(upsert("radar_topics_v2", rows, "user_id,radar,week_of,rank"))
+
+    print(f"slates (week of {week}): trend {into_empty_week('trend', trend_rows)}, dev {into_empty_week('dev', dev_rows)}")
     vids = n8n_rows(TABLES["dev_video_archive"])
     arch = [{"user_id": USER, "video_id": v["videoId"], "title": v.get("title") or "", "url": v.get("url") or "",
              "source": v.get("source") or "", "channel": v.get("channel") or "", "published_at": v.get("date") or None,
