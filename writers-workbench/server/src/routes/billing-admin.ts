@@ -94,9 +94,12 @@ billingAdminRouter.get('/revenue', async (req: Request, res: Response) => {
         d.setUTCMonth(start.getUTCMonth() + i);
         months[d.toISOString().slice(0, 7)] = 0;
       }
-      for await (const inv of stripe.invoices.list({ status: 'paid', created: { gte: Math.floor(start.getTime() / 1000) }, limit: 100 })) {
-        const key = new Date((inv.status_transitions?.paid_at ?? inv.created) * 1000).toISOString().slice(0, 7);
-        if (key in months) months[key] += inv.amount_paid;
+      // Every successful charge, net of refunds: subscriptions AND one-off payments (credit packs,
+      // reader print orders), which have no invoice. Counting invoices only left those out.
+      for await (const ch of stripe.charges.list({ created: { gte: Math.floor(start.getTime() / 1000) }, limit: 100 })) {
+        if (!ch.paid || ch.status !== 'succeeded') continue;
+        const key = new Date(ch.created * 1000).toISOString().slice(0, 7);
+        if (key in months) months[key] += ch.amount - (ch.amount_refunded ?? 0);
       }
       const customers = await stripe.customers.list({ limit: 100 });
       data.stripe = {
