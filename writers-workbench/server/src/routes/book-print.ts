@@ -52,8 +52,23 @@ function page(title: string, body: string): string {
     `</head><body>${body}</body></html>`;
 }
 
+/**
+ * The quote page's form posts here and is answered with a redirect to Stripe Checkout. The app-wide
+ * CSP has `form-action 'self'`, and Chrome applies form-action to the redirect too, so "Pay with
+ * Stripe" silently did nothing in a browser (curl, which ignores CSP, worked). These pages allow
+ * Stripe's checkout as a form destination; nothing else changes.
+ */
+export function withStripeFormAction(csp: string): string {
+  if (!csp) return csp;
+  return /form-action/.test(csp)
+    ? csp.replace(/form-action ([^;]*)/, (_m, v: string) => (v.includes('checkout.stripe.com') ? `form-action ${v}` : `form-action ${v.trim()} https://checkout.stripe.com`))
+    : `${csp};form-action 'self' https://checkout.stripe.com`;
+}
+
 function send(res: Response, status: number, title: string, body: string): void {
   res.setHeader('Cache-Control', 'no-store');
+  const csp = res.getHeader('Content-Security-Policy');
+  if (typeof csp === 'string') res.setHeader('Content-Security-Policy', withStripeFormAction(csp));
   res.status(status).type('html').send(page(title, body));
 }
 
