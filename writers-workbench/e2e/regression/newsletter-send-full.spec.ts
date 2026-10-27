@@ -46,7 +46,11 @@ test.describe('Newsletter FULL send (data path)', () => {
     // ── 2) Approve all three HITL gates from the Approval detail screen ────────
     // The gates fire in sequence (stories → subject → image); each time, the ONLY open approval
     // for this execution is the current gate. Approve whichever is open, three times.
-    const GATE_TIMEOUTS = [120_000, 120_000, 600_000]; // image gate waits on 5 sequential segment+image builds
+    // Gate 1 waits on gather + pick. The saga gives the pick step 240s (newsletter_saga, timeout_s)
+    // and a weekly edition hands a thinking model a whole week of stories, so 120s here was tighter
+    // than the pipeline's own budget (flaky on DEV 2026-10-27). The image gate waits on 5 sequential
+    // segment+image builds.
+    const GATE_TIMEOUTS = [300_000, 120_000, 600_000];
     for (let gate = 0; gate < 3; gate++) {
       let token: string | null = null;
       const deadline = Date.now() + GATE_TIMEOUTS[gate];
