@@ -58,6 +58,8 @@ async def lifespan(_: FastAPI) -> Any:
         task.cancel()
         with contextlib.suppress(asyncio.CancelledError, Exception):
             await task
+        with contextlib.suppress(Exception):
+            await fleet.deregister(await get_redis(), SERVICE)
         await close_redis()
         logger.info("gateway.shutdown")
 
