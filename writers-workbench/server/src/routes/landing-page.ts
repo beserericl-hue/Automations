@@ -49,6 +49,7 @@ import { loadProject, saveOutline, marketingKey } from './publishing.js';
 import { authorPhotoUrl } from './author.js';
 import { composeCover } from '../lib/cover.js';
 import type { ValidationResult } from '../lib/kdp-validate.js';
+import { coverChoice } from '../lib/book-cover.js';
 import {
   SECTION_KINDS,
   UNAVAILABLE_MECHANICS,
@@ -297,7 +298,11 @@ async function gatherInputs(userId: string, project: { id: string; title: string
     authorPhotoUrl(userId),
   ]);
 
-  const coverRow = (images ?? []).find((i) => i.image_type === 'cover_art');
+  // The author's chosen cover when it is still there; otherwise the newest cover art.
+  const chosenCover = coverChoice(outline).default;
+  const coverRow =
+    (images ?? []).find((i) => chosenCover && i.id === chosenCover) ??
+    (images ?? []).find((i) => i.image_type === 'cover_art');
   const referencePhotos: ReferencePhoto[] = (images ?? [])
     .filter((i) => i.image_type === 'reference_photo')
     .map((i) => {

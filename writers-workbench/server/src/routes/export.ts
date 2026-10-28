@@ -10,6 +10,7 @@ import { buildEpub, epubFilename, type EpubChapter } from '../lib/epub.js';
 import { composeCover } from '../lib/cover.js';
 import { buildKdpPackage } from '../lib/kdp-package.js';
 import { loadBookSource } from '../lib/book-source.js';
+import { downloadCover, findCover } from '../lib/book-cover.js';
 
 export const exportRouter = Router();
 
@@ -327,7 +328,7 @@ exportRouter.post(
     try {
       const { data: project, error: projError } = await getSupabaseAdmin()
         .from('writing_projects_v2')
-        .select('title, genre_slug')
+        .select('title, genre_slug, outline')
         .eq('id', project_id)
         .eq('user_id', user_id)
         .single();
@@ -385,28 +386,18 @@ exportRouter.post(
       // bars, and carries no words, so the shelf shows a picture rather than a book.
       let cover: { data: Buffer; ext: 'jpg' | 'png' } | null = null;
       try {
-        const { data: art } = await getSupabaseAdmin()
-          .from('generated_images_v2')
-          .select('storage_path')
-          .eq('project_id', project_id)
-          .eq('image_type', 'cover_art')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (art?.storage_path) {
-          const dl = await getSupabaseAdmin()
-            .storage.from('cover-images')
-            .download(art.storage_path as string);
-          if (dl.data) {
-            const raw = Buffer.from(await dl.data.arrayBuffer());
-            const composed = await composeCover({
-              art: raw,
-              title: project.title as string,
-              author: author_name,
-            });
-            // Falling back to the raw art is still better than no cover at all.
-            cover = composed ? { data: composed, ext: 'jpg' } : { data: raw, ext: 'png' };
-          }
+        const raw = await downloadCover(
+          getSupabaseAdmin(),
+          await findCover(getSupabaseAdmin(), project_id, project.outline as Record<string, unknown> | null),
+        );
+        if (raw) {
+          const composed = await composeCover({
+            art: raw,
+            title: project.title as string,
+            author: author_name,
+          });
+          // Falling back to the raw art is still better than no cover at all.
+          cover = composed ? { data: composed, ext: 'jpg' } : { data: raw, ext: 'png' };
         }
       } catch (err) {
         logger.warn({ err, project_id }, 'epub: cover unavailable, exporting without one');

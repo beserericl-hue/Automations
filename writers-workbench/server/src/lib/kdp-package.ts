@@ -87,6 +87,8 @@ export interface BuildPackageOptions {
   onlyVolume?: number | null;
   /** The project's selected cover art. Without it there is no cover of either kind. */
   art?: Buffer | null;
+  /** A book's own cover in a series, keyed by volume index as a string; `art` for the rest. */
+  artByVolume?: Record<string, Buffer>;
   /** Listing copy per volume index (as a string key), as stored on the outline. */
   marketing?: Record<string, Marketing | null>;
   /** Draft chapters are included by default — but then they are marked, not hidden. */
@@ -374,6 +376,7 @@ export async function buildKdpPackage(opts: BuildPackageOptions): Promise<Packag
   for (const v of wanted) {
     const parts = volumeParts(opts, planned, all, v);
     const { volume, label, fullTitle, marketing, isbn, bio } = parts;
+    const art = opts.artByVolume?.[String(v.index)] ?? opts.art;
     const dir = zip.folder(label)!;
     if (!parts.rows.length) {
       errors.push(`${label}: no chapters with text in this volume`);
@@ -407,9 +410,9 @@ export async function buildKdpPackage(opts: BuildPackageOptions): Promise<Packag
     // The cover wrap. Its spine comes from the interior's real page count — never an estimate,
     // because a spine off by a tenth of an inch puts the title on the front of the book.
     let spineIn: number | null = null;
-    if (opts.art?.length) {
+    if (art?.length) {
       const wrap = await composeCoverWrap({
-        art: opts.art,
+        art,
         author: opts.author,
         pageCount: interior.pageCount,
         trimWidthIn: trim.w,
@@ -451,10 +454,10 @@ export async function buildKdpPackage(opts: BuildPackageOptions): Promise<Packag
       status: c.status ?? null,
     }));
     let ebookCover: { data: Buffer; ext: 'jpg' | 'png' } | null = null;
-    if (opts.art?.length) {
+    if (art?.length) {
       const t = wrapTitling(opts.title, volume);
-      const jacket = await composeCover({ art: opts.art, title: t.title, author: opts.author, seriesLine: t.seriesLine });
-      ebookCover = jacket ? { data: jacket, ext: 'jpg' } : { data: opts.art, ext: 'png' };
+      const jacket = await composeCover({ art, title: t.title, author: opts.author, seriesLine: t.seriesLine });
+      ebookCover = jacket ? { data: jacket, ext: 'jpg' } : { data: art, ext: 'png' };
       dir.file(`${slug(fullTitle)}-ebook-cover.${ebookCover.ext}`, ebookCover.data);
       files.push(`${label}/${slug(fullTitle)}-ebook-cover.${ebookCover.ext}`);
       if (jacket) {

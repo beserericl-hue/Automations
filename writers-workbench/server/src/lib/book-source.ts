@@ -7,6 +7,7 @@
  */
 
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
+import { downloadCover, findCover } from './book-cover.js';
 import { marketingKey, publishingOf } from '../routes/publishing.js';
 import { logger } from './logger.js';
 import type { BuildPackageOptions, PackageChapter, PackageSettings } from './kdp-package.js';
@@ -60,27 +61,26 @@ export async function loadBookSource(projectId: string, userId: string): Promise
     authorName = String(account?.display_name ?? '').trim();
   }
 
+  const plan = outline._volume_plan as
+    | { volumes?: { index: number; first_chapter: number; last_chapter: number }[] }
+    | undefined;
+
+  // The whole book's cover, and each book's own where the author chose one for it.
   let art: Buffer | null = null;
+  const artByVolume: Record<string, Buffer> = {};
   try {
-    const { data: coverArt } = await supabase
-      .from('generated_images_v2')
-      .select('storage_path')
-      .eq('project_id', projectId)
-      .eq('image_type', 'cover_art')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (coverArt?.storage_path) {
-      const dl = await supabase.storage.from('cover-images').download(coverArt.storage_path as string);
-      if (dl.data) art = Buffer.from(await dl.data.arrayBuffer());
+    const whole = await findCover(supabase, projectId, outline);
+    art = await downloadCover(supabase, whole);
+    for (const v of plan?.volumes ?? []) {
+      const own = await findCover(supabase, projectId, outline, v.index);
+      if (!own || own.id === whole?.id) continue;
+      const bytes = await downloadCover(supabase, own);
+      if (bytes) artByVolume[String(v.index)] = bytes;
     }
   } catch (err) {
     logger.warn({ err, projectId }, 'book source: cover art unavailable');
   }
 
-  const plan = outline._volume_plan as
-    | { volumes?: { index: number; first_chapter: number; last_chapter: number }[] }
-    | undefined;
   const volumeCount = Math.max(1, plan?.volumes?.length ?? 1);
   const marketing: Record<string, unknown> = {};
   for (let i = 1; i <= volumeCount; i += 1) {
@@ -102,6 +102,7 @@ export async function loadBookSource(projectId: string, userId: string): Promise
     settings,
     volumes: plan?.volumes,
     art,
+    artByVolume,
     marketing: marketing as BuildPackageOptions['marketing'],
   };
 }

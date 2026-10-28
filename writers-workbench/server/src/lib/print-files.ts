@@ -81,7 +81,8 @@ export async function buildPrintFiles(source: BookSource, edition: Edition, volu
       `Printed copies are ${edition.trim}″; this book is set to ${source.settings.trim}″. Change the trim size above first.`,
     );
   }
-  if (!source.art?.length) {
+  const art = source.artByVolume?.[String(volumeIndex)] ?? source.art;
+  if (!art?.length) {
     throw new PrintFilesError('NO_COVER_ART', 'Select cover art for the project first — the cover is built from it.');
   }
   const all = source.chapters.filter((c) => String(c.content_text ?? '').trim());
@@ -112,7 +113,7 @@ export async function buildPrintFiles(source: BookSource, edition: Edition, volu
 
   const geometry = await coverGeometry(edition, pages);
   const wrap = await composeCoverWrap({
-    art: source.art,
+    art,
     author: source.author,
     // RPI pads an odd interior with a blank page, and the spine is measured on the padded count.
     pageCount: rpiPageCount(pages),

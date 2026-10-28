@@ -101,4 +101,65 @@ describe('SeriesPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Use this ending' }));
     await waitFor(() => expect(mockFetch.mock.calls.some(([p, o]) => String(p).endsWith('/books/1/ending/apply') && (o as { method?: string }).method === 'POST')).toBe(true));
   });
+
+  describe('where each book ends', () => {
+    const renderBreaks = (onPlanWithBreaks = vi.fn(), breaksByAuthor = false) => {
+      renderWithProviders(
+        <SeriesPanel
+          projectId="p1"
+          series={SERIES}
+          planned
+          planning={false}
+          onPlan={() => {}}
+          onPlanWithBreaks={onPlanWithBreaks}
+          breaksByAuthor={breaksByAuthor}
+          stateKey={['publishing', 'p1']}
+        />,
+      );
+      return onPlanWithBreaks;
+    };
+
+    it('shows the current break and where the next book begins', () => {
+      renderBreaks();
+      expect(screen.getByLabelText('Book 1 ends after chapter')).toHaveValue(30);
+      expect(screen.getByText('Book 2 begins at chapter 31')).toBeInTheDocument();
+      // Nothing changed yet, so there is nothing to re-plan.
+      expect(screen.getByRole('button', { name: 'Use these breaks' })).toBeDisabled();
+    });
+
+    it('re-plans with the chapters the author typed', () => {
+      const onPlan = renderBreaks();
+      fireEvent.change(screen.getByLabelText('Book 1 ends after chapter'), { target: { value: '28' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Add a break' }));
+      fireEvent.change(screen.getByLabelText('Book 2 ends after chapter'), { target: { value: '59' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Use these breaks' }));
+      expect(onPlan).toHaveBeenCalledWith([28, 59]);
+    });
+
+    it('refuses breaks out of order', () => {
+      renderBreaks();
+      fireEvent.click(screen.getByRole('button', { name: 'Add a break' }));
+      fireEvent.change(screen.getByLabelText('Book 2 ends after chapter'), { target: { value: '12' } });
+      expect(screen.getByText('Each book must end after the one before it.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Use these breaks' })).toBeDisabled();
+    });
+
+    it('removing every break makes one book again', () => {
+      const onPlan = renderBreaks();
+      fireEvent.click(screen.getByRole('button', { name: 'Remove this break' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Use these breaks' }));
+      expect(onPlan).toHaveBeenCalledWith(null);
+    });
+
+    it('hands the choice back to the planner only when the author made it', () => {
+      const onPlan = renderBreaks(vi.fn(), true);
+      fireEvent.click(screen.getByRole('button', { name: 'Let the planner choose' }));
+      expect(onPlan).toHaveBeenCalledWith(null);
+    });
+
+    it('has no planner hand-back while the planner chose', () => {
+      renderBreaks();
+      expect(screen.queryByRole('button', { name: 'Let the planner choose' })).toBeNull();
+    });
+  });
 });
