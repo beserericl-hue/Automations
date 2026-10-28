@@ -350,6 +350,19 @@ export default function ContentDetail() {
     return editorRef.current?.reveal(quote) ?? 'missing';
   }, []);
 
+  /**
+   * A humanized passage replaces the old one on the server, and the chapter then reloads. Without a
+   * mark, the author has to hunt for what changed. The new text waits here until the reloaded
+   * chapter is in the editor — the editor's own effect loads it first, as a child — then is marked
+   * the same way a review finding is.
+   */
+  const replacedRef = useRef<string | null>(null);
+  useEffect(() => {
+    const replaced = replacedRef.current;
+    if (!replaced) return;
+    if (revealInEditor(replaced) !== 'missing') replacedRef.current = null;
+  }, [editorContent, revealInEditor]);
+
   if (isLoading) {
     return <div className="flex items-center justify-center h-64 text-sm text-gray-500">Loading...</div>;
   }
@@ -755,6 +768,9 @@ export default function ContentDetail() {
                   contentId={id!}
                   getSelection={() => editorRef.current?.getSelectedText() ?? ''}
                   seed={humanizerSeed}
+                  onReplaced={(text) => {
+                    replacedRef.current = text;
+                  }}
                 />
               )}
               {currentTab === 'sources' && <ProvenancePanel contentId={id!} />}
