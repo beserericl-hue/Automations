@@ -40,6 +40,12 @@ class TestTheBioAsksBeforeItInvents:
         assert "Invent nothing" in s
         assert "fabricated credential is a false claim" in s
 
+    def test_it_keeps_each_fact_on_its_own_event(self) -> None:
+        # A real bio moved "Piscataway" from the author's friend onto the dig he worked on.
+        s = M._build_bio_system()
+        assert "KEEP EACH FACT WHERE IT WAS GIVEN" in s
+        assert "never move it onto a different one" in s
+
     def test_it_bans_the_stock_phrases(self) -> None:
         s = M._build_bio_system()
         for banned in ("award-winning", "acclaimed", "passionate about"):

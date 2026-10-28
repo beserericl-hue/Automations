@@ -16,7 +16,8 @@
  * All of it is stored on the project. Nothing here lives only in this tab.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import { supabase } from '../../config/supabase';
@@ -532,9 +533,25 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
               label="Author bio"
               value={data.author.bio || marketing.author_bio}
               note={
-                data.author.bio
-                  ? 'Your approved bio, from the Author Profile. This is what gets printed.'
-                  : 'Suggested — set your own in Settings → Author Profile before publishing.'
+                // The approved bio is the profile's, shared by every book, and the copywriter returns
+                // it word for word — so a revise below cannot change it. Say where it can be changed.
+                data.author.bio ? (
+                  <>
+                    Your approved bio, from the Author Profile. This is what gets printed, in every one of your books —
+                    asking for a change below does not touch it.{' '}
+                    <Link to="/settings/author" className="text-brand-600 underline">
+                      Change the bio in your Author Profile
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    Suggested —{' '}
+                    <Link to="/settings/author" className="text-brand-600 underline">
+                      set your own in your Author Profile
+                    </Link>{' '}
+                    before publishing.
+                  </>
+                )
               }
             />
             {marketing.role_warnings?.length ? (
@@ -645,6 +662,15 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
                   className={inputClass}
                 />
               </Field>
+            ) : null}
+            {marketing && data.author.bio && /\bbio\b|biography/i.test(instructions) ? (
+              <p data-testid="bio-not-revised" className="rounded-lg bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+                The author bio is not part of this copy — it is your approved bio, printed exactly as you wrote it.{' '}
+                <Link to="/settings/author" className="underline">
+                  Change it in your Author Profile
+                </Link>
+                ; it updates every book.
+              </p>
             ) : null}
             <div className="flex flex-wrap gap-2">
               <button
@@ -887,7 +913,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
-function Copy({ label, value, note }: { label: string; value?: string; note?: string }) {
+function Copy({ label, value, note }: { label: string; value?: string; note?: ReactNode }) {
   return (
     <div>
       <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
