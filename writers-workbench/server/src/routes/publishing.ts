@@ -125,6 +125,23 @@ function publishingOf(outline: Outline | null): Publishing {
 }
 
 /**
+ * Why the author's breaks cannot be used with these chapters, or null when they can. The engine
+ * applies the same rules; checking here first means a refused plan never overwrites the saved
+ * breaks, and the author hears why at once instead of the plan silently not changing.
+ */
+export function breaksProblem(chapterNumbers: number[], breaks: number[]): string | null {
+  const sorted = [...chapterNumbers].sort((a, b) => a - b);
+  const last = sorted[sorted.length - 1];
+  const seen = new Set(sorted);
+  for (const b of breaks) {
+    if (!seen.has(b)) return `chapter ${b} is not in the book`;
+    if (b === last) return `chapter ${b} is the last chapter — it ends the series, not a book`;
+  }
+  if (new Set(breaks).size !== breaks.length) return 'two books cannot end on the same chapter';
+  return null;
+}
+
+/**
  * Why an ISBN cannot be used, or null when it can. A mistyped ISBN is printed on the copyright page
  * and refused by KDP only at upload, so the check digit is verified here. Hyphens and spaces are
  * allowed, as printed.
@@ -424,6 +441,30 @@ publishingRouter.post(
         : settings.volume_count;
 
     try {
+      if (breaks) {
+        // The chapters the planner will read: written ones, as the engine counts them.
+        const numbers: number[] = [];
+        for (let page = 0; ; page += 1) {
+          const { data, error } = await getSupabaseAdmin()
+            .from('published_content_v2')
+            .select('chapter_number')
+            .eq('project_id', project.id)
+            .eq('content_type', 'chapter')
+            .is('deleted_at', null)
+            .not('content_text', 'is', null)
+            .neq('content_text', '')
+            .range(page * 1000, page * 1000 + 999);
+          if (error) throw error;
+          numbers.push(...(data ?? []).map((r) => Number(r.chapter_number)));
+          if ((data ?? []).length < 1000) break;
+        }
+        const problem = breaksProblem(numbers, breaks);
+        if (problem) {
+          res.status(400).json({ success: false, error: { code: 'BAD_BREAKS', message: `Those breaks cannot be used: ${problem}.` } });
+          return;
+        }
+      }
+
       // The trim used for the plan becomes the project's trim. Otherwise the plan and the interior
       // PDF can disagree about how many pages a volume is, which is how a 900-page volume reaches
       // KDP and is refused.

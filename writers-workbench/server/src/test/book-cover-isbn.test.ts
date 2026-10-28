@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { coverChoice, findCover } from '../lib/book-cover.js';
 import { buildKdpPackage, type PackageSettings } from '../lib/kdp-package.js';
-import { assessReadiness, isbnProblem, publishingOf, PUBLISHING_DEFAULTS } from '../routes/publishing.js';
+import { assessReadiness, breaksProblem, isbnProblem, publishingOf, PUBLISHING_DEFAULTS } from '../routes/publishing.js';
 
 type Row = { id: string; project_id: string; image_type: string; storage_path: string; created_at: string };
 
@@ -198,4 +198,21 @@ describe("each book's own cover in the package", () => {
     expect(noCover.some((e) => e.includes('volume-1'))).toBe(true);
     expect(noCover.some((e) => e.includes('volume-2'))).toBe(false);
   }, 180_000);
+});
+
+describe("the author's book breaks, checked before they are saved", () => {
+  const chapters = Array.from({ length: 96 }, (_, i) => i);
+  it('accepts breaks inside the book', () => {
+    expect(breaksProblem(chapters, [30, 60])).toBeNull();
+  });
+  it('refuses the last chapter, which ends the series rather than a book', () => {
+    expect(breaksProblem(chapters, [95])).toMatch(/last chapter/);
+  });
+  it('refuses a chapter that is not in the book, or not written', () => {
+    expect(breaksProblem(chapters, [120])).toMatch(/not in the book/);
+    expect(breaksProblem([1, 2, 4, 5], [3])).toMatch(/not in the book/);
+  });
+  it('refuses two books ending on one chapter', () => {
+    expect(breaksProblem(chapters, [30, 30])).toMatch(/same chapter/);
+  });
 });
