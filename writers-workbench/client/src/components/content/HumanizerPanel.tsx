@@ -49,10 +49,13 @@ export default function HumanizerPanel({
   contentId,
   getSelection,
   seed,
+  onReplaced,
 }: {
   contentId: string;
   getSelection: () => string;
   seed?: HumanizerSeed | null;
+  /** Told the new text once it is in the manuscript, so the editor can mark where it went. */
+  onReplaced?: (replacement: string) => void;
 }) {
   const queryClient = useQueryClient();
   const [text, setText] = useState('');
@@ -78,7 +81,9 @@ export default function HumanizerPanel({
   const apply = useMutation({
     mutationFn: async (args: { original: string; replacement: string }) =>
       apiFetch<ApiEnvelope<{ replaced: boolean }>>(`/api/content/${contentId}/humanize/apply`, { method: 'POST', body: JSON.stringify(args) }),
-    onSuccess: () => {
+    onSuccess: (_data, args) => {
+      // Before the refetch, so the reloaded chapter arrives with the passage already waiting to be shown.
+      onReplaced?.(args.replacement);
       void queryClient.invalidateQueries({ queryKey: ['content-detail', contentId] });
       void queryClient.invalidateQueries({ queryKey: ['content-versions', contentId] });
     },
@@ -174,7 +179,7 @@ export default function HumanizerPanel({
             <button className={btn} onClick={() => run.reset()}>Discard</button>
           </div>
           {apply.isError ? <p className="text-xs text-red-600">{(apply.error as Error).message}</p> : null}
-          {apply.isSuccess ? <p className="text-xs text-green-700 dark:text-green-400" role="status">Replaced. The previous text is in the Versions tab.</p> : null}
+          {apply.isSuccess ? <p className="text-xs text-green-700 dark:text-green-400" role="status">Replaced — the new text is highlighted in the editor. The previous text is in the Versions tab.</p> : null}
         </div>
       ) : null}
     </div>
