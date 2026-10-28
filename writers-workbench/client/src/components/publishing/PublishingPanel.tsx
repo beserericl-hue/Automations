@@ -24,6 +24,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { useEngineJobQueue } from '../../hooks/useEngineJobQueue';
 import PrintCopies from './PrintCopies';
 import SeriesPanel, { type SeriesView } from './SeriesPanel';
+import CoverChooser, { type CoverOption } from './CoverChooser';
 
 interface Settings {
   trim: string;
@@ -38,6 +39,9 @@ interface Settings {
   authors_note: string;
   acknowledgements: string;
   body_size: number;
+  breaks: number[] | null;
+  cover_image_id: string | null;
+  cover_image_ids: Record<string, string>;
 }
 
 interface PlannedVolume {
@@ -105,7 +109,8 @@ interface PublishingState {
   marketing_history: HistoryEntry[];
   author: { pen_name: string; bio: string; bio_source: string | null; profile_why_this_book: string };
   chapters: { total: number; approved: number };
-  cover_art: { id: string; created_at: string } | null;
+  cover_art: { id: string; created_at: string; chosen?: boolean } | null;
+  cover_options?: CoverOption[];
   trim_options: { trim: string; w: number; h: number }[];
   paper_options: string[];
 }
@@ -162,7 +167,8 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
   const drafting = stateOf(`${projectId}:marketing`) === 'queued';
 
   const saveSettings = useMutation({
-    mutationFn: async (patch: Partial<Settings>) => {
+    // A null in cover_image_ids clears that book's own cover.
+    mutationFn: async (patch: Partial<Omit<Settings, 'cover_image_ids'>> & { cover_image_ids?: Record<string, string | null> }) => {
       const res = await apiFetch<ApiEnvelope<Settings>>(
         `/api/publishing/project/${projectId}/settings`,
         { method: 'PUT', body: JSON.stringify(patch) },
@@ -178,8 +184,10 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
     onError: (err: Error) => addToast(err.message || 'Could not save', 'error'),
   });
 
+  // With `breaks` the books end where the author put them; null hands the choice back to the
+  // planner; absent re-uses whatever was saved.
   const planVolumes = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (vars?: { breaks: number[] | null }) => {
       const res = await apiFetch<{ jobId?: string }>(
         `/api/publishing/project/${projectId}/volumes/plan`,
         {
@@ -188,12 +196,16 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
             trim: settings?.trim,
             volume_count: settings?.volume_count ?? null,
             judge_endings: true,
+            ...(vars ? { breaks: vars.breaks } : {}),
           }),
         },
       );
       return res.jobId;
     },
-    onSuccess: (jobId) => {
+    onSuccess: (jobId, vars) => {
+      if (vars && settings) {
+        setSettings({ ...settings, breaks: vars.breaks, volume_count: vars.breaks ? vars.breaks.length + 1 : settings.volume_count });
+      }
       if (jobId) {
         trackJob(`${projectId}:volumes`, jobId, [stateKey, ['publishing-readiness', projectId]]);
         addToast('Reading the closing pages of each candidate break…', 'info');
@@ -449,7 +461,9 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
         series={data.series}
         planned={Boolean(plan)}
         planning={planning || planVolumes.isPending}
-        onPlan={() => planVolumes.mutate()}
+        onPlan={() => planVolumes.mutate(undefined)}
+        onPlanWithBreaks={(breaks) => planVolumes.mutate({ breaks })}
+        breaksByAuthor={Boolean(data.settings.breaks?.length)}
         warnings={plan?.warnings}
         summary={
           plan
@@ -460,6 +474,22 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
         }
         stateKey={stateKey}
       />
+
+      {/* Cover: which picture, for the whole book and for each book of a series */}
+      <Section
+        title="Cover"
+        subtitle="Which picture the book is printed with. Every picture you generate lands in the Art gallery; choose the one that is the cover."
+      >
+        <CoverChooser
+          projectId={projectId}
+          options={data.cover_options ?? []}
+          chosen={data.settings.cover_image_id ?? null}
+          chosenByBook={data.settings.cover_image_ids ?? {}}
+          books={(data.series?.books ?? []).map((b) => ({ index: b.index, title: b.title }))}
+          saving={saveSettings.isPending}
+          onChoose={(patch) => saveSettings.mutate(patch)}
+        />
+      </Section>
 
       {/* 3. Listing copy */}
       {/* Named for what it is rather than where it goes. "Amazon listing copy" is precise and it is

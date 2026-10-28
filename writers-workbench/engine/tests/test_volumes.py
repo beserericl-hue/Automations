@@ -15,6 +15,7 @@ from writer_engine.volumes import (
     SAFE_MAX_PAGES,
     WORDS_PER_PAGE,
     ChapterInfo,
+    break_indices,
     compare_trims,
     estimate_pages,
     minimum_volumes,
@@ -166,3 +167,37 @@ class TestTrimIsAChoiceWithAConsequence:
     def test_fewest_volumes_is_listed_first(self) -> None:
         rows = compare_trims([ch(i) for i in range(1, 97)])
         assert rows[0]["minimum_volumes"] <= rows[-1]["minimum_volumes"]
+
+
+class TestAuthorBreaks:
+    """The author picks where each book ends; the planner reports the cost but never moves it."""
+
+    def test_the_breaks_are_used_as_given(self) -> None:
+        chapters = [ch(i, 6000) for i in range(0, 96)]
+        chapters[40].judged = 0.95  # the planner would like this one
+        plan = plan_volumes(chapters, trim="6x9", breaks=[28, 59])
+        assert [(v.first_chapter, v.last_chapter) for v in plan.volumes] == [(0, 28), (29, 59), (60, 95)]
+
+    def test_volume_count_follows_the_breaks(self) -> None:
+        chapters = [ch(i, 3000) for i in range(1, 41)]
+        plan = plan_volumes(chapters, trim="6x9", volume_count=5, breaks=[20])
+        assert len(plan.volumes) == 2
+
+    def test_an_over_long_book_is_warned_not_moved(self) -> None:
+        chapters = [ch(i, 6000) for i in range(1, 97)]
+        plan = plan_volumes(chapters, trim="6x9", breaks=[90])
+        assert plan.volumes[0].last_chapter == 90
+        assert any("over the" in w for w in plan.warnings)
+
+    def test_the_last_chapter_cannot_end_a_book(self) -> None:
+        chapters = [ch(i) for i in range(1, 11)]
+        assert "last chapter" in str(break_indices(chapters, [10]))
+        assert plan_volumes(chapters, breaks=[10]).volumes == []
+
+    def test_breaks_must_be_in_order(self) -> None:
+        chapters = [ch(i) for i in range(1, 11)]
+        assert "after the one before" in str(break_indices(chapters, [6, 3]))
+        assert "after the one before" in str(break_indices(chapters, [4, 4]))
+
+    def test_an_unknown_chapter_is_refused(self) -> None:
+        assert "not in the book" in str(break_indices([ch(i) for i in range(1, 11)], [42]))

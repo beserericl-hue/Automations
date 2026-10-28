@@ -58,6 +58,13 @@ interface Props {
   planned: boolean;
   planning: boolean;
   onPlan: () => void;
+  /**
+   * Re-plan with the author's own breaks (the chapter that ends each book but the last), or with
+   * null to hand the choice back to the planner.
+   */
+  onPlanWithBreaks?: (breaks: number[] | null) => void;
+  /** True when the current books end where the author put them rather than where the planner did. */
+  breaksByAuthor?: boolean;
   warnings?: string[];
   summary?: string;
   stateKey: readonly unknown[];
@@ -69,7 +76,18 @@ function messageOf(err: unknown): string {
   return err instanceof ApiError || err instanceof Error ? err.message : 'Something went wrong';
 }
 
-export default function SeriesPanel({ projectId, series, planned, planning, onPlan, warnings, summary, stateKey }: Props) {
+export default function SeriesPanel({
+  projectId,
+  series,
+  planned,
+  planning,
+  onPlan,
+  onPlanWithBreaks,
+  breaksByAuthor,
+  warnings,
+  summary,
+  stateKey,
+}: Props) {
   const queryClient = useQueryClient();
   const { addToast } = useToast();
   const base = `/api/publishing/project/${projectId}/series`;
@@ -77,12 +95,15 @@ export default function SeriesPanel({ projectId, series, planned, planning, onPl
   const [titles, setTitles] = useState<Record<string, string>>({});
   const [desc, setDesc] = useState<{ text: string; tagline: string } | null>(null);
   const [drafting, setDrafting] = useState<number | null>(null);
+  // The chapter that ends each book but the last, as the author is editing them.
+  const [breaks, setBreaks] = useState<string[]>([]);
 
   useEffect(() => {
     if (!series) return;
     setName(series.name_is_default ? '' : series.name);
     setTitles(Object.fromEntries(series.books.map((b) => [String(b.index), b.title])));
     setDesc(series.description ? { text: series.description.text, tagline: series.description.tagline } : null);
+    setBreaks(series.books.slice(0, -1).map((b) => String(b.last_chapter)));
   }, [series]);
 
   const refresh = (s?: SeriesView) => {
@@ -136,6 +157,12 @@ export default function SeriesPanel({ projectId, series, planned, planning, onPl
 
   const books = series?.books ?? [];
   const isSeries = books.length > 1;
+  const currentBreaks = books.slice(0, -1).map((b) => String(b.last_chapter));
+  const breaksChanged = breaks.join(',') !== currentBreaks.join(',');
+  const breakNumbers = breaks.map((b) => Number(b));
+  const breaksValid =
+    breaks.every((b) => b.trim() !== '' && Number.isInteger(Number(b))) &&
+    breakNumbers.every((n, i) => i === 0 || n > breakNumbers[i - 1]);
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 space-y-4 dark:border-gray-800 dark:bg-gray-900">
@@ -157,6 +184,74 @@ export default function SeriesPanel({ projectId, series, planned, planning, onPl
       {summary ? <p className="text-xs text-gray-500 dark:text-gray-400">{summary}</p> : null}
       {!planned ? (
         <p className="text-xs text-gray-500 dark:text-gray-400">No plan yet. Until there is one this is a single book.</p>
+      ) : null}
+
+      {planned && onPlanWithBreaks ? (
+        <div className="space-y-2 rounded-lg border border-gray-200 p-3 text-xs dark:border-gray-800" data-testid="series-breaks">
+          <h3 className="font-semibold text-gray-700 dark:text-gray-300">Where each book ends</h3>
+          <p className="text-gray-500 dark:text-gray-400">
+            {breaksByAuthor
+              ? 'You chose these breaks. The planner reads each ending and reports it, but does not move them.'
+              : 'The planner chose these breaks. Change any of them — the next book begins with the chapter after.'}
+          </p>
+          {breaks.map((b, i) => (
+            <div key={i} className="flex flex-wrap items-center gap-2">
+              <label className="text-gray-600 dark:text-gray-400">
+                Book {i + 1} ends after chapter
+                <input
+                  aria-label={`Book ${i + 1} ends after chapter`}
+                  type="number"
+                  min={0}
+                  value={b}
+                  onChange={(e) => setBreaks(breaks.map((x, k) => (k === i ? e.target.value : x)))}
+                  className="ml-2 inline-block w-20 rounded border border-gray-300 px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                />
+              </label>
+              <span className="text-gray-400">
+                {b.trim() ? `Book ${i + 2} begins at chapter ${Number(b) + 1}` : ''}
+              </span>
+              <button
+                onClick={() => setBreaks(breaks.filter((_, k) => k !== i))}
+                className="text-gray-500 underline hover:text-red-600"
+              >
+                Remove this break
+              </button>
+            </div>
+          ))}
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setBreaks([...breaks, ''])}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+            >
+              Add a break
+            </button>
+            <button
+              onClick={() => onPlanWithBreaks(breakNumbers.length ? breakNumbers : null)}
+              disabled={planning || !breaksChanged || !breaksValid}
+              className="rounded-lg bg-brand-600 px-3 py-1.5 font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+            >
+              {planning ? 'Planning…' : 'Use these breaks'}
+            </button>
+            {breaksByAuthor ? (
+              <button
+                onClick={() => onPlanWithBreaks(null)}
+                disabled={planning}
+                className="rounded-lg border border-brand-300 px-3 py-1.5 font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50 dark:border-brand-700 dark:text-brand-300"
+              >
+                Let the planner choose
+              </button>
+            ) : null}
+          </div>
+          {!breaksValid ? (
+            <p className="text-amber-700 dark:text-amber-400">Each book must end after the one before it.</p>
+          ) : null}
+          {breaksChanged && isSeries ? (
+            <p className="text-gray-500 dark:text-gray-400">
+              Titles chosen for the old chapters are kept and flagged to check; per-book listing copy should be
+              written again for the new chapters.
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       {isSeries ? (

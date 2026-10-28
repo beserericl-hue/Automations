@@ -4217,6 +4217,7 @@ async def _op_plan_volumes(payload: dict) -> dict:
     from writer_engine.supabase.client import get_supabase_admin
     from writer_engine.volumes import (
         ChapterInfo,
+        break_indices,
         compare_trims,
         minimum_volumes,
         plan_volumes,
@@ -4266,10 +4267,26 @@ async def _op_plan_volumes(payload: dict) -> dict:
             )
         )
 
-    n_vol = int(requested) if requested else minimum_volumes(chapters, trim)
+    # The author's own breaks (chapter numbers ending each book but the last). Used as given; only
+    # those chapters are judged, so each book's ending score is a verdict rather than a heuristic.
+    breaks = [int(b) for b in (payload.get("breaks") or [])]
+    fixed = break_indices(chapters, breaks) if breaks else None
+    if isinstance(fixed, str):
+        return {"planned": False, "reason": f"breaks not used: {fixed}"}
+
+    n_vol = (
+        len(fixed) + 1
+        if fixed is not None
+        else int(requested)
+        if requested
+        else minimum_volumes(chapters, trim)
+    )
     judged = 0
     if judge and n_vol > 1:
-        candidates = split_candidates(chapters, trim=trim, volume_count=n_vol)
+        if fixed is not None:
+            candidates = list(fixed)
+        else:
+            candidates = split_candidates(chapters, trim=trim, volume_count=n_vol)
         # The last chapter is the end of the BOOK; it is allowed to resolve, and is never a break.
         candidates = [i for i in candidates if i < len(chapters) - 1]
         sem = asyncio.Semaphore(6)
@@ -4288,9 +4305,15 @@ async def _op_plan_volumes(payload: dict) -> dict:
         await asyncio.gather(*[judge_one(i) for i in candidates])
         logger.info("volume.endings_judged", candidates=len(candidates), judged=judged)
 
-    plan = plan_volumes(chapters, trim=trim, volume_count=int(requested) if requested else None)
+    plan = plan_volumes(
+        chapters,
+        trim=trim,
+        volume_count=int(requested) if requested else None,
+        breaks=breaks or None,
+    )
     out = plan.as_dict()
     out["judged_candidates"] = judged
+    out["breaks_chosen_by"] = "author" if breaks else "planner"
     # Every trim and what it costs, so the choice is made with the consequence visible rather than
     # inherited from a default. Trim decides how many books this becomes.
     out["trim_options"] = compare_trims(chapters)

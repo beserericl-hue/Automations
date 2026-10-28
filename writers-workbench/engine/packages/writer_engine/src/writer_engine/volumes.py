@@ -27,6 +27,7 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import asdict, dataclass, field
+from itertools import pairwise
 from typing import Any
 
 # KDP's hard ceiling for a black-ink paperback on white or cream stock, across the common trims.
@@ -238,17 +239,23 @@ def plan_volumes(
     volume_count: int | None = None,
     cap: int = SAFE_MAX_PAGES,
     balance_weight: float = 0.45,
+    breaks: list[int] | None = None,
 ) -> VolumePlan:
     """Choose split points: strongest endings, subject to no volume over the cap.
 
     ``balance_weight`` trades evenness against ending strength. It is below 0.5 on purpose — pages
     are a constraint, the story is the point, and a reader notices a bad ending long before an
     uneven spine.
+
+    ``breaks`` are the author's own: the chapter NUMBERS that end each book but the last. They are
+    used as given — the planner reports what they cost (pages, a weak ending) but never moves them.
     """
     plan = VolumePlan(trim=trim, total_words=sum(c.words for c in chapters))
     if not chapters:
         plan.warnings.append("no chapters")
         return plan
+    if breaks:
+        return _plan_from_breaks(plan, chapters, trim=trim, breaks=breaks, cap=cap)
 
     n_vol = volume_count or minimum_volumes(chapters, trim, cap)
     n = len(chapters)
@@ -326,16 +333,25 @@ def plan_volumes(
         j = i
     cuts.reverse()
 
+    _fill_volumes(plan, chapters, cuts, trim)
+    return plan
+
+
+def _fill_volumes(
+    plan: VolumePlan, chapters: list[ChapterInfo], cuts: list[tuple[int, int]], trim: str
+) -> None:
+    """Build the volumes for `cuts` (half-open index ranges) and warn about weak endings."""
     for idx, (i, j) in enumerate(cuts, start=1):
         last = chapters[j - 1]
+        words = sum(c.words for c in chapters[i:j])
         plan.volumes.append(
             Volume(
                 index=idx,
                 first_chapter=chapters[i].number,
                 last_chapter=last.number,
                 chapters=[c.number for c in chapters[i:j]],
-                words=prefix[j] - prefix[i],
-                estimated_pages=pages_for(i, j),
+                words=words,
+                estimated_pages=estimate_pages(words, j - i, trim),
                 ending_score=round(last.ending_score, 3),
                 ending_title=last.title,
                 ending_reason=last.judged_reason,
@@ -349,6 +365,43 @@ def plan_volumes(
             plan.warnings.append(
                 f"volume {vol.index} ends on chapter {vol.last_chapter} with a weak hook "
                 f"({vol.ending_score:.2f}) — consider strengthening it before publishing"
+            )
+
+
+def break_indices(chapters: list[ChapterInfo], breaks: list[int]) -> list[int] | str:
+    """Chapter indices for the author's break chapter numbers, or why they cannot be used.
+
+    A break must be a chapter in the book, not the last one (that ends the series, not a book), and
+    the breaks must run in order with at least one chapter between them.
+    """
+    position = {c.number: k for k, c in enumerate(chapters)}
+    out: list[int] = []
+    for b in breaks:
+        k = position.get(b)
+        if k is None:
+            return f"chapter {b} is not in the book"
+        if k == len(chapters) - 1:
+            return f"chapter {b} is the last chapter — it ends the series, not a book"
+        if out and k <= out[-1]:
+            return "each book must end after the one before it"
+        out.append(k)
+    return out
+
+
+def _plan_from_breaks(
+    plan: VolumePlan, chapters: list[ChapterInfo], *, trim: str, breaks: list[int], cap: int
+) -> VolumePlan:
+    idx = break_indices(chapters, breaks)
+    if isinstance(idx, str):
+        plan.warnings.append(f"breaks not used: {idx}")
+        return plan
+    edges = [0, *[k + 1 for k in idx], len(chapters)]
+    _fill_volumes(plan, chapters, list(pairwise(edges)), trim)
+    for vol in plan.volumes:
+        if vol.estimated_pages > cap:
+            plan.warnings.append(
+                f"volume {vol.index} is about {vol.estimated_pages} pages — over the {cap}-page "
+                "limit; end it earlier or choose a larger trim"
             )
     return plan
 
@@ -387,6 +440,7 @@ __all__ = [
     "ChapterInfo",
     "Volume",
     "VolumePlan",
+    "break_indices",
     "compare_trims",
     "estimate_pages",
     "minimum_volumes",

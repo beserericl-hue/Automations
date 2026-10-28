@@ -31,6 +31,7 @@ import { TRIM_SIZES } from '../lib/print-pdf.js';
 import { PAPER_THICKNESS } from '../lib/cover.js';
 import { searchArchives } from '../lib/image-archives.js';
 import { bookTitle, seriesName, seriesView } from '../lib/series.js';
+import { findCover } from '../lib/book-cover.js';
 
 export const publishingRouter = Router();
 publishingRouter.use(requireAuth);
@@ -100,13 +101,47 @@ const PUBLISHING_DEFAULTS = {
   authors_note: '',
   acknowledgements: '',
   body_size: 11,
+  /**
+   * The author's own book breaks: the chapter numbers that end each book but the last. Null lets the
+   * planner choose them from the page cap and the endings.
+   */
+  breaks: null as number[] | null,
+  /** The chosen cover picture for the whole book (see lib/book-cover.ts). Null: the newest. */
+  cover_image_id: null as string | null,
+  /** Each book's own cover in a series, keyed by volume index as a string. */
+  cover_image_ids: {} as Record<string, string>,
 };
 
 type Publishing = typeof PUBLISHING_DEFAULTS;
 
 function publishingOf(outline: Outline | null): Publishing {
   const stored = (outline?._publishing as Partial<Publishing> | undefined) ?? {};
-  return { ...PUBLISHING_DEFAULTS, ...stored, isbns: { ...(stored.isbns ?? {}) } };
+  return {
+    ...PUBLISHING_DEFAULTS,
+    ...stored,
+    isbns: { ...(stored.isbns ?? {}) },
+    cover_image_ids: { ...(stored.cover_image_ids ?? {}) },
+  };
+}
+
+/**
+ * Why an ISBN cannot be used, or null when it can. A mistyped ISBN is printed on the copyright page
+ * and refused by KDP only at upload, so the check digit is verified here. Hyphens and spaces are
+ * allowed, as printed.
+ */
+export function isbnProblem(raw: string): string | null {
+  const s = raw.replace(/[\s-]/g, '').toUpperCase();
+  if (!s) return null;
+  if (/^\d{13}$/.test(s)) {
+    if (!s.startsWith('978') && !s.startsWith('979')) return 'an ISBN-13 starts with 978 or 979';
+    const sum = [...s].reduce((acc, d, i) => acc + Number(d) * (i % 2 ? 3 : 1), 0);
+    return sum % 10 === 0 ? null : 'the check digit (the last one) is wrong — it is probably mistyped';
+  }
+  if (/^\d{9}[\dX]$/.test(s)) {
+    const sum = [...s].reduce((acc, d, i) => acc + (d === 'X' ? 10 : Number(d)) * (10 - i), 0);
+    return sum % 11 === 0 ? null : 'the check digit (the last one) is wrong — it is probably mistyped';
+  }
+  return 'an ISBN is 13 digits (or 10 for an old one)';
 }
 
 const SettingsSchema = z.object({
@@ -123,6 +158,10 @@ const SettingsSchema = z.object({
   authors_note: z.string().max(20000).optional(),
   acknowledgements: z.string().max(20000).optional(),
   body_size: z.number().min(9).max(14).optional(),
+  breaks: z.array(z.number().int().min(0)).max(11).nullable().optional(),
+  cover_image_id: z.string().uuid().nullable().optional(),
+  /** A null value removes that book's own choice, so it falls back to the whole book's cover. */
+  cover_image_ids: z.record(z.string(), z.string().uuid().nullable()).optional(),
 });
 
 const PlanVolumesSchema = z.object({
@@ -133,6 +172,11 @@ const PlanVolumesSchema = z.object({
    * the reader hanging. Off falls back to a heuristic, which is a shortlist rather than a verdict.
    */
   judge_endings: z.boolean().optional().default(true),
+  /**
+   * The author's breaks (see `breaks` in the settings). Absent re-uses the saved ones; null clears
+   * them and lets the planner choose again.
+   */
+  breaks: z.array(z.number().int().min(0)).max(11).nullable().optional(),
 });
 
 const MarketingDraftSchema = z.object({
@@ -196,14 +240,16 @@ publishingRouter.get('/project/:projectId', async (req, res, next) => {
       .is('deleted_at', null)
       .in('status', ['approved', 'published']);
 
-    const { data: art } = await supabase
+    const art = await findCover(supabase, project.id, outline);
+    // Every cover picture in the project, newest first, to choose from — the whole book's and, in a
+    // series, each book's.
+    const { data: coverImages } = await supabase
       .from('generated_images_v2')
-      .select('id, storage_path, created_at')
+      .select('id, storage_path, created_at, metadata')
       .eq('project_id', project.id)
       .eq('image_type', 'cover_art')
       .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(60);
 
     const { data: authorProfile } = await supabase
       .from('author_profiles_v2')
@@ -235,7 +281,15 @@ publishingRouter.get('/project/:projectId', async (req, res, next) => {
           profile_why_this_book: String(authorProfile?.why_this_book ?? ''),
         },
         chapters: { total: chapterCount ?? 0, approved: approvedCount ?? 0 },
-        cover_art: art ? { id: art.id, created_at: art.created_at } : null,
+        cover_art: art ? { id: art.id, created_at: art.created_at, chosen: art.chosen } : null,
+        cover_options: (coverImages ?? []).map((i) => ({
+          id: i.id as string,
+          created_at: i.created_at as string,
+          url: i.storage_path
+            ? supabase.storage.from('cover-images').getPublicUrl(i.storage_path as string).data.publicUrl
+            : null,
+          prompt: String(((i.metadata ?? {}) as Record<string, unknown>).prompt ?? '').slice(0, 200) || null,
+        })),
         trim_options: Object.entries(TRIM_SIZES).map(([name, t]) => ({ trim: name, ...t })),
         paper_options: Object.keys(PAPER_THICKNESS),
       },
@@ -268,6 +322,38 @@ publishingRouter.put(
       const current = publishingOf(outline);
       const body = req.body as z.infer<typeof SettingsSchema>;
 
+      for (const [vol, isbn] of Object.entries(body.isbns ?? {})) {
+        const problem = isbnProblem(isbn);
+        if (problem) {
+          res.status(400).json({
+            success: false,
+            error: { code: 'BAD_ISBN', message: `ISBN for book ${vol} (${isbn.trim()}): ${problem}.` },
+          });
+          return;
+        }
+      }
+      // A cover must be one of this project's pictures — an id from anywhere else would put another
+      // book's cover (or another author's) on this one.
+      const coverIds = [
+        body.cover_image_id,
+        ...Object.values(body.cover_image_ids ?? {}),
+      ].filter((id): id is string => Boolean(id));
+      if (coverIds.length) {
+        const { data: owned } = await getSupabaseAdmin()
+          .from('generated_images_v2')
+          .select('id')
+          .eq('project_id', project.id)
+          .in('id', coverIds);
+        const ownedIds = new Set((owned ?? []).map((r) => r.id as string));
+        if (coverIds.some((id) => !ownedIds.has(id))) {
+          res.status(400).json({
+            success: false,
+            error: { code: 'NOT_THIS_PROJECTS_IMAGE', message: 'That picture is not in this project.' },
+          });
+          return;
+        }
+      }
+
       // Merge rather than replace: a screen that saves the trim size must not erase the ISBN.
       const next_: Publishing = { ...current };
       for (const [k, v] of Object.entries(body)) {
@@ -275,6 +361,15 @@ publishingRouter.put(
         (next_ as unknown as Record<string, unknown>)[k] = v;
       }
       if (body.isbns) next_.isbns = { ...current.isbns, ...body.isbns };
+      if (body.cover_image_ids) {
+        const merged: Record<string, string> = { ...current.cover_image_ids };
+        for (const [vol, id] of Object.entries(body.cover_image_ids)) {
+          if (id) merged[vol] = id;
+          else delete merged[vol];
+        }
+        next_.cover_image_ids = merged;
+      }
+      if (body.breaks) next_.breaks = [...body.breaks].sort((a, b) => a - b);
 
       outline._publishing = next_;
       await saveOutline(project.id, req.userId!, outline);
@@ -315,14 +410,29 @@ publishingRouter.post(
     const outline: Outline = { ...(project.outline ?? {}) };
     const settings = publishingOf(outline);
     const trim = body.trim ?? settings.trim;
-    const volumeCount = body.volume_count !== undefined ? body.volume_count : settings.volume_count;
+    // The author's breaks win over a book count: three breaks is four books, whatever the count says.
+    const breaks =
+      body.breaks === undefined
+        ? settings.breaks
+        : body.breaks && body.breaks.length
+          ? [...body.breaks].sort((a, b) => a - b)
+          : null;
+    const volumeCount = breaks
+      ? breaks.length + 1
+      : body.volume_count !== undefined
+        ? body.volume_count
+        : settings.volume_count;
 
     try {
       // The trim used for the plan becomes the project's trim. Otherwise the plan and the interior
       // PDF can disagree about how many pages a volume is, which is how a 900-page volume reaches
       // KDP and is refused.
-      if (trim !== settings.trim || volumeCount !== settings.volume_count) {
-        outline._publishing = { ...settings, trim, volume_count: volumeCount ?? null };
+      if (
+        trim !== settings.trim ||
+        volumeCount !== settings.volume_count ||
+        JSON.stringify(breaks) !== JSON.stringify(settings.breaks)
+      ) {
+        outline._publishing = { ...settings, trim, volume_count: volumeCount ?? null, breaks };
         await saveOutline(project.id, req.userId!, outline);
       }
 
@@ -332,6 +442,7 @@ publishingRouter.post(
         user_id: req.userId!,
         trim,
         volume_count: volumeCount ?? undefined,
+        ...(breaks ? { breaks } : {}),
         judge_endings: body.judge_endings,
         persist: true,
         async: true,
@@ -605,6 +716,8 @@ export interface ReadinessFacts {
   authorName: string;
   authorBio: string;
   hasCoverArt: boolean;
+  /** False when the cover is the newest picture by default rather than the author's choice. */
+  coverChosen?: boolean;
 }
 
 export interface ReadinessVerdict {
@@ -640,6 +753,8 @@ export function assessReadiness(facts: ReadinessFacts): ReadinessVerdict {
   }
   if (!facts.hasCoverArt) {
     blockers.push('no cover art — both the paperback wrap and the ebook cover are built from it');
+  } else if (facts.coverChosen === false) {
+    gaps.push('cover not chosen — the newest cover picture is used; choose one under Cover');
   }
   if (!facts.authorBio.trim()) {
     gaps.push('author bio — the back cover and Author Central both ask for one');
@@ -661,8 +776,12 @@ export function assessReadiness(facts: ReadinessFacts): ReadinessVerdict {
     if (!(Array.isArray(m.categories) ? m.categories.length : 0)) {
       gaps.push(`${label}no categories chosen`);
     }
-    if (!String(settings.isbns[String(i)] ?? '').trim()) {
+    const isbn = String(settings.isbns[String(i)] ?? '').trim();
+    if (!isbn) {
       gaps.push(`${label}no ISBN (KDP issues one free for the paperback; ebooks need none)`);
+    } else {
+      const problem = isbnProblem(isbn);
+      if (problem) blockers.push(`${label}ISBN ${isbn}: ${problem}`);
     }
   }
 
@@ -707,13 +826,7 @@ publishingRouter.get('/project/:projectId/readiness', async (req, res, next) => 
       .eq('user_id', req.userId!)
       .maybeSingle();
 
-    const { data: art } = await supabase
-      .from('generated_images_v2')
-      .select('id')
-      .eq('project_id', project.id)
-      .eq('image_type', 'cover_art')
-      .limit(1)
-      .maybeSingle();
+    const art = await findCover(supabase, project.id, project.outline);
 
     res.json({
       success: true,
@@ -723,6 +836,7 @@ publishingRouter.get('/project/:projectId/readiness', async (req, res, next) => 
         authorName: String(authorProfile?.pen_name ?? ''),
         authorBio: String(authorProfile?.bio ?? ''),
         hasCoverArt: Boolean(art),
+        coverChosen: art?.chosen ?? false,
       }),
     });
   } catch (err) {
