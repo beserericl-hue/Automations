@@ -1714,26 +1714,41 @@ def _numbered_paragraphs(text: str) -> tuple[list[str], dict[int, int]]:
     return parts, index
 
 
+_CURLY = str.maketrans({"\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"'})
+_INWORD_APOSTROPHE_RE = re.compile(r"(?<=\w)'(?=\w)")
+
+
+def _match_typography(new: str, old: str) -> str:
+    """Models echo a paragraph with straight apostrophes where the author used curly ones. Put the
+    author's back inside words (don't, Dorothy's), where the direction is never in doubt."""
+    if "\u2019" in old and "'" not in old:
+        return _INWORD_APOSTROPHE_RE.sub("\u2019", new)
+    return new
+
+
 def apply_passage_edits(text: str, edits: list[PassageEdit]) -> tuple[str, list[dict[str, Any]]]:
     """Apply paragraph edits to ``text``; pure, so what a fix can touch is testable without a model.
 
     Paragraphs no edit names are kept exactly. An edit to a paragraph that does not exist, an empty
-    edit, a second replacement of the same paragraph, and a replacement that changes nothing are
-    dropped. Returns the new text and the changes made (paragraph, before, after, fixes)."""
+    edit, a second replacement of the same paragraph, and a replacement that changes nothing but
+    quote marks are dropped. Returns the new text and the changes made (paragraph, before, after,
+    fixes)."""
     parts, index = _numbered_paragraphs(text)
     replaced: dict[int, str] = {}
     inserted: dict[int, list[str]] = {}
     changes: list[dict[str, Any]] = []
     for e in edits:
-        new = _strip_em_dashes(e.text.strip())
         idx = index.get(e.paragraph)
-        if idx is None or not new:
+        if idx is None:
             continue
         old = parts[idx]
+        new = _match_typography(_strip_em_dashes(e.text.strip()), old)
+        if not new:
+            continue
         if e.insert_after:
             inserted.setdefault(idx, []).append(new)
             changes.append({"paragraph": e.paragraph, "before": "", "after": new, "fixes": e.fixes})
-        elif idx not in replaced and new != old.strip():
+        elif idx not in replaced and new.translate(_CURLY) != old.strip().translate(_CURLY):
             replaced[idx] = new
             changes.append({"paragraph": e.paragraph, "before": old.strip(), "after": new, "fixes": e.fixes})
     for idx in set(replaced) | set(inserted):
@@ -3500,6 +3515,10 @@ def _build_repair_check_system() -> str:
         "relationship, date or concrete detail the original had that the revision changed or dropped "
         "when no finding asked for that change; invented backstory or explanation that the original "
         "did not need. Each item is one sentence and quotes the revised wording briefly.\n"
+        "- introduced_in: when the revision is given as changed paragraphs, the PARAGRAPH number of "
+        "every edit that caused an item in introduced. Otherwise leave it empty.\n"
+        "A RESEARCH GAP finding asks for a period fact to be checked or added: an edit that answers "
+        "one with accurate period detail is resolving it, not changing a fact unasked.\n"
         "Line-level rewording, tightened sentences and woven-in period detail are the point of the "
         "repair: they are NOT problems unless they change a fact. Do not report something the "
         "original already had. Return strict JSON matching RepairCheck and nothing else."
@@ -3522,6 +3541,9 @@ async def _verify_repair(
     ``changes``: a passage repair's edits. The revision is then shown as those edits, each paragraph
     before and after, since nothing else in the chapter changed."""
     findings = [*(drift.story_drift if drift else []), *(drift.character_drift if drift else [])]
+    # The research gaps are findings the repair may act on too. Leaving them out made every edit that
+    # answered one (an imprint's 1952 name, a period instrument) read as a fact changed unasked.
+    findings += [f"RESEARCH GAP: {g}" for g in (drift.research_gaps if drift else [])]
     router = get_router(service=STEP_NAME)
     if changes:
         revision = "THE REVISION CHANGED ONLY THESE PARAGRAPHS; every other paragraph is unchanged.\n\n" + (
@@ -3581,6 +3603,43 @@ def judge_repair(
     if had_drift and not check.resolved and not author_directed:
         return False, "the repair fixed none of the drift it was given, so the original text was kept"
     return True, ""
+
+
+async def _keep_clean_edits(
+    text: str,
+    changes: list[dict[str, Any]],
+    check: RepairCheck,
+    *,
+    drift: DriftReport | None,
+    roster_text: str,
+    beat: str,
+    model: str,
+) -> tuple[str, list[dict[str, Any]], RepairCheck] | None:
+    """A passage repair without the edits ``check`` blamed, re-checked on its own. None when nothing
+    is left, nothing was blamed, or what is left does not pass."""
+    bad = set(check.introduced_in)
+    kept = [c for c in changes if c["paragraph"] not in bad]
+    if not kept or len(kept) == len(changes):
+        return None
+    new_text, applied = apply_passage_edits(
+        text,
+        [
+            PassageEdit(
+                paragraph=c["paragraph"],
+                text=c["after"],
+                insert_after=not c["before"],
+                fixes=c.get("fixes", ""),
+            )
+            for c in kept
+        ],
+    )
+    if not applied:
+        return None
+    again = await _verify_repair(
+        text, new_text, drift=drift, roster_text=roster_text, beat=beat, model=model, changes=applied
+    )
+    keep, _ = judge_repair(again, drift=drift, author_directed=False)
+    return (new_text, applied, again) if keep and again is not None else None
 
 
 async def _record_repair(payload: dict, record: dict, drift: DriftReport | None) -> None:
@@ -3744,6 +3803,28 @@ async def _op_repair(payload: dict) -> dict:
     keep, why_not = (
         judge_repair(check, drift=before_drift, author_directed=author_directed) if changed else (True, "")
     )
+    # One bad paragraph edit should not cost the good ones. Drop the edits the check blames, and keep
+    # the rest only if they pass a check of their own.
+    dropped: list[str] = []
+    if changed and not keep and changes and check and check.introduced_in:
+        trimmed = await _keep_clean_edits(
+            text, changes, check, drift=before_drift, roster_text=roster_text, beat=beat, model=model
+        )
+        if trimmed:
+            dropped = check.introduced
+            new_text, changes, check = trimmed
+            keep, why_not = True, ""
+            drift = (
+                await _detect_drift(
+                    new_text,
+                    outline=ctx.get("outline") or {},
+                    chapter_number=chapter_number,
+                    roster_text=roster_text,
+                    period=period,
+                    model=model,
+                )
+                or drift
+            )
     after_qa = (
         await _score_chapter(new_text, period, roster_text=roster_text, beat=beat)
         if changed and keep
@@ -3840,6 +3921,7 @@ async def _op_repair(payload: dict) -> dict:
                 # findings it declined, so the author can see exactly what it did.
                 "changes": changes,
                 "skipped": skipped,
+                "dropped": dropped,
             },
             drift,
         )
@@ -3858,6 +3940,7 @@ async def _op_repair(payload: dict) -> dict:
         "check": check.model_dump(mode="json") if check else None,
         "changes": changes,
         "skipped": skipped,
+        "dropped": dropped,
         "craft_mean_before": round(before_mean, 4) if before_mean is not None else None,
         "craft_mean_after": round(after_mean, 4) if after_mean is not None else None,
         "scores": after_scores or before_scores,

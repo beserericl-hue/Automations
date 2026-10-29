@@ -25,7 +25,7 @@ actually read.
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, ClassVar
 from unittest.mock import patch
 
 import pytest
@@ -103,12 +103,14 @@ def _run_repair(
     *,
     corrected: bool = True,
     drift: DriftReport | None = None,
-    check: RepairCheck | None | str = "clean",
+    check: RepairCheck | None | str | list = "clean",
+    edits: list | None = None,
     **payload: Any,
 ) -> dict:
     """Drive _op_repair with a scripted scorer: `before` for the original text, `after` for the
     repaired one. `drift` is what the pre-repair scan finds; `check` is the before/after judgement
-    ("clean" = resolved everything, introduced nothing; None = could not be read)."""
+    ("clean" = resolved everything, introduced nothing; None = could not be read; a list = one check
+    per call, in order). `edits`: the passage changes the fix returns, applied to `content_text`."""
     calls: list[str] = []
 
     async def fake_score(text: str, period: str, roster_text: str = "", beat: str = "") -> Any:
@@ -119,13 +121,18 @@ def _run_repair(
         persisted["path"] = "whole-chapter"
         return ("REPAIRED" if corrected else text, None, 1 if corrected else 0)
 
-    edits = [{"paragraph": 1, "before": "ORIGINAL", "after": "REPAIRED", "fixes": "f"}]
+    changes = edits or [{"paragraph": 1, "before": "ORIGINAL", "after": "REPAIRED", "fixes": "f"}]
 
     async def fake_passages(text: str, **kw: Any) -> tuple[str, Any, int, list, list]:
         persisted["path"] = "passages"
         if not corrected:
             return text, None, 0, [], []
-        return "REPAIRED", None, 1, edits, ["a wrong finding: the chapter is right"]
+        if edits:
+            revised, applied = M.apply_passage_edits(
+                text, [PassageEdit(paragraph=c["paragraph"], text=c["after"]) for c in edits]
+            )
+            return revised, None, 1, applied, []
+        return "REPAIRED", None, 1, changes, ["a wrong finding: the chapter is right"]
 
     async def fake_ctx(pid: str, pl: dict) -> dict:
         return {"genre_slug": "g", "title": "t", "outline": {"chapters": []}, "roster": []}
@@ -138,6 +145,9 @@ def _run_repair(
     async def fake_verify(before_t: str, after_t: str, **kw: Any) -> RepairCheck | None:
         persisted["verified"] = (before_t, after_t)
         persisted["verified_changes"] = kw.get("changes")
+        persisted.setdefault("checks_made", []).append(kw.get("changes"))
+        if isinstance(check, list):
+            return check.pop(0)
         if check == "clean":
             d = drift or DriftReport()
             return RepairCheck(resolved=[*d.story_drift, *d.character_drift])
@@ -515,3 +525,97 @@ class TestThePassagePromptIsScoped:
 
     def test_a_wrong_finding_is_skipped_not_obeyed(self) -> None:
         assert "SKIP it" in M._build_passage_fix_system("ancient-history")
+
+
+class TestCleanEditsSurviveABadOne:
+    """The third real ch80 run: of four paragraph edits, one re-added genealogy. The other three were
+    thrown away with it. Now the blamed edit is dropped and the rest are checked again on their own."""
+
+    TEXT = "One.\n\nTwo.\n\nThree."
+    EDITS: ClassVar[list[dict[str, Any]]] = [
+        {"paragraph": 1, "before": "One.", "after": "One, fixed."},
+        {"paragraph": 3, "before": "Three.", "after": "Three, plus a generation of genealogy."},
+    ]
+
+    def test_the_blamed_edit_is_dropped_and_the_rest_is_kept(self) -> None:
+        checks = [
+            RepairCheck(resolved=[ELEANOR], introduced=["adds genealogy"], introduced_in=[3]),
+            RepairCheck(resolved=[ELEANOR]),
+        ]
+        out = _run_repair(GOOD, GOOD, drift=DRIFTED, check=checks, edits=self.EDITS, content_text=self.TEXT)
+        assert out["rolled_back"] is False
+        assert out["content_text"] == "One, fixed.\n\nTwo.\n\nThree."
+        assert out["_persisted"]["chapter_text"] == "One, fixed.\n\nTwo.\n\nThree."
+        rec = out["_persisted"]["last_repair"]
+        assert rec["kept"] is True
+        assert rec["dropped"] == ["adds genealogy"]
+        assert [c["paragraph"] for c in rec["changes"]] == [1]
+
+    def test_the_remaining_edits_are_checked_again(self) -> None:
+        checks = [
+            RepairCheck(resolved=[ELEANOR], introduced=["adds genealogy"], introduced_in=[3]),
+            RepairCheck(resolved=[ELEANOR]),
+        ]
+        out = _run_repair(GOOD, GOOD, drift=DRIFTED, check=checks, edits=self.EDITS, content_text=self.TEXT)
+        second = out["_persisted"]["checks_made"][1]
+        assert [c["paragraph"] for c in second] == [1]
+
+    def test_if_the_rest_fails_its_own_check_nothing_is_kept(self) -> None:
+        checks = [
+            RepairCheck(resolved=[ELEANOR], introduced=["adds genealogy"], introduced_in=[3]),
+            RepairCheck(introduced=["drops a date"], introduced_in=[1]),
+        ]
+        out = _run_repair(GOOD, GOOD, drift=DRIFTED, check=checks, edits=self.EDITS, content_text=self.TEXT)
+        assert out["rolled_back"] is True
+        assert out["content_text"] == self.TEXT
+        assert "chapter_text" not in out["_persisted"]
+
+    def test_when_every_edit_is_blamed_nothing_is_kept(self) -> None:
+        checks = [RepairCheck(introduced=["a", "b"], introduced_in=[1, 3])]
+        out = _run_repair(GOOD, GOOD, drift=DRIFTED, check=checks, edits=self.EDITS, content_text=self.TEXT)
+        assert out["rolled_back"] is True
+        assert len(out["_persisted"]["checks_made"]) == 1
+
+    def test_without_blame_the_whole_fix_is_rolled_back(self) -> None:
+        checks = [RepairCheck(introduced=["something, somewhere"])]
+        out = _run_repair(GOOD, GOOD, drift=DRIFTED, check=checks, edits=self.EDITS, content_text=self.TEXT)
+        assert out["rolled_back"] is True
+        assert len(out["_persisted"]["checks_made"]) == 1
+
+
+class TestTypography:
+    def test_an_edit_that_only_straightens_quotes_is_not_a_change(self) -> None:
+        """Paragraph 126 of the third ch80 run: returned with \u2019 turned into ' and nothing else."""
+        text = "Eleanor\u2019s timeline was Dorothy\u2019s argument."
+        assert M.apply_passage_edits(text, [_edit(1, "Eleanor's timeline was Dorothy's argument.")]) == (
+            text,
+            [],
+        )
+
+    def test_the_authors_curly_apostrophes_survive_an_edit(self) -> None:
+        text = "Eleanor\u2019s timeline was Dorothy\u2019s argument."
+        out, _ = M.apply_passage_edits(text, [_edit(1, "Eleanor's timeline was her great-aunt's argument.")])
+        assert out == "Eleanor\u2019s timeline was her great-aunt\u2019s argument."
+
+    def test_straight_apostrophes_stay_straight(self) -> None:
+        out, _ = M.apply_passage_edits("Dorothy's box.", [_edit(1, "Dorothy's crate.")])
+        assert out == "Dorothy's crate."
+
+
+class TestResearchGapsAreFindings:
+    def test_the_check_is_shown_the_research_gaps(self) -> None:
+        """Without them, an edit that answered a research gap (the imprint's 1952 name) read as a fact
+        changed unasked, and sank the fix."""
+        seen: dict[str, str] = {}
+
+        async def fake_structured(router: Any, **kw: Any) -> tuple[RepairCheck, None]:
+            seen["prompt"] = kw["prompt"]
+            return RepairCheck(), None
+
+        drift = DriftReport(aligned=False, research_gaps=["Was it Smithsonian Institution Press in 1952?"])
+        with (
+            patch.object(M, "complete_structured", fake_structured),
+            patch.object(M, "get_router", lambda **k: None),
+        ):
+            asyncio.run(M._verify_repair("a", "b", drift=drift, roster_text="", beat="", model="m"))
+        assert "RESEARCH GAP: Was it Smithsonian Institution Press in 1952?" in seen["prompt"]

@@ -912,6 +912,8 @@ type LastRepairRecord = {
   // left alone because the chapter was already right or the finding could not be fixed locally.
   changes?: { paragraph: number; before: string; after: string }[];
   skipped?: string[];
+  // Problems some edits would have caused; those edits were left out and the rest kept.
+  dropped?: string[];
 };
 
 function LastRepair({ r }: { r: LastRepairRecord }) {
@@ -940,6 +942,7 @@ function LastRepair({ r }: { r: LastRepairRecord }) {
       {list(r.kept ? 'Fixed' : 'It would have fixed (not applied)', r.resolved)}
       {list('Still open', r.unresolved)}
       {!r.kept ? list('What it would have broken', r.introduced) : null}
+      {r.kept ? list('Edits left out (they would have broken something)', r.dropped) : null}
       {list('Left as written', r.skipped)}
       {r.changes?.length ? (
         <details data-testid="last-repair-changes" className="mt-1">
