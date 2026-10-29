@@ -133,6 +133,34 @@ describe('finding the passage a finding points at', () => {
     const hit = findInDoc(doc, 'He had carried the slab eleven days.')!;
     expect(textAt(doc, hit.from, hit.to)).toBe('He had carried the slab eleven days.');
   });
+
+  it('finds the whole of a quote that carries markdown italics the editor shows as italics', () => {
+    // The finding from OSSUARY II, Stratum XV: three paragraphs, the middle one italic. Matching
+    // stopped at the asterisk, so only the first paragraph lit up and it read as "changed".
+    const doc = docOf(
+      '<p>He thought: what is the name for?</p>' +
+        '<p>He had asked the woman this, when he was twelve. He had asked it because he did not know better.</p>' +
+        '<p>She had said: <em>the name is for the place.</em></p>' +
+        '<p>He had not understood that either.</p><p>He thought about the boy.</p>',
+    );
+    const hit = findInDoc(
+      doc,
+      'He had asked the woman this, when he was twelve. He had asked it because he did not know better.\n\n' +
+        'She had said: *the name is for the place.*\n\nHe had not understood that either.',
+    )!;
+    expect(hit.exact).toBe(true);
+    expect(textAt(doc, hit.from, hit.to)).toBe(
+      'He had asked the woman this, when he was twelve. He had asked it because he did not know better. ' +
+        'She had said: the name is for the place. He had not understood that either.',
+    );
+  });
+
+  it('lands on the passage, not a few characters off, when an ellipsis comes before it', () => {
+    // The folded projection writes … as three dots; each must still point at the one real character.
+    const doc = docOf('<p>He waited… and waited… and then the gravel cracked.</p><p>The boy’s hand was steady.</p>');
+    const hit = findInDoc(doc, "The boy's hand was steady.")!;
+    expect(textAt(doc, hit.from, hit.to)).toBe('The boy’s hand was steady.');
+  });
 });
 
 describe('revealing does not touch the manuscript', () => {

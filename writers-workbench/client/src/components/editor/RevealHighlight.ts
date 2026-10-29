@@ -74,7 +74,13 @@ interface DocIndex {
   posAt: number[];
 }
 
-function buildIndex(doc: PMNode): DocIndex {
+/**
+ * Build the projection. `foldChars` folds each character as it is added (see `fold`), so a
+ * character that folds to several — an ellipsis to three dots — gives each of them its own entry,
+ * all pinned to the real character. Folding the finished string instead would shift every position
+ * after the first ellipsis, and the highlight would land a few characters off the passage.
+ */
+function buildIndex(doc: PMNode, foldChars: boolean): DocIndex {
   const chars: string[] = [];
   const posAt: number[] = [];
   let pendingGap = false;
@@ -88,6 +94,7 @@ function buildIndex(doc: PMNode): DocIndex {
           pendingGap = true;
           continue;
         }
+        if (EMPHASIS.test(ch)) continue;
         if (pendingGap && chars.length) {
           // The space stands in for whatever whitespace was there, and is pinned to the position
           // of the character that follows it so a match starting on it still lands inside the text.
@@ -95,8 +102,10 @@ function buildIndex(doc: PMNode): DocIndex {
           posAt.push(pos + i);
         }
         pendingGap = false;
-        chars.push(ch);
-        posAt.push(pos + i);
+        for (const out of foldChars ? fold(ch).toLowerCase() : ch) {
+          chars.push(out);
+          posAt.push(pos + i);
+        }
       }
       return false;
     }
@@ -109,9 +118,17 @@ function buildIndex(doc: PMNode): DocIndex {
   return { text: chars.join(''), posAt };
 }
 
+/**
+ * Markdown emphasis markers. The stored chapter writes italics as `*the name is for the place.*`;
+ * the editor shows the italics and holds no asterisks. A quote taken from the stored text carries
+ * them, so they are dropped from both sides — otherwise the match stops at the first italic word
+ * and the passage looks edited when it is not.
+ */
+const EMPHASIS = /[*_]/;
+
 /** The same projection, applied to the needle. */
 function normalise(s: string): string {
-  return s.replace(/\s+/g, ' ').trim();
+  return s.replace(/[*_]/g, '').replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -146,20 +163,18 @@ export interface FindResult extends RevealRange {
 export function findInDoc(doc: PMNode, quote: string): FindResult | null {
   const needle = normalise(quote);
   if (needle.length < 4) return null;
-  const index = buildIndex(doc);
-  if (!index.text) return null;
+  const plain = buildIndex(doc, false);
+  if (!plain.text) return null;
+  const folded = buildIndex(doc, true);
 
-  const haystacks = [index.text, fold(index.text).toLowerCase()];
-  const needles = [needle, fold(needle).toLowerCase()];
-
-  for (let attempt = 0; attempt < haystacks.length; attempt += 1) {
-    const at = haystacks[attempt].indexOf(needles[attempt]);
+  const attempts: Array<[DocIndex, string]> = [
+    [plain, needle],
+    [folded, fold(needle).toLowerCase()],
+  ];
+  for (const [index, n] of attempts) {
+    const at = index.text.indexOf(n);
     if (at < 0) continue;
-    return {
-      from: index.posAt[at],
-      to: index.posAt[Math.min(at + needle.length - 1, index.posAt.length - 1)] + 1,
-      exact: true,
-    };
+    return { from: index.posAt[at], to: index.posAt[at + n.length - 1] + 1, exact: true };
   }
 
   // FALL BACK TO THE LONGEST OPENING THAT STILL MATCHES.
@@ -171,17 +186,13 @@ export function findInDoc(doc: PMNode, quote: string): FindResult | null {
   //
   // The floor is there because a short enough prefix matches somewhere by accident, and landing on
   // an arbitrary paragraph is worse than saying the passage is gone.
-  const words = needles[1].split(' ');
+  const words = attempts[1][1].split(' ');
   for (let count = words.length - 1; count >= 4; count -= 1) {
     const head = words.slice(0, count).join(' ');
     if (head.length < MIN_PARTIAL_CHARS) break;
-    const at = haystacks[1].indexOf(head);
+    const at = folded.text.indexOf(head);
     if (at < 0) continue;
-    return {
-      from: index.posAt[at],
-      to: index.posAt[Math.min(at + head.length - 1, index.posAt.length - 1)] + 1,
-      exact: false,
-    };
+    return { from: folded.posAt[at], to: folded.posAt[at + head.length - 1] + 1, exact: false };
   }
   return null;
 }
