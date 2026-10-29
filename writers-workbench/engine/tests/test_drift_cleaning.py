@@ -175,6 +175,42 @@ class TestTheAdditiveRuleReachesStoryDrift:
         assert "it is not a finding" in system
 
 
+class TestTheContradictionTest:
+    """OSSUARY I ch80, 2026-10-29. Eleanor was not in the roster; the roster made Renata Dorothy's
+    great-niece. The reviewer read the gap as a contradiction ("Eleanor is a separate (unrostered)
+    figure"), and the repair it triggered rewrote a correct relationship. The same mistake is in the
+    stored DEV reports for another book (ch89: a grandmother "not in the roster or bible" filed as
+    invented backstory). A drift item now has to point at the statement it contradicts."""
+
+    @staticmethod
+    def _system() -> str:
+        from chapter_step.main import _build_drift_system
+
+        return _build_drift_system()
+
+    def test_a_finding_must_name_the_statement_it_contradicts(self) -> None:
+        system = self._system()
+        assert "THE CONTRADICTION TEST" in system
+        assert "If you cannot point to such a statement, it is not drift" in system
+
+    def test_absence_from_the_roster_is_not_a_contradiction(self) -> None:
+        assert "Absence is not contradiction" in self._system()
+
+    def test_the_family_cases_from_ch80_are_named(self) -> None:
+        system = self._system()
+        assert "two great-nieces" in system
+        assert "calls C B's great-niece" in system
+        assert "only once, or only in one section" in system
+        assert "verify as intentional" in system
+
+    def test_real_departures_are_still_asked_for(self) -> None:
+        """The test narrows what counts; it must not talk the reviewer out of a real name error,
+        like ch64's 'Garrett Wills' for the roster's Garrett Slade."""
+        system = self._system().lower()
+        assert "a roster character renamed" in system
+        assert "contradicts the beat" in system
+
+
 class TestTheFilterDoesNotReachRealContradictions:
     """The obvious next regex pattern was the hedge "is consistent with". It is not added, and this
     is why: of the five surviving findings that contain it, one is a genuine period contradiction —
