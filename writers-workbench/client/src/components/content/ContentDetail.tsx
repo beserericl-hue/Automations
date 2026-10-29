@@ -822,7 +822,7 @@ export default function ContentDetail() {
 
 // CR-008 B: surface the engine's per-chapter QA + drift (stored in published_content_v2.metadata by
 // CR-005) on the chapter detail page — the old QAReportPanel only reads the n8n last_qa_report field.
-// CR-008/009: a "Fix drift" action runs the engine repair op (drift-correct + research + line-edit).
+// CR-008/009: a "Fix drift" action runs the engine repair op, which edits only the paragraphs the drift concerns.
 function EngineQaPanel({ metadata, contentId }: { metadata: Record<string, unknown> | null | undefined; contentId: string }) {
   // CR-010 B2: non-blocking Fix Drift + Cancel, shared with the Chapters-table button via the hook —
   // the click queues the engine repair and returns immediately; a background poller refreshes this
@@ -836,10 +836,7 @@ function EngineQaPanel({ metadata, contentId }: { metadata: Record<string, unkno
     | undefined;
   // What the last Fix drift did. A repair is judged against the text it replaced and thrown away if it
   // fixed nothing or broke something, so "nothing changed" is an outcome the author needs to be told.
-  const lastRepair = m.last_repair as
-    | { kept?: boolean; verdict?: string; at?: string; resolved?: string[]; unresolved?: string[]; introduced?: string[] }
-    | null
-    | undefined;
+  const lastRepair = m.last_repair as LastRepairRecord | null | undefined;
   if (!qa && !drift) return null;
   const qaEntries = qa ? Object.entries(qa).filter(([, v]) => typeof v === 'number') : [];
   const qaAvg = qaEntries.length ? qaEntries.reduce((a, [, v]) => a + v, 0) / qaEntries.length : null;
@@ -863,7 +860,7 @@ function EngineQaPanel({ metadata, contentId }: { metadata: Record<string, unkno
             <button
               onClick={queue}
               disabled={state === 'queued'}
-              title="Queue the engine repair op (correct drift vs outline/roster, weave research, line-edit). Runs in the background — the panel refreshes when it's done."
+              title="Fix the drift by editing only the paragraphs it concerns; every other paragraph is left exactly as written. The fix is checked against the original and kept only if it fixes something and breaks nothing. Runs in the background — the panel refreshes when it's done."
               className="rounded border border-amber-400 px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50 dark:border-amber-600 dark:text-amber-300 dark:hover:bg-amber-950"
             >
               {state === 'queued' ? 'Queued — fixing…' : state === 'error' ? 'Retry fix' : 'Fix drift'}
@@ -904,11 +901,20 @@ function EngineQaPanel({ metadata, contentId }: { metadata: Record<string, unkno
   );
 }
 
-function LastRepair({
-  r,
-}: {
-  r: { kept?: boolean; verdict?: string; at?: string; resolved?: string[]; unresolved?: string[]; introduced?: string[] };
-}) {
+type LastRepairRecord = {
+  kept?: boolean;
+  verdict?: string;
+  at?: string;
+  resolved?: string[];
+  unresolved?: string[];
+  introduced?: string[];
+  // The paragraphs Fix drift edited (before is empty for an inserted paragraph), and the findings it
+  // left alone because the chapter was already right or the finding could not be fixed locally.
+  changes?: { paragraph: number; before: string; after: string }[];
+  skipped?: string[];
+};
+
+function LastRepair({ r }: { r: LastRepairRecord }) {
   const when = r.at ? new Date(r.at).toLocaleString() : '';
   const list = (title: string, items?: string[]) =>
     items?.length ? (
@@ -934,6 +940,21 @@ function LastRepair({
       {list(r.kept ? 'Fixed' : 'It would have fixed (not applied)', r.resolved)}
       {list('Still open', r.unresolved)}
       {!r.kept ? list('What it would have broken', r.introduced) : null}
+      {list('Left as written', r.skipped)}
+      {r.changes?.length ? (
+        <details data-testid="last-repair-changes" className="mt-1">
+          <summary className="cursor-pointer font-medium">
+            {r.kept ? 'Paragraphs changed' : 'Paragraphs it would have changed'} ({r.changes.length})
+          </summary>
+          {r.changes.map((c, i) => (
+            <div key={i} className="mt-1 border-l-2 border-gray-300 pl-2 dark:border-gray-600">
+              <p className="opacity-70">Paragraph {c.paragraph}{c.before ? '' : ' (new paragraph after it)'}</p>
+              {c.before ? <p className="line-through opacity-70">{c.before}</p> : null}
+              <p>{c.after}</p>
+            </div>
+          ))}
+        </details>
+      ) : null}
     </div>
   );
 }

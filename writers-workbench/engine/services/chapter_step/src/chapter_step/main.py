@@ -33,6 +33,8 @@ from writer_engine.schemas.chapter import (
     DriftReport,
     DriftScanResult,
     GenreEval,
+    PassageEdit,
+    PassageFix,
     RepairCheck,
     RevisedMarketing,
     SeriesDescription,
@@ -1682,6 +1684,188 @@ async def _drift_correct_pass(
     return revised, (final_drift or drift), 1
 
 
+# --- Fix drift edits passages, not the chapter -------------------------------------------------
+#
+# Fix drift used to hand the whole chapter to _correct_drift with a line edit of EVERY sentence. Two
+# real runs on OSSUARY I ch80 (2026-10-29) show what that costs: asked to fix two sentences about one
+# relationship, the rewrite also dropped "Stratum XIII, ca. 750 BCE", turned "two thousand years" into
+# "several centuries", lost Priya's name and swapped a typewriter for a phone. The verifier caught
+# both and threw them away, so the chapter was safe, but the fix never landed either.
+#
+# So the drift fix now returns paragraph edits, and the code applies them: every paragraph no edit
+# names is copied byte for byte. A detail can only be lost inside a paragraph the fix chose to touch,
+# and the verifier reads exactly those paragraphs, before and after. The author-directed rewrites
+# (research focus, style directives) still revise the whole chapter, because that is what was asked.
+
+_PARA_SPLIT_RE = re.compile(r"(\n[ \t]*\n\s*)")
+_SCENE_BREAK_RE = re.compile(r"^\s*([-*_])\1{2,}\s*$")
+
+
+def _numbered_paragraphs(text: str) -> tuple[list[str], dict[int, int]]:
+    """Split ``text`` keeping its separators, so ``"".join(parts) == text``. Returns the parts and a
+    map from paragraph number (1-based, prose only — scene breaks are not numbered) to part index."""
+    parts = _PARA_SPLIT_RE.split(text)
+    index: dict[int, int] = {}
+    n = 0
+    for i in range(0, len(parts), 2):
+        if parts[i].strip() and not _SCENE_BREAK_RE.match(parts[i]):
+            n += 1
+            index[n] = i
+    return parts, index
+
+
+def apply_passage_edits(text: str, edits: list[PassageEdit]) -> tuple[str, list[dict[str, Any]]]:
+    """Apply paragraph edits to ``text``; pure, so what a fix can touch is testable without a model.
+
+    Paragraphs no edit names are kept exactly. An edit to a paragraph that does not exist, an empty
+    edit, a second replacement of the same paragraph, and a replacement that changes nothing are
+    dropped. Returns the new text and the changes made (paragraph, before, after, fixes)."""
+    parts, index = _numbered_paragraphs(text)
+    replaced: dict[int, str] = {}
+    inserted: dict[int, list[str]] = {}
+    changes: list[dict[str, Any]] = []
+    for e in edits:
+        new = _strip_em_dashes(e.text.strip())
+        idx = index.get(e.paragraph)
+        if idx is None or not new:
+            continue
+        old = parts[idx]
+        if e.insert_after:
+            inserted.setdefault(idx, []).append(new)
+            changes.append({"paragraph": e.paragraph, "before": "", "after": new, "fixes": e.fixes})
+        elif idx not in replaced and new != old.strip():
+            replaced[idx] = new
+            changes.append({"paragraph": e.paragraph, "before": old.strip(), "after": new, "fixes": e.fixes})
+    for idx in set(replaced) | set(inserted):
+        parts[idx] = "\n\n".join([replaced.get(idx, parts[idx]), *inserted.get(idx, [])])
+    return "".join(parts), changes
+
+
+def _build_passage_fix_system(genre_slug: str) -> str:
+    return compose_craft_system(
+        seed_keys=["follett_seeds.research.no_dumping", "follett_seeds.research.period_language"],
+        genre_block=_genre_block(genre_slug),
+    ) + (
+        "\n\nYou FIX DRIFT in a novel chapter by editing as few paragraphs as possible. The chapter "
+        "is given with each paragraph numbered [P1], [P2], ... You do not rewrite the chapter. Return "
+        "strict JSON matching PassageFix:\n"
+        "- edits: one entry per paragraph you change: {paragraph, text, fixes}. `text` is the WHOLE "
+        "new paragraph. Change only the words the finding needs; copy every other sentence of that "
+        "paragraph exactly as written, including its italics and punctuation. `fixes` quotes the "
+        "finding. To restore a missing beat, add {paragraph, text, insert_after: true} to put a new "
+        "paragraph after paragraph N.\n"
+        "- skipped: each finding you did not act on, with the reason in one sentence.\n"
+        "Rules:\n"
+        "1. Touch only paragraphs a finding concerns. No line editing, no polishing, no tightening "
+        "of paragraphs you were not asked about.\n"
+        "2. FACTS: change a name, family relationship, age or date only where a finding names it, and "
+        "state it one way in every paragraph where it appears. Never add genealogy or explanation to "
+        "reconcile two versions of a fact; use the one the roster gives.\n"
+        "3. If a finding contradicts the roster or the chapter's own established facts, or the "
+        "chapter is already right, SKIP it. A wrong finding is not a reason to change correct prose.\n"
+        "4. Keep every concrete detail in a paragraph you edit: names, initials, places, dates, "
+        "numbers, objects, documents.\n"
+        "5. A research gap may be filled with one of the RESEARCHED FACTS, woven into the paragraph "
+        "where it belongs as concrete detail. Do not invent facts beyond them.\n"
+        "Every edit is checked against the original afterwards; a fix that loses or contradicts a "
+        "correct fact is thrown away."
+    )
+
+
+async def _fix_passages(
+    text: str,
+    *,
+    drift: DriftReport,
+    roster_text: str,
+    beat: str,
+    genre_slug: str,
+    model: str,
+    research_facts: str = "",
+) -> PassageFix | None:
+    """Ask for the drift fix as paragraph edits. None when no usable answer came back."""
+    parts, index = _numbered_paragraphs(text)
+    numbered = "\n\n".join(f"[P{n}] {parts[i].strip()}" for n, i in index.items())
+    findings = "\n".join(
+        [
+            *(f"- STORY: {x}" for x in drift.story_drift),
+            *(f"- CHARACTER: {x}" for x in drift.character_drift),
+            *(f"- RESEARCH GAP: {x}" for x in (drift.research_gaps if research_facts.strip() else [])),
+        ]
+    )
+    research = f"\n\nRESEARCHED FACTS:\n{research_facts}" if research_facts.strip() else ""
+    prompt = (
+        f"FINDINGS:\n{findings}\n\n"
+        f"CHARACTER ROSTER:\n{roster_text}\n\n"
+        f"PLANNED OUTLINE BEAT:\n{beat}{research}\n\n"
+        f"CHAPTER:\n{numbered}"
+    )
+    router = get_router(service=STEP_NAME)
+    for attempt in range(2):
+        try:
+            fix, _resp = await complete_structured(
+                router,
+                provider="anthropic",
+                model=model,
+                system=_build_passage_fix_system(genre_slug),
+                prompt=prompt,
+                schema=PassageFix,
+                max_tokens=16384,
+            )
+            return fix
+        except ProviderNotRegistered:
+            return None
+        except ValueError:
+            if attempt == 1:
+                return None
+    return None
+
+
+async def _passage_repair_pass(
+    text: str,
+    *,
+    ctx: dict[str, Any],
+    req: WriteChapterRequest,
+    roster_text: str,
+    period: str,
+    model: str,
+    drift: DriftReport | None,
+    beat: str,
+) -> tuple[str, DriftReport | None, int, list[dict[str, Any]], list[str]]:
+    """Fix drift by editing only the paragraphs the findings concern. Returns (text, the drift that
+    describes it, passes, the changes made, the findings skipped). No drift, no edit: a chapter the
+    scan could not read or found clean is returned untouched."""
+    if drift is None or not (drift.story_drift or drift.character_drift or drift.research_gaps):
+        return text, drift, 0, [], []
+    research_facts = ""
+    if drift.research_gaps:
+        research_facts, _ = await _chapter_research(
+            beat, period=period, title=str(ctx.get("title") or ""), focus=_research_focus(ctx)
+        )
+    fix = await _fix_passages(
+        text,
+        drift=drift,
+        roster_text=roster_text,
+        beat=beat,
+        genre_slug=ctx["genre_slug"],
+        model=model,
+        research_facts=research_facts,
+    )
+    if fix is None:
+        return text, drift, 0, [], []
+    revised, changes = apply_passage_edits(text, fix.edits)
+    if not changes:
+        return text, drift, 0, [], fix.skipped
+    final_drift = await _detect_drift(
+        revised,
+        outline=ctx["outline"],
+        chapter_number=req.chapter_number,
+        roster_text=roster_text,
+        period=period,
+        model=model,
+    )
+    return revised, (final_drift or drift), 1, changes, fix.skipped
+
+
 def _saved_sub_chapters(outline: dict[str, Any], chapter_number: Any) -> list:
     """The reviewed chapter outline saved by chapter.plan, if any (E2E-4 R116 auto-plan guard)."""
     for ch in (outline or {}).get("chapters") or []:
@@ -3305,8 +3489,8 @@ async def _load_persisted_chapter(project_id: str, chapter_number: int) -> str:
 
 def _build_repair_check_system() -> str:
     return (
-        "You audit a REPAIR of a novel chapter. You are given the ORIGINAL chapter, the REVISED "
-        "chapter, the drift FINDINGS the revision was asked to fix, the CHARACTER ROSTER and the "
+        "You audit a REPAIR of a novel chapter. You are given the ORIGINAL chapter, the revision "
+        "(the REVISED chapter, or the paragraphs it changed, before and after), the drift FINDINGS the revision was asked to fix, the CHARACTER ROSTER and the "
         "PLANNED OUTLINE BEAT. You do not rewrite anything. Report:\n"
         "- resolved: each finding the REVISED text fixes. Copy the finding's text.\n"
         "- unresolved: each finding the REVISED text does not fix. Copy the finding's text.\n"
@@ -3330,18 +3514,36 @@ async def _verify_repair(
     roster_text: str,
     beat: str,
     model: str,
+    changes: list[dict[str, Any]] | None = None,
 ) -> RepairCheck | None:
     """Judge a repair against what it replaced. None when the judgement could not be read — the
-    caller treats that as unverified, and an unverified repair is not kept."""
+    caller treats that as unverified, and an unverified repair is not kept.
+
+    ``changes``: a passage repair's edits. The revision is then shown as those edits, each paragraph
+    before and after, since nothing else in the chapter changed."""
     findings = [*(drift.story_drift if drift else []), *(drift.character_drift if drift else [])]
     router = get_router(service=STEP_NAME)
+    if changes:
+        revision = "THE REVISION CHANGED ONLY THESE PARAGRAPHS; every other paragraph is unchanged.\n\n" + (
+            "\n\n".join(
+                f"PARAGRAPH {c['paragraph']} "
+                + (
+                    f"(NEW, inserted after it):\n{c['after']}"
+                    if not c["before"]
+                    else f"BEFORE:\n{c['before']}\nAFTER:\n{c['after']}"
+                )
+                for c in changes
+            )
+        )
+    else:
+        revision = f"REVISED CHAPTER:\n{after}"
     prompt = (
         f"FINDINGS THE REPAIR WAS ASKED TO FIX:\n"
         f"{chr(10).join(f'- {f}' for f in findings) or '(none — a line edit only)'}\n\n"
         f"CHARACTER ROSTER:\n{roster_text}\n\n"
         f"PLANNED OUTLINE BEAT:\n{beat}\n\n"
         f"ORIGINAL CHAPTER:\n{before}\n\n"
-        f"REVISED CHAPTER:\n{after}"
+        f"{revision}"
     )
     for attempt in range(2):
         try:
@@ -3489,40 +3691,58 @@ async def _op_repair(payload: dict) -> dict:
         model=model,
     )
 
-    new_text, drift, passes = await _drift_correct_pass(
-        text,
-        ctx=ctx,
-        req=req,
-        roster_text=roster_text,
-        period=period,
-        model=model,
-        min_length_ratio=min_ratio,
-        weave_research=True,
-        line_edit=True,
-        research_focus=research_focus,
-        style_directives=style_directives,
-        citation_mode=citation_mode,
-        initial_drift=before_drift,
-    )
+    author_directed = bool(research_focus.strip() or style_directives.strip())
+    changes: list[dict[str, Any]] = []
+    skipped: list[str] = []
+    if author_directed:
+        # The author asked for a rewrite (a research focus or style directives): revise the whole
+        # chapter, line edit included.
+        new_text, drift, passes = await _drift_correct_pass(
+            text,
+            ctx=ctx,
+            req=req,
+            roster_text=roster_text,
+            period=period,
+            model=model,
+            min_length_ratio=min_ratio,
+            weave_research=True,
+            line_edit=True,
+            research_focus=research_focus,
+            style_directives=style_directives,
+            citation_mode=citation_mode,
+            initial_drift=before_drift,
+        )
+    else:
+        # Fix drift: edit only the paragraphs the findings concern; every other one is kept exactly.
+        new_text, drift, passes, changes, skipped = await _passage_repair_pass(
+            text,
+            ctx=ctx,
+            req=req,
+            roster_text=roster_text,
+            period=period,
+            model=model,
+            drift=before_drift,
+            beat=beat,
+        )
 
     # Verify the repair rather than trusting it: first that it fixed what it was given and broke
     # nothing, then that the prose did not get worse. Either failure keeps the original.
     changed = bool(passes) and new_text != text
     check = (
         await _verify_repair(
-            text, new_text, drift=before_drift, roster_text=roster_text, beat=beat, model=model
+            text,
+            new_text,
+            drift=before_drift,
+            roster_text=roster_text,
+            beat=beat,
+            model=model,
+            changes=changes or None,
         )
         if changed
         else None
     )
     keep, why_not = (
-        judge_repair(
-            check,
-            drift=before_drift,
-            author_directed=bool(research_focus.strip() or style_directives.strip()),
-        )
-        if changed
-        else (True, "")
+        judge_repair(check, drift=before_drift, author_directed=author_directed) if changed else (True, "")
     )
     after_qa = (
         await _score_chapter(new_text, period, roster_text=roster_text, beat=beat)
@@ -3616,6 +3836,10 @@ async def _op_repair(payload: dict) -> dict:
                 "resolved": check.resolved if check else [],
                 "unresolved": check.unresolved if check else [],
                 "introduced": check.introduced if check else [],
+                # The paragraphs a Fix drift changed (or would have, when not kept), and the
+                # findings it declined, so the author can see exactly what it did.
+                "changes": changes,
+                "skipped": skipped,
             },
             drift,
         )
@@ -3632,6 +3856,8 @@ async def _op_repair(payload: dict) -> dict:
         "rolled_back": rolled_back,
         "verdict": verdict,
         "check": check.model_dump(mode="json") if check else None,
+        "changes": changes,
+        "skipped": skipped,
         "craft_mean_before": round(before_mean, 4) if before_mean is not None else None,
         "craft_mean_after": round(after_mean, 4) if after_mean is not None else None,
         "scores": after_scores or before_scores,

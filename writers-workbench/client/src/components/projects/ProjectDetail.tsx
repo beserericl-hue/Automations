@@ -1119,8 +1119,8 @@ function ChapterQaBadge({ qa }: { qa?: { aligned: boolean | null; qaAvg: number 
   return <span className="text-xs text-gray-500">{score ?? '—'}</span>;
 }
 
-// CR-008/009: per-row "Fix Drift" — runs the engine repair op (drift-correct vs outline/roster + weave
-// research + line-edit). NON-BLOCKING: the click only QUEUES the job (returns immediately as "Queued"),
+// CR-008/009: per-row "Fix Drift" — runs the engine repair op (edits only the paragraphs the drift
+// concerns). NON-BLOCKING: the click only QUEUES the job (returns immediately as "Queued"),
 // so the user can fan out fix-drift jobs across many chapters at once. A background poller watches the
 // engine job and, when it finishes, refetches project-chapter-qa + project-chapters so this row's QA
 // badge flips to ✓ on its own. Same engine action the ContentDetail EngineQaPanel exposes.
@@ -1136,7 +1136,7 @@ function ChapterFixDriftButton({ contentId, projectId }: { contentId: string; pr
       <button
         disabled={state === 'queued'}
         onClick={queue}
-        title="Queue the engine repair op (correct drift vs outline/roster, weave research, line-edit). Runs in the background — you can queue more chapters while it works."
+        title="Fix the drift by editing only the paragraphs it concerns; every other paragraph is left exactly as written, and the fix is kept only if it fixes something and breaks nothing. Runs in the background — you can queue more chapters while it works."
         className="rounded-lg px-3 py-1.5 text-xs font-medium border border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950 disabled:opacity-60 whitespace-nowrap"
       >
         {state === 'queued' ? 'Queued — fixing…' : state === 'error' ? 'Retry fix' : 'Fix Drift'}

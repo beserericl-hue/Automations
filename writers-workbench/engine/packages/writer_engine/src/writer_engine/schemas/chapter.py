@@ -276,6 +276,29 @@ class RepairCheck(BaseModel):
     introduced: list[str] = Field(default_factory=list)
 
 
+class PassageEdit(BaseModel):
+    """One scoped change a drift fix makes: paragraph ``paragraph`` (1-based, as numbered in the
+    prompt) becomes ``text``, or — with ``insert_after`` — ``text`` is added as a new paragraph after
+    it. ``fixes`` names the finding it answers."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    paragraph: int
+    text: str
+    insert_after: bool = False
+    fixes: str = ""
+
+
+class PassageFix(BaseModel):
+    """A drift fix as a list of paragraph edits, never a rewritten chapter. ``skipped``: findings the
+    fix left alone, each with why (wrong per the roster or the chapter, or not fixable locally)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    edits: list[PassageEdit] = Field(default_factory=list)
+    skipped: list[str] = Field(default_factory=list)
+
+
 class DriftFinding(BaseModel):
     kind: str
     detail: str
