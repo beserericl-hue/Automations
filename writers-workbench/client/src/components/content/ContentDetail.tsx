@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 import { supabase } from '../../config/supabase';
+import { plainText } from '../../lib/plainText';
 import { useUser } from '../../contexts/UserContext';
 import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import RichTextEditor, { type RichTextEditorHandle } from '../editor/RichTextEditor';
@@ -122,6 +123,8 @@ export default function ContentDetail() {
       // Each save snapshots a new content_versions_v2 row — refresh the Version History list too, else
       // the panel shows a stale (cached) version list until a full page reload.
       queryClient.invalidateQueries({ queryKey: ['content-versions', id] });
+      // A passage rewritten by hand answers the review finding about it.
+      queryClient.invalidateQueries({ queryKey: ['chapter-annotations', id] });
       setTimeout(() => setSaveStatus(null), 3000);
     },
     onError: () => {
@@ -397,9 +400,11 @@ export default function ContentDetail() {
   // Badge the Review tab with the craft findings that carry an applicable span. Without a count the
   // suggestions sit behind an unmarked tab and nobody opens it — the Q/A tab says "5/8 passed" and
   // the actual line-level fixes for those three failures are one click away, unannounced. Only
-  // findings with a quote are counted: those are the ones with something to accept.
+  // findings with a quote are counted: those are the ones with something to accept. A quote no
+  // longer in the chapter has been rewritten — fixed — and is not counted.
   const craftFindings = meta.craft_findings as { findings?: { quote?: string }[] } | undefined;
-  const craftAnchored = craftFindings?.findings?.filter((f) => f.quote).length ?? 0;
+  const chapterWords = plainText(item.content_text ?? '');
+  const craftAnchored = craftFindings?.findings?.filter((f) => f.quote && chapterWords.includes(plainText(f.quote))).length ?? 0;
   const tabs: { id: 'qa' | 'annotations' | 'characters' | 'humanize' | 'sources' | 'versions'; label: string; badge?: number; warn?: boolean }[] = [
     ...(isChapter
       ? ([
