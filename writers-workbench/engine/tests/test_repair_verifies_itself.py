@@ -31,7 +31,7 @@ from unittest.mock import patch
 import pytest
 from chapter_step import main as M
 
-from writer_engine.schemas.chapter import ChapterCraftQa, DriftReport, RepairCheck
+from writer_engine.schemas.chapter import ChapterCraftQa, DriftReport, PassageEdit, PassageFix, RepairCheck
 
 GOOD = dict(
     character_follows_guide=1.0,
@@ -116,7 +116,16 @@ def _run_repair(
         return ChapterCraftQa(**(after if text == "REPAIRED" else before))
 
     async def fake_correct(text: str, **kw: Any) -> tuple[str, Any, int]:
+        persisted["path"] = "whole-chapter"
         return ("REPAIRED" if corrected else text, None, 1 if corrected else 0)
+
+    edits = [{"paragraph": 1, "before": "ORIGINAL", "after": "REPAIRED", "fixes": "f"}]
+
+    async def fake_passages(text: str, **kw: Any) -> tuple[str, Any, int, list, list]:
+        persisted["path"] = "passages"
+        if not corrected:
+            return text, None, 0, [], []
+        return "REPAIRED", None, 1, edits, ["a wrong finding: the chapter is right"]
 
     async def fake_ctx(pid: str, pl: dict) -> dict:
         return {"genre_slug": "g", "title": "t", "outline": {"chapters": []}, "roster": []}
@@ -128,6 +137,7 @@ def _run_repair(
 
     async def fake_verify(before_t: str, after_t: str, **kw: Any) -> RepairCheck | None:
         persisted["verified"] = (before_t, after_t)
+        persisted["verified_changes"] = kw.get("changes")
         if check == "clean":
             d = drift or DriftReport()
             return RepairCheck(resolved=[*d.story_drift, *d.character_drift])
@@ -155,6 +165,7 @@ def _run_repair(
     with (
         patch.object(M, "_score_chapter", fake_score),
         patch.object(M, "_drift_correct_pass", fake_correct),
+        patch.object(M, "_passage_repair_pass", fake_passages),
         patch.object(M, "_load_context", fake_ctx),
         patch.object(M, "_persist_qa_artifacts", fake_persist_qa),
         patch.object(M, "_persist_chapter_if_requested", fake_persist_chapter),
@@ -318,3 +329,189 @@ class TestTheCorrectionPromptGuardsFacts:
         system = M._build_correct_system("ancient-history")
         assert "Never add a sentence of genealogy" in system
         assert "ONE way everywhere" in system
+
+
+# --- Fix drift edits passages, it does not rewrite the chapter ------------------------------------
+#
+# The two real ch80 runs that were rolled back (2026-10-29) were whole-chapter rewrites: asked about
+# one relationship, they also dropped "Stratum XIII, ca. 750 BCE", Priya's name and "two thousand
+# years". A paragraph no edit names cannot lose anything, because it is never handed back to a model.
+
+CH80 = (
+    "Stratum XIII, ca. 750 BCE. The tag was in Dorothy's hand.\n\n"
+    "Eleanor was the niece of Renata's great aunt Dorothy. Renata was the next generation over.\n\n"
+    "---\n\n"
+    "Priya set the box down. Two thousand years, she said.\n\n"
+    "Renata typed the letter on *the old Remington*."
+)
+
+
+def _edit(n: int, text: str, insert: bool = False) -> PassageEdit:
+    return PassageEdit(paragraph=n, text=text, insert_after=insert, fixes="f")
+
+
+class TestApplyPassageEdits:
+    def test_paragraphs_no_edit_names_are_kept_byte_for_byte(self) -> None:
+        out, changes = M.apply_passage_edits(
+            CH80, [_edit(2, "Eleanor was Dorothy's great-niece, as Renata was.")]
+        )
+        assert out == CH80.replace(
+            "Eleanor was the niece of Renata's great aunt Dorothy. Renata was the next generation over.",
+            "Eleanor was Dorothy's great-niece, as Renata was.",
+        )
+        for kept in (
+            "Stratum XIII, ca. 750 BCE",
+            "Priya",
+            "Two thousand years",
+            "*the old Remington*",
+            "\n\n---\n\n",
+        ):
+            assert kept in out
+        assert changes == [
+            {
+                "paragraph": 2,
+                "before": "Eleanor was the niece of Renata's great aunt Dorothy. Renata was the next generation over.",
+                "after": "Eleanor was Dorothy's great-niece, as Renata was.",
+                "fixes": "f",
+            }
+        ]
+
+    def test_no_edits_is_the_same_text(self) -> None:
+        assert M.apply_passage_edits(CH80, []) == (CH80, [])
+
+    def test_scene_breaks_are_not_numbered(self) -> None:
+        """Paragraph 3 is Priya's, not the `---` separator, so a fix can never edit a scene break."""
+        out, _ = M.apply_passage_edits(
+            CH80, [_edit(3, "Priya set the crate down. Two thousand years, she said.")]
+        )
+        assert "crate" in out and "\n\n---\n\n" in out
+
+    def test_an_edit_to_a_paragraph_that_does_not_exist_is_dropped(self) -> None:
+        assert M.apply_passage_edits(CH80, [_edit(0, "x"), _edit(99, "x")]) == (CH80, [])
+
+    def test_an_empty_or_unchanged_edit_is_dropped(self) -> None:
+        same = "Stratum XIII, ca. 750 BCE. The tag was in Dorothy's hand."
+        assert M.apply_passage_edits(CH80, [_edit(1, "   "), _edit(1, same)]) == (CH80, [])
+
+    def test_a_paragraph_is_replaced_once(self) -> None:
+        out, changes = M.apply_passage_edits(CH80, [_edit(1, "first"), _edit(1, "second")])
+        assert out.startswith("first\n\n") and "second" not in out
+        assert len(changes) == 1
+
+    def test_insert_after_adds_a_paragraph_and_keeps_the_one_before(self) -> None:
+        out, changes = M.apply_passage_edits(CH80, [_edit(1, "A restored beat.", insert=True)])
+        assert out.startswith(
+            "Stratum XIII, ca. 750 BCE. The tag was in Dorothy's hand.\n\nA restored beat.\n\nEleanor"
+        )
+        assert changes[0]["before"] == ""
+
+    def test_dashes_are_cleaned_in_the_edit_only(self) -> None:
+        text = "Keep this — as the author wrote it.\n\nFix this."
+        out, _ = M.apply_passage_edits(text, [_edit(2, "Fixed — now.")])
+        assert out == "Keep this — as the author wrote it.\n\nFixed, now."
+
+
+class TestFixDriftUsesPassages:
+    def test_fix_drift_edits_passages(self) -> None:
+        out = _run_repair(GOOD, GOOD, drift=DRIFTED)
+        assert out["_persisted"]["path"] == "passages"
+        assert out["content_text"] == "REPAIRED"
+
+    def test_an_author_directed_rewrite_still_revises_the_whole_chapter(self) -> None:
+        out = _run_repair(GOOD, GOOD, drift=DRIFTED, style_directives="Fix these Q/A findings")
+        assert out["_persisted"]["path"] == "whole-chapter"
+
+    def test_the_check_reads_the_edited_paragraphs(self) -> None:
+        out = _run_repair(GOOD, GOOD, drift=DRIFTED)
+        assert out["_persisted"]["verified_changes"] == [
+            {"paragraph": 1, "before": "ORIGINAL", "after": "REPAIRED", "fixes": "f"}
+        ]
+
+    def test_the_record_shows_what_changed_and_what_was_skipped(self) -> None:
+        out = _run_repair(GOOD, GOOD, drift=DRIFTED)
+        rec = out["_persisted"]["last_repair"]
+        assert rec["changes"][0]["after"] == "REPAIRED"
+        assert rec["skipped"] == ["a wrong finding: the chapter is right"]
+
+    def test_a_rolled_back_fix_still_shows_what_it_would_have_changed(self) -> None:
+        out = _run_repair(GOOD, GOOD, drift=DRIFTED, check=RepairCheck(introduced=["x"]))
+        assert out["_persisted"]["last_repair"]["changes"]
+        assert out["content_text"] == "ORIGINAL"
+
+
+def _passage_pass(drift: DriftReport | None, fix: PassageFix | None) -> tuple:
+    calls: dict[str, int] = {"fix": 0, "research": 0}
+
+    async def fake_fix(text: str, **kw: Any) -> PassageFix | None:
+        calls["fix"] += 1
+        return fix
+
+    async def fake_research(beat: str, **kw: Any) -> tuple[str, list]:
+        calls["research"] += 1
+        return "facts", []
+
+    async def fake_detect(text: str, **kw: Any) -> DriftReport:
+        return DriftReport(aligned=True)
+
+    req = M.WriteChapterRequest.model_validate(
+        {
+            "project_id": "11111111-2222-3333-4444-555555555555",
+            "chapter_number": 80,
+            "chapter_run_id": "99999999-2222-3333-4444-555555555555",
+        }
+    )
+    ctx = {"genre_slug": "g", "title": "t", "outline": {}, "roster": []}
+    with (
+        patch.object(M, "_fix_passages", fake_fix),
+        patch.object(M, "_chapter_research", fake_research),
+        patch.object(M, "_detect_drift", fake_detect),
+    ):
+        out = asyncio.run(
+            M._passage_repair_pass(
+                CH80, ctx=ctx, req=req, roster_text="", period="", model="m", drift=drift, beat="b"
+            )
+        )
+    return out, calls
+
+
+class TestThePassagePass:
+    def test_no_drift_means_no_model_call_and_no_change(self) -> None:
+        (text, _d, passes, changes, _s), calls = _passage_pass(DriftReport(aligned=True), PassageFix())
+        assert (text, passes, changes) == (CH80, 0, [])
+        assert calls == {"fix": 0, "research": 0}
+
+    def test_an_unread_scan_changes_nothing(self) -> None:
+        (text, _d, passes, _c, _s), calls = _passage_pass(None, PassageFix())
+        assert text == CH80 and passes == 0 and calls["fix"] == 0
+
+    def test_an_unusable_answer_changes_nothing(self) -> None:
+        (text, _d, passes, _c, _s), _ = _passage_pass(DRIFTED, None)
+        assert text == CH80 and passes == 0
+
+    def test_a_fix_that_skips_every_finding_changes_nothing(self) -> None:
+        fix = PassageFix(skipped=[f"{ELEANOR} The chapter is right."])
+        (text, _d, passes, _c, skipped), _ = _passage_pass(DRIFTED, fix)
+        assert text == CH80 and passes == 0 and skipped == fix.skipped
+
+    def test_edits_are_applied_and_the_result_is_rescanned(self) -> None:
+        fix = PassageFix(edits=[_edit(4, "Renata wrote the letter by hand.")])
+        (text, drift, passes, changes, _s), _ = _passage_pass(DRIFTED, fix)
+        assert passes == 1 and "by hand" in text and "Stratum XIII" in text
+        assert drift is not None and drift.aligned is True
+        assert len(changes) == 1
+
+    def test_research_is_fetched_only_for_research_gaps(self) -> None:
+        _, calls = _passage_pass(DRIFTED, PassageFix())
+        assert calls["research"] == 0
+        _, calls = _passage_pass(DriftReport(aligned=False, research_gaps=["1952 loan forms"]), PassageFix())
+        assert calls["research"] == 1
+
+
+class TestThePassagePromptIsScoped:
+    def test_it_forbids_touching_other_paragraphs(self) -> None:
+        system = M._build_passage_fix_system("ancient-history")
+        assert "No line editing" in system
+        assert "copy every other sentence of that" in system
+
+    def test_a_wrong_finding_is_skipped_not_obeyed(self) -> None:
+        assert "SKIP it" in M._build_passage_fix_system("ancient-history")
