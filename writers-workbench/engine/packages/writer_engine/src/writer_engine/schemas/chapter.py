@@ -259,6 +259,23 @@ class ChapterCraftQa(BaseModel):
         return out
 
 
+class RepairCheck(BaseModel):
+    """What a repair actually did, judged by reading the chapter before and after it.
+
+    ``resolved`` / ``unresolved``: the drift findings the repair was asked to fix, sorted by whether
+    the revised text fixes them. ``introduced``: problems the revised text has that the original did
+    not — a fact stated two incompatible ways, a contradiction of the roster or the beat, a name,
+    relationship or detail the original had right that the revision changed or dropped. A repair with
+    anything in ``introduced`` is not kept.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    resolved: list[str] = Field(default_factory=list)
+    unresolved: list[str] = Field(default_factory=list)
+    introduced: list[str] = Field(default_factory=list)
+
+
 class DriftFinding(BaseModel):
     kind: str
     detail: str

@@ -31,7 +31,7 @@ from unittest.mock import patch
 import pytest
 from chapter_step import main as M
 
-from writer_engine.schemas.chapter import ChapterCraftQa
+from writer_engine.schemas.chapter import ChapterCraftQa, DriftReport, RepairCheck
 
 GOOD = dict(
     character_follows_guide=1.0,
@@ -97,9 +97,18 @@ class TestCraftMean:
         assert set(M._dimension_scores(qa)) == set(M.CRAFT_DIMENSIONS)
 
 
-def _run_repair(before: dict, after: dict, *, corrected: bool = True, **payload: Any) -> dict:
+def _run_repair(
+    before: dict,
+    after: dict,
+    *,
+    corrected: bool = True,
+    drift: DriftReport | None = None,
+    check: RepairCheck | None | str = "clean",
+    **payload: Any,
+) -> dict:
     """Drive _op_repair with a scripted scorer: `before` for the original text, `after` for the
-    repaired one."""
+    repaired one. `drift` is what the pre-repair scan finds; `check` is the before/after judgement
+    ("clean" = resolved everything, introduced nothing; None = could not be read)."""
     calls: list[str] = []
 
     async def fake_score(text: str, period: str, roster_text: str = "", beat: str = "") -> Any:
@@ -113,6 +122,20 @@ def _run_repair(before: dict, after: dict, *, corrected: bool = True, **payload:
         return {"genre_slug": "g", "title": "t", "outline": {"chapters": []}, "roster": []}
 
     persisted: dict[str, Any] = {}
+
+    async def fake_detect(text: str, **kw: Any) -> DriftReport | None:
+        return drift
+
+    async def fake_verify(before_t: str, after_t: str, **kw: Any) -> RepairCheck | None:
+        persisted["verified"] = (before_t, after_t)
+        if check == "clean":
+            d = drift or DriftReport()
+            return RepairCheck(resolved=[*d.story_drift, *d.character_drift])
+        return check  # type: ignore[return-value]
+
+    async def fake_record(pl: dict, record: dict, d: DriftReport | None) -> None:
+        persisted["last_repair"] = record
+        persisted["drift"] = d
 
     async def fake_persist_qa(pl: dict, scores: dict, findings: list, nc: Any, text: str) -> dict:
         persisted.update({"scores": scores, "text": text})
@@ -135,6 +158,9 @@ def _run_repair(before: dict, after: dict, *, corrected: bool = True, **payload:
         patch.object(M, "_load_context", fake_ctx),
         patch.object(M, "_persist_qa_artifacts", fake_persist_qa),
         patch.object(M, "_persist_chapter_if_requested", fake_persist_chapter),
+        patch.object(M, "_detect_drift", fake_detect),
+        patch.object(M, "_verify_repair", fake_verify),
+        patch.object(M, "_record_repair", fake_record),
     ):
         out = asyncio.run(M._op_repair(body))
     out["_persisted"] = persisted
@@ -157,7 +183,8 @@ class TestTheRepairIsVerified:
         out = _run_repair(GOOD, POOR)
         assert out["rolled_back"] is True
         assert out["content_text"] == "ORIGINAL"
-        assert out["_persisted"]["chapter_text"] == "ORIGINAL"
+        # The stored chapter already IS the original: a rollback writes no new version of it.
+        assert "chapter_text" not in out["_persisted"]
         assert "ROLLED BACK" in out["verdict"]
 
     def test_a_rolled_back_repair_does_not_claim_to_have_repaired(self) -> None:
@@ -204,3 +231,90 @@ class TestTheReportMatchesWhatIsStored:
         out = _run_repair(POOR, GOOD)
         report = M._build_qa_report(out["_persisted"]["scores"], [], None, out["_persisted"]["text"])
         assert M.qa_report_is_stale(report, out["content_text"]) is False
+
+
+# --- OSSUARY I ch80: a repair that fixed one thing and broke another was kept ---------------------
+
+ELEANOR = "Eleanor Voss: the chapter calls her Dorothy's great-niece; the beat says niece."
+TYPEWRITER = "Renata Voss: a typewriter on her desk is anachronistic for 2011."
+DRIFTED = DriftReport(aligned=False, character_drift=[ELEANOR, TYPEWRITER])
+
+
+class TestARepairMustNotMakeThingsWorse:
+    def test_a_repair_that_introduces_a_contradiction_is_rolled_back(self) -> None:
+        """The real case: the typewriter was fixed, the craft score held, and the repair also wrote
+        "Renata was Dorothy's great-niece as well, one generation younger than Eleanor". Kept before."""
+        check = RepairCheck(
+            resolved=[TYPEWRITER],
+            unresolved=[ELEANOR],
+            introduced=["Calls Eleanor and Renata both great-nieces yet a generation apart."],
+        )
+        out = _run_repair(GOOD, GOOD, drift=DRIFTED, check=check)
+        assert out["rolled_back"] is True
+        assert out["repaired"] is False
+        assert out["content_text"] == "ORIGINAL"
+        assert "chapter_text" not in out["_persisted"]
+        assert "generation apart" in out["verdict"]
+
+    def test_the_rollback_is_recorded_with_its_reason(self) -> None:
+        check = RepairCheck(introduced=["Drops the E.M.V. initials and the donor file."])
+        out = _run_repair(GOOD, GOOD, drift=DRIFTED, check=check)
+        rec = out["_persisted"]["last_repair"]
+        assert rec["kept"] is False
+        assert rec["introduced"] == ["Drops the E.M.V. initials and the donor file."]
+
+    def test_after_a_rollback_the_stored_drift_describes_the_original(self) -> None:
+        """Not the re-scan of the text that was thrown away."""
+        out = _run_repair(GOOD, GOOD, drift=DRIFTED, check=RepairCheck(introduced=["x"]))
+        assert out["_persisted"]["drift"] == DRIFTED
+
+    def test_a_repair_that_fixes_nothing_it_was_given_is_rolled_back(self) -> None:
+        check = RepairCheck(unresolved=[ELEANOR, TYPEWRITER])
+        out = _run_repair(GOOD, GOOD, drift=DRIFTED, check=check)
+        assert out["rolled_back"] is True
+        assert "fixed none" in out["verdict"]
+
+    def test_a_repair_that_cannot_be_verified_is_not_kept(self) -> None:
+        out = _run_repair(GOOD, GOOD, drift=DRIFTED, check=None)
+        assert out["rolled_back"] is True
+        assert "could not be verified" in out["verdict"]
+
+    def test_a_repair_that_fixes_some_and_breaks_nothing_is_kept(self) -> None:
+        check = RepairCheck(resolved=[TYPEWRITER], unresolved=[ELEANOR])
+        out = _run_repair(GOOD, GOOD, drift=DRIFTED, check=check)
+        assert out["rolled_back"] is False
+        assert out["content_text"] == "REPAIRED"
+        assert out["_persisted"]["last_repair"]["unresolved"] == [ELEANOR]
+
+    def test_an_author_directed_rewrite_is_kept_even_when_no_drift_moved(self) -> None:
+        """Rewrite-with-research uses the same op; the author asked for the research, not a drift fix."""
+        check = RepairCheck(unresolved=[ELEANOR, TYPEWRITER])
+        out = _run_repair(GOOD, GOOD, drift=DRIFTED, check=check, research_focus="1952 Smithsonian loans")
+        assert out["rolled_back"] is False
+
+    def test_the_check_reads_both_texts(self) -> None:
+        out = _run_repair(GOOD, GOOD, drift=DRIFTED)
+        assert out["_persisted"]["verified"] == ("ORIGINAL", "REPAIRED")
+
+    def test_a_rejected_repair_is_not_paid_for_with_a_second_score(self) -> None:
+        out = _run_repair(GOOD, GOOD, drift=DRIFTED, check=RepairCheck(introduced=["x"]))
+        assert out["_scored"] == ["ORIGINAL"]
+
+
+class TestTheRule:
+    def test_introduced_beats_resolved(self) -> None:
+        keep, why = M.judge_repair(
+            RepairCheck(resolved=["a"], introduced=["b"]), drift=DRIFTED, author_directed=False
+        )
+        assert keep is False and "b" in why
+
+    def test_a_line_edit_with_no_drift_is_kept(self) -> None:
+        keep, _ = M.judge_repair(RepairCheck(), drift=DriftReport(), author_directed=False)
+        assert keep is True
+
+
+class TestTheCorrectionPromptGuardsFacts:
+    def test_it_forbids_reconciling_genealogy(self) -> None:
+        system = M._build_correct_system("ancient-history")
+        assert "Never add a sentence of genealogy" in system
+        assert "ONE way everywhere" in system

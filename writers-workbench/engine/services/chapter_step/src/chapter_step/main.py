@@ -33,6 +33,7 @@ from writer_engine.schemas.chapter import (
     DriftReport,
     DriftScanResult,
     GenreEval,
+    RepairCheck,
     RevisedMarketing,
     SeriesDescription,
     SeriesEndingJudgement,
@@ -1484,6 +1485,14 @@ def _build_correct_system(genre_slug: str) -> str:
         "LENGTH — you are FIXING, not trimming. The revised chapter MUST be AT LEAST as long as the "
         "original. Do NOT summarize, condense, or drop scenes. PRESERVE the POV and the chapter's "
         "place in the story.\n"
+        "FACTS — change a name, family relationship, age or date ONLY where a drift item names it, "
+        "and then state it ONE way everywhere it appears. Never add a sentence of genealogy or "
+        "explanation to reconcile two versions of a fact; pick the one the roster gives and use it. "
+        "If a drift item asks for something the roster or the chapter's own established facts "
+        "contradict, leave that passage as written. Keep every concrete detail the original had "
+        "(initials, documents, objects, names) unless a drift item requires removing it. Every "
+        "repair is checked against the original afterwards, and one that adds a contradiction or "
+        "loses a correct fact is thrown away.\n"
         "OUTPUT — return ONLY the chapter prose. Do NOT print a cast list, a 'Confirmed cast' section, "
         "a 'POV character' line, a 'Validation' / BEGINNING-MIDDLE-END checklist, chapter or "
         "sub-chapter headings, or any notes about what you changed."
@@ -1575,6 +1584,7 @@ async def _drift_correct_pass(
     research_focus: str = "",
     style_directives: str = "",
     citation_mode: str = "",
+    initial_drift: DriftReport | None = None,
 ) -> tuple[str, DriftReport | None, int]:
     """QA cycle 1 (detect drift vs outline/arc/roster + research gaps) -> QA cycle 2 (correct it).
 
@@ -1586,8 +1596,11 @@ async def _drift_correct_pass(
     the post-correction drift report, passes).
 
     ``min_length_ratio`` is the floor below which a (shrinking) correction is rejected. At WRITE time
-    it is 0.85; the REPAIR op uses a higher floor now that the roster is clean (less to cut)."""
-    drift = await _detect_drift(
+    it is 0.85; the REPAIR op uses a higher floor now that the roster is clean (less to cut).
+
+    ``initial_drift``: a detection the caller already ran on ``text`` (the REPAIR op keeps it to judge
+    the repair against), so it is not paid for twice."""
+    drift = initial_drift or await _detect_drift(
         text,
         outline=ctx["outline"],
         chapter_number=req.chapter_number,
@@ -3276,6 +3289,136 @@ async def _load_persisted_chapter(project_id: str, chapter_number: int) -> str:
     return str(rows[0].get("content_text") or "") if rows else ""
 
 
+# --- A repair must not make the chapter worse ---------------------------------------------------
+#
+# Found in use, OSSUARY I ch80, 2026-10-29. The outline beat called Eleanor "Renata's great-aunt's
+# niece"; the chapter said, correctly per the author, that she was Dorothy's great-niece. The drift
+# check flagged the correct sentence, Fix drift rewrote it, and the rewrite invented a genealogy that
+# contradicts itself — "Renata was Dorothy's great-niece as well, one generation younger than
+# Eleanor" — while dropping the initials and donor-file detail the passage had. The craft score did
+# not move, so the only guard there was kept it, and the panel still read "Drift detected".
+#
+# Two independent drift scans cannot settle whether a repair helped: each is a fresh LLM reading and
+# the lists differ run to run. So the repair is judged directly — both texts side by side, against
+# the findings it was given — and kept only when it fixed something and broke nothing.
+
+
+def _build_repair_check_system() -> str:
+    return (
+        "You audit a REPAIR of a novel chapter. You are given the ORIGINAL chapter, the REVISED "
+        "chapter, the drift FINDINGS the revision was asked to fix, the CHARACTER ROSTER and the "
+        "PLANNED OUTLINE BEAT. You do not rewrite anything. Report:\n"
+        "- resolved: each finding the REVISED text fixes. Copy the finding's text.\n"
+        "- unresolved: each finding the REVISED text does not fix. Copy the finding's text.\n"
+        "- introduced: every problem the REVISED text has that the ORIGINAL did not. Look hard for: "
+        "a fact stated in two incompatible ways (a relationship, an age, a date, a name); a "
+        "contradiction of the roster or the beat that the original did not have; a name, family "
+        "relationship, date or concrete detail the original had that the revision changed or dropped "
+        "when no finding asked for that change; invented backstory or explanation that the original "
+        "did not need. Each item is one sentence and quotes the revised wording briefly.\n"
+        "Line-level rewording, tightened sentences and woven-in period detail are the point of the "
+        "repair: they are NOT problems unless they change a fact. Do not report something the "
+        "original already had. Return strict JSON matching RepairCheck and nothing else."
+    )
+
+
+async def _verify_repair(
+    before: str,
+    after: str,
+    *,
+    drift: DriftReport | None,
+    roster_text: str,
+    beat: str,
+    model: str,
+) -> RepairCheck | None:
+    """Judge a repair against what it replaced. None when the judgement could not be read — the
+    caller treats that as unverified, and an unverified repair is not kept."""
+    findings = [*(drift.story_drift if drift else []), *(drift.character_drift if drift else [])]
+    router = get_router(service=STEP_NAME)
+    prompt = (
+        f"FINDINGS THE REPAIR WAS ASKED TO FIX:\n"
+        f"{chr(10).join(f'- {f}' for f in findings) or '(none — a line edit only)'}\n\n"
+        f"CHARACTER ROSTER:\n{roster_text}\n\n"
+        f"PLANNED OUTLINE BEAT:\n{beat}\n\n"
+        f"ORIGINAL CHAPTER:\n{before}\n\n"
+        f"REVISED CHAPTER:\n{after}"
+    )
+    for attempt in range(2):
+        try:
+            check, _resp = await complete_structured(
+                router,
+                provider="anthropic",
+                model=model,
+                system=_build_repair_check_system(),
+                prompt=prompt,
+                schema=RepairCheck,
+                max_tokens=8192,
+            )
+            return check
+        except ProviderNotRegistered:
+            return RepairCheck()
+        except ValueError:
+            if attempt == 1:
+                return None
+    return None
+
+
+def judge_repair(
+    check: RepairCheck | None, *, drift: DriftReport | None, author_directed: bool
+) -> tuple[bool, str]:
+    """(keep, why) for a repair, from its check. Pure, so the rule is testable without a model.
+
+    Not kept when: the check could not be made; it introduced anything; or it was asked to fix drift,
+    fixed none of it, and the author had not asked for anything else (a research focus or style
+    directive is work the author wants even when no drift moved)."""
+    if check is None:
+        return False, "the repair could not be verified, so the original text was kept"
+    if check.introduced:
+        return False, "the repair introduced new problems: " + "; ".join(check.introduced)
+    had_drift = bool(drift and (drift.story_drift or drift.character_drift))
+    if had_drift and not check.resolved and not author_directed:
+        return False, "the repair fixed none of the drift it was given, so the original text was kept"
+    return True, ""
+
+
+async def _record_repair(payload: dict, record: dict, drift: DriftReport | None) -> None:
+    """Store what the last repair did on the chapter row (``metadata.last_repair``), and the drift
+    report that describes the text now stored. Best-effort; never fails the repair."""
+    from datetime import UTC, datetime
+
+    from writer_engine.config import get_settings
+
+    project_id = payload.get("project_id")
+    settings = get_settings()
+    if not (project_id and settings.supabase_url and settings.supabase_service_role_key):
+        return
+    try:
+        from writer_engine.supabase.client import get_supabase_admin
+
+        client = await get_supabase_admin()
+        cur = await (
+            client.table("published_content_v2")
+            .select("id,metadata")
+            .eq("project_id", str(project_id))
+            .eq("content_type", "chapter")
+            .eq("chapter_number", _coerce_chapter_number(payload.get("chapter_number"), 0))
+            .limit(1)
+            .execute()
+        )
+        rows = getattr(cur, "data", None) or []
+        if not rows:
+            return
+        meta = dict(rows[0].get("metadata") or {})
+        meta["last_repair"] = {**record, "at": datetime.now(UTC).isoformat()}
+        if drift is not None:
+            meta["drift_report"] = drift.model_dump(mode="json")
+        await (
+            client.table("published_content_v2").update({"metadata": meta}).eq("id", rows[0]["id"]).execute()
+        )
+    except Exception as exc:
+        logger.warning("chapter.repair.record_failed", error=str(exc)[:200])
+
+
 async def _op_repair(payload: dict) -> dict:
     """Repair a persisted chapter's drift: re-run QA cycle 1 (detect, now hardened) + QA cycle 2
     (correct) on the EXISTING chapter text, then re-persist. Use to fix chapters that were written
@@ -3336,6 +3479,15 @@ async def _op_repair(payload: dict) -> dict:
     before_qa = await _score_chapter(text, period, roster_text=roster_text, beat=beat)
     before_scores = _dimension_scores(before_qa)
     before_mean = craft_mean(before_scores)
+    # The drift the repair is asked to fix, kept so the result can be judged against it.
+    before_drift = await _detect_drift(
+        text,
+        outline=ctx.get("outline") or {},
+        chapter_number=chapter_number,
+        roster_text=roster_text,
+        period=period,
+        model=model,
+    )
 
     new_text, drift, passes = await _drift_correct_pass(
         text,
@@ -3350,15 +3502,43 @@ async def _op_repair(payload: dict) -> dict:
         research_focus=research_focus,
         style_directives=style_directives,
         citation_mode=citation_mode,
+        initial_drift=before_drift,
     )
 
-    # Verify the repair rather than trusting it, and keep the better of the two.
-    after_qa = await _score_chapter(new_text, period, roster_text=roster_text, beat=beat) if passes else None
+    # Verify the repair rather than trusting it: first that it fixed what it was given and broke
+    # nothing, then that the prose did not get worse. Either failure keeps the original.
+    changed = bool(passes) and new_text != text
+    check = (
+        await _verify_repair(
+            text, new_text, drift=before_drift, roster_text=roster_text, beat=beat, model=model
+        )
+        if changed
+        else None
+    )
+    keep, why_not = (
+        judge_repair(
+            check,
+            drift=before_drift,
+            author_directed=bool(research_focus.strip() or style_directives.strip()),
+        )
+        if changed
+        else (True, "")
+    )
+    after_qa = (
+        await _score_chapter(new_text, period, roster_text=roster_text, beat=beat)
+        if changed and keep
+        else None
+    )
     after_scores = _dimension_scores(after_qa)
     after_mean = craft_mean(after_scores)
     rolled_back = False
     verdict = "no change"
-    if passes:
+    if changed and not keep:
+        rolled_back = True
+        new_text, after_scores, after_mean = text, before_scores, before_mean
+        verdict = f"ROLLED BACK — {why_not}"
+        logger.warning("chapter.repair.rejected", chapter=chapter_number, why=why_not[:300])
+    elif changed:
         if before_mean is None or after_mean is None:
             # Unscoreable in either direction. Keep the repair (it is the drift-corrected text) but
             # say so, rather than reporting a comparison that was never made.
@@ -3385,13 +3565,19 @@ async def _op_repair(payload: dict) -> dict:
                 before=round(before_mean, 4),
                 after=round(after_mean, 4),
             )
+    # After a rollback the stored text is the original, so the drift that describes it is the scan
+    # made BEFORE the repair — not the re-scan of the rejected text.
+    if rolled_back:
+        drift = before_drift
     persist_result = None
     # Persist whenever persist is requested — NOT only when a correction happened. A repair that
     # re-scans and finds the chapter already clean must still record the verified aligned=True state,
     # otherwise the stale pre-correction telemetry (aligned=False) lingers and the project view keeps
     # showing drift that was already fixed. `drift` here is the POST-correction re-scan (see
     # _drift_correct_pass), so the stored aligned reflects the true final state either way.
-    if payload.get("persist"):
+    # A rolled-back repair does not write the chapter: the stored text already IS the original, and
+    # rewriting it would add a version that changed nothing.
+    if payload.get("persist") and not rolled_back:
         out = WriteChapterResponse(
             chapter_id=uuid4(),
             chapter_run_id=req.chapter_run_id,
@@ -3402,6 +3588,7 @@ async def _op_repair(payload: dict) -> dict:
             drift_report=drift.model_dump(mode="json") if drift else None,
         )
         persist_result = await _persist_chapter_if_requested(payload, ctx, out, model=model)
+    if payload.get("persist"):
         # Refresh the Q/A report so it describes the text that is now stored. Without this the repair
         # left the pre-repair report in place and the panel showed findings against replaced prose.
         # On a rollback this still runs, and correctly re-stamps the ORIGINAL text as what was scored.
@@ -3420,6 +3607,18 @@ async def _op_repair(payload: dict) -> dict:
                 None,
                 new_text,
             )
+        # What the repair did, for the chapter page to show: kept or rolled back, and why.
+        await _record_repair(
+            payload,
+            {
+                "kept": changed and not rolled_back,
+                "verdict": verdict,
+                "resolved": check.resolved if check else [],
+                "unresolved": check.unresolved if check else [],
+                "introduced": check.introduced if check else [],
+            },
+            drift,
+        )
     d = drift.model_dump(mode="json") if drift else None
     return {
         "repaired": bool(passes) and not rolled_back,
@@ -3432,6 +3631,7 @@ async def _op_repair(payload: dict) -> dict:
         # `rolled_back: true` means the pass ran, was measured, and was thrown away on purpose.
         "rolled_back": rolled_back,
         "verdict": verdict,
+        "check": check.model_dump(mode="json") if check else None,
         "craft_mean_before": round(before_mean, 4) if before_mean is not None else None,
         "craft_mean_after": round(after_mean, 4) if after_mean is not None else None,
         "scores": after_scores or before_scores,

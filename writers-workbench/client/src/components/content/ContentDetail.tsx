@@ -834,6 +834,12 @@ function EngineQaPanel({ metadata, contentId }: { metadata: Record<string, unkno
     | { aligned?: boolean; story_drift?: string[]; character_drift?: string[]; research_gaps?: string[] }
     | null
     | undefined;
+  // What the last Fix drift did. A repair is judged against the text it replaced and thrown away if it
+  // fixed nothing or broke something, so "nothing changed" is an outcome the author needs to be told.
+  const lastRepair = m.last_repair as
+    | { kept?: boolean; verdict?: string; at?: string; resolved?: string[]; unresolved?: string[]; introduced?: string[] }
+    | null
+    | undefined;
   if (!qa && !drift) return null;
   const qaEntries = qa ? Object.entries(qa).filter(([, v]) => typeof v === 'number') : [];
   const qaAvg = qaEntries.length ? qaEntries.reduce((a, [, v]) => a + v, 0) / qaEntries.length : null;
@@ -893,6 +899,41 @@ function EngineQaPanel({ metadata, contentId }: { metadata: Record<string, unkno
           </ul>
         </div>
       )}
+      {lastRepair && state !== 'queued' && <LastRepair r={lastRepair} />}
+    </div>
+  );
+}
+
+function LastRepair({
+  r,
+}: {
+  r: { kept?: boolean; verdict?: string; at?: string; resolved?: string[]; unresolved?: string[]; introduced?: string[] };
+}) {
+  const when = r.at ? new Date(r.at).toLocaleString() : '';
+  const list = (title: string, items?: string[]) =>
+    items?.length ? (
+      <>
+        <p className="mt-1 font-medium">{title}</p>
+        <ul className="list-disc pl-4">
+          {items.slice(0, 6).map((x, i) => <li key={i}>{x}</li>)}
+        </ul>
+      </>
+    ) : null;
+  return (
+    <div
+      data-testid="last-repair"
+      className={`mt-3 rounded border p-2 text-xs ${r.kept
+        ? 'border-green-200 bg-green-50 text-green-900 dark:border-green-900 dark:bg-green-950/30 dark:text-green-200'
+        : 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200'}`}
+    >
+      <p className="font-medium">
+        {r.kept ? 'Last Fix drift was kept' : 'Last Fix drift was not kept — the chapter is unchanged'}
+        {when ? <span className="ml-1 font-normal opacity-70">· {when}</span> : null}
+      </p>
+      {!r.kept && r.verdict && !r.introduced?.length ? <p className="mt-1">{r.verdict.replace(/^ROLLED BACK — /, 'Why: ')}</p> : null}
+      {list('Fixed', r.resolved)}
+      {list('Still open', r.unresolved)}
+      {!r.kept ? list('What it would have broken', r.introduced) : null}
     </div>
   );
 }
