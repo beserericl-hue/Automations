@@ -205,3 +205,36 @@ describe('showing a finding in the manuscript', () => {
     expect(onReveal).toHaveBeenCalledWith(TARGET);
   });
 });
+
+describe('a finding whose passage has been rewritten', () => {
+  const FIXED = {
+    ...ANNOTATION,
+    id: 'craft_qa:ch7:2',
+    message: 'Pacing — no story turn: the slab section repeats itself.',
+    evidence_quote: null,
+    suggestion: { action: 'note' as const },
+    resolved: true,
+  };
+
+  it('shows as fixed, with no Apply Fix, and is not counted as active', async () => {
+    mockFetch.mockImplementation(async (path: string) =>
+      path.endsWith('/annotations')
+        ? ({ ...RESPONSE, annotations: [ANNOTATION, FIXED] } as never)
+        : ({ success: true } as never),
+    );
+    renderWithProviders(<AnnotationsPanel contentId="c1" />);
+    expect(await screen.findByText('1 active')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Apply Fix' })).toHaveLength(1);
+    expect(screen.getByTestId('fixed-annotations')).toHaveTextContent('1 fixed since the report');
+    expect(screen.getByTestId('fixed-annotations')).toHaveTextContent(FIXED.message);
+  });
+
+  it('says the report is dealt with when every finding is fixed', async () => {
+    mockFetch.mockImplementation(async (path: string) =>
+      path.endsWith('/annotations') ? ({ ...RESPONSE, annotations: [FIXED] } as never) : ({ success: true } as never),
+    );
+    renderWithProviders(<AnnotationsPanel contentId="c1" />);
+    expect(await screen.findByText(/has been dealt with/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Apply Fix' })).toBeNull();
+  });
+});

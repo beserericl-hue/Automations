@@ -184,16 +184,45 @@ describe('craft annotations', () => {
     });
   });
 
-  it('degrades to a note when the quote is no longer in the chapter', () => {
-    // The author edited there since the report ran. Showing an Apply would 422 on click.
+  it('reports a finding as fixed once its passage has been rewritten, with no Apply Fix', () => {
+    // The quote was verified against the chapter when the report ran; it is gone now because the
+    // author replaced it (Apply, the Humanizer, or by hand). An Apply here would 422 on click.
     const a = buildCraftAnnotations(
       meta([{ dimension: 'prose_transparent', problem: 'dense', quote: 'a line since deleted', replacement: 'x' }]),
       7,
       PROSE,
       dismissedNone,
     );
+    expect(a[0].resolved).toBe(true);
     expect(a[0].suggestion).toEqual({ action: 'note' });
     expect(a[0].evidence_quote).toBeNull();
+  });
+
+  it('keeps one id as a finding moves from open to fixed', () => {
+    const quote = 'The heater ticked as it cooled.';
+    const f = [{ dimension: 'prose_transparent', problem: 'dense', quote, replacement: 'x' }];
+    const open = buildCraftAnnotations(meta(f), 7, PROSE, dismissedNone)[0];
+    const fixed = buildCraftAnnotations(meta(f), 7, PROSE.replace(quote, 'Rewritten.'), dismissedNone)[0];
+    expect(open.resolved).toBeUndefined();
+    expect(fixed.resolved).toBe(true);
+    expect(fixed.id).toBe(open.id);
+  });
+
+  it('does not call a finding fixed just because the editor saved the chapter as HTML', () => {
+    // The quote was taken from plain text with markdown italics and a paragraph break; the saved
+    // chapter now has <p> and <em> around the same words.
+    const quote = 'He was going to say: *we stop here.*\n\nNot that.';
+    const html = '<p>He walked.</p><p>He was going to say: <em>we stop here.</em></p><p>Not that.</p>';
+    const a = buildCraftAnnotations(meta([{ dimension: 'prose_transparent', problem: 'p', quote, replacement: 'x' }]), 7, html, dismissedNone);
+    expect(a[0].resolved).toBeUndefined();
+    expect(a[0].evidence_quote).toBe(quote);
+    // No exact span to swap, so no one-click replace — but still shown and findable.
+    expect(a[0].suggestion).toEqual({ action: 'note' });
+  });
+
+  it('never calls a chapter-wide finding fixed — it has no passage to rewrite', () => {
+    const a = buildCraftAnnotations(meta([{ dimension: 'story_turn_density', problem: 'flat' }]), 7, PROSE, dismissedNone);
+    expect(a[0].resolved).toBeUndefined();
   });
 
   it('keeps a chapter-wide finding as a note instead of dropping it', () => {

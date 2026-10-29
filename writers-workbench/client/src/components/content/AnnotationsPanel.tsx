@@ -37,6 +37,8 @@ interface UnifiedAnnotation {
     delta_chars?: number;
   };
   dismissed: boolean;
+  /** The passage it was about has been rewritten since the report — answered, nothing to apply. */
+  resolved?: boolean;
 }
 
 interface AnnotationsResponse {
@@ -149,11 +151,17 @@ export default function AnnotationsPanel({ contentId, onReveal, onHumanize }: An
   }
   if (!data) return null;
 
-  const active = data.annotations.filter((a) => !a.dismissed);
+  const active = data.annotations.filter((a) => !a.dismissed && !a.resolved);
+  const fixed = data.annotations.filter((a) => !a.dismissed && a.resolved);
   if (active.length === 0) {
     return (
-      <div className="rounded-lg border border-gray-200 px-4 py-3 text-sm text-gray-500 dark:border-gray-700">
-        No active review annotations for this chapter. Run the Q/A check from the Q/A tab, or a genre evaluation or character-drift scan from the chat, to populate.
+      <div className="space-y-2">
+        <div className="rounded-lg border border-gray-200 px-4 py-3 text-sm text-gray-500 dark:border-gray-700">
+          {fixed.length
+            ? 'Every finding in this chapter’s report has been dealt with.'
+            : 'No active review annotations for this chapter. Run the Q/A check from the Q/A tab, or a genre evaluation or character-drift scan from the chat, to populate.'}
+        </div>
+        <FixedList fixed={fixed} />
       </div>
     );
   }
@@ -233,7 +241,35 @@ export default function AnnotationsPanel({ contentId, onReveal, onHumanize }: An
           />
         )}
       </div>
+      <FixedList fixed={fixed} />
     </div>
+  );
+}
+
+/**
+ * Findings whose passage has been rewritten since the report — by Apply, the Humanizer or by hand.
+ * They are answered, so they leave the active list and lose their Apply Fix (the passage it would
+ * replace is gone). Kept here, folded, so the author can see the report was dealt with rather than
+ * watching findings silently vanish.
+ */
+function FixedList({ fixed }: { fixed: UnifiedAnnotation[] }) {
+  if (!fixed.length) return null;
+  return (
+    <details data-testid="fixed-annotations" className="border-t border-gray-100 px-4 py-2 text-xs dark:border-gray-800">
+      <summary className="cursor-pointer text-green-700 dark:text-green-400">
+        ✓ {fixed.length} fixed since the report
+      </summary>
+      <ul className="mt-2 space-y-1.5">
+        {fixed.map((a) => (
+          <li key={a.id} className="text-gray-500 dark:text-gray-400">
+            <span className="mr-1.5 rounded bg-green-100 px-1.5 py-0.5 font-medium text-green-800 dark:bg-green-900/40 dark:text-green-300">
+              Fixed
+            </span>
+            {a.message}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 

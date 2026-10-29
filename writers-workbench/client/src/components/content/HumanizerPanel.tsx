@@ -86,6 +86,8 @@ export default function HumanizerPanel({
       onReplaced?.(args.replacement);
       void queryClient.invalidateQueries({ queryKey: ['content-detail', contentId] });
       void queryClient.invalidateQueries({ queryKey: ['content-versions', contentId] });
+      // The passage may be one a review finding pointed at; that finding is now fixed.
+      void queryClient.invalidateQueries({ queryKey: ['chapter-annotations', contentId] });
     },
   });
 

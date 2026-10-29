@@ -115,6 +115,8 @@ interface UnifiedAnnotation {
     delta_chars?: number;
   };
   dismissed: boolean;
+  /** The passage it was about has been rewritten since the report: answered, not active. */
+  resolved?: boolean;
   raw: unknown; // original report fragment for debugging
 }
 
@@ -158,6 +160,27 @@ const CRAFT_DIMENSION_LABELS: Record<string, string> = {
 };
 
 /**
+ * The words of a chapter or quote, without markup: tags gone, the common entities decoded, markdown
+ * emphasis dropped, whitespace collapsed. A chapter is plain text until the editor saves it, and HTML
+ * after; a quote taken from one must still be recognised in the other.
+ */
+export function plainText(s: string): string {
+  return s
+    // A block boundary is a word break; an inline tag (<em>) sits inside a word as often as not.
+    .replace(/<\/?(p|div|h[1-6]|li|ul|ol|blockquote|br|hr)\b[^>]*>/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/[*_]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * Build the craft-Q/A annotations for a chapter from `metadata.craft_findings`.
  *
  * Shared by the GET and the apply handler so a finding can never be listed with one target span and
@@ -181,17 +204,27 @@ export function buildCraftAnnotations(
     const replacement = (f.replacement as string | undefined) || null;
     const problem = (f.problem as string | undefined) || '';
     const fix = (f.fix as string | undefined) || '';
-    // A quote that is no longer in the chapter is stale, not wrong — the author has already edited
-    // there. Keep the note, drop the one-click fix.
+    // The engine stores a quote only after finding it in the chapter (`anchor_findings`), so a quote
+    // that is no longer there means the passage has been rewritten since — by Apply, the Humanizer
+    // or the author's own hand. That finding is answered: it is reported as fixed, with no one-click
+    // fix (its target is gone) and no place among the active findings.
     const anchored = quote && chapterText.includes(quote) ? quote : null;
+    // "Still there" is judged on the words, not the bytes: once the editor saves, the chapter is HTML,
+    // and an italic phrase or a paragraph break inside the quote would otherwise read as a rewrite.
+    const present = Boolean(anchored) || Boolean(quote && plainText(chapterText).includes(plainText(quote)));
+    const resolved = Boolean(quote) && !present;
     const label = CRAFT_DIMENSION_LABELS[dimension] || dimension;
-    const aid = buildAnnotationId('craft_qa', chapterNumber, anchored || `${dimension}:${problem}`, dimension);
+    // Keyed on the quote whether or not it is still there, so the finding keeps one id as it moves
+    // from open to fixed.
+    const aid = buildAnnotationId('craft_qa', chapterNumber, quote || `${dimension}:${problem}`, dimension);
     out.push({
       id: aid,
       source: 'craft_qa',
       severity: CRAFT_DIMENSION_SEVERITY[dimension] || 'low',
       message: problem ? `${label}: ${problem}` : label,
-      evidence_quote: anchored,
+      // Still shown (and findable in the editor, which matches loosely) when only the markup moved;
+      // the one-click replace below still needs the exact span.
+      evidence_quote: present ? quote : null,
       evidence_context: fix || null,
       chapter_number: chapterNumber,
       suggestion:
@@ -204,6 +237,7 @@ export function buildCraftAnnotations(
             }
           : { action: 'note' },
       dismissed: dismissed.has(aid),
+      ...(resolved ? { resolved: true } : {}),
       raw: f,
     });
   }
@@ -371,7 +405,7 @@ contentActionsRouter.get('/:id/annotations', async (req: Request, res: Response)
       annotations,
       counts: {
         total: annotations.length,
-        active: annotations.filter((a) => !a.dismissed).length,
+        active: annotations.filter((a) => !a.dismissed && !a.resolved).length,
         by_source: {
           genre_eval: annotations.filter((a) => a.source === 'genre_eval').length,
           drift_scan: annotations.filter((a) => a.source === 'drift_scan').length,
