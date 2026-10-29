@@ -931,7 +931,7 @@ function LastRepair({
         {when ? <span className="ml-1 font-normal opacity-70">· {when}</span> : null}
       </p>
       {!r.kept && r.verdict && !r.introduced?.length ? <p className="mt-1">{r.verdict.replace(/^ROLLED BACK — /, 'Why: ')}</p> : null}
-      {list('Fixed', r.resolved)}
+      {list(r.kept ? 'Fixed' : 'It would have fixed (not applied)', r.resolved)}
       {list('Still open', r.unresolved)}
       {!r.kept ? list('What it would have broken', r.introduced) : null}
     </div>
