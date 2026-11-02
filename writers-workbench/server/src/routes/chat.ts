@@ -113,9 +113,13 @@ chatRouter.post('/proxy', requireAuth, validateBody(ChatProxySchema), async (req
   // queued (returning an engine job_id the client polls via /api/jobs/engine/:id). Default is n8n.
   if (hubBackend() === 'engine') {
     try {
+      // The page's project rides in `context`; the conversation id keys the engine's memory of this
+      // drawer session (last list shown, current project, recent turns), which the engine loads
+      // before routing and saves after it answers.
       const hub = await callEngineHub({
         message,
         userId,
+        conversationId: req.body.conversation_id,
         context: {
           ...(req.body.project_id ? { project_id: req.body.project_id } : {}),
           ...(req.body.project_title ? { project_title: req.body.project_title } : {}),
@@ -132,11 +136,13 @@ chatRouter.post('/proxy', requireAuth, validateBody(ChatProxySchema), async (req
         queue: classification.queue,
         jobType: classification.jobType,
       };
+      const conversation = hub.conversation_id ? { conversationId: hub.conversation_id } : {};
       if (hub.kind === 'queued' && hub.job_id) {
         res.json({
           mode: 'async', jobId: hub.job_id, engineJob: true, status: hub.status ?? 'queued',
           assistantMessage: hub.assistant_message, classification: classBlock,
           creditsCharged: bypassCredits(req) ? 0 : cost, creditsRemaining: balance,
+          ...conversation,
         });
       } else {
         res.json({
@@ -144,6 +150,8 @@ chatRouter.post('/proxy', requireAuth, validateBody(ChatProxySchema), async (req
           creditsCharged: bypassCredits(req) ? 0 : cost, creditsRemaining: balance,
           assistantMessage: hub.assistant_message,
           data: hub.kind === 'data' ? hub.data : { reply: hub.assistant_message },
+          ...(hub.tool ? { tool: hub.tool, op: hub.op } : {}),
+          ...conversation,
         });
       }
     } catch (error) {

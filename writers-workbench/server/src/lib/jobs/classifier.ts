@@ -40,6 +40,14 @@ interface Rule {
 }
 
 const RULES: Rule[] = [
+  // ---------- sync: story-bible add / update ----------
+  // First, like the engine's deterministic rule: the description is free text, and a word in it
+  // ("research", "write a newsletter") must not be charged as that job.
+  {
+    test: /^\s*(?:please\s+|now\s+|also\s+|can\s+you\s+|could\s+you\s+)*(add|put|record|create|insert|update|change|edit|revise|modify|rename|append)\b[\s\S]*\bbible\b/i,
+    tier: 'sync',
+    jobType: 'story_bible_edit',
+  },
   // ---------- sync: retrieve / list / revert / approve ----------
   {
     test: /\b(list|show|display)\s+(?:(?:all|my|the)\s+)?(outlines?|drafts?|projects?|story\s+arcs?|chapters?)\b/i,

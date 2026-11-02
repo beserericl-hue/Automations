@@ -112,14 +112,23 @@ export interface HubResponse {
   job_id?: string | null;
   status?: string | null;
   error?: string | null;
+  /** The conversation the engine remembered this turn under (writer_engine.hub.memory). */
+  conversation_id?: string | null;
 }
 
-/** POST a message to the engine hub. Throws on transport/HTTP failure. */
+/**
+ * POST a message to the engine hub. Throws on transport/HTTP failure.
+ *
+ * `conversationId` keys the engine's conversation memory (last list shown, current project, recent
+ * turns), which is what lets "pick #3" follow "list my outlines". Without one the engine uses the
+ * user's default chat conversation.
+ */
 export async function callEngineHub(args: {
   message: string;
   userId: string;
   context?: Record<string, unknown>;
   source?: 'chat' | 'voice';
+  conversationId?: string;
 }): Promise<HubResponse> {
   const resp = await engineFetch('/internal/hub', {
     method: 'POST',
@@ -129,6 +138,7 @@ export async function callEngineHub(args: {
       user_id: args.userId,
       context: args.context ?? {},
       source: args.source ?? 'chat',
+      ...(args.conversationId ? { conversation_id: args.conversationId } : {}),
     }),
   });
   if (!resp.ok) {

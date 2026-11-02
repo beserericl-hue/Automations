@@ -20,6 +20,17 @@ export const ChatProxySchema = z.object({
    * paid jobs (two social posts, two cover arts, a full newsletter run, a humanized blog post).
    */
   dry_run: z.boolean().optional(),
+  /**
+   * The chat drawer's conversation. The engine hub remembers the last list shown, the current
+   * project and recent turns under (user, conversation) so "pick #3" resolves on the next message.
+   */
+  conversation_id: z.string().min(1).max(128).optional(),
+  /**
+   * The project page the user is on. These were read by the route all along but missing here, so
+   * zod stripped them and the hub never saw the page's project.
+   */
+  project_id: z.string().min(1).max(64).optional(),
+  project_title: z.string().min(1).max(300).optional(),
 });
 
 export const BrainstormParseSchema = z.object({

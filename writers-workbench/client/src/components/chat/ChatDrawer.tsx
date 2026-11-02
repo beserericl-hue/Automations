@@ -49,6 +49,7 @@ interface ChatDrawerProps {
 
 const CHAT_STORAGE_KEY = 'writers-workbench-chat-history';
 const ACTIVE_JOBS_KEY = 'writers-workbench-active-jobs';
+const CONVERSATION_KEY = 'writers-workbench-chat-conversation';
 const MAX_MESSAGES = 100;
 
 const QUICK_COMMANDS = [
@@ -78,6 +79,31 @@ function saveMessages(messages: Message[]) {
     localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages.slice(-MAX_MESSAGES)));
   } catch {
     localStorage.removeItem(CHAT_STORAGE_KEY);
+  }
+}
+
+/**
+ * The drawer's conversation id. The engine hub keeps its memory of this conversation (the last list
+ * it showed, the current project, recent turns) under it, so "pick #3" after "list my outlines"
+ * resolves. It lives as long as the visible history does: "Clear history" starts a new one.
+ */
+function newConversationId(): string {
+  try {
+    return `drawer-${crypto.randomUUID()}`;
+  } catch {
+    return `drawer-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+}
+
+function loadConversationId(): string {
+  try {
+    const stored = localStorage.getItem(CONVERSATION_KEY);
+    if (stored) return stored;
+    const fresh = newConversationId();
+    localStorage.setItem(CONVERSATION_KEY, fresh);
+    return fresh;
+  } catch {
+    return newConversationId();
   }
 }
 
@@ -146,6 +172,7 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
     }
   }, [queryClient]);
   const [messages, setMessages] = useState<Message[]>(loadMessages);
+  const [conversationId, setConversationId] = useState<string>(loadConversationId);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [showCommands, setShowCommands] = useState(false);
@@ -306,6 +333,12 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
         body: JSON.stringify({
           user_message_request: text,
           user_id: profile?.user_id || '',
+          conversation_id: conversationId,
+          // The project page the user is on: "write the next chapter" / "add X to the story bible"
+          // then act on this book without the user naming it.
+          ...(isOnProject && params.id
+            ? { project_id: params.id, ...(currentProject?.title ? { project_title: currentProject.title } : {}) }
+            : {}),
         }),
       });
 
@@ -350,6 +383,11 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
           engineJob: !!data.engineJob,
         });
       } else {
+        // A story-bible add/update from chat changed rows the Story Bible tab has cached.
+        if (data?.tool === 'story_bible' || data?.classification?.jobType === 'story_bible_edit') {
+          void queryClient.invalidateQueries({ queryKey: ['story-bible'] });
+          void queryClient.invalidateQueries({ queryKey: ['project-bible'] });
+        }
         const payload = data?.data ?? data;
         const assistantContent =
           payload?.output || payload?.text || payload?.message || data?.assistantMessage || JSON.stringify(payload);
@@ -389,6 +427,15 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
     setMessages([]);
     localStorage.removeItem(CHAT_STORAGE_KEY);
     localStorage.removeItem(ACTIVE_JOBS_KEY);
+    // A cleared history is a new conversation: the hub must not answer "pick #3" from a list the
+    // user can no longer see.
+    const fresh = newConversationId();
+    setConversationId(fresh);
+    try {
+      localStorage.setItem(CONVERSATION_KEY, fresh);
+    } catch {
+      // ignore
+    }
   };
 
   const contextCommands = currentProject
