@@ -5,15 +5,20 @@
 // The summary is read from the Playwright logs: each pass's counts and the name of every test that
 // failed or was flaky. Without POSTAL_API_URL / POSTAL_API_KEY / E2E_NOTIFY_EMAIL it prints the
 // summary and sends nothing, so a missing mail setting never hides the result from the deploy log.
+//
+// The same script reports the engine suite (scripts/e2e_full_verify.py): its "DONE ... :: {counts}"
+// line is the count, and each "[i/n] R01 FAIL :: ..." / PARTIAL / NO_PROMPT line names a test.
+// E2E_NOTIFY_TITLE names the suite in the subject (default "Writers Workbench E2E on DEV").
 
 import fs from 'fs';
 
 const [commit = '', note = '', status = '1', ...logs] = process.argv.slice(2);
 const failed = status !== '0';
+const title = process.env.E2E_NOTIFY_TITLE || 'Writers Workbench E2E on DEV';
 
 const strip = (s) => s.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
 const lines = logs.flatMap((f) => (fs.existsSync(f) ? strip(fs.readFileSync(f, 'utf8')).split('\n') : []));
-const counts = lines.filter((l) => /^\s+\d+ (passed|failed|flaky|skipped|did not run)\b/.test(l) || /^=== Pass /.test(l));
+const counts = lines.filter((l) => /^\s+\d+ (passed|failed|flaky|skipped|did not run)\b/.test(l) || /^=== Pass /.test(l) || /^DONE .* :: \{/.test(l));
 // Playwright's end-of-run summary lists each failed / flaky test on an indented "[project] › ..."
 // line under its "N failed" / "N flaky" heading. (Progress lines start "[n/m]", not indented.)
 const named = [];
@@ -23,15 +28,17 @@ for (const l of lines) {
   if (h) { heading = h[1]; continue; }
   if (/^\s+\d+ (passed|skipped|did not run)\b/.test(l) || /^=== /.test(l)) { heading = ''; continue; }
   if (heading && /^\s+\[[\w-]+\] › /.test(l)) named.push(`${heading}: ${l.trim()}`);
+  const e = /^\[\d+\/\d+\] ([RV]\d+) (FAIL|PARTIAL|NO_PROMPT) :: (.*)$/.exec(l);
+  if (e) named.push(`${e[2].toLowerCase()}: ${e[1]} ${e[3].slice(0, 220)}`);
 }
 
 const summary = [
-  `Writers Workbench E2E on DEV — ${failed ? 'FAILED' : 'passed'} — commit ${commit || 'unknown'}`,
+  `${title} — ${failed ? 'FAILED' : 'passed'} — commit ${commit || 'unknown'}`,
   '',
   note,
   ...counts.map((l) => l.trim()),
   '',
-  ...(named.length ? ['Failed or flaky:', ...named] : []),
+  ...(named.length ? ['Failed, flaky or partial:', ...named] : []),
   '',
   'Full output: Railway → writer-e2e → the latest deployment\'s logs.',
 ]
@@ -53,7 +60,7 @@ const res = await fetch(`${POSTAL_API_URL.replace(/\/+$/, '')}/send/message`, {
   body: JSON.stringify({
     to: [E2E_NOTIFY_EMAIL],
     from: SENDER_EMAIL || 'eve@courseworx.media',
-    subject: `${failed ? 'FAILED' : 'Passed'}: Writers Workbench E2E on DEV (${commit || 'unknown'})`,
+    subject: `${failed ? 'FAILED' : 'Passed'}: ${title} (${commit || 'unknown'})`,
     plain_body: summary,
     html_body: `<pre style="font:13px/1.5 ui-monospace,monospace">${esc(summary)}</pre>`,
   }),
