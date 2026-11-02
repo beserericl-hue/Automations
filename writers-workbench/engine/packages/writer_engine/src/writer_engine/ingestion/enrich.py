@@ -3,14 +3,14 @@
 A feed entry is a title, a link and — if you are lucky — a summary. The newsletter needs the article
 body, so between "deduped candidate" and "ingested row" the n8n pipeline ran three calls:
 
-1. **Firecrawl** ``/v1/scrape`` with a ``json`` extraction prompt, for the verbatim main content and
-   the in-content image URLs
+1. **a scrape** for the verbatim main content and the in-content image URLs — Firecrawl's ``json``
+   extraction in n8n, ScraperAPI + ``trafilatura`` here (``writer_engine.scraping``)
 2. an **LLM relevance gate** — "is this a full piece of content relevant to an AI newsletter?" —
    which is what kept job postings and unrelated-industry filler out of the corpus
 3. an **LLM link extractor** for ``external_source_urls``, the primary sources the writing step
    later cites
 
-All three prompts are ported verbatim, because they are the editorial judgement embodied in 3,926
+Both LLM prompts are ported verbatim, because they are the editorial judgement embodied in 3,926
 rows of corpus and rewriting them would change what the newsletter is about. The one substantive
 change is the model: n8n called ``o3-mini``, and the engine has no OpenAI chat adapter (OpenAI is
 registered for embeddings only), so both LLM calls run on Gemini Flash through the normal router —
@@ -28,48 +28,18 @@ from dataclasses import dataclass, field
 import httpx
 from pydantic import BaseModel, Field
 
+from writer_engine import scraping
 from writer_engine.config import get_settings
 from writer_engine.llm import complete_structured, get_router
-from writer_engine.rate_limit.provider_budget import call_provider
 from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("ingestion.enrich")
-
-SCRAPE_TIMEOUT_S = 120.0
-"""Firecrawl's json extraction runs a model server-side, so this is minutes-scale, not seconds."""
 
 MAX_JUDGE_CHARS = 24_000
 """How much of the body the relevance gate sees. The verdict is decided in the first page or two."""
 
 MAX_LINKS_FOR_EXTRACTION = 120
 """Cap on the link list handed to the extractor. A news page can carry hundreds of nav links."""
-
-# Verbatim from the `scrape_url` node of `Node - Scrape Url V2` (workflow BJaUNEt6PPIqbWLa).
-FIRECRAWL_JSON_PROMPT = (
-    "Identify the main content of the text (i.e., the article or newsletter body). Provide the "
-    "exact text for that main content verbatim, without summarizing or rewriting any part of it. "
-    "Exclude all non-essential elements such as banners, headers, footers, calls to action, ads, "
-    "or purely navigational text. Format this output as markdown using appropriate '#' characters "
-    "as heading levels. Exclude any promotional or sponsored content on your output. Additionally, "
-    "you must identify and extract the image urls within this main content. These images must be "
-    "inside the main content of the page so you must exclude small logo images, icons, avatars and "
-    "other images which aren't a core part of the main content. The images you extract should at "
-    "least have a width of 600 pixels (px) so it can be included on our content."
-)
-
-FIRECRAWL_JSON_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "content": {
-            "type": "string",
-            "description": "The exact verbatim main text content of the web page in markdown format.",
-        },
-        "main_content_image_urls": {
-            "type": "array",
-            "items": {"type": "string", "description": "An image url inside the main content."},
-        },
-    },
-}
 
 # Verbatim from the `evaluate_content` chainLlm node.
 RELEVANCE_PROMPT = (
@@ -194,67 +164,29 @@ def scraper_available() -> bool:
     """Is a scraper configured AND switched on?
 
     Asked by the pipeline BEFORE it reaches for one, so a run with no scraper reports its items as
-    deferred instead of attempting 62 calls that will all answer 402 and then calling them
-    unscrapeable. `FIRECRAWL_ENABLED=false` is the switch; a missing key means the same thing.
+    deferred instead of attempting 62 calls that all fail and then calling them unscrapeable.
     """
-    settings = get_settings()
-    return bool(settings.firecrawl_enabled and settings.firecrawl_api_key)
+    return scraping.scraper_available()
 
 
 async def scrape(url: str, *, client: httpx.AsyncClient | None = None) -> Scraped:
-    """Firecrawl the article. Never raises — a failed scrape is one skipped item.
+    """Fetch the article and read its main body. Never raises — a failed scrape is one skipped item.
 
-    ``formats`` and ``excludeTags`` match the n8n node exactly. ``markdown`` is taken from the json
-    extraction's ``content`` (the verbatim main body) and not from Firecrawl's own ``markdown``,
-    which still carries nav and CTA text; that is the distinction the extraction prompt exists for.
+    The n8n node asked Firecrawl's server-side model to copy the main content out "verbatim". That
+    job is now ``trafilatura`` in ``writer_engine.scraping``, which can only return text that is in
+    the page. Links keep the n8n extractor's rule: query strings stripped, so tracking parameters do
+    not make two links to the same page look like two sources.
     """
-    settings = get_settings()
-    if not settings.firecrawl_api_key:
-        return Scraped(error="firecrawl_not_configured")
-    if not settings.firecrawl_enabled:
-        return Scraped(error="firecrawl_disabled")
-
-    owned = client is None
-    http = client or httpx.AsyncClient(timeout=SCRAPE_TIMEOUT_S)
-    try:
-
-        async def _post() -> httpx.Response:
-            resp = await http.post(
-                "https://api.firecrawl.dev/v1/scrape",
-                headers={
-                    "authorization": f"Bearer {settings.firecrawl_api_key}",
-                    "content-type": "application/json",
-                },
-                json={
-                    "url": url,
-                    "formats": ["json", "markdown", "rawHtml", "links"],
-                    "excludeTags": ["iframe", "nav", "header", "footer"],
-                    "onlyMainContent": True,
-                    "jsonOptions": {"prompt": FIRECRAWL_JSON_PROMPT, "schema": FIRECRAWL_JSON_SCHEMA},
-                },
-            )
-            resp.raise_for_status()
-            return resp
-
-        resp = await call_provider("firecrawl", _post)
-        data = (resp.json() or {}).get("data") or {}
-    except Exception as exc:
-        return Scraped(error=f"{type(exc).__name__}: {exc}"[:200])
-    finally:
-        if owned:
-            await http.aclose()
-
-    extracted = data.get("json") or {}
-    metadata = data.get("metadata") or {}
+    page = await scraping.fetch_page(url, client=client)
+    if page.error:
+        return Scraped(url=url, error=page.error)
     return Scraped(
-        markdown=str(extracted.get("content") or data.get("markdown") or ""),
-        html=str(data.get("rawHtml") or ""),
-        image_urls=[str(u) for u in (extracted.get("main_content_image_urls") or []) if u],
-        # Strip query strings, as the n8n extractor prompt did, so tracking params do not make two
-        # links to the same page look like two sources.
-        links=[str(link).split("?")[0] for link in (data.get("links") or []) if link],
-        title=str(metadata.get("title") or ""),
-        url=str(metadata.get("url") or url),
+        markdown=page.markdown,
+        html=page.html,
+        image_urls=page.image_urls,
+        links=list(dict.fromkeys(link.split("?")[0] for link in page.links)),
+        title=page.title,
+        url=page.url,
     )
 
 
@@ -346,8 +278,6 @@ __all__ = [
     "AI_GENRES",
     "EXTERNAL_SOURCES_PROMPT",
     "EXTERNAL_SOURCES_SHAPE",
-    "FIRECRAWL_JSON_PROMPT",
-    "FIRECRAWL_JSON_SCHEMA",
     "GATE_UNAVAILABLE",
     "MAX_JUDGE_CHARS",
     "RELEVANCE_PROMPT",

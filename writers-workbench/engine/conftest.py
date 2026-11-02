@@ -27,7 +27,7 @@ for _isolated_key in (
     "GEMINI_API_KEY",
     "PERPLEXITY_API_KEY",
     "OPENAI_API_KEY",
-    "FIRECRAWL_API_KEY",
+    "SCRAPERAPI_API_KEY",
     "POSTAL_API_KEY",
     "POSTAL_API_URL",
     # These were MISSING, so the "no real API calls" contract above was not actually upheld on any

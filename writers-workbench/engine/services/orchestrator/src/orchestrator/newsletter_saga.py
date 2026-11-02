@@ -266,14 +266,15 @@ class NewsletterSagaDriver:
             # Scrape supplemental URLs. TRULY non-fatal: run_step_via_http RAISES on a timeout / 5xx
             # (it does not return an ERROR status), so a slow or dead external URL — e.g. a survivalist
             # blog that hangs — would otherwise crash the whole stage and the newsletter would never
-            # send. Catch everything here and degrade to no scraped content. Generous timeout because a
-            # story can carry several URLs, each up to the scrape step's 30s Firecrawl budget.
+            # send. Catch everything here and degrade to no scraped content. The scrape step fetches a
+            # story's URLs side by side and cuts each off at 120s (ScraperAPI alone can spend 70s on
+            # one hard page), so 180s covers the step with room for the hop.
             try:
                 scrape_out = await run_step_via_http(
                     _step("scrape"),
                     execution_id=execution_id,
                     payload={"urls": story.external_source_links},
-                    timeout_s=150.0,
+                    timeout_s=180.0,
                 )
                 scraped = (
                     [] if scrape_out.status is StepStatus.ERROR else (scrape_out.payload.get("scraped") or [])

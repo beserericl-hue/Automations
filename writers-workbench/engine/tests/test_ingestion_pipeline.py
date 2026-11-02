@@ -4,7 +4,7 @@
 2. **the dead loop** — ``DEV - Newsletter Ingestion (Multi-User Cron)`` never wired ``report_run``
    back to ``split_per_feed``, so it processed the first feed and stopped, having already claimed
    all 32.
-3. **the wasted scrape** — every candidate was Firecrawled even when the feed carried the full post.
+3. **the wasted scrape** — every candidate was scraped even when the feed carried the full post.
 """
 
 from __future__ import annotations
@@ -57,7 +57,7 @@ def _item(n: int, **overrides: object) -> dict[str, object]:
 
 @pytest.fixture
 def wired(monkeypatch: pytest.MonkeyPatch, fake_supabase: FakeSupabase) -> FakeSupabase:
-    """Supabase faked (both entry points), Firecrawl and both LLM calls stubbed."""
+    """Supabase faked (both entry points), the scraper and both LLM calls stubbed."""
 
     async def _client() -> FakeSupabase:
         return fake_supabase
@@ -83,7 +83,7 @@ def wired(monkeypatch: pytest.MonkeyPatch, fake_supabase: FakeSupabase) -> FakeS
     async def _external(scraped: enrich.Scraped) -> list[str]:
         return ["https://openai.com/announcement"]
 
-    # The suite runs with FIRECRAWL_API_KEY cleared (conftest), and the pipeline now asks whether a
+    # The suite runs with SCRAPERAPI_API_KEY cleared (conftest), and the pipeline now asks whether a
     # scraper is available BEFORE reaching for one — so a stubbed `scrape` is not enough on its own.
     monkeypatch.setattr(pipeline.enrich, "scraper_available", lambda: True)
     monkeypatch.setattr(pipeline.enrich, "scrape", _scrape)
@@ -236,7 +236,7 @@ class TestScrapeAvoidance:
         self, wired: FakeSupabase, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Medium / Clarkesworld / Escape Pod syndicate the whole post; scraping it spends a
-        Firecrawl credit to get a worse copy of text we already have."""
+        scrape credit to get a worse copy of text we already have."""
         scraped: list[str] = []
 
         async def _spy(url: str, *, client: object = None) -> enrich.Scraped:
@@ -276,7 +276,7 @@ class TestScrapeAvoidance:
         self, wired: FakeSupabase, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         async def _broken(url: str, *, client: object = None) -> enrich.Scraped:
-            return enrich.Scraped(error="ReadTimeout: firecrawl")
+            return enrich.Scraped(error="ReadTimeout: scraperapi")
 
         monkeypatch.setattr(pipeline.enrich, "scrape", _broken)
         async with _client_serving(_json_feed(_item(1))) as client:
@@ -557,7 +557,7 @@ class TestLabelOrdering:
 
 
 class TestNoScraperConfigured:
-    """Firecrawl is excluded on DEV until the account is topped up or a substitute is wired in. The
+    """Scraping can be switched off (SCRAPER_ENABLED=false) or have no key. The
     point of this block is that "we are not scraping today" must not be recorded as "this
     destination cannot be read": on the first live tick, 62 of 72 items were lost to a 402 and the
     counters called them unscrapeable, which reads as a feed problem."""
@@ -603,17 +603,17 @@ class TestNoScraperConfigured:
     ) -> None:
         from writer_engine.config import get_settings
 
-        monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test-key")
-        monkeypatch.setenv("FIRECRAWL_ENABLED", "true")
+        monkeypatch.setenv("SCRAPERAPI_API_KEY", "sapi-test-key")
+        monkeypatch.setenv("SCRAPER_ENABLED", "true")
         get_settings.cache_clear()
         assert enrich.scraper_available() is True
 
-        monkeypatch.setenv("FIRECRAWL_ENABLED", "false")
+        monkeypatch.setenv("SCRAPER_ENABLED", "false")
         get_settings.cache_clear()
         assert enrich.scraper_available() is False
 
-        monkeypatch.setenv("FIRECRAWL_ENABLED", "true")
-        monkeypatch.setenv("FIRECRAWL_API_KEY", "")
+        monkeypatch.setenv("SCRAPER_ENABLED", "true")
+        monkeypatch.setenv("SCRAPERAPI_API_KEY", "")
         get_settings.cache_clear()
         assert enrich.scraper_available() is False
         get_settings.cache_clear()

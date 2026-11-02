@@ -55,7 +55,7 @@ const NEWSLETTER_HELP: Record<HelpSection, HelpDoc> = {
       <>
         <p>Feeds are RSS / Reddit / source URLs that the cron worker polls every 30 minutes. Each newsletter has its own list — adding the OpenAI blog to your "AI News" newsletter does not also add it to your "Indie Authors" newsletter.</p>
         <ul className="mt-2 list-disc space-y-1 pl-5">
-          <li><strong>Type</strong> — pick <code>rss</code> for most feeds, <code>reddit</code> for r/* JSON feeds, <code>source</code> for plain HTML pages, <code>firecrawl_scrape</code> for sites that need full-page scraping.</li>
+          <li><strong>Type</strong> — pick <code>rss</code> for most feeds, <code>reddit</code> for r/* JSON feeds, <code>source</code> for plain HTML pages, <code>firecrawl_scrape</code> for sites that need full-page scraping (the name is historical; pages are scraped through ScraperAPI).</li>
           <li><strong>Interval</strong> — minutes between polls. Defaults to 240 (4h). Don't go below 60 unless you really need to.</li>
           <li><strong>Pause/Resume</strong> doesn't lose history. <strong>Delete</strong> removes the feed and its run history.</li>
         </ul>

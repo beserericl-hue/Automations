@@ -18,11 +18,12 @@ Four things differ from the n8n baseline, each because the baseline was measurab
 * **XML feeds work.** See ``feeds.sniff``.
 * **A feed that already carries its body is not scraped.** n8n scraped every candidate
   unconditionally. Several live feeds (Medium tags, Clarkesworld, Escape Pod) syndicate the full
-  post in ``content:encoded``, so scraping spent a Firecrawl credit to get a worse copy of text we
+  post in ``content:encoded``, so scraping spent a scrape credit to get a worse copy of text we
   already had. See :data:`INLINE_BODY_MIN_WORDS`.
 
-What is deliberately kept: the Firecrawl extraction prompt, the relevance gate, the external-source
-extractor, the unscrapeable-destination list, and the key convention. Those encode what the corpus
+What is deliberately kept: the verbatim main-content extraction (now ScraperAPI + trafilatura), the
+relevance gate, the external-source extractor, the unscrapeable-destination list, and the key
+convention. Those encode what the corpus
 is, and 3,926 rows already depend on them.
 """
 
@@ -407,7 +408,7 @@ async def ingest_due_feeds(
 ) -> list[FeedRunResult]:
     """Claim every due feed and ingest each one. Serial on purpose.
 
-    Serial because the per-item work is already the expensive part (a Firecrawl scrape plus two LLM
+    Serial because the per-item work is already the expensive part (a ScraperAPI scrape plus two LLM
     calls) and all of it is rate-limited per provider by ``call_provider``. Fanning out feeds would
     only move the queueing from this loop into the budget's wait.
     """

@@ -36,7 +36,7 @@ def test_every_provider_the_engine_actually_calls_has_a_limit() -> None:
         "gemini",
         "perplexity",
         "openai",
-        "firecrawl",
+        "scraperapi",
         "kieai",
         "stealthgpt",
     }
@@ -178,7 +178,7 @@ async def test_the_gate_fails_open_when_commands_fail() -> None:
 
 @pytest.mark.asyncio
 async def test_call_provider_still_calls_through_when_redis_commands_fail() -> None:
-    """The path that actually broke: embeddings / firecrawl / kieai go through call_provider, which
+    """The path that actually broke: embeddings / scraperapi / kieai go through call_provider, which
     has no router above it to contain a raise."""
     budget = ProviderBudget(
         redis_client=_CommandsFail(),  # type: ignore[arg-type]
@@ -390,7 +390,7 @@ async def test_with_retry_does_not_sleep_on_a_non_retryable_error() -> None:
         slept.append(d)
 
     with pytest.raises(httpx.HTTPStatusError):
-        await retry_mod.with_retry(_bad_request, provider="firecrawl", sleep=_sleep)
+        await retry_mod.with_retry(_bad_request, provider="scraperapi", sleep=_sleep)
     assert slept == []
 
 
@@ -416,11 +416,11 @@ async def test_call_provider_counts_exactly_one_request(fake_redis: Any) -> None
 @pytest.mark.asyncio
 async def test_a_failed_call_is_still_counted(fake_redis: Any) -> None:
     """The provider counted it. A failure that goes unrecorded makes the window under-report."""
-    budget = ProviderBudget(redis_client=fake_redis, limits={"firecrawl": ProviderLimits(rpm=10)})
+    budget = ProviderBudget(redis_client=fake_redis, limits={"scraperapi": ProviderLimits(rpm=10)})
 
     async def _work() -> str:
         raise _http_error(400)
 
     with pytest.raises(httpx.HTTPStatusError):
-        await call_provider("firecrawl", _work, budget=budget)
-    assert (await budget.snapshot("firecrawl", ""))["requests"] == 1
+        await call_provider("scraperapi", _work, budget=budget)
+    assert (await budget.snapshot("scraperapi", ""))["requests"] == 1

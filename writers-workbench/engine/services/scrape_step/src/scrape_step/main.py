@@ -1,39 +1,22 @@
-"""scrape-svc — fetch supplemental source URLs (Firecrawl) with per-URL error filtering."""
+"""scrape-svc — fetch supplemental source URLs (ScraperAPI) with per-URL error filtering."""
 
 from __future__ import annotations
+
+import asyncio
 
 import httpx
 
 from writer_engine.config import get_settings
-from writer_engine.rate_limit.provider_budget import call_provider
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
+from writer_engine.scraping import FETCH_TIMEOUT_S, fetch_page
 from writer_engine.step_service import build_step_app
 
 STEP_NAME = "scrape"
 
-
-async def _firecrawl(url: str, key: str) -> dict[str, str]:
-    """Single-URL scrape against Firecrawl v1."""
-    async with httpx.AsyncClient(timeout=30.0) as client:
-
-        async def _post() -> httpx.Response:
-            resp = await client.post(
-                "https://api.firecrawl.dev/v1/scrape",
-                headers={"authorization": f"Bearer {key}", "content-type": "application/json"},
-                json={"url": url, "formats": ["markdown"]},
-            )
-            resp.raise_for_status()
-            return resp
-
-        # B8: a newsletter fans this out once per story, so it is the easiest way to hit Firecrawl's
-        # per-minute limit — and it had neither a budget nor a retry.
-        resp = await call_provider("firecrawl", _post)
-        data = resp.json()
-        return {
-            "url": url,
-            "markdown": (data.get("data") or {}).get("markdown") or "",
-            "title": ((data.get("data") or {}).get("metadata") or {}).get("title") or "",
-        }
+URL_DEADLINE_S = 120.0
+"""One URL's whole budget, retries and the rendered fallback included. The newsletter saga gives this
+step 180s, so the URLs run side by side and each is cut off inside that, rather than one hanging page
+taking every other source of the story down with it."""
 
 
 async def handler(inp: StepInput) -> StepOutput:
@@ -41,15 +24,26 @@ async def handler(inp: StepInput) -> StepOutput:
     settings = get_settings()
     scraped: list[dict[str, str]] = []
     errors: list[dict[str, str]] = []
-    if not settings.firecrawl_api_key:
+    if not settings.scraperapi_api_key:
         # Fixture: echo the URLs back without content so downstream still wires.
         scraped = [{"url": u, "markdown": "(scrape provider not configured)", "title": ""} for u in urls]
     else:
-        for url in urls:
-            try:
-                scraped.append(await _firecrawl(url, settings.firecrawl_api_key))
-            except Exception as exc:
-                errors.append({"url": url, "error": type(exc).__name__})
+        # B8: a newsletter fans this out once per story; fetch_page goes through the shared
+        # scraperapi budget and its retry.
+        async with httpx.AsyncClient(timeout=FETCH_TIMEOUT_S) as client:
+
+            async def _one(url: str) -> tuple[str, str, str]:
+                try:
+                    page = await asyncio.wait_for(fetch_page(url, client=client), URL_DEADLINE_S)
+                except TimeoutError:
+                    return url, "", "TimeoutError"
+                return url, page.markdown if not page.error else "", page.error or page.title
+
+            for url, markdown, detail in await asyncio.gather(*(_one(u) for u in urls)):
+                if markdown:
+                    scraped.append({"url": url, "markdown": markdown, "title": detail})
+                else:
+                    errors.append({"url": url, "error": detail.split(":", 1)[0]})
     return StepOutput(
         execution_id=inp.execution_id,
         step_name=STEP_NAME,

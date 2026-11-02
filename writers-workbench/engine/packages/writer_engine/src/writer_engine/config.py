@@ -57,14 +57,18 @@ class EngineSettings(BaseSettings):
 
     # Image / scrape
     kieai_api_key: str = Field(default="", alias="KIEAI_API_KEY")
-    firecrawl_api_key: str = Field(default="", alias="FIRECRAWL_API_KEY")
-    # Scraping can be switched off without removing the key. Set false on DEV 2026-10-18: the
-    # Firecrawl account is out of credits, so every scrape answered 402 and 62 of 72 items on the
-    # first live tick were lost to a billing state. Off, the pipeline ingests what the feeds already
-    # syndicate (Medium, Clarkesworld, Escape Pod, Strange Horizons, reddit self posts) and records
-    # the rest as deferred rather than failed — so the number does not lie about why they are not
-    # there. Turn it back on when the account is topped up or a substitute scraper is wired in.
-    firecrawl_enabled: bool = Field(default=True, alias="FIRECRAWL_ENABLED")
+    # Scraping (writer_engine.scraping). ScraperAPI replaced Firecrawl 2026-11-01: the Firecrawl
+    # account ran out of credits on 2026-10-18 and every scrape answered 402.
+    scraperapi_api_key: str = Field(default="", alias="SCRAPERAPI_API_KEY")
+    # Scraping can be switched off without removing the key. Off, the pipeline ingests what the
+    # feeds already syndicate and records the rest as deferred rather than failed, so the count does
+    # not lie about why they are not there.
+    scraper_enabled: bool = Field(default=True, alias="SCRAPER_ENABLED")
+    # Re-fetch with JavaScript rendering (10 credits instead of 1) when the plain page has no
+    # readable body.
+    scraper_render_fallback: bool = Field(default=True, alias="SCRAPER_RENDER_FALLBACK")
+    # Optional two-letter proxy country (e.g. "us"). Empty lets ScraperAPI choose.
+    scraperapi_country_code: str = Field(default="", alias="SCRAPERAPI_COUNTRY_CODE")
 
     # Humanizer (E6). StealthGPT REST: POST https://www.stealthgpt.ai/api/stealthify with an
     # `api-token` header, max 3000 words per request. Empty = the humanize pass is OFF, which is the
@@ -234,7 +238,7 @@ class EngineSettings(BaseSettings):
     # each feed row carries its own `fetch_interval_minutes` (180 or 240 on DEV) and the tick only
     # picks up the ones whose interval has elapsed, so a shorter tick costs one cheap query.
     ingestion_poll_seconds: float = Field(default=1800.0, alias="INGESTION_POLL_SECONDS")
-    # Per-feed item ceiling for one run. Each item can cost a Firecrawl scrape plus two LLM calls,
+    # Per-feed item ceiling for one run. Each item can cost a ScraperAPI scrape plus two LLM calls,
     # so this is the knob that bounds a tick's spend when an aggregator feed has a busy day.
     ingestion_max_items_per_feed: int = Field(default=25, alias="INGESTION_MAX_ITEMS_PER_FEED")
     # How many due feeds one tick claims. 100 covers the 32 live rows with room for growth.

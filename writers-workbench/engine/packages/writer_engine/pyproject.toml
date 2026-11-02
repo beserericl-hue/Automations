@@ -25,6 +25,7 @@ dependencies = [
     # ENABLE_PYTHON_EMBEDDINGS=true is useless unless it is installed — retrieval silently degrades
     # to no grounding, which is the exact silent-no-op class A1 exists to prevent.
     "openai>=1.40.0",
+    "trafilatura>=2.0",
 ]
 
 [build-system]

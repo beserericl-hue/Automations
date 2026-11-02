@@ -11,7 +11,7 @@ Where this was missing before B8:
     openai      AsyncOpenAI (SDK default 2)        retries
     gemini      genai.generate_content             NO retry at all
     perplexity  httpx + raise_for_status           NO retry at all
-    firecrawl   httpx                              NO retry at all
+    firecrawl   httpx                              NO retry at all (replaced by scraperapi)
     kieai       httpx                              NO retry at all
 
 gemini carries every hub turn (voice and chat) and perplexity is the whole of ``research.run``, so a
