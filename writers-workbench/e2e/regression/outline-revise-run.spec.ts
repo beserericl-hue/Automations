@@ -32,8 +32,9 @@ const DIRECTIVE =
 
 test.describe('Revise outline (real engine job)', () => {
   let projectId = '';
+  const projectTitle = `E2E Revise Run ${Date.now()}`;
   test.beforeAll(async () => {
-    projectId = await seedProject({ title: `E2E Revise Run ${Date.now()}`, outline: OUTLINE });
+    projectId = await seedProject({ title: projectTitle, outline: OUTLINE });
   });
   test.afterAll(async () => {
     if (!projectId) return;
@@ -60,11 +61,15 @@ test.describe('Revise outline (real engine job)', () => {
         return (row?.outline?.chapters ?? []).map((c: any) => String(c.title ?? ''));
       }, { timeout: 840_000, intervals: [10_000], message: 'brainstorm.revise-outline never persisted a revised outline' })
       .toContain(NEW_TITLE);
+    // The prior outline is snapshotted: by the engine ("pre-revision snapshot") and, on DEV, also by
+    // the outline-change trigger ("Auto-snapshot before outline change"). Every snapshot is the OLD one.
     const versions = await supaGet('outline_versions_v2', `project_id=eq.${projectId}&select=version_number,outline,revision_note`);
-    expect(versions).toHaveLength(1);
-    expect(versions[0].outline.chapters.map((c: any) => c.title)).toEqual(['The Signal', 'The Answer']);
+    expect(versions.length).toBeGreaterThanOrEqual(1);
+    expect(versions.map((v: any) => v.revision_note)).toContain('pre-revision snapshot');
+    for (const v of versions) expect(v.outline.chapters.map((c: any) => c.title)).toEqual(['The Signal', 'The Answer']);
     const [after] = await supaGet('writing_projects_v2', `id=eq.${projectId}&select=outline,chapter_count`);
-    expect(after.outline.title).toBe(OUTLINE.title); // title lock
+    // Title lock: the route sends the PROJECT's title, which the revision keeps.
+    expect(after.outline.title).toBe(projectTitle);
     expect(after.outline.chapters.length).toBeGreaterThanOrEqual(3);
     expect(after.chapter_count).toBe(after.outline.chapters.length);
 
@@ -72,7 +77,8 @@ test.describe('Revise outline (real engine job)', () => {
     // the revision count without a reload.
     await expect(page.getByTestId('outline-revise-result')).toContainText(`Outline revised: 2 → ${after.outline.chapters.length} chapters`, { timeout: 60_000 });
     await expect(page.getByText(NEW_TITLE).first()).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText('1 prior revisions')).toBeVisible({ timeout: 30_000 });
+    // Shown twice (Book Overview header and the chapter list header); both must have refreshed.
+    await expect(page.getByText(`${versions.length} prior revisions`)).toHaveCount(2, { timeout: 30_000 });
     await expect(page.getByLabel('Outline revision instructions')).toBeEnabled();
   });
 });

@@ -5,7 +5,7 @@ import { apiClient } from '../pages/api';
  * Engine scheduler (cron) health — RESULT-asserting, against the live DEV engine.
  *
  * The admin API reads /admin/scheduler from every runtime replica with the engine admin token (held
- * server-side only) and merges them. DEV runs two or more runtime replicas and eight scheduled jobs;
+ * server-side only) and merges them. DEV runs two or more runtime replicas and nine scheduled jobs;
  * every one must be reported, with a health verdict consistent with its own last run, and the Admin →
  * Engine Fleet tab must show the same jobs and verdicts. The browser never sees the admin token: its
  * only request is /api/admin/engine-scheduler with the user's own bearer token.
@@ -19,6 +19,7 @@ const EXPECTED_JOBS = [
   'queue-metrics',
   'autoscale',
   'workbench-lifecycle',
+  'eve-kb-prune',
 ];
 
 async function scheduler(): Promise<any> {
@@ -34,16 +35,22 @@ test.describe('Engine scheduler (result-asserting)', () => {
   test('the API reports every scheduled job, merged across the runtime replicas', async () => {
     const data = await scheduler();
     expect(data.running).toBe(true);
-    // Every runtime replica was asked, and they all answered.
-    expect(data.replicas.length).toBeGreaterThanOrEqual(2);
-    expect(data.replicas.every((r: any) => r.ok)).toBe(true);
-    expect(data.jobs.map((j: any) => j.name).sort()).toEqual([...EXPECTED_JOBS].sort());
+    // Every runtime replica the private name resolves to was asked, and at least two answered. Not
+    // "all": this suite runs right after a deploy, and an engine rollout briefly resolves to a replica
+    // that is going away (the API lists it as not answering, which is the point of listing it).
+    const answered = data.replicas.filter((r: any) => r.ok);
+    expect(answered.length).toBeGreaterThanOrEqual(2);
+    for (const r of data.replicas.filter((x: any) => !x.ok)) expect(typeof r.error).toBe('string');
+    // At least these; the engine adds jobs over time, and each new one must show up here too.
+    const names = data.jobs.map((j: any) => j.name);
+    for (const name of EXPECTED_JOBS) expect(names).toContain(name);
+    expect(new Set(names).size).toBe(names.length);
 
     for (const j of data.jobs) {
       expect(j.interval_s, j.name).toBeGreaterThan(0);
       expect(['ok', 'failing', 'overdue', 'waiting', 'pending'], j.name).toContain(j.health);
       // One entry per replica, and the merged counters are their sums.
-      expect(j.replicas.length, j.name).toBe(data.replicas.length);
+      expect(j.replicas.length, j.name).toBe(answered.length);
       expect(j.ticks, j.name).toBe(j.replicas.reduce((n: number, r: any) => n + r.ticks, 0));
       if (j.last_run) {
         // The merged last run is the latest replica's, and the next run is one interval after it.
@@ -60,6 +67,9 @@ test.describe('Engine scheduler (result-asserting)', () => {
     const metrics = data.jobs.find((j: any) => j.name === 'queue-metrics');
     expect(metrics.singleton).toBe(false);
     expect(metrics.ticks).toBeGreaterThan(0);
+    // The Eve KB prune is a deliberate no-op on DEV (no ElevenLabs key): once it has run, it says so.
+    const prune = data.jobs.find((j: any) => j.name === 'eve-kb-prune');
+    if (prune.last_run) expect(String(prune.last_result?.skipped ?? ''), 'eve-kb-prune').toContain('not configured');
     // Only the merged view comes back — no engine credentials or raw config.
     expect(Object.keys(data).sort()).toEqual(['checked_at', 'jobs', 'replicas', 'running']);
   });
@@ -73,10 +83,10 @@ test.describe('Engine scheduler (result-asserting)', () => {
     const section = page.getByTestId('engine-scheduler');
     await expect(section).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId('scheduler-jobs')).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByTestId('scheduler-jobs').locator('tbody tr')).toHaveCount(EXPECTED_JOBS.length);
-    await expect(page.getByTestId('scheduler-summary')).toContainText(`${EXPECTED_JOBS.length} jobs`);
-
     const data = await scheduler();
+    await expect(page.getByTestId('scheduler-jobs').locator('tbody tr')).toHaveCount(data.jobs.length);
+    await expect(page.getByTestId('scheduler-summary')).toContainText(`${data.jobs.length} jobs`);
+
     for (const j of data.jobs) {
       const row = page.getByTestId(`scheduler-job-${j.name}`);
       await expect(row).toBeVisible();

@@ -33,6 +33,21 @@ describe('mergeSchedulerReports', () => {
     expect(radar.replicas.map((r) => r.instance)).toEqual(['a', 'b']);
   });
 
+  it('carries the latest run\'s own result, so a deliberate skip is visible', () => {
+    const [prune] = mergeSchedulerReports(
+      [
+        { instance: 'a', jobs: [job({ name: 'eve-kb-prune', interval_s: 21600, skipped: 1 })] },
+        {
+          instance: 'b',
+          jobs: [job({ name: 'eve-kb-prune', interval_s: 21600, ticks: 1, last_run: ago(60), last_result: { skipped: 'ELEVENLABS_API_KEY/ELEVENLABS_AGENT_ID not configured', deleted: 0 } })],
+        },
+      ],
+      NOW,
+    );
+    expect(prune).toMatchObject({ health: 'ok', last_result: { skipped: 'ELEVENLABS_API_KEY/ELEVENLABS_AGENT_ID not configured', deleted: 0 } });
+    expect(mergeSchedulerReports([{ instance: 'a', jobs: [job({ name: 'radar' })] }], NOW)[0].last_result).toBeNull();
+  });
+
   it('flags a job whose latest run failed, but not one whose old failure was followed by a good run elsewhere', () => {
     const jobs = mergeSchedulerReports(
       [
@@ -43,6 +58,18 @@ describe('mergeSchedulerReports', () => {
     );
     expect(jobs.find((j) => j.name === 'ingestion')).toMatchObject({ health: 'failing', last_error: 'RuntimeError: boom' });
     expect(jobs.find((j) => j.name === 'cadence')).toMatchObject({ health: 'ok', last_error: null });
+  });
+
+  it('carries the latest successful run’s result, when the engine reports one', () => {
+    const [prune, plain] = mergeSchedulerReports(
+      [
+        { instance: 'a', jobs: [job({ name: 'eve-kb-prune', ticks: 1, last_run: ago(50), last_result: { skipped: 'not configured' } }), job({ name: 'radar' })] },
+        { instance: 'b', jobs: [job({ name: 'eve-kb-prune', ticks: 1, last_run: ago(500), last_result: { deleted: 2 } }), job({ name: 'radar' })] },
+      ],
+      NOW,
+    );
+    expect(prune.last_result).toEqual({ skipped: 'not configured' });
+    expect(plain.last_result).toBeNull();
   });
 
   it('calls a job overdue after two intervals plus grace, and tells never-run jobs apart', () => {

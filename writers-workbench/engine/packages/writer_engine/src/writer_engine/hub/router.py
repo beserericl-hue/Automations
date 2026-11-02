@@ -612,6 +612,134 @@ def _social_params(message: str) -> dict[str, Any]:
     return params
 
 
+# --- story-bible writes: "add <entry> to the story bible …" / "update <entry> in the story bible …" ---
+# Deterministic because the message carries free text (the description) that would otherwise trip
+# every other rule — a description mentioning "research" or "write a newsletter" must not start one.
+_BIBLE_LEAD = re.compile(
+    r"^\s*(?:please\s+|now\s+|also\s+|can\s+you\s+|could\s+you\s+)*"
+    r"(add|put|record|create|insert|update|change|edit|revise|modify|rename|append)\b",
+    re.I,
+)
+_BIBLE_WORD = re.compile(r"\bbible\b", re.I)
+_BIBLE_UPDATE_VERBS = {"update", "change", "edit", "revise", "modify", "rename", "append"}
+_BIBLE_TYPE_WORDS = (
+    r"character|person|place|location|setting|object|item|artifact|artefact|concept|"
+    r"faction|organi[sz]ation|technology|event"
+)
+_BIBLE_DESC_MARKER = re.compile(
+    r"\s*(?:\bwith\s+(?:the\s+)?description\b|\bdescription\b|\bsaying\b|\bto\s+say\b|\bto\s+read\b)\s*[:=]?\s*",
+    re.I,
+)
+_BIBLE_PROJECT = re.compile(
+    r"\bbible\s+(?:for|of|in|on)\s+(?:the\s+(?:book|project|novel|series|story)\s+)?"
+    r"[\"“]?(.+?)[\"”]?\s*$",
+    re.I,
+)
+_BIBLE_AS_TYPE = re.compile(rf"\s*\bas\s+(?:a|an|the)\s+(?:new\s+)?({_BIBLE_TYPE_WORDS})\b", re.I)
+_BIBLE_TYPE_LABEL = re.compile(r"\b(?:type|entry\s+type)\s*[:=]\s*([a-z_]+)", re.I)
+_BIBLE_RENAME = re.compile(
+    rf"\brename\s+(?:the\s+)?(?:(?:{_BIBLE_TYPE_WORDS})\s+)?[\"“]?(.+?)[\"”]?\s+to\s+[\"“]?(.+?)[\"”]?"
+    r"\s+(?:in|on|within)\s+(?:the\s+|my\s+|our\s+)?(?:story\s+)?bible\b",
+    re.I,
+)
+_BIBLE_NAMED = re.compile(
+    r"\b(?:named|called)\s+[\"“]?(.+?)[\"”]?(?=\s+(?:to|in|into|on|as|for|from)\s|\s*$)", re.I
+)
+_BIBLE_AFTER_VERB = re.compile(
+    r"^\s*(?:please\s+|now\s+|also\s+|can\s+you\s+|could\s+you\s+)*"
+    r"(?:add|put|record|create|insert|update|change|edit|revise|modify|append)\s+"
+    r"(?:to\s+)?(?:(?:a|an|the|new|entry|for)\s+)*"
+    rf"(?:({_BIBLE_TYPE_WORDS})\s+)?(?:entry\s+(?:for\s+)?)?"
+    r"[\"“]?(.+?)[\"”]?(?:['\u2019]s\s+(?:description|entry|bio|details))?"
+    r"\s+(?:to|in|into|on|within)\s+(?:the\s+|my\s+|our\s+)?(?:story\s+)?bible\b",
+    re.I,
+)
+_BIBLE_ARTICLE_TYPE = re.compile(rf"\b(?:a|an|the|new)\s+({_BIBLE_TYPE_WORDS})\b", re.I)
+
+
+def _bible_write_params(message: str) -> tuple[str, dict[str, Any]] | None:
+    """Parse a story-bible add/update request into ``(op, params)``, or None when it isn't one or
+    no entry name can be found (then Gemini, which knows the story_bible ops, gets the message).
+
+    Handles the shapes people type: "Add a character named Mara Voss to the story bible for "The Last
+    Signal": a salvage pilot", "Update Mara Voss in the story bible: now captain of the Wren",
+    "Rename Osei to Osei Asante in the story bible", "Add to Mara Voss's description in the story
+    bible: lost her arm at Ceres" (append). The entry_type is passed as typed; the op maps it onto the
+    canonical vocabulary."""
+    lead = _BIBLE_LEAD.match(message or "")
+    if not lead or not _BIBLE_WORD.search(message):
+        return None
+    verb = lead.group(1).lower()
+    text = message.strip()
+    low = text.lower()
+    op = "update" if verb in _BIBLE_UPDATE_VERBS else "add"
+    params: dict[str, Any] = {}
+    if verb == "append" or re.search(r"^\W*(?:please\s+)?add\s+to\b.{0,80}\bdescription\b", low):
+        op = "update"
+        params["mode"] = "append"
+
+    # 1. description: after the first colon, else after an explicit marker ("description …").
+    head, desc = text, ""
+    if ":" in text:
+        head, desc = text.split(":", 1)
+    else:
+        dm = _BIBLE_DESC_MARKER.search(text)
+        if dm and dm.start() > 0:
+            head, desc = text[: dm.start()], text[dm.end() :]
+        else:
+            parts = re.split(r"\s+[\u2014\u2013]\s+", text, maxsplit=1)
+            if len(parts) == 2:
+                head, desc = parts
+    desc = desc.strip().strip('"“”').strip()
+    if desc:
+        params["description"] = desc
+    head = head.strip().rstrip(".")
+
+    # 2. entry type: "as a character" / "type: place" / "a new character …".
+    tm = _BIBLE_AS_TYPE.search(head)
+    if tm:
+        params["entry_type"] = tm.group(1).lower()
+        head = (head[: tm.start()] + head[tm.end() :]).strip()
+    else:
+        tl = _BIBLE_TYPE_LABEL.search(head)
+        if tl:
+            params["entry_type"] = tl.group(1).lower()
+            head = (head[: tl.start()] + head[tl.end() :]).strip(" ,")
+
+    # 3. project: "… story bible for "Title"" (the tail of the head clause).
+    pm = _BIBLE_PROJECT.search(head)
+    if pm:
+        title = pm.group(1).strip(' ."“”')
+        if title and title.lower() not in {"it", "this", "that", "this book", "this project", "the book"}:
+            params["project_title"] = title
+
+    # 4. the entry name (and, for a rename, the new name).
+    name: str | None = None
+    rm = _BIBLE_RENAME.search(head)
+    if rm:
+        op = "update"
+        name, params["new_name"] = rm.group(1).strip(), rm.group(2).strip()
+    else:
+        nm = _BIBLE_NAMED.search(head)
+        if nm:
+            name = nm.group(1)
+        else:
+            am = _BIBLE_AFTER_VERB.search(head)
+            if am:
+                name = am.group(2)
+                if am.group(1) and "entry_type" not in params:
+                    params["entry_type"] = am.group(1).lower()
+    if "entry_type" not in params:
+        at = _BIBLE_ARTICLE_TYPE.search(head)
+        if at:
+            params["entry_type"] = at.group(1).lower()
+    name = (name or "").strip(" .,\"“”'")
+    if not name or name.lower() in {"this", "that", "it", "him", "her", "them", "an entry", "entry"}:
+        return None
+    params["name"] = name
+    return op, params
+
+
 def _decide(tool: str, op: str, params: dict[str, Any], conf: float = 0.6) -> HubDecision:
     spec = lookup(tool, op)
     return HubDecision(
@@ -653,11 +781,35 @@ def _numbered_selection(req: HubRequest) -> HubDecision | None:
     if not isinstance(item, dict):
         return None
     title = item.get("project_title") or item.get("title") or item.get("name")
-    params: dict[str, Any] = {"content_type": item.get("content_type", "outline")}
-    if title:
-        params["project_title"] = title
-    if item.get("project_id"):
-        params["project_id"] = item["project_id"]
+    ctype = item.get("content_type", "outline")
+
+    # A story-bible list (hub.memory records one from story_bible.list): show that one entry.
+    if ctype == "story_bible_entry":
+        bparams: dict[str, Any] = {"name": item.get("name") or title}
+        if item.get("project_id"):
+            bparams["project_id"] = item["project_id"]
+        return HubDecision(
+            kind="info",
+            tool="story_bible",
+            op="list",
+            params=bparams,
+            assistant_message=f"Here's {title or 'that entry'} from the story bible.",
+            confidence=0.9,
+        )
+
+    params: dict[str, Any] = {"content_type": ctype}
+    if ctype == "outline":
+        if title:
+            params["project_title"] = title
+        if item.get("project_id"):
+            params["project_id"] = item["project_id"]
+    else:
+        # Published content / research / arcs: the retrieve op narrows by title keywords, so the pick
+        # comes back as that one item rather than the whole project's list it was shown in.
+        if title:
+            params["search_term"] = title
+        if item.get("project_id"):
+            params["project_id"] = item["project_id"]
     return HubDecision(
         kind="info",
         tool="library",
@@ -678,6 +830,11 @@ def _deterministic_override(message: str) -> HubDecision | None:
     (G3/G7/G10/G13/G14/G16/G17). Returns None for anything not on this whitelist (→ normal routing)."""
     msg = (message or "").strip()
     low = msg.lower()
+    # Story-bible add/update — first, because its description is free text that can contain any
+    # other rule's trigger words ("… she emails me research reports" must not start research.run).
+    bw = _bible_write_params(msg)
+    if bw is not None:
+        return _decide("story_bible", bw[0], bw[1], 0.85)
     if _EMAIL_INTENT.search(low):  # 'email me …' keeps its own precedence
         return None
     # 'call me back' is the eve-callback flow — defer so it isn't stolen by the research/retrieve rules
@@ -719,7 +876,9 @@ def _deterministic_override(message: str) -> HubDecision | None:
         return _decide("library", "retrieve", {"content_type": "research", "search_term": title or msg}, 0.8)
 
     # G3 — read the story bible (not write to it).
-    if "story bible" in low and not re.search(r"\b(write|create|add|update|generate|build)\b", low):
+    if "story bible" in low and not re.search(
+        r"\b(write|create|add|update|generate|build|change|edit|rename|modify|revise|put|record)\b", low
+    ):
         params: dict[str, Any] = {}
         t = _extract_project_title(msg)
         if t:
@@ -971,6 +1130,12 @@ def _router_system() -> str:
         "of Y to version 2' = library.revert (put scope=outline|chapter + version_number + project_title "
         "+ chapter_number). TRASH: 'delete the draft titled X' = library.lifecycle action=delete; "
         "'undelete X' = action=undelete; 'show my deleted/trash' = action=list_deleted.\n"
+        "- STORY BIBLE: 'show/get the story bible' = story_bible.list. 'add <entry> to the story bible "
+        "[for <project>]: <description>' = story_bible.add (name, entry_type, description, "
+        "project_title). 'update/change/rename <entry> in the story bible' = story_bible.update (name = "
+        "the entry as it is now; description and/or new_name / new_entry_type = the change; "
+        "mode=append when they ADD to the description). entry_type is one of character, place, "
+        "object, concept, event. If no project is named, leave it out — the active project is used.\n"
         "- Extract any params you can from the message into 'params' (project_title, chapter_number, "
         "genre, story_arc, url, directive, action, content_type, title, search_term, subject, recipient, "
         "content, scope, version_number, content_id, mode). Leave unknown params out — never invent.\n"
@@ -986,9 +1151,22 @@ async def _gemini_route(req: HubRequest, router: LLMRouter, model: str) -> HubDe
     ctx = ""
     if req.context.get("project_title"):
         ctx += f"\nActive project: {req.context['project_title']}"
-    if req.context.get("last_list"):
-        n = len(req.context["last_list"])
-        ctx += f"\n(There is a list of {n} items currently shown to the user.)"
+    last_list = req.context.get("last_list")
+    if isinstance(last_list, list) and last_list:
+        shown = "; ".join(
+            f"{i}. {it.get('title') or it.get('name') or '?'}"
+            for i, it in enumerate(last_list[:10], start=1)
+            if isinstance(it, dict)
+        )
+        ctx += f"\n(There is a list of {len(last_list)} items currently shown to the user: {shown})"
+    turns = req.context.get("recent_turns")
+    if isinstance(turns, list) and turns:
+        # The last few lines of THIS conversation, so "that one" / "do the same for chapter 4" has a
+        # referent. Short on purpose: the router picks a tool, it does not hold the conversation.
+        lines = [
+            f"{t.get('role')}: {str(t.get('text') or '')[:160]}" for t in turns[-6:] if isinstance(t, dict)
+        ]
+        ctx += "\nRecent conversation:\n" + "\n".join(lines)
     prompt = f"User message:\n{req.message}{ctx}"
     from writer_engine.telemetry import token_accounting
 

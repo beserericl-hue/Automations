@@ -349,6 +349,56 @@ def _is_junk_bible_name(name: str, entry_type: str) -> bool:
     return False
 
 
+# The canonical story-bible vocabulary (A6): what ``schemas.chapter.BibleEntry`` emits and what the
+# client groups by first. ``story_bible_v2.entry_type`` has no CHECK, so anything typed by a person
+# (chat, voice) is mapped onto these words here rather than accreting a sixth type per phrasing.
+CANONICAL_ENTRY_TYPES: tuple[str, ...] = ("character", "place", "object", "concept", "event")
+_ENTRY_TYPE_SYNONYMS: dict[str, str] = {
+    "person": "character",
+    "people": "character",
+    "characters": "character",
+    "cast": "character",
+    "protagonist": "character",
+    "antagonist": "character",
+    "villain": "character",
+    "location": "place",
+    "locations": "place",
+    "setting": "place",
+    "places": "place",
+    "city": "place",
+    "planet": "place",
+    "item": "object",
+    "items": "object",
+    "artifact": "object",
+    "artefact": "object",
+    "weapon": "object",
+    "ship": "object",
+    "objects": "object",
+    "faction": "concept",
+    "organization": "concept",
+    "organisation": "concept",
+    "group": "concept",
+    "technology": "concept",
+    "world_rule": "concept",
+    "rule": "concept",
+    "lore": "concept",
+    "concepts": "concept",
+    "timeline": "event",
+    "battle": "event",
+    "events": "event",
+}
+
+
+def normalize_entry_type(raw: Any) -> str | None:
+    """Map a typed entry type onto the canonical vocabulary; None when it is not recognisable."""
+    t = re.sub(r"[\s-]+", "_", str(raw or "").strip().lower())
+    if not t:
+        return None
+    if t in CANONICAL_ENTRY_TYPES:
+        return t
+    return _ENTRY_TYPE_SYNONYMS.get(t)
+
+
 _TRAILING_PAREN = re.compile(r"\s*\(([^)]*)\)\s*$")
 
 

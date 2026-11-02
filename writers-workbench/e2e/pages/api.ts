@@ -208,6 +208,8 @@ export async function seedCalendarPost(fields: {
   channels?: string[];
   linkedinContent?: string;
   state?: string;
+  /** social_schedule_v2.humanize (migration 042): what the radar drafter's humanize pass recorded. */
+  humanize?: Record<string, unknown>;
 }): Promise<{ id: string; display_number: number }> {
   const res = await fetch(`${SUPA_URL}/rest/v1/social_schedule_v2`, {
     method: 'POST',
@@ -218,6 +220,7 @@ export async function seedCalendarPost(fields: {
       channels: fields.channels ?? ['li_personal'], scheduled_date: fields.scheduledDate, slot: fields.slot ?? 'morning',
       // The trigger recomputes this from date + slot.
       scheduled_at: `${fields.scheduledDate}T12:00:00Z`, state: fields.state ?? 'pending', source: 'manual',
+      ...(fields.humanize ? { humanize: fields.humanize } : {}),
     }),
   });
   if (!res.ok) throw new Error(`seedCalendarPost ${res.status}: ${(await res.text()).slice(0, 200)}`);

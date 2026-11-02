@@ -110,8 +110,11 @@ class HumanizeResult:
     """True when the per-run word ceiling halted the pass. The remaining chunks keep their original
     text, exactly like a failed chunk."""
     rejected: dict[int, str] = field(default_factory=dict)
-    """chunk index -> why its rewrite was thrown away (names_lost / structure_collapsed). Measured
-    rejections, not provider errors: the call succeeded and the OUTPUT was unacceptable."""
+    """chunk index -> why its rewrite was thrown away (terms_lost / links_lost / structure_collapsed).
+    Measured rejections, not provider errors: the call succeeded and the OUTPUT was unacceptable."""
+    retried: dict[int, str] = field(default_factory=dict)
+    """chunk index -> "<mode>:accepted" or "<mode>:<reason>" for a structure_collapsed chunk that was
+    re-sent once in ``HUMANIZE_COLLAPSE_RETRY_MODE``. Both calls bill."""
     skipped: str = ""
     """Why nothing happened, when nothing happened (not configured / empty input)."""
 
@@ -136,6 +139,7 @@ class HumanizeResult:
             "detectability": self.detectability,
             "stopped_at_budget": self.stopped_at_budget,
             "rejected": self.rejected,
+            "retried": self.retried,
             "skipped": self.skipped or None,
         }
 
@@ -195,6 +199,14 @@ def _paragraphs(text: str) -> int:
     return len([p for p in _PARA_SPLIT.split(text.strip()) if p.strip()])
 
 
+_URL_RE = re.compile(r"https?://[^\s)\]>\"'<]+")
+
+
+def links_in(text: str) -> set[str]:
+    """The URLs in ``text``, without trailing sentence punctuation."""
+    return {u.rstrip(".,;:!?") for u in _URL_RE.findall(text)}
+
+
 def judge_rewrite(
     original: str,
     rewritten: str,
@@ -219,6 +231,11 @@ def judge_rewrite(
       and a turn every few pages — so a rewrite that reads as a wall of text is not an improvement
       whatever it scores.
     """
+    gone = links_in(original) - links_in(rewritten)
+    if gone:
+        # A non-fiction draft's links are its sources and its call to action; a roundup post IS its
+        # link. A rewrite that drops or mangles one is not publishable however it reads.
+        return f"links_lost:{len(gone)}"
     lost = terms_present(original, protect) - terms_present(rewritten, protect)
     if lost:
         return f"terms_lost:{','.join(sorted(lost))}"
@@ -254,6 +271,48 @@ async def _stealthify(
         return dict(resp.json() or {})
 
 
+async def _retry_collapsed(
+    i: int,
+    chunk: str,
+    retry_mode: str,
+    payload: dict[str, Any],
+    result: str,
+    verdict: str,
+    protect: Iterable[str],
+    call: Any,
+    use_model: str,
+    out: HumanizeResult,
+    bill: Any,
+) -> tuple[dict[str, Any], str, str]:
+    """Re-send a ``structure_collapsed`` chunk once in ``retry_mode``. Returns the payload, result
+    and verdict to use: the retry's when it was accepted, else the first attempt's verdict with the
+    retry's reason appended."""
+    from writer_engine.rate_limit.provider_budget import call_provider
+
+    async def _again() -> dict[str, Any]:
+        return dict(await call(chunk, retry_mode))
+
+    try:
+        second = await call_provider(
+            "stealthgpt", _again, model=use_model, input_tokens=len(chunk.split()), attempts=2
+        )
+    except Exception as exc:
+        out.retried[i] = f"{retry_mode}:error:{type(exc).__name__}"
+        return payload, result, verdict
+    second_text = str(second.get("result") or "").strip()
+    if not second_text:
+        out.retried[i] = f"{retry_mode}:empty_result"
+        return payload, result, verdict
+    bill(second)
+    second_verdict = judge_rewrite(chunk, second_text, protect=protect)
+    logger.info("humanize.collapse_retry", chunk=i, mode=retry_mode, verdict=second_verdict or "accepted")
+    if not second_verdict:
+        out.retried[i] = f"{retry_mode}:accepted"
+        return second, second_text, ""
+    out.retried[i] = f"{retry_mode}:{second_verdict}"
+    return payload, result, f"{verdict};retry_{retry_mode}:{second_verdict}"
+
+
 async def humanize_text(
     text: str,
     *,
@@ -262,11 +321,16 @@ async def humanize_text(
     output_format: str | None = None,
     protect: Iterable[str] = (),
     timeout_s: float = 180.0,
+    budget_words: int | None = None,
 ) -> HumanizeResult:
     """Humanize ``text``, preserving its scene structure and the dash ban.
 
     Never raises for a provider failure: a chunk that cannot be humanized keeps its original text
     and is listed in ``failed_chunks``.
+
+    ``budget_words`` overrides ``HUMANIZE_MAX_WORDS_PER_RUN`` for this call — a caller that runs
+    several passes as one job (a newsletter's sections, a radar slate) passes what is left of the
+    job's ceiling so the ceiling holds across the whole job, not per piece.
     """
     settings = get_settings()
     key = settings.stealthgpt_api_key.strip()
@@ -278,6 +342,9 @@ async def humanize_text(
     use_model = (model or settings.stealthgpt_model or "standard").strip()
     use_mode = (mode or settings.stealthgpt_mode or "Low").strip()
     use_format = (output_format or settings.stealthgpt_output_format or "markdown").strip()
+    retry_mode = (settings.humanize_collapse_retry_mode or "").strip()
+    if retry_mode.lower() == use_mode.lower():
+        retry_mode = ""  # re-rolling the same setting is a second bill for the same odds
 
     scenes_before = _scene_count(text)
     chunks = chunk_text(text)
@@ -286,7 +353,21 @@ async def humanize_text(
 
     from writer_engine.rate_limit.provider_budget import call_provider
 
-    budget_words = max(0, int(settings.humanize_max_words_per_run))
+    if budget_words is None:
+        budget_words = max(0, int(settings.humanize_max_words_per_run))
+    else:
+        budget_words = max(0, int(budget_words))
+        if budget_words == 0:
+            # An explicit 0 from a caller means "the job's ceiling is spent", not "unlimited".
+            return HumanizeResult(
+                text=text, chunks=len(chunks), stopped_at_budget=True, skipped="budget spent"
+            )
+
+    def _bill(p: dict[str, Any]) -> None:
+        out.words_spent += int(p.get("wordsSpent") or 0)
+        with contextlib.suppress(TypeError, ValueError):
+            out.charged_credits += int(p.get("meteredChargedCredits") or 0)
+
     for i, chunk in enumerate(chunks):
         if len(chunk.split()) < MIN_WORDS:
             # Passed through, not counted as a failure: there is nothing here worth paying to rewrite.
@@ -301,13 +382,13 @@ async def humanize_text(
             pieces.append(chunk)
             continue
 
-        # Bound as a default argument, not captured: a closure over the loop variable would send
+        # Bound as default arguments, not captured: a closure over the loop variable would send
         # the LAST chunk on every retry.
-        async def _call(c: str = chunk) -> dict[str, Any]:
+        async def _call(c: str = chunk, m: str = use_mode) -> dict[str, Any]:
             return await _stealthify(
                 c,
                 model=use_model,
-                mode=use_mode,
+                mode=m,
                 key=key,
                 timeout_s=timeout_s,
                 output_format=use_format,
@@ -343,7 +424,20 @@ async def humanize_text(
             pieces.append(chunk)
             continue
 
+        _bill(payload)
         verdict = judge_rewrite(chunk, result, protect=protect)
+        if (
+            verdict.startswith("structure_collapsed")
+            and retry_mode
+            and not (budget_words and out.words_spent >= budget_words)
+        ):
+            # One more roll in a different mode before giving up on the chunk. Only for a collapse:
+            # merged paragraphs are a property of the setting, whereas a lost term is a property of
+            # the passage and a second roll loses it again. The first call has already billed.
+            payload, result, verdict = await _retry_collapsed(
+                i, chunk, retry_mode, payload, result, verdict, protect, _call, use_model, out, _bill
+            )
+
         if verdict:
             # The call succeeded and we pay for it either way; the OUTPUT is what failed. Keeping
             # the original is the only safe move, and recording why is what makes the setting
@@ -351,17 +445,11 @@ async def humanize_text(
             logger.warning("humanize.rejected", chunk=i, of=len(chunks), reason=verdict)
             out.rejected[i] = verdict
             out.failed_chunks.append(i)
-            out.words_spent += int(payload.get("wordsSpent") or 0)
-            with contextlib.suppress(TypeError, ValueError):
-                out.charged_credits += int(payload.get("meteredChargedCredits") or 0)
             pieces.append(chunk)
             continue
 
         pieces.append(result)
         out.humanized_chunks += 1
-        out.words_spent += int(payload.get("wordsSpent") or 0)
-        with contextlib.suppress(TypeError, ValueError):
-            out.charged_credits += int(payload.get("meteredChargedCredits") or 0)
         if payload.get("remainingCredits") is not None:
             # Informational only — a provider that changes this field's type must not fail the pass.
             with contextlib.suppress(TypeError, ValueError):
@@ -456,9 +544,11 @@ __all__ = [
     "chunk_text",
     "enabled",
     "extract_protected_terms",
+    "humanize_capped",
     "humanize_draft",
     "humanize_text",
     "judge_rewrite",
+    "links_in",
     "strip_banned_dashes",
     "terms_present",
 ]
@@ -726,6 +816,7 @@ async def humanize_draft(
     content_type: str,
     payload: dict[str, Any] | None = None,
     protect: Iterable[str] | None = None,
+    budget_words: int | None = None,
 ) -> tuple[str, dict[str, Any] | None]:
     """Humanize a NON-FICTION draft, or return it untouched.
 
@@ -747,10 +838,12 @@ async def humanize_draft(
         return text, None
 
     terms = list(protect) if protect is not None else extract_protected_terms(text)
-    result = await humanize_text(text, protect=terms)
+    result = await humanize_text(text, protect=terms, budget_words=budget_words)
     report = result.as_report()
     report["content_type"] = content_type
     report["protected_terms"] = len(terms)
+    # Whether the text handed back contains any humanized prose (False = ran, every chunk kept).
+    report["applied"] = result.humanized_chunks > 0
     if result.skipped:
         return text, report
     logger.info(
@@ -762,3 +855,36 @@ async def humanize_draft(
         words_spent=result.words_spent,
     )
     return result.text, report
+
+
+async def humanize_capped(
+    text: str,
+    *,
+    content_type: str,
+    payload: dict[str, Any] | None = None,
+    char_limit: int | None = None,
+    budget_words: int | None = None,
+    protect: Iterable[str] | None = None,
+) -> tuple[str, dict[str, Any] | None]:
+    """:func:`humanize_draft` for a piece with a hard character limit (a social post).
+
+    A rewrite over ``char_limit`` cannot be published, so the original is kept and the report says
+    why (``rejected_for_length``) — the same rule the media step applies to social posts. The report
+    carries ``applied``: True only when the stored text is the humanized one.
+    """
+    original = text or ""
+    rewritten, report = await humanize_draft(
+        original,
+        content_type=content_type,
+        payload=payload,
+        protect=protect if protect is not None else extract_protected_terms(original),
+        budget_words=budget_words,
+    )
+    if report is None:
+        return original, None
+    if char_limit and len(rewritten) > char_limit:
+        logger.warning("humanize.too_long", content_type=content_type, chars=len(rewritten), limit=char_limit)
+        report["rejected_for_length"] = {"chars": len(rewritten), "limit": char_limit}
+        rewritten = original
+        report["applied"] = False
+    return rewritten, report

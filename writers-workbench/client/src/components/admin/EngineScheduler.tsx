@@ -20,6 +20,8 @@ export interface SchedulerJobRow {
   skipped: number;
   last_run: string | null;
   last_error: string | null;
+  /** The latest run's own summary; `skipped` means it deliberately did nothing (e.g. unconfigured). */
+  last_result?: Record<string, unknown> | null;
   next_run: string | null;
   health: SchedulerHealth;
   replicas: Array<{ instance: string; ticks: number; skipped: number; last_run: string | null; last_error: string | null }>;
@@ -49,6 +51,16 @@ export function formatInterval(s: number): string {
   if (s < 3600) return `${Math.round(s / 60)} min`;
   const h = s / 3600;
   return `${Number.isInteger(h) ? h : h.toFixed(1)} h`;
+}
+
+/** A run's returned summary as one short line: "skipped: not configured · deleted: 2". */
+export function resultSummary(r: Record<string, unknown> | null | undefined): string {
+  if (!r) return '';
+  const text = Object.entries(r)
+    .filter(([, v]) => v !== null && v !== undefined && v !== '')
+    .map(([k, v]) => `${k}: ${String(v)}`)
+    .join(' · ');
+  return text.length > 140 ? `${text.slice(0, 139)}…` : text;
 }
 
 function relative(iso: string | null, now: number): string {
@@ -144,8 +156,19 @@ function SchedulerBody({ data }: { data: EngineSchedulerData }) {
                 <td className="px-4 py-2 text-xs">
                   {j.last_error ? (
                     <span className="text-red-600 dark:text-red-400" data-testid="scheduler-last-error">{j.last_error}</span>
+                  ) : j.last_run && typeof j.last_result?.skipped === 'string' ? (
+                    <span className="text-gray-500 dark:text-gray-400" data-testid="scheduler-last-skipped">
+                      Skipped: {j.last_result.skipped}
+                    </span>
                   ) : j.last_run ? (
-                    <span className="text-gray-600 dark:text-gray-300">OK</span>
+                    <span className="text-gray-600 dark:text-gray-300">
+                      OK
+                      {resultSummary(j.last_result) && (
+                        <span className="ml-1 text-gray-500" data-testid="scheduler-last-result">
+                          · {resultSummary(j.last_result)}
+                        </span>
+                      )}
+                    </span>
                   ) : (
                     <span className="text-gray-400">—</span>
                   )}

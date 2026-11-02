@@ -223,6 +223,78 @@ async def draft_roundup(
     return drafted, len(topics) - len(drafted)
 
 
+LINKEDIN_CHAR_LIMIT = 3000
+"""LinkedIn's post limit. The drafting prompts ask for under 2900; a humanized rewrite that grows past
+3000 cannot be posted, so it is rejected and the drafted text kept (humanize.humanize_capped)."""
+
+_HUMANIZE_FIELDS = (
+    ("body_md", "radar_blog", None),
+    ("linkedin_content", "radar_linkedin", LINKEDIN_CHAR_LIMIT),
+)
+
+
+def _compact(report: dict[str, Any]) -> dict[str, Any]:
+    keep = (
+        "applied",
+        "chunks",
+        "humanized_chunks",
+        "rejected",
+        "retried",
+        "words_spent",
+        "charged_credits",
+        "stopped_at_budget",
+        "rejected_for_length",
+        "skipped",
+    )
+    return {k: report.get(k) for k in keep if report.get(k) not in (None, {}, [])} | {
+        "applied": bool(report.get("applied"))
+    }
+
+
+async def humanize_drafts(drafted: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """E6 for the radars: humanize each drafted post before it goes on the calendar.
+
+    Non-fiction, so the same pass and guards as blog / social / newsletter: protected terms and
+    links (a roundup post IS its link), structure + the collapse retry, LinkedIn's character cap, and
+    the spend ceiling — HUMANIZE_MAX_WORDS_PER_RUN applies to the WHOLE slate here, not per post, so
+    a 10-topic week cannot bill ten times the cap. Each post records its outcome under ``humanize``
+    (stored in social_schedule_v2.humanize). Off with HUMANIZE_RADAR_DRAFTS=false. Returns a slate
+    summary, or None when the pass did not run.
+    """
+    from writer_engine.humanize import humanize_capped
+
+    settings = get_settings()
+    if not settings.humanize_radar_drafts:
+        return None
+    ceiling = int(settings.humanize_max_words_per_run or 0)
+    spent = 0
+    ran = applied = 0
+    for post in drafted:
+        reports: dict[str, Any] = {}
+        for field, content_type, limit in _HUMANIZE_FIELDS:
+            text = str(post.get(field) or "")
+            if not text.strip():
+                continue
+            left = None if ceiling <= 0 else max(0, ceiling - spent)
+            new_text, report = await humanize_capped(
+                text, content_type=content_type, char_limit=limit, budget_words=left
+            )
+            if report is None:
+                continue
+            spent += int(report.get("words_spent") or 0)
+            post[field] = new_text
+            reports[field] = _compact(report)
+        if reports:
+            ran += 1
+            post_applied = any(r.get("applied") for r in reports.values())
+            applied += int(post_applied)
+            post["humanize"] = {"applied": post_applied, **reports}
+    if not ran:
+        return None
+    logger.info("radar.humanized", posts=ran, applied=applied, words_spent=spent)
+    return {"posts": ran, "applied": applied, "words_spent": spent}
+
+
 async def schedule_slate(
     client: Any,
     *,
@@ -248,6 +320,7 @@ async def schedule_slate(
         taken = await S.taken_slots(client, user_id, start)
         slots = S.next_slots(now, len(drafted), weekdays_only=True, taken=taken, start=start)
         source, prefix = "roundup_batch", "roundup"
+    humanized = await humanize_drafts(drafted)
     rows = [
         S.row_for(user_id, {**post, "channels": chans}, day, slot, source=source, prefix=prefix)
         for post, (day, slot) in zip(drafted, slots, strict=False)
@@ -257,6 +330,7 @@ async def schedule_slate(
         "scheduled": len(added),
         "drafted": len(drafted),
         "failed_drafts": failed,
+        "humanize": humanized,
         "channels": chans,
         "schedule": [
             {
