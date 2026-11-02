@@ -217,7 +217,22 @@ class StorySegment(BaseModel):
                     out["story_title"] = val
                     break
         if not out.get("newsletter_section_content"):
-            for alias in ("content", "body", "section_content", "section", "markdown", "text"):
+            # "segment" is what the live n8n segment brief asks for: every DEV section since
+            # 2026-10-24 came back as {"segment": "..."} and was stored EMPTY, so the editions went
+            # out with no story sections at all.
+            for alias in (
+                "segment",
+                "segment_content",
+                "story_segment",
+                "newsletter_section",
+                "newsletter_segment",
+                "content",
+                "body",
+                "section_content",
+                "section",
+                "markdown",
+                "text",
+            ):
                 val = out.get(alias)
                 if isinstance(val, str) and val.strip():
                     out["newsletter_section_content"] = val
