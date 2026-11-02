@@ -274,7 +274,10 @@ class EngineSettings(BaseSettings):
     # n8n is still posting the same calendar, and a second poster would publish everything twice.
     social_poll_seconds: float = Field(default=300.0, alias="SOCIAL_POLL_SECONDS")
     social_posting_mode: str = Field(default="dry_run", alias="SOCIAL_POSTING_MODE")
-    blotato_api_key: str = Field(default="", alias="BLOTATO_API_KEY")
+    # Blotato keys and website tokens are per user (user_integrations_v2, entered in Settings →
+    # Integrations), encrypted with this key. There is deliberately no BLOTATO_API_KEY any more: a
+    # company key in a variable would post every user's content through one account.
+    integrations_encryption_key: str = Field(default="", alias="INTEGRATIONS_ENCRYPTION_KEY")
     blotato_base_url: str = Field(default="https://backend.blotato.com/v2", alias="BLOTATO_BASE_URL")
     # The radars (Trend Radar, Dev Radar): hourly check of whether this week's run is due.
     radar_poll_seconds: float = Field(default=3600.0, alias="RADAR_POLL_SECONDS")

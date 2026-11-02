@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -10,8 +11,11 @@ import httpx
 import pytest
 from conftest import FakeSupabase
 
+from writer_engine import integrations
 from writer_engine.social import channels as ch
 from writer_engine.social import poster
+
+TEST_KEY = base64.b64encode(bytes(range(32))).decode()
 
 NOW = datetime(2026, 11, 2, 14, 5, tzinfo=UTC)  # 09:05 ET, Monday
 USER = "+14105914612"
@@ -33,7 +37,6 @@ def _channels(db: FakeSupabase) -> None:
                 "endpoint": "https://www.techahir.com/api/blog",
                 "public_base": "https://www.techahir.com/blog/",
                 "auth_header": "x-api-key",
-                "auth_env": "TECHAHIR_BLOG_API_KEY",
             },
         },
         {
@@ -42,7 +45,7 @@ def _channels(db: FakeSupabase) -> None:
             "kind": "linkedin",
             "label": "TechAhir LinkedIn page",
             "enabled": True,
-            "config": {"account_id": "9115", "page_id": "104364682"},
+            "config": {"page_id": "104364682"},
         },
         {
             "user_id": USER,
@@ -50,8 +53,32 @@ def _channels(db: FakeSupabase) -> None:
             "kind": "linkedin",
             "label": "personal LinkedIn profile",
             "enabled": True,
-            "config": {"account_id": "9115"},
+            "config": {},
         },
+    ]
+
+
+def _secret_row(user: str, provider: str, channel: str | None, value: str, **config: Any) -> dict[str, Any]:
+    key = integrations.load_key(TEST_KEY)
+    return {
+        "user_id": user,
+        "provider": provider,
+        "channel": channel,
+        "config": config,
+        "secret_ciphertext": integrations.encrypt(
+            value, user_id=user, provider=provider, channel=channel, key=key
+        )
+        if value
+        else None,
+    }
+
+
+def _credentials(
+    db: FakeSupabase, *, blotato: str = "test-blotato-key-0001", website: str = "test-website-key-01"
+) -> None:
+    db.tables["user_integrations_v2"] = [
+        _secret_row(USER, "blotato", None, blotato, account_id="9115"),
+        _secret_row(USER, "website", "website", website),
     ]
 
 
@@ -122,20 +149,28 @@ class _Net:
         async def no_sleep(_s: float) -> None:
             return None
 
+        async def public_dns(_host: str, _port: int) -> list[str]:
+            return ["93.184.216.34"]
+
         return poster.Transport(
-            http=httpx.AsyncClient(transport=httpx.MockTransport(self.handler)), sleep=no_sleep
+            http=httpx.AsyncClient(transport=httpx.MockTransport(self.handler)),
+            sleep=no_sleep,
+            resolve=public_dns,
         )
 
 
 @pytest.fixture
 def db(monkeypatch: pytest.MonkeyPatch) -> FakeSupabase:
-    monkeypatch.setenv("TECHAHIR_BLOG_API_KEY", "test-website-key")
-    monkeypatch.setenv("BLOTATO_API_KEY", "test-blotato-key")
+    # Company keys in the environment must be IGNORED: there is no shared-key path any more.
+    monkeypatch.setenv("TECHAHIR_BLOG_API_KEY", "company-website-key")
+    monkeypatch.setenv("BLOTATO_API_KEY", "company-blotato-key")
+    monkeypatch.setenv("INTEGRATIONS_ENCRYPTION_KEY", TEST_KEY)
     from writer_engine.config import get_settings
 
     get_settings.cache_clear()
     d = FakeSupabase()
     _channels(d)
+    _credentials(d)
     yield d
     get_settings.cache_clear()
 
@@ -172,8 +207,8 @@ async def test_live_posts_each_channel_once_and_builds_the_public_url(db: FakeSu
         "https://www.techahir.com/api/blog",
         "https://backend.blotato.com/v2/posts",
     ]
-    assert posts[0][3]["x-api-key"] == "test-website-key"
-    assert posts[1][3]["blotato-api-key"] == "test-blotato-key"
+    assert posts[0][3]["x-api-key"] == "test-website-key-01"
+    assert posts[1][3]["blotato-api-key"] == "test-blotato-key-0001"
     d = _deliveries(db)
     # Not the API's localhost URL: the public one.
     assert d["website"]["public_url"] == "https://www.techahir.com/blog/ship-it"
@@ -265,15 +300,15 @@ async def test_an_unconfigured_channel_fails_with_a_reason_and_others_still_post
 async def test_a_missing_key_in_live_mode_is_a_failed_delivery_not_a_crash(
     db: FakeSupabase, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.delenv("BLOTATO_API_KEY")
-    from writer_engine.config import get_settings
-
-    get_settings.cache_clear()
-    _row(db, channels=["li_techahir"])
+    db.tables["user_integrations_v2"] = [_secret_row(USER, "blotato", None, "", account_id="9115")]
+    _row(db, channels=["li_techahir", "website"])
     net = _Net()
     result = await poster.run_tick(db, net.transport(), now=NOW, mode="live")
+    # The company BLOTATO_API_KEY / TECHAHIR_BLOG_API_KEY in the environment are not used.
     assert result.failed == 1 and net.calls == []
-    assert "BLOTATO_API_KEY" in _deliveries(db)["li_techahir"]["detail"]
+    d = _deliveries(db)
+    assert "no Blotato API key is set for this user" in d["li_techahir"]["detail"]
+    assert "no auth token is set for this website" in d["website"]["detail"]
 
 
 @pytest.mark.asyncio
@@ -342,3 +377,85 @@ async def test_imported_n8n_failures_are_never_retried(db: FakeSupabase) -> None
     result = await poster.run_tick(db, net.transport(), now=NOW, mode="live")
     assert result.claimed == 0 and net.calls == []
     assert {r["state"] for r in db.tables["social_schedule_v2"]} == {"failed", "partial"}
+
+
+@pytest.mark.asyncio
+async def test_each_user_posts_with_their_own_credentials(db: FakeSupabase) -> None:
+    other = "+15550001111"
+    db.tables["social_channels_v2"].append(
+        {
+            "user_id": other,
+            "channel": "website",
+            "kind": "website",
+            "label": "Other blog",
+            "enabled": True,
+            "config": {"endpoint": "https://blog.example.org/api/posts", "auth_header": "Authorization"},
+        }
+    )
+    db.tables["user_integrations_v2"].append(_secret_row(other, "website", "website", "other-users-token-9"))
+    _row(db, channels=["website"])
+    _row(db, user_id=other, channels=["website"], external_id="other-1")
+    net = _Net()
+    await poster.run_tick(db, net.transport(), now=NOW, mode="live")
+    sent = {c[1]: c[3] for c in net.calls if c[0] == "POST"}
+    assert sent["https://www.techahir.com/api/blog"]["x-api-key"] == "test-website-key-01"
+    assert sent["https://blog.example.org/api/posts"]["authorization"] == "Bearer other-users-token-9"
+
+
+@pytest.mark.asyncio
+async def test_a_ciphertext_moved_to_another_user_does_not_decrypt(db: FakeSupabase) -> None:
+    other = "+15550001111"
+    stolen = dict(db.tables["user_integrations_v2"][0])  # USER's Blotato row
+    db.tables["user_integrations_v2"].append({**stolen, "user_id": other})
+    creds = await integrations.load_user_credentials(db, other)
+    assert creds.blotato_api_key == "" and creds.problems
+    assert "could not be decrypted" in creds.problems[0]
+
+
+@pytest.mark.asyncio
+async def test_dry_run_resolves_credentials_and_reports_what_is_missing(db: FakeSupabase) -> None:
+    _row(db, channels=["website", "li_techahir"])
+    await poster.run_tick(db, _Net().transport(), now=NOW, mode="dry_run")
+    d = _deliveries(db)
+    assert "would send the user's website token in x-api-key" in d["website"]["detail"]
+    assert "would send with the user's Blotato key (account 9115)" in d["li_techahir"]["detail"]
+    # Nothing secret in what is stored.
+    stored = json.dumps(d)
+    assert "test-website-key-01" not in stored and "test-blotato-key-0001" not in stored
+
+    db.tables["user_integrations_v2"] = []
+    db.tables["social_schedule_deliveries_v2"] = []
+    _row(db, channels=["website", "li_techahir"], external_id="second")
+    await poster.run_tick(db, _Net().transport(), now=NOW, mode="dry_run")
+    d = _deliveries(db)
+    assert d["website"]["status"] == "dry_run"
+    assert "would fail: channel website: no auth token" in d["website"]["detail"]
+    assert "would fail: no Blotato API key" in d["li_techahir"]["detail"]
+
+
+@pytest.mark.asyncio
+async def test_a_private_endpoint_is_refused_at_send_time(db: FakeSupabase) -> None:
+    db.tables["social_channels_v2"][0]["config"]["endpoint"] = "https://internal.example.com/api/blog"
+    _row(db, channels=["website"])
+    net = _Net()
+
+    async def rebinding_dns(_host: str, _port: int) -> list[str]:
+        return ["169.254.169.254"]
+
+    transport = net.transport()
+    transport.resolve = rebinding_dns
+    result = await poster.run_tick(db, transport, now=NOW, mode="live")
+    assert result.failed == 1 and net.calls == []
+    assert "endpoint refused" in _deliveries(db)["website"]["detail"]
+
+
+@pytest.mark.asyncio
+async def test_reconcile_uses_the_posts_owner_key(db: FakeSupabase) -> None:
+    _row(db, channels=["li_techahir"])
+    net = _Net()
+    await poster.run_tick(db, net.transport(), now=NOW, mode="live")
+    _deliveries(db)["li_techahir"]["updated_at"] = _iso(datetime.now(UTC) - timedelta(minutes=5))
+    before = len(net.calls)
+    assert await poster.reconcile_submitted(db, net.transport()) == 1
+    status_calls = [c for c in net.calls[before:] if c[0] == "GET"]
+    assert status_calls and status_calls[0][3]["blotato-api-key"] == "test-blotato-key-0001"
