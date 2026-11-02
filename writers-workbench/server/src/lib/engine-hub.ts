@@ -285,6 +285,8 @@ export interface SchedulerJobReport {
   skipped?: number;
   last_run: string | null;
   last_error: string | null;
+  /** What the last successful tick returned, summarised by the engine to its scalar fields. */
+  last_result?: Record<string, unknown> | null;
 }
 
 export type SchedulerJobHealth = 'ok' | 'failing' | 'overdue' | 'waiting' | 'pending';
@@ -301,6 +303,8 @@ export interface SchedulerJob {
   last_run: string | null;
   /** The error of that latest run; null when it succeeded. */
   last_error: string | null;
+  /** What that latest run returned when it succeeded (e.g. `{skipped: "not configured"}`), if the engine reports it. */
+  last_result: Record<string, unknown> | null;
   /** When the next run is due (last run + interval); null before the first run. */
   next_run: string | null;
   health: SchedulerJobHealth;
@@ -375,6 +379,7 @@ export function mergeSchedulerReports(
       skipped,
       last_run: lastRun,
       last_error: lastError,
+      last_result: (!lastError && latest?.job.last_result) || null,
       next_run: nextRun,
       health,
       replicas: seen.map((s) => ({

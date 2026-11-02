@@ -51,6 +51,28 @@ describe('OutlineReviseBox', () => {
     expect(screen.queryByTestId('outline-revise-result')).toBeNull();
   });
 
+  it('keeps waiting through a failed poll (the engine briefly unreachable) and reports the finished job', async () => {
+    engine([
+      { status: 'in_progress' },
+      { status: 'error', error: 'engine job poll 502' },
+      { status: 'complete', result: { payload: { result: { revised: true, chapters_before: 2, chapters_after: 3, persist: { persisted: true } } } } },
+    ]);
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      renderWithProviders(<OutlineReviseBox projectId="p1" chapterCount={2} />);
+      fireEvent.change(screen.getByLabelText('Outline revision instructions'), { target: { value: 'Add a chapter.' } });
+      fireEvent.click(screen.getByTestId('outline-revise-submit'));
+      expect(await screen.findByTestId('outline-revise-progress')).toHaveTextContent(/Revising the outline/);
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(screen.queryByTestId('outline-revise-error')).toBeNull();
+      expect(screen.getByTestId('outline-revise-progress')).toBeInTheDocument();
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(await screen.findByTestId('outline-revise-result')).toHaveTextContent('Outline revised: 2 → 3 chapters');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('says what the engine said when it completed without revising', async () => {
     engine([{ status: 'complete', result: { payload: { result: { revised: false, error: 'no outline to revise' } } } }]);
     renderWithProviders(<OutlineReviseBox projectId="p1" chapterCount={4} />);

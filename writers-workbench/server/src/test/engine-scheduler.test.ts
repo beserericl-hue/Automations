@@ -45,6 +45,18 @@ describe('mergeSchedulerReports', () => {
     expect(jobs.find((j) => j.name === 'cadence')).toMatchObject({ health: 'ok', last_error: null });
   });
 
+  it('carries the latest successful run’s result, when the engine reports one', () => {
+    const [prune, plain] = mergeSchedulerReports(
+      [
+        { instance: 'a', jobs: [job({ name: 'eve-kb-prune', ticks: 1, last_run: ago(50), last_result: { skipped: 'not configured' } }), job({ name: 'radar' })] },
+        { instance: 'b', jobs: [job({ name: 'eve-kb-prune', ticks: 1, last_run: ago(500), last_result: { deleted: 2 } }), job({ name: 'radar' })] },
+      ],
+      NOW,
+    );
+    expect(prune.last_result).toEqual({ skipped: 'not configured' });
+    expect(plain.last_result).toBeNull();
+  });
+
   it('calls a job overdue after two intervals plus grace, and tells never-run jobs apart', () => {
     const jobs = mergeSchedulerReports(
       [{
