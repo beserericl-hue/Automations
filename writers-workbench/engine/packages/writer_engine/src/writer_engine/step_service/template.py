@@ -101,25 +101,40 @@ def build_step_app(step_name: str, handler: StepHandler) -> FastAPI:
             project_id=inp.payload.get("project_id"),
             chapter_number=inp.payload.get("chapter_number"),
             workflow=f"{step_name}.{op}" if op else step_name,
+            # The worker's run id (the arq job id) ties every cost row of one job together, so the
+            # cost view can show cost per RUN of an operation, not only per call.
+            run_id=str(inp.payload.get("run_id") or inp.execution_id),
+            content_id=(str(inp.payload["content_id"]) if inp.payload.get("content_id") else None),
         )
+        flushed = False
         try:
-            with observe_latency(STEP_LATENCY, service=step_name, step=step_name, status="ok"):
-                out = await handler(inp)
-        except HTTPException:
-            await token_accounting.flush()
-            raise
-        except Exception as exc:  # log + return structured error envelope
-            # Flush first: a step that burned tokens and THEN failed still cost real money, and
-            # dropping that record is how cost silently diverges from the Anthropic bill.
-            await token_accounting.flush()
-            logger.exception("step.error", step=step_name, execution_id=str(inp.execution_id))
-            return StepOutput(
-                execution_id=inp.execution_id,
-                step_name=step_name,
-                status=StepStatus.ERROR,
-                error=StepError(code=type(exc).__name__, message=str(exc)),
-            )
-        usage = await token_accounting.flush()
+            try:
+                with observe_latency(STEP_LATENCY, service=step_name, step=step_name, status="ok"):
+                    out = await handler(inp)
+            except HTTPException:
+                flushed = True
+                await token_accounting.flush()
+                raise
+            except Exception as exc:  # log + return structured error envelope
+                # Flush first: a step that burned tokens and THEN failed still cost real money, and
+                # dropping that record is how cost silently diverges from the Anthropic bill.
+                flushed = True
+                await token_accounting.flush()
+                logger.exception("step.error", step=step_name, execution_id=str(inp.execution_id))
+                return StepOutput(
+                    execution_id=inp.execution_id,
+                    step_name=step_name,
+                    status=StepStatus.ERROR,
+                    error=StepError(code=type(exc).__name__, message=str(exc)),
+                )
+            flushed = True
+            usage = await token_accounting.flush()
+        finally:
+            if not flushed:
+                # CancelledError (the worker's HTTP call timed out and disconnected, a deploy's
+                # SIGTERM) is a BaseException, so neither handler above ran and every call this job
+                # paid for was dropped — 22 Q/A jobs on DEV. flush() shields its own write.
+                await token_accounting.flush()
         if usage.get("calls"):
             # Prefer payload["result"], which is where notifications.task_email looks (:147) and
             # where chapter_step used to put it. Doing it here means token usage now appears in the

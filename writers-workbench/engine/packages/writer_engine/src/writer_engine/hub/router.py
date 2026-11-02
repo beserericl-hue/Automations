@@ -1168,16 +1168,27 @@ async def _gemini_route(req: HubRequest, router: LLMRouter, model: str) -> HubDe
         ]
         ctx += "\nRecent conversation:\n" + "\n".join(lines)
     prompt = f"User message:\n{req.message}{ctx}"
-    decision, _resp = await complete_structured(
-        router,
-        provider="gemini",
-        model=model,
-        system=_router_system(),
-        prompt=prompt,
-        schema=HubDecision,
-        max_tokens=1024,
-        temperature=0.1,
-    )
+    from writer_engine.telemetry import token_accounting
+
+    # The hub runs in the gateway, outside any step, so its Gemini calls had no accounting context
+    # and were never recorded. Every chat/voice turn now writes a hub.route.<source> cost row.
+    async with token_accounting.scope(
+        workflow=f"hub.route.{req.source}",
+        user_id=req.user_id,
+        project_id=(str(req.context.get("project_id")) if req.context.get("project_id") else None),
+        run_id=req.conversation_id,
+        wait=False,  # a voice turn must not wait on a billing insert
+    ):
+        decision, _resp = await complete_structured(
+            router,
+            provider="gemini",
+            model=model,
+            system=_router_system(),
+            prompt=prompt,
+            schema=HubDecision,
+            max_tokens=1024,
+            temperature=0.1,
+        )
     return _normalise(decision)
 
 

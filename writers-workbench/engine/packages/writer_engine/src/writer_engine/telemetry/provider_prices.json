@@ -1,0 +1,141 @@
+{
+  "checked": "2026-11-02",
+  "notes": "Single price table for every paid provider call. Token prices are USD per 1,000,000 tokens; unit prices are USD per unit. The server keeps a byte-identical copy in server/src/lib/provider-prices.ts (tests/test_cost_pricing.py enforces it). Change a price here, then copy it there, with the date you checked the source.",
+  "entries": [
+    {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "aliases": [],
+      "per_mtok": { "input": 3.0, "output": 15.0, "cache_read": 0.3, "cache_write_5m": 3.75, "cache_write_1h": 6.0 },
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "checked": "2026-11-02"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-haiku-4-5",
+      "aliases": ["claude-haiku-4-5-20251001"],
+      "per_mtok": { "input": 1.0, "output": 5.0, "cache_read": 0.1, "cache_write_5m": 1.25, "cache_write_1h": 2.0 },
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "checked": "2026-11-02"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-4-8",
+      "aliases": [],
+      "per_mtok": { "input": 5.0, "output": 25.0, "cache_read": 0.5, "cache_write_5m": 6.25, "cache_write_1h": 10.0 },
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "checked": "2026-11-02"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "aliases": [],
+      "per_mtok": { "input": 4.0, "output": 20.0, "cache_read": 0.2, "cache_write_5m": 5.0, "cache_write_1h": 8.0 },
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "checked": "2026-11-02"
+    },
+    {
+      "provider": "gemini",
+      "model": "gemini-2.5-flash",
+      "aliases": [],
+      "per_mtok": { "input": 0.3, "output": 2.5, "cache_read": 0.03 },
+      "note": "Output price includes thinking tokens. Deprecated by Google: routes to Gemini 3.5 Flash-Lite from 2026-12-01.",
+      "source": "https://ai.google.dev/gemini-api/docs/pricing",
+      "checked": "2026-11-02"
+    },
+    {
+      "provider": "gemini",
+      "model": "gemini-2.5-pro",
+      "aliases": [],
+      "per_mtok": { "input": 1.25, "output": 10.0, "cache_read": 0.125 },
+      "long_context": { "threshold_tokens": 200000, "per_mtok": { "input": 2.5, "output": 15.0, "cache_read": 0.25 } },
+      "note": "Output price includes thinking tokens. Prompts over 200k tokens use long_context prices. Deprecated by Google: routes to Gemini 3.8 Flash from 2026-12-01.",
+      "source": "https://ai.google.dev/gemini-api/docs/pricing",
+      "checked": "2026-11-02"
+    },
+    {
+      "provider": "perplexity",
+      "model": "sonar-pro",
+      "aliases": [],
+      "provider_reports_cost": true,
+      "per_mtok": { "input": 3.0, "output": 15.0 },
+      "per_request": { "low": 0.0025, "medium": 0.0025, "high": 0.0025 },
+      "fallback_cost_source": "estimated",
+      "note": "Exact cost is response usage.cost.total_cost (verified live 2026-11-02: input_tokens_cost + output_tokens_cost + request_cost). Perplexity no longer publishes a Sonar rate card; these numbers are only the fallback when usage.cost is absent, and are recorded as 'estimated'. request fee observed live at search_context_size=low.",
+      "source": "https://docs.perplexity.ai/docs/getting-started/pricing",
+      "checked": "2026-11-02"
+    },
+    {
+      "provider": "perplexity",
+      "model": "sonar",
+      "aliases": [],
+      "provider_reports_cost": true,
+      "per_mtok": { "input": 1.0, "output": 1.0 },
+      "per_request": { "low": 0.0025, "medium": 0.0025, "high": 0.0025 },
+      "fallback_cost_source": "estimated",
+      "note": "See sonar-pro: usage.cost.total_cost is the exact figure; these are fallback estimates.",
+      "source": "https://docs.perplexity.ai/docs/getting-started/pricing",
+      "checked": "2026-11-02"
+    },
+    {
+      "provider": "openai",
+      "model": "text-embedding-3-small",
+      "aliases": [],
+      "per_mtok": { "input": 0.02, "output": 0.0 },
+      "source": "https://developers.openai.com/api/docs/pricing",
+      "checked": "2026-11-02"
+    },
+    {
+      "provider": "openai",
+      "model": "dall-e-3",
+      "aliases": [],
+      "per_unit": 0.08,
+      "unit_type": "images",
+      "fallback_cost_source": "estimated",
+      "note": "Cover-art fallback only (1024x1792 standard). DALL-E 3 is no longer on OpenAI's pricing page; $0.08 is its last published price, so rows are 'estimated'.",
+      "source": "https://developers.openai.com/api/docs/pricing",
+      "checked": "2026-11-02"
+    },
+    {
+      "provider": "kieai",
+      "model": "google/nano-banana",
+      "aliases": [],
+      "per_credit": 0.005,
+      "credits_per_unit": 4,
+      "unit_type": "images",
+      "note": "Exact credits come from the task's creditsConsumed when KIE returns it; otherwise 4 credits per image (the listed price). 1 credit = $0.005.",
+      "source": "https://kie.ai/pricing",
+      "checked": "2026-11-02"
+    },
+    {
+      "provider": "stealthgpt",
+      "model": "standard",
+      "aliases": ["lite"],
+      "per_unit": 0.0002,
+      "unit_type": "words",
+      "note": "$0.20 per 1,000 words; billed words are the response's wordsSpent (input + output words).",
+      "source": "https://docs.stealthgpt.ai/api-reference/endpoints/stealthify",
+      "checked": "2026-11-02"
+    },
+    {
+      "provider": "stealthgpt",
+      "model": "super",
+      "aliases": [],
+      "per_unit": 0.0005,
+      "unit_type": "words",
+      "note": "$0.05 per 100 words; billed words are the response's wordsSpent.",
+      "source": "https://docs.stealthgpt.ai/api-reference/endpoints/stealthify",
+      "checked": "2026-11-02"
+    },
+    {
+      "provider": "scraperapi",
+      "model": "api",
+      "aliases": [],
+      "per_credit": 0.00049,
+      "unit_type": "credits",
+      "note": "Credits per request are ScraperAPI's sa-credit-cost header (1 plain, 10 render=true). $ per credit depends on the plan: Hobby $49 / 100,000 credits = $0.00049. Override with SCRAPERAPI_USD_PER_CREDIT for another plan (0 on the free/trial plan DEV is on as of 2026-11-02).",
+      "source": "https://www.scraperapi.com/pricing/",
+      "checked": "2026-11-02"
+    }
+  ]
+}
