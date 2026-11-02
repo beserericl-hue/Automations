@@ -24,29 +24,70 @@ def _clean(v: str | None) -> str | None:
     return s or None
 
 
-async def load_app_config(client, keys, user_id=None) -> dict[str, str]:
-    """Load ``app_config_v2`` key→value for the given keys, scoped to ``user_id`` when supplied.
+USER_TABLE = "app_config_v2"
+GLOBAL_TABLE = "app_config_global_v2"
+"""Global (all-user) settings, migration 045. ``app_config_v2`` is per-user with a NOT NULL FK on
+``user_id``, so a shared value could only be stored by copying it onto every account."""
 
-    G2: the engine previously queried a table named ``app_config``; DEV/PROD Supabase actually have
-    ``app_config_v2``, and it is PER-USER (the ``recipient_email`` row differs per account). So the
-    lookup silently failed and every email fell back to ``users_v2.email``. This reads the correct,
-    user-scoped table: a user-scoped value wins over a global (null user_id) one for the same key."""
+
+async def _key_values(client, table: str, keys, user_id=None) -> dict[str, str]:
     import contextlib
 
-    cfg: dict[str, str] = {}
-    global_cfg: dict[str, str] = {}
-    with contextlib.suppress(Exception):
-        rows = (
-            await client.table("app_config_v2").select("key,value,user_id").in_("key", list(keys)).execute()
-        )
+    out: dict[str, str] = {}
+    with contextlib.suppress(Exception):  # a missing table/column is "no values", never an error
+        q = client.table(table).select("key,value").in_("key", list(keys))
+        if user_id is not None:
+            q = q.eq("user_id", str(user_id))
+        rows = await q.execute()
         for r in getattr(rows, "data", None) or []:
-            if not r.get("value"):
-                continue
-            if user_id and str(r.get("user_id")) == str(user_id):
-                cfg[r["key"]] = r["value"]
-            elif not r.get("user_id"):
-                global_cfg[r["key"]] = r["value"]
-    return {**global_cfg, **cfg}  # user-scoped overrides global
+            v = r.get("value")
+            if v is not None and str(v).strip():
+                out[str(r["key"])] = str(v)
+    return out
+
+
+async def load_config_layers(client, keys, user_id=None) -> tuple[dict[str, str], dict[str, str]]:
+    """``(user_values, global_values)`` for ``keys``. Kept apart so a caller can slot its own
+    user-level fallback (e.g. ``users_v2.email``) in ahead of the global value."""
+    user = await _key_values(client, USER_TABLE, keys, user_id) if user_id else {}
+    glob = await _key_values(client, GLOBAL_TABLE, keys)
+    return user, glob
+
+
+async def load_app_config(client, keys, user_id=None, defaults=None) -> dict[str, str]:
+    """Resolve ``keys`` as user -> global -> default.
+
+    G2: the engine once queried a table named ``app_config``; the real one is ``app_config_v2`` and it
+    is PER-USER (the ``recipient_email`` row differs per account). Item 8 (2026-11-02) adds the global
+    scope: ``app_config_global_v2`` holds values every user inherits unless they set their own."""
+    user, glob = await load_config_layers(client, keys, user_id)
+    return {**(defaults or {}), **glob, **user}
+
+
+async def load_recipient_config(client, user_id=None) -> dict[str, str]:
+    """``recipient_email`` / ``bcc_email`` for ``user_id``: the user's setting, then their account
+    email (still THEIR address, so it outranks any global value), then the global setting.
+
+    A global ``recipient_email`` therefore only reaches users with no address of their own, while a
+    global ``bcc_email`` (an operator copy) applies to everyone who has not set a bcc."""
+    import contextlib
+
+    user, glob = await load_config_layers(client, ["recipient_email", "bcc_email"], user_id)
+    if user_id and not user.get("recipient_email"):
+        with contextlib.suppress(Exception):
+            ur = (
+                await client.table("users_v2")
+                .select("email,bcc_email")
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
+            row = (getattr(ur, "data", None) or [{}])[0]
+            if row.get("email"):
+                user["recipient_email"] = str(row["email"])
+            if row.get("bcc_email") and not user.get("bcc_email"):
+                user["bcc_email"] = str(row["bcc_email"])
+    return {**glob, **user}
 
 
 def resolve_recipients(

@@ -1,11 +1,11 @@
 // Sprint 8 (S8-6 / S8-7): credit cost lookup, configurable via
-// app_config_v2.sprint8_superuser_config.credit_costs. Falls back to
+// app_config_global_v2.sprint8_superuser_config.credit_costs. Falls back to
 // hard-coded defaults when no config row exists.
 //
 // Defaults match the spec ("Writing operations: 5 credits, Brainstorm: 3,
 // Research: 2, Cover art: 10, Social repurpose: 3, list/retrieve: 0").
 
-import { getSupabaseAdmin } from './supabase-admin.js';
+import { getGlobalJson } from '../lib/app-config.js';
 
 export const DEFAULT_CREDIT_COSTS: Record<string, number> = {
   // Writing operations
@@ -44,14 +44,9 @@ const SUPERUSER_CONFIG_KEY = 'sprint8_superuser_config';
 
 async function loadCosts(): Promise<Record<string, number>> {
   if (cachedCosts && Date.now() - cacheLoadedAt < CACHE_TTL_MS) return cachedCosts;
-  const supabase = getSupabaseAdmin();
   try {
-    const { data } = await supabase
-      .from('app_config_v2')
-      .select('value')
-      .eq('key', SUPERUSER_CONFIG_KEY)
-      .maybeSingle();
-    const configured = (data?.value as { credit_costs?: Record<string, number> } | null)?.credit_costs;
+    // Item 8: system-wide, so it lives in the global settings table (migration 045), not per-user.
+    const configured = (await getGlobalJson<{ credit_costs?: Record<string, number> }>(SUPERUSER_CONFIG_KEY))?.credit_costs;
     cachedCosts = { ...DEFAULT_CREDIT_COSTS, ...(configured ?? {}) };
   } catch {
     cachedCosts = { ...DEFAULT_CREDIT_COSTS };

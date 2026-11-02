@@ -9,7 +9,6 @@ failure must never affect the job.
 
 from __future__ import annotations
 
-import contextlib
 from html import escape
 from typing import Any
 
@@ -27,28 +26,11 @@ _BODY_SNIPPET_CHARS = 20000  # cap the inlined prose so the email isn't enormous
 
 
 async def _load_recipients(client: Any, user_id: str | None):
-    """Recipient precedence: app_config_v2.recipient_email (user-scoped) > users_v2.email.
+    """Recipient precedence: app_config_v2.recipient_email (user) > users_v2.email > the global
+    app_config_global_v2 value. See ``load_recipient_config``."""
+    from writer_engine.library_helpers.email_recipients import load_recipient_config
 
-    G2: reads ``app_config_v2`` (per-user), not the non-existent ``app_config``."""
-    from writer_engine.library_helpers.email_recipients import load_app_config
-
-    cfg = await load_app_config(client, ["recipient_email", "bcc_email"], user_id)
-    # app_config_v2.recipient_email (what the user configured) wins; users_v2.email is the fallback.
-    if not cfg.get("recipient_email") and user_id:
-        with contextlib.suppress(Exception):
-            ur = (
-                await client.table("users_v2")
-                .select("email,bcc_email")
-                .eq("user_id", user_id)
-                .limit(1)
-                .execute()
-            )
-            row = (getattr(ur, "data", None) or [{}])[0]
-            if row.get("email"):
-                cfg["recipient_email"] = row["email"]
-            if row.get("bcc_email"):
-                cfg.setdefault("bcc_email", row["bcc_email"])
-    return resolve_recipients(config=cfg)
+    return resolve_recipients(config=await load_recipient_config(client, user_id))
 
 
 def _deliverable_html(tool: str, op: str, result: dict) -> str:

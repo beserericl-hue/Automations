@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import EngineFleet, { type EngineFleetData } from './EngineFleet';
 import EngineScheduler, { type EngineSchedulerData } from './EngineScheduler';
+import GlobalSettings, { type GlobalSetting } from './GlobalSettings';
 import { useUser } from '../../contexts/UserContext';
 import { useToast } from '../../contexts/ToastContext';
 import { supabase } from '../../config/supabase';
@@ -81,7 +82,7 @@ async function adminFetch<T>(path: string, options?: RequestInit): Promise<T> {
   return json.data;
 }
 
-type AdminTab = 'users' | 'subscriptions' | 'revenue' | 'metrics' | 'workflows' | 'queues' | 'fleet' | 'bounces';
+type AdminTab = 'users' | 'subscriptions' | 'revenue' | 'metrics' | 'workflows' | 'queues' | 'fleet' | 'bounces' | 'settings';
 
 const TAB_LABELS: Record<AdminTab, string> = {
   users: 'User Management',
@@ -92,6 +93,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   queues: 'Queues',
   fleet: 'Engine Fleet',
   bounces: 'Email Bounces',
+  settings: 'Global Settings',
 };
 
 export default function AdminPanel() {
@@ -145,6 +147,16 @@ export default function AdminPanel() {
         </div>
       )}
       {activeTab === 'bounces' && <BounceStatus />}
+      {activeTab === 'settings' && (
+        <GlobalSettings
+          api={{
+            load: () => adminFetch<GlobalSetting[]>('/global-config'),
+            save: (key, body) =>
+              adminFetch<GlobalSetting>(`/global-config/${encodeURIComponent(key)}`, { method: 'PUT', body: JSON.stringify(body) }),
+            remove: (key) => adminFetch<{ deleted: boolean }>(`/global-config/${encodeURIComponent(key)}`, { method: 'DELETE' }),
+          }}
+        />
+      )}
     </div>
   );
 }
