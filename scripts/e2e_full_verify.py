@@ -8,7 +8,7 @@ voice webhook (the simulated-Eve surface). Writes scripts/e2e_out/verify/<id>.js
 scripts/e2e_out/verify/REPORT.md at the end.
 
 Env: E2E_SECRET (64-char gateway secret), SUPA_URL, SUPA_KEY (DEV Supabase).
-Exit status: 1 if any test FAILs (or has no runnable prompt), else 0.
+Exit status: 1 if any test FAILs (or has no runnable prompt), else 0. MANUAL tests are reported only.
 
 Runs by hand or in the writer-e2e Railway runner (writers-workbench/e2e/runner/run.sh), which maps
 those names from its Railway variables. Never point it at PROD.
@@ -323,7 +323,14 @@ def parse_suite():
             em = re.search(r"\*\*Expected[^:]*:\*\*\s*(.+)", b)
             if em:
                 expected = [s.strip() for s in re.split(r";\s*", em.group(1)) if s.strip()]
-        tests.append({"id": tid, "title": title, "route": route, "steps": steps, "expected": expected})
+        # A "[Manual setup: ...]" command (R42: seed a past-due scheduled row by SQL, wait for the cron) is
+        # an instruction for a person, not a chat message; sending it to the engine just gets a "not
+        # sure what to do" reply and a false FAIL. Report it as MANUAL instead.
+        manual = any(p.lstrip().lower().startswith("[manual setup") for _src, p in steps)
+        if manual:
+            steps = []
+        tests.append({"id": tid, "title": title, "route": route, "steps": steps, "expected": expected,
+                      "manual": manual})
     return tests
 
 
@@ -527,7 +534,10 @@ def main():
 
     log(f"# Full E2E verify — {len(tests)} tests — start {datetime.now(timezone.utc).isoformat()}")
     for i, t in enumerate(tests, 1):
-        if not t["steps"]:
+        if t.get("manual"):
+            verdict, ev = "MANUAL", ["manual-setup test: not run by this script"]
+            runs = []
+        elif not t["steps"]:
             verdict, ev = "NO_PROMPT", ["no runnable command found in suite"]
             runs = []
         else:
