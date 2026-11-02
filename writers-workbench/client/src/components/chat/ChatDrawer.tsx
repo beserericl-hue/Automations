@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useLocation, useParams } from 'react-router-dom';
+import { matchPath, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import ReactMarkdown from 'react-markdown';
 import { useUser } from '../../contexts/UserContext';
@@ -158,7 +158,10 @@ interface CreditExhaustionState {
 export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
   const { profile, refreshSubscription } = useUser();
   const location = useLocation();
-  const params = useParams<{ id: string }>();
+  // The drawer is mounted by AppShell, the LAYOUT route, so useParams() here never sees the child
+  // route's :id — it was always undefined, which silently disabled the project context (the
+  // "Write next chapter of …" shortcuts and the project sent to the hub). Match the path instead.
+  const projectId = matchPath('/projects/:id/*', location.pathname)?.params.id;
   const queryClient = useQueryClient();
   // When a chat-dispatched engine job finishes, its result lands in the DB (a new brainstorm project, a
   // written chapter, etc.) but the lists that show it were never told to refetch — so it appeared only
@@ -182,18 +185,18 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const isOnProject = location.pathname.startsWith('/projects/') && params.id;
+  const isOnProject = !!projectId;
   const { data: currentProject } = useQuery({
-    queryKey: ['project-context', params.id],
+    queryKey: ['project-context', projectId],
     queryFn: async () => {
       const { data } = await supabase
         .from('writing_projects_v2')
         .select('title, chapter_count')
-        .eq('id', params.id!)
+        .eq('id', projectId!)
         .maybeSingle();
       return data as { title: string; chapter_count: number } | null;
     },
-    enabled: !!isOnProject,
+    enabled: isOnProject,
   });
 
   useEffect(() => {
@@ -336,8 +339,8 @@ export default function ChatDrawer({ open, onClose }: ChatDrawerProps) {
           conversation_id: conversationId,
           // The project page the user is on: "write the next chapter" / "add X to the story bible"
           // then act on this book without the user naming it.
-          ...(isOnProject && params.id
-            ? { project_id: params.id, ...(currentProject?.title ? { project_title: currentProject.title } : {}) }
+          ...(projectId
+            ? { project_id: projectId, ...(currentProject?.title ? { project_title: currentProject.title } : {}) }
             : {}),
         }),
       });
