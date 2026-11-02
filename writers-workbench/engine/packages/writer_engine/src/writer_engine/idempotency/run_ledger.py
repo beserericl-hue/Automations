@@ -87,7 +87,9 @@ async def claim_run(
     * **prior row is complete** — ``should_skip`` is True: the work is done, replay the result.
     * **prior row is in_progress** — go ahead. The previous owner died mid-run (arq only re-queues a
       job after a cancel), so re-running is the correct repair, and the idempotent persist paths
-      absorb the overlap. ``attempts`` is bumped so the repetition is visible.
+      absorb the overlap. ``attempts`` is bumped so the repetition is visible. "Died" is only
+      true once the previous attempt's run lease has lapsed — arq cancels the worker, not the step
+      it called — so the worker takes the lease (``run_lease``) BEFORE claiming here.
     * **prior row errored** — go ahead and reset the row to in_progress.
     """
     if not run_id:

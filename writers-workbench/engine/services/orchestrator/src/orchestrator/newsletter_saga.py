@@ -357,6 +357,10 @@ class NewsletterSagaDriver:
                     # E6: what is left of the newsletter's humanize ceiling, so the per-run cap holds
                     # across all its sections rather than per section. None = no ceiling configured.
                     "humanize_budget_words": _humanize_budget_left(segments_data),
+                    # The edition's theme, so a non-AI edition's sections are written about their
+                    # own subject instead of refused against the AI-newsletter brief.
+                    "genre": (st.get("cfg") or {}).get("genre") or None,
+                    "newsletter_name": (st.get("cfg") or {}).get("newsletter_name") or None,
                     **({"humanize": False} if (st.get("cfg") or {}).get("humanize") is False else {}),
                 },
                 timeout_s=240.0,
