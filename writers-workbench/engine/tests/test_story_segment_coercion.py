@@ -9,6 +9,11 @@ the authoritative story title afterwards.
 
 from __future__ import annotations
 
+from uuid import uuid4
+
+import pytest
+
+from writer_engine.schemas import StepInput, StepStatus
 from writer_engine.schemas.newsletter import StorySegment
 
 
@@ -52,3 +57,25 @@ def test_section_and_headline_aliases() -> None:
     seg = StorySegment.model_validate({"headline": "H", "section": "S body"})
     assert seg.story_title == "H"
     assert seg.newsletter_section_content == "S body"
+
+
+def test_segment_key_maps_to_section_content() -> None:
+    """The live segment brief answers {"segment": "..."}; DEV stored those sections EMPTY from 2026-10-24."""
+    seg = StorySegment.model_validate({"segment": "# Seed banks\n\n**The Recap:** ..."})
+    assert seg.newsletter_section_content.startswith("# Seed banks")
+
+
+async def _empty_write(*args: object, **kwargs: object) -> StorySegment:
+    return StorySegment(story_title="T", newsletter_section_content="")
+
+
+@pytest.mark.asyncio
+async def test_an_empty_section_is_an_error_not_a_blank_newsletter(monkeypatch: pytest.MonkeyPatch) -> None:
+    from segment_step import main as segment_main
+
+    monkeypatch.setattr(segment_main, "_write", _empty_write)
+    out = await segment_main.handler(
+        StepInput(execution_id=uuid4(), step_name="segment", payload={"story": {"title": "T"}})
+    )
+    assert out.status is StepStatus.ERROR
+    assert out.error is not None and out.error.code == "EMPTY_SEGMENT"
