@@ -32,8 +32,10 @@ from typing import Any
 import httpx
 
 from writer_engine.config import get_settings
+from writer_engine.integrations import UserCredentials, load_user_credentials
 from writer_engine.social import channels as ch
 from writer_engine.telemetry.logging import get_logger
+from writer_engine.url_safety import Resolver, check_public_https_url
 
 logger = get_logger("social.poster")
 
@@ -188,10 +190,17 @@ class Transport:
 
     http: httpx.AsyncClient
     sleep: Callable[[float], Awaitable[Any]] = asyncio.sleep
+    resolve: Resolver | None = None
+    """DNS for the SSRF check on blog endpoints. None = the system resolver."""
 
 
 async def _cover(
-    transport: Transport, row: dict[str, Any], wanted: list[ch.Channel], *, live: bool
+    transport: Transport,
+    row: dict[str, Any],
+    wanted: list[ch.Channel],
+    *,
+    live: bool,
+    creds: UserCredentials,
 ) -> tuple[tuple[bytes, str] | None, str | None, str]:
     """The sketchnote for this post: (website cover, Blotato media url, note). Made once, shared."""
     if not row.get("include_image") or not wanted:
@@ -211,9 +220,9 @@ async def _cover(
         return None, None, "image generation failed or timed out: posted without an image"
     data, content_type, src = made
     media = None
-    if any(c.kind == "linkedin" for c in wanted) and settings.blotato_api_key:
+    if any(c.kind == "linkedin" for c in wanted) and creds.blotato_api_key:
         media = await ch.blotato_upload_media(
-            transport.http, src, api_key=settings.blotato_api_key, base_url=settings.blotato_base_url
+            transport.http, src, api_key=creds.blotato_api_key, base_url=settings.blotato_base_url
         )
     return (data, content_type), media, ""
 
@@ -224,6 +233,7 @@ async def post_row(
     """Send every channel of a claimed row that has not gone out yet. Returns the deliveries."""
     settings = get_settings()
     configured = await ch.load_channels(client, str(row["user_id"]))
+    creds = await load_user_credentials(client, str(row["user_id"]))
     deliveries = await _deliveries_for(client, str(row["id"]))
     todo = [
         c for c in row.get("channels") or [] if (deliveries.get(c) or {}).get("status") not in ch.OK_DELIVERY
@@ -246,39 +256,84 @@ async def post_row(
             continue
         wanted.append(channel)
 
-    cover, media_url, image_note = await _cover(transport, row, wanted, live=live)
+    cover, media_url, image_note = await _cover(transport, row, wanted, live=live, creds=creds)
 
     for channel in wanted:
         if channel.kind == "website":
             request = ch.website_request(row, channel, cover=cover, now=now)
         else:
-            request = ch.linkedin_request(row, channel, media_url=media_url)
+            request = ch.linkedin_request(
+                row, channel, media_url=media_url, account_id=creds.blotato_account_id
+            )
         existing = deliveries.get(channel.channel)
         if not live:
-            note = "dry run: nothing sent" + (f"; {image_note}" if image_note else "")
+            problem = await _dry_run_problem(channel, request, creds, transport)
+            note = "dry run: nothing sent; " + (
+                f"would fail: {problem}" if problem else _credentials_note(channel, request)
+            )
+            note += f"; {image_note}" if image_note else ""
             deliveries[channel.channel] = await _write_delivery(
                 client, row["id"], channel.channel, existing, status="dry_run", request=request, detail=note
             )
             continue
         try:
             if channel.kind == "website":
-                result = await ch.send_website(transport.http, channel, request)
+                result = await ch.send_website(
+                    transport.http,
+                    channel,
+                    request,
+                    token=creds.website_token(channel.channel),
+                    resolve=transport.resolve,
+                )
             else:
                 result = await ch.send_linkedin(
                     transport.http,
                     channel,
                     request,
-                    api_key=settings.blotato_api_key,
+                    api_key=creds.blotato_api_key,
                     base_url=settings.blotato_base_url,
                 )
         except Exception as exc:
             result = ch.SendResult("failed", detail=f"{type(exc).__name__}: {exc}"[:500])
+        if result.status == "failed" and creds.problems:
+            result.detail = f"{result.detail}; {'; '.join(creds.problems)}"
         if image_note and result.status != "failed":
             result.detail = f"{result.detail}; {image_note}"
         deliveries[channel.channel] = await _write_delivery(
             client, row["id"], channel.channel, existing, status=result.status, request=request, result=result
         )
     return deliveries
+
+
+def _credentials_note(channel: ch.Channel, request: dict[str, Any]) -> str:
+    if channel.kind == "website":
+        header = str(channel.config.get("auth_header") or "Authorization")
+        return f"would send the user's website token in {header} to {channel.config.get('endpoint')}"
+    return f"would send with the user's Blotato key (account {request['post']['accountId']})"
+
+
+async def _dry_run_problem(
+    channel: ch.Channel, request: dict[str, Any], creds: UserCredentials, transport: Transport
+) -> str | None:
+    """What would make this channel fail if it were live. Checked without sending anything, so a
+    dry run says "you have not entered your Blotato key" before the cutover, not after it."""
+    problem: str | None
+    if channel.kind == "website":
+        problem = ch.website_problem(channel, creds.website_token(channel.channel))
+        if problem is None:
+            unsafe = await check_public_https_url(
+                str(channel.config.get("endpoint") or ""), resolve=transport.resolve
+            )
+            problem = f"endpoint refused: {unsafe}" if unsafe else None
+    elif not creds.blotato_api_key:
+        problem = ch.NO_BLOTATO_KEY
+    elif not request["post"]["accountId"]:
+        problem = "no Blotato account id is set (Settings → Integrations → Blotato)"
+    else:
+        problem = None
+    if problem and creds.problems:
+        problem = f"{problem}; {'; '.join(creds.problems)}"
+    return problem
 
 
 async def _settle(
@@ -305,10 +360,10 @@ async def _settle(
 async def reconcile_submitted(
     client: Any, transport: Transport, *, min_age: timedelta = timedelta(seconds=40)
 ) -> int:
-    """Ask Blotato about LinkedIn posts it accepted but had not finished. Returns rows changed."""
+    """Ask Blotato about LinkedIn posts it accepted but had not finished. Returns rows changed.
+
+    Each delivery is checked with its own user's Blotato key: there is no shared key to ask with."""
     settings = get_settings()
-    if not settings.blotato_api_key:
-        return 0
     now = datetime.now(UTC)
     resp = await (
         client.table(DELIVERIES)
@@ -320,14 +375,26 @@ async def reconcile_submitted(
     )
     changed = 0
     touched: set[str] = set()
+    owners: dict[str, str] = {}
+    keys: dict[str, str] = {}
     for d in resp.data or []:
         if not d.get("provider_ref"):
             continue
+        schedule_id = str(d["schedule_id"])
+        if schedule_id not in owners:
+            found = (await client.table(SCHEDULE).select("id,user_id").eq("id", schedule_id).execute()).data
+            owners[schedule_id] = str(found[0].get("user_id") or "") if found else ""
+        user_id = owners[schedule_id]
+        if user_id and user_id not in keys:
+            keys[user_id] = (await load_user_credentials(client, user_id)).blotato_api_key
+        api_key = keys.get(user_id, "")
+        if not api_key:
+            continue  # the user removed their key; the delivery stays 'submitted' until they add it
         try:
             result = await ch.blotato_status(
                 transport.http,
                 str(d["provider_ref"]),
-                api_key=settings.blotato_api_key,
+                api_key=api_key,
                 base_url=settings.blotato_base_url,
             )
         except Exception as exc:
@@ -348,7 +415,7 @@ async def reconcile_submitted(
             .eq("id", d["id"])
             .execute()
         )
-        touched.add(str(d["schedule_id"]))
+        touched.add(schedule_id)
         changed += 1
     for schedule_id in touched:
         rows = (await client.table(SCHEDULE).select("*").eq("id", schedule_id).execute()).data or []
