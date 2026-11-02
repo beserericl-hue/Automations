@@ -418,6 +418,39 @@ adminRouter.get('/engine-fleet', async (_req: Request, res: Response) => {
 
 /**
  * @openapi
+ * /admin/engine-scheduler:
+ *   get:
+ *     tags: [Admin]
+ *     summary: The engine's scheduled (cron) jobs and whether each is healthy
+ *     description: |
+ *       Reads the engine runtime's /admin/scheduler from every runtime replica with the engine admin
+ *       token (held by this server only) and merges them: per job the interval, last run, last error,
+ *       next run and a health verdict (ok, failing, overdue, waiting, pending).
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Scheduler snapshot.
+ *       403:
+ *         description: Not an admin.
+ *       502:
+ *         description: Engine unreachable, or the server has no engine admin token.
+ */
+adminRouter.get('/engine-scheduler', async (_req: Request, res: Response) => {
+  try {
+    const { getEngineScheduler } = await import('../lib/engine-hub.js');
+    res.json({ success: true, data: await getEngineScheduler() });
+  } catch (err) {
+    logger.error({ err }, 'admin/engine-scheduler: fetch failed');
+    res.status(502).json({
+      success: false,
+      error: { code: 'ENGINE_UNREACHABLE', message: err instanceof Error ? err.message : 'Engine unreachable' },
+    });
+  }
+});
+
+/**
+ * @openapi
  * /admin/queues:
  *   get:
  *     tags: [Admin]

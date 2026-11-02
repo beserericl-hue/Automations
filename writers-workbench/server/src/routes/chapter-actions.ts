@@ -13,6 +13,12 @@
  *
  * Credits: an outline is charged as a chapter brainstorm and a write or rewrite as a chapter write
  * (see JOB_TYPE).
+ *
+ *   POST /api/projects/:projectId/outline/revise   { directive }
+ *
+ * The project-level "Revise outline" box: the author's free-text directive goes to the engine's
+ * brainstorm.revise-outline op by project id, which rewrites the WHOLE outline and persists it (the
+ * prior outline is snapshotted to outline_versions_v2 first). Charged as `revise_outline`.
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -121,6 +127,72 @@ chapterActionsRouter.post(
       res.status(202).json({ success: true, jobId: job.job_id, engineJob: true, status: job.status ?? 'queued', jobType });
     } catch (err) {
       logger.error({ err, projectId: project.id, chapterNumber, action }, 'chapter action failed');
+      res.status(502).json({ success: false, error: { code: 'ENGINE_UNREACHABLE', message: err instanceof Error ? err.message : 'Engine error' } });
+    }
+  },
+);
+
+const ReviseSchema = z.object({
+  directive: z.string().trim().min(3, 'Tell the engine what to change').max(4000),
+});
+
+chapterActionsRouter.post(
+  '/:projectId/outline/revise',
+  validateBody(ReviseSchema),
+  async (req: Request, res: Response) => {
+    const { directive } = req.body as z.infer<typeof ReviseSchema>;
+    const userId = req.userId!;
+    const { data: project } = await getSupabaseAdmin()
+      .from('writing_projects_v2')
+      .select('id, title, outline')
+      .eq('id', String(req.params.projectId))
+      .eq('user_id', userId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (!project) {
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Project not found' } });
+      return;
+    }
+    // The op revises an existing outline; with none it returns "no outline to revise" after a queue
+    // round trip. Say so now, and charge nothing.
+    const chapters = (project.outline as { chapters?: unknown[] } | null)?.chapters ?? [];
+    if (!chapters.length) {
+      res.status(400).json({ success: false, error: { code: 'NO_OUTLINE', message: 'This project has no outline to revise yet.' } });
+      return;
+    }
+
+    const jobType = 'revise_outline';
+    const cost = await getCreditCost(jobType);
+    const hasSubscription = req.subscriptionTier !== null && req.subscriptionTier !== undefined;
+    if (!bypassCredits(req) && cost > 0 && hasSubscription && (req.creditsRemaining ?? 0) < cost) {
+      res.status(402).json({
+        success: false,
+        error: { code: 'INSUFFICIENT_CREDITS', message: `This needs ${cost} credits; you have ${req.creditsRemaining ?? 0}.`, creditsRequired: cost },
+      });
+      return;
+    }
+
+    try {
+      const job = await callEngineWriteTool('brainstorm', {
+        op: 'revise-outline',
+        project_id: project.id,
+        project_title: project.title,
+        title: project.title,
+        directive,
+        user_id: userId,
+        persist: true,
+        async: true,
+      });
+      let remaining = req.creditsRemaining ?? 0;
+      if (!bypassCredits(req) && cost > 0 && hasSubscription) {
+        const r = await deductCredits(userId, cost, `outline.revise:${jobType}`);
+        if (r.ok) remaining = r.balance_after;
+      }
+      res.setHeader('X-Credits-Remaining', String(remaining));
+      logger.info({ userId, projectId: project.id, jobId: job.job_id }, 'outline revision queued');
+      res.status(202).json({ success: true, jobId: job.job_id, engineJob: true, status: job.status ?? 'queued', jobType });
+    } catch (err) {
+      logger.error({ err, projectId: project.id }, 'outline revision failed to queue');
       res.status(502).json({ success: false, error: { code: 'ENGINE_UNREACHABLE', message: err instanceof Error ? err.message : 'Engine error' } });
     }
   },
