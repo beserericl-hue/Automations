@@ -8,8 +8,11 @@ are thin and take an ``httpx.AsyncClient`` so tests can hand them a mock transpo
 Differences from n8n, all deliberate:
 
 * Channels, endpoints and LinkedIn page ids come from ``social_channels_v2``, not from code, and
-  the API keys come from Railway variables named in the channel config. n8n typed the KIE key into
-  six nodes.
+  the Blotato key, Blotato account and each blog's token are the *user's* own, stored encrypted in
+  ``user_integrations_v2`` (Settings → Integrations; see ``writer_engine.integrations``). There is
+  no company key in a Railway variable. n8n typed the KIE key into six nodes.
+* A blog endpoint is user-supplied, so it is checked for SSRF (https, public addresses only) at
+  send time as well as when it is saved.
 * The personal LinkedIn profile is its own channel (``li_personal``). n8n posted there silently
   whenever any company page was chosen, so "both pages" was three posts nobody could see coming.
 * The website's public URL is built from ``public_base`` + slug. The TechAhir API answers with a
@@ -22,7 +25,6 @@ from __future__ import annotations
 
 import base64
 import json
-import os
 import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -31,6 +33,7 @@ from typing import Any
 import httpx
 
 from writer_engine.telemetry.logging import get_logger
+from writer_engine.url_safety import Resolver, check_public_https_url
 
 logger = get_logger("social.channels")
 
@@ -161,7 +164,11 @@ def website_request(
     return payload
 
 
-def linkedin_request(row: dict[str, Any], channel: Channel, *, media_url: str | None) -> dict[str, Any]:
+def linkedin_request(
+    row: dict[str, Any], channel: Channel, *, media_url: str | None, account_id: str = ""
+) -> dict[str, Any]:
+    """``account_id`` is the user's Blotato account (Settings → Integrations). A channel config
+    ``account_id`` overrides it for that one channel (migration 043 keeps one only where it differs)."""
     text = str(row.get("linkedin_content") or "") or blog_body(str(row.get("body_md") or ""))
     target: dict[str, Any] = {"targetType": "linkedin"}
     page_id = str(channel.config.get("page_id") or "").strip()
@@ -169,7 +176,7 @@ def linkedin_request(row: dict[str, Any], channel: Channel, *, media_url: str | 
         target["pageId"] = page_id
     return {
         "post": {
-            "accountId": str(channel.config.get("account_id") or ""),
+            "accountId": str(channel.config.get("account_id") or account_id or "").strip(),
             "content": {
                 "text": fit_linkedin(text),
                 "platform": "linkedin",
@@ -203,10 +210,6 @@ class SendResult:
     response: dict[str, Any] | None = None
 
 
-def _secret(name: str) -> str:
-    return (os.environ.get(name) or "").strip()
-
-
 def website_public_url(channel: Channel, response: dict[str, Any]) -> str | None:
     slug = str(response.get("slug") or "").strip().strip("/")
     base = str(channel.config.get("public_base") or "").strip()
@@ -220,22 +223,52 @@ def website_public_url(channel: Channel, response: dict[str, Any]) -> str | None
     return None
 
 
-async def send_website(http: httpx.AsyncClient, channel: Channel, request: dict[str, Any]) -> SendResult:
+NO_BLOTATO_KEY = "no Blotato API key is set for this user (Settings → Integrations → Blotato)"
+
+
+def website_problem(channel: Channel, token: str) -> str | None:
+    """Why this website channel cannot be sent, before any network call; None when it can."""
+    if not str(channel.config.get("endpoint") or "").strip():
+        return f"channel {channel.channel}: no endpoint configured"
+    if not token:
+        return (
+            f"channel {channel.channel}: no auth token is set for this website "
+            "(Settings → Integrations → Website blogs)"
+        )
+    return None
+
+
+async def send_website(
+    http: httpx.AsyncClient,
+    channel: Channel,
+    request: dict[str, Any],
+    *,
+    token: str,
+    resolve: Resolver | None = None,
+) -> SendResult:
     endpoint = str(channel.config.get("endpoint") or "").strip()
     header = str(channel.config.get("auth_header") or "Authorization").strip()
-    env_name = str(channel.config.get("auth_env") or "").strip()
-    token = _secret(env_name) if env_name else ""
-    if not endpoint:
-        return SendResult("failed", detail=f"channel {channel.channel}: no endpoint configured")
-    if not token:
-        return SendResult("failed", detail=f"channel {channel.channel}: {env_name or 'auth_env'} is not set")
+    problem = website_problem(channel, token)
+    if problem:
+        return SendResult("failed", detail=problem)
+    unsafe = await check_public_https_url(endpoint, resolve=resolve)
+    if unsafe:
+        return SendResult("failed", detail=f"channel {channel.channel}: endpoint refused: {unsafe}")
     value = (
         token
         if header.lower() != "authorization" or token.lower().startswith("bearer ")
         else f"Bearer {token}"
     )
-    resp = await http.post(endpoint, json=request, headers={header: value}, timeout=60.0)
+    # No redirects: a 30x to an internal address would walk straight past the check above.
+    resp = await http.post(
+        endpoint, json=request, headers={header: value}, timeout=60.0, follow_redirects=False
+    )
     data = _json(resp)
+    if 300 <= resp.status_code < 400:
+        where = resp.headers.get("location", "")[:200]
+        return SendResult(
+            "failed", detail=f"HTTP {resp.status_code}: endpoint redirects ({where}); not followed"
+        )
     if resp.status_code >= 400:
         return SendResult("failed", detail=f"HTTP {resp.status_code}: {_short(data)}", response=data)
     url = website_public_url(channel, data)
@@ -251,9 +284,12 @@ async def send_linkedin(
     http: httpx.AsyncClient, channel: Channel, request: dict[str, Any], *, api_key: str, base_url: str
 ) -> SendResult:
     if not api_key:
-        return SendResult("failed", detail="BLOTATO_API_KEY is not set")
+        return SendResult("failed", detail=NO_BLOTATO_KEY)
     if not request["post"]["accountId"]:
-        return SendResult("failed", detail=f"channel {channel.channel}: no Blotato account_id configured")
+        return SendResult(
+            "failed",
+            detail=f"channel {channel.channel}: no Blotato account id is set (Settings → Integrations → Blotato)",
+        )
     resp = await http.post(f"{base_url}/posts", json=request, headers=_blotato_headers(api_key), timeout=60.0)
     data = _json(resp)
     if resp.status_code >= 400:

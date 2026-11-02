@@ -436,6 +436,7 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
             findable without knowing it is filed under Settings. */}
         <SidebarLink to="/settings/author" icon={AuthorIcon} label="Author Profile" open={open} />
         <SidebarLink to="/trash" icon={TrashIcon} label="Trash" open={open} />
+        <SidebarLink to="/settings/integrations" icon={IntegrationsIcon} label="Integrations" open={open} />
         <SidebarLink to="/settings" icon={SettingsIcon} label="Settings" open={open} />
         {isAdmin && (
           <SidebarLink to="/admin" icon={AdminIcon} label="Admin" open={open} />
@@ -629,6 +630,14 @@ function AuthorIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+    </svg>
+  );
+}
+
+function IntegrationsIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
     </svg>
   );
 }
