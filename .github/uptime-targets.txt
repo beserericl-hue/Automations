@@ -1,0 +1,11 @@
+# Public health URLs checked from outside Railway by .github/workflows/uptime.yml.
+#
+# One target per line: <name> <url>. Blank lines and lines starting with # are ignored.
+# Public, unauthenticated URLs only: the check sends no secret and no auth header.
+# A target is up when it answers 2xx with a JSON body containing "status":"ok" (any of several attempts).
+#
+# PROD URLs are added here at cutover, not before.
+
+dev-workbench        https://writersworkbench-develop.up.railway.app/api/health
+dev-engine-runtime   https://writer-engine-runtime-develop.up.railway.app/admin/health
+dev-engine-gateway   https://writer-engine-gateway-develop.up.railway.app/admin/health
