@@ -980,6 +980,7 @@ newsletterRouter.get('/approvals/open', requireAuth, async (req: Request, res: R
 function assembleApprovalPreviewData(
   stories: Array<{ title?: string; summary?: string; external_source_links?: string[] }>,
   brandTitle: string,
+  issueNumber: number | null = null,
 ): Record<string, unknown> {
   const clean = stories.filter((s) => s && (s.title || s.summary));
   const [first, ...rest] = clean;
@@ -993,7 +994,8 @@ function assembleApprovalPreviewData(
   return {
     title: brandTitle,
     preheader: `${clean.length} ${clean.length === 1 ? 'story' : 'stories'} this issue`,
-    issue: { date: new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }), number: 1 },
+    // The number this issue will get when it is saved (migration 041); 1 only when unknown.
+    issue: { date: new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }), number: issueNumber ?? 1 },
     // Lead = the first story; the rest render in the body. Decorative sections are null so the
     // template hides them (deepMerge won't fall back to sample_data for an explicit null).
     lead: first
@@ -1060,10 +1062,22 @@ newsletterRouter.get('/approvals/:token/preview', requireAuth, async (req: Reque
   const ed = (editionRow ?? {}) as { newsletter_name?: string | null; display_name?: string | null; stamp_url?: string | null; signature_name?: string | null; signature_role?: string | null };
   const brandTitle = ed.newsletter_name || ed.display_name || 'Newsletter';
 
-  // 3) Compose data from the selected stories, layered under edition overrides.
+  // 3) Compose data from the selected stories, layered under edition overrides. The issue number is
+  //    the one a save for today would get (best effort — the preview still renders without it).
+  let issueNumber: number | null = null;
+  try {
+    const { data: peek } = await supabase.rpc('newsletter_peek_issue_number', {
+      p_edition_id: editionId,
+      p_send_date: new Date().toISOString().slice(0, 10),
+    });
+    if (typeof peek === 'number' && peek > 0) issueNumber = peek;
+  } catch {
+    /* preview falls back to #1 */
+  }
   const storyData = assembleApprovalPreviewData(
     stories as Array<{ title?: string; summary?: string; external_source_links?: string[] }>,
     brandTitle,
+    issueNumber,
   );
   const editionData: Record<string, unknown> = {};
   if (ed.stamp_url) editionData.stamp_url = ed.stamp_url;

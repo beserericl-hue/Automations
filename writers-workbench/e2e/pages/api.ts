@@ -465,6 +465,56 @@ export async function seedSend(fields: {
   return ((await res.json()) as Array<{ id: string }>)[0].id;
 }
 
+/** Insert a disposable newsletter_editions_v2 row (owned by the demo user). Teardown: hardDeleteEdition. */
+export async function seedEdition(id: string, displayName = `E2E ${id}`): Promise<void> {
+  const res = await fetch(`${SUPA_URL}/rest/v1/newsletter_editions_v2`, {
+    method: 'POST',
+    headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      id,
+      display_name: displayName,
+      subheader: 'Disposable regression edition',
+      genre: 'post-apocalyptic',
+      newsletter_name: displayName,
+      user_id: DEMO_USER_ID,
+    }),
+  });
+  if (!res.ok) throw new Error(`seedEdition ${res.status}: ${(await res.text()).slice(0, 200)}`);
+}
+
+/**
+ * UPSERT a newsletter_sends_v2 row on (edition_id, send_date) — the engine persist step's write —
+ * and return the saved row (id + issue_number).
+ */
+export async function upsertSend(fields: {
+  edition_id: string;
+  send_date: string;
+  subject: string;
+  status?: string;
+  issue_number?: number;
+}): Promise<{ id: string; issue_number: number | null }> {
+  const row: Record<string, unknown> = {
+    user_id: DEMO_USER_ID,
+    edition_id: fields.edition_id,
+    send_date: fields.send_date,
+    subject: fields.subject,
+    status: fields.status ?? 'draft',
+    html_body: '<!doctype html><html><body><p>E2E upsert</p></body></html>',
+  };
+  if (fields.issue_number !== undefined) row.issue_number = fields.issue_number;
+  const res = await fetch(`${SUPA_URL}/rest/v1/newsletter_sends_v2?on_conflict=edition_id,send_date`, {
+    method: 'POST',
+    headers: {
+      ...supaHeaders(),
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation,resolution=merge-duplicates',
+    },
+    body: JSON.stringify(row),
+  });
+  if (!res.ok) throw new Error(`upsertSend ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return ((await res.json()) as Array<{ id: string; issue_number: number | null }>)[0];
+}
+
 export async function deleteSend(id: string): Promise<void> {
   await supaDelete('newsletter_sends_v2', `id=eq.${encodeURIComponent(id)}`);
 }
