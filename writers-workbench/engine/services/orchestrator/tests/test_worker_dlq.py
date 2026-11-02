@@ -24,6 +24,14 @@ from writer_engine.queues import (
 )
 
 
+@pytest.fixture(autouse=True)
+async def _hermetic_redis(fake_redis: Any) -> None:
+    """The worker takes a run lease in Redis (item 16). Without this, a machine with a local Redis on
+    6379 shares leases between tests: one a cancelled job leaves to expire blocks the next test that
+    reuses its job id. Each test gets the conftest's in-memory Redis instead."""
+    return None
+
+
 @pytest.fixture
 def recorded(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
