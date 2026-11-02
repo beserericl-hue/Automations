@@ -125,7 +125,40 @@ async def fetch_html(
         credits = int(resp.headers.get("sa-credit-cost") or 0)
     except ValueError:
         credits = 0
+    _record_scrape_cost(credits, render=render, status=resp.status_code)
     return resp.text, credits
+
+
+def _record_scrape_cost(credits: int, *, render: bool, status: int) -> None:
+    """One cost row per billed ScraperAPI request (the render fallback is its own request and row).
+
+    ``sa-credit-cost`` is ScraperAPI's own count. Without it the documented price is assumed (1 plain,
+    10 render=true) and the row is marked estimated.
+    """
+    from writer_engine.telemetry import pricing, token_accounting
+
+    if credits > 0:
+        token_accounting.record_units(
+            provider="scraperapi",
+            model="api",
+            units=credits,
+            unit_type="credits",
+            credits=credits,
+            metadata={"render": render, "status": status},
+        )
+        return
+    assumed = 10 if render else 1
+    base = pricing.unit_cost("scraperapi", "api", units=assumed, credits=assumed)
+    token_accounting.record_units(
+        provider="scraperapi",
+        model="api",
+        units=assumed,
+        unit_type="credits",
+        cost=pricing.Cost(
+            base.cost_usd, pricing.COST_ESTIMATED, {**base.unit_prices, "assumed_credits": assumed}
+        ),
+        metadata={"render": render, "status": status, "credit_header": False},
+    )
 
 
 _semaphores: dict[int, asyncio.Semaphore] = {}

@@ -7,7 +7,7 @@ from writer_engine.humanize import humanize_draft
 from writer_engine.llm import LLMRouter, ProviderNotRegistered, complete_structured, get_router
 from writer_engine.prompt_store import get_prompt_store, seed_default_prompts
 from writer_engine.prompt_store.n8n_translate import render_live_prompt
-from writer_engine.schemas import StepInput, StepOutput, StepStatus
+from writer_engine.schemas import StepError, StepInput, StepOutput, StepStatus
 from writer_engine.schemas.newsletter import StorySegment
 from writer_engine.step_service import build_step_app
 
@@ -91,6 +91,20 @@ async def handler(inp: StepInput) -> StepOutput:
     # stages (image gate, chosen-image matching, assemble) can key on it reliably.
     if not seg.story_title:
         seg.story_title = str(story.get("title") or "Story")
+    if not fixture and not seg.newsletter_section_content.strip():
+        # An empty section is a failure, not a result. Returned as OK it was assembled into
+        # editions with no story sections at all (every DEV send from 2026-10-24 to 2026-11-02, when
+        # the model named the field "segment"); as an ERROR the saga stops and says why.
+        return StepOutput(
+            execution_id=inp.execution_id,
+            step_name=STEP_NAME,
+            status=StepStatus.ERROR,
+            error=StepError(
+                code="EMPTY_SEGMENT",
+                message=f"segment model returned no section text for {seg.story_title!r}",
+            ),
+            payload={},
+        )
     humanize_report = None if fixture else await _humanize_section(seg, inp.payload)
     out = seg.model_dump(mode="json")
     # Recorded beside the segment, not on StorySegment: that model is also the schema the LLM fills,

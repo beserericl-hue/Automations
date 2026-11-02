@@ -39,10 +39,18 @@ class LLMResponse:
     input_tokens: int = 0
     output_tokens: int = 0
     cache_read_tokens: int = 0
+    # 5-minute cache writes; 1-hour writes (billed 2x input, not 1.25x) are counted separately.
     cache_write_tokens: int = 0
     model: str = ""
     provider: str = ""
     citations: tuple[str, ...] = ()
+    cache_write_1h_tokens: int = 0
+    # The provider's own dollar figure for this call when it returns one (Perplexity usage.cost).
+    reported_cost_usd: float | None = None
+    # Perplexity's search_context_size, which sets its per-request fee.
+    search_context_size: str | None = None
+    # Provider message / response id, stored as token_usage_v2.request_id.
+    request_id: str = ""
 
 
 class TokenBudget(Protocol):
@@ -214,17 +222,24 @@ class LLMRouter:
                 resp = await self._dispatch(**kwargs)
         else:
             resp = await self._dispatch(**kwargs)
-        # CR-007: record token usage for billing (best-effort; no-op when no accounting context set).
+        # CR-007 / 042: record the call's exact cost (best-effort; written even with no context, as
+        # an unattributed row, so no paid call disappears).
         try:
             from writer_engine.telemetry import token_accounting
 
             token_accounting.record(
                 provider=provider,
-                model=resp.model or model,
+                # Price what was ASKED for: some providers echo a dated or routed model name.
+                model=model,
                 input_tokens=resp.input_tokens,
                 output_tokens=resp.output_tokens,
                 cache_read=resp.cache_read_tokens,
                 cache_write=resp.cache_write_tokens,
+                cache_write_1h=resp.cache_write_1h_tokens,
+                reported_cost_usd=resp.reported_cost_usd,
+                request_fee_tier=resp.search_context_size,
+                request_id=resp.request_id or None,
+                metadata={"response_model": resp.model} if resp.model and resp.model != model else None,
             )
         except Exception:  # accounting must never break a generation
             pass

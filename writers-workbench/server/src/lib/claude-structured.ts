@@ -9,6 +9,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import type { z } from 'zod';
+import { anthropicTokens, recordUsage } from './cost-recorder.js';
 
 export const MODEL = 'claude-opus-5-5';
 
@@ -24,9 +25,19 @@ function anthropic(): Anthropic {
   });
 }
 
+/** Who and what a call is for — every call is recorded in token_usage_v2 under this label. */
+export interface CallContext {
+  operation: string;
+  userId: string | null | undefined;
+  projectId?: string | null;
+  contentId?: string | null;
+  chapterNumber?: number | null;
+}
+
 export async function parseWith<T extends z.ZodType>(
   schema: T,
   prompt: string,
+  ctx: CallContext,
   effort: 'low' | 'medium' | 'high' = 'medium',
 ): Promise<z.infer<T>> {
   const response = await anthropic().messages.parse({
@@ -34,6 +45,19 @@ export async function parseWith<T extends z.ZodType>(
     max_tokens: 16000,
     output_config: { effort, format: zodOutputFormat(schema) },
     messages: [{ role: 'user', content: prompt }],
+  });
+  // Recorded before any of the checks below: a refusal or a max_tokens stop was still billed.
+  await recordUsage({
+    operation: ctx.operation,
+    provider: 'anthropic',
+    model: response.model || MODEL,
+    userId: ctx.userId ?? null,
+    projectId: ctx.projectId ?? null,
+    contentId: ctx.contentId ?? null,
+    chapterNumber: ctx.chapterNumber ?? null,
+    requestId: response.id ?? null,
+    tokens: anthropicTokens(response.usage),
+    metadata: { stop_reason: response.stop_reason, effort },
   });
   if (response.stop_reason === 'refusal') throw new Error('The model declined this request.');
   if (response.stop_reason === 'max_tokens') throw new Error('The model ran out of room before finishing.');
