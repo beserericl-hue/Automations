@@ -42,7 +42,7 @@ img { max-width: 100%; height: auto; }
 </style></head>
 <body>
 <div class="masthead">$masthead</div>
-<div class="preheader">$preheader</div>
+<div class="preheader">$issue_line$preheader</div>
 $body
 <div class="permalink">Read on web: $permalink_url</div>
 </body></html>
@@ -82,18 +82,27 @@ def _format_issue_date(send_date: str) -> str:
 
 
 def _render_data(
-    *, subject: str, preheader: str, markdown_body: str, send_date: str, view_url: str = ""
+    *,
+    subject: str,
+    preheader: str,
+    markdown_body: str,
+    send_date: str,
+    view_url: str = "",
+    issue_number: int | None = None,
 ) -> dict[str, Any]:
     """The ``data`` object for /api/newsletter/render-html (mirrors the n8n send payload).
 
     ``body_md`` carries the assembled markdown; the decorative sections are ``None`` (not omitted)
     so the renderer's deepMerge does NOT fall back to the template's ``sample_data`` — that is what
     hides an empty sponsor/lead/trending block instead of showing a sample placeholder. ``view_url``
-    feeds the template's "view in browser" link.
+    feeds the template's "view in browser" link. ``issue_number`` fills ``{{issue.number}}``;
+    without it every email printed the sample's "Issue #1".
     """
     issue: dict[str, Any] = {"date": _format_issue_date(send_date)}
     if view_url:
         issue["view_url"] = view_url
+    if issue_number is not None:
+        issue["number"] = issue_number
     return {
         "title": subject,
         "preheader": preheader,
@@ -108,7 +117,14 @@ def _render_data(
 
 
 async def _render_via_workbench(
-    edition_id: str, *, subject: str, preheader: str, markdown_body: str, send_date: str, view_url: str
+    edition_id: str,
+    *,
+    subject: str,
+    preheader: str,
+    markdown_body: str,
+    send_date: str,
+    view_url: str,
+    issue_number: int | None = None,
 ) -> str | None:
     """Render the edition's stored Handlebars template through the Workbench renderer.
 
@@ -126,6 +142,7 @@ async def _render_via_workbench(
         markdown_body=markdown_body,
         send_date=send_date,
         view_url=view_url,
+        issue_number=issue_number,
     )
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=8.0)) as client:
@@ -151,6 +168,8 @@ async def handler(inp: StepInput) -> StepOutput:
     markdown_body = str(inp.payload.get("markdown_body") or "")
     permalink_url = str(inp.payload.get("permalink_url") or "")
     send_date = str(inp.payload.get("send_date") or "")
+    raw_issue = inp.payload.get("issue_number")
+    issue_number = raw_issue if isinstance(raw_issue, int) and not isinstance(raw_issue, bool) else None
 
     # The stored template defines the newsletter's look; render it through the Workbench renderer.
     html_body = await _render_via_workbench(
@@ -160,6 +179,7 @@ async def handler(inp: StepInput) -> StepOutput:
         markdown_body=markdown_body,
         send_date=send_date,
         view_url=permalink_url,
+        issue_number=issue_number,
     )
     if html_body:
         template_id = edition_id
@@ -171,6 +191,7 @@ async def handler(inp: StepInput) -> StepOutput:
             preheader=preheader,
             body=_markdown_to_html(markdown_body),
             permalink_url=permalink_url or "(not yet published)",
+            issue_line=f"Issue #{issue_number} · " if issue_number is not None else "",
         )
         template_id = None
 

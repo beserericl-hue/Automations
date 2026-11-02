@@ -205,7 +205,12 @@ export default function NewsletterHome() {
               {nextScheduled.edition_id && editionsById.has(nextScheduled.edition_id) && (
                 <EditionBadge edition={editionsById.get(nextScheduled.edition_id)!} />
               )}
-              <div className="text-sm font-medium truncate">{nextScheduled.subject || '(no subject)'}</div>
+              <div className="text-sm font-medium truncate">
+                {nextScheduled.issue_number != null && (
+                  <span className="mr-1 text-gray-500 dark:text-gray-400" data-testid="next-scheduled-issue">#{nextScheduled.issue_number}</span>
+                )}
+                {nextScheduled.subject || '(no subject)'}
+              </div>
               <div className="text-xs text-gray-500 dark:text-gray-400">
                 {nextScheduled.scheduled_send_at ? formatDateTime(nextScheduled.scheduled_send_at) : nextScheduled.send_date}
               </div>
@@ -235,6 +240,7 @@ export default function NewsletterHome() {
             <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:bg-gray-800 dark:text-gray-400">
               <tr>
                 <th className="px-4 py-2">Edition</th>
+                <th className="px-4 py-2">Issue</th>
                 <th className="px-4 py-2">Subject</th>
                 <th className="px-4 py-2">Send date</th>
                 <th className="px-4 py-2">Status</th>
@@ -260,6 +266,9 @@ export default function NewsletterHome() {
                   >
                     <td className="px-4 py-2">
                       {edition ? <EditionBadge edition={edition} /> : <span className="text-gray-400">—</span>}
+                    </td>
+                    <td className="px-4 py-2 text-xs text-gray-700 dark:text-gray-300" data-testid="recent-run-issue">
+                      {run.issue_number != null ? `#${run.issue_number}` : '—'}
                     </td>
                     <td className="px-4 py-2 max-w-md truncate">{run.subject || '(no subject)'}</td>
                     <td className="px-4 py-2 font-mono text-xs">{run.send_date}</td>
