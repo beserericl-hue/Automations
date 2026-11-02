@@ -16,8 +16,11 @@ needs:
 * **PROD only on purpose.** ``--target prod`` refuses to touch the network at all without
   ``--confirm``, and ``SUPABASE_URL`` must actually be the PROD project for ``--target prod`` (and the
   DEV project for ``--target dev``): a DEV key pointed at by a PROD flag, or the reverse, is refused.
-* **Idempotent.** Channels, subscriptions and editions are upserts on their keys; a feed source is
-  added only when the edition does not already have that URL (its unique index is on ``lower(url)``,
+* **Idempotent.** Subscriptions and editions are upserts on their keys. Channels and the Blotato
+  account (user_integrations_v2, migration 043) are user settings now, so — like seed_social_dev.py —
+  they are inserted only when missing and never overwrite what the owner set in the UI; API keys are
+  entered in Settings -> Integrations, never here. A feed source is added only when the edition does
+  not already have that URL (its unique index is on ``lower(url)``,
   which PostgREST cannot upsert on). A row already as seeded is not written at all ("same"), and an
   update names the fields it changes, so a second run writes nothing.
 * **Never takes over someone else's edition.** An edition id that already exists under a different
@@ -28,8 +31,8 @@ needs:
 * The target user must already exist in ``users_v2`` (checked before any write).
 
 Credentials come from the environment only (e.g. ``railway run -s WritersWorkbench -e develop -- ...``):
-``SUPABASE_URL``, ``SUPABASE_SERVICE_ROLE_KEY``. Channel configs name env vars (``auth_env``) — no
-secret is ever written to a row or printed.
+``SUPABASE_URL``, ``SUPABASE_SERVICE_ROLE_KEY``. No secret is ever written to a row or printed: the
+Blotato key and the blog token are entered per user in Settings -> Integrations.
 """
 
 from __future__ import annotations
@@ -47,7 +50,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from seed_social_dev import CHANNELS, EDITIONS, USER  # noqa: E402  (one definition of the rows)
+from seed_social_dev import BLOTATO_ACCOUNT_ID, CHANNELS, EDITIONS, USER  # noqa: E402  (one definition of the rows)
 
 REFS = {"dev": "gvbvwcnmjkdpclcisqrr", "prod": "faklxfakgzkpkbxfihzh"}
 
@@ -87,15 +90,20 @@ class Plan:
 def build_plan(*, target: str, user_id: str, enabled: bool) -> Plan:
     """Every row the seed writes, in dependency order (editions before their feed sources)."""
     plan = Plan(target=target, user_id=user_id, enabled=enabled)
+    # Channels and the Blotato account are user settings (Settings -> Integrations, migration 043):
+    # inserted when missing, never overwritten — the same rule as seed_social_dev.py.
     for c in CHANNELS:
         plan.steps.append(
-            Step(
-                "social_channels_v2",
-                c["channel"],
-                {"user_id": user_id, "enabled": enabled, **c},
-                "user_id,channel",
-            )
+            Step("social_channels_v2", c["channel"], {"user_id": user_id, "enabled": enabled, **c}, None)
         )
+    plan.steps.append(
+        Step(
+            "user_integrations_v2",
+            "blotato",
+            {"user_id": user_id, "provider": "blotato", "channel": None, "config": {"account_id": BLOTATO_ACCOUNT_ID}},
+            None,
+        )
+    )
     for radar, chans, edition in (("trend", TREND_CHANNELS, "ai-mvp"), ("dev", DEV_CHANNELS, "ai-dev-roundup")):
         plan.steps.append(
             Step(
@@ -185,9 +193,17 @@ def classify(plan: Plan, db: Supabase) -> None:
     uid = _q(plan.user_id)
     for s in plan.steps:
         r = s.row
-        if s.table == "social_channels_v2":
-            have = db.select(s.table, f"select=*&user_id=eq.{uid}&channel=eq.{_q(r['channel'])}")
-        elif s.table == "radar_subscriptions_v2":
+        if s.table in ("social_channels_v2", "user_integrations_v2"):
+            if s.table == "social_channels_v2":
+                q = f"select=user_id&user_id=eq.{uid}&channel=eq.{_q(r['channel'])}"
+            else:
+                q = f"select=user_id&user_id=eq.{uid}&provider=eq.{_q(r['provider'])}"
+            if db.select(s.table, q):
+                s.action, s.note = "same", "exists; settings made in the UI are kept"
+            else:
+                s.action = "insert"
+            continue
+        if s.table == "radar_subscriptions_v2":
             have = db.select(s.table, f"select=*&user_id=eq.{uid}&radar=eq.{_q(r['radar'])}")
         elif s.table == "newsletter_editions_v2":
             have = db.select(s.table, f"select=*&id=eq.{_q(r['id'])}")

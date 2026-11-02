@@ -116,6 +116,7 @@ def test_plan_defaults_and_enable_flag() -> None:
     assert all(s.row.get("enabled", True) for s in dev.steps)
     tables = [s.table for s in dev.steps]
     assert tables.count("social_channels_v2") == 4
+    assert tables.count("user_integrations_v2") == 1
     assert tables.count("radar_subscriptions_v2") == 2
     assert tables.count("newsletter_editions_v2") == 2
     assert tables.count("newsletter_feed_sources_v2") == 4
@@ -130,7 +131,7 @@ def test_dry_run_reads_and_writes_nothing(db: FakeDb, capsys: pytest.CaptureFixt
     assert S.main([], _env(DEV_URL)) == 0
     assert db.writes == []
     out = capsys.readouterr().out
-    assert "dry run" in out and "insert" in out and "totals: insert=12" in out
+    assert "dry run" in out and "insert" in out and "totals: insert=13" in out
 
 
 def test_prod_dry_run_with_confirm_still_writes_nothing(db: FakeDb) -> None:
@@ -142,19 +143,33 @@ def test_apply_then_apply_again_writes_nothing_the_second_time(
     db: FakeDb, capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert S.main(["--apply"], _env(DEV_URL)) == 0
-    assert len(db.writes) == 12
+    assert len(db.writes) == 13
     capsys.readouterr()
     assert S.main(["--apply"], _env(DEV_URL)) == 0
-    assert len(db.writes) == 12  # unchanged
-    assert "totals: same=12" in capsys.readouterr().out
+    assert len(db.writes) == 13  # unchanged
+    assert "totals: same=13" in capsys.readouterr().out
 
 
 def test_an_update_names_its_fields(db: FakeDb, capsys: pytest.CaptureFixture[str]) -> None:
     S.main(["--apply"], _env(DEV_URL))
-    db.tables["social_channels_v2"][0]["label"] = "renamed by hand"
+    db.tables["radar_subscriptions_v2"][0]["settings"] = {"channels": ["website"]}
     capsys.readouterr()
     S.main([], _env(DEV_URL))
-    assert "changes: label" in capsys.readouterr().out
+    assert "changes: settings" in capsys.readouterr().out
+
+
+def test_channel_and_blotato_settings_made_in_the_ui_are_never_overwritten(
+    db: FakeDb, capsys: pytest.CaptureFixture[str]
+) -> None:
+    S.main(["--apply"], _env(DEV_URL))
+    db.tables["social_channels_v2"][0]["label"] = "renamed by hand"
+    db.tables["user_integrations_v2"][0]["config"] = {"account_id": "changed in UI"}
+    before = len(db.writes)
+    S.main(["--apply"], _env(DEV_URL))
+    assert len(db.writes) == before
+    assert db.tables["social_channels_v2"][0]["label"] == "renamed by hand"
+    assert db.tables["user_integrations_v2"][0]["config"] == {"account_id": "changed in UI"}
+    assert "settings made in the UI are kept" in capsys.readouterr().out
 
 
 def test_someone_elses_edition_is_not_taken_over(db: FakeDb, capsys: pytest.CaptureFixture[str]) -> None:
