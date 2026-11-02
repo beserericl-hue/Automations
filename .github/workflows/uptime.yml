@@ -68,7 +68,7 @@ jobs:
               echo "| $name | up | $i | $code | ${t}s |" >> "$GITHUB_STEP_SUMMARY"
             else
               down=$((down + 1))
-              echo "::error title=$name is DOWN::$url did not answer a healthy 2xx ("status":"ok") in $ATTEMPTS attempts (${TIMEOUT}s timeout, ${PAUSE}s apart); last HTTP $code (000 = no response)."
+              echo "::error title=$name is DOWN::$url did not answer a healthy 2xx (status ok) in $ATTEMPTS attempts (${TIMEOUT}s timeout, ${PAUSE}s apart); last HTTP $code (000 = no response)."
               echo "| $name | **DOWN** | $ATTEMPTS | $code | ${t}s |" >> "$GITHUB_STEP_SUMMARY"
             fi
           done < .github/uptime-targets.txt

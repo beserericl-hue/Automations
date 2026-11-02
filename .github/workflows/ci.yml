@@ -11,9 +11,11 @@ on:
   pull_request:
     branches: [main, develop]
 
+# PR runs supersede each other. Pushes get a unique group (run id), so every push to develop/main runs
+# to completion: a shared group would cancel a queued push run whenever another push lands behind it.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
 
 defaults:
   run:
