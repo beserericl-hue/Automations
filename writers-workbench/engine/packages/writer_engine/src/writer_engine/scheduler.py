@@ -58,6 +58,18 @@ STARTUP_DELAY_S = 20.0
 listening — so the first ingestion run is not racing startup."""
 
 
+def _summarise(result: object) -> object:
+    """A job's return value, kept small enough to sit in ``/admin/scheduler``: the scalar fields of
+    a dict (lists and nested objects can be a whole feed run), or None for anything else."""
+    if not isinstance(result, dict):
+        return None
+    return {
+        str(k): (v[:200] if isinstance(v, str) else v)
+        for k, v in list(result.items())[:20]
+        if v is None or isinstance(v, str | int | float | bool)
+    }
+
+
 @dataclass
 class Job:
     """One scheduled job: a name, an interval, and something to await."""
@@ -89,6 +101,7 @@ class Scheduler:
         self._ticks: dict[str, int] = {}
         self._skipped: dict[str, int] = {}
         self._errors: dict[str, str] = {}
+        self._results: dict[str, object] = {}
 
     def status(self) -> dict[str, object]:
         """What ``/admin/scheduler`` reports: is the clock actually ticking, and did it work?"""
@@ -103,6 +116,10 @@ class Scheduler:
                     "skipped": self._skipped.get(j.name, 0),
                     "last_run": self._last_run[j.name].isoformat() if j.name in self._last_run else None,
                     "last_error": self._errors.get(j.name),
+                    # What the last successful tick returned (a job's summary dict). A job that
+                    # deliberately did nothing — e.g. the Eve KB prune with no ElevenLabs key — says
+                    # so here, so "skipped" is visible and not mistaken for "ran, found nothing".
+                    "last_result": self._results.get(j.name),
                 }
                 for j in self.jobs
             ]
@@ -120,8 +137,9 @@ class Scheduler:
         started = datetime.now(UTC)
         self._ticks[job.name] = self._ticks.get(job.name, 0) + 1
         try:
-            await job.run()
+            result = await job.run()
             self._errors.pop(job.name, None)
+            self._results[job.name] = _summarise(result)
         except asyncio.CancelledError:
             raise
         except Exception as exc:

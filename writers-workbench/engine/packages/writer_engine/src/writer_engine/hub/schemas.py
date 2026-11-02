@@ -21,7 +21,8 @@ class HubRequest(BaseModel):
     user_id: str | None = None
     conversation_id: str | None = None
     source: Literal["chat", "voice"] = "chat"
-    # Lightweight conversation context the router can use (Sprint A: passed in; Sprint B: server-side store).
+    # Conversation context the router can use: what the caller passes explicitly (the page's project)
+    # merged over what hub.memory remembered for this conversation (last_list, anchors, recent turns).
     context: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("message", mode="before")
@@ -78,3 +79,6 @@ class HubResponse(BaseModel):
     jobs: list[dict[str, Any]] | None = None
     # error / clarify
     error: str | None = None
+    # The conversation this turn was remembered under (hub.memory) — echoed so a caller that did not
+    # send one can thread it into its next turn.
+    conversation_id: str | None = None

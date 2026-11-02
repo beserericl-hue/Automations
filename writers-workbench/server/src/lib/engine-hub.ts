@@ -112,14 +112,23 @@ export interface HubResponse {
   job_id?: string | null;
   status?: string | null;
   error?: string | null;
+  /** The conversation the engine remembered this turn under (writer_engine.hub.memory). */
+  conversation_id?: string | null;
 }
 
-/** POST a message to the engine hub. Throws on transport/HTTP failure. */
+/**
+ * POST a message to the engine hub. Throws on transport/HTTP failure.
+ *
+ * `conversationId` keys the engine's conversation memory (last list shown, current project, recent
+ * turns), which is what lets "pick #3" follow "list my outlines". Without one the engine uses the
+ * user's default chat conversation.
+ */
 export async function callEngineHub(args: {
   message: string;
   userId: string;
   context?: Record<string, unknown>;
   source?: 'chat' | 'voice';
+  conversationId?: string;
 }): Promise<HubResponse> {
   const resp = await engineFetch('/internal/hub', {
     method: 'POST',
@@ -129,6 +138,7 @@ export async function callEngineHub(args: {
       user_id: args.userId,
       context: args.context ?? {},
       source: args.source ?? 'chat',
+      ...(args.conversationId ? { conversation_id: args.conversationId } : {}),
     }),
   });
   if (!resp.ok) {
@@ -285,6 +295,8 @@ export interface SchedulerJobReport {
   skipped?: number;
   last_run: string | null;
   last_error: string | null;
+  /** The scalar summary the last successful tick returned (e.g. `{skipped: "... not configured"}`). */
+  last_result?: Record<string, unknown> | null;
 }
 
 export type SchedulerJobHealth = 'ok' | 'failing' | 'overdue' | 'waiting' | 'pending';
@@ -301,6 +313,11 @@ export interface SchedulerJob {
   last_run: string | null;
   /** The error of that latest run; null when it succeeded. */
   last_error: string | null;
+  /**
+   * What that latest run returned. A job that deliberately did nothing says so here — the Eve KB
+   * prune with no ElevenLabs key reports `{skipped: ...}` — so a skip is not mistaken for "OK".
+   */
+  last_result: Record<string, unknown> | null;
   /** When the next run is due (last run + interval); null before the first run. */
   next_run: string | null;
   health: SchedulerJobHealth;
@@ -375,6 +392,7 @@ export function mergeSchedulerReports(
       skipped,
       last_run: lastRun,
       last_error: lastError,
+      last_result: latest?.job.last_result ?? null,
       next_run: nextRun,
       health,
       replicas: seen.map((s) => ({

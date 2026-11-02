@@ -5,7 +5,7 @@ import { apiClient } from '../pages/api';
  * Engine scheduler (cron) health — RESULT-asserting, against the live DEV engine.
  *
  * The admin API reads /admin/scheduler from every runtime replica with the engine admin token (held
- * server-side only) and merges them. DEV runs two or more runtime replicas and eight scheduled jobs;
+ * server-side only) and merges them. DEV runs two or more runtime replicas and nine scheduled jobs;
  * every one must be reported, with a health verdict consistent with its own last run, and the Admin →
  * Engine Fleet tab must show the same jobs and verdicts. The browser never sees the admin token: its
  * only request is /api/admin/engine-scheduler with the user's own bearer token.
@@ -19,6 +19,7 @@ const EXPECTED_JOBS = [
   'queue-metrics',
   'autoscale',
   'workbench-lifecycle',
+  'eve-kb-prune',
 ];
 
 async function scheduler(): Promise<any> {
@@ -60,6 +61,9 @@ test.describe('Engine scheduler (result-asserting)', () => {
     const metrics = data.jobs.find((j: any) => j.name === 'queue-metrics');
     expect(metrics.singleton).toBe(false);
     expect(metrics.ticks).toBeGreaterThan(0);
+    // The Eve KB prune is a deliberate no-op on DEV (no ElevenLabs key): once it has run, it says so.
+    const prune = data.jobs.find((j: any) => j.name === 'eve-kb-prune');
+    if (prune.last_run) expect(String(prune.last_result?.skipped ?? ''), 'eve-kb-prune').toContain('not configured');
     // Only the merged view comes back — no engine credentials or raw config.
     expect(Object.keys(data).sort()).toEqual(['checked_at', 'jobs', 'replicas', 'running']);
   });
