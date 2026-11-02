@@ -77,7 +77,8 @@ test.describe('Revise outline (real engine job)', () => {
     // the revision count without a reload.
     await expect(page.getByTestId('outline-revise-result')).toContainText(`Outline revised: 2 → ${after.outline.chapters.length} chapters`, { timeout: 60_000 });
     await expect(page.getByText(NEW_TITLE).first()).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText(`${versions.length} prior revisions`)).toBeVisible({ timeout: 30_000 });
+    // Shown twice (Book Overview header and the chapter list header); both must have refreshed.
+    await expect(page.getByText(`${versions.length} prior revisions`)).toHaveCount(2, { timeout: 30_000 });
     await expect(page.getByLabel('Outline revision instructions')).toBeEnabled();
   });
 });
