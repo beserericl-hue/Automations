@@ -17,6 +17,9 @@ os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 # this is unset, which makes a missing provider key fail loudly instead of persisting placeholder
 # content as real work. Tests that assert the fail-loud path turn it off explicitly.
 os.environ.setdefault("ALLOW_FIXTURE_FALLBACK", "true")
+# Hub conversation memory lives in Redis, which the suite does not run. Off by default so a hub test
+# never depends on (or waits for) a local Redis; the memory tests turn it on over fakeredis.
+os.environ.setdefault("HUB_MEMORY_ENABLED", "false")
 
 # Override any provider/Supabase keys that may be in .env so tests use fixtures (no real API calls).
 # Tests that want real keys should opt in by clearing these in their own setup.

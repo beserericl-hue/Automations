@@ -16,7 +16,7 @@ const DATA: EngineSchedulerData = {
     { instance: 'rep-b', address: '10.0.0.2', ok: true, running: true },
   ],
   jobs: [
-    row({ name: 'ingestion', interval_s: 1800 }),
+    row({ name: 'ingestion', interval_s: 1800, last_result: { claimed: 3, skipped: null } }),
     row({ name: 'queue-metrics', interval_s: 30, singleton: false, ticks: 40 }),
     row({ name: 'radar', interval_s: 3600, ticks: 0, skipped: 1, last_run: null, next_run: null, health: 'waiting' }),
   ],
@@ -32,10 +32,25 @@ describe('EngineScheduler', () => {
     expect(ingestion).toHaveTextContent(/6\ds ago/);
     expect(ingestion).toHaveTextContent('OK');
     expect(ingestion).toHaveTextContent(/in 1[34]m/);
+    expect(within(ingestion).getByTestId('scheduler-last-result')).toHaveTextContent('· claimed: 3');
     expect(screen.getByTestId('scheduler-job-queue-metrics')).toHaveTextContent('(per replica)');
     const radar = screen.getByTestId('scheduler-job-radar');
     expect(within(radar).getByText('Waiting')).toBeInTheDocument();
     expect(radar).toHaveTextContent('1 left to another replica');
+  });
+
+  it('shows a deliberately skipped run as skipped, not OK', async () => {
+    renderWithProviders(
+      <EngineScheduler
+        load={async () => ({
+          ...DATA,
+          jobs: [row({ name: 'eve-kb-prune', interval_s: 21600, last_result: { skipped: 'ELEVENLABS_API_KEY/ELEVENLABS_AGENT_ID not configured', deleted: 0 } })],
+        })}
+      />,
+    );
+    const prune = await screen.findByTestId('scheduler-job-eve-kb-prune');
+    expect(within(prune).getByTestId('scheduler-last-skipped')).toHaveTextContent('Skipped: ELEVENLABS_API_KEY/ELEVENLABS_AGENT_ID not configured');
+    expect(prune).toHaveTextContent('6 h');
   });
 
   it('flags failing and overdue jobs, the error, and a replica that did not answer', async () => {

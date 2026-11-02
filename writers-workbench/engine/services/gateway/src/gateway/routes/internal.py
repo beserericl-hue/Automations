@@ -17,6 +17,7 @@ from writer_engine.hub import (
     route_message,
     split_tasks,
 )
+from writer_engine.hub import memory as hub_memory
 from writer_engine.telemetry.logging import get_logger
 
 router = APIRouter(dependencies=[Depends(require_service_secret)])
@@ -113,14 +114,40 @@ async def _execute_multi(req: HubRequest, clauses: list[str]) -> HubResponse:
 
 
 async def _execute_hub(req: HubRequest) -> HubResponse:
+    """Route + dispatch one hub request with conversation memory around it (hub.memory).
+
+    The remembered context (last list shown, current project, recent turns) is merged under what the
+    caller sent before routing, and the finished turn is folded back in afterwards — so "list my
+    outlines" then "pick #3" resolves on the second turn. A turn that fails is not remembered."""
+    state = await hub_memory.load_state(req)
+    resp, body = await _route_and_dispatch(hub_memory.with_memory(req, state))
+    if state is not None:
+        hub_memory.record_turn(state, req=req, resp=resp, body=body)
+        if await hub_memory.save_state(req, state):
+            resp.conversation_id = state.conversation_id
+    return resp
+
+
+def _result_message(data: Any) -> str:
+    """The sentence a sync op wrote about its own outcome (``payload.result.message``), if any."""
+    if not isinstance(data, dict):
+        return ""
+    payload = data.get("payload") if isinstance(data.get("payload"), dict) else data
+    result = payload.get("result") if isinstance(payload, dict) else None
+    msg = result.get("message") if isinstance(result, dict) else None
+    return msg if isinstance(msg, str) else ""
+
+
+async def _route_and_dispatch(req: HubRequest) -> tuple[HubResponse, dict[str, Any] | None]:
     """Route + dispatch one hub request. Shared by the chat (``/hub``) and voice (``/hub/voice``)
-    surfaces so both go through the identical Gemini-router → sync/async-dispatch path."""
+    surfaces so both go through the identical Gemini-router → sync/async-dispatch path. Returns the
+    response and the step body that was dispatched (None when nothing was)."""
     logger.info("hub.request", source=req.source, user_id=req.user_id, msg_preview=req.message[:160])
 
     # V31: fan a multi-task message ("… and also …") out to one job per task.
     clauses = split_tasks(req.message)
     if len(clauses) > 1:
-        return await _execute_multi(req, clauses)
+        return await _execute_multi(req, clauses), None
 
     decision = await route_message(req)
     plan = build_dispatch_plan(decision, req)
@@ -134,12 +161,12 @@ async def _execute_hub(req: HubRequest) -> HubResponse:
     )
 
     if plan.action == "reply":
-        return HubResponse(kind="reply", assistant_message=plan.assistant_message)
+        return HubResponse(kind="reply", assistant_message=plan.assistant_message), None
 
     # V30: eve-callback resolves content existence synchronously before it queues anything.
     if plan.tool == "notify" and plan.op == "eve-callback":
         try:
-            return await _execute_eve_callback(req, plan)
+            return await _execute_eve_callback(req, plan), plan.body
         except HTTPException as exc:
             logger.error(
                 "hub.dispatch_failed",
@@ -155,12 +182,20 @@ async def _execute_hub(req: HubRequest) -> HubResponse:
         if plan.action == "call_sync":
             data = await _forward("POST", url, json=plan.body, timeout_s=120.0)
             logger.info("hub.sync_ok", tool=plan.tool, op=plan.op, user_id=req.user_id)
-            return HubResponse(
-                kind="data",
-                assistant_message=plan.assistant_message,
-                tool=plan.tool,
-                op=plan.op,
-                data=data,
+            message = plan.assistant_message
+            # A story-bible write says what it actually did ("Added Mara Voss (character) …", "No
+            # entry named X …"); the router's ack was written before the op ran and can't know.
+            if plan.tool == "story_bible":
+                message = _result_message(data) or message
+            return (
+                HubResponse(
+                    kind="data",
+                    assistant_message=message,
+                    tool=plan.tool,
+                    op=plan.op,
+                    data=data,
+                ),
+                plan.body,
             )
 
         # enqueue — heavy generation; orchestrator returns {job_id, status, tool}
@@ -174,13 +209,16 @@ async def _execute_hub(req: HubRequest) -> HubResponse:
             chapter=plan.body.get("chapter_number"),
             project=plan.body.get("project_id") or plan.body.get("project_title"),
         )
-        return HubResponse(
-            kind="queued",
-            assistant_message=plan.assistant_message,
-            tool=plan.tool,
-            op=plan.op,
-            job_id=enq.get("job_id"),
-            status=enq.get("status", "queued"),
+        return (
+            HubResponse(
+                kind="queued",
+                assistant_message=plan.assistant_message,
+                tool=plan.tool,
+                op=plan.op,
+                job_id=enq.get("job_id"),
+                status=enq.get("status", "queued"),
+            ),
+            plan.body,
         )
     except HTTPException as exc:
         logger.error(
@@ -220,8 +258,14 @@ async def hub_voice(body: dict[str, Any]) -> dict[str, Any]:
     Differs from ``/hub`` only at the edges: it accepts the ElevenLabs caller fields
     (``system__caller_id`` / ``caller_id`` → ``user_id``; ``user_message_request`` → message) and
     returns a FLAT, voice-friendly shape — ``{response, job_id?, status?, tool?, op?}`` — where
-    ``response`` is the single line Eve should speak. The agent holds the conversation turns itself,
-    so this stays stateless per turn (``conversation_id`` is threaded through for correlation only)."""
+    ``response`` is the single line Eve should speak.
+
+    Memory (hub.memory): the agent holds the spoken turns itself, but "read me the second one" needs
+    the list the hub last returned, which only the hub has. A call that carries
+    ``system__conversation_id`` (or ``conversation_id``) is remembered under that id — one memory per
+    call. The DEV demo agent's webhook tool does not send one today (adding it is an agent config
+    change, and agents are not edited from here), so its turns share the caller's ``voice:default``
+    memory, which expires after HUB_VOICE_CONVERSATION_TTL_SECONDS (30 min) — about one call."""
     user_id = (
         body.get("user_id")
         or body.get("system__caller_id")
@@ -248,6 +292,8 @@ async def hub_voice(body: dict[str, Any]) -> dict[str, Any]:
         out["status"] = resp.status
     if resp.kind == "data" and resp.data is not None:
         out["data"] = resp.data
+    if resp.conversation_id:
+        out["conversation_id"] = resp.conversation_id
     return out
 
 

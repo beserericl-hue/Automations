@@ -93,8 +93,39 @@ CATALOG: tuple[ToolSpec, ...] = (
         "list",
         "info",
         intent="list / show the story bible (series canon, characters, synopsis) for a project",
-        params=("project_id", "project_title"),
+        params=("project_id", "project_title", "name"),
         aliases=("list_bible", "show_bible"),
+    ),
+    ToolSpec(
+        "story_bible",
+        "add",
+        "info",
+        intent="add a NEW character, place, object, concept or event to a project's story bible "
+        "('add a character named Mara Voss to the story bible for X: a salvage pilot', 'put the "
+        "Ironhold fortress in the story bible as a place'). entry_type is one of character|place|"
+        "object|concept|event",
+        params=("project_id", "project_title", "name", "entry_type", "description"),
+        aliases=("add_bible_entry", "add_to_bible", "bible_add"),
+    ),
+    ToolSpec(
+        "story_bible",
+        "update",
+        "info",
+        intent="change an EXISTING story bible entry — its description, its name (rename), or its type "
+        "('update Mara Voss in the story bible: she is now captain', 'rename Osei to Osei Asante in the "
+        "story bible'). name = the entry as it is now; new_name / new_entry_type / description = the "
+        "change; mode=append adds to the description instead of replacing it",
+        params=(
+            "project_id",
+            "project_title",
+            "name",
+            "entry_type",
+            "description",
+            "new_name",
+            "new_entry_type",
+            "mode",
+        ),
+        aliases=("update_bible_entry", "edit_bible_entry", "bible_update"),
     ),
     ToolSpec(
         "media",
