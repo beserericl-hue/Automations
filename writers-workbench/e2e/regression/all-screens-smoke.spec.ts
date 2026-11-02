@@ -12,6 +12,7 @@
  *           (i.e. it did NOT fall through the `*` redirect to `/`).
  *   FAIL  = anchor missing within timeout, a crash/ErrorBoundary, or an unintended redirect.
  */
+import { randomBytes, randomUUID } from 'node:crypto';
 import { test, expect, type Page } from '@playwright/test';
 
 // Accept both env conventions: direct runs use SUPABASE_*; run-regression.sh uses E2E_SUPA_*.
@@ -50,10 +51,82 @@ test.beforeAll(async () => {
   ID.image = first(await rest(`generated_images_v2?user_id=eq.${UID}&select=id&limit=1`)) || ID.image;
   ID.template = first(await rest(`newsletter_templates_v2?edition_id=eq.${ID.edition}&select=id&limit=1`)) || ID.template;
   ID.send = first(await rest(`newsletter_sends_v2?user_id=eq.${UID}&select=id&order=created_at.desc&limit=1`)) || ID.send;
-  const ap = await rest(`newsletter_approvals_v2?edition_id=eq.${ID.edition}&decision=is.null&select=token,execution_id&order=created_at.desc&limit=1`);
-  ID.approvalToken = (ap[0]?.token as string) || '';
-  ID.execution = (ap[0]?.execution_id as string) || '';
+  // A real run of the edition (resolved or not) — the execution-status screen only needs an id the
+  // engine has seen. The approval screens get their own fixture below; they never borrow a real gate.
+  const ex = await rest(`newsletter_approvals_v2?edition_id=eq.${ID.edition}&select=execution_id&order=created_at.desc&limit=1`);
+  ID.execution = (ex[0]?.execution_id as string) || '';
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pending-approval fixture. The approvals list and detail screens need a gate that is still open
+// (resolved_at IS NULL, expires_at in the future). Real gates get answered within minutes by test
+// cleanup and real sends, so the suite makes its own and removes it afterwards:
+//   - resume_url NULL + a random execution_id that no saga owns, so a stray Approve has nothing to
+//     resume (the engine's resolve finds no saga; no n8n Wait node is POSTed).
+//   - created_at in the past: both cadence crons (server newsletter-edition-extras + engine
+//     orchestrator) take the edition's newest approval created_at as "last run", so a fixture
+//     stamped now() would push The Wasteland Wire's next scheduled issue back.
+//   - expires_at 30 minutes out: if afterAll never runs (killed worker), the row drops out of every
+//     "open" query on its own and the next run's sweep deletes it.
+// ─────────────────────────────────────────────────────────────────────────────
+const FIXTURE_MARK = 'all-screens-smoke';
+
+async function svc(method: 'POST' | 'DELETE', path: string, body?: unknown): Promise<Response> {
+  return fetch(`${SUPA}/rest/v1/${path}`, {
+    method,
+    headers: {
+      apikey: SVC,
+      authorization: `Bearer ${SVC}`,
+      'content-type': 'application/json',
+      prefer: 'return=representation',
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+async function createPendingApproval(): Promise<string> {
+  if (!SVC || !/gvbvwcnmjkdpclcisqrr/.test(SUPA)) {
+    throw new Error('pending-approval fixture needs the DEV service key (SUPABASE_URL must be DEV gvbv...)');
+  }
+  // Sweep only fixtures that have already expired — a live one may belong to a parallel worker.
+  await svc('DELETE', `newsletter_approvals_v2?payload->>e2e_fixture=eq.${FIXTURE_MARK}&expires_at=lt.${new Date().toISOString()}`);
+  const token = randomBytes(24).toString('base64url');
+  const res = await svc('POST', 'newsletter_approvals_v2', {
+    token,
+    user_id: decodeURIComponent(UID),
+    execution_id: randomUUID(),
+    edition_id: ID.edition,
+    stage: 'stories',
+    resume_url: null,
+    created_at: '2000-01-01T00:00:00Z',
+    expires_at: new Date(Date.now() + 30 * 60_000).toISOString(),
+    payload: {
+      e2e_fixture: FIXTURE_MARK,
+      top_selected_stories: [
+        {
+          title: 'E2E fixture lead story',
+          summary: 'Seeded by all-screens-smoke so the approval screens have an open gate to render.',
+          identifiers: [],
+          external_source_links: [],
+        },
+        {
+          title: 'E2E fixture second story',
+          summary: 'Removed again when the suite finishes.',
+          identifiers: [],
+          external_source_links: [],
+        },
+      ],
+    },
+  });
+  if (!res.ok) throw new Error(`pending-approval fixture insert failed: ${res.status} ${await res.text()}`);
+  return token;
+}
+
+async function deletePendingApproval(token: string): Promise<void> {
+  if (!token) return;
+  const res = await svc('DELETE', `newsletter_approvals_v2?token=eq.${encodeURIComponent(token)}`);
+  if (!res.ok) throw new Error(`pending-approval fixture delete failed: ${res.status} ${await res.text()}`);
+}
 
 // A screen "loaded" means: an anchor is visible and we're not on the wildcard-redirected dashboard
 // (unless the screen IS the dashboard). Encapsulates the general PASS/FAIL rule above.
@@ -290,22 +363,44 @@ test.describe('Newsletter screens', () => {
     await expect(page.getByText(/Execution|stage|status/i).first()).toBeVisible({ timeout: 20_000 });
   });
 
-  test('Pending approvals /newsletter/approvals', async ({ page }) => {
-    await page.goto('/newsletter/approvals', { waitUntil: 'domcontentloaded' });
-    await expectScreen(page, page.getByRole('heading', { name: /Pending approvals/ }));
-    await expect(page.getByText('The Wasteland Wire').first()).toBeVisible();
-  });
+  test.describe('approvals (own pending fixture)', () => {
+    // Each worker that runs one of these makes its own open gate and deletes it after.
+    test.beforeAll(async () => {
+      ID.approvalToken = await createPendingApproval();
+    });
+    test.afterAll(async () => {
+      await deletePendingApproval(ID.approvalToken);
+      ID.approvalToken = '';
+    });
 
-  test('Approval detail /newsletter/approvals/:token (email preview)', async ({ page }) => {
-    test.skip(!ID.approvalToken, 'no pending approval token');
-    await page.goto(`/newsletter/approvals/${ID.approvalToken}`, { waitUntil: 'domcontentloaded' });
-    // PASS: the Email preview panel + iframe render.
-    await expectScreen(page, page.getByRole('heading', { name: /Email preview/i }));
-    const preview = page.frameLocator('iframe[title="Approval email preview"]');
-    await expect(preview.getByText(/Wasteland Wire/i).first()).toBeVisible({ timeout: 20_000 });
-    // No phantom logo/stamp image when the edition has no stamp_url — a broken <img> (the old
-    // /static/logos/courseworx-stamp-black.png fallback) must never render.
-    await expect(preview.locator('img[alt*="stamp" i]')).toHaveCount(0);
+    test('Pending approvals /newsletter/approvals', async ({ page }) => {
+      // PASS: the list shows the open gate — its Wasteland Wire edition badge and its lead-story
+      // excerpt, with a Review link to its own detail route.
+      await page.goto('/newsletter/approvals', { waitUntil: 'domcontentloaded' });
+      await expectScreen(page, page.getByRole('heading', { name: /Pending approvals/ }));
+      const row = page.getByRole('button').filter({ hasText: 'E2E fixture lead story' }).first();
+      await expect(row).toBeVisible({ timeout: 20_000 });
+      await expect(row.getByText('The Wasteland Wire')).toBeVisible();
+      await expect(row.getByRole('link', { name: /Review/ })).toHaveAttribute(
+        'href',
+        `/newsletter/approvals/${encodeURIComponent(ID.approvalToken)}`,
+      );
+    });
+
+    test('Approval detail /newsletter/approvals/:token (email preview)', async ({ page }) => {
+      await page.goto(`/newsletter/approvals/${ID.approvalToken}`, { waitUntil: 'domcontentloaded' });
+      // PASS: the Stories approval panel, then the Email preview panel + iframe rendering the
+      // edition's default template with the fixture's stories laid in.
+      await expectScreen(page, page.getByRole('heading', { name: /Stories approval/ }));
+      await expectScreen(page, page.getByRole('heading', { name: /Email preview/i }));
+      const preview = page.frameLocator('iframe[title="Approval email preview"]');
+      await expect(preview.getByText(/Wasteland Wire/i).first()).toBeVisible({ timeout: 20_000 });
+      await expect(preview.getByText('E2E fixture lead story').first()).toBeVisible();
+      await expect(preview.getByText('E2E fixture second story').first()).toBeVisible();
+      // No phantom logo/stamp image when the edition has no stamp_url — a broken <img> (the old
+      // /static/logos/courseworx-stamp-black.png fallback) must never render.
+      await expect(preview.locator('img[alt*="stamp" i]')).toHaveCount(0);
+    });
   });
 
   test('Scheduled sends /newsletter/sends', async ({ page }) => {
