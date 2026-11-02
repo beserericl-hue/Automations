@@ -85,7 +85,7 @@ PR #71 (story-bible extraction) was this kind. Deployed in this order:
 2. Edit DEV workflow + verify.
 3. Edit PROD workflow.
 4. Apply schema change to PROD (none).
-5. PR scripts to main (with docs file to bypass CI paths filter).
+5. PR scripts to main.
 
 ### Schema-only
 
@@ -122,9 +122,11 @@ git cherry-pick <hotfix-commit-sha>
 
 ## Hotfix gotchas (per past releases)
 
-### CI paths filter (PR #71 lesson)
+### CI paths filter (PR #71 lesson) — fixed
 
-Scripts-only PRs don't trigger CI. Required checks can't pass. Workaround: include a docs file (e.g. `writers-workbench/docs/hotfix-2026-04-29-story-bible-extraction.md`) so the path filter triggers CI.
+Scripts-only PRs used to skip CI, so required checks never reported. Fixed 2026-11-02: `ci.yml` has no
+`paths:` filter any more; a `changes` job skips the heavy jobs instead, and skipped jobs report success.
+See [[ci-pipeline]].
 
 ### n8n PUT settings rejection
 

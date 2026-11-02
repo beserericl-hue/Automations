@@ -1,9 +1,9 @@
 ---
 name: CI pipeline
-description: GitHub Actions jobs, required status checks, paths filter, secrets.
+description: GitHub Actions jobs, required status checks, changes-detection (no paths filter), secrets.
 type: concept
 tags: [testing, ci, github-actions]
-last_reviewed: 2026-05-09
+last_reviewed: 2026-11-02
 ---
 
 # CI pipeline
@@ -24,22 +24,18 @@ Branch protection on `main`: 4 required status checks (TypeScript, Unit, Build, 
 
 `develop`: 1 approving review. Same self-approve restriction. Admin override used in practice for stacked-PR chains.
 
-## paths filter — gotcha
+## No paths filter — `changes` job instead (H6, fixed 2026-11-02)
 
-```yaml
-on:
-  pull_request:
-    paths:
-      - 'writers-workbench/**'
-      - 'workflows/**'
-      - 'scripts/check-base-table-immutability.py'
-      - '.github/workflows/ci.yml'
-      - 'CLAUDE.md'
-```
+`ci.yml` used to have a `paths:` filter on push and pull_request. A workflow skipped by a path filter
+never reports its checks, so a PR touching none of those paths (docs, wiki, `.github`, scripts) could
+never satisfy `main`'s required checks. The filter is gone: the workflow always runs, a `changes` job
+(`dorny/paths-filter`) checks the same path list, and TypeScript & Lint / Unit Tests / Production Build
+skip via `if:` when nothing relevant changed. A job skipped by `if:` reports as successful, so the
+required checks always report. Schema Governance Check always runs (seconds of Python).
 
-**Scripts-only PRs to `main`** (e.g. `scripts/hotfix-*.py`) **don't trigger CI** and therefore can't satisfy `main`'s required-status-check gate.
-
-**Workaround:** include a docs file under `writers-workbench/docs/` as part of any scripts-only hotfix targeting `main`. PR #71 used this — runbook served the purpose AND was genuinely useful.
+The old workaround (add a `writers-workbench/docs/` file to a scripts-only hotfix PR) is no longer needed.
+Proved by a docs-only PR (this paragraph): Detect changes ran, Schema Governance Check ran, and
+TypeScript & Lint / Unit Tests / Production Build reported as skipped, which satisfies a required check.
 
 ## Schema Governance Check details
 
@@ -156,7 +152,7 @@ See [[releases-and-tags]] for the full release runbook.
 
 ## Common gotchas
 
-- **paths filter** silently skips CI on scripts-only PRs.
+- **Do not re-add a `paths:` filter** to a workflow whose jobs are required checks; gate jobs on the `changes` job instead.
 - **`if: github.event_name == 'pull_request'`** on E2E job means push-to-develop never runs E2E. Latent failures accumulate until next PR.
 - **Secrets are scoped to repo, not env.** No need for separate DEV vs PROD CI secrets currently.
 - **Railway deploy logs** are available via `railway logs` CLI or Railway dashboard. CI doesn't surface them.
