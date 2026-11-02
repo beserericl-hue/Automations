@@ -8,6 +8,7 @@ import ConfirmDialog from '../shared/ConfirmDialog';
 import EntryForm from './EntryForm';
 import type { StoryBibleEntry, WritingProject } from '../../types/database';
 import { entryTypeLabel, entryTypesPresent } from '../../lib/story-bible-types';
+import { isSeriesBibleEntry } from '../projects/SeriesBiblePanel';
 
 
 // A6: labels/icons are a presentation nicety only — an unknown type still renders, using a
@@ -193,6 +194,17 @@ export default function StoryBiblePanel() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium text-gray-900 dark:text-white">{entry.name}</span>
+                          {isSeriesBibleEntry(entry) && (
+                            // Engine-kept canon (the project page shows it as its own panel). Editable here,
+                            // but the engine rewrites it the next time the outline is saved.
+                            <span
+                              data-testid="series-bible-mark"
+                              title="Kept by the engine: rewritten whenever the outline is saved"
+                              className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700 dark:bg-brand-950 dark:text-brand-300"
+                            >
+                              Series Bible · engine-managed
+                            </span>
+                          )}
                         {entry.chapter_introduced != null && (
                             <span className="text-xs text-gray-400">
                               Introduced Ch. {entry.chapter_introduced}
