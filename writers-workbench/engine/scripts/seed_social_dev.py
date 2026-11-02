@@ -39,18 +39,26 @@ TABLES = {
     "dev_video_archive": "D7joILMPMDustkCv",
 }
 
+# Endpoints, page ids and the Blotato account are user settings now (Settings → Integrations,
+# migration 043). These rows are only a starting point: they are inserted when missing and never
+# overwrite what the owner has since changed in the UI. No keys or tokens here, and no auth_env
+# (the old "name of a Railway variable" path is gone): the owner enters the Blotato key and the
+# blog token in the UI, where they are encrypted per user.
 CHANNELS = [
     {"channel": "website", "kind": "website", "label": "TechAhir website",
      "config": {"endpoint": "https://www.techahir.com/api/blog", "public_base": "https://www.techahir.com/blog/",
-                "author": "Tech Ahir", "auth_header": os.environ.get("TECHAHIR_BLOG_API_HEADER", "Authorization"),
-                "auth_env": "TECHAHIR_BLOG_API_KEY"}},
+                "author": "Tech Ahir", "auth_header": "Authorization"}},
     {"channel": "li_techahir", "kind": "linkedin", "label": "TechAhir LinkedIn page",
-     "config": {"account_id": "9115", "page_id": "104364682"}},
+     "config": {"page_id": "104364682"}},
     {"channel": "li_agile", "kind": "linkedin", "label": "Agile Ad Testing LinkedIn page",
-     "config": {"account_id": "9115", "page_id": "109837978"}},
+     "config": {"page_id": "109837978"}},
     {"channel": "li_personal", "kind": "linkedin", "label": "Personal LinkedIn profile",
-     "config": {"account_id": "9115"}},
+     "config": {}},
 ]
+
+BLOTATO_ACCOUNT_ID = "9115"
+"""The owner's Blotato LinkedIn account id. Not a secret; the API key that goes with it is entered
+in the UI."""
 
 EDITIONS = [
     {"id": "ai-mvp", "display_name": "The MVP Brief", "subheader": "What founders need to ship before they pitch",
@@ -87,12 +95,13 @@ def _req(method: str, url: str, headers: dict[str, str], body: Any = None) -> An
     return json.loads(raw) if raw else None
 
 
-def upsert(table: str, rows: list[dict[str, Any]], on_conflict: str) -> int:
+def upsert(table: str, rows: list[dict[str, Any]], on_conflict: str, *, keep_existing: bool = False) -> int:
     if not rows:
         return 0
     url, headers = _sb()
+    resolution = "ignore-duplicates" if keep_existing else "merge-duplicates"
     out = _req("POST", f"{url}/rest/v1/{table}?on_conflict={on_conflict}",
-               {**headers, "Prefer": "resolution=merge-duplicates,return=representation"}, rows)
+               {**headers, "Prefer": f"resolution={resolution},return=representation"}, rows)
     return len(out or [])
 
 
@@ -102,8 +111,17 @@ def select(table: str, query: str) -> list[dict[str, Any]]:
 
 
 def seed() -> None:
-    n = upsert("social_channels_v2", [{"user_id": USER, "enabled": True, **c} for c in CHANNELS], "user_id,channel")
-    print(f"channels: {n}")
+    n = upsert("social_channels_v2", [{"user_id": USER, "enabled": True, **c} for c in CHANNELS], "user_id,channel",
+               keep_existing=True)
+    print(f"channels: {n} new")
+    # The Blotato account id (no key: that is entered in Settings → Integrations). The unique index
+    # is on an expression, which PostgREST cannot upsert against, so: insert only when missing.
+    have = select("user_integrations_v2", f"select=id&user_id=eq.{urllib.parse.quote(USER)}&provider=eq.blotato")
+    if not have:
+        u, h = _sb()
+        _req("POST", f"{u}/rest/v1/user_integrations_v2", {**h, "Prefer": "return=minimal"},
+             [{"user_id": USER, "provider": "blotato", "channel": None, "config": {"account_id": BLOTATO_ACCOUNT_ID}}])
+    print(f"blotato account: {'kept' if have else 'added'} (API key: enter it in Settings → Integrations)")
     subs = [
         {"user_id": USER, "radar": "trend", "enabled": True,
          "settings": {"channels": ["website", "li_techahir", "li_agile", "li_personal"], "edition_id": "ai-mvp"}},
