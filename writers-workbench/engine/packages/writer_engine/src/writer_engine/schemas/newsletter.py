@@ -266,6 +266,9 @@ class NewsletterSendRow(BaseModel):
     html_body: str
     status: str = "saved"
     metadata: dict[str, Any] = Field(default_factory=dict)
+    # The number rendered into the email ("Issue #N"). A proposal: the database trigger (migration
+    # 041) keeps it unless another send of the edition already holds it.
+    issue_number: int | None = None
 
 
 class DeliveryResult(BaseModel):

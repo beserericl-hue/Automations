@@ -97,7 +97,7 @@ export default function NewsletterDetail() {
             {edition ? <EditionBadge edition={edition} /> : <span className="font-mono text-xs">{send.edition_id ?? '—'}</span>}
           </Tile>
           <Tile label="Issue">
-            {send.issue_number != null ? `#${send.issue_number}` : '—'}
+            <span data-testid="send-detail-issue">{send.issue_number != null ? `#${send.issue_number}` : '—'}</span>
             <span className="ml-2 text-xs text-gray-400">{formatDate(send.send_date)}</span>
           </Tile>
           {send.scheduled_send_at && (

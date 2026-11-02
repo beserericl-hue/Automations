@@ -28,6 +28,7 @@ esac
 # Heavy = real engine/LLM/image jobs (>=90s internal timeouts).
 HEAVY=(
   regression/project-plan-write.spec.ts
+  regression/outline-revise-run.spec.ts
   regression/content-repair.spec.ts
   regression/content-qa.spec.ts
   regression/content-detail-full.spec.ts

@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import EngineFleet, { type EngineFleetData } from './EngineFleet';
+import EngineScheduler, { type EngineSchedulerData } from './EngineScheduler';
 import { useUser } from '../../contexts/UserContext';
 import { useToast } from '../../contexts/ToastContext';
 import { supabase } from '../../config/supabase';
@@ -137,7 +138,12 @@ export default function AdminPanel() {
       {activeTab === 'metrics' && <SystemMetrics />}
       {activeTab === 'workflows' && <WorkflowStatus />}
       {activeTab === 'queues' && <QueueStatus />}
-      {activeTab === 'fleet' && <EngineFleet load={() => adminFetch<EngineFleetData>('/engine-fleet')} />}
+      {activeTab === 'fleet' && (
+        <div className="space-y-8">
+          <EngineFleet load={() => adminFetch<EngineFleetData>('/engine-fleet')} />
+          <EngineScheduler load={() => adminFetch<EngineSchedulerData>('/engine-scheduler')} />
+        </div>
+      )}
       {activeTab === 'bounces' && <BounceStatus />}
     </div>
   );
