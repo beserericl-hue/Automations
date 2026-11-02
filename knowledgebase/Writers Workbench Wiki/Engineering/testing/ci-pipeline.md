@@ -34,6 +34,8 @@ skip via `if:` when nothing relevant changed. A job skipped by `if:` reports as 
 required checks always report. Schema Governance Check always runs (seconds of Python).
 
 The old workaround (add a `writers-workbench/docs/` file to a scripts-only hotfix PR) is no longer needed.
+Proved by a docs-only PR (this paragraph): Detect changes ran, Schema Governance Check ran, and
+TypeScript & Lint / Unit Tests / Production Build reported as skipped, which satisfies a required check.
 
 ## Schema Governance Check details
 
