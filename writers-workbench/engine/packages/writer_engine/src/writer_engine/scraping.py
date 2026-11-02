@@ -19,6 +19,7 @@ is fetched once more with ``render=true`` — ten times the price, so only on th
 
 from __future__ import annotations
 
+import asyncio
 import re
 from dataclasses import dataclass, field
 from urllib.parse import parse_qsl, urljoin, urlparse
@@ -110,7 +111,8 @@ async def fetch_html(
     try:
 
         async def _get() -> httpx.Response:
-            resp = await http.get(SCRAPERAPI_URL, params=params, headers=headers, timeout=FETCH_TIMEOUT_S)
+            async with _in_flight():
+                resp = await http.get(SCRAPERAPI_URL, params=params, headers=headers, timeout=FETCH_TIMEOUT_S)
             resp.raise_for_status()
             return resp
 
@@ -124,6 +126,20 @@ async def fetch_html(
     except ValueError:
         credits = 0
     return resp.text, credits
+
+
+_semaphores: dict[int, asyncio.Semaphore] = {}
+
+
+def _in_flight() -> asyncio.Semaphore:
+    """The plan caps concurrent requests (5) and answers 429 past it, and a newsletter's scrape step
+    starts every source of a story at once. One semaphore per event loop, since a semaphore is bound
+    to the loop it first waits on."""
+    loop_id = id(asyncio.get_running_loop())
+    sem = _semaphores.get(loop_id)
+    if sem is None:
+        sem = _semaphores[loop_id] = asyncio.Semaphore(max(1, get_settings().scraperapi_max_concurrency))
+    return sem
 
 
 def read_page(html: str, url: str) -> Page:

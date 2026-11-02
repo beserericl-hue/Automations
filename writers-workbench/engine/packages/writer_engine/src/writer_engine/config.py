@@ -69,6 +69,9 @@ class EngineSettings(BaseSettings):
     scraper_render_fallback: bool = Field(default=True, alias="SCRAPER_RENDER_FALLBACK")
     # Optional two-letter proxy country (e.g. "us"). Empty lets ScraperAPI choose.
     scraperapi_country_code: str = Field(default="", alias="SCRAPERAPI_COUNTRY_CODE")
+    # Requests in flight at once, per process. The plan allows 5 (measured on the account
+    # 2026-11-02) and answers 429 past it; 3 leaves room for the second runtime replica.
+    scraperapi_max_concurrency: int = Field(default=3, alias="SCRAPERAPI_MAX_CONCURRENCY")
 
     # Humanizer (E6). StealthGPT REST: POST https://www.stealthgpt.ai/api/stealthify with an
     # `api-token` header, max 3000 words per request. Empty = the humanize pass is OFF, which is the

@@ -95,8 +95,8 @@ DEFAULT_PROVIDER_LIMITS: dict[str, ProviderLimits] = {
     # Embeddings only (text-embedding-3-small). Token-shaped limit, so both are set.
     "openai": ProviderLimits(rpm=500, tpm=1_000_000),
     # Scrape (ScraperAPI). One call per URL, fanned out per story in a newsletter. ScraperAPI limits
-    # concurrent requests by plan and answers 429 past it; a request can take up to 70s, so 50/min
-    # stays well inside even a small plan's concurrency.
+    # concurrent requests by plan and answers 429 past it. A rate cannot bound that (a request can
+    # take 70s), so writer_engine.scraping caps requests in flight; this only caps the rate.
     "scraperapi": ProviderLimits(rpm=50),
     # Image generation: slow, expensive, and polled. Low on purpose.
     "kieai": ProviderLimits(rpm=20),
