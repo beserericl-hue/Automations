@@ -121,7 +121,14 @@ async def resolve_or_create_project(
 async def persist_outline(
     client: Any, *, project_id: str, user_id: str, outline: dict, note: str = "engine brainstorm"
 ) -> None:
-    """Snapshot the prior outline to outline_versions_v2, then update writing_projects_v2.outline (W2)."""
+    """Snapshot the prior outline to outline_versions_v2, then update writing_projects_v2.outline (W2).
+
+    Item 7: the outline is validated and normalised to the canonical shape FIRST — an outline the
+    schema rejects raises :class:`OutlineValidationError` before anything (snapshot included) is
+    written."""
+    from writer_engine.outline_schema import normalize_outline
+
+    outline = normalize_outline(outline)
     cur = await client.table("writing_projects_v2").select("outline").eq("id", project_id).limit(1).execute()
     prior = (await _rows(cur) or [{}])[0].get("outline")
     if prior:

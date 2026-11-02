@@ -109,7 +109,9 @@ async def test_persist_canon_is_idempotent(db: Any) -> None:
 async def test_persist_outline_updates_rather_than_duplicates(db: Any) -> None:
     db.tables["writing_projects_v2"] = [{"id": "p1", "outline": None}]
     for _ in range(2):
-        await ph.persist_outline(db, project_id="p1", user_id="u1", outline={"chapters": [{}]})
+        await ph.persist_outline(
+            db, project_id="p1", user_id="u1", outline={"chapters": [{"chapter_number": 1}]}
+        )
     assert db.count("writing_projects_v2") == 1
     # The second run snapshots the first run's outline — one extra version, no lost data.
     assert db.count("outline_versions_v2") == 1
