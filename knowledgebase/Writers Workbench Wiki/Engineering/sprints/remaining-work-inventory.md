@@ -366,7 +366,7 @@ existed on paper and did nothing in practice.
 | **H3** | ~~L5 parity was never measured~~ | ✅ **DONE** 2026-10-16 — harness built (`run_corpus`/`render_report` + `scripts/parity_run.py`, 3 modes) and RUN. First run found a real craft regression (see **A13**). A failing tool fails the whole run, since the gate is per-tool at cutover. `live`/shadow mode still needed for the true same-input A4 number. | The ≥0.95 parity score is the stated precondition for every cutover ([[engine-framework-sprints]] F1-7.5 / [[engine-api-system-tests]]) |
 | H4 | L6 load/scalability suite never run | ❌ | See **B11** |
 | H5 | The 157-test engine E2E is a manual script, not CI | 🟡 | `scripts/e2e_full_verify.py` |
-| H6 | `ci.yml` has a `paths` filter, so some PRs cannot satisfy required checks | 🟡 | See [[ci-pipeline]]. `engine-ci.yml` deliberately avoids this |
+| H6 | ~~`ci.yml` has a `paths` filter, so some PRs cannot satisfy required checks~~ | ✅ **DONE** 2026-11-02 | Filter removed; a `changes` job (`dorny/paths-filter`) skips TypeScript & Lint / Unit Tests / Production Build when no Workbench path changed, and skipped jobs report success. See [[ci-pipeline]] |
 
 ---
 
