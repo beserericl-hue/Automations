@@ -33,7 +33,7 @@ socialCalendarRouter.use(requireAuth);
 const POST_COLUMNS =
   'id, display_number, external_id, title, body_md, linkedin_content, seo_title, meta_description, category, ' +
   'include_image, post_status, channels, scheduled_date, slot, scheduled_at, state, attempts, posted_at, last_error, ' +
-  'source, item_type, source_url, radar_topic_id, created_at, updated_at';
+  'source, item_type, source_url, radar_topic_id, humanize, created_at, updated_at';
 const DELIVERY_COLUMNS = 'schedule_id, channel, status, attempts, public_url, detail, updated_at';
 
 const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'yyyy-mm-dd');
