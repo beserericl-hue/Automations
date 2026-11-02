@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from writer_engine.config import get_settings
 from writer_engine.humanize import humanize_draft
 from writer_engine.llm import LLMRouter, ProviderNotRegistered, complete_structured, get_router
@@ -158,14 +160,71 @@ async def _humanize_section(seg: StorySegment, payload: dict) -> dict | None:
         return None
     raw_budget = payload.get("humanize_budget_words")
     budget = int(raw_budget) if isinstance(raw_budget, int) and not isinstance(raw_budget, bool) else None
-    text, report = await humanize_draft(
-        seg.newsletter_section_content,
+    original = seg.newsletter_section_content
+    # The section is a template: "# Title", "**The Recap:** ...", "**Unpacked:**" + bullets,
+    # "**Bottom line:** ...". Measured on DEV 2026-11-02, StealthGPT drops every bold label, and as
+    # protected terms the labels ("Recap") got every section rejected (5 of 5, 1,678 words billed,
+    # nothing kept). So only the prose goes to the humanizer; headings and labels stay put and are
+    # put back by position. A rewrite that changes the paragraph or bullet layout is not used.
+    fixed, prose = _split_section(original)
+    prose_text = "\n\n".join(prose)
+    rewritten, report = await humanize_draft(
+        prose_text,
         content_type="newsletter_segment",
         payload=payload,
         budget_words=budget,
     )
-    seg.newsletter_section_content = text
+    if report is None:
+        return None
+    new_prose = [p.strip() for p in re.split(r"\n\s*\n", rewritten.strip()) if p.strip()]
+    if not report.get("applied") or rewritten.strip() == prose_text.strip():
+        seg.newsletter_section_content = original
+        return report
+    if len(new_prose) != len(prose) or any(
+        _bullets(a) != _bullets(b) for a, b in zip(prose, new_prose, strict=True)
+    ):
+        report["rejected_layout"] = {"paragraphs": [len(prose), len(new_prose)]}
+        report["applied"] = False
+        seg.newsletter_section_content = original
+        return report
+    seg.newsletter_section_content = _join_section(fixed, new_prose)
     return report
+
+
+_LABEL_RE = re.compile(r"\*\*[^*\n]{1,40}:\*\*")
+
+
+def _bullets(paragraph: str) -> int:
+    return sum(1 for line in paragraph.splitlines() if line.lstrip().startswith(("- ", "* ")))
+
+
+def _split_section(text: str) -> tuple[list[tuple[str, int | None]], list[str]]:
+    """Paragraphs -> a layout of (fixed prefix, index of its prose or None) and the prose list."""
+    layout: list[tuple[str, int | None]] = []
+    prose: list[str] = []
+    for para in [p for p in re.split(r"\n\s*\n", text.strip()) if p.strip()]:
+        stripped = para.strip()
+        if stripped.startswith("#") or _LABEL_RE.fullmatch(stripped):
+            layout.append((stripped, None))
+            continue
+        m = re.match(r"(\*\*[^*\n]{1,40}:\*\*)\s*", stripped)
+        prefix = m.group(1) + " " if m else ""
+        body = stripped[m.end() :] if m else stripped
+        if not body.strip():
+            layout.append((stripped, None))
+            continue
+        layout.append((prefix, len(prose)))
+        prose.append(body)
+    return layout, prose
+
+
+def _join_section(layout: list[tuple[str, int | None]], prose: list[str]) -> str:
+    return "\n\n".join(prefix + prose[idx] if idx is not None else prefix for prefix, idx in layout)
+
+
+def section_labels(text: str) -> list[str]:
+    """The bold format labels a section is built from, e.g. ``**The Recap:**``."""
+    return list(dict.fromkeys(_LABEL_RE.findall(text)))
 
 
 app = build_step_app(STEP_NAME, handler)
