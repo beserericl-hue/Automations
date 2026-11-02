@@ -34,6 +34,8 @@ export interface SocialPost {
   source: string;
   item_type: string;
   source_url: string | null;
+  /** Set by the radar drafter when the humanizer ran on this post (migration 042). */
+  humanize?: { applied?: boolean; [k: string]: unknown } | null;
   deliveries?: SocialDelivery[];
 }
 
@@ -121,6 +123,13 @@ export default function PostEditor({ post, channels, defaultDate, defaultSlot, o
         )}
         {post?.last_error && post.state !== 'posted' && (
           <p className="mb-3 text-xs text-red-600">{post.last_error}</p>
+        )}
+        {post?.humanize && (
+          <p className="mb-3 text-xs text-gray-500 dark:text-gray-400" data-testid="post-humanize">
+            {post.humanize.applied
+              ? 'Humanized (StealthGPT) before it was scheduled.'
+              : 'The humanizer ran but every rewrite was rejected, so the drafted text was kept.'}
+          </p>
         )}
 
         <fieldset disabled={!editable} className="space-y-3">

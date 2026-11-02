@@ -158,6 +158,8 @@ def row_for(
         "item_type": str(post.get("item_type") or "article"),
         "source_url": post.get("source_url") or None,
         "radar_topic_id": post.get("radar_topic_id") or None,
+        # Only when the humanizer ran (migration 042); absent keeps the insert valid without it.
+        **({"humanize": post["humanize"]} if isinstance(post.get("humanize"), dict) else {}),
     }
 
 
