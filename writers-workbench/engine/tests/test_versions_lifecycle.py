@@ -157,10 +157,19 @@ def test_revert_outline_snapshots_then_overwrites(monkeypatch):
         monkeypatch,
         {
             "writing_projects_v2": [
-                {"id": "p1", "title": "The Accord", "user_id": "u1", "outline": {"chapters": [{}, {}, {}]}},
+                {
+                    "id": "p1",
+                    "title": "The Accord",
+                    "user_id": "u1",
+                    "outline": {"chapters": [{"number": 1}, {"number": 2}, {"number": 3}]},
+                },
             ],
             "outline_versions_v2": [
-                {"project_id": "p1", "version_number": 1, "outline": {"chapters": [{}, {}]}},
+                {
+                    "project_id": "p1",
+                    "version_number": 1,
+                    "outline": {"chapters": [{"number": 1, "brief": "b"}, {"number": 2}]},
+                },
             ],
         },
     )
@@ -176,6 +185,35 @@ def test_revert_outline_snapshots_then_overwrites(monkeypatch):
     # project outline overwritten to the v1 (2-ch) outline
     proj_updates = [p for (t, f, p) in store.updates if t == "writing_projects_v2"]
     assert proj_updates and len(proj_updates[-1]["outline"]["chapters"]) == 2
+    # Item 7: the restored legacy-shaped version is written back in the canonical shape.
+    assert proj_updates[-1]["outline"]["chapters"][0] == {"chapter_number": 1, "beat": "b", "title": ""}
+
+
+def test_revert_refuses_a_version_the_schema_rejects(monkeypatch):
+    store, _ = _patch(
+        monkeypatch,
+        {
+            "writing_projects_v2": [
+                {
+                    "id": "p1",
+                    "title": "The Accord",
+                    "user_id": "u1",
+                    "outline": {"chapters": [{"chapter_number": 1}]},
+                },
+            ],
+            "outline_versions_v2": [
+                {"project_id": "p1", "version_number": 1, "outline": {"chapters": ["junk"]}}
+            ],
+        },
+    )
+    out = asyncio.run(
+        lib._op_revert(
+            {"scope": "outline", "project_title": "The Accord", "version_number": 1, "user_id": "u1"}
+        )
+    )
+    assert out["reverted"] is False
+    assert "chapters[0] must be an object" in out["error_message"]
+    assert not [p for (t, f, p) in store.updates if t == "writing_projects_v2"]
 
 
 def test_revert_invalid_version_no_mutation(monkeypatch):

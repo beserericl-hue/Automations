@@ -67,12 +67,20 @@ export default function ProjectEditForm({ project, onClose }: ProjectEditFormPro
         });
         return;
       }
-      const { error } = await supabase
-        .from('writing_projects_v2')
-        .update({ ...payload, updated_at: new Date().toISOString() })
-        .eq('id', project.id)
-        .eq('user_id', userId!);
-      if (error) throw error;
+      // Item 7: through the server, so the merged outline is validated like every other outline write
+      // (a direct Supabase update bypassed the schema). A rejected outline comes back as a 422 whose
+      // message names the problem, and is shown in the form.
+      await apiFetch(`/api/publishing/project/${project.id}/details`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          title: payload.title,
+          genre_slug: payload.genre_slug,
+          status: payload.status,
+          project_type: payload.project_type,
+          premise: premise.trim(),
+          themes: themes.split(',').map(t => t.trim()).filter(Boolean),
+        }),
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project-detail', project.id] });

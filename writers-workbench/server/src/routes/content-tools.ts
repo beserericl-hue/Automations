@@ -33,6 +33,7 @@ import { logger } from '../lib/logger.js';
 import { parseWith } from '../lib/claude-structured.js';
 import { normalize, rankResearch, type ResearchReport } from '../lib/landing-page.js';
 import { applyRename, findMentions, nameAmbiguity, namesInText, type Mention } from '../lib/manuscript-tools.js';
+import { normalizeOutline } from '../lib/outline-schema.js';
 
 export const contentToolsRouter = Router();
 contentToolsRouter.use(requireAuth);
@@ -334,7 +335,7 @@ contentToolsRouter.post('/:id/characters/rename', validateBody(RenameBody), asyn
       const outline = (project?.outline ?? {}) as { characters?: Array<{ name?: string }> } & Record<string, unknown>;
       if (outline.characters?.some((c) => c.name === from)) {
         outline.characters = outline.characters.map((c) => (c.name === from ? { ...c, name: to } : c));
-        await supabase.from('writing_projects_v2').update({ outline, updated_at: new Date().toISOString() }).eq('id', chapter.project_id).eq('user_id', userId);
+        await supabase.from('writing_projects_v2').update({ outline: normalizeOutline(outline), updated_at: new Date().toISOString() }).eq('id', chapter.project_id).eq('user_id', userId);
         records += 1;
       }
     }

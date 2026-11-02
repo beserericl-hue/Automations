@@ -921,7 +921,14 @@ async def _op_revert(payload: dict) -> dict:
     target = next((v for v in vrows if int(v.get("version_number") or 0) == version_number), None)
     if not target:
         return {"reverted": False, "error_message": f"version {version_number} not found for '{title}'"}
-    target_outline = target.get("outline") or {}
+    # Item 7: a restored version goes through the same schema as any other write. An old version in
+    # the legacy shape comes back normalised; one the schema cannot accept is refused, not restored.
+    from writer_engine.outline_schema import OutlineValidationError, normalize_outline
+
+    try:
+        target_outline = normalize_outline(target.get("outline") or {})
+    except OutlineValidationError as exc:
+        return {"reverted": False, "error_message": f"version {version_number} cannot be restored: {exc}"}
 
     try:  # snapshot current outline BEFORE overwrite
         next_v = max((int(v.get("version_number") or 0) for v in vrows), default=0) + 1

@@ -19,6 +19,7 @@ from writer_engine import outline_keys
 from writer_engine.humanize import humanize_draft
 from writer_engine.library_helpers import optional_int
 from writer_engine.llm import ProviderNotRegistered, complete_structured, get_router
+from writer_engine.outline_schema import OutlineValidationError, normalize_outline
 from writer_engine.prompt_store import compose_craft_system, seed_default_prompts
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
 from writer_engine.schemas.chapter import (
@@ -563,8 +564,14 @@ async def _persist_chapter_outline(
         rows = getattr(cur, "data", None) or []
         if not rows:
             return {"persisted": False, "reason": "project not found"}
-        outline = dict(rows[0].get("outline") or {})
+        prior = rows[0].get("outline") or {}
         user_id = rows[0].get("user_id")
+        # Item 7: validate (and normalise a legacy shape) BEFORE the snapshot, so a rejected outline
+        # writes nothing at all.
+        try:
+            outline = normalize_outline(prior)
+        except OutlineValidationError as exc:
+            return {"persisted": False, "reason": str(exc)[:300]}
         chapters = list(outline.get("chapters") or [])
         # Snapshot the prior outline (R118: chapter-outline revision keeps history).
         try:
@@ -584,7 +591,7 @@ async def _persist_chapter_outline(
                         "user_id": user_id,
                         "project_id": project_id,
                         "version_number": vn,
-                        "outline": outline,
+                        "outline": prior,
                         "revision_note": f"pre chapter-outline snapshot (ch {chapter_number})",
                     }
                 )
@@ -597,7 +604,8 @@ async def _persist_chapter_outline(
             return {"persisted": False, "reason": "could not snapshot the outline first"}
         found = False
         for ch in chapters:
-            if isinstance(ch, dict) and str(ch.get("chapter_number")) == str(chapter_number):
+            # outline_keys.matches: "04", 4 and 4.0 are all chapter 4 (the old str() compare was not).
+            if outline_keys.matches(ch, chapter_number):
                 ch["chapter_outline"] = {
                     "sub_chapters": sub_chapters,
                     "chapter_story_arc": chapter_story_arc,
@@ -610,7 +618,7 @@ async def _persist_chapter_outline(
         outline["chapters"] = chapters
         await (
             client.table("writing_projects_v2")
-            .update({"outline": outline, **touch()})
+            .update({"outline": normalize_outline(outline), **touch()})
             .eq("id", project_id)
             .execute()
         )
@@ -3184,7 +3192,7 @@ async def _persist_qa_artifacts(
             outline["_character_drift_scan"] = {"characters": list(merged.values())}
             await (
                 client.table("writing_projects_v2")
-                .update({"outline": outline, **touch()})
+                .update({"outline": normalize_outline(outline), **touch()})
                 .eq("id", str(project_id))
                 .execute()
             )
@@ -4860,7 +4868,7 @@ async def _op_plan_volumes(payload: dict) -> dict:
 
             await (
                 client.table("writing_projects_v2")
-                .update({"outline": outline, **touch()})
+                .update({"outline": normalize_outline(outline), **touch()})
                 .eq("id", project_id)
                 .execute()
             )
@@ -5567,7 +5575,7 @@ async def _op_marketing(payload: dict) -> dict:
 
             await (
                 client.table("writing_projects_v2")
-                .update({"outline": outline, **touch()})
+                .update({"outline": normalize_outline(outline), **touch()})
                 .eq("id", project_id)
                 .execute()
             )
