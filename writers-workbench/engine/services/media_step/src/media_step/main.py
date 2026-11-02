@@ -83,6 +83,8 @@ async def _kieai_cover(prompt: str, *, key: str, timeout_s: int = 180) -> bytes 
                 pr.raise_for_status()
                 data = pr.json().get("data") or {}
                 state = data.get("state")
+                if state in ("success", "fail", "error"):
+                    _record_kie_cost(task_id, data, succeeded=state == "success")
                 if state == "success":
                     result = json.loads(data.get("resultJson") or "{}")
                     urls = result.get("resultUrls") or []
@@ -96,6 +98,29 @@ async def _kieai_cover(prompt: str, *, key: str, timeout_s: int = 180) -> bytes 
             return None
         except Exception:
             return None
+
+
+def _record_kie_cost(task_id: str, data: dict, *, succeeded: bool) -> None:
+    """One cost row per KIE task from KIE's own ``creditsConsumed``; a failed task without a credit
+    count is not billed and is not recorded."""
+    from writer_engine.telemetry import token_accounting
+
+    raw = data.get("creditsConsumed")
+    try:
+        credits = float(raw) if raw is not None else None
+    except (TypeError, ValueError):
+        credits = None
+    if not succeeded and not credits:
+        return
+    token_accounting.record_units(
+        provider="kieai",
+        model="google/nano-banana",
+        units=1 if succeeded else 0,
+        unit_type="images",
+        credits=credits,
+        request_id=str(task_id),
+        metadata={"state": data.get("state"), "cost_time_s": data.get("costTime")},
+    )
 
 
 async def _dalle_cover(prompt: str, *, key: str) -> bytes | None:
@@ -113,6 +138,16 @@ async def _dalle_cover(prompt: str, *, key: str) -> bytes | None:
             r = await client.post(_OPENAI_IMAGES, headers=headers, json=body)
             r.raise_for_status()
             b64 = (r.json().get("data") or [{}])[0].get("b64_json")
+            if b64:
+                from writer_engine.telemetry import token_accounting
+
+                token_accounting.record_units(
+                    provider="openai",
+                    model="dall-e-3",
+                    units=1,
+                    unit_type="images",
+                    metadata={"size": "1024x1792"},
+                )
             return base64.b64decode(b64) if b64 else None
         except Exception:
             return None

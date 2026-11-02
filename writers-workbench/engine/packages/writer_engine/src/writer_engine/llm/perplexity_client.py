@@ -67,6 +67,16 @@ class PerplexityAdapter:
         input_tokens = int(usage.get("prompt_tokens", 0))
         output_tokens = int(usage.get("completion_tokens", 0))
         citations = tuple(str(c) for c in (payload.get("citations") or []) if c)
+        # Perplexity reports the exact dollars per request in usage.cost (token costs + the per-request
+        # search fee, verified live 2026-11-02). That figure is what gets recorded; the price table
+        # is only a fallback for a response without it.
+        cost = usage.get("cost") if isinstance(usage.get("cost"), dict) else {}
+        reported: float | None = None
+        try:
+            if cost.get("total_cost") is not None:
+                reported = float(cost["total_cost"])
+        except (TypeError, ValueError):
+            reported = None
 
         LLM_CALLS.labels(service=self._service, provider=self.provider, model=model, status="ok").inc()
         if input_tokens:
@@ -85,6 +95,9 @@ class PerplexityAdapter:
             model=model,
             provider=self.provider,
             citations=citations,
+            reported_cost_usd=reported,
+            search_context_size=str(usage.get("search_context_size") or "") or None,
+            request_id=str(payload.get("id") or ""),
         )
 
     async def aclose(self) -> None:

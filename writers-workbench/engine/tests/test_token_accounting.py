@@ -14,8 +14,10 @@ def test_cost_usd_sonnet_rates() -> None:
     assert ta.cost_usd("claude-sonnet-4-6", 1_000_000, 0, 0, 0) == 3.0
 
 
-def test_unknown_model_uses_fallback_rate() -> None:
-    assert ta.cost_usd("some-future-model", 0, 1_000_000, 0, 0) == 15.0  # sonnet-class fallback
+def test_unknown_model_is_unpriced_not_guessed() -> None:
+    # Was a silent Sonnet-class guess. An unknown model is now $0 AND flagged 'unpriced' (see
+    # test_cost_pricing.py), so the cost view shows it instead of a made-up number.
+    assert ta.cost_usd("some-future-model", 0, 1_000_000, 0, 0) == 0.0
 
 
 def test_record_and_snapshot_accumulate() -> None:
@@ -37,18 +39,19 @@ def test_record_and_snapshot_accumulate() -> None:
     assert snap["cost_usd"] > 0
 
 
-def test_record_noop_without_context() -> None:
-    # recording with no active context must not raise and must not accumulate
+def test_record_without_context_does_not_raise() -> None:
+    # recording with no active context must not raise and must not leak into a later context (it is
+    # queued as an unattributed row instead — see test_cost_recording.py)
     ta.reset()
     ta.record(provider="anthropic", model="claude-sonnet-4-6", input_tokens=10, output_tokens=10)
     assert ta.snapshot()["calls"] == 0
 
 
-def test_flush_skips_without_user_id() -> None:
+def test_flush_without_user_id_still_returns_totals() -> None:
     ta.reset()
     ta.begin(user_id=None, workflow="chapter.write")
     ta.record(provider="anthropic", model="claude-sonnet-4-6", input_tokens=10, output_tokens=10)
-    snap = asyncio.run(ta.flush())  # no user_id -> skip DB write, still returns totals
+    snap = asyncio.run(ta.flush())  # rows with no user are still written (a system job costs money)
     assert snap["calls"] == 1 and snap["output_tokens"] == 10
 
 

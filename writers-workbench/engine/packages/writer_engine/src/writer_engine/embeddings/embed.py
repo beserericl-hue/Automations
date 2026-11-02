@@ -102,6 +102,19 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
         attempts=1,  # the OpenAI SDK retries a 429 itself; another layer would multiply the wait
         max_wait_s=30.0,
     )
+    # Exact cost: OpenAI reports the billed tokens in usage (embeddings have no output tokens).
+    from writer_engine.telemetry import token_accounting
+
+    usage = getattr(resp, "usage", None)
+    billed = int(getattr(usage, "total_tokens", 0) or getattr(usage, "prompt_tokens", 0) or 0)
+    token_accounting.record_units(
+        provider="openai",
+        model=settings.embedding_model,
+        units=billed,
+        unit_type="tokens",
+        input_tokens=billed,
+        metadata={"inputs": len(texts)},
+    )
     # Preserve input order (OpenAI returns data sorted by index, but be explicit).
     ordered = sorted(resp.data, key=lambda d: d.index)
     return [d.embedding for d in ordered]

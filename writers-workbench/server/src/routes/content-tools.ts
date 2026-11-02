@@ -197,7 +197,12 @@ contentToolsRouter.post('/:id/characters/check', validateBody(NameQuery), async 
       '',
       ...passages.map((p, i) => `<passage n="${i + 1}" chapter="${p.chapter ?? '?'}">\n${p.text}\n</passage>`),
     ].join('\n');
-    const out = await parseWith(CheckOutput, prompt, 'high');
+    const out = await parseWith(
+      CheckOutput,
+      prompt,
+      { operation: 'characters.check', userId: req.userId, projectId: chapter.project_id, contentId: chapter.id, chapterNumber: chapter.chapter_number },
+      'high',
+    );
     const texts = passages.map((p) => p.text);
     const findings = out.findings
       .map((f) => ({ ...f, quotes: verifiedQuotes(f.quotes, texts) }))
@@ -252,7 +257,12 @@ contentToolsRouter.post('/:id/characters/suggest', validateBody(NameQuery), asyn
       '',
       ...reports.map((r) => `<report id="${r.id}" topic="${r.topic.replace(/"/g, "'")}">\n${r.content}\n</report>`),
     ].join('\n');
-    const out = await parseWith(SuggestOutput, prompt, 'medium');
+    const out = await parseWith(
+      SuggestOutput,
+      prompt,
+      { operation: 'characters.suggest-names', userId: req.userId, projectId: chapter.project_id, contentId: chapter.id, chapterNumber: chapter.chapter_number },
+      'medium',
+    );
     const byId = new Map(reports.map((r) => [r.id, r]));
     const suggestions = out.suggestions
       .filter((s) => {
