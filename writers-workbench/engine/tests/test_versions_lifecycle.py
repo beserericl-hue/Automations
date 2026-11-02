@@ -356,3 +356,89 @@ def test_list_deleted_filters_by_type(monkeypatch):
         lib._op_lifecycle({"action": "list_deleted", "content_type_filter": "blog_post", "user_id": "u1"})
     )
     assert out["count"] == 1 and out["items"][0]["title"] == "Del Blog"
+
+
+# --------------------------------------------------------------------------- lifecycle targets the named row
+# 2026-11-02 DEV E2E: "Approve the draft titled 'E2E Lifecycle R22 0f29d4c4'" approved "E2E Pub B ...",
+# because the named row was outside the capped batch and one shared keyword ("e2e") counted as a match.
+
+
+def _draft(i, title, status="draft"):
+    return {
+        "id": i,
+        "user_id": "u1",
+        "title": title,
+        "status": status,
+        "content_text": "body",
+        "content_type": "blog_post",
+        "metadata": {},
+    }
+
+
+def test_approve_never_mutates_a_row_sharing_one_keyword(monkeypatch):
+    store, _sent = _patch(
+        monkeypatch,
+        {
+            "app_config_global_v2": _APP_CONFIG,
+            "published_content_v2": [_draft("x1", "E2E Pub B 1793652321471")],
+        },
+    )
+    out = asyncio.run(
+        lib._op_lifecycle({"action": "approve", "title": "E2E Lifecycle R22 0f29d4c4", "user_id": "u1"})
+    )
+    assert out.get("matched") is False and "nothing was changed" in out["error"]
+    assert not [u for u in store.updates if u[0] == "published_content_v2"]
+    assert store.rows["published_content_v2"][0]["status"] == "draft"
+
+
+def test_approve_picks_the_exactly_named_row_among_lookalikes(monkeypatch):
+    store, _sent = _patch(
+        monkeypatch,
+        {
+            "app_config_global_v2": _APP_CONFIG,
+            "published_content_v2": [
+                _draft("x1", "E2E Pub B 1793652321471"),
+                _draft("x2", "E2E Lifecycle R25 31213771"),
+                _draft("x3", "E2E Lifecycle R22 0f29d4c4"),
+            ],
+        },
+    )
+    out = asyncio.run(
+        lib._op_lifecycle({"action": "approve", "title": "e2e lifecycle r22 0f29d4c4", "user_id": "u1"})
+    )
+    assert out["status"] == "approved"
+    statuses = {r["id"]: r["status"] for r in store.rows["published_content_v2"]}
+    assert statuses == {"x1": "draft", "x2": "draft", "x3": "approved"}
+
+
+def test_strict_best_match_majority_rule():
+    rows = [{"title": "The Vault of Bones"}, {"title": "The Graveyard of Good Ideas"}]
+    # one of two keywords is not enough for a mutation...
+    assert lib._strict_best_match(rows, "Seed Vault", ("title",), majority=True) is None
+    # ...but read-only lookups keep the old behaviour (default)
+    assert lib._strict_best_match(rows, "Seed Vault", ("title",))["title"] == "The Vault of Bones"
+    # a majority of the keywords is a match
+    m = lib._strict_best_match(rows, "graveyard good ideas notes", ("title",), majority=True)
+    assert m and m["title"] == "The Graveyard of Good Ideas"
+
+
+def test_exact_title_row_escapes_like_wildcards_and_checks_equality():
+    seen = {}
+
+    class _Q:
+        def ilike(self, col, pattern):
+            seen["pattern"] = pattern
+            return self
+
+        def order(self, *a, **k):
+            return self
+
+        def limit(self, *a, **k):
+            return self
+
+        async def execute(self):
+            return _Resp([{"title": "100% Wrong"}, {"title": "100% Right"}])
+
+    row = asyncio.run(lib._exact_title_row(_Q(), "100% Right"))
+    assert row == {"title": "100% Right"}
+    assert seen["pattern"] == "100_ Right"

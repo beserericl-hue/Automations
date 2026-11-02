@@ -106,30 +106,44 @@ async def _op_lifecycle(payload: dict) -> dict:
                 "needs_title": True,
                 "action": action,
             }
-        q = client.table("published_content_v2").select(cols)
-        if user_id:
-            q = q.eq("user_id", user_id)
-        if action == "undelete":
-            q = q.eq("status", "deleted")
-        # NOTE: do NOT filter by content_type here. The router/Gemini often passes a noise content_type
-        # ("draft", "blog") that does not equal the stored value ("blog_post") and would exclude the real
-        # row → a false not-found (it regressed approve/publish/reject/delete). Title match is the gate.
         chn = optional_int(payload.get("chapter_number"))
+
+        def _scoped():  # a fresh query with this request's scope (the builder is mutable)
+            q = client.table("published_content_v2").select(cols)
+            if user_id:
+                q = q.eq("user_id", user_id)
+            if action == "undelete":
+                q = q.eq("status", "deleted")
+            # NOTE: do NOT filter by content_type here. The router/Gemini often passes a noise
+            # content_type ("draft", "blog") that does not equal the stored value ("blog_post") and would
+            # exclude the real row → a false not-found (it regressed approve/publish/reject/delete).
+            if chn is not None:
+                q = q.eq("chapter_number", chn)
+            return q
+
         pid = None
         if chn is not None:
-            q = q.eq("chapter_number", chn)
             # 'approve/publish/... chapter N of <project>' — the term is the PROJECT title, but a chapter's
             # own title (e.g. "The Carrier Wave") won't contain it. Resolve the project first so the
             # chapter-number filter + project scope pick the right row (VP06/VP07 class).
             from writer_engine.persist_helpers import resolve_project_id
 
             pid, _prow = await resolve_project_id(client, user_id=user_id, title=term)
-        rows = getattr(await q.limit(300).execute(), "data", None) or []
-        if pid:
+        # 1) The named row itself, looked up by title in the database. The batch below is capped, so on
+        #    a user with many rows the named one may not be in it — and the fuzzy fallback then mutated a
+        #    DIFFERENT row (approve "E2E Lifecycle R22 …" approved "E2E Pub B …", 2026-11-02).
+        exact = await _exact_title_row(_scoped(), term)
+        # 2) Otherwise fuzzy-match over the user's most recently touched rows.
+        rows = (
+            getattr(await _scoped().order("updated_at", desc=True).limit(300).execute(), "data", None) or []
+        )
+        if exact:
+            row = exact
+        elif pid:
             scoped = [r for r in rows if str(r.get("project_id")) == str(pid)]
-            row = scoped[0] if scoped else _strict_best_match(rows, term, ("title",))
+            row = scoped[0] if scoped else _strict_best_match(rows, term, ("title",), majority=True)
         else:
-            row = _strict_best_match(rows, term, ("title",))
+            row = _strict_best_match(rows, term, ("title",), majority=True)
     if not row:
         return {
             "error": f"No content matching '{_clean_str(payload.get('project_title') or payload.get('title') or payload.get('search_term'))}' found — nothing was changed.",
@@ -451,10 +465,15 @@ def _best_match(rows: list[dict], term: str, fields: tuple[str, ...]) -> dict | 
     return best
 
 
-def _strict_best_match(rows: list[dict], term: str, fields: tuple[str, ...]) -> dict | None:
+def _strict_best_match(
+    rows: list[dict], term: str, fields: tuple[str, ...], *, majority: bool = False
+) -> dict | None:
     """Like :func:`_best_match` but NEVER falls back to rows[0]: an empty term or zero keyword overlap
     returns None. Used for MUTATING lifecycle resolution (G11) where guessing = corrupting the wrong
-    content. Prefers an exact normalized-title match, then the best keyword-overlap match."""
+    content. Prefers an exact normalized-title match, then the best keyword-overlap match.
+
+    ``majority=True`` (mutations): the keyword fallback must cover MORE THAN HALF of the term's
+    keywords. One shared word ("e2e", "chapter") is not a match for an approve/publish/delete."""
     from writer_engine.library_helpers.title_resolver import normalize_title, titles_match
 
     kws = _keywords(term)
@@ -473,7 +492,28 @@ def _strict_best_match(rows: list[dict], term: str, fields: tuple[str, ...]) -> 
         score = sum(1 for kw in kws if kw in hay)
         if score > best_score:
             best, best_score = row, score
+    if majority and best_score * 2 <= len(kws):
+        return None
     return best
+
+
+async def _exact_title_row(query, term: str) -> dict | None:
+    """The most recently updated row whose title equals ``term`` (case/article-insensitive), looked up
+    in the database rather than in a capped batch. ``query`` is an already-scoped select. LIKE
+    wildcards in the term are replaced by ``_`` (any one character); the equality check below is what
+    decides, so the pattern only has to be broad enough to fetch the candidates."""
+    from writer_engine.library_helpers.title_resolver import normalize_title
+
+    want = normalize_title(term)
+    if not want:
+        return None
+    pattern = re.sub(r"[%_*\\]", "_", term.strip())
+    try:
+        resp = await query.ilike("title", pattern).order("updated_at", desc=True).limit(20).execute()
+    except Exception:
+        return None
+    rows = getattr(resp, "data", None) or []
+    return next((r for r in rows if normalize_title(r.get("title")) == want), None)
 
 
 def _render_outline_md(outline: dict, title: str) -> str:
