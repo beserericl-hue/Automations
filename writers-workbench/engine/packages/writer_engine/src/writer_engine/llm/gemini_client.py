@@ -83,8 +83,14 @@ class GeminiAdapter:
             raise
 
         usage = getattr(response, "usage_metadata", None)
-        in_tok = int(getattr(usage, "prompt_token_count", 0) or 0)
-        out_tok = int(getattr(usage, "candidates_token_count", 0) or 0)
+        prompt_tok = int(getattr(usage, "prompt_token_count", 0) or 0)
+        # Gemini 2.5 bills thinking tokens at the output rate, but candidates_token_count leaves them
+        # out — counting only candidates under-reported every hub/picker call. Implicitly cached
+        # prompt tokens (included in prompt_token_count) bill at the cache rate.
+        thoughts = int(getattr(usage, "thoughts_token_count", 0) or 0)
+        cached = min(int(getattr(usage, "cached_content_token_count", 0) or 0), prompt_tok)
+        in_tok = prompt_tok - cached
+        out_tok = int(getattr(usage, "candidates_token_count", 0) or 0) + thoughts
         text = response.text or ""
 
         LLM_CALLS.labels(service=self._service, provider=self.provider, model=model, status="ok").inc()
@@ -101,6 +107,8 @@ class GeminiAdapter:
             text=text,
             input_tokens=in_tok,
             output_tokens=out_tok,
+            cache_read_tokens=cached,
             model=model,
             provider=self.provider,
+            request_id=str(getattr(response, "response_id", "") or ""),
         )

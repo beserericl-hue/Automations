@@ -2,6 +2,9 @@ import { Router, Request, Response } from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import { logger } from '../lib/logger.js';
+import { computeKieCost, recordUsage, settleUsage } from '../lib/cost-recorder.js';
+
+const KIE_MODEL = 'google/nano-banana';
 
 export const imagesRouter = Router();
 
@@ -102,7 +105,7 @@ imagesRouter.post('/generate', requireAuth, async (req: Request, res: Response) 
         Authorization: `Bearer ${getKieApiKey()}`,
       },
       body: JSON.stringify({
-        model: 'google/nano-banana',
+        model: KIE_MODEL,
         callBackUrl: '',
         input: { prompt, image_urls: imageUrls },
       }),
@@ -116,6 +119,23 @@ imagesRouter.post('/generate', requireAuth, async (req: Request, res: Response) 
       res.status(502).json({ success: false, error: { code: 'UPSTREAM_ERROR', message: 'Failed to create image task' } });
       return;
     }
+
+    // Record the task the moment it exists, at the listed price (estimated). /status replaces it
+    // with KIE's own creditsConsumed when the task finishes. Recording here, not only at success,
+    // means a task whose poller gave up is still on the books.
+    const est = computeKieCost(KIE_MODEL, null, 1);
+    await recordUsage({
+      operation: 'images.generate',
+      provider: 'kieai',
+      model: KIE_MODEL,
+      userId: req.userId ?? null,
+      projectId: typeof project_id === 'string' && project_id ? project_id : null,
+      requestId: String(taskData.taskId),
+      units: est.units,
+      unitType: est.unitType,
+      cost: est,
+      metadata: { genre_slug: genre_slug ?? null, reference_image: !!reference_image_url },
+    });
 
     // Return task ID for polling
     res.json({
@@ -147,6 +167,24 @@ imagesRouter.get('/status/:taskId', requireAuth, async (req: Request, res: Respo
     const data = await response.json() as Record<string, unknown>;
     const statusData = data.data as Record<string, unknown> | undefined;
     const state = (statusData?.state as string) || 'unknown';
+
+    if (state === 'success' || state === 'failed' || state === 'fail') {
+      const reported = typeof statusData?.creditsConsumed === 'number' ? (statusData.creditsConsumed as number) : null;
+      // A failed task with no credit figure is not billed by KIE; record it as $0 rather than the
+      // estimate taken at creation.
+      const cost = state === 'success' ? computeKieCost(KIE_MODEL, reported, 1) : computeKieCost(KIE_MODEL, reported ?? 0, 0);
+      await settleUsage('kieai', String(taskId), {
+        operation: 'images.generate',
+        provider: 'kieai',
+        model: KIE_MODEL,
+        userId: req.userId ?? null,
+        requestId: String(taskId),
+        units: cost.units,
+        unitType: cost.unitType,
+        cost,
+        metadata: { state, credits_reported: reported !== null, cost_time_s: statusData?.costTime ?? null },
+      });
+    }
 
     if (state === 'success') {
       const resultJson = JSON.parse((statusData?.resultJson as string) || '{}');

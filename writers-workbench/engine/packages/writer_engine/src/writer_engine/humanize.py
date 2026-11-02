@@ -333,6 +333,7 @@ async def humanize_text(
             pieces.append(chunk)
             continue
 
+        _record_humanize_cost(payload, model=use_model, chunk_words=len(chunk.split()))
         result = str(payload.get("result") or "").strip()
         if not result:
             # A 200 with no text is still a failure; treating it as success would silently blank
@@ -397,6 +398,40 @@ async def humanize_text(
         stopped_at_budget=out.stopped_at_budget,
     )
     return out
+
+
+def _record_humanize_cost(payload: dict[str, Any], *, model: str, chunk_words: int) -> None:
+    """One cost row per StealthGPT call, from the response's own ``wordsSpent`` (input + output
+    words, which is what StealthGPT bills). Recorded before the result is judged: a rejected rewrite
+    was still paid for."""
+    from writer_engine.telemetry import token_accounting
+
+    try:
+        words = int(payload.get("wordsSpent") or 0)
+    except (TypeError, ValueError):
+        words = 0
+    from writer_engine.telemetry import pricing
+
+    cost = None
+    if not words:
+        # No count from the provider: assume ~2x the input words (measured 2026-10-17) and say so.
+        guess = pricing.unit_cost("stealthgpt", model, units=2 * chunk_words)
+        cost = pricing.Cost(
+            guess.cost_usd, pricing.COST_ESTIMATED, {**guess.unit_prices, "assumed_words": 2 * chunk_words}
+        )
+    token_accounting.record_units(
+        provider="stealthgpt",
+        model=model,
+        units=words or 2 * chunk_words,
+        unit_type="words",
+        cost=cost,
+        metadata={
+            "billing_mode": payload.get("billingMode"),
+            "metered_charged_credits": payload.get("meteredChargedCredits"),
+            "chunk_words": chunk_words,
+            **({} if words else {"words_spent_missing": True}),
+        },
+    )
 
 
 # Kept here rather than imported from chapter_step so the shared package does not depend on a

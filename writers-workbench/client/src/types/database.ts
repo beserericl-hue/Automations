@@ -235,6 +235,40 @@ export interface TokenUsage {
   created_at: string;
 }
 
+/** One aggregated row from GET /api/costs/breakdown (token_usage_breakdown, migration 043). */
+export interface CostBreakdownRow {
+  operation: string | null;
+  provider: string | null;
+  model: string | null;
+  project_id: string | null;
+  user_id: string | null;
+  day: string | null;
+  calls: number;
+  runs: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  units: number | string;
+  unit_types: string | null;
+  cost_usd: number | string;
+  avg_cost_per_call: number | string | null;
+  avg_cost_per_run: number | string | null;
+  provider_reported_calls: number;
+  estimated_calls: number;
+  unpriced_calls: number;
+}
+
+export type CostGroup = 'operation' | 'provider' | 'model' | 'project' | 'day' | 'operation_model' | 'user';
+
+export interface CostBreakdown {
+  group: string;
+  from: string;
+  to: string;
+  rows: CostBreakdownRow[];
+  totals: CostBreakdownRow | null;
+}
+
 export interface GeneratedImage {
   id: string;
   user_id: string;

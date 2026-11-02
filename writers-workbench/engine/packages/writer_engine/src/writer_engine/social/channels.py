@@ -318,6 +318,8 @@ async def kie_sketchnote(
             pr = await http.get(KIE_RECORD, params={"taskId": task_id}, headers=headers, timeout=30.0)
             data = _json(pr).get("data") or {}
             state = str(data.get("state") or "")
+            if state in ("success", "fail", "error", "failed"):
+                _record_kie_cost(str(task_id), data, succeeded=state == "success")
             if state == "success":
                 urls = json.loads(data.get("resultJson") or "{}").get("resultUrls") or []
                 if not urls:
@@ -332,6 +334,28 @@ async def kie_sketchnote(
     except Exception as exc:  # an image is decoration; the post goes out without it
         logger.warning("social.image_failed", error=f"{type(exc).__name__}: {exc}"[:200])
         return None
+
+
+def _record_kie_cost(task_id: str, data: dict[str, Any], *, succeeded: bool) -> None:
+    """One cost row per KIE sketchnote task, from KIE's own ``creditsConsumed``."""
+    from writer_engine.telemetry import token_accounting
+
+    raw = data.get("creditsConsumed")
+    try:
+        credits = float(raw) if raw is not None else None
+    except (TypeError, ValueError):
+        credits = None
+    if not succeeded and not credits:
+        return
+    token_accounting.record_units(
+        provider="kieai",
+        model="google/nano-banana",
+        units=1 if succeeded else 0,
+        unit_type="images",
+        credits=credits,
+        request_id=task_id,
+        metadata={"state": data.get("state"), "purpose": "social.sketchnote"},
+    )
 
 
 def _json(resp: httpx.Response) -> dict[str, Any]:

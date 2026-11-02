@@ -270,6 +270,30 @@ export async function seedTokenUsage(projectId: string): Promise<string> {
   return ((await res.json()) as Array<{ id: string }>)[0].id;
 }
 
+/**
+ * Insert one labelled cost row (migration 043 columns) for the cost-breakdown spec. Returns its id.
+ * Rows carry run_id so the per-run average is exercised too.
+ */
+export async function seedCostRow(fields: {
+  projectId: string; operation: string; provider: string; model: string; costUsd: number;
+  inputTokens?: number; outputTokens?: number; runId?: string;
+}): Promise<string> {
+  const res = await fetch(`${SUPA_URL}/rest/v1/token_usage_v2`, {
+    method: 'POST',
+    headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify({
+      user_id: DEMO_USER_ID, workflow_name: fields.operation, operation: fields.operation,
+      provider: fields.provider, model: fields.model, project_id: fields.projectId,
+      input_tokens: fields.inputTokens ?? 100, output_tokens: fields.outputTokens ?? 50,
+      total_tokens: (fields.inputTokens ?? 100) + (fields.outputTokens ?? 50),
+      cost_usd: fields.costUsd, cost_source: 'computed', source: 'e2e', run_id: fields.runId ?? null,
+      metadata: { project_id: fields.projectId, e2e: true },
+    }),
+  });
+  if (!res.ok) throw new Error(`seedCostRow ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return ((await res.json()) as Array<{ id: string }>)[0].id;
+}
+
 /** Insert a private story arc directly (story_arcs_v2) for EDIT tests. Returns its id. */
 export async function seedStoryArc(fields: { name: string; description: string; promptText?: string }): Promise<string> {
   const res = await fetch(`${SUPA_URL}/rest/v1/story_arcs_v2`, {

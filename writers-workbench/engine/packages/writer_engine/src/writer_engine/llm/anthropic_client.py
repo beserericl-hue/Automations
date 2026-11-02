@@ -111,6 +111,11 @@ class AnthropicAdapter:
         output_tokens = int(getattr(usage, "output_tokens", 0) or 0)
         cache_read = int(getattr(usage, "cache_read_input_tokens", 0) or 0)
         cache_write = int(getattr(usage, "cache_creation_input_tokens", 0) or 0)
+        # 1-hour cache writes bill at 2x input, 5-minute ones at 1.25x; usage.cache_creation splits
+        # the total by TTL. Absent (older SDK / no caching) means every write was 5-minute.
+        breakdown = getattr(usage, "cache_creation", None)
+        cache_write_1h = int(getattr(breakdown, "ephemeral_1h_input_tokens", 0) or 0) if breakdown else 0
+        cache_write_1h = min(cache_write_1h, cache_write)
 
         LLM_CALLS.labels(service=self._service, provider=self.provider, model=model, status="ok").inc()
         for kind, count in (
@@ -129,7 +134,9 @@ class AnthropicAdapter:
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             cache_read_tokens=cache_read,
-            cache_write_tokens=cache_write,
+            cache_write_tokens=cache_write - cache_write_1h,
+            cache_write_1h_tokens=cache_write_1h,
             model=model,
             provider=self.provider,
+            request_id=str(getattr(msg, "id", "") or ""),
         )

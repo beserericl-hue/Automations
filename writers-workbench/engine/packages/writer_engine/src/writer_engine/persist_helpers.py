@@ -727,13 +727,37 @@ async def persist_content(
 
 
 async def persist_token_usage(
-    client: Any, *, user_id: str, workflow: str, calls: list[dict], metadata: dict | None = None
+    client: Any,
+    *,
+    user_id: str | None = None,
+    workflow: str = "",
+    calls: list[dict] | None = None,
+    metadata: dict | None = None,
+    rows: list[dict] | None = None,
 ) -> int:
-    """CR-007 — write one ``token_usage_v2`` row per LLM call (billing parity with the n8n workflows).
-    Each row: model, input/output/total tokens, cost_usd, and metadata (project_id/chapter_number +
-    cache tokens). Best-effort bulk insert; returns the number of rows written."""
+    """CR-007 — write one ``token_usage_v2`` row per paid call.
+
+    ``rows`` are complete rows built by :mod:`writer_engine.telemetry.token_accounting` (migration 043
+    columns: operation, provider, units, unit_prices, cost_source, run_id, ...); they are inserted
+    as-is. Rows carrying a ``request_id`` are upserted on ``(provider, request_id)`` with
+    ignore-duplicates, so a provider task recorded twice cannot be billed twice. The older
+    ``calls``/``workflow`` form is kept for callers written before 043. Returns rows written."""
+    if rows is not None:
+        if not rows:
+            return 0
+        keyed = [r for r in rows if r.get("request_id")]
+        plain = [r for r in rows if not r.get("request_id")]
+        if plain:
+            await client.table("token_usage_v2").insert(plain).execute()
+        for r in keyed:
+            try:
+                await client.table("token_usage_v2").insert(r).execute()
+            except Exception as exc:  # 23505 = already recorded under this request id
+                if "23505" not in str(exc) and "duplicate key" not in str(exc):
+                    raise
+        return len(rows)
     rows = []
-    for c in calls:
+    for c in calls or []:
         inp = int(c.get("input_tokens") or 0)
         out = int(c.get("output_tokens") or 0)
         cr = int(c.get("cache_read_tokens") or 0)
