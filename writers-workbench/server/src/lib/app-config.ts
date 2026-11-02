@@ -1,5 +1,5 @@
 /**
- * Settings resolution: user -> global -> default (item 8, migration 044).
+ * Settings resolution: user -> global -> default (item 8, migration 045).
  *
  * `app_config_v2` is per-user (user_id NOT NULL, FK to users_v2, unique (user_id, key)), so it has no
  * way to hold a value every account inherits. `app_config_global_v2` is that scope. The engine reads

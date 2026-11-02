@@ -45,7 +45,7 @@ const SUPERUSER_CONFIG_KEY = 'sprint8_superuser_config';
 async function loadCosts(): Promise<Record<string, number>> {
   if (cachedCosts && Date.now() - cacheLoadedAt < CACHE_TTL_MS) return cachedCosts;
   try {
-    // Item 8: system-wide, so it lives in the global settings table (migration 044), not per-user.
+    // Item 8: system-wide, so it lives in the global settings table (migration 045), not per-user.
     const configured = (await getGlobalJson<{ credit_costs?: Record<string, number> }>(SUPERUSER_CONFIG_KEY))?.credit_costs;
     cachedCosts = { ...DEFAULT_CREDIT_COSTS, ...(configured ?? {}) };
   } catch {

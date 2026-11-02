@@ -1,6 +1,6 @@
 """Item 8 — global (all-user) settings resolve user -> global -> default.
 
-``app_config_v2`` is per-user with a NOT NULL FK on user_id, so before migration 044 a shared value
+``app_config_v2`` is per-user with a NOT NULL FK on user_id, so before migration 045 a shared value
 had to be copied onto every account (DEV had two ``recipient_email`` rows, one per user, and no way
 to say "everyone"). ``app_config_global_v2`` is that scope; these pin the precedence.
 """

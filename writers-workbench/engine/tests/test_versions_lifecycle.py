@@ -95,7 +95,7 @@ def _patch(monkeypatch, rows):
     return store, sent
 
 
-# A row with no user_id is a GLOBAL setting; since migration 044 those live in app_config_global_v2
+# A row with no user_id is a GLOBAL setting; since migration 045 those live in app_config_global_v2
 # (app_config_v2.user_id is NOT NULL, so the old null-user row could never exist there).
 _APP_CONFIG = [{"key": "recipient_email", "value": "eric@agileadtesting.com"}]
 

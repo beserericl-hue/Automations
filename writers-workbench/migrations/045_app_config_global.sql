@@ -1,4 +1,4 @@
--- 044 — Global (all-user) settings: app_config_global_v2.
+-- 045 — Global (all-user) settings: app_config_global_v2.
 --
 -- WHY. app_config_v2 is per-user: user_id is NOT NULL with a FK to users_v2 and the unique key is
 -- (user_id, key). There is no way to store a value every account inherits. DEV shows the cost: two
@@ -43,4 +43,4 @@ CREATE POLICY service_role_all_app_config_global_v2
     WITH CHECK (true);
 
 COMMENT ON TABLE app_config_global_v2 IS
-    'Settings every user inherits unless app_config_v2 has their own value (user -> global -> default). Service role only. Migration 044.';
+    'Settings every user inherits unless app_config_v2 has their own value (user -> global -> default). Service role only. Migration 045.';

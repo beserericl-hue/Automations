@@ -324,7 +324,7 @@ const SUPERUSER_CONFIG_KEY = 'sprint8_superuser_config';
  *       200: { description: Config object }
  */
 superuserRouter.get('/config', async (_req: Request, res: Response) => {
-  // Item 8: a system-wide value lives in the global settings table (migration 044). It used to be
+  // Item 8: a system-wide value lives in the global settings table (migration 045). It used to be
   // upserted into the per-user app_config_v2 with no user_id, which that table's NOT NULL rejects,
   // so this config was never actually saved.
   let stored: unknown;

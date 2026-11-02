@@ -26,7 +26,7 @@ def _clean(v: str | None) -> str | None:
 
 USER_TABLE = "app_config_v2"
 GLOBAL_TABLE = "app_config_global_v2"
-"""Global (all-user) settings, migration 044. ``app_config_v2`` is per-user with a NOT NULL FK on
+"""Global (all-user) settings, migration 045. ``app_config_v2`` is per-user with a NOT NULL FK on
 ``user_id``, so a shared value could only be stored by copying it onto every account."""
 
 

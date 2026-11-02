@@ -427,7 +427,7 @@ adminRouter.get('/engine-fleet', async (_req: Request, res: Response) => {
 });
 
 // ------------------------------------------------------------------------------------------------
-// Global settings (item 8, migration 044): values every user inherits unless they set their own.
+// Global settings (item 8, migration 045): values every user inherits unless they set their own.
 // ------------------------------------------------------------------------------------------------
 
 const GlobalSettingSchema = z.object({

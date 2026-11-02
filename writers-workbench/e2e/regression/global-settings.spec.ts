@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { apiClient, supaGet, supaDelete, supaInsert, DEMO_USER_ID, RUN_TAG } from '../pages/api';
 
 /**
- * Global settings (item 8, migration 044) — RESULT-asserting. A setting saved in the global table
+ * Global settings (item 8, migration 045) — RESULT-asserting. A setting saved in the global table
  * reaches a user with no value of their own; the user's own value in app_config_v2 wins over it;
  * removing both falls back to nothing. Every step is checked in the database, not just on screen.
  * Each test uses its own disposable key and removes it, so nothing real is touched.
