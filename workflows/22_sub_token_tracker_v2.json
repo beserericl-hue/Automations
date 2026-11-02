@@ -37,7 +37,7 @@
           "parameters": [
             {
               "name": "X-N8N-API-KEY",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmZDdjYzkxZC01MDUxLTQ0NTUtOTVhNi04NDJhNjhjZWFkYjciLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzcxOTQ5NDE0fQ.6kV1Ylcp-J_ygc9_bTT3dWjIfF4MmTbYTRpzuzQsAqE"
+              "value": "REDACTED_SET_IN_N8N"
             }
           ]
         },
@@ -309,7 +309,7 @@
             "parameters": [
               {
                 "name": "X-N8N-API-KEY",
-                "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmZDdjYzkxZC01MDUxLTQ0NTUtOTVhNi04NDJhNjhjZWFkYjciLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzcxOTQ5NDE0fQ.6kV1Ylcp-J_ygc9_bTT3dWjIfF4MmTbYTRpzuzQsAqE"
+                "value": "REDACTED_SET_IN_N8N"
               }
             ]
           },
