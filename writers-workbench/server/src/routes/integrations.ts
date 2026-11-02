@@ -441,7 +441,15 @@ integrationsRouter.post('/websites', async (req: Request, res: Response) => {
       .from(CHANNELS)
       .insert({ user_id: userId, channel, kind: 'website', label: body.label, config, enabled: body.enabled ?? true });
     if (error) throw new Error(error.message);
-    if (body.auth_token !== undefined) await saveIntegration(userId, 'website', channel, sealed(userId, 'website', channel, body.auth_token));
+    if (body.auth_token !== undefined) {
+      try {
+        await saveIntegration(userId, 'website', channel, sealed(userId, 'website', channel, body.auth_token));
+      } catch (err) {
+        // No half-made website: a channel without the token the user just typed would fail every post.
+        await getSupabaseAdmin().from(CHANNELS).delete().eq('user_id', userId).eq('channel', channel);
+        throw err;
+      }
+    }
     res.status(201).json({ success: true, data: { channel } });
   } catch (err) {
     if (keyError(res, err)) return;

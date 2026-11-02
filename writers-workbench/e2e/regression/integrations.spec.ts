@@ -76,31 +76,38 @@ test.describe('Settings → Integrations (result-asserting)', () => {
     for (const b of bodies) expect(b).not.toMatch(/"v1\.[A-Za-z0-9_-]+\./);
   });
 
-  test('Blotato: a short key is refused and nothing is saved; account id edits are saved', async ({ page }) => {
-    const before = (await supaGet('user_integrations_v2', `user_id=eq.${USER}&provider=eq.blotato&select=*`))[0];
+  // The demo user's Blotato row is the OWNER's real account, and the Railway writer-e2e service runs
+  // this suite on every deploy, concurrently with any manual run. So this test never changes it: an
+  // edit-then-restore raced a concurrent run on DEV (2026-11-02) and left a test id behind. It proves
+  // the save path with invalid input (refused, nothing written) and an idempotent re-save of the value.
+  test('Blotato: invalid key / account id are refused and nothing is saved; a re-save keeps the value', async ({ page }) => {
+    const read = async () => (await supaGet('user_integrations_v2', `user_id=eq.${USER}&provider=eq.blotato&select=*`))[0];
+    const before = await read();
     await open(page);
+    await expect(page.getByTestId('blotato-account-id')).toHaveValue(String(before?.config?.account_id ?? ''));
     await page.getByTestId('blotato-api-key').fill('short');
     await page.getByTestId('blotato-save').click();
     await expect(page.getByTestId('blotato-error')).toContainText('api_key');
-    const after = (await supaGet('user_integrations_v2', `user_id=eq.${USER}&provider=eq.blotato&select=*`))[0];
-    expect(after?.secret_ciphertext ?? null).toBe(before?.secret_ciphertext ?? null);
+    expect((await read())?.secret_ciphertext ?? null).toBe(before?.secret_ciphertext ?? null);
 
-    // Account id: change, verify, restore.
-    const original = String(before?.config?.account_id ?? '');
     await page.getByTestId('blotato-api-key').fill('');
-    await page.getByTestId('blotato-account-id').fill(`e2e${TAG}`);
+    await page.getByTestId('blotato-account-id').fill('bad id!');
     await page.getByTestId('blotato-save').click();
-    await expect.poll(async () =>
-      (await supaGet('user_integrations_v2', `user_id=eq.${USER}&provider=eq.blotato&select=config`))[0]?.config?.account_id,
-    { timeout: 15_000 }).toBe(`e2e${TAG}`);
-    const api = await apiClient();
-    try {
-      const restore = await api.put('/api/integrations/blotato', { data: { account_id: original } });
-      expect(restore.status(), await restore.text()).toBe(200);
-    } finally {
-      await api.dispose();
+    await expect(page.getByTestId('blotato-error')).toContainText('account_id');
+    expect((await read())?.config ?? null).toEqual(before?.config ?? null);
+
+    if (before?.config?.account_id) {
+      const api = await apiClient();
+      try {
+        const same = await api.put('/api/integrations/blotato', { data: { account_id: before.config.account_id } });
+        expect(same.status(), await same.text()).toBe(200);
+      } finally {
+        await api.dispose();
+      }
+      const after = await read();
+      expect(after.config.account_id).toBe(before.config.account_id);
+      expect(after.secret_ciphertext ?? null).toBe(before.secret_ciphertext ?? null);
     }
-    expect((await supaGet('user_integrations_v2', `user_id=eq.${USER}&provider=eq.blotato&select=config`))[0]?.config?.account_id).toBe(original);
   });
 
   test('Blotato: Test connection reports a missing key, and renders a result', async ({ page }) => {
@@ -189,7 +196,12 @@ test.describe('Settings → Integrations (result-asserting)', () => {
     expect(row.config).toEqual({ endpoint: ECHO, auth_header: 'x-e2e-token', public_base: 'https://httpbin.org/blog/', author: 'E2E Author' });
 
     // Stored as ciphertext, never as plaintext.
-    const secret = (await supaGet('user_integrations_v2', `user_id=eq.${USER}&provider=eq.website&channel=eq.${row.channel}&select=*`))[0];
+    // (The channel row is written first and the token row right after it, so wait for the token.)
+    let secret: any;
+    await expect.poll(async () => {
+      secret = (await supaGet('user_integrations_v2', `user_id=eq.${USER}&provider=eq.website&channel=eq.${row.channel}&select=*`))[0];
+      return Boolean(secret?.secret_ciphertext);
+    }, { timeout: 15_000 }).toBe(true);
     expect(secret.secret_ciphertext).toMatch(/^v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
     expect(JSON.stringify(secret)).not.toContain(token);
     expect(secret.secret_last4).toBe('ZQ42');
