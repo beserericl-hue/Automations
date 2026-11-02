@@ -237,7 +237,48 @@ class StorySegment(BaseModel):
                 if isinstance(val, str) and val.strip():
                     out["newsletter_section_content"] = val
                     break
+        if not out.get("newsletter_section_content"):
+            # Still nothing: the model wrapped it ({"output": {...}}) or invented a key. Take the
+            # longest prose string anywhere in the reply (two levels deep), never a URL or a title.
+            found = _longest_prose(out)
+            if found:
+                out["newsletter_section_content"] = found
         return out
+
+
+# Never content. "error" matters most: when the brief and the story disagree the model answers
+# {"error": "I cannot write this section..."}, and a refusal must not be published as the section.
+_NOT_CONTENT = {
+    "story_title",
+    "title",
+    "headline",
+    "section_title",
+    "name",
+    "chosen_image_url",
+    "image_options",
+    "error",
+    "message",
+    "reason",
+    "refusal",
+}
+
+
+def _longest_prose(data: dict[str, Any], depth: int = 0) -> str:
+    best = ""
+    for key, val in data.items():
+        if key in _NOT_CONTENT:
+            continue
+        if isinstance(val, dict) and depth < 2:
+            nested = val.get("newsletter_section_content")
+            cand = nested if isinstance(nested, str) and nested.strip() else _longest_prose(val, depth + 1)
+        elif isinstance(val, str):
+            cand = val
+        else:
+            continue
+        text = cand.strip()
+        if len(text) >= 80 and not text.startswith(("http://", "https://")) and len(text) > len(best):
+            best = text
+    return best
 
 
 class ImageOptions(BaseModel):

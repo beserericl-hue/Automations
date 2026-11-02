@@ -65,6 +65,20 @@ def test_segment_key_maps_to_section_content() -> None:
     assert seg.newsletter_section_content.startswith("# Seed banks")
 
 
+def test_wrapped_or_unknown_key_falls_back_to_the_longest_prose() -> None:
+    body = "A section about seed libraries, long enough to be prose and not a label. " * 2
+    seg = StorySegment.model_validate({"output": {"whatever": body, "link": "https://x.y/z"}})
+    assert seg.newsletter_section_content == body.strip()
+
+
+def test_a_refusal_is_never_taken_as_the_section() -> None:
+    refusal = (
+        "I cannot write this newsletter section. The provided story has no connection to AI at all, sorry."
+    )
+    seg = StorySegment.model_validate({"error": refusal})
+    assert seg.newsletter_section_content == ""
+
+
 async def _empty_write(*args: object, **kwargs: object) -> StorySegment:
     return StorySegment(story_title="T", newsletter_section_content="")
 

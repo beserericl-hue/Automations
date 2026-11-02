@@ -23,6 +23,8 @@ import {
 } from '../schemas.js';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import { logger } from '../lib/logger.js';
+import { getGlobalJson, setGlobalConfig } from '../lib/app-config.js';
+import { clearCreditCostCache } from '../services/credit-costs.js';
 
 export const superuserRouter = Router();
 
@@ -322,21 +324,20 @@ const SUPERUSER_CONFIG_KEY = 'sprint8_superuser_config';
  *       200: { description: Config object }
  */
 superuserRouter.get('/config', async (_req: Request, res: Response) => {
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from('app_config_v2')
-    .select('value')
-    .eq('key', SUPERUSER_CONFIG_KEY)
-    .maybeSingle();
-
-  if (error) {
-    res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: error.message } });
+  // Item 8: a system-wide value lives in the global settings table (migration 045). It used to be
+  // upserted into the per-user app_config_v2 with no user_id, which that table's NOT NULL rejects,
+  // so this config was never actually saved.
+  let stored: unknown;
+  try {
+    stored = await getGlobalJson(SUPERUSER_CONFIG_KEY);
+  } catch (err) {
+    res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: err instanceof Error ? err.message : 'read failed' } });
     return;
   }
 
   res.json({
     success: true,
-    data: data?.value ?? {
+    data: stored ?? {
       credit_costs: {
         write_chapter: 5, write_short_story: 5, write_blog: 5, write_newsletter: 5,
         brainstorm: 3, research: 2, cover_art: 10, social_repurpose: 3,
@@ -347,16 +348,15 @@ superuserRouter.get('/config', async (_req: Request, res: Response) => {
 });
 
 superuserRouter.put('/config', validateBody(SuperuserConfigSchema), async (req: Request, res: Response) => {
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from('app_config_v2')
-    .upsert({ key: SUPERUSER_CONFIG_KEY, value: req.body }, { onConflict: 'key' })
-    .select()
-    .single();
-
-  if (error) {
-    res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: error.message } });
+  try {
+    await setGlobalConfig(SUPERUSER_CONFIG_KEY, JSON.stringify(req.body), {
+      description: 'Superuser system config: credit costs and maintenance mode',
+      updatedBy: req.realUserId ?? req.userId ?? null,
+    });
+    clearCreditCostCache();
+  } catch (err) {
+    res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: err instanceof Error ? err.message : 'write failed' } });
     return;
   }
-  res.json({ success: true, data: data.value });
+  res.json({ success: true, data: req.body });
 });

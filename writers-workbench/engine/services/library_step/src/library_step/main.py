@@ -485,23 +485,12 @@ def _render_outline_md(outline: dict, title: str) -> str:
 
 
 async def _email_recipients(client, explicit: str | None, user_id: str | None):
-    """Resolve to/bcc for email-content. Precedence: explicit ("send it to X") > app_config.recipient_email
-    > users_v2.email (last resort). BCC from app_config.bcc_email. Mirrors the centralized-email rule."""
-    import contextlib
+    """Resolve to/bcc for email-content. Precedence: explicit ("send it to X") > the user's
+    recipient_email > users_v2.email > the global setting. BCC: user > account > global."""
+    from writer_engine.library_helpers.email_recipients import load_recipient_config, resolve_recipients
 
-    from writer_engine.library_helpers.email_recipients import load_app_config, resolve_recipients
-
-    cfg = await load_app_config(client, ["recipient_email", "bcc_email"], user_id)
-    rec = resolve_recipients(trigger_recipient=_clean_str(explicit) or None, config=cfg)
-    if not rec.to and user_id:
-        with contextlib.suppress(Exception):
-            ur = await client.table("users_v2").select("email").eq("user_id", user_id).limit(1).execute()
-            row = (getattr(ur, "data", None) or [{}])[0]
-            if row.get("email"):
-                from writer_engine.library_helpers.email_recipients import Recipients
-
-                return Recipients(to=row["email"], bcc=rec.bcc)
-    return rec
+    cfg = await load_recipient_config(client, user_id)
+    return resolve_recipients(trigger_recipient=_clean_str(explicit) or None, config=cfg)
 
 
 async def _resolve_artifact(

@@ -95,6 +95,8 @@ def _patch(monkeypatch, rows):
     return store, sent
 
 
+# A row with no user_id is a GLOBAL setting; since migration 045 those live in app_config_global_v2
+# (app_config_v2.user_id is NOT NULL, so the old null-user row could never exist there).
 _APP_CONFIG = [{"key": "recipient_email", "value": "eric@agileadtesting.com"}]
 
 
@@ -249,7 +251,7 @@ def test_delete_draft_snapshots_soft_deletes_and_emails(monkeypatch):
     store, sent = _patch(
         monkeypatch,
         {
-            "app_config_v2": _APP_CONFIG,
+            "app_config_global_v2": _APP_CONFIG,
             "published_content_v2": [
                 {
                     "id": "c1",
@@ -278,7 +280,7 @@ def test_delete_published_is_rejected(monkeypatch):
     store, sent = _patch(
         monkeypatch,
         {
-            "app_config_v2": _APP_CONFIG,
+            "app_config_global_v2": _APP_CONFIG,
             "published_content_v2": [
                 {
                     "id": "c2",
@@ -305,7 +307,7 @@ def test_undelete_restores_to_draft(monkeypatch):
     _store, sent = _patch(
         monkeypatch,
         {
-            "app_config_v2": _APP_CONFIG,
+            "app_config_global_v2": _APP_CONFIG,
             "published_content_v2": [
                 {
                     "id": "c3",

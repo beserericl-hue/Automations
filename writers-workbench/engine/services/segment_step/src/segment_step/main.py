@@ -10,8 +10,10 @@ from writer_engine.prompt_store.n8n_translate import render_live_prompt
 from writer_engine.schemas import StepError, StepInput, StepOutput, StepStatus
 from writer_engine.schemas.newsletter import StorySegment
 from writer_engine.step_service import build_step_app
+from writer_engine.telemetry.logging import get_logger
 
 STEP_NAME = "segment"
+logger = get_logger("segment_step")
 seed_default_prompts()
 DEFAULT_MODEL = "claude-sonnet-4-6"
 
@@ -51,9 +53,21 @@ async def _write(
         pre_header=str(ctx.get("pre_header") or ""),
         newsletter_date=str(ctx.get("newsletter_date") or ""),
     )
+    genre = str(ctx.get("genre") or "").strip()
+    if genre and genre.lower() not in ("ai", "ai-news", "ai-marketing"):
+        # The live n8n brief was written for the AI newsletter ("AI that helps professionals..."). On
+        # a themed edition the model refused to write the section at all ({"error": "...no
+        # connection to AI..."}), so the edition's own theme is stated and takes precedence.
+        name = str(ctx.get("newsletter_name") or "this newsletter")
+        user += (
+            f"\n\nEDITION THEME (takes precedence over any instruction above about AI): this section "
+            f"is for {name}, a newsletter about {genre.replace('-', ' ')}. Write the section about "
+            "the story's own subject, from the sources given, in the same section format. Do not "
+            "require or invent an AI angle."
+        )
     if image_options:
         user += "\n\nAVAILABLE IMAGE URLS (choose at most one):\n" + "\n".join(image_options)
-    segment, _ = await complete_structured(
+    segment, response = await complete_structured(
         router,
         provider="anthropic",
         model=model,
@@ -61,6 +75,13 @@ async def _write(
         prompt=user,
         schema=StorySegment,
     )
+    if not segment.newsletter_section_content.strip():
+        # Diagnostic for the EMPTY_SEGMENT error the handler returns: what did the model send?
+        logger.warning(
+            "segment.empty_reply",
+            story=str(story.get("title") or "")[:80],
+            reply_head=str(getattr(response, "text", "") or "")[:400],
+        )
     return segment
 
 
@@ -82,6 +103,8 @@ async def handler(inp: StepInput) -> StepOutput:
                 "subject_line": inp.payload.get("subject_line"),
                 "pre_header": inp.payload.get("pre_header"),
                 "newsletter_date": inp.payload.get("newsletter_date"),
+                "genre": inp.payload.get("genre"),
+                "newsletter_name": inp.payload.get("newsletter_name"),
             },
         )
     except ProviderNotRegistered:
@@ -101,7 +124,11 @@ async def handler(inp: StepInput) -> StepOutput:
             status=StepStatus.ERROR,
             error=StepError(
                 code="EMPTY_SEGMENT",
-                message=f"segment model returned no section text for {seg.story_title!r}",
+                message=(
+                    f"segment model returned no section text for {seg.story_title!r} "
+                    "(its reply is logged as segment.empty_reply; a refusal usually means the story "
+                    "does not fit the edition's brief)"
+                ),
             ),
             payload={},
         )

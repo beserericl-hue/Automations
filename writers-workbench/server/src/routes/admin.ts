@@ -15,6 +15,16 @@ import {
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import { adjustCreditsAdmin } from '../services/credits.js';
 import { logger } from '../lib/logger.js';
+import { z } from 'zod';
+import {
+  CONFIG_KEY_RE,
+  deleteGlobalConfig,
+  forDisplay,
+  listGlobalConfig,
+  maskSecret,
+  resolveConfigDetailed,
+  setGlobalConfig,
+} from '../lib/app-config.js';
 
 export const adminRouter = Router();
 
@@ -413,6 +423,125 @@ adminRouter.get('/engine-fleet', async (_req: Request, res: Response) => {
       success: false,
       error: { code: 'ENGINE_UNREACHABLE', message: err instanceof Error ? err.message : 'Engine unreachable' },
     });
+  }
+});
+
+// ------------------------------------------------------------------------------------------------
+// Global settings (item 8, migration 045): values every user inherits unless they set their own.
+// ------------------------------------------------------------------------------------------------
+
+const GlobalSettingSchema = z.object({
+  value: z.string().max(100_000),
+  description: z.string().max(500).optional(),
+  is_secret: z.boolean().optional(),
+});
+
+function settingKey(req: Request, res: Response): string | null {
+  const key = String(req.params.key ?? '');
+  if (!CONFIG_KEY_RE.test(key)) {
+    res.status(400).json({ success: false, error: { code: 'BAD_KEY', message: 'Keys are 1-128 of A-Z a-z 0-9 _ . : -' } });
+    return null;
+  }
+  return key;
+}
+
+/**
+ * @openapi
+ * /admin/global-config:
+ *   get:
+ *     tags: [Admin]
+ *     summary: List global settings (secret values masked)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: "Rows of { key, value, description, is_secret, masked, updated_by, updated_at }" }
+ */
+adminRouter.get('/global-config', async (_req: Request, res: Response) => {
+  try {
+    res.json({ success: true, data: (await listGlobalConfig()).map(forDisplay) });
+  } catch (err) {
+    res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: err instanceof Error ? err.message : 'read failed' } });
+  }
+});
+
+/**
+ * @openapi
+ * /admin/global-config/resolve:
+ *   get:
+ *     tags: [Admin]
+ *     summary: How keys resolve for one user (user -> global -> default), with the source of each
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: query, name: keys, required: true, schema: { type: string }, description: Comma-separated keys }
+ *       - { in: query, name: user_id, schema: { type: string } }
+ *     responses:
+ *       200: { description: "{ key: { value, source } } — secret global values masked" }
+ */
+adminRouter.get('/global-config/resolve', async (req: Request, res: Response) => {
+  const keys = String(req.query.keys ?? '').split(',').map((k) => k.trim()).filter((k) => CONFIG_KEY_RE.test(k)).slice(0, 50);
+  if (!keys.length) {
+    res.status(400).json({ success: false, error: { code: 'NO_KEYS', message: 'Pass ?keys=a,b' } });
+    return;
+  }
+  const userId = req.query.user_id ? String(req.query.user_id) : null;
+  const [resolved, rows] = await Promise.all([resolveConfigDetailed(keys, userId), listGlobalConfig().catch(() => [])]);
+  const secret = new Set(rows.filter((r) => r.is_secret).map((r) => r.key));
+  for (const [k, v] of Object.entries(resolved)) {
+    if (v.source === 'global' && secret.has(k) && v.value) v.value = maskSecret(v.value);
+  }
+  res.json({ success: true, data: resolved });
+});
+
+/**
+ * @openapi
+ * /admin/global-config/{key}:
+ *   put:
+ *     tags: [Admin]
+ *     summary: Create or update a global setting
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: The saved row (masked when secret). }
+ *       400: { description: Bad key or body. }
+ *   delete:
+ *     tags: [Admin]
+ *     summary: Remove a global setting (users fall back to the default)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: "{ deleted: boolean }" }
+ */
+adminRouter.put('/global-config/:key', validateBody(GlobalSettingSchema), async (req: Request, res: Response) => {
+  const key = settingKey(req, res);
+  if (!key) return;
+  const body = req.body as z.infer<typeof GlobalSettingSchema>;
+  try {
+    const row = await setGlobalConfig(key, body.value, {
+      description: body.description,
+      isSecret: body.is_secret,
+      updatedBy: req.realUserId ?? req.userId ?? null,
+    });
+    logger.info({ key, by: req.realUserId ?? req.userId, secret: row.is_secret }, 'admin/global-config: saved');
+    if (key === 'sprint8_superuser_config') {
+      const { clearCreditCostCache } = await import('../services/credit-costs.js');
+      clearCreditCostCache();
+    }
+    res.json({ success: true, data: forDisplay(row) });
+  } catch (err) {
+    res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: err instanceof Error ? err.message : 'write failed' } });
+  }
+});
+
+adminRouter.delete('/global-config/:key', async (req: Request, res: Response) => {
+  const key = settingKey(req, res);
+  if (!key) return;
+  try {
+    const deleted = await deleteGlobalConfig(key);
+    logger.info({ key, by: req.realUserId ?? req.userId, deleted }, 'admin/global-config: deleted');
+    res.json({ success: true, data: { deleted } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: err instanceof Error ? err.message : 'delete failed' } });
   }
 });
 
