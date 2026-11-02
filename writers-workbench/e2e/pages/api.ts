@@ -90,6 +90,17 @@ export async function supaDelete(table: string, filter: string): Promise<void> {
   });
 }
 
+/** INSERT one row (service key) and return it — for seeding a disposable row a test then cleans up. */
+export async function supaInsert<T = any>(table: string, row: Record<string, unknown>): Promise<T> {
+  const res = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify(row),
+  });
+  if (!res.ok) throw new Error(`supaInsert ${res.status} ${table} :: ${(await res.text()).slice(0, 200)}`);
+  return ((await res.json()) as T[])[0];
+}
+
 /** Remove an object from a storage bucket (teardown only). */
 export async function supaRemoveObject(bucket: string, path: string): Promise<void> {
   await fetch(`${SUPA_URL}/storage/v1/object/${bucket}/${path.split('/').map(encodeURIComponent).join('/')}`, {
