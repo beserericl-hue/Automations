@@ -1,0 +1,116 @@
+{
+  "_about": "Item 7: one outline schema, two implementations (engine writer_engine/outline_schema.py, server src/lib/outline-schema.ts). Both test suites run every case here and must agree. 'out' is the exact normalised outline for an accepted input; 'reject' lists substrings that must appear in the error.",
+  "cases": [
+    {
+      "name": "canonical engine shape passes unchanged",
+      "in": {
+        "title": "The Burial Mound",
+        "premise": "p",
+        "themes": ["memory"],
+        "characters": [{"name": "Ada"}],
+        "story_arc_name": "Hero",
+        "chapters": [
+          {"chapter_number": 1, "title": "One", "act": "I", "arc_point": "hook", "pov_character": "Ada", "beat": "b1", "bridge_from_prior": "", "arc_notes": "n"},
+          {"chapter_number": 2, "title": "Two", "beat": "b2", "chapter_outline": {"sub_chapters": [{"number": 1, "brief": "s"}]}, "research": {}, "last_qa_report": {"checks": []}}
+        ],
+        "_volume_plan": {"volumes": [1, 2]},
+        "_marketing_v2": {"keywords": ["a"]}
+      },
+      "out": {
+        "title": "The Burial Mound",
+        "premise": "p",
+        "themes": ["memory"],
+        "characters": [{"name": "Ada"}],
+        "story_arc_name": "Hero",
+        "chapters": [
+          {"chapter_number": 1, "title": "One", "act": "I", "arc_point": "hook", "pov_character": "Ada", "beat": "b1", "bridge_from_prior": "", "arc_notes": "n"},
+          {"chapter_number": 2, "title": "Two", "beat": "b2", "chapter_outline": {"sub_chapters": [{"number": 1, "brief": "s"}]}, "research": {}, "last_qa_report": {"checks": []}}
+        ],
+        "_volume_plan": {"volumes": [1, 2]},
+        "_marketing_v2": {"keywords": ["a"]}
+      }
+    },
+    {
+      "name": "legacy n8n shape is normalised: number -> chapter_number, brief -> beat",
+      "in": {
+        "title": "The Clockwork Rebellion",
+        "premise": "p",
+        "themes": [],
+        "characters": [],
+        "chapters": [
+          {"number": 1, "title": "One", "brief": "b1", "arc_notes": "n", "research_topics": ["gears"], "chapter_outline": null}
+        ]
+      },
+      "out": {
+        "title": "The Clockwork Rebellion",
+        "premise": "p",
+        "themes": [],
+        "characters": [],
+        "chapters": [
+          {"chapter_number": 1, "title": "One", "beat": "b1", "arc_notes": "n", "research_topics": ["gears"], "chapter_outline": null}
+        ]
+      }
+    },
+    {
+      "name": "chapter numbers written as text or as whole floats become integers",
+      "in": {"chapters": [{"chapter_number": "04", "title": "Four"}, {"number": 5.0, "title": "Five"}]},
+      "out": {"chapters": [{"chapter_number": 4, "title": "Four"}, {"chapter_number": 5, "title": "Five"}]}
+    },
+    {
+      "name": "an LLM's numeric act becomes text; a missing chapter title becomes empty",
+      "in": {"chapters": [{"chapter_number": 1, "act": 2, "beat": "b"}]},
+      "out": {"chapters": [{"chapter_number": 1, "act": "2", "beat": "b", "title": ""}]}
+    },
+    {
+      "name": "comma-separated themes and bare character names are accepted",
+      "in": {"themes": "power, memory ,", "characters": ["Ada", {"name": "Bo", "role": "lead"}]},
+      "out": {"themes": ["power", "memory"], "characters": [{"name": "Ada"}, {"name": "Bo", "role": "lead"}]}
+    },
+    {
+      "name": "an empty beat beside a legacy brief takes the brief",
+      "in": {"chapters": [{"number": 1, "title": "t", "beat": "", "brief": "real"}]},
+      "out": {"chapters": [{"chapter_number": 1, "title": "t", "beat": "real"}]}
+    },
+    {
+      "name": "the same number under both keys is accepted",
+      "in": {"chapters": [{"chapter_number": 3, "number": 3, "title": "t"}]},
+      "out": {"chapters": [{"chapter_number": 3, "title": "t"}]}
+    },
+    {
+      "name": "an outline with only a premise (no chapters yet) is fine",
+      "in": {"premise": "only this", "themes": ["a"]},
+      "out": {"premise": "only this", "themes": ["a"]}
+    },
+    {"name": "an empty outline is fine", "in": {}, "out": {}},
+    {"name": "a non-object outline is rejected", "in": [1, 2], "reject": ["outline must be an object"]},
+    {"name": "an unknown top-level key is rejected", "in": {"title": "t", "logline": "x"}, "reject": ["unknown top-level key 'logline'"]},
+    {"name": "chapters must be a list", "in": {"chapters": {"1": {}}}, "reject": ["chapters must be a list"]},
+    {"name": "a chapter must be an object", "in": {"chapters": ["Chapter one"]}, "reject": ["chapters[0] must be an object"]},
+    {"name": "a chapter with no number is rejected", "in": {"chapters": [{"title": "t", "beat": "b"}]}, "reject": ["chapters[0] has no chapter number"]},
+    {"name": "a fractional chapter number is rejected", "in": {"chapters": [{"chapter_number": 4.5}]}, "reject": ["is not a whole number"]},
+    {"name": "a negative chapter number is rejected", "in": {"chapters": [{"chapter_number": -1}]}, "reject": ["is not a whole number"]},
+    {"name": "a word is not a chapter number", "in": {"chapters": [{"number": "four"}]}, "reject": ["is not a whole number"]},
+    {
+      "name": "conflicting chapter_number and number are rejected",
+      "in": {"chapters": [{"chapter_number": 3, "number": 4}]},
+      "reject": ["has both chapter_number=3 and number=4"]
+    },
+    {
+      "name": "conflicting beat and brief are rejected",
+      "in": {"chapters": [{"chapter_number": 1, "beat": "a", "brief": "b"}]},
+      "reject": ["has both 'beat' and legacy 'brief'"]
+    },
+    {
+      "name": "a repeated chapter number is rejected",
+      "in": {"chapters": [{"chapter_number": 2}, {"number": "2"}]},
+      "reject": ["chapters[1] repeats chapter number 2"]
+    },
+    {
+      "name": "wrong types inside a chapter are rejected",
+      "in": {"chapters": [{"chapter_number": 1, "beat": {"x": 1}, "chapter_outline": "plan", "research_topics": "gears"}]},
+      "reject": ["chapters[0].beat must be text", "chapters[0].chapter_outline must be an object", "chapters[0].research_topics must be a list"]
+    },
+    {"name": "a theme must be text", "in": {"themes": [{"t": 1}]}, "reject": ["themes[0] must be text"]},
+    {"name": "a premise must be text", "in": {"premise": ["a"]}, "reject": ["premise must be text"]}
+  ]
+}

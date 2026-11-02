@@ -14,6 +14,7 @@ import { Router, Request, Response } from 'express';
 import { requireAuth, requireSuperuser } from '../middleware/auth.js';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import { logger } from '../lib/logger.js';
+import { normalizeOutline, OutlineValidationError, outlineErrorBody } from '../lib/outline-schema.js';
 
 export const impersonateWriteRouter = Router();
 
@@ -98,6 +99,18 @@ impersonateWriteRouter.patch('/projects/:id', async (req: Request, res: Response
   if (Object.keys(updates).length === 0) {
     res.status(400).json({ success: false, error: { code: 'NO_FIELDS', message: 'No valid fields to update' } });
     return;
+  }
+  if ('outline' in updates) {
+    // Item 7: the same outline schema as every other write path.
+    try {
+      (updates as Record<string, unknown>).outline = normalizeOutline(updates.outline);
+    } catch (err) {
+      if (err instanceof OutlineValidationError) {
+        res.status(422).json(outlineErrorBody(err));
+        return;
+      }
+      throw err;
+    }
   }
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase

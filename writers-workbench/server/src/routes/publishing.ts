@@ -32,6 +32,7 @@ import { PAPER_THICKNESS } from '../lib/cover.js';
 import { searchArchives } from '../lib/image-archives.js';
 import { bookTitle, seriesName, seriesView } from '../lib/series.js';
 import { findCover } from '../lib/book-cover.js';
+import { normalizeOutline } from '../lib/outline-schema.js';
 
 export const publishingRouter = Router();
 publishingRouter.use(requireAuth);
@@ -73,9 +74,12 @@ async function loadProject(req: Request, res: Response): Promise<ProjectRow | nu
  * has already been caught by once.
  */
 async function saveOutline(projectId: string, userId: string, outline: Outline): Promise<void> {
+  // Item 7: every outline write goes through the one schema; a legacy shape is normalised here and
+  // an unknown one throws OutlineValidationError (the error handler answers 422 with the problems).
+  const canonical = normalizeOutline(outline);
   const { error } = await getSupabaseAdmin()
     .from('writing_projects_v2')
-    .update({ outline, updated_at: new Date().toISOString() })
+    .update({ outline: canonical, updated_at: new Date().toISOString() })
     .eq('id', projectId)
     .eq('user_id', userId);
   if (error) throw new Error(error.message);
@@ -217,6 +221,56 @@ const MarketingEditSchema = z.object({
 // ------------------------------------------------------------------------------------------------
 // Reading the state
 // ------------------------------------------------------------------------------------------------
+
+const ProjectDetailsSchema = z.object({
+  title: z.string().trim().min(1).max(300).optional(),
+  genre_slug: z.string().max(100).nullable().optional(),
+  status: z.string().max(50).optional(),
+  project_type: z.string().max(50).optional(),
+  premise: z.string().max(20_000).optional(),
+  themes: z.array(z.string().max(200)).max(50).optional(),
+});
+
+/**
+ * @openapi
+ * /publishing/project/{projectId}/details:
+ *   patch:
+ *     tags: [Publishing]
+ *     summary: Edit a project's title, genre, status, type, premise and themes
+ *     description: |
+ *       Item 7: the Edit Project form used to write writing_projects_v2.outline straight from the
+ *       browser, the one outline write that no schema saw. It comes through here now, so the merged
+ *       outline is validated (and a legacy shape normalised) like every other outline write. A
+ *       rejected outline answers 422 with every problem listed.
+ *     security: [{ bearerAuth: [] }]
+ */
+publishingRouter.patch('/project/:projectId/details', validateBody(ProjectDetailsSchema), async (req, res, next) => {
+  try {
+    const project = await loadProject(req, res);
+    if (!project) return;
+    const body = req.body as z.infer<typeof ProjectDetailsSchema>;
+    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    for (const k of ['title', 'genre_slug', 'status', 'project_type'] as const) if (body[k] !== undefined) patch[k] = body[k];
+    if (body.premise !== undefined || body.themes !== undefined) {
+      const merged: Outline = { ...(project.outline ?? {}) };
+      if (body.premise !== undefined) merged.premise = body.premise.trim();
+      if (body.themes !== undefined) merged.themes = body.themes.map((t) => t.trim()).filter(Boolean);
+      patch.outline = normalizeOutline(merged);
+    }
+    const { data, error } = await getSupabaseAdmin()
+      .from('writing_projects_v2')
+      .update(patch)
+      .eq('id', project.id)
+      .eq('user_id', req.userId!)
+      .select('id, title, genre_slug, status, project_type, outline, updated_at')
+      .single();
+    if (error) throw new Error(error.message);
+    logger.info({ userId: req.userId, projectId: project.id, fields: Object.keys(patch) }, 'publishing: project details saved');
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * @openapi
