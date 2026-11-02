@@ -20,7 +20,7 @@ export interface SchedulerJobRow {
   skipped: number;
   last_run: string | null;
   last_error: string | null;
-  /** What the last successful run returned (scalar fields), when the engine reports it. */
+  /** The latest run's own summary; `skipped` means it deliberately did nothing (e.g. unconfigured). */
   last_result?: Record<string, unknown> | null;
   next_run: string | null;
   health: SchedulerHealth;
@@ -156,6 +156,10 @@ function SchedulerBody({ data }: { data: EngineSchedulerData }) {
                 <td className="px-4 py-2 text-xs">
                   {j.last_error ? (
                     <span className="text-red-600 dark:text-red-400" data-testid="scheduler-last-error">{j.last_error}</span>
+                  ) : j.last_run && typeof j.last_result?.skipped === 'string' ? (
+                    <span className="text-gray-500 dark:text-gray-400" data-testid="scheduler-last-skipped">
+                      Skipped: {j.last_result.skipped}
+                    </span>
                   ) : j.last_run ? (
                     <span className="text-gray-600 dark:text-gray-300">
                       OK

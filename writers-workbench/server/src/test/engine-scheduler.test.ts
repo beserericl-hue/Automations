@@ -33,6 +33,21 @@ describe('mergeSchedulerReports', () => {
     expect(radar.replicas.map((r) => r.instance)).toEqual(['a', 'b']);
   });
 
+  it('carries the latest run\'s own result, so a deliberate skip is visible', () => {
+    const [prune] = mergeSchedulerReports(
+      [
+        { instance: 'a', jobs: [job({ name: 'eve-kb-prune', interval_s: 21600, skipped: 1 })] },
+        {
+          instance: 'b',
+          jobs: [job({ name: 'eve-kb-prune', interval_s: 21600, ticks: 1, last_run: ago(60), last_result: { skipped: 'ELEVENLABS_API_KEY/ELEVENLABS_AGENT_ID not configured', deleted: 0 } })],
+        },
+      ],
+      NOW,
+    );
+    expect(prune).toMatchObject({ health: 'ok', last_result: { skipped: 'ELEVENLABS_API_KEY/ELEVENLABS_AGENT_ID not configured', deleted: 0 } });
+    expect(mergeSchedulerReports([{ instance: 'a', jobs: [job({ name: 'radar' })] }], NOW)[0].last_result).toBeNull();
+  });
+
   it('flags a job whose latest run failed, but not one whose old failure was followed by a good run elsewhere', () => {
     const jobs = mergeSchedulerReports(
       [

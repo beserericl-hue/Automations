@@ -32,6 +32,7 @@ export const DEFAULT_CREDIT_COSTS: Record<string, number> = {
   retrieve_content: 0,
   approve_content: 0,
   list_story_arcs: 0,
+  story_bible_edit: 0,
   chat_generic: 0,
 };
 
