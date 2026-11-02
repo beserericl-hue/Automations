@@ -126,6 +126,13 @@ class EngineSettings(BaseSettings):
     # Hub router model (CR-004) — fast/cheap Gemini for intent + tool selection, mirroring the n8n
     # hub's gemini-2.5-flash. Routing is a short structured call, so flash is the right tier.
     hub_router_model: str = Field(default="gemini-2.5-flash", alias="HUB_ROUTER_MODEL")
+    # Hub conversation memory (writer_engine.hub.memory): the last list shown, the current project
+    # and the recent turns, kept in Redis per user + conversation so "pick #3" and "that one" resolve.
+    # Chat conversations are long-lived drawer sessions; a voice call is minutes, so a voice
+    # conversation that arrives without an id (the demo agent sends none) expires with the call.
+    hub_memory_enabled: bool = Field(default=True, alias="HUB_MEMORY_ENABLED")
+    hub_conversation_ttl_seconds: int = Field(default=43200, alias="HUB_CONVERSATION_TTL_SECONDS")
+    hub_voice_conversation_ttl_seconds: int = Field(default=1800, alias="HUB_VOICE_CONVERSATION_TTL_SECONDS")
 
     # Anthropic model pins (F1-A — see [[f1a-decisions]] § model lineup). Strategy slots resolve to
     # these concrete ids; overridable per-env without code change.
@@ -288,6 +295,12 @@ class EngineSettings(BaseSettings):
     # three indexed queries.
     workbench_cron_secret: str = Field(default="", alias="WORKBENCH_CRON_SECRET")
     workbench_lifecycle_poll_seconds: float = Field(default=3600.0, alias="WORKBENCH_LIFECYCLE_POLL_SECONDS")
+    # Eve knowledge-base pruning. The callback flow deletes old "Eve Session:" docs only right before
+    # it uploads a new one, so a callback that fails after its upload, or a long quiet spell, leaves
+    # transcripts of a user's draft sitting in the ElevenLabs KB indefinitely. Six-hourly is plenty
+    # for a KB that changes a few times a day; the tick is a no-op without ELEVENLABS_API_KEY.
+    eve_kb_prune_poll_seconds: float = Field(default=21600.0, alias="EVE_KB_PRUNE_POLL_SECONDS")
+    eve_kb_max_age_hours: float = Field(default=24.0, alias="EVE_KB_MAX_AGE_HOURS")
 
     # Observability
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
