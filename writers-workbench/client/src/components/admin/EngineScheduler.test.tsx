@@ -38,6 +38,20 @@ describe('EngineScheduler', () => {
     expect(radar).toHaveTextContent('1 left to another replica');
   });
 
+  it('shows a deliberately skipped run as skipped, not OK', async () => {
+    renderWithProviders(
+      <EngineScheduler
+        load={async () => ({
+          ...DATA,
+          jobs: [row({ name: 'eve-kb-prune', interval_s: 21600, last_result: { skipped: 'ELEVENLABS_API_KEY/ELEVENLABS_AGENT_ID not configured', deleted: 0 } })],
+        })}
+      />,
+    );
+    const prune = await screen.findByTestId('scheduler-job-eve-kb-prune');
+    expect(within(prune).getByTestId('scheduler-last-skipped')).toHaveTextContent('Skipped: ELEVENLABS_API_KEY/ELEVENLABS_AGENT_ID not configured');
+    expect(prune).toHaveTextContent('6 h');
+  });
+
   it('flags failing and overdue jobs, the error, and a replica that did not answer', async () => {
     renderWithProviders(
       <EngineScheduler
