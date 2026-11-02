@@ -35,7 +35,7 @@
 import crypto from 'crypto';
 import dns from 'dns/promises';
 import net from 'net';
-import { parseWith } from '../lib/claude-structured.js';
+import { parseWith, type CallContext } from '../lib/claude-structured.js';
 import { seriesName, storedSeries } from '../lib/series.js';
 import { renderMailing } from '../lib/landing-mail.js';
 import { sendEmail } from '../lib/email.js';
@@ -190,12 +190,12 @@ const FactsOutput = z.object({
   facts: z.array(z.object({ text: z.string(), quote: z.string(), report_id: z.string() })),
 });
 
-async function analyseSample(url: string): Promise<SampleStructure> {
+async function analyseSample(url: string, ctx: CallContext): Promise<SampleStructure> {
   const text = htmlToText(await fetchPublicPage(url));
   if (text.length < 300) {
     throw new Error('The sample page has almost no text in its HTML; it is probably drawn in the browser.');
   }
-  const out = await parseWith(SampleOutput, samplePrompt(text));
+  const out = await parseWith(SampleOutput, samplePrompt(text), { ...ctx, operation: 'landing-page.sample-structure' });
   return { url, sections: out.sections, cta_count: out.cta_count };
 }
 
@@ -206,10 +206,12 @@ async function analyseSample(url: string): Promise<SampleStructure> {
 async function pickFacts(
   book: { title: string; author: string },
   reports: ResearchReport[],
+  ctx: CallContext,
 ): Promise<{ kept: SourcedFact[]; rejected: { text: string; reasons: string[] }[] }> {
+  const factCtx: CallContext = { ...ctx, operation: 'landing-page.facts' };
   const byId = new Map(reports.map((r) => [r.id, r]));
   const base = factPrompt(book, reports);
-  const first = selectFacts((await parseWith(FactsOutput, base)).facts, byId);
+  const first = selectFacts((await parseWith(FactsOutput, base, factCtx)).facts, byId);
   let kept = first.kept.slice(0, FACTS_WANTED);
   const rejected = first.rejected.map((r) => ({ text: r.fact.text, reasons: r.findings.map((f) => f.message) }));
 
@@ -221,7 +223,7 @@ async function pickFacts(
       ...first.rejected.map((r) => `- "${r.fact.text}": ${r.findings.map((f) => f.message).join('; ')}`),
       `Give ${FACTS_WANTED - kept.length} replacement facts, different from these, that pass.`,
     ].join('\n');
-    const second = selectFacts((await parseWith(FactsOutput, feedback)).facts, byId);
+    const second = selectFacts((await parseWith(FactsOutput, feedback, { ...factCtx, operation: 'landing-page.facts-retry' })).facts, byId);
     const seen = new Set(kept.map((f) => f.text));
     kept = [...kept, ...second.kept.filter((f) => !seen.has(f.text))].slice(0, FACTS_WANTED);
     rejected.push(...second.rejected.map((r) => ({ text: r.fact.text, reasons: r.findings.map((f) => f.message) })));
@@ -534,12 +536,12 @@ landingPageRouter.post('/project/:projectId', validateBody(GenerateSchema), asyn
     const ranked = rankResearch(inputs.reports, researchTerms(inputs.marketing), RESEARCH_BUDGET_CHARS);
     const [sampleResult, facts] = await Promise.all([
       sampleUrl
-        ? analyseSample(sampleUrl).catch((err: Error) => {
+        ? analyseSample(sampleUrl, { operation: 'landing-page.sample-structure', userId, projectId: project.id }).catch((err: Error) => {
             warnings.push(`Sample page not used: ${err.message} The default section order was used.`);
             return null;
           })
         : Promise.resolve(null),
-      pickFacts({ title: project.title, author: inputs.author }, ranked),
+      pickFacts({ title: project.title, author: inputs.author }, ranked, { operation: 'landing-page.facts', userId, projectId: project.id }),
     ]);
 
     const chosen = inputs.referencePhotos.filter((p) => body.reference_photo_ids?.includes(p.id));

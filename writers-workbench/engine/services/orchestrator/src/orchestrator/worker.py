@@ -218,7 +218,8 @@ async def _run_write_tool(
         out = await run_step_via_http(
             StepRef(name=tool, url=url),
             execution_id=uuid4(),
-            payload=body,
+            # run_id rides along so every cost row of this job carries it (token_usage_v2.run_id).
+            payload={**body, "run_id": run_id} if run_id else body,
             timeout_s=WORKER_STEP_TIMEOUT_S,
         )
     except Exception as exc:

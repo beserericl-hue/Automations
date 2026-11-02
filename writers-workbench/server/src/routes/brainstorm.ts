@@ -5,6 +5,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { requireAuth } from '../middleware/auth.js';
 import { BrainstormSubmitSchema } from '../schemas.js';
 import { logger } from '../lib/logger.js';
+import { anthropicTokens, recordUsage } from '../lib/cost-recorder.js';
 import { hubBackend, callEngineWriteTool } from '../lib/engine-hub.js';
 
 export const brainstormRouter = Router();
@@ -42,7 +43,7 @@ async function extractText(buffer: Buffer, mimetype: string): Promise<string> {
 }
 
 /** Call Claude Haiku to extract structured fields from book proposal text */
-async function parseBookProposal(text: string): Promise<{
+async function parseBookProposal(text: string, userId: string | undefined): Promise<{
   title: string;
   genre_suggestion: string;
   story_arc: string;
@@ -81,6 +82,16 @@ Book proposal text:
 ${text.substring(0, 40000)}`,
       },
     ],
+  });
+
+  await recordUsage({
+    operation: 'brainstorm.parse-proposal',
+    provider: 'anthropic',
+    model: message.model || 'claude-haiku-4-5-20251001',
+    userId: userId ?? null,
+    requestId: message.id ?? null,
+    tokens: anthropicTokens(message.usage),
+    metadata: { stop_reason: message.stop_reason },
   });
 
   const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
@@ -139,7 +150,7 @@ brainstormRouter.post(
         return;
       }
 
-      const parsed = await parseBookProposal(contentText);
+      const parsed = await parseBookProposal(contentText, req.userId);
 
       res.json({
         ...parsed,

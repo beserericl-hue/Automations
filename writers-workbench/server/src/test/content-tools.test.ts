@@ -133,6 +133,8 @@ describe('consistency check', () => {
       expect(j.data.findings).toHaveLength(1);
       expect(j.data.findings[0].kind).toBe('ambiguity');
       expect(j.data.dropped).toBe(1);
+      // Every server-side Claude call is labelled for the cost record (migration 044).
+      expect(parseWith.mock.calls[0][2]).toMatchObject({ operation: 'characters.check', userId: 'u1', projectId: 'p1', contentId: 'c4', chapterNumber: 4 });
     });
   });
 });
@@ -147,6 +149,7 @@ describe('name suggestions', () => {
       const j = await post(base, '/characters/suggest', { name: 'Seven' });
       expect(j.data.suggestions.map((s: { name: string }) => s.name)).toEqual(['Tashaw']);
       expect(j.data.suggestions[0].report_topic).toBe('The Ossuary — naming');
+      expect(parseWith.mock.calls[0][2]).toMatchObject({ operation: 'characters.suggest-names', userId: 'u1', projectId: 'p1' });
     });
   });
 });
