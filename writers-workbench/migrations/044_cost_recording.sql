@@ -1,4 +1,4 @@
--- 043 — Exact cost recording: one labelled row per paid provider call, and server-side aggregation.
+-- 044 — Exact cost recording: one labelled row per paid provider call, and server-side aggregation.
 --
 -- WHY. The owner asked for "the exact cost of every operation". token_usage_v2 recorded only the
 -- engine's LLM calls, with the operation in workflow_name and everything else (project, provider,

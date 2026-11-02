@@ -1,5 +1,5 @@
 /**
- * Exact cost recording on the server (migration 043).
+ * Exact cost recording on the server (migration 044).
  *
  * Asserted: prices come from the shared table (Haiku 4.5 at $1/$5, Opus 5.5 cache reads at 0.05x,
  * 1-hour cache writes at 2x); an unknown model is recorded at $0 and flagged 'unpriced', never priced

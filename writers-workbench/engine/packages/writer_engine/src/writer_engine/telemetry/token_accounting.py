@@ -1,4 +1,4 @@
-"""Exact per-call cost accounting, written to ``token_usage_v2`` (CR-007, extended by migration 043).
+"""Exact per-call cost accounting, written to ``token_usage_v2`` (CR-007, extended by migration 044).
 
 Every paid provider call — LLM tokens (Anthropic, Gemini, Perplexity), embeddings (OpenAI), images
 (KIE, DALL-E), humanizer words (StealthGPT), scraper credits (ScraperAPI) — becomes ONE row labelled
@@ -158,7 +158,7 @@ def _row(ctx: dict[str, Any], call: dict[str, Any], operation: str | None) -> di
         "run_id": ctx.get("run_id"),
         "request_id": call.get("request_id"),
         "metadata": {
-            # Kept for readers written before migration 043 (CostDashboard's project filter).
+            # Kept for readers written before migration 044 (CostDashboard's project filter).
             "provider": call["provider"],
             "project_id": project_id,
             "chapter_number": ctx.get("chapter_number"),

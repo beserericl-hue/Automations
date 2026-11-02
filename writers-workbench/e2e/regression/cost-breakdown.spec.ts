@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { apiClient, seedProject, deleteProject, seedCostRow, supaDelete } from '../pages/api';
 
 /**
- * Per-operation cost view (migration 043 + GET /api/costs/breakdown) — RESULT-asserting.
+ * Per-operation cost view (migration 044 + GET /api/costs/breakdown) — RESULT-asserting.
  *
  * A disposable project gets three labelled cost rows (two operations, two providers, two runs). The
  * project's Cost tab must show exactly the total the API computes in Postgres, one row per operation,

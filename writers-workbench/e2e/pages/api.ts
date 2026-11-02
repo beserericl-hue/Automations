@@ -274,7 +274,7 @@ export async function seedTokenUsage(projectId: string): Promise<string> {
 }
 
 /**
- * Insert one labelled cost row (migration 043 columns) for the cost-breakdown spec. Returns its id.
+ * Insert one labelled cost row (migration 044 columns) for the cost-breakdown spec. Returns its id.
  * Rows carry run_id so the per-run average is exercised too.
  */
 export async function seedCostRow(fields: {

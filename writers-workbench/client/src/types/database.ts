@@ -235,7 +235,7 @@ export interface TokenUsage {
   created_at: string;
 }
 
-/** One aggregated row from GET /api/costs/breakdown (token_usage_breakdown, migration 043). */
+/** One aggregated row from GET /api/costs/breakdown (token_usage_breakdown, migration 044). */
 export interface CostBreakdownRow {
   operation: string | null;
   provider: string | null;

@@ -787,11 +787,11 @@ async def persist_token_usage(
 ) -> int:
     """CR-007 — write one ``token_usage_v2`` row per paid call.
 
-    ``rows`` are complete rows built by :mod:`writer_engine.telemetry.token_accounting` (migration 043
+    ``rows`` are complete rows built by :mod:`writer_engine.telemetry.token_accounting` (migration 044
     columns: operation, provider, units, unit_prices, cost_source, run_id, ...); they are inserted
     as-is. Rows carrying a ``request_id`` are upserted on ``(provider, request_id)`` with
     ignore-duplicates, so a provider task recorded twice cannot be billed twice. The older
-    ``calls``/``workflow`` form is kept for callers written before 043. Returns rows written."""
+    ``calls``/``workflow`` form is kept for callers written before 044. Returns rows written."""
     if rows is not None:
         if not rows:
             return 0

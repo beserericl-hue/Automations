@@ -2,7 +2,7 @@
  * Exact cost recording for every paid provider call the server makes.
  *
  * One row per call in token_usage_v2, with the same columns and labels the engine writes
- * (migration 043): operation, provider, model, user/project/content ids, token and unit counts, the
+ * (migration 044): operation, provider, model, user/project/content ids, token and unit counts, the
  * unit prices used, cost_usd and where the cost came from (cost_source):
  *
  *   provider_reported  the provider returned the dollar figure itself

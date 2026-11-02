@@ -1,5 +1,5 @@
 /**
- * Cost breakdowns from token_usage_v2, aggregated in Postgres (token_usage_breakdown, migration 043).
+ * Cost breakdowns from token_usage_v2, aggregated in Postgres (token_usage_breakdown, migration 044).
  *
  *   GET /api/costs/breakdown        — the caller's own costs (the impersonated user's when a
  *                                     superuser is impersonating: req.userId is the effective user)
