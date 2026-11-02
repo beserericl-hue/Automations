@@ -418,6 +418,86 @@ adminRouter.get('/engine-fleet', async (_req: Request, res: Response) => {
 
 /**
  * @openapi
+ * /admin/engine-single-delivery-probe:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Enqueue a burst of cheap engine jobs to prove each executes exactly once
+ *     description: |
+ *       Enqueues `jobs` (max 50) library/list-outlines jobs with unique run_ids plus `dupes` (max 10)
+ *       pairs sharing one run_id, all at once, so every runtime replica competes for them. No model
+ *       calls, no email. Poll GET /admin/engine-single-delivery-probe/{tag} for the ledger verdict.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: The probe tag, its run ids and the job ids. }
+ *       502: { description: Engine unreachable. }
+ */
+adminRouter.post('/engine-single-delivery-probe', async (req: Request, res: Response) => {
+  const { planProbe, submissions } = await import('../lib/single-delivery-probe.js');
+  const { callEngineWriteTool } = await import('../lib/engine-hub.js');
+  const plan = planProbe(Number(req.body?.jobs ?? 20), Number(req.body?.dupes ?? 5));
+  try {
+    const queued = await Promise.all(
+      submissions(plan).map((runId) =>
+        callEngineWriteTool('library', { op: 'list-outlines', limit: 1, async: true, run_id: runId, notify: false }),
+      ),
+    );
+    logger.info({ tag: plan.tag, jobs: queued.length }, 'admin/single-delivery-probe: enqueued');
+    res.json({
+      success: true,
+      data: {
+        tag: plan.tag,
+        expected_runs: plan.unique.length + plan.dupes.length,
+        submitted: queued.length,
+        job_ids: queued.map((q) => q.job_id ?? null),
+      },
+    });
+  } catch (err) {
+    logger.error({ err, tag: plan.tag }, 'admin/single-delivery-probe: enqueue failed');
+    res.status(502).json({
+      success: false,
+      error: { code: 'ENGINE_UNREACHABLE', message: err instanceof Error ? err.message : 'Engine unreachable' },
+    });
+  }
+});
+
+/**
+ * @openapi
+ * /admin/engine-single-delivery-probe/{tag}:
+ *   get:
+ *     tags: [Admin]
+ *     summary: The run-ledger verdict for a single-delivery probe
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: path, name: tag, required: true, schema: { type: string } }
+ *       - { in: query, name: expected, schema: { type: integer } }
+ *     responses:
+ *       200: { description: "PASS / FAIL / PENDING, with any run that executed more than once." }
+ *       400: { description: Not a probe tag. }
+ */
+adminRouter.get('/engine-single-delivery-probe/:tag', async (req: Request, res: Response) => {
+  const { isProbeTag, judge } = await import('../lib/single-delivery-probe.js');
+  const tag = String(req.params.tag);
+  if (!isProbeTag(tag)) {
+    res.status(400).json({ success: false, error: { code: 'BAD_TAG', message: 'Not a probe tag' } });
+    return;
+  }
+  const { data, error } = await getSupabaseAdmin()
+    .from('engine_job_runs')
+    .select('run_id, status, attempts')
+    .like('run_id', `${tag}-%`)
+    .limit(500);
+  if (error) {
+    res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: error.message } });
+    return;
+  }
+  const expected = req.query.expected ? Number(req.query.expected) : undefined;
+  res.json({ success: true, data: judge(tag, (data ?? []) as { run_id: string; status: string; attempts: number }[], expected) });
+});
+
+/**
+ * @openapi
  * /admin/queues:
  *   get:
  *     tags: [Admin]

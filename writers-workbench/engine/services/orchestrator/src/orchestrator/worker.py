@@ -19,7 +19,7 @@ from arq.connections import RedisSettings
 
 from writer_engine.config import get_settings
 from writer_engine.fleet import instance_id
-from writer_engine.idempotency import RunClaim, claim_run, complete_run, fail_run
+from writer_engine.idempotency import RunClaim, claim_run, complete_run, fail_run, run_lease
 from writer_engine.queues import (
     HEAVY,
     INTERACTIVE,
@@ -96,25 +96,84 @@ async def _ledger() -> Any | None:
         return None
 
 
+async def _lease_redis(ctx: dict[str, Any]) -> Any | None:
+    """The Redis the run lease lives in: arq's own pool when running under arq, else the shared
+    client. None (lease skipped, fail open) when neither is reachable."""
+    redis = ctx.get("redis")
+    if redis is not None:
+        return redis
+    try:
+        from writer_engine.redis_client.client import get_redis
+
+        return await get_redis()
+    except Exception as exc:
+        logger.warning("worker.lease_redis_unavailable", error=str(exc)[:160])
+        return None
+
+
 async def run_write_tool_job(ctx: dict[str, Any], tool: str, body: dict[str, Any]) -> dict[str, Any]:
     """Async write-tool job: dispatch to the step service off the request path (no edge timeout).
 
     The worker has no 300s edge limit, so a sub-chapter fan-out or a full-novel outline can run for
     minutes. Returns the StepOutput dict, which arq stores as the job result for polling.
+
+    Single delivery across replicas is two locks deep (item 16, 2026-11-02):
+
+    1. the **run lease** (Redis, ``writer_engine.idempotency.run_lease``) — at most one LIVE execution
+       of a run_id anywhere in the fleet. A retry that arrives while the previous attempt's step is
+       still running (arq cancelled the worker, not the step) waits for it to finish or lapse;
+    2. the **run ledger** (Postgres, B6) — a run already recorded ``complete`` is replayed, never
+       re-executed.
     """
     url = resolve_step_url(tool, get_settings())
     if url is None:
         logger.error("worker.write_tool.unknown", tool=tool)
         return {"status": "error", "error": {"code": "UNKNOWN_TOOL", "message": tool}}
+
+    # The run_id is the arq job_id unless the caller supplied its own, so a retry shares it and a
+    # deliberate second request does not. See writer_engine.idempotency.
+    run_id = str(body.get("run_id") or ctx.get("job_id") or "")
+    if not run_id:
+        return await _run_write_tool(ctx, tool, body, url, run_id)
+
+    redis = await _lease_redis(ctx)
+    if redis is None:
+        return await _run_write_tool(ctx, tool, body, url, run_id)
+    lease = await run_lease.acquire(redis, run_id, run_lease.new_owner(instance_id()))
+    if lease.available and not lease.acquired:
+        # Another attempt of this run is alive and still refreshing its lease after a full TTL: it is
+        # doing this work right now. Running it again is exactly the double delivery the lease exists
+        # to stop, so this attempt stands down. The ledger row belongs to the live attempt.
+        logger.warning(
+            "worker.write_tool.duplicate_in_flight",
+            tool=tool,
+            op=body.get("op"),
+            run_id=run_id,
+            holder=lease.holder,
+            waited_s=lease.waited_s,
+            job_id=ctx.get("job_id"),
+        )
+        return {
+            "status": "ok",
+            "payload": {"result": {"duplicate_in_flight": True, "run_id": run_id, "holder": lease.holder}},
+        }
+    if lease.waited_s >= 1:
+        logger.warning(
+            "worker.write_tool.waited_for_lease", tool=tool, run_id=run_id, waited_s=lease.waited_s
+        )
+    async with run_lease.held(redis, lease):
+        return await _run_write_tool(ctx, tool, body, url, run_id)
+
+
+async def _run_write_tool(
+    ctx: dict[str, Any], tool: str, body: dict[str, Any], url: str, run_id: str
+) -> dict[str, Any]:
     chapter = body.get("chapter_number")
     op = body.get("op")
 
     # B6: claim the run before doing any work. arq re-queues a job on CancelledError (a worker
     # restart, a deploy, a SIGTERM mid-chapter), and four of the persist paths are plain INSERTs
-    # that duplicate under that — including token_usage_v2, which is billing data. The run_id is
-    # the arq job_id unless the caller supplied its own, so a retry shares it and a deliberate
-    # second request does not. See writer_engine.idempotency.
-    run_id = str(body.get("run_id") or ctx.get("job_id") or "")
+    # that duplicate under that — including token_usage_v2, which is billing data.
     ledger = await _ledger() if run_id else None
     claim: RunClaim | None = None
     if ledger is not None:
