@@ -15,6 +15,8 @@ import ProjectEditForm from './ProjectEditForm';
 import ImageGallery from '../images/ImageGallery';
 import SocialMediaPanel from '../social/SocialMediaPanel';
 import ResearchRunBox from '../research/ResearchRunBox';
+import OutlineReviseBox from './OutlineReviseBox';
+import SeriesBiblePanel, { isSeriesBibleEntry, pickSeriesBible } from './SeriesBiblePanel';
 import CostDashboard from '../cost/CostDashboard';
 import { startChapterAction, type ChapterAction } from '../../lib/chapterActions';
 import { useEngineJobQueue } from '../../hooks/useEngineJobQueue';
@@ -388,6 +390,9 @@ export default function ProjectDetail() {
 
   const writtenChapters = chapters?.length ?? 0;
   const outlinedChapters = outline?.chapters?.length ?? 0;
+  // The engine's Series Bible row gets its own panel; the generic Story Bible list leaves it out.
+  const seriesBible = pickSeriesBible(bibleEntries);
+  const storyBibleEntries = bibleEntries?.filter((e) => !isSeriesBibleEntry(e));
 
   // Word count across all chapters
   const totalWords = chapters?.reduce((sum, ch) => {
@@ -454,7 +459,7 @@ export default function ProjectDetail() {
             >
               {tabLabels[tab]}
               {tab === 'chapters' && chapters ? ` (${writtenChapters})` : ''}
-              {tab === 'bible' && bibleEntries ? ` (${bibleEntries.length})` : ''}
+              {tab === 'bible' && storyBibleEntries ? ` (${storyBibleEntries.length})` : ''}
             </button>
           ))}
         </nav>
@@ -463,20 +468,28 @@ export default function ProjectDetail() {
       {/* Tab content */}
       <div>
         {activeTab === 'overview' && (
-          <OverviewTab
-            project={project}
-            outline={outline}
-            writtenChapters={writtenChapters}
-            outlinedChapters={outlinedChapters}
-            totalWords={totalWords}
-            bibleCount={bibleEntries?.length ?? 0}
-            genreConfig={genreConfig ?? null}
-          />
+          <div className="space-y-6">
+            <OverviewTab
+              project={project}
+              outline={outline}
+              writtenChapters={writtenChapters}
+              outlinedChapters={outlinedChapters}
+              totalWords={totalWords}
+              bibleCount={storyBibleEntries?.length ?? 0}
+              genreConfig={genreConfig ?? null}
+            />
+            {bibleEntries && <SeriesBiblePanel entry={seriesBible} outlineChapterCount={outlinedChapters} />}
+          </div>
         )}
         {activeTab === 'outline' && <OutlineTab outline={outline} storyArc={storyArc ?? null} projectId={id!} projectTitle={project.title} genreSlug={project.genre_slug} userId={userId!} writtenChapterNumbers={new Set((chapters || []).map(c => c.chapter_number).filter((n): n is number => n != null))} projectUpdatedAt={project.updated_at} outlineVersionInfo={outlineVersionInfo ?? null} />}
         {activeTab === 'chapters' && <ChaptersTab chapters={chapters} qaByChapter={qaByChapter} projectId={id!} projectTitle={project.title} projectType={project.project_type} genreSlug={project.genre_slug} userId={userId!} />}
         {activeTab === 'qa' && <QATab chapters={chapters} qaByChapter={qaByChapter} userId={userId!} />}
-        {activeTab === 'bible' && <BibleTab entries={bibleEntries} projectId={id!} />}
+        {activeTab === 'bible' && (
+          <div className="space-y-6">
+            {bibleEntries && <SeriesBiblePanel entry={seriesBible} outlineChapterCount={outlinedChapters} />}
+            <BibleTab entries={storyBibleEntries} projectId={id!} />
+          </div>
+        )}
         {activeTab === 'art' && (
           <ArtTab
             projectId={id!}
@@ -874,6 +887,9 @@ function OutlineTab({ outline, storyArc, projectId, projectTitle, genreSlug, use
           )}
         </div>
       )}
+
+      {/* Project-level revision: the whole outline, from a free-text directive (brainstorm.revise-outline). */}
+      <OutlineReviseBox projectId={projectId} chapterCount={chapters.length} />
 
       {/* Chapter list with expand/collapse controls + version info */}
       <div className="flex items-center justify-between">

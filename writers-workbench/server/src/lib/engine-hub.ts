@@ -267,3 +267,180 @@ export async function getEngineFleet(): Promise<{ fleet: Record<string, unknown>
     gatewayAddresses: await engineGatewayAddressCount(),
   };
 }
+
+// ---------------------------------------------------------------------------------------------------
+// Engine scheduler (cron) health — Admin → Engine Fleet → Scheduler.
+
+/** The runtime (orchestrator) base URL. `/admin/scheduler` lives there, not on the gateway. */
+export function engineRuntimeUrl(): string {
+  return process.env.ENGINE_RUNTIME_URL || 'http://writer-engine-runtime.railway.internal:8001';
+}
+
+/** One job as one runtime replica reports it (writer_engine.scheduler.Scheduler.status). */
+export interface SchedulerJobReport {
+  name: string;
+  interval_s: number;
+  singleton?: boolean;
+  ticks: number;
+  skipped?: number;
+  last_run: string | null;
+  last_error: string | null;
+}
+
+export type SchedulerJobHealth = 'ok' | 'failing' | 'overdue' | 'waiting' | 'pending';
+
+export interface SchedulerJob {
+  name: string;
+  interval_s: number;
+  singleton: boolean;
+  /** Runs across every replica since each started. */
+  ticks: number;
+  /** Ticks a replica passed up because another held the job's lock (the singleton lock working). */
+  skipped: number;
+  /** The latest run on any replica. */
+  last_run: string | null;
+  /** The error of that latest run; null when it succeeded. */
+  last_error: string | null;
+  /** When the next run is due (last run + interval); null before the first run. */
+  next_run: string | null;
+  health: SchedulerJobHealth;
+  replicas: Array<{ instance: string; ticks: number; skipped: number; last_run: string | null; last_error: string | null }>;
+}
+
+export interface SchedulerView {
+  running: boolean;
+  replicas: Array<{ instance: string; address: string; ok: boolean; running?: boolean; error?: string }>;
+  jobs: SchedulerJob[];
+  checked_at: string;
+}
+
+/** The engine never ticks a job more often than this (scheduler.MIN_INTERVAL_S). */
+const SCHEDULER_MIN_INTERVAL_S = 30;
+/** Slack on top of two intervals before a job counts as overdue: a slow tick delays the next one. */
+const OVERDUE_GRACE_S = 120;
+
+/**
+ * Merge every replica's view of the scheduler into one row per job, and judge each.
+ *
+ * Each runtime replica runs the scheduler and keeps its counters in memory, and a singleton job runs
+ * on whichever replica takes the lock first — so one replica alone says "radar: never run" while the
+ * other ran it ten minutes ago. Asking one replica would flag healthy jobs. The latest run across
+ * replicas is the job's last run, and ITS error is the job's current state (a replica that failed an
+ * hour ago and has not run since is not the latest word).
+ *
+ *   failing — the latest run threw
+ *   overdue — no run for more than two intervals (plus a grace for a slow tick)
+ *   waiting — not run since the replicas started, but they have been skipping it: another holder
+ *             of the lock, typically the run just before a deploy. Not a fault.
+ *   pending — not run yet and nothing has tried (the startup delay)
+ *   ok      — ran on time and succeeded
+ */
+export function mergeSchedulerReports(
+  reports: Array<{ instance: string; jobs: SchedulerJobReport[] }>,
+  now: number = Date.now(),
+): SchedulerJob[] {
+  const order: string[] = [];
+  const byName = new Map<string, Array<{ instance: string; job: SchedulerJobReport }>>();
+  for (const r of reports) {
+    for (const job of r.jobs) {
+      if (!byName.has(job.name)) {
+        byName.set(job.name, []);
+        order.push(job.name);
+      }
+      byName.get(job.name)!.push({ instance: r.instance, job });
+    }
+  }
+  return order.map((name) => {
+    const seen = byName.get(name)!;
+    const latest = seen
+      .filter((s) => s.job.last_run)
+      .sort((a, b) => Date.parse(b.job.last_run!) - Date.parse(a.job.last_run!))[0];
+    const interval = seen[0].job.interval_s;
+    const ticks = seen.reduce((n, s) => n + (s.job.ticks || 0), 0);
+    const skipped = seen.reduce((n, s) => n + (s.job.skipped || 0), 0);
+    const lastRun = latest?.job.last_run ?? null;
+    const lastError = latest?.job.last_error ?? null;
+    const step = Math.max(SCHEDULER_MIN_INTERVAL_S, interval) * 1000;
+    const nextRun = lastRun ? new Date(Date.parse(lastRun) + step).toISOString() : null;
+    let health: SchedulerJobHealth;
+    if (lastRun && lastError) health = 'failing';
+    else if (lastRun && now - Date.parse(lastRun) > 2 * step + OVERDUE_GRACE_S * 1000) health = 'overdue';
+    else if (lastRun) health = 'ok';
+    else health = skipped > 0 ? 'waiting' : 'pending';
+    return {
+      name,
+      interval_s: interval,
+      singleton: seen[0].job.singleton !== false,
+      ticks,
+      skipped,
+      last_run: lastRun,
+      last_error: lastError,
+      next_run: nextRun,
+      health,
+      replicas: seen.map((s) => ({
+        instance: s.instance,
+        ticks: s.job.ticks || 0,
+        skipped: s.job.skipped || 0,
+        last_run: s.job.last_run,
+        last_error: s.job.last_error,
+      })),
+    };
+  });
+}
+
+/**
+ * Read `/admin/scheduler` from EVERY runtime replica (X-Admin-Token, held only by this server) and
+ * merge them. The admin token never reaches the browser: the client calls /api/admin/engine-scheduler.
+ */
+export async function getEngineScheduler(): Promise<SchedulerView> {
+  const token = process.env.ENGINE_ADMIN_TOKEN || process.env.ADMIN_TOKEN || '';
+  if (!token) throw new Error('ENGINE_ADMIN_TOKEN is not set on the Workbench server');
+  const base = engineRuntimeUrl();
+  const u = new URL(base);
+  let targets: Array<{ address: string; url: string }> = [{ address: u.host, url: base.replace(/\/$/, '') }];
+  if (u.hostname.endsWith(PRIVATE_SUFFIX)) {
+    const addrs = await privateAddresses(u.hostname);
+    if (addrs.length > 0) {
+      targets = addrs.map((ip) => {
+        const t = new URL(base);
+        t.hostname = ip.includes(':') ? `[${ip}]` : ip;
+        return { address: ip, url: t.toString().replace(/\/$/, '') };
+      });
+    }
+  }
+  const answers = await Promise.all(
+    targets.map(async (t) => {
+      try {
+        const resp = await fetch(`${t.url}/admin/scheduler`, {
+          headers: { 'x-admin-token': token },
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (!resp.ok) return { address: t.address, instance: t.address, ok: false as const, error: `HTTP ${resp.status}` };
+        const body = (await resp.json()) as { running?: boolean; jobs?: SchedulerJobReport[] };
+        return {
+          address: t.address,
+          instance: resp.headers.get('x-engine-instance') || t.address,
+          ok: true as const,
+          running: body.running !== false,
+          jobs: body.jobs ?? [],
+        };
+      } catch (err) {
+        return { address: t.address, instance: t.address, ok: false as const, error: err instanceof Error ? err.message : String(err) };
+      }
+    }),
+  );
+  const answered = answers.flatMap((a) => (a.ok ? [a] : []));
+  if (answered.length === 0) {
+    throw new Error(`engine scheduler unreachable: ${answers.map((a) => `${a.address} ${a.ok ? '' : a.error}`).join('; ')}`);
+  }
+  return {
+    running: answered.every((a) => a.running),
+    replicas: answers.map((a) =>
+      a.ok
+        ? { instance: a.instance, address: a.address, ok: true, running: a.running }
+        : { instance: a.instance, address: a.address, ok: false, error: a.error },
+    ),
+    jobs: mergeSchedulerReports(answered.map((a) => ({ instance: a.instance, jobs: a.jobs }))),
+    checked_at: new Date().toISOString(),
+  };
+}

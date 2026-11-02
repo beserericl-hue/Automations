@@ -6,7 +6,9 @@
 #   2. wait until the DEV Workbench is serving the commit this container was built from, so the
 #      suite tests that code and not the deploy before it;
 #   3. run the unauthenticated project, then the regression passes in E2E_PASSES (default "A");
-#   4. email the result to E2E_NOTIFY_EMAIL, and exit non-zero if anything failed.
+#   4. email the result to E2E_NOTIFY_EMAIL;
+#   5. run the engine end-to-end suite (scripts/e2e_full_verify.py, 157 chat + voice tests) against
+#      the DEV engine gateway and email its result separately; exit non-zero if anything failed.
 #
 # Pass B (real engine jobs, 15-30 minutes of paid model calls) is opt-in: set E2E_PASSES=ABC on the
 # service and redeploy it.
@@ -64,5 +66,34 @@ REGRESSION=${PIPESTATUS[0]}
 
 STATUS=$(( NOAUTH != 0 || REGRESSION != 0 ))
 node e2e/runner/notify.mjs "${SHA:0:7}" "" "$STATUS" "$LOGS/noauth.log" "$LOGS/regression.log"
-echo "=== RESULT: noauth=$NOAUTH regression=$REGRESSION ==="
+
+# --- Engine end-to-end suite (scripts/e2e_full_verify.py) against the DEV engine gateway ---------
+# 157 chat + voice tests from engine-chat-e2e-suite.md, each polled to completion and checked against
+# DEV Supabase. Hours of real engine work and paid model calls, so it runs after the Playwright result
+# has already been emailed, and is reported in its own email. E2E_ENGINE_VERIFY=off skips it;
+# E2E_ENGINE_ONLY="R01,V03" runs a subset. The gateway secret is a Railway reference variable
+# (SERVICE_SHARED_SECRET = ${{writer-engine-gateway.SERVICE_SHARED_SECRET}}); nothing is kept in GitHub.
+ENGINE=skipped
+if [ "${E2E_ENGINE_VERIFY:-on}" != "off" ]; then
+  export E2E_GATEWAY="${E2E_ENGINE_GATEWAY:-https://writer-engine-gateway-develop.up.railway.app}"
+  case "$E2E_GATEWAY" in
+    *-develop.up.railway.app*) ;;
+    *) echo "REFUSING TO RUN the engine suite: E2E_ENGINE_GATEWAY is not the DEV gateway." >&2; exit 2 ;;
+  esac
+  if [ -z "${SERVICE_SHARED_SECRET:-}" ]; then
+    ENGINE=1
+    echo "SERVICE_SHARED_SECRET is not set on writer-e2e" > "$LOGS/engine.log"
+    E2E_NOTIFY_TITLE="Engine E2E on DEV" node e2e/runner/notify.mjs "${SHA:0:7}" \
+      "Engine suite not run: SERVICE_SHARED_SECRET is not set on writer-e2e." 1
+  else
+    echo "=== Engine suite against $E2E_GATEWAY (${E2E_ENGINE_ONLY:-all tests}) ==="
+    E2E_SECRET="$SERVICE_SHARED_SECRET" SUPA_URL="$SUPABASE_URL" SUPA_KEY="$SUPABASE_SERVICE_ROLE_KEY" \
+      E2E_ONLY="${E2E_ENGINE_ONLY:-}" E2E_TIMEOUT="${E2E_ENGINE_TIMEOUT:-1200}" \
+      python3 -u scripts/e2e_full_verify.py 2>&1 | tee "$LOGS/engine.log"
+    ENGINE=${PIPESTATUS[0]}
+    E2E_NOTIFY_TITLE="Engine E2E on DEV" node e2e/runner/notify.mjs "${SHA:0:7}" "" "$ENGINE" "$LOGS/engine.log"
+  fi
+  [ "$ENGINE" = 0 ] || STATUS=1
+fi
+echo "=== RESULT: noauth=$NOAUTH regression=$REGRESSION engine=$ENGINE ==="
 exit "$STATUS"
