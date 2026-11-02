@@ -34,6 +34,7 @@ const CreditsPage = lazyRetry(() => import('./components/credits/CreditsPage'));
 
 // Publishing — the author's own facts, and the KDP path for a finished book.
 const AuthorProfile = lazyRetry(() => import('./components/settings/AuthorProfile'));
+const Integrations = lazyRetry(() => import('./components/settings/Integrations'));
 const ProjectPublishing = lazyRetry(() => import('./components/publishing/ProjectPublishing'));
 
 // Compose Newsletter 2a (S4) — newsletter route stubs. S6/S7/S8 fill in the
@@ -112,6 +113,7 @@ export default function App() {
                     <Route path="sources" element={<SourceBrowser />} />
                     <Route path="settings" element={<UserSettings />} />
                     <Route path="settings/author" element={<AuthorProfile />} />
+                    <Route path="settings/integrations" element={<Integrations />} />
                     <Route path="admin/*" element={<AdminPanel />} />
                     <Route path="superuser/*" element={<SuperuserPanel />} />
                     <Route path="credits" element={<CreditsPage />} />

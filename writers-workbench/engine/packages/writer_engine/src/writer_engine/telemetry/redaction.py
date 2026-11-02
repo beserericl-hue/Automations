@@ -85,13 +85,35 @@ def _exact_secrets() -> list[str]:
             "ingestion_secret",
             "newsletter_callback_secret",
             "workbench_cron_secret",
+            "integrations_encryption_key",
         )
     ]
     out = {str(v).strip() for v in candidates if isinstance(v, str) and len(str(v).strip()) >= _MIN_EXACT_LEN}
+    out |= _runtime_secrets
     return sorted(out, key=len, reverse=True)
 
 
 _cached_exact: list[str] | None = None
+
+_runtime_secrets: set[str] = set()
+"""Secrets that are not settings: per-user integration credentials (Blotato keys, blog tokens)
+decrypted from ``user_integrations_v2`` at send time. Registered by ``writer_engine.integrations``
+the moment they are decrypted, so a provider error that echoes one back is masked like ours.
+Bounded so a long-running process with many users cannot grow it without limit."""
+
+_MAX_RUNTIME_SECRETS = 2000
+
+
+def register_secret(value: str) -> None:
+    """Mask ``value`` in every log line from now on. Short values are ignored (see _MIN_EXACT_LEN)."""
+    global _cached_exact
+    v = (value or "").strip()
+    if len(v) < _MIN_EXACT_LEN or v in _runtime_secrets:
+        return
+    if len(_runtime_secrets) >= _MAX_RUNTIME_SECRETS:
+        _runtime_secrets.clear()
+    _runtime_secrets.add(v)
+    _cached_exact = None
 
 
 def reset_cache() -> None:
@@ -136,4 +158,4 @@ def redact_processor(
     return event_dict
 
 
-__all__ = ["MASK", "redact", "redact_processor", "reset_cache"]
+__all__ = ["MASK", "redact", "redact_processor", "register_secret", "reset_cache"]
