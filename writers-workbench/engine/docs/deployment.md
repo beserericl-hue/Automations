@@ -143,6 +143,12 @@ Variables on `writer-engine-runtime` (never in GitHub):
 | `SCRAPER_ENABLED` | `false` stops spending without removing the key. Default `true`. | — |
 | `SCRAPER_RENDER_FALLBACK` | When a page has no readable body (a JavaScript shell), fetch it once more with `render=true` — 10 credits instead of 1. Default `true`. | JS-only pages are skipped |
 | `SCRAPERAPI_COUNTRY_CODE` | Optional proxy country, e.g. `us`. | ScraperAPI chooses |
+| `SCRAPERAPI_MAX_CONCURRENCY` | Requests in flight at once, per process. The plan allows 5 and answers 429 past it. Default `3`. | — |
+
+Cost, measured on the DEV account 2026-11-02 (plan: 5,000 credits/month, 5 concurrent): a plain page
+is 1 credit, but ScraperAPI bills protected sites at its premium rate even without rendering (The
+Verge: 10 credits), and a protected page that also needs rendering costs more again (abc.xyz: 30 for
+the plain fetch plus the rendered one). Each request's cost is in its `sa-credit-cost` header.
 
 `FIRECRAWL_API_KEY` and `FIRECRAWL_ENABLED` are no longer read and can be deleted from both engine
 services.

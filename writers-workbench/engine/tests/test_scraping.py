@@ -144,6 +144,31 @@ class TestFetch:
         assert len(seen) == scraping.FETCH_ATTEMPTS == 2
 
 
+class TestConcurrency:
+    async def test_requests_in_flight_never_exceed_the_cap(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The plan answers 429 past 5 concurrent requests; a story's sources all start at once."""
+        import asyncio
+
+        monkeypatch.setenv("SCRAPERAPI_MAX_CONCURRENCY", "3")
+        get_settings.cache_clear()
+        in_flight = peak = 0
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal in_flight, peak
+            in_flight += 1
+            peak = max(peak, in_flight)
+            await asyncio.sleep(0.02)
+            in_flight -= 1
+            return httpx.Response(200, text=ARTICLE, headers={"sa-credit-cost": "1"})
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            pages = await asyncio.gather(
+                *(scraping.fetch_page(f"https://news.example.com/{n}", client=client) for n in range(8))
+            )
+        assert all(p.ok for p in pages)
+        assert peak == 3
+
+
 class TestAvailability:
     async def test_no_key_and_switched_off_both_skip_the_call(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("SCRAPER_ENABLED", "false")
