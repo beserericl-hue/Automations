@@ -268,7 +268,10 @@ async def _stealthify(
             json=body,
         )
         resp.raise_for_status()
-        return dict(resp.json() or {})
+        data = dict(resp.json() or {})
+    # Recorded HERE so every billed call is a row — first attempts, collapse retries, any caller.
+    _record_humanize_cost(data, model=model, chunk_words=len(chunk.split()))
+    return data
 
 
 async def _retry_collapsed(
@@ -414,7 +417,6 @@ async def humanize_text(
             pieces.append(chunk)
             continue
 
-        _record_humanize_cost(payload, model=use_model, chunk_words=len(chunk.split()))
         result = str(payload.get("result") or "").strip()
         if not result:
             # A 200 with no text is still a failure; treating it as success would silently blank
