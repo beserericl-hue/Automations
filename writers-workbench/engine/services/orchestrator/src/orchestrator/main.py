@@ -744,7 +744,7 @@ def build_app() -> FastAPI:
         """Enqueue one ingestion run on the heavy queue (E1).
 
         Enqueued rather than run inline: a tick walks every due feed and each item can cost a
-        Firecrawl scrape plus two LLM calls, which has no business happening inside the process that
+        ScraperAPI scrape plus two LLM calls, which has no business happening inside the process that
         serves the API. Going through arq also gives it the DLQ, the retry policy and the run ledger
         that every other engine job has.
 

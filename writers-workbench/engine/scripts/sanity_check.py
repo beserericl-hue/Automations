@@ -40,7 +40,7 @@ def print_keys() -> None:
         ("GEMINI_API_KEY", s.gemini_api_key),
         ("PERPLEXITY_API_KEY", s.perplexity_api_key),
         ("OPENAI_API_KEY", s.openai_api_key),
-        ("FIRECRAWL_API_KEY", s.firecrawl_api_key),
+        ("SCRAPERAPI_API_KEY", s.scraperapi_api_key),
         ("KIEAI_API_KEY", s.kieai_api_key),
         ("POSTAL_API_KEY", s.postal_api_key),
         ("POSTAL_API_URL", s.postal_api_url),
@@ -152,19 +152,14 @@ async def probe_openai(timeout: float = 30.0) -> str:
     return f"{text!r} ({usage.get('prompt_tokens')}→{usage.get('completion_tokens')} tok, {time.perf_counter() - t:.2f}s)"
 
 
-async def probe_firecrawl(timeout: float = 30.0) -> str:
-    key = get_settings().firecrawl_api_key
+async def probe_scraperapi(timeout: float = 30.0) -> str:
+    from writer_engine.scraping import fetch_page
+
     t = time.perf_counter()
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        resp = await client.post(
-            "https://api.firecrawl.dev/v1/scrape",
-            headers={"authorization": f"Bearer {key}", "content-type": "application/json"},
-            json={"url": "https://example.com", "formats": ["markdown"]},
-        )
-    resp.raise_for_status()
-    data = resp.json()
-    md = (data.get("data") or {}).get("markdown") or ""
-    return f"scraped example.com ({len(md)} md chars, {time.perf_counter() - t:.2f}s)"
+    page = await fetch_page("https://example.com")
+    if page.error:
+        raise RuntimeError(page.error)
+    return f"scraped example.com ({len(page.markdown)} md chars, {page.credits} credits, {time.perf_counter() - t:.2f}s)"
 
 
 async def probe_supabase(timeout: float = 30.0) -> str:
@@ -253,7 +248,7 @@ async def main() -> None:
         ("Gemini " + get_settings().picker_model, probe_gemini),
         ("Perplexity sonar", probe_perplexity),
         ("OpenAI gpt-4o-mini", probe_openai),
-        ("Firecrawl scrape", probe_firecrawl),
+        ("ScraperAPI scrape", probe_scraperapi),
         ("Supabase DEV content_ingestion_v2", probe_supabase),
         ("Postal /api/v1/send/message reachability", probe_postal),
         ("pick-step (Gemini end-to-end)", probe_pick_step),

@@ -317,7 +317,7 @@ def parse_reddit_listing(payload: Any, *, subreddit_label: str = "") -> list[Fee
 
 
 # Link-post destinations that are not articles: the n8n `filter_reddit_*_items` node excluded these
-# before scraping, because Firecrawl on a YouTube page or a bare image burns a credit for nothing.
+# before scraping, because scraping a YouTube page or a bare image burns a credit for nothing.
 UNSCRAPEABLE_HOSTS = (
     "reddit.com",
     "youtube.com",

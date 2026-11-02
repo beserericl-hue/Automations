@@ -14,7 +14,7 @@ Ops, mirroring how the other steps are addressed:
           "1,3,5-7"|"all", optional ``channels``) — the port of n8n's Batch Week / Roundup Batch
 
 The handler never fails the step for a feed-level problem. A dead feed, an unparseable body, a
-Firecrawl outage: each is recorded against its own feed row and counted in the payload, and the step
+scraper outage: each is recorded against its own feed row and counted in the payload, and the step
 still returns ``ok``. The alternative — one bad feed failing the tick — is exactly the J6 behaviour
 this replaces.
 """

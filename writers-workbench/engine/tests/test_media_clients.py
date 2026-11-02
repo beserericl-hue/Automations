@@ -40,6 +40,6 @@ def test_scrape_url_requires_url() -> None:
 
 def test_scrape_url_stub_without_key() -> None:
     out = asyncio.run(_op_scrape_url({"url": "https://example.com"}))
-    # without FIRECRAWL_API_KEY the op returns a stub marker, never raises
+    # without SCRAPERAPI_API_KEY the op returns a stub marker, never raises
     assert out["url"] == "https://example.com"
     assert "markdown" in out

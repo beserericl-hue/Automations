@@ -21,7 +21,7 @@ it Railway's edge proxy 502s "Application failed to respond" even though the con
 - 2 Railway services created in `bubbly-solace` / `develop` env:
   - `writer-engine-gateway` (id `f87274f7-9068-4065-b7cf-c8c993435e6c`)
   - `writer-engine-runtime` (id `8e87e53d-9f25-4ee5-b345-6ab8e5fd68c8`)
-- 19 env vars bulk-set on each via `railway variables --set` (Anthropic / Gemini / Perplexity / OpenAI / Firecrawl / KIE.AI / Postal / Supabase / shared Redis at `redis.railway.internal` / Ingestion secret / etc.). Fresh `SERVICE_SHARED_SECRET` + `ADMIN_TOKEN` generated; `ARCHIVE_BASE_URL` pointed at Supabase Storage public bucket.
+- 19 env vars bulk-set on each via `railway variables --set` (Anthropic / Gemini / Perplexity / OpenAI / Firecrawl (since replaced by ScraperAPI) / KIE.AI / Postal / Supabase / shared Redis at `redis.railway.internal` / Ingestion secret / etc.). Fresh `SERVICE_SHARED_SECRET` + `ADMIN_TOKEN` generated; `ARCHIVE_BASE_URL` pointed at Supabase Storage public bucket.
 - Gateway has `ORCHESTRATOR_URL=http://writer-engine-runtime.railway.internal:8001` so it reaches the runtime over Railway's private network.
 - Engine uses a 2-service runtime architecture (per `engine-framework-sprints` F2-3 pragmatic deploy): one image for the gateway, one for everything else. The `runtime` image starts orchestrator + arq worker + all 10 step services as background uvicorn processes; the orchestrator calls each step via `localhost:801x` set in `services/runtime/entrypoint.sh`.
 
@@ -128,6 +128,24 @@ time, and the count stays between the floor and the ceiling.
 | `RAILWAY_AUTOSCALE_TOKEN` | a Railway **project token for the develop environment** | Railway scopes it to that one environment, so it cannot change PROD. |
 | `AUTOSCALE_MIN_REPLICAS` / `AUTOSCALE_MAX_REPLICAS` | `2` / `4` | PROD at cutover: `4` / its ceiling. |
 | `AUTOSCALE_ALLOW_PRODUCTION` | unset | Required as well before it acts in an environment named `production`. |
+
+## Scraping (ScraperAPI, replaced Firecrawl 2026-11-01)
+
+Newsletter ingestion, the newsletter's source scrape and `media.scrape-url` all fetch pages through
+ScraperAPI and read the article body out with `trafilatura` (`writer_engine/scraping.py`). No model
+call is involved in reading the page, so the body is the page's own text.
+
+Variables on `writer-engine-runtime` (never in GitHub):
+
+| Variable | What it does | Without it |
+|---|---|---|
+| `SCRAPERAPI_API_KEY` | ScraperAPI key, sent as the `x-sapi-api_key` header (never in the URL). | No scraping: ingestion records items as deferred, the newsletter's story sources come back empty |
+| `SCRAPER_ENABLED` | `false` stops spending without removing the key. Default `true`. | — |
+| `SCRAPER_RENDER_FALLBACK` | When a page has no readable body (a JavaScript shell), fetch it once more with `render=true` — 10 credits instead of 1. Default `true`. | JS-only pages are skipped |
+| `SCRAPERAPI_COUNTRY_CODE` | Optional proxy country, e.g. `us`. | ScraperAPI chooses |
+
+`FIRECRAWL_API_KEY` and `FIRECRAWL_ENABLED` are no longer read and can be deleted from both engine
+services.
 
 ## Post calendar, radars and the two editions (port of the n8n blog / LinkedIn system)
 

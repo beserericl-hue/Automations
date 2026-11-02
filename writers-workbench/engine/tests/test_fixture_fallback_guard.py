@@ -138,7 +138,7 @@ async def test_subject_step_still_fixtures_when_allowed() -> None:
     assert out.payload["subject_line"]
 
 
-async def test_media_scrape_refuses_without_firecrawl_key(fixtures_disabled: None) -> None:
+async def test_media_scrape_refuses_without_scraper_key(fixtures_disabled: None) -> None:
     """Scraped text grounds newsletter segments and blog copy — a stub body must not pass as source."""
     from media_step.main import _op_scrape_url
 

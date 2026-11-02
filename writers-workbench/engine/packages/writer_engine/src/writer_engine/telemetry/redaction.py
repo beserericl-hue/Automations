@@ -38,7 +38,7 @@ MASK = "[redacted]"
 # Ordered longest-prefix-first so `sk-ant-...` is not partly consumed by the `sk-` rule.
 _PATTERNS: tuple[re.Pattern[str], ...] = (
     # Anthropic (both workspace and account keys), OpenAI, Supabase (PAT + the new secret format),
-    # Firecrawl, Google.
+    # Firecrawl (old keys may still sit in logs), Google.
     re.compile(r"\bsk-ant-[A-Za-z0-9_\-]{8,}"),
     re.compile(r"\bsk-[A-Za-z0-9_\-]{16,}"),
     re.compile(r"\bsbp_[A-Za-z0-9]{16,}"),
@@ -49,7 +49,9 @@ _PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}"),
     # Credentials carried in a URL or a header that an SDK echoed back.
     re.compile(r"(?i)\b(apikey|api[-_]?key|access[-_]?token|token)=([^\s&\"']{8,})"),
-    re.compile(r"(?i)\b(authorization|x-api-key|x-admin-token|x-service-secret)\s*[:=]\s*\S{8,}"),
+    re.compile(
+        r"(?i)\b(authorization|x-api-key|x-sapi-api_key|x-admin-token|x-service-secret)\s*[:=]\s*\S{8,}"
+    ),
     re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._\-]{12,}"),
 )
 
@@ -73,7 +75,7 @@ def _exact_secrets() -> list[str]:
             "openai_api_key",
             "gemini_api_key",
             "perplexity_api_key",
-            "firecrawl_api_key",
+            "scraperapi_api_key",
             "kieai_api_key",
             "stealthgpt_api_key",
             "postal_api_key",

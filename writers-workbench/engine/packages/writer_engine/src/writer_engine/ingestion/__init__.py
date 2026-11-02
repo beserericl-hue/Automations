@@ -21,7 +21,7 @@ Module layout:
 ``keys``       the ``{date}/{slug}.{source}`` convention, and the J6 fix
 ``sources``    the publisher label, derived from the data instead of hardcoded per feed
 ``feeds``      fetch + parse: JSON Feed, RSS 2.0, Atom, Reddit listings
-``enrich``     Firecrawl scrape, the relevance gate, the external-source extractor
+``enrich``     the scrape (writer_engine.scraping), the relevance gate, the external-source extractor
 ``store``      the feed list, batch dedupe, and the storage + row write
 ``pipeline``   one feed end to end, and the due-feed tick
 """

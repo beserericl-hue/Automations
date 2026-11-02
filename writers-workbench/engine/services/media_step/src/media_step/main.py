@@ -2,7 +2,7 @@
 
 cover-art generates a book cover via KIE.AI (google/nano-banana), falls back to OpenAI DALL-E 3,
 and persists the image to Supabase Storage (``cover-images`` bucket) — mirroring the n8n
-``Generate Cover Art`` workflow. scrape-url calls Firecrawl. social-posts runs craft-composed
+``Generate Cover Art`` workflow. scrape-url calls ScraperAPI. social-posts runs craft-composed
 generation. Every op fixture-falls back when its provider/key is absent so the service still boots.
 """
 
@@ -23,6 +23,7 @@ from writer_engine.llm.structured import extract_json
 from writer_engine.prompt_store import compose_craft_system, seed_default_prompts
 from writer_engine.rate_limit.provider_budget import call_provider
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
+from writer_engine.scraping import fetch_page
 from writer_engine.step_service import build_step_app
 from writer_engine.telemetry.logging import get_logger
 
@@ -480,42 +481,25 @@ async def _op_social_posts(payload: dict) -> dict:
 
 
 async def _op_scrape_url(payload: dict) -> dict:
-    """Firecrawl scrape -> markdown + html + metadata. Fixture when no key/url."""
+    """ScraperAPI fetch -> main-content markdown + html + metadata. Fixture when no key/url."""
     settings = get_settings()
     url = payload.get("url")
     if not url:
         return {"url": None, "markdown": "", "html": "", "metadata": {}, "note": "no url"}
-    if not settings.firecrawl_api_key:
+    if not settings.scraperapi_api_key:
         # A1: scraped text feeds newsletter segments and blog grounding. A "(stub — …)" body silently
         # became the source material for generated copy.
-        guard_fixture_fallback(step=STEP_NAME, reason="FIRECRAWL_API_KEY not set")
-        return {"url": url, "markdown": "(stub — FIRECRAWL_API_KEY not set)", "html": "", "metadata": {}}
-    body = {"url": url, "formats": ["markdown", "html"]}
-    async with httpx.AsyncClient(timeout=90.0) as client:
-
-        async def _post() -> httpx.Response:
-            r = await client.post(
-                "https://api.firecrawl.dev/v1/scrape",
-                headers={
-                    "Authorization": f"Bearer {settings.firecrawl_api_key}",
-                    "Content-Type": "application/json",
-                },
-                json=body,
-            )
-            r.raise_for_status()
-            return r
-
-        try:
-            r = await call_provider("firecrawl", _post)  # B8: budget + 429 retry
-            data = r.json().get("data") or {}
-            return {
-                "url": url,
-                "markdown": data.get("markdown") or "",
-                "html": data.get("html") or "",
-                "metadata": data.get("metadata") or {},
-            }
-        except Exception as e:
-            return {"url": url, "markdown": "", "html": "", "metadata": {}, "error": str(e)[:200]}
+        guard_fixture_fallback(step=STEP_NAME, reason="SCRAPERAPI_API_KEY not set")
+        return {"url": url, "markdown": "(stub — SCRAPERAPI_API_KEY not set)", "html": "", "metadata": {}}
+    page = await fetch_page(str(url))  # B8: shared scraperapi budget + retry
+    if page.error:
+        return {"url": url, "markdown": "", "html": "", "metadata": {}, "error": page.error[:200]}
+    return {
+        "url": url,
+        "markdown": page.markdown,
+        "html": page.html,
+        "metadata": {"title": page.title, "image_urls": page.image_urls, "rendered": page.rendered},
+    }
 
 
 OPS = {"cover-art": _op_cover_art, "social-posts": _op_social_posts, "scrape-url": _op_scrape_url}

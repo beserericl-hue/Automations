@@ -2,7 +2,7 @@
 
 Anthropic has had a Redis-shared per-model token budget since CR-003. Nothing else did, and the
 others are not decorative: ``gemini`` routes every hub turn (voice and chat), ``perplexity`` is the
-whole of ``research.run``, ``openai`` embeds project canon, ``firecrawl`` scrapes and ``kieai``
+whole of ``research.run``, ``openai`` embeds project canon, ``scraperapi`` scrapes and ``kieai``
 generates cover art. At one user that is invisible. At ten concurrent users each provider is being
 called by up to 24 interactive jobs plus 8 heavy ones across however many instances are running, and
 the account-wide per-minute limit is shared by all of them.
@@ -94,8 +94,10 @@ DEFAULT_PROVIDER_LIMITS: dict[str, ProviderLimits] = {
     "perplexity": ProviderLimits(rpm=40),
     # Embeddings only (text-embedding-3-small). Token-shaped limit, so both are set.
     "openai": ProviderLimits(rpm=500, tpm=1_000_000),
-    # Scrape. One call per URL, fanned out per story in a newsletter.
-    "firecrawl": ProviderLimits(rpm=50),
+    # Scrape (ScraperAPI). One call per URL, fanned out per story in a newsletter. ScraperAPI limits
+    # concurrent requests by plan and answers 429 past it; a request can take up to 70s, so 50/min
+    # stays well inside even a small plan's concurrency.
+    "scraperapi": ProviderLimits(rpm=50),
     # Image generation: slow, expensive, and polled. Low on purpose.
     "kieai": ProviderLimits(rpm=20),
     # Humanizer (E6). Billed per WORD with a hard 3000-word cap per request, so a single chapter is
@@ -188,7 +190,7 @@ class ProviderBudget:
         lazily, so an unreachable Redis does not fail when the client is created — it fails on the
         first command. The original version only caught the acquisition failure, so a Redis outage
         made this gate RAISE instead of fail open, and the raise propagated through call_provider
-        into embeddings / firecrawl / kieai. Found by running the real retrieval path on a machine
+        into embeddings / scraperapi / kieai. Found by running the real retrieval path on a machine
         with no Redis; the test that was supposed to cover it only faked a failing ``get_redis``.
         """
         try:
@@ -406,7 +408,7 @@ __all__ = [
 
 # --- the one call site a non-LLM provider needs --------------------------------------------------
 #
-# The LLM providers are gated inside LLMRouter, which every LLM call already goes through. Firecrawl
+# The LLM providers are gated inside LLMRouter, which every LLM call already goes through. ScraperAPI
 # and KIE.AI have no such choke point — they are raw httpx calls inside step services — so they get
 # this helper instead: reserve, retry, and record in one wrapper.
 
