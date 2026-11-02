@@ -99,6 +99,14 @@ class EngineSettings(BaseSettings):
     # nothing upstream would stop a mistaken "humanize all": 96 chapters x 7k words x 2 is about
     # 1.3M billed words. 20000 covers two or three chapters and makes a runaway pass impossible.
     humanize_max_words_per_run: int = Field(default=20_000, alias="HUMANIZE_MAX_WORDS_PER_RUN")
+    # A chunk rejected as `structure_collapsed` (paragraphs merged) is retried ONCE in this mode
+    # before the original is kept. A rejection still bills, so without a retry half the spend bought
+    # nothing. Empty = no retry. Never retried for `terms_lost` (a second roll loses the same terms).
+    humanize_collapse_retry_mode: str = Field(default="Medium", alias="HUMANIZE_COLLAPSE_RETRY_MODE")
+    # Per-surface switches (each still needs HUMANIZE_NON_FICTION + a key). The newsletter saga's
+    # per-story sections, and the posts the Trend / Dev radars draft onto the post calendar.
+    humanize_newsletter_segments: bool = Field(default=True, alias="HUMANIZE_NEWSLETTER_SEGMENTS")
+    humanize_radar_drafts: bool = Field(default=True, alias="HUMANIZE_RADAR_DRAFTS")
 
     # Delivery
     postal_api_key: str = Field(default="", alias="POSTAL_API_KEY")

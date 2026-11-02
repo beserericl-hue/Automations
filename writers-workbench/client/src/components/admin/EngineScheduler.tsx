@@ -53,6 +53,16 @@ export function formatInterval(s: number): string {
   return `${Number.isInteger(h) ? h : h.toFixed(1)} h`;
 }
 
+/** A run's returned summary as one short line: "skipped: not configured · deleted: 2". */
+export function resultSummary(r: Record<string, unknown> | null | undefined): string {
+  if (!r) return '';
+  const text = Object.entries(r)
+    .filter(([, v]) => v !== null && v !== undefined && v !== '')
+    .map(([k, v]) => `${k}: ${String(v)}`)
+    .join(' · ');
+  return text.length > 140 ? `${text.slice(0, 139)}…` : text;
+}
+
 function relative(iso: string | null, now: number): string {
   if (!iso) return '—';
   const diff = Math.round((Date.parse(iso) - now) / 1000);
@@ -151,7 +161,14 @@ function SchedulerBody({ data }: { data: EngineSchedulerData }) {
                       Skipped: {j.last_result.skipped}
                     </span>
                   ) : j.last_run ? (
-                    <span className="text-gray-600 dark:text-gray-300">OK</span>
+                    <span className="text-gray-600 dark:text-gray-300">
+                      OK
+                      {resultSummary(j.last_result) && (
+                        <span className="ml-1 text-gray-500" data-testid="scheduler-last-result">
+                          · {resultSummary(j.last_result)}
+                        </span>
+                      )}
+                    </span>
                   ) : (
                     <span className="text-gray-400">—</span>
                   )}

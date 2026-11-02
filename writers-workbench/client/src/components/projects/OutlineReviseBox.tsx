@@ -50,6 +50,8 @@ interface JobStatus {
 }
 
 const POLL_MS = 5_000;
+/** Consecutive failed polls (a minute's worth) before the box stops waiting. */
+const MAX_POLL_MISSES = 12;
 /** A revision is one 64k-token call; past this the job is treated as lost rather than polled forever. */
 const MAX_AGE_MS = 60 * 60 * 1000;
 
@@ -120,11 +122,24 @@ export default function OutlineReviseBox({ projectId, chapterCount }: { projectI
   useEffect(() => {
     if (!job) return;
     let stopped = false;
+    let misses = 0;
+    // A failed POLL is not a failed JOB. The server answers {status: 'error', error: 'engine job poll
+    // 502'} when it could not reach the engine (seen on DEV during an engine deploy), and the job
+    // carries on regardless — so only give up after a minute of failed polls in a row.
+    const missed = (text: string) => {
+      misses += 1;
+      if (misses >= MAX_POLL_MISSES) finish('error', text);
+    };
     const tick = async () => {
       setNow(Date.now());
       try {
         const s = await apiFetch<JobStatus>(`/api/jobs/engine/${job.jobId}/status`);
         if (stopped || jobRef.current?.jobId !== job.jobId) return;
+        if (s.status === 'error' && /^engine job poll/.test(s.error ?? '')) {
+          missed(`Lost touch with the engine while revising (${s.error}). The revision may still finish; reload the page in a few minutes.`);
+          return;
+        }
+        if (s.status !== 'not_found') misses = 0;
         if (s.status === 'queued' || s.status === 'deferred') setPhase('queued');
         else if (s.status === 'in_progress') setPhase('in_progress');
         else if (s.status === 'complete') {
@@ -143,10 +158,10 @@ export default function OutlineReviseBox({ projectId, chapterCount }: { projectI
         } else if (s.status === 'error') {
           finish('error', `The revision failed: ${s.error || 'engine error'}`);
         } else if (s.status === 'not_found') {
-          finish('error', 'The revision job was lost (the engine no longer knows it). Nothing was changed; try again.');
+          missed('The revision job was lost (the engine no longer knows it). Nothing was changed; try again.');
         }
       } catch {
-        // transient poll failure — try again on the next tick
+        if (!stopped) missed('Lost touch with the Workbench while revising. The revision may still finish; reload the page in a few minutes.');
       }
     };
     void tick();
