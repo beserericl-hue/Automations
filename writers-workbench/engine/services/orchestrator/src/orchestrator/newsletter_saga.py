@@ -24,6 +24,7 @@ from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
 
+from writer_engine.config import get_settings
 from writer_engine.schemas import Stage, StepStatus
 from writer_engine.schemas.newsletter import (
     AssembledNewsletter,
@@ -79,6 +80,43 @@ def _step(name: str) -> StepRef:
 
 
 EnqueueHook = Callable[[UUID], Awaitable[None]] | None
+
+
+def _humanize_budget_left(segments: list[dict[str, Any]]) -> int | None:
+    """HUMANIZE_MAX_WORDS_PER_RUN minus what this newsletter's sections have already billed."""
+    ceiling = int(get_settings().humanize_max_words_per_run or 0)
+    if ceiling <= 0:
+        return None
+    spent = sum(int((seg.get("humanize") or {}).get("words_spent") or 0) for seg in segments)
+    return max(0, ceiling - spent)
+
+
+def _humanize_summary(segments: list[dict[str, Any]]) -> dict[str, Any]:
+    """Per-section humanize outcome for the send row's metadata ({} when the pass never ran)."""
+    ran = [
+        (seg.get("story_title"), seg["humanize"]) for seg in segments if isinstance(seg.get("humanize"), dict)
+    ]
+    if not ran:
+        return {}
+    return {
+        "humanize": {
+            "applied": any(r.get("applied") for _, r in ran),
+            "words_spent": sum(int(r.get("words_spent") or 0) for _, r in ran),
+            "sections": [
+                {
+                    "story_title": title,
+                    "applied": bool(r.get("applied")),
+                    "chunks": r.get("chunks"),
+                    "humanized_chunks": r.get("humanized_chunks"),
+                    "rejected": r.get("rejected"),
+                    "retried": r.get("retried"),
+                    "words_spent": r.get("words_spent"),
+                    "skipped": r.get("skipped"),
+                }
+                for title, r in ran
+            ],
+        }
+    }
 
 
 class NewsletterSagaDriver:
@@ -315,6 +353,10 @@ class NewsletterSagaDriver:
                     "subject_line": subj.get("subject_line", ""),
                     "pre_header": subj.get("pre_header_text", ""),
                     "newsletter_date": str((st.get("cfg") or {}).get("send_date") or ""),
+                    # E6: what is left of the newsletter's humanize ceiling, so the per-run cap holds
+                    # across all its sections rather than per section. None = no ceiling configured.
+                    "humanize_budget_words": _humanize_budget_left(segments_data),
+                    **({"humanize": False} if (st.get("cfg") or {}).get("humanize") is False else {}),
                 },
                 timeout_s=240.0,
             )
@@ -441,6 +483,7 @@ class NewsletterSagaDriver:
                     s.identifiers for s in PickedStories.model_validate(st["picked"]).top_selected_stories
                 ],
                 "subject_reasoning": subj.subject_line_reasoning,
+                **_humanize_summary(st.get("segments_data") or []),
             },
         )
         persist_out = await run_step_via_http(
