@@ -27,6 +27,8 @@ const CASES: Array<[string, string]> = [
   ["put together this week's newsletter for The Wasteland Wire", 'write_newsletter'],
   // Natural blog phrasing.
   ['write a blog post about ancient Egyptian bread makers', 'write_blog'],
+  // A story-bible add whose description mentions research must stay a (free) bible edit.
+  ['Add a character named Nyx Arden to the story bible: she does research on the signal', 'story_bible_edit'],
 ];
 
 test.describe('Chat natural phrasing → correct router classification', () => {

@@ -165,10 +165,33 @@ Variables on `writer-engine-runtime` (never in GitHub):
 | Variable | What it does | Without it |
 |---|---|---|
 | `SOCIAL_POSTING_MODE` | `live` posts for real. Anything else (default `dry_run`) records each channel's exact request as a `dry_run` delivery and sends nothing. | dry run |
-| `BLOTATO_API_KEY` | LinkedIn posts via Blotato (`blotato-api-key` header), and the status check. | LinkedIn deliveries fail with "BLOTATO_API_KEY is not set" (live mode only) |
-| `TECHAHIR_BLOG_API_KEY` | The TechAhir blog API token. The header it goes in is the website channel's `auth_header` in `social_channels_v2` (default `Authorization`, sent as `Bearer …`). | website deliveries fail (live mode only) |
+| `INTEGRATIONS_ENCRYPTION_KEY` | 32 random bytes, base64. Decrypts each user's Blotato key and blog tokens (`user_integrations_v2`, migration 043). **Must be the same value on `WritersWorkbench`** (which encrypts them) — set on those two services only. | per-user keys cannot be read: deliveries fail with "INTEGRATIONS_ENCRYPTION_KEY is not set on this service" |
 | `YOUTUBE_API_KEY` | Dev Radar's YouTube search (8 queries, 800 quota units a week). | Dev Radar uses the 45-day video archive only |
 | `KIEAI_API_KEY` | Sketchnote images (already set). | posts go out without an image |
+
+**Blotato and blog keys are per user, not variables.** `BLOTATO_API_KEY` and `TECHAHIR_BLOG_API_KEY`
+are **no longer read** (and the website channel's `auth_env` is gone) — delete them from
+`writer-engine-runtime` if present. Each user enters their own Blotato API key, Blotato LinkedIn
+account id, LinkedIn page ids, and each blog's endpoint / auth header / token in the Workbench under
+**Settings → Integrations**. The server encrypts every key with AES-256-GCM
+(`INTEGRATIONS_ENCRYPTION_KEY`, bound to the user and channel) before storing it; the table has no
+read policy for signed-in users, and the API returns only set / last 4 / updated. The engine decrypts
+at send time with the post owner's credentials, and re-checks each blog endpoint for SSRF (https,
+public addresses only, no redirects). A dry-run delivery's detail says which credentials would be
+used, or "would fail: …" when one is missing.
+
+Generating the key (never print it, never commit it), once per environment, and setting the SAME
+value on both services:
+
+```bash
+KEY=$(openssl rand -base64 32)
+railway variables -e <env> -s WritersWorkbench      --set "INTEGRATIONS_ENCRYPTION_KEY=$KEY" --skip-deploys
+railway variables -e <env> -s writer-engine-runtime --set "INTEGRATIONS_ENCRYPTION_KEY=$KEY" --skip-deploys
+unset KEY
+```
+
+Rotating it makes every stored key unreadable (each user re-enters theirs); there is no re-encrypt
+job. DEV has its own key; **a PROD cutover generates a separate PROD key** — never copy DEV's.
 
 Crons (engine internal timer, all US Eastern): publisher every 5 min (slots 09:00 / 14:00), radars
 hourly check (Trend Monday 06:00, Dev Sunday 06:00), one run per user, radar and week.
@@ -180,6 +203,8 @@ re-run `scripts/seed_social_dev.py --import-n8n` so the last n8n posts are in; t
 Imported n8n rows that were still `pending` are imported as `cancelled` on purpose — requeue the ones
 the engine should post.
 
-Setup on a database: `python scripts/seed_social_dev.py --seed` (channels, radar subscriptions, the
-`ai-mvp` and `ai-dev-roundup` editions with their `radar://` and `social://` sources). DEV only; it
+Setup on a database: `python scripts/seed_social_dev.py --seed` (channels, the Blotato account id,
+radar subscriptions, the `ai-mvp` and `ai-dev-roundup` editions with their `radar://` and `social://`
+sources). It inserts missing channels only and never overwrites what was changed in the UI, and it
+seeds no keys: those are entered in Settings → Integrations. DEV only; it
 refuses any other Supabase URL.

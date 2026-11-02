@@ -17,6 +17,10 @@ export const REDACT_PATHS = [
   'req.headers["x-postal-webhook-secret"]',
   'req.headers["x-rpi-printapi-hmac-sha256"]',
   'req.query.token',
+  // Settings → Integrations (per-user Blotato keys, blog tokens). Bodies are not logged today;
+  // this keeps it that way if anyone ever adds them.
+  'req.body.api_key',
+  'req.body.auth_token',
   'res.headers["set-cookie"]',
 ];
 

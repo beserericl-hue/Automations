@@ -8,6 +8,10 @@ voice webhook (the simulated-Eve surface). Writes scripts/e2e_out/verify/<id>.js
 scripts/e2e_out/verify/REPORT.md at the end.
 
 Env: E2E_SECRET (64-char gateway secret), SUPA_URL, SUPA_KEY (DEV Supabase).
+Exit status: 1 if any test FAILs (or has no runnable prompt), else 0.
+
+Runs by hand or in the writer-e2e Railway runner (writers-workbench/e2e/runner/run.sh), which maps
+those names from its Railway variables. Never point it at PROD.
 """
 from __future__ import annotations
 
@@ -25,6 +29,10 @@ USER = os.environ.get("E2E_USER", "+14105914612")
 TIMEOUT = int(os.environ.get("E2E_TIMEOUT", "900"))
 SUPA_URL = os.environ["SUPA_URL"].rstrip("/")
 SUPA_KEY = os.environ["SUPA_KEY"]
+# DEV only: this suite writes, emails and deletes rows. Refuse anything but DEV Supabase + a DEV gateway.
+if "gvbvwcnmjkdpclcisqrr" not in SUPA_URL or "develop" not in GATEWAY:
+    raise SystemExit("REFUSING TO RUN: SUPA_URL must be DEV Supabase (gvbvwcnmjkdpclcisqrr) and "
+                     "E2E_GATEWAY a -develop engine gateway.")
 SUITE = "knowledgebase/Writers Workbench Wiki/Engineering/testing/engine-chat-e2e-suite.md"
 OUT = "scripts/e2e_out/verify"
 RUN_START = datetime.now(timezone.utc) - timedelta(minutes=2)  # rows created after this count as "new"
@@ -568,7 +576,10 @@ def main():
     for s in summary:
         counts[s["verdict"]] = counts.get(s["verdict"], 0) + 1
     log(f"\nDONE {datetime.now(timezone.utc).isoformat()} :: {counts}")
+    # Non-zero when any test FAILed or had no runnable prompt, so a runner (e2e/runner/run.sh on the
+    # writer-e2e Railway service) can report the pass as failed. PARTIAL is reported, not failed.
+    return 1 if (counts.get("FAIL", 0) or counts.get("NO_PROMPT", 0) or not summary) else 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

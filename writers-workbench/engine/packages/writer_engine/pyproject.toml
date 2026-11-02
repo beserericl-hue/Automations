@@ -26,6 +26,9 @@ dependencies = [
     # to no grounding, which is the exact silent-no-op class A1 exists to prevent.
     "openai>=1.40.0",
     "trafilatura>=2.0",
+    # Per-user integration secrets (writer_engine.integrations): AES-256-GCM. Already in the tree
+    # via supabase/pyjwt; named here because the engine now imports it directly.
+    "cryptography>=42.0",
 ]
 
 [build-system]

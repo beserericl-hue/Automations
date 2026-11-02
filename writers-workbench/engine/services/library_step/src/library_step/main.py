@@ -360,13 +360,12 @@ async def _op_list_outlines(payload: dict) -> dict:
     client = await _supabase_or_none()
     if client is None:
         return {"items": []}
-    resp = await (
-        client.table("writing_projects_v2")
-        .select("id,title,outline")
-        .neq("outline", "{}")
-        .limit(int(payload.get("limit") or 50))
-        .execute()
-    )
+    q = client.table("writing_projects_v2").select("id,title,outline").neq("outline", "{}")
+    # Scoped to the caller. This listed every user's outlines; it went unnoticed because nothing read
+    # the list back — until hub.memory started remembering it for "pick #3".
+    if payload.get("user_id"):
+        q = q.eq("user_id", payload["user_id"])
+    resp = await q.limit(int(payload.get("limit") or 50)).execute()
     return {"items": getattr(resp, "data", None) or []}
 
 

@@ -18,6 +18,7 @@ export const DEFAULT_CREDIT_COSTS: Record<string, number> = {
   brainstorm: 3,
   brainstorm_story: 3,
   brainstorm_chapter: 3,
+  revise_outline: 3,
   // Research
   research: 2,
   // Cover art
@@ -31,6 +32,7 @@ export const DEFAULT_CREDIT_COSTS: Record<string, number> = {
   retrieve_content: 0,
   approve_content: 0,
   list_story_arcs: 0,
+  story_bible_edit: 0,
   chat_generic: 0,
 };
 

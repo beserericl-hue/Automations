@@ -132,6 +132,13 @@ export default function UserSettings() {
   return (
     <div className="space-y-8 max-w-xl">
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
+      <p className="text-sm text-gray-500 dark:text-gray-400">
+        Your Blotato key, LinkedIn pages and blog websites are under{' '}
+        <button type="button" onClick={() => navigate('/settings/integrations')} className="text-brand-600 underline">
+          Integrations
+        </button>
+        .
+      </p>
 
       {/* Profile */}
       <Section title="Profile">

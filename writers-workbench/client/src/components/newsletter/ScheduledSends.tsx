@@ -120,7 +120,7 @@ export default function ScheduledSends() {
                     <td className="px-4 py-2">
                       {edition ? <EditionBadge edition={edition} /> : <span className="text-xs text-gray-400">{s.edition_id ?? '—'}</span>}
                     </td>
-                    <td className="px-4 py-2 text-xs text-gray-700 dark:text-gray-300">
+                    <td className="px-4 py-2 text-xs text-gray-700 dark:text-gray-300" data-testid="send-issue">
                       {s.issue_number != null ? `#${s.issue_number}` : '—'}
                     </td>
                     <td className="px-4 py-2">

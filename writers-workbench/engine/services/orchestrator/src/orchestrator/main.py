@@ -942,6 +942,13 @@ def build_app() -> FastAPI:
             logger.info("cron.radar", week_of=week.isoformat(), enqueued=enqueued)
         return {"week_of": week.isoformat(), "enqueued": enqueued}
 
+    async def _eve_kb_prune_tick() -> dict[str, Any]:
+        """Prune stale "Eve Session:" knowledge-base docs (writer_engine.eve). A logged no-op, shown
+        in /admin/scheduler as ``skipped``, wherever ElevenLabs is not configured — DEV today."""
+        from writer_engine.eve import prune_stale_kb_docs
+
+        return await prune_stale_kb_docs(max_age_s=get_settings().eve_kb_max_age_hours * 3600.0)
+
     @app.post("/cron/radar")
     async def cron_radar(request: Request) -> dict[str, Any]:
         """Start due radars now. Auth: ``X-Cron-Secret``. Also on the internal timer (hourly)."""
@@ -1138,6 +1145,11 @@ def build_app() -> FastAPI:
             name="workbench-lifecycle",
             interval_s=settings_for_jobs.workbench_lifecycle_poll_seconds,
             run=run_lifecycle,
+        ),
+        CronJob(
+            name="eve-kb-prune",
+            interval_s=settings_for_jobs.eve_kb_prune_poll_seconds,
+            run=_eve_kb_prune_tick,
         ),
     ]
 

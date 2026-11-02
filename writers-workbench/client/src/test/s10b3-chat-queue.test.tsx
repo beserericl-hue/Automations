@@ -136,4 +136,55 @@ describe('S10b-3: ChatDrawer async queue dispatch', () => {
     await waitFor(() => expect(screen.getByText(/Dust, Hollow/)).toBeTruthy());
     expect(screen.queryByText('Queued')).toBeNull();
   });
+
+  it('sends the drawer conversation id, and the project of the page it sits on', async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ mode: 'sync', data: { output: 'ok' } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    // The drawer is mounted by the layout route, outside <Route path="projects/:id">, so it has to
+    // read the project from the path (useParams there was always empty).
+    window.history.pushState({}, '', '/projects/0b5c1a52-1111-4222-8333-944455556666/bible');
+    try {
+      renderWithProviders(<ChatDrawer open={true} onClose={() => {}} />);
+      const textarea = screen.getByPlaceholderText('Type a message...') as HTMLTextAreaElement;
+      fireEvent.change(textarea, { target: { value: 'Add Mara Voss to the story bible: a pilot' } });
+      fireEvent.keyDown(textarea, { key: 'Enter' });
+      await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+      const calls = fetchMock.mock.calls as unknown as Array<[string, RequestInit]>;
+      const body = JSON.parse(String(calls[0][1].body)) as Record<string, unknown>;
+      expect(body.project_id).toBe('0b5c1a52-1111-4222-8333-944455556666');
+      expect(String(body.conversation_id)).toMatch(/^drawer-/);
+      // The same conversation id is reused on the next message (it is what keys the hub's memory).
+      expect(localStorage.getItem('writers-workbench-chat-conversation')).toBe(body.conversation_id);
+    } finally {
+      window.history.pushState({}, '', '/');
+    }
+  });
+
+  it('sends no project off a project page', async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ mode: 'sync', data: { output: 'ok' } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    window.history.pushState({}, '', '/library');
+    try {
+      renderWithProviders(<ChatDrawer open={true} onClose={() => {}} />);
+      const textarea = screen.getByPlaceholderText('Type a message...') as HTMLTextAreaElement;
+      fireEvent.change(textarea, { target: { value: 'list my projects' } });
+      fireEvent.keyDown(textarea, { key: 'Enter' });
+      await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+      const calls = fetchMock.mock.calls as unknown as Array<[string, RequestInit]>;
+      const body = JSON.parse(String(calls[0][1].body)) as Record<string, unknown>;
+      expect(body.project_id).toBeUndefined();
+    } finally {
+      window.history.pushState({}, '', '/');
+    }
+  });
 });

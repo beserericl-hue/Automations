@@ -33,7 +33,7 @@ def _to_db_row(row: NewsletterSendRow, execution_id: str) -> dict[str, Any]:
     and ``user_id`` is ``NOT NULL``. Idempotency key for the upsert is ``(edition_id, send_date)``
     (unique index added in migration 024).
     """
-    return {
+    db_row: dict[str, Any] = {
         "user_id": row.user_id,
         "edition_id": row.edition_id,
         "send_date": row.send_date,
@@ -44,6 +44,11 @@ def _to_db_row(row: NewsletterSendRow, execution_id: str) -> dict[str, Any]:
         "status": _DB_STATUS.get(row.status, "draft"),
         "metadata": {**(row.metadata or {}), "execution_id": execution_id},
     }
+    # Only a known number is proposed. Omitting the column leaves an existing row's number alone on
+    # the upsert, and the trigger (migration 041) numbers a new row itself.
+    if row.issue_number is not None:
+        db_row["issue_number"] = row.issue_number
+    return db_row
 
 
 async def _upsert(row: NewsletterSendRow, execution_id: str) -> dict[str, Any]:

@@ -24,6 +24,8 @@ from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
 
+from writer_engine.config import get_settings
+from writer_engine.newsletter_issue import peek_issue_number, saved_issue_number
 from writer_engine.schemas import Stage, StepStatus
 from writer_engine.schemas.newsletter import (
     AssembledNewsletter,
@@ -79,6 +81,43 @@ def _step(name: str) -> StepRef:
 
 
 EnqueueHook = Callable[[UUID], Awaitable[None]] | None
+
+
+def _humanize_budget_left(segments: list[dict[str, Any]]) -> int | None:
+    """HUMANIZE_MAX_WORDS_PER_RUN minus what this newsletter's sections have already billed."""
+    ceiling = int(get_settings().humanize_max_words_per_run or 0)
+    if ceiling <= 0:
+        return None
+    spent = sum(int((seg.get("humanize") or {}).get("words_spent") or 0) for seg in segments)
+    return max(0, ceiling - spent)
+
+
+def _humanize_summary(segments: list[dict[str, Any]]) -> dict[str, Any]:
+    """Per-section humanize outcome for the send row's metadata ({} when the pass never ran)."""
+    ran = [
+        (seg.get("story_title"), seg["humanize"]) for seg in segments if isinstance(seg.get("humanize"), dict)
+    ]
+    if not ran:
+        return {}
+    return {
+        "humanize": {
+            "applied": any(r.get("applied") for _, r in ran),
+            "words_spent": sum(int(r.get("words_spent") or 0) for _, r in ran),
+            "sections": [
+                {
+                    "story_title": title,
+                    "applied": bool(r.get("applied")),
+                    "chunks": r.get("chunks"),
+                    "humanized_chunks": r.get("humanized_chunks"),
+                    "rejected": r.get("rejected"),
+                    "retried": r.get("retried"),
+                    "words_spent": r.get("words_spent"),
+                    "skipped": r.get("skipped"),
+                }
+                for title, r in ran
+            ],
+        }
+    }
 
 
 class NewsletterSagaDriver:
@@ -315,6 +354,10 @@ class NewsletterSagaDriver:
                     "subject_line": subj.get("subject_line", ""),
                     "pre_header": subj.get("pre_header_text", ""),
                     "newsletter_date": str((st.get("cfg") or {}).get("send_date") or ""),
+                    # E6: what is left of the newsletter's humanize ceiling, so the per-run cap holds
+                    # across all its sections rather than per section. None = no ceiling configured.
+                    "humanize_budget_words": _humanize_budget_left(segments_data),
+                    **({"humanize": False} if (st.get("cfg") or {}).get("humanize") is False else {}),
                 },
                 timeout_s=240.0,
             )
@@ -410,45 +453,69 @@ class NewsletterSagaDriver:
             permalink_placeholder = (
                 f"{os.environ.get('ARCHIVE_BASE_URL', '').rstrip('/')}/{edition_id}/{send_id_str}.html"
             )
-        out = await run_step_via_http(
-            _step("render"),
-            execution_id=execution_id,
-            payload={
-                "edition_id": edition_id,
-                "subject": subj.subject_line,
-                "pre_header_text": subj.pre_header_text,
-                # Masthead comes from the edition (newsletter_name), not a hardcoded default, so a
-                # themed edition (e.g. "The Wasteland Wire") isn't rendered as "The Workbench".
-                "masthead": cfg.get("newsletter_name") or "The Workbench",
-                "markdown_body": assembled.markdown_body,
-                "permalink_url": permalink_placeholder,
-                "send_date": send_date,
-            },
-            timeout_s=180.0,  # Handlebars render via the Workbench HTTP endpoint — headroom over 60s
-        )
-        rendered = RenderedNewsletter.model_validate(out.payload)
-        row = NewsletterSendRow(
-            user_id=str(cfg.get("user_id") or ""),
-            edition_id=edition_id,
-            send_date=send_date,
-            subject=subj.subject_line,
-            pre_header_text=subj.pre_header_text,
-            markdown_body=assembled.markdown_body,
-            html_body=rendered.html_body,
-            status="saved",
-            metadata={
-                "selected_story_identifiers": [
-                    s.identifiers for s in PickedStories.model_validate(st["picked"]).top_selected_stories
-                ],
-                "subject_reasoning": subj.subject_line_reasoning,
-            },
-        )
-        persist_out = await run_step_via_http(
-            _step("persist"),
-            execution_id=execution_id,
-            payload={"row": row.model_dump(mode="json")},
-        )
-        send_row_saved = persist_out.payload.get("send_row", {})
+        render_payload: dict[str, Any] = {
+            "edition_id": edition_id,
+            "subject": subj.subject_line,
+            "pre_header_text": subj.pre_header_text,
+            # Masthead comes from the edition (newsletter_name), not a hardcoded default, so a
+            # themed edition (e.g. "The Wasteland Wire") isn't rendered as "The Workbench".
+            "masthead": cfg.get("newsletter_name") or "The Workbench",
+            "markdown_body": assembled.markdown_body,
+            "permalink_url": permalink_placeholder,
+            "send_date": send_date,
+        }
+        story_ids = [s.identifiers for s in PickedStories.model_validate(st["picked"]).top_selected_stories]
+        humanize_meta = _humanize_summary(st.get("segments_data") or [])
+
+        async def _render_and_persist(number: int | None) -> tuple[RenderedNewsletter, dict[str, Any]]:
+            out = await run_step_via_http(
+                _step("render"),
+                execution_id=execution_id,
+                payload={**render_payload, "issue_number": number},
+                timeout_s=180.0,  # Handlebars render via the Workbench HTTP endpoint — headroom over 60s
+            )
+            rendered = RenderedNewsletter.model_validate(out.payload)
+            row = NewsletterSendRow(
+                user_id=str(cfg.get("user_id") or ""),
+                edition_id=edition_id,
+                send_date=send_date,
+                subject=subj.subject_line,
+                pre_header_text=subj.pre_header_text,
+                markdown_body=assembled.markdown_body,
+                html_body=rendered.html_body,
+                status="saved",
+                issue_number=number,
+                metadata={
+                    "selected_story_identifiers": story_ids,
+                    "subject_reasoning": subj.subject_line_reasoning,
+                    **humanize_meta,
+                },
+            )
+            persist_out = await run_step_via_http(
+                _step("persist"),
+                execution_id=execution_id,
+                payload={"row": row.model_dump(mode="json")},
+                # A re-render must re-save: one key per number, or the idempotency cache would hand
+                # back the first save and keep the stale HTML.
+                idempotency_key=f"{execution_id}:persist:{number}",
+            )
+            return rendered, dict(persist_out.payload.get("send_row") or {})
+
+        # Issue number: the database assigns it on save (migration 041), but the email prints it, so
+        # ask for the number this save will get, render with it, and propose it on the save.
+        issue_number = await peek_issue_number(edition_id, send_date)
+        rendered, send_row_saved = await _render_and_persist(issue_number)
+        saved_number = saved_issue_number(send_row_saved)
+        if saved_number is not None and saved_number != issue_number:
+            # Another send of this edition took the peeked number between the peek and the save, so
+            # the trigger gave this one the next free number. Re-render so the email matches the row.
+            logger.info(
+                "saga.issue_number_reassigned",
+                execution_id=str(execution_id),
+                peeked=issue_number,
+                saved=saved_number,
+            )
+            rendered, send_row_saved = await _render_and_persist(saved_number)
         await self._advance(
             execution_id,
             Stage.SAVED,
