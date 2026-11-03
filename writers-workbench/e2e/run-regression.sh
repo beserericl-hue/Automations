@@ -60,6 +60,21 @@ RETRIES="${E2E_RETRIES:-2}"
 PASSES="${E2E_PASSES:-ABC}"
 A=0; B=0; C=0
 
+# E2E_ONLY_SPECS="regression/a.spec.ts regression/b.spec.ts" runs just those specs (workers=1, so a
+# heavy spec never shares the engine) instead of the passes; E2E_GREP narrows them to matching test
+# titles. For verifying one change on the writer-e2e service without a full Pass B.
+if [ -n "${E2E_ONLY_SPECS:-}" ]; then
+  read -r -a ONLY <<< "$E2E_ONLY_SPECS"
+  for i in "${!ONLY[@]}"; do ONLY[$i]="${ONLY[$i]#e2e/}"; done
+  GREP_ARGS=()
+  [ -n "${E2E_GREP:-}" ] && GREP_ARGS=(--grep "$E2E_GREP")
+  echo "=== Only: ${ONLY[*]} ${E2E_GREP:+(grep: $E2E_GREP)} @ workers=1, retries=$RETRIES ==="
+  npx playwright test --project=chromium --workers=1 --retries="$RETRIES" --reporter=line "${GREP_ARGS[@]}" "${ONLY[@]}"
+  RC=$?
+  echo "=== RESULT: only=$RC ==="
+  exit $RC
+fi
+
 if [[ "$PASSES" == *A* ]]; then
 echo "=== Pass A: ${#LIGHT[@]} light specs @ workers=3, retries=$RETRIES ==="
 npx playwright test --project=chromium --workers=3 --retries="$RETRIES" --reporter=line "${LIGHT[@]}"
