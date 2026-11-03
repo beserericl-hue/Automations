@@ -72,6 +72,7 @@ import {
   computeKieCost,
   computeTokenCost,
   findPrice,
+  normalizeProvider,
   recordUsage,
   settleUsage,
 } from '../lib/cost-recorder.js';
@@ -177,6 +178,21 @@ describe('recordUsage', () => {
     await expect(recordUsage({ operation: 'x', provider: 'kieai', model: 'google/nano-banana', requestId: 't1' })).resolves.toBeUndefined();
     insertError = { message: 'db down' };
     await expect(recordUsage({ operation: 'x', provider: 'anthropic', model: 'claude-opus-5-5' })).resolves.toBeUndefined();
+  });
+
+  it('records provider "google" as gemini and prices it (n8n Hub V2 wrote "google")', () => {
+    expect(normalizeProvider('Google')).toBe('gemini');
+    expect(normalizeProvider('anthropic')).toBe('anthropic');
+    const row = buildUsageRow({
+      operation: 'x', provider: 'google', model: 'gemini-2.5-pro', tokens: { input: 18285, output: 85 },
+    });
+    expect(row).toMatchObject({ provider: 'gemini', cost_usd: 0.023706, cost_source: 'computed' });
+    expect((row.metadata as Row).provider).toBe('gemini');
+  });
+
+  it('prices retired Sonnet 4 so old rows can be re-priced', () => {
+    const r = computeTokenCost('anthropic', 'claude-sonnet-4-20250514', { input: 1_000_000, output: 1_000_000 });
+    expect(r.costUsd).toBe(18);
   });
 
   it('builds a $0 unpriced row for an unknown model instead of guessing', () => {

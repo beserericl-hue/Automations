@@ -80,6 +80,9 @@ def test_every_model_literal_in_the_engine_source_has_a_price() -> None:
         ("claude-haiku-4-5-20251001", 1.0, 5.0, 0.10, 1.25, 2.0),  # was $0.80/$4 — wrong
         ("claude-opus-4-8", 5.0, 25.0, 0.50, 6.25, 10.0),  # was $15/$75 — wrong
         ("claude-opus-5-5", 4.0, 20.0, 0.20, 5.0, 8.0),  # cache read is 0.05x on Opus 5.5
+        # Sonnet 4 (retired): kept so n8n-era rows can be re-priced (migration 047)
+        ("claude-sonnet-4-20250514", 3.0, 15.0, 0.30, 3.75, 6.0),
+        ("claude-sonnet-4-0", 3.0, 15.0, 0.30, 3.75, 6.0),
     ],
 )
 def test_anthropic_prices(model: str, inp: float, out: float, read: float, w5: float, w1h: float) -> None:
@@ -101,6 +104,22 @@ def test_gemini_pro_long_context_tier() -> None:
     long = pricing.token_cost("gemini", "gemini-2.5-pro", input_tokens=300_000, output_tokens=1_000)
     assert short.cost_usd == pytest.approx(100_000 * 1.25e-6 + 1_000 * 10e-6)
     assert long.cost_usd == pytest.approx(300_000 * 2.5e-6 + 1_000 * 15e-6)
+
+
+@pytest.mark.parametrize("alias", ["google", "Google", " google ", "google-genai", "googleai"])
+def test_google_is_an_alias_for_gemini(alias: str) -> None:
+    assert pricing.normalize_provider(alias) == "gemini"
+    assert pricing.price_entry(alias, "gemini-2.5-pro") is pricing.price_entry("gemini", "gemini-2.5-pro")
+    cost = pricing.token_cost(alias, "gemini-2.5-pro", input_tokens=18285, output_tokens=85)
+    # The n8n Hub V2 row this came from carried estimated_cost 0.023706 and cost_usd 0.
+    assert (cost.cost_usd, cost.cost_source) == (0.023706, pricing.COST_COMPUTED)
+
+
+def test_normalize_provider_leaves_canonical_names_alone() -> None:
+    for name in ("anthropic", "gemini", "perplexity", "openai", "kieai", "stealthgpt", "scraperapi"):
+        assert pricing.normalize_provider(name) == name
+    assert pricing.normalize_provider(None) == ""
+    assert pricing.normalize_provider("claude") == "anthropic"
 
 
 def test_provider_reported_cost_wins() -> None:
