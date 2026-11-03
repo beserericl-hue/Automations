@@ -340,7 +340,8 @@ test.describe('Content Studio full path (engine + publisher + newsletter)', () =
         await page.goto(`/newsletter/approvals/${gate.token}`, { waitUntil: 'domcontentloaded' });
         // Every gate's email preview shows the chosen stories — the image gate is the last look before it goes out.
         const preview = page.frameLocator('iframe[title="Approval email preview"]');
-        await expect(preview.getByText('3 stories this issue')).toBeVisible({ timeout: 30_000 });
+        // The preheader is hidden in an email by design (inbox preview text): attached, not visible.
+        await expect(preview.getByText('3 stories this issue')).toBeAttached({ timeout: 30_000 });
         for (const t of chosen) await expect(preview.getByText(t).first()).toBeVisible();
         await page.getByRole('button', { name: /^Approve/i }).click();
         await expect.poll(async () => (await supaGet('newsletter_approvals_v2', `token=eq.${gate.token}&select=decision`))[0]?.decision, { timeout: 30_000 }).toBe('approve');
