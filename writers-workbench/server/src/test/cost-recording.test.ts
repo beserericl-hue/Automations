@@ -183,6 +183,14 @@ describe('recordUsage', () => {
     expect(buildUsageRow({ operation: 'x', provider: 'anthropic', model: 'mystery', tokens: { input: 5, output: 5 } }))
       .toMatchObject({ cost_usd: 0, cost_source: 'unpriced' });
   });
+
+  it('never builds a row without provider and operation: defaults them and logs at error', async () => {
+    const { logger } = await import('../lib/logger.js');
+    const row = buildUsageRow({ operation: '', provider: '', model: 'm' });
+    expect(row).toMatchObject({ provider: 'unknown', operation: 'unattributed.unknown', workflow_name: 'unattributed.unknown', source: 'server' });
+    expect((row.metadata as Row).label_defaulted).toEqual(['provider', 'operation']);
+    expect(logger.error).toHaveBeenCalledWith(expect.objectContaining({ missing: ['provider', 'operation'] }), 'cost.unlabelled_row');
+  });
 });
 
 describe('settleUsage (KIE provisional row)', () => {

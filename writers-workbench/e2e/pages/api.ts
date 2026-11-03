@@ -275,7 +275,9 @@ export async function seedTokenUsage(projectId: string): Promise<string> {
     method: 'POST',
     headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
     body: JSON.stringify({
-      user_id: DEMO_USER_ID, workflow_name: 'E2E Cost Regression', model: 'e2e-model',
+      // operation + provider: migration 048 defaults (and warns about) a row written without them.
+      user_id: DEMO_USER_ID, workflow_name: 'E2E Cost Regression', operation: 'e2e.cost-regression',
+      provider: 'e2e', model: 'e2e-model',
       input_tokens: 100, output_tokens: 50, total_tokens: 150, cost_usd: 0.0123,
       metadata: { project_id: projectId },
     }),
