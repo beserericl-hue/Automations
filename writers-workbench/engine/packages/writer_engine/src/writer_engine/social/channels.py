@@ -32,6 +32,7 @@ from typing import Any
 
 import httpx
 
+from writer_engine.safe_http import UnsafeDestinationError
 from writer_engine.telemetry.logging import get_logger
 from writer_engine.url_safety import Resolver, check_public_https_url
 
@@ -259,10 +260,15 @@ async def send_website(
         if header.lower() != "authorization" or token.lower().startswith("bearer ")
         else f"Bearer {token}"
     )
-    # No redirects: a 30x to an internal address would walk straight past the check above.
-    resp = await http.post(
-        endpoint, json=request, headers={header: value}, timeout=60.0, follow_redirects=False
-    )
+    # No redirects: the token must not follow a 30x anywhere. The check above gives the user a
+    # readable reason; the connection itself is checked again by the caller's safe client
+    # (writer_engine.safe_http), which is what defeats a DNS answer that changes in between.
+    try:
+        resp = await http.post(
+            endpoint, json=request, headers={header: value}, timeout=60.0, follow_redirects=False
+        )
+    except UnsafeDestinationError as exc:
+        return SendResult("failed", detail=f"channel {channel.channel}: endpoint refused: {exc}")
     data = _json(resp)
     if 300 <= resp.status_code < 400:
         where = resp.headers.get("location", "")[:200]

@@ -36,6 +36,7 @@ from xml.etree import ElementTree
 
 import httpx
 
+from writer_engine.safe_http import safe_async_client
 from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("ingestion.feeds")
@@ -380,7 +381,7 @@ async def fetch_feed(
     dead feed is visible in ``last_error`` instead of looking like a quiet one.
     """
     owned = client is None
-    http = client or httpx.AsyncClient(timeout=FETCH_TIMEOUT_S, follow_redirects=True)
+    http = client or safe_async_client(timeout=FETCH_TIMEOUT_S, follow_redirects=True)
     try:
         resp = await http.get(url, headers={"User-Agent": USER_AGENT, "Accept": "*/*"})
         resp.raise_for_status()
@@ -427,7 +428,7 @@ async def fetch_reddit_post(url: str, *, client: httpx.AsyncClient | None = None
     if not match:
         return None
     owned = client is None
-    http = client or httpx.AsyncClient(timeout=FETCH_TIMEOUT_S, follow_redirects=True)
+    http = client or safe_async_client(timeout=FETCH_TIMEOUT_S, follow_redirects=True)
     try:
         resp = await http.get(
             f"https://www.reddit.com/comments/{match.group(1)}.json?raw_json=1",
