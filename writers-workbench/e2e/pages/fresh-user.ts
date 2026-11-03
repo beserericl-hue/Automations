@@ -21,7 +21,13 @@ const made: FreshUser[] = [];
 /** Sign a browser page in as this user (supabase-js reads the session from localStorage on boot). */
 export async function signInPage(page: import('@playwright/test').Page, user: FreshUser): Promise<void> {
   const key = `sb-${new URL(SUPA_URL).hostname.split('.')[0]}-auth-token`;
-  await page.addInitScript(({ k, v }) => { try { window.localStorage.setItem(k, v); } catch { /* about:blank */ } }, { k: key, v: JSON.stringify(user.session) });
+  // A brand-new user gets the onboarding tutorial, whose backdrop covers the page: mark it done.
+  await page.addInitScript(({ k, v, tut }) => {
+    try {
+      window.localStorage.setItem(k, v);
+      window.localStorage.setItem(tut, 'true');
+    } catch { /* about:blank */ }
+  }, { k: key, v: JSON.stringify(user.session), tut: `tutorial_completed_${user.userId}` });
 }
 
 export async function makeFreshUser(tag: string): Promise<FreshUser> {

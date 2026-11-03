@@ -299,7 +299,7 @@ describe('the saved card (a Stripe PaymentMethod)', () => {
   it('is collected by Checkout in setup mode and becomes the customer and subscription default', async () => {
     const r = await call('POST', '/api/billing/card/setup');
     expect(r.json.data.checkout_url).toContain('checkout.stripe.test');
-    expect(calls.find((c) => c[0] === 'checkout.create')![1]).toMatchObject({ mode: 'setup', customer: 'cus_1', metadata: { kind: 'save_card', user_id: 'u1' } });
+    expect(calls.find((c) => c[0] === 'checkout.create')![1]).toMatchObject({ mode: 'setup', customer: 'cus_1', allowed_payment_method_types: ['card'], metadata: { kind: 'save_card', user_id: 'u1' } });
     await deliver('checkout.session.completed', { id: 'cs_s', mode: 'setup', customer: 'cus_1', setup_intent: 'seti_1', metadata: { kind: 'save_card', user_id: 'u1' } });
     expect(calls).toContainEqual(['customers.update', { invoice_settings: { default_payment_method: 'pm_new' } }]);
     expect(calls).toContainEqual(['subscriptions.update', { id: 'sub_1', default_payment_method: 'pm_new' }]);
