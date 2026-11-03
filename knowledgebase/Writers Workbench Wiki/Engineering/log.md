@@ -1606,3 +1606,61 @@ comparisons of deliberately-skewed samples are meaningless; and a cost window is
 boundary.
 
 Context: all on DEV, The Ossuary project. PROD untouched.
+
+## [2026-10-27] update | catch-up for 2026-10-21 → 10-27 (written 2026-11-03 from git history)
+
+This log stopped at 2026-10-20. Summary of what merged to `develop` since, from `git log` and the PR
+list; details live in the PRs and the auto-memory files. All DEV; PROD untouched.
+
+- **10-21 → 10-23 (direct commits):** name/continuity checks in QA (honorifics, impossible ages), the
+  approval gate stops on defects only; the publishing path — volume splits where the story breaks,
+  trim size, front/back matter, interior PDF and cover wrap, KDP pre-flight, listing copy and author
+  bio with a review loop (migrations 032, 033); reference photographs with provenance (034); blog and
+  social posts written from the project.
+- **10-24 → 10-27 (PRs #150–#204):** public landing page `/books/<slug>` + reservations and mailings
+  (035, 037); E2E moved to DEV-only with a Railway runner (`writer-e2e`, no GitHub secrets, #155);
+  RPI print orders (036); series books (#163, #166); blog on the open web (#171); per-user rate
+  limits + log redaction (#173, #175); health watch + alert emails (#178); engine fleet — per-instance
+  heartbeats, single-replica crons, fleet view, autoscaler (#179–#181, #190); CR-001 gaps closed and
+  CR-002 name variants merged (#185, #186); Gemini on `google-genai` (#191, #204); the n8n blog /
+  LinkedIn system ported to the post calendar and radars (#192–#194, migration 038); RLS on
+  `writing_embeddings_v2` (#195, 040); Sprint 9 Stripe on DEV in test mode (#196–#203, 039).
+
+## [2026-11-03] update | DEV code-work list 1–20 done; docs brought up to date (item 19)
+
+Merged 2026-10-28 → 11-03, PRs #205–#260. Each claim below was checked against `develop` (`600be4b`),
+the migrations folder, DEV Railway variable names and read-only DEV queries, not taken from PR text.
+
+- **Publishing / review (10-28 → 10-29, #205–#217):** book breaks, cover and ISBN checks; humanized
+  text highlighted in the editor; Fix drift edits only the paragraphs it concerns, and a repair that
+  breaks something or fixes nothing is not kept (#213, #215–#217).
+- **Scraping:** ScraperAPI replaces Firecrawl (#218), requests in flight capped (#219). No
+  `FIRECRAWL_*` variable is left on DEV.
+- **The 20-item DEV list** (table in [[remaining-work-inventory]]): hub conversation memory and
+  story-bible add/update from chat/Eve (#229); Revise-outline box, Series Bible panel, cron health in
+  Admin (#226, #230); issue numbers (#225, 041); humanizer on newsletter sections + radar drafts with a
+  Medium retry for collapsed chunks (#231, #243, 042); canonical outline schema (#242); global settings
+  (#240, 045); exception audit + ruff BLE (#260); engine E2E in the runner (#221); required checks
+  always report (#222, #228); external uptime check (#223 — runs on schedule only once it is on
+  `main`); Eve KB prune cron (#229); run lease for single delivery (#236); PROD-capable social seed
+  (#233); branch sync (#224); DEV debris gone (0 open approvals).
+- **Costs:** exact labelled row per paid call + per-operation view (#237, 044 — drops the
+  `"Own data only"` policy on `token_usage_v2`), owner on newsletter/ingestion rows (#253, 046), every
+  row labelled + dead runs reaped (#258, 048), n8n-era rows priced and Gemini as one provider (#259,
+  047, 049), chat ops charged under their screen's credit key (#252).
+- **Integrations:** per-user Blotato + blog credentials, AES-GCM encrypted (#235, 043).
+- **Fixes:** newsletter sections stored empty since 10-24 (#239) and themed sections refused (#241);
+  lifecycle on the wrong row (#245); chat edit-outline no-op (#248); SSRF connect-time check (#251);
+  dashboard counts and a 14 MB Content Library fetch (#250, #254).
+
+Docs updated in the same PR: the CR README and CR-001/002/005/006/010 headers; [[remaining-work-inventory]]
+(new status section; rows B7, C4, D3, D5–D7, F1, F3, H5, J4, J5, I8, I10); [[migrations]] (001–049, and
+015 exists — the page said it was skipped); [[workflow-id-map]] (15 of 24 labels were wrong; the JSON
+ids were right); `engine/docs/deployment.md` (repo-connected deploys, process model, variable table,
+humanizer switches); new `writers-workbench/docs/prod-release-checklist.md`.
+
+Found while checking, not fixed (code/config, not docs): `main` requires `Engine CI` but
+`engine-ci.yml` is not on `main`, so a hotfix PR to `main` cannot pass until the release lands; the
+newsletter send's humanize summary drops `rejected_layout`, so a section discarded by the layout check
+shows no reason. Newsletter sections mostly fail the humanizer's guards (0 of 5 kept on the 11-03 06:01
+DEV send) while still billing.

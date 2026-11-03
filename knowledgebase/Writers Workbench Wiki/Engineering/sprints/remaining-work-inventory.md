@@ -2,11 +2,89 @@
 name: Remaining work inventory (engine completion + scale to 50 users)
 description: Evidence-backed inventory of everything left to finish in the Writers Workbench engine, categorised A–I by workstream with per-item status (not implemented / partial / implemented-but-wrong). Includes the two decisions taken 2026-10-15 — ingestion moves to the engine and n8n is turned off (E1), and the runtime container collapses 21 processes to 3 rather than splitting into per-step Railway services (B10). Supersedes the sprint-status framing in planned-sprints and python-migration-roadmap.
 type: concept
-tags: [sprints, engine, inventory, scaling, parity, remaining-work, gate-plan, 2026-10]
-last_reviewed: 2026-10-18
+tags: [sprints, engine, inventory, scaling, parity, remaining-work, gate-plan, 2026-10, 2026-11]
+last_reviewed: 2026-11-03
 ---
 
 # Remaining work inventory
+
+## Status 2026-11-03 — the DEV code-work list is done
+
+On 2026-11-02 the open DEV work was consolidated into a 20-item list. All 20 are done on DEV, checked
+2026-11-03 against `origin/develop` (`600be4b`, PR #260), the migrations folder, DEV Railway variable
+names and read-only DEV Supabase queries. Nothing here is on PROD; the PROD steps are in
+[`writers-workbench/docs/prod-release-checklist.md`](../../../../writers-workbench/docs/prod-release-checklist.md).
+
+| # | Item (inventory id) | PR | Evidence on develop |
+|---|---|---|---|
+| 1 | Hub conversation memory: "pick #3" resolves | #229 | `hub/memory.py` (Redis, per user + conversation, `HUB_CONVERSATION_TTL_SECONDS` 12 h); `server/src/routes/chat.ts` sends `conversation_id`. Voice uses `voice:default` with a 30-min TTL (`HUB_VOICE_CONVERSATION_TTL_SECONDS`) |
+| 2 | Chat/Eve add + update a story-bible entry | #229 | `story_bible.add` / `story_bible.update` in `hub/catalog.py`; ops in `story_bible_step` |
+| 3 | Project-level Revise outline box (CR-008 C4) | #226, #230, #234 | `client/.../projects/OutlineReviseBox.tsx`; survives a failed poll (#230) |
+| 4 | Series Bible panel (CR-008 C4) | #226 | `SeriesBiblePanel.tsx`; the entry is badged "engine-managed" in the Story Bible list |
+| 5 | Newsletter issue numbers | #225 | migration **041** (trigger + race-safe numbering + backfill of sent rows) |
+| 6 | Humanizer on newsletter story sections + radar drafts (E6) | #231, #243 | `segment_step._humanize_section` (prose only, labels kept, #243); `radar/drafts.py`; migration **042**. Switches `HUMANIZE_NEWSLETTER_SEGMENTS`, `HUMANIZE_RADAR_DRAFTS` (both default on) |
+| 7 | One canonical outline schema, validated on every write (F3) | #242 | `writer_engine/outline_schema.py` `normalize_outline` (first thing `persist_outline` does); `server/src/lib/outline-schema.ts` |
+| 8 | Global settings scope: user → global → default (F1) | #240 | migration **045** `app_config_global_v2`; Admin → Global Settings; `server/src/lib/app-config.ts` |
+| 9 | Exception audit; ruff `BLE` enabled (C4) | #260 | `engine/pyproject.toml` selects `BLE`; 12 defects fixed |
+| 10 | 157-test engine E2E in the `writer-e2e` runner (H5) | #221 | `e2e/runner/run.sh` runs `scripts/e2e_full_verify.py` every pass |
+| 11 | Required checks always report (H6) | #222, #227, #228 | `ci.yml` `changes` job (`dorny/paths-filter`) instead of an `on: paths` filter |
+| 12 | Humanizer rejection economics: one `Medium` retry (J4) | #231 | `HUMANIZE_COLLAPSE_RETRY_MODE` (default `Medium`), `humanize.py` |
+| 13 | External uptime check (J5) | #223 | `.github/workflows/uptime.yml` + `.github/uptime-targets.txt` (3 DEV URLs). **The `schedule` trigger only runs from `main`, so it is not running yet** — it starts with the release; PROD URLs added then |
+| 14 | Cron health in Admin (I10) | #226, #230 | `EngineScheduler.tsx` under Admin → Engine Fleet; `last_result` per job (#230) |
+| 15 | Eve knowledge-base prune cron (I10) | #229 | scheduler job `eve-kb-prune` (6 h, `EVE_KB_MAX_AGE_HOURS` 24). No-op on DEV: no ElevenLabs key |
+| 16 | Single delivery across replicas (B7) | #236 | `idempotency/run_lease.py` (60 s lease, refreshed) on top of the 028 run ledger |
+| 17 | PROD-capable social seed | #233 | `engine/scripts/seed_social.py --target prod --confirm [--apply]`, dry run by default, never run against PROD |
+| 18 | DEV debris | — (ops, no PR) | Checked 2026-11-03: 0 unresolved rows in DEV `newsletter_approvals_v2`; no `FIRECRAWL_*` variable on any DEV service |
+| 19 | Docs refresh | this PR | CR README + headers, this page, the wiki log / migrations / workflow-ID map pages, `engine/docs/deployment.md`, the PROD release checklist |
+| 20 | Branch drift (`main` hotfixes, `release/v1.0` `04038cc`) | #224 | `04038cc`, `fba46c9`, `d55baaf` are all ancestors of `develop` |
+
+Shipped alongside the list (2026-11-02 → 11-03):
+
+| Change | PR |
+|---|---|
+| ScraperAPI in place of Firecrawl; requests in flight capped (`SCRAPERAPI_MAX_CONCURRENCY`, default 3) | #218, #219 |
+| `.mcp.json` untracked; n8n key scrubbed from the workflow export | #220 |
+| Per-user Blotato + blog credentials, AES-GCM encrypted (`INTEGRATIONS_ENCRYPTION_KEY`) | #235 (migration **043**), #238 |
+| Exact labelled cost row for every paid provider call; per-operation view (`token_usage_breakdown`) | #237 (migration **044**) |
+| Newsletter: story sections stored empty since 10-24; themed sections refused by the brief | #239, #241 |
+| Engine lifecycle actions changed the wrong row on a fuzzy title match | #245 |
+| Chat edit-outline was a silent no-op (R118) | #248 |
+| SSRF guard checks the address actually connected to (DNS rebinding) | #251 |
+| Chat/hub op names charged under the same credit key as their screen | #252 |
+| Newsletter + ingestion cost rows carry the owner | #253 (migration **046**) |
+| Every cost row labelled (insert trigger); project/content on step rows; dead runs reaped (`run-reaper` job, every 15 min) | #258 (migration **048**) |
+| n8n-era zero-cost rows priced; Gemini recorded as one provider | #259 (migrations **047**, **049**) |
+| Dashboard/sidebar counts; post-calendar channel defaults; Content Library no longer fetches 14 MB of chapter text | #250, #254 |
+| E2E hardening (approvals fixture, manual tests reported as MANUAL, race-proof specs, superseded commits) | #230, #234, #244, #246, #247, #249, #255, #256, #257 |
+
+### What remains before PROD
+
+Code that is still open (none of it blocks a release by itself; each is a decision):
+
+- **D7 — E2E is not a required check** (issue #3). `develop` requires only `Engine CI`; `main` requires
+  the four Workbench checks + `Engine CI`.
+- **`main` requires `Engine CI` but `engine-ci.yml` is not on `main`**, so a `hotfix/*` PR to `main`
+  cannot get that check until the release lands.
+- **Newsletter-section humanizing mostly fails its guards and still bills.** DEV send 2026-11-03 06:01:
+  0 of 5 sections kept (one `structure_collapsed` after the Medium retry, one `links_lost`, three
+  discarded by the section-layout check), 1,866 words billed; the 11-02 21:23 send kept 4 of 5. The
+  send row's summary omits `rejected_layout`, so a discarded section shows no reason. Decide whether
+  `HUMANIZE_NEWSLETTER_SEGMENTS` ships on.
+- **A8** Eve on the engine (baseline-protected, needs sign-off) · **A12** `/v1` B2B stub · **B9** TPM
+  ceiling (a tier decision) · **J1** canon backfill for older projects · **J2** scene breaks on a live
+  write · CR-006's "unassigned research" bucket · `library_retrieve_step` still deployed though
+  deprecated · I3 cross-chapter continuity, I5 storage, I6 model bake-off.
+- **E4/E8/E9** the parallel n8n content system, Blotato LinkedIn and the RSS feeds — out of the Workbench,
+  but they keep n8n alive.
+
+PROD-only steps (all in the release checklist): migrations 023–049 (and 013–017 if the dump says
+so), the engine services + HA Redis, new PROD secrets (`SERVICE_SHARED_SECRET`, `ADMIN_TOKEN` /
+`ENGINE_ADMIN_TOKEN`, `INTEGRATIONS_ENCRYPTION_KEY`, `CRON_SECRET`), `RAILWAY_DEPLOYMENT_DRAINING_SECONDS=60`,
+ScraperAPI/StealthGPT keys, Stripe live mode, Supabase Auth URLs (I9), `seed_social.py --target prod`,
+PROD uptime targets, then the post-release checks. Rotations still owed by Eric: G1 (PROD passwords),
+G2 (PROD Postgres password + 4 keys), the old n8n key.
+
+---
 
 Audited 2026-10-15 against the **live repo, live n8n, and both Railway tiers** — not against the planning
 docs. The planning docs are stale in ways that matter (see §0), so every item below cites code, a live
@@ -48,9 +126,9 @@ Correct these before using any of them for sequencing.
 |---|---|
 | [[python-migration-roadmap]] / [[planned-sprints]] present the Python rewrite as future work (Sprints 16–27) | **The engine is built, deployed, hub-routed and passing a 161-test parity suite on DEV.** What remains is *cutover and hardening*, not construction |
 | Roadmap puts the hub port at Sprint 22 / phase F4 | **Already shipped** — CR-004 Path B: `writer_engine.hub` with Gemini router, `POST /internal/hub` + `/internal/hub/voice`, `HUB_BACKEND=engine` live on DEV, stress-tested 10-concurrent over 84 chapters |
-| [[workflow-id-map]] PROD↔DEV table | **IDs map to the wrong names** — see **D3**. The promotion script reads this file |
+| [[workflow-id-map]] PROD↔DEV table | **The wiki page's labels were wrong; the JSON's id pairs are right** — see **D3** (corrected 2026-11-03) |
 | [[postal-mail-stack]] / [[email-pipeline]] / [[credentials-map]] / [[env-vars-by-tier]] describe two Postal mail servers with per-tier keys | One shared server, one shared key (corrected in [[log]] 2026-05-17; the pages were never fixed) |
-| [[log]] is current | Ends **2026-07-07**. ~91 commits since are unrecorded |
+| [[log]] is current | Ended 2026-07-07 at this audit; brought up to 2026-11-03 since |
 
 ---
 
@@ -154,7 +232,7 @@ certainly `chapter_step`.
 | **B4** | ~~One arq queue for everything~~ | ✅ **DONE 2026-10-16** — two queues (`engine-heavy` 8 slots / `engine-interactive` 24 slots), one arq worker each, routed by `(tool, op)` | `orchestrator/worker.py:87` `queue_name="newsletter"`, `max_jobs=16` — newsletter sagas, chapter writes, Q/A, plan, cover-art and lifecycle share 16 slots | A 96-chapter batch starves every interactive op (CR-010 C3) |
 | **B5** | ~~90-min timeout × 2 tries, uniform across ops~~ | ✅ **DONE 2026-10-16** — per-queue `job_timeout` (5400s / 600s) + a capped Redis DLQ at `GET /admin/dlq`, recording crashes AND returned step errors | `worker.py:97,99` `job_timeout=5400`, `max_tries=2` | 16 stuck jobs = a 3-hour total stall. A Q/A needs seconds, not 90 minutes. No dead-letter path |
 | **B6** | ~~Retry idempotency unproven outside `chapter.write`~~ | ✅ **DONE 2026-10-17** — run ledger (`engine_job_runs`, migration 028 **applied**); a duplicate `run_id` replays instead of re-running. Verified live | `run_write_tool_job` is retried by arq; only `chapter.write` is keyed on `chapter_run_id`. brainstorm/research/media persist and lifecycle are unverified | A retry after partial success duplicates rows |
-| **B7** | **Multi-instance has never been run** | 🟡 | **Graceful drain DONE 2026-10-18** (`writer_engine/drain.py`): the supervisor raises a container-local flag on SIGTERM, holds it `DRAIN_READINESS_DELAY_S` so a readiness probe fails and the LB stops routing, then terminates. `/admin/ready` reports `draining` — distinct from `unhealthy`, because the remedies are opposite and the watchdog pages CRITICAL on the latter — and the watchdog skips its ticks while draining. arq workers now carry `job_completion_wait` (`drain_wait_s`: heavy 30s, interactive 20s), so SIGTERM stops them picking up work and lets in-flight jobs finish. **And the platform had to be told to allow it:** Railway's `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` defaults to **0** — SIGTERM then immediate SIGKILL — so every line of the drain would have been dead code. Set to 60 on both DEV engine services 2026-10-18; **a PROD cutover must set it too**. **Still open:** a second replica has never actually run, and cross-instance arq single-delivery is still unverified — that needs a Railway replica change | A deploy mid-chapter used to lose a 90-minute job (CR-010 C1). A heavy job that cannot finish inside the platform's grace period is re-queued, which is only safe because of B6's run ledger |
+| **B7** | **Multi-instance has never been run** | 🟡 | **Graceful drain DONE 2026-10-18** (`writer_engine/drain.py`): the supervisor raises a container-local flag on SIGTERM, holds it `DRAIN_READINESS_DELAY_S` so a readiness probe fails and the LB stops routing, then terminates. `/admin/ready` reports `draining` — distinct from `unhealthy`, because the remedies are opposite and the watchdog pages CRITICAL on the latter — and the watchdog skips its ticks while draining. arq workers now carry `job_completion_wait` (`drain_wait_s`: heavy 30s, interactive 20s), so SIGTERM stops them picking up work and lets in-flight jobs finish. **And the platform had to be told to allow it:** Railway's `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` defaults to **0** — SIGTERM then immediate SIGKILL — so every line of the drain would have been dead code. Set to 60 on both DEV engine services 2026-10-18; **a PROD cutover must set it too**. ~~**Still open:** a second replica has never actually run, and cross-instance arq single-delivery is still unverified~~ **Closed on DEV:** DEV has run 2 gateway + 2 runtime replicas since 2026-10-26 (CR-010 C1), and PR #236 (2026-11-02) added a per-run lease (`idempotency/run_lease.py`) so a job executes once across replicas; PR #258 added a reaper for runs whose worker died. PROD runs 4 + 4 from the cutover | A deploy mid-chapter used to lose a 90-minute job (CR-010 C1). A heavy job that cannot finish inside the platform's grace period is re-queued, which is only safe because of B6's run ledger |
 | **B8** | ~~Per-provider shared budgets missing~~ | ✅ **DONE 2026-10-16** — Redis-shared RPM/TPM budgets for gemini / perplexity / openai / firecrawl / kieai / stealthgpt, plus 429 retries where there were none | Only Anthropic has a Redis-shared budget (`rate_limit/anthropic_budget.py`). OpenAI, Perplexity, Gemini, Firecrawl and KIE.AI have none; CR-003 still lists the Perplexity limiter as outstanding | Fan-out at 50 users will 429 those providers |
 | **B9** | **Account-wide Anthropic TPM is a hard ceiling** | 🟡 | **The lever is built and MEASURED — and the answer is: do not pull it (2026-10-19).** It did not exist before: `hybrid-draft-polish` was in the public schema and named here as the fix, while the resolver was a two-entry dict for haiku/sonnet, so every hybrid request silently meant Sonnet-for-everything. `model_plan()` now returns a (draft, polish) pair and the sub-chapter fan-out — almost all the output tokens — can draft on Haiku. **The comparison**: The Ossuary chapter 2 written twice, same inputs, `persist=false`. Sonnet 7,446 words / mean craft **0.458**; hybrid 6,060 words / mean **0.286**. Every dimension that varies got worse — dialogue **0.72 → 0.0**, turn density 0.74 → 0.41, no-boring-paragraphs 0.76 → 0.55 — and the Haiku draft opened with a stray markdown H1. Wall-clock was ~10 min hybrid vs ~20 min Sonnet, so the throughput is real; the prose is not worth it. `CHAPTER_LLM_STRATEGY` stays `sonnet`. Remaining levers: a higher Anthropic tier, or BYOK (deferred) | Tier-4 Sonnet = 90k output TPM ≈ **5 chapters/min** ([[f1a-decisions]]). 50 concurrent heavy users queue rather than fail — but they queue |
 | **B10** | **Per-step independent scaling defeated by deployment** | 🟡 | All 21 steps in one image (locked in F1 as "no new Docker images", deferred to F3) | **RESOLVED — see Decisions above.** Collapse to 3 processes; defer the split until Gate 2 data |
@@ -268,8 +346,8 @@ on real drift, so most chapters keep them — confirm on the next live run.
 | J1 | **Canon index covers 4 of 26 projects** | 🟡 | `index_project_canon` fired only on a brainstorm outline save, so every project created before A3 had none. **Partly resolved 2026-10-18:** that is no longer the only trigger — `reindex_if_stale()` runs once per project per process on the chapter-write path, comparing the newest canon row against the newest canon INPUT (K4). The Burial Mound's own index was additionally blocked by K3. **Still open:** a backfill loop for the other 22 projects |
 | J2 | **A13 scene breaks unverified on a live write** | 🟡 | The em-dash backstop was deleting the separators and leaving `", -"` in the prose; fixed 2026-10-17, but **no chapter has been written since**, so N sub-chapters → N−1 breaks is still unproven end to end. One chapter settles it |
 | J3 | ~~Prose never enters the canon index~~ | ✅ **DONE** — `index_chapter_prose` runs on the write path (`chapter_step/main.py:1769`) and The Burial Mound carries 1,879 `chapter_prose` chunks. K2 is why they survive a canon reindex | `build_canon_chunks` indexes the outline and bible only, so retrieval returns the PLAN, never what was written. Chapter N knows what N−1 was supposed to contain, not what it said. `bridge_from_prior` carries the connection today, which held across 96 chapters of a detailed outline but would not on a thin one. This is the real content of **I3** (cross-chapter continuity) |
-| J4 | **Humanizer rejection economics** | 🟡 | ~50% of chunks are rejected on a real blog post and **a rejection still bills**, so a pass costs ~2x the input words for partial application. Candidate fix: retry a `structure_collapsed` chunk once at `Medium` before falling back |
-| J5 | **No notification of total engine death** | — | **DECIDED 2026-10-17: accepted for DEV.** Railway's healthcheck (`healthcheckPath = /admin/health`) already restarts the container; nothing reports that it happened. The watchdog cannot — it lives inside the engine. **Required before any PROD cutover**; a scheduled GitHub Action against `/admin/health` is the no-vendor option |
+| J4 | ~~Humanizer rejection economics~~ | ✅ | **DONE 2026-11-02 (PR #231)** — a `structure_collapsed` chunk is retried once at `HUMANIZE_COLLAPSE_RETRY_MODE` (`Medium`). Newsletter sections still mostly fail (see the status section). Original: | ~50% of chunks are rejected on a real blog post and **a rejection still bills**, so a pass costs ~2x the input words for partial application. Candidate fix: retry a `structure_collapsed` chunk once at `Medium` before falling back |
+| J5 | ~~No notification of total engine death~~ | ✅ | **DONE for DEV 2026-11-02 (PR #223)** — `.github/workflows/uptime.yml`, targets in `.github/uptime-targets.txt`. Its cron runs only from `main`, so it starts at the release, when the PROD URLs are added. Original: | **DECIDED 2026-10-17: accepted for DEV.** Railway's healthcheck (`healthcheckPath = /admin/health`) already restarts the container; nothing reports that it happened. The watchdog cannot — it lives inside the engine. **Required before any PROD cutover**; a scheduled GitHub Action against `/admin/health` is the no-vendor option |
 | J6 | ~~DEV ingestion workflow failing every 4 hours~~ | ✅ | **RESOLVED 2026-10-17 with E1.** Root cause confirmed from execution 67920: `get_identity` built the key with `$json.isoDate.substring(0, 10)`, so one feed entry with no `isoDate` emptied it and `/api/ingestion/search` answered 400 `prefix: key is required` — taking every other feed's items down with it. 23 days, zero rows. The port keeps the key shape byte-for-byte and changes only the failure behaviour: a missing date falls back to today, an unslugifiable title skips that one item. The workflow is now deactivated |
 
 ## K. Found 2026-10-18 (memory between chapters, scaling levers)
@@ -295,7 +373,7 @@ existed on paper and did nothing in practice.
 | C1 | ~~No dashboard~~ | ✅ **DONE 2026-10-17** — `GET /admin/dashboard`: readiness per dependency, per-queue depth/running/waiting, recent dead letters |
 | C2 | ~~No alerting of any kind~~ | ✅ | **DONE** — uptime/dependency + DLQ alerting shipped 2026-10-17 (watchdog + Postal, delivery verified). Queue depth and the capacity verdict added 2026-10-19: the two actionable verdicts send a debounced alert naming WHICH lever (a replica vs the Anthropic tier), WARNING not CRITICAL because nothing is broken, and a healthy tick clears the key so the next episode is not swallowed |
 | C3 | ~~Provider error strings logged raw; no secret-redaction pass~~ | ✅ | **DONE 2026-10-19** — a structlog processor (`telemetry/redaction.py`) installed immediately before `JSONRenderer`, so it also covers formatted exception text; a test pins that order. Matches the key shapes this engine uses plus the configured secrets, since `SERVICE_SHARED_SECRET` looks like nothing in particular. Values under 12 chars are left alone (they match inside ordinary words). Also closes **G4** |
-| C4 | Bare `except Exception` swallows failures in several paths | 🟡 | `prompt_store/store.py:44-50`; step fixture fallbacks |
+| C4 | ~~Bare `except Exception` swallows failures in several paths~~ | ✅ | **DONE 2026-11-03 (PR #260)** — every broad handler audited, 12 defects fixed, ruff `BLE` enabled so a new one fails CI |
 
 ---
 
@@ -305,11 +383,11 @@ existed on paper and did nothing in practice.
 |---|---|---|---|
 | **D1** | **PROD is 3.5 months behind DEV** | ⚠️ | PROD `/api/health` → `deployed_at: 2026-07-01`, `version: "unknown"`; DEV → `2026-10-10`. ~91 commits DEV-only |
 | **D2** | **PROD is still 100% n8n** | ❌ | `HUB_BACKEND=engine` is DEV-only (`server/src/lib/engine-hub.ts:16`). The F1-7.5 acceptance gate (A1–A5) has never run; no shadow period |
-| **D3** | **`workflow-id-map.json` is factually wrong vs live n8n** | ⚠️ | Live: `TVNfTVwOrCAnWBo7` = `PROD - Sub - Manage Research Reports` (map says *Tool - QA Chapter*); `Ugc2BonNNMCoeXP0` = `PROD - Data: AI Scraping Pipeline` (map says *Tool - Format Kindle Book*); `dk75OYTASeu6NkTr` = `PROD - Sub - Token Usage Tracker` (map says *Tool - Write Short Story*). **`scripts/promote-dev-to-prod.py` reads this to rewrite `executeWorkflow` refs — treat the promotion path as unsafe until regenerated** |
+| **D3** | ~~**`workflow-id-map.json` is factually wrong vs live n8n**~~ | ✅ | **Corrected 2026-11-03: the JSON was right, the wiki labels were wrong.** `scripts/workflow-id-map.json` holds ids only; all 24 PROD→DEV pairs resolve to the same `PROD - X` / `DEV - X` name in live n8n (read-only check). The promote script takes names from live PROD, not from this file. The mislabelled rows were on [[workflow-id-map]], now fixed. Original finding: | Live: `TVNfTVwOrCAnWBo7` = `PROD - Sub - Manage Research Reports` (map says *Tool - QA Chapter*); `Ugc2BonNNMCoeXP0` = `PROD - Data: AI Scraping Pipeline` (map says *Tool - Format Kindle Book*); `dk75OYTASeu6NkTr` = `PROD - Sub - Token Usage Tracker` (map says *Tool - Write Short Story*). **`scripts/promote-dev-to-prod.py` reads this to rewrite `executeWorkflow` refs — treat the promotion path as unsafe until regenerated** |
 | D4 | F2 newsletter PROD cutover gated | 🟡 | Needs migration 024 + the `newsletter-archive` bucket + PROD env verification |
-| D5 | Migrations 013/014/016/017 PROD status contradictory | 🟡 | [[migrations]] table says NO; [[log]] 2026-05-28 says applied. Needs a `pg_dump --schema-only` check |
-| D6 | Migrations 024/025/026 applied to DEV only | 🟡 | |
-| **D7** | **E2E is not a required check** | ⚠️ | Issue #3, open since 2026-04-18. The 173-test UI suite and 157-test engine suite gate nothing |
+| D5 | Migrations 013/014/016/017 PROD status contradictory | 🟡 | [[migrations]] table says NO; [[log]] 2026-05-28 says applied. Needs a `pg_dump --schema-only` check — step A3 of the PROD release checklist |
+| D6 | Migrations 023–049 applied to DEV only | 🟡 | All present on DEV (checked 2026-11-03). PROD order and per-migration notes in the PROD release checklist, section B |
+| **D7** | **E2E is not a required check** | ⚠️ | Issue #3, open since 2026-04-18. The Playwright suite and the 157-test engine suite now run on every `writer-e2e` pass (#221) and `e2e-dev` reports on commits (#249), but neither is a required check |
 | D8 | PR #113 open since 2026-06-02 | 🟡 | |
 | D9 | ~~`CRON_SECRET` unset on both tiers~~ | 🟡 | **DEV DONE 2026-10-19.** Worse than 'unset': the three lifecycle routes answered 500 MISCONFIGURED *and* nothing called them, so on DEV trials never expired, credits never reset and no warning emails went out. Shared secret set on both DEV services and the engine's scheduler now drives all three hourly, expiry before warnings. PROD still unset |
 
@@ -336,9 +414,9 @@ existed on paper and did nothing in practice.
 
 | ID | Item | St | Detail |
 |---|---|---|---|
-| F1 | `app_config_v2` is per-user with an FK on `user_id`; **two conflicting `recipient_email` rows**; no global scope for shared settings | 🟡 | The engine now correctly queries `app_config_v2` (G2 repaired, `library_helpers/email_recipients.py:39`), but the global-scope problem remains |
+| F1 | ~~`app_config_v2` has no global scope~~ | ✅ | **DONE 2026-11-02 (PR #240, migration 045)** — `app_config_global_v2`, resolved user → global → default by the engine and the server, edited in Admin → Global Settings. Original: | The engine now correctly queries `app_config_v2` (G2 repaired, `library_helpers/email_recipients.py:39`), but the global-scope problem remains |
 | F2 | `story_bible_v2` ~1000 polluted rows | 🟡 | See **A6** |
-| F3 | `outline` JSONB has no schema validation | 🟡 | Field-aliasing bugs already bit (segment blank-body, brief↔beat). **Measured 2026-10-17: two incompatible shapes exist in live data** — 16 projects key chapters on `chapter_number`+`beat`, 10 on `number`+`brief`, and each reader understood only one half. Mitigated by `writer_engine.outline_keys` (both readers now accept either), but the data is still unvalidated and a third shape would repeat it. See [[base-tables]] |
+| F3 | ~~`outline` JSONB has no schema validation~~ | ✅ | **DONE 2026-11-02 (PR #242)** — one canonical schema (`writer_engine/outline_schema.py`, `server/src/lib/outline-schema.ts`), legacy shapes normalised on write, unknown shapes rejected. Original: | Field-aliasing bugs already bit (segment blank-body, brief↔beat). **Measured 2026-10-17: two incompatible shapes exist in live data** — 16 projects key chapters on `chapter_number`+`beat`, 10 on `number`+`brief`, and each reader understood only one half. Mitigated by `writer_engine.outline_keys` (both readers now accept either), but the data is still unvalidated and a third shape would repeat it. See [[base-tables]] |
 | F4 | 17+ meta tables and growing, because base tables are immutable | — | By design per [[base-tables]]; noted as accumulating cost |
 
 ---
@@ -365,7 +443,7 @@ existed on paper and did nothing in practice.
 | **H8** | ~~mypy covers only 4 of 21 workspace members~~ | ✅ **DONE 2026-10-16** — 141 files checked across all members | `pyproject.toml [tool.mypy] files` = `packages/writer_engine/src`, `gateway`, `orchestrator`, `library_retrieve_step`. The other **17 step services are not type-checked at all** — including `chapter_step` and `media_step`. Given that 3 latent `None`-crashes turned up in the *checked* quarter, this is a real gap; expanding coverage will surface a backlog, so it wants its own pass |
 | **H3** | ~~L5 parity was never measured~~ | ✅ **DONE** 2026-10-16 — harness built (`run_corpus`/`render_report` + `scripts/parity_run.py`, 3 modes) and RUN. First run found a real craft regression (see **A13**). A failing tool fails the whole run, since the gate is per-tool at cutover. `live`/shadow mode still needed for the true same-input A4 number. | The ≥0.95 parity score is the stated precondition for every cutover ([[engine-framework-sprints]] F1-7.5 / [[engine-api-system-tests]]) |
 | H4 | L6 load/scalability suite never run | ❌ | See **B11** |
-| H5 | The 157-test engine E2E is a manual script, not CI | 🟡 | `scripts/e2e_full_verify.py` |
+| H5 | ~~The 157-test engine E2E is a manual script~~ | ✅ | **DONE 2026-11-02 (PR #221)** — runs on every `writer-e2e` pass |
 | H6 | ~~`ci.yml` has a `paths` filter, so some PRs cannot satisfy required checks~~ | ✅ **DONE** 2026-11-02 | Filter removed; a `changes` job (`dorny/paths-filter`) skips TypeScript & Lint / Unit Tests / Production Build when no Workbench path changed, and skipped jobs report success. See [[ci-pipeline]] |
 
 ---
@@ -381,9 +459,9 @@ existed on paper and did nothing in practice.
 | I5 | Sprint 14 storage decision |
 | I6 | [[sprint-15-testbed]] + the LLM bake-off — so **model choices are unvalidated** |
 | I7 | CR-010 B3 buttons: run research, repurpose to social, generate image, story-bible CRUD |
-| I8 | Auto-trial on signup skip — users who skip tier selection get `credits=0` and every chat 402s |
+| I8 | ~~Auto-trial on signup skip~~ — done: `ensureTrialSubscription` in `server/src/middleware/auth.ts` |
 | I9 | Supabase Auth Site URL / redirect URLs still factory `localhost:3000` → **password reset is broken on both tiers** |
-| I10 | Google OAuth; cron health dashboard; `_scanner_exclusions` UI; Eve KB cleanup cron |
+| I10 | Google OAuth; `_scanner_exclusions` UI (nothing in the code refers to it). Cron health dashboard (#226) and Eve KB cleanup cron (#229) are done |
 
 ---
 

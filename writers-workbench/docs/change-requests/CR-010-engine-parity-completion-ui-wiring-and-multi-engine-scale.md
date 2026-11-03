@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposed |
+| **Status** | Done on DEV (checked 2026-11-03); the tables below are the original 2026-06-09 audit and describe the gaps as they were then. **Shipped:** A1 Format Kindle removed; A1 Eve callback built (`writer_engine/eve.py`, a dry run while the ElevenLabs keys are unset); A2 embeddings (reindex after outline writes, canon retrieval in `chapter.write`), token accounting in every step (step template), `library.versions` / `library.revert`, `story_bible.add` / `update` routed from chat and Eve (#229), `library.email-content`; A3 ingestion ported to the engine (`writer_engine.ingestion` + scheduler); A4 dead `brainstorm.chapter` removed. All B items (B3 buttons; B4 credits now Stripe). C1 2 + 2 replicas, graceful drain, one execution per job across replicas (run lease, #236); C2 per-provider budgets; C3 heavy/interactive queues + DLQ; C4 alerting, fleet view, autoscaler, HA Redis. **Left:** the Eve callback live (baseline-protected); `ENABLE_PYTHON_EMBEDDINGS` defaults to false in code (set on DEV; must be set on PROD); `NEWSLETTER_BACKEND` defaults to `n8n`, so "no action falls back to n8n" needs `NEWSLETTER_BACKEND=python` as well as `HUB_BACKEND=engine`; versions/revert and email-content are chat-only (no Workbench button); `library_retrieve_step` is deprecated but still deployed; `/v1` stays a stub (out of scope); PROD 4 + 4 replicas at cutover |
 | **Opened** | 2026-06-09 |
 | **Tier** | DEV first; PROD at engine go-live |
 | **Goal** | Close every remaining gap between the n8n V2 workflows, the Python engine, and the Workbench UI so the engine can fully replace n8n, **and** finish the multi-engine load-balancing work started in [CR-003](CR-003-scaling-rate-limits-load-balancing.md). |

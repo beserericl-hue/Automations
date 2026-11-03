@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress |
+| **Status** | Done on DEV (checked 2026-11-03). `chapter_qa_v2` (migration 025) is written by every chapter run with drift, craft QA, `research_used` and `bible_entries_loaded`; write-time research goes to `research_reports_v2` (replacing the chapter's own report, not adding one); the swallowed failures, worker start/finish, budget waits and LLM truncation/429s are logged; the project view shows a QA badge per chapter. **Departures from the text below:** research is *not* copied into `story_bible_v2` as `entry_type='research'` (removed on purpose, inventory A6: it duplicated the report), and `last_chapter_seen` is set when a chapter writes an entry, not bumped when one is read. PROD at cutover |
 | **Opened** | 2026-06-06 |
 | **Tier** | DEV (build + migrate + validate); PROD at go-live |
 | **Goal** | Make every generation run *observable and auditable*: per-chapter drift + craft-QA persisted to the DB for the project view; write-time research persisted to the research report **and** the story bible with a record of what was actually used; and operational logging for the failures that are currently swallowed (research skip, bible-persist fail), the queue/rate-limit behaviour, and LLM truncation/429s. |

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress |
+| **Status** | Done on DEV (checked 2026-11-03). Shipped: the Series Bible row (`persist_helpers.persist_canon`, written by every outline save), the chapter-count + synopsis anchor in brainstorm (`_load_project_anchor`), outline chapter titles, roster-from-outline, name variants resolved at write time (`resolve_character_variant`, #186) and the Series Bible panel in the project page (#226). Left: `locked_synopsis` is not a hub/router parameter (the hub uses the project anchor), and no live run has yet proved a regenerated outline lands within ±3 of the anchored count. PROD at cutover |
 | **Opened** | 2026-06-05 |
 | **Tier** | DEV only |
 | **Depends on** | CR-001 (engine DB persistence) |
