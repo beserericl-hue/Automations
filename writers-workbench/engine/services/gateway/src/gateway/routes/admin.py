@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends
 
 from writer_engine.auth import require_admin_token
 from writer_engine.config import get_settings
+from writer_engine.errors import HTTP_ERRORS
 from writer_engine.prompt_store import get_prompt_store
 from writer_engine.telemetry.logging import get_logger
 
@@ -51,7 +52,7 @@ async def reload_prompts() -> dict[str, Any]:
             )
             resp.raise_for_status()
             downstream = resp.json() or {}
-    except Exception as exc:
+    except HTTP_ERRORS as exc:
         # The gateway's own reload succeeded, which is still worth reporting — but the caller must
         # know the generating code did NOT pick up the change.
         logger.warning("gateway.reload_prompts.fanout_failed", error=str(exc)[:200])

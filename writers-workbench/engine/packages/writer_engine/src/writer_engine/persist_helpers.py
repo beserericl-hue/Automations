@@ -10,12 +10,12 @@ right account in the UI. No base-table schema changes — only inserts/updates.
 
 from __future__ import annotations
 
-import contextlib
 import re
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
+from writer_engine.errors import SUPABASE_ERRORS
 from writer_engine.telemetry import token_accounting
 from writer_engine.telemetry.logging import get_logger
 
@@ -198,7 +198,7 @@ async def persist_canon(client: Any, *, project_id: str, user_id: str, outline: 
             await client.table("story_bible_v2").update(row).eq("id", rows[0]["id"]).execute()
         else:
             await client.table("story_bible_v2").insert(row).execute()
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         # C4: was `pass`. The Series Bible entry is the project's synopsis + target chapter count,
         # so losing it silently means a later chapter is written without the canon it should have.
         logger.warning(
@@ -555,8 +555,12 @@ def first_name_entry_to_rename(name: str, existing: list[str]) -> str | None:
     return singles[0] if len(singles) == 1 and not fulls else None
 
 
-async def _live_character_names(client: Any, project_id: str) -> dict[str, str]:
-    """Live character entries for the project, name -> description."""
+async def _live_character_names(client: Any, project_id: str) -> dict[str, str] | None:
+    """Live character entries for the project, name -> description. None when it cannot be read.
+
+    None, not ``{}``: an empty roster means "no characters yet", and persist_bible would then write
+    every variant ("Osei Asante" beside "Osei") as a new person (CR-002) on one failed read.
+    """
     try:
         resp = await (
             client.table("story_bible_v2")
@@ -568,8 +572,13 @@ async def _live_character_names(client: Any, project_id: str) -> dict[str, str]:
             .execute()
         )
         return {str(r["name"]): str(r.get("description") or "") for r in await _rows(resp) if r.get("name")}
-    except Exception:
-        return {}
+    except SUPABASE_ERRORS as exc:
+        logger.warning(
+            "persist.bible_roster_unreadable",
+            project_id=str(project_id),
+            error=f"{type(exc).__name__}: {str(exc)[:160]}",
+        )
+        return None
 
 
 async def persist_bible(
@@ -586,7 +595,8 @@ async def persist_bible(
     """
     count = 0
     failures: list[str] = []
-    characters: dict[str, str] | None = None
+    characters: dict[str, str] = {}
+    roster: str = "unread"  # unread | ok | unreadable
     for e in entries:
         name = e.get("name")
         if not name:
@@ -597,8 +607,15 @@ async def persist_bible(
         if entry_type == "character":
             # CR-002: "Osei" and "Osei Asante" were kept as two characters, and the writer's roster
             # then had two people where the book has one. A variant is written to the entry it names.
-            if characters is None:
-                characters = await _live_character_names(client, project_id)
+            if roster == "unread":
+                loaded = await _live_character_names(client, project_id)
+                roster = "ok" if loaded is not None else "unreadable"
+                characters = loaded or {}
+            if roster == "unreadable":
+                # Without the roster a variant cannot be matched to its person, and writing it
+                # anyway adds a second one. Skipped and counted; the next chapter's pass adds it.
+                failures.append(f"{name}: character roster unreadable")
+                continue
             descriptions = {**characters, str(name): str(e.get("description") or "")}
             canonical = resolve_character_variant(str(name), list(characters), descriptions=descriptions)
             if canonical:
@@ -608,7 +625,7 @@ async def persist_bible(
                 if short:
                     # The bible knew this person only by first name; give that entry the full name
                     # rather than adding a second person.
-                    with contextlib.suppress(Exception):
+                    try:
                         await (
                             client.table("story_bible_v2")
                             .update({"name": name})
@@ -618,6 +635,16 @@ async def persist_bible(
                             .is_("deleted_at", None)
                             .execute()
                         )
+                    except SUPABASE_ERRORS as exc:
+                        # Was suppressed, and the full name was then inserted beside the first-name
+                        # entry: two people again. Not renamed, so this sighting updates "Osei".
+                        logger.warning(
+                            "persist.bible_rename_failed",
+                            project_id=str(project_id),
+                            error=f"{type(exc).__name__}: {str(exc)[:160]}",
+                        )
+                        name = short
+                    else:
                         characters[str(name)] = characters.pop(short, "")
                 characters.setdefault(str(name), str(e.get("description") or ""))
         row = {
@@ -649,7 +676,7 @@ async def persist_bible(
             else:
                 await client.table("story_bible_v2").insert(row).execute()
             count += 1
-        except Exception as exc:
+        except SUPABASE_ERRORS as exc:
             # C4: was a bare `continue`, so 0 persisted entries looked the same as 50 failures.
             # Counted and summarised once rather than logged per row — a chapter can emit dozens.
             failures.append(f"{name}: {type(exc).__name__}")
@@ -730,11 +757,19 @@ async def persist_research(
     report_id = str(rows[0]["id"]) if rows else ""
     if report_id and project_id:
         # Best-effort link — a missing meta table (pre-migration-026) must not fail the report write.
-        with contextlib.suppress(Exception):
+        # But not silent: an unlinked report is saved yet missing from the project's research tab.
+        try:
             await (
                 client.table("research_report_projects_v2")
                 .insert({"report_id": report_id, "project_id": str(project_id), "user_id": user_id})
                 .execute()
+            )
+        except SUPABASE_ERRORS as exc:
+            logger.warning(
+                "persist.research_link_failed",
+                report_id=report_id,
+                project_id=str(project_id),
+                error=f"{type(exc).__name__}: {str(exc)[:160]}",
             )
     return report_id
 

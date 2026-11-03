@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 
 from writer_engine.config import get_settings
+from writer_engine.errors import SUPABASE_ERRORS
 from writer_engine.llm import ProviderNotRegistered, complete_structured, get_router
 from writer_engine.prompt_store import compose_craft_system, get_prompt_store, seed_default_prompts
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
@@ -180,7 +181,8 @@ async def _persist_outline_if_requested(payload: dict, outline_dict: dict) -> di
             return {"persisted": False, "reason": "could not resolve or create a project"}
         await persist_outline(client, project_id=str(project_id), user_id=str(user_id), outline=outline_dict)
         return {"persisted": True, "project_id": str(project_id), "created_project": created}
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:  # OutlineValidationError is a ValueError, so it is in here too
+        logger.warning("brainstorm.outline_persist_failed", error=f"{type(exc).__name__}: {exc}"[:200])
         return {"persisted": False, "error": str(exc)[:200]}
 
 
@@ -211,8 +213,14 @@ async def _load_project_anchor(payload: dict) -> tuple[int, str]:
         if rows:
             target = target or int(rows[0].get("chapter_count") or 0)
             synopsis = synopsis or str((rows[0].get("outline") or {}).get("premise") or "")
-    except Exception:
-        pass
+    except SUPABASE_ERRORS as exc:
+        # Was `pass`: the regeneration then ran unanchored and drifted in scale and premise, which
+        # is the CR-002 failure this function exists to prevent. Refuse rather than drift.
+        logger.warning("brainstorm.anchor_unreadable", project_id=str(project_id), error=str(exc)[:160])
+        raise RuntimeError(
+            "could not read the project's chapter count and premise to anchor the outline; "
+            "nothing was regenerated, try again"
+        ) from exc
     return target, synopsis
 
 
@@ -555,7 +563,8 @@ async def _op_create_project(payload: dict) -> dict:
         client = await get_supabase_admin()
         pid = await create_project(client, user_id=user_id, title=title, genre_slug=genre)
         return {"created": bool(pid), "project_id": pid, "title": title}
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
+        logger.warning("brainstorm.create_project_failed", error=f"{type(exc).__name__}: {exc}"[:200])
         return {"created": False, "error": str(exc)[:200]}
 
 
@@ -580,7 +589,7 @@ async def _reindex_canon(op: str, payload: dict, result: dict) -> None:
         n = await index_project_canon(user_id=str(user_id), project_id=str(project_id))
         if n:
             logger.info("brainstorm.canon_reindexed", op=op, chunks=n, project_id=str(project_id))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - canon reindex is best-effort (embeddings provider + DB); logged
         logger.warning("brainstorm.canon_reindex_failed", op=op, error=str(exc)[:160])
 
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from writer_engine.config import get_settings
+from writer_engine.errors import HTTP_ERRORS, ErrorTypes
 from writer_engine.postal import send_email
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
 from writer_engine.step_service import build_step_app
@@ -12,6 +13,9 @@ from writer_engine.telemetry.logging import get_logger
 
 STEP_NAME = "notify"
 logger = get_logger("notify_step")
+
+# an ElevenLabs call failure, or eve_config() without an agent_id
+_EVE_ERRORS: ErrorTypes = (*HTTP_ERRORS, KeyError)
 
 _CALLBACK_STOP = {
     "the",
@@ -215,7 +219,7 @@ async def _op_eve_reset_greeting(payload: dict) -> dict:
     try:
         await EveClient(eve_config()).set_first_message("review", "your writing")
         return {"agent_id": eve_config()["agent_id"], "reset": True}
-    except Exception as exc:
+    except _EVE_ERRORS as exc:
         logger.warning("eve.reset.failed", error=str(exc)[:160])
         return {"reset": False, "error": str(exc)[:160]}
 

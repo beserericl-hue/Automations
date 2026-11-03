@@ -21,6 +21,8 @@ import time
 import uuid
 from typing import TYPE_CHECKING
 
+from writer_engine.errors import REDIS_ERRORS
+
 if TYPE_CHECKING:
     import redis.asyncio as redis
 
@@ -49,7 +51,10 @@ async def current(client: redis.Redis, key: str) -> int:
             text = m.decode("utf-8", "replace") if isinstance(m, bytes | bytearray) else str(m)
             _, count = text.rsplit(":", 1)
             total += int(count)
-        except Exception:
+        except (ValueError, TypeError):
+            # Decoding first (above) leaves two ways a member can be unreadable: no ":" to split on
+            # (ValueError from the unpack) or a non-integer count (ValueError from int()). TypeError
+            # stays named for a member type nobody anticipated.
             # A member written by an older/other format is ignored rather than crashing the gate:
             # over-counting or under-counting by one entry is survivable, refusing to answer is not.
             continue
@@ -91,7 +96,7 @@ async def record_stall(client: redis.Redis, provider: str, model: str) -> None:
     try:
         await record(client, f"{STALL_KEY}:{provider}", 1)
         await record(client, STALL_KEY, 1)
-    except Exception:  # pragma: no cover - never worth failing a call over
+    except REDIS_ERRORS:  # pragma: no cover - never worth failing a call over
         return
 
 
@@ -99,5 +104,5 @@ async def stalls_in_window(client: redis.Redis, provider: str = "") -> int:
     """How many calls had to wait for token capacity in the last window. 0 when nothing stalled."""
     try:
         return await current(client, f"{STALL_KEY}:{provider}" if provider else STALL_KEY)
-    except Exception:
+    except REDIS_ERRORS:
         return 0

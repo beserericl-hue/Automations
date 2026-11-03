@@ -18,6 +18,7 @@ from uuid import UUID, uuid4
 from arq.connections import RedisSettings
 
 from writer_engine.config import get_settings
+from writer_engine.errors import REDIS_ERRORS, SUPABASE_ERRORS
 from writer_engine.fleet import instance_id
 from writer_engine.idempotency import RunClaim, claim_run, complete_run, fail_run, run_lease
 from writer_engine.queues import (
@@ -91,7 +92,7 @@ async def _ledger() -> Any | None:
         from writer_engine.supabase.client import get_supabase_admin
 
         return await get_supabase_admin()
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         logger.warning("worker.ledger_unavailable", error=str(exc)[:160])
         return None
 
@@ -106,7 +107,7 @@ async def _lease_redis(ctx: dict[str, Any]) -> Any | None:
         from writer_engine.redis_client.client import get_redis
 
         return await get_redis()
-    except Exception as exc:
+    except REDIS_ERRORS as exc:
         logger.warning("worker.lease_redis_unavailable", error=str(exc)[:160])
         return None
 
@@ -280,7 +281,7 @@ async def _run_write_tool(
 
             result = (dumped.get("payload") or {}).get("result") or {}
             await send_task_completion_email(tool, body, result)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - a completion email must never fail the job
             logger.warning("worker.task_email.error", tool=tool, error=str(exc)[:200])
     if ledger is not None and claim is not None:
         # A step that returns status=error is a real outcome, not a crash — record it as an error so

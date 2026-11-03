@@ -38,10 +38,14 @@ from typing import Any
 import httpx
 from prometheus_client import Counter, Gauge
 
+from writer_engine.errors import REDIS_ERRORS, ErrorTypes
 from writer_engine.queues import QUEUE_HEAVY
 from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("autoscale")
+
+# a Redis failure, or a stored state with fields this version does not take
+_STATE_READ_ERRORS: ErrorTypes = (*REDIS_ERRORS, TypeError)
 
 RAILWAY_GRAPHQL = "https://backboard.railway.com/graphql/v2"
 STATE_KEY = "engine:autoscale:state"
@@ -281,7 +285,7 @@ async def load_state(redis: Any) -> AutoscaleState:
         if raw:
             known = AutoscaleState.__dataclass_fields__
             return AutoscaleState(**{k: v for k, v in json.loads(raw).items() if k in known})
-    except Exception as exc:
+    except _STATE_READ_ERRORS as exc:
         logger.warning("autoscale.state_read_failed", error=f"{type(exc).__name__}: {exc}"[:160])
     return AutoscaleState()
 
@@ -289,7 +293,7 @@ async def load_state(redis: Any) -> AutoscaleState:
 async def save_state(redis: Any, state: AutoscaleState) -> None:
     try:
         await redis.set(STATE_KEY, json.dumps(asdict(state)), ex=7 * 24 * 3600)
-    except Exception as exc:
+    except REDIS_ERRORS as exc:
         logger.warning("autoscale.state_write_failed", error=f"{type(exc).__name__}: {exc}"[:160])
 
 
@@ -313,7 +317,7 @@ async def tick(
     state = await load_state(redis)
     try:
         current = await scaler.current()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Railway GraphQL call: any failure leaves the replica count unchanged and is returned in the tick result
         DECISIONS.labels(action="error").inc()
         logger.warning("autoscale.read_failed", error=f"{type(exc).__name__}: {exc}"[:200])
         return {"acted": False, "action": "error", "reason": f"could not read replicas: {exc}"[:240]}
@@ -335,7 +339,7 @@ async def tick(
                 target=decision.target,
                 reason=decision.reason,
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - Railway GraphQL call: any failure leaves the replica count unchanged and is returned in the tick result
             DECISIONS.labels(action="error").inc()
             logger.warning(
                 "autoscale.set_failed", target=decision.target, error=f"{type(exc).__name__}: {exc}"[:200]

@@ -21,6 +21,7 @@ from typing import Any
 import httpx
 
 from writer_engine.config import get_settings
+from writer_engine.errors import HTTP_ERRORS
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
 from writer_engine.schemas.newsletter import RenderedNewsletter
 from writer_engine.step_service import build_step_app
@@ -156,7 +157,7 @@ async def _render_via_workbench(
         body = resp.json()
         html = body.get("html") if isinstance(body, dict) else None
         return html if isinstance(html, str) and html.strip() else None
-    except Exception:
+    except HTTP_ERRORS:
         return None
 
 

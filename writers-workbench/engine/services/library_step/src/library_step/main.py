@@ -6,6 +6,7 @@ import re
 from datetime import UTC
 
 from writer_engine.config import get_settings
+from writer_engine.errors import SUPABASE_ERRORS
 from writer_engine.fixtures import guard_fixture_fallback
 from writer_engine.library_helpers import optional_int
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
@@ -189,7 +190,7 @@ async def _op_lifecycle(payload: dict) -> dict:
                 )
                 .execute()
             )
-        except Exception as exc:  # snapshot is best-effort; never block the lifecycle change
+        except SUPABASE_ERRORS as exc:  # snapshot is best-effort; never block the lifecycle change
             logger.warning("lifecycle.snapshot_failed", action=action, error=str(exc)[:200])
 
     updates: dict = {"status": new_status, "updated_at": datetime.now(UTC).isoformat()}
@@ -225,7 +226,7 @@ async def _op_lifecycle(payload: dict) -> dict:
         from writer_engine.notifications.task_email import send_lifecycle_email
 
         await send_lifecycle_email(client, row_user, {**row, **updates}, new_status, action)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - a lifecycle email must never block the lifecycle change
         logger.warning("lifecycle.email_failed", action=action, error=str(exc)[:200])
     return out
 
@@ -510,7 +511,10 @@ async def _exact_title_row(query, term: str) -> dict | None:
     pattern = re.sub(r"[%_*\\]", "_", term.strip())
     try:
         resp = await query.ilike("title", pattern).order("updated_at", desc=True).limit(20).execute()
-    except Exception:
+    except SUPABASE_ERRORS as exc:
+        # The caller falls back to fuzzy matching over a capped batch; logged so it is not mistaken
+        # for "no exact title".
+        logger.warning("library.exact_title_lookup_failed", error=f"{type(exc).__name__}: {exc}"[:160])
         return None
     rows = getattr(resp, "data", None) or []
     return next((r for r in rows if normalize_title(r.get("title")) == want), None)
@@ -670,7 +674,11 @@ async def _op_email_content(payload: dict) -> dict:
         subject = subject or default_subject
         label = content_type or "content"
 
-    rec = await _email_recipients(client, payload.get("recipient"), user_id)
+    try:
+        rec = await _email_recipients(client, payload.get("recipient"), user_id)
+    except SUPABASE_ERRORS as exc:
+        logger.warning("email_content.recipients_unreadable", error=str(exc)[:200])
+        return {"emailed": False, "error_message": "could not read your email settings; no email sent"}
     if not rec.to:
         return {"emailed": False, "error_message": "no recipient configured (app_config.recipient_email)"}
 
@@ -687,7 +695,7 @@ async def _op_email_content(payload: dict) -> dict:
             html=html,
             bcc=[rec.bcc] if rec.bcc else None,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Postal send; a failure is returned as emailed=False with the reason
         logger.warning("email_content.send_failed", error=str(exc)[:200])
         return {"emailed": False, "error_message": f"email send failed: {str(exc)[:160]}"}
     logger.info(
@@ -848,8 +856,14 @@ async def _revert_chapter(client, payload: dict, version_number: int, user_id) -
             )
             .execute()
         )
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
+        # Was logged and then overwritten anyway: the current text was gone for good and the user
+        # was told "reverted". No history, no overwrite (the rule chapter-outline writes already keep).
         logger.warning("revert.snapshot_failed", scope="chapter", error=str(exc)[:200])
+        return {
+            "reverted": False,
+            "error_message": "could not save the current version first, so nothing was changed; try again",
+        }
     await (
         client.table("published_content_v2")
         .update({"content_text": target.get("content_text"), "updated_at": datetime.now(UTC).isoformat()})
@@ -945,8 +959,13 @@ async def _op_revert(payload: dict) -> dict:
             )
             .execute()
         )
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
+        # Same rule as the chapter revert: never overwrite what could not be snapshotted.
         logger.warning("revert.snapshot_failed", scope="outline", error=str(exc)[:200])
+        return {
+            "reverted": False,
+            "error_message": "could not save the current outline first, so nothing was changed; try again",
+        }
 
     chapter_count = len(target_outline.get("chapters") or [])
     await (

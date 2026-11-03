@@ -21,6 +21,7 @@ from typing import Any
 
 import httpx
 
+from writer_engine.errors import HTTP_ERRORS
 from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("radar.dev")
@@ -284,7 +285,7 @@ async def gather(
                     yt.append(r.json())
                 else:
                     stats["errors"].append(f"youtube {q!r}: HTTP {r.status_code}")
-            except Exception as exc:
+            except HTTP_ERRORS as exc:
                 stats["errors"].append(f"youtube {q!r}: {type(exc).__name__}")
     else:
         stats["errors"].append("youtube: YOUTUBE_API_KEY not set (archive videos only)")
@@ -306,7 +307,7 @@ async def gather(
             )
             if r.status_code < 400:
                 hn.append(r.json())
-        except Exception as exc:
+        except HTTP_ERRORS as exc:
             stats["errors"].append(f"hn {q!r}: {type(exc).__name__}")
     articles = parse_hn(hn)
 
@@ -316,7 +317,7 @@ async def gather(
     for url in feeds:
         try:
             entries = await feedlib.fetch_feed(url, url_type="rss", client=http)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - untrusted third-party feed: the failure is recorded in the run's errors and the next source is tried
             stats["errors"].append(f"rss {url}: {type(exc).__name__}")
             continue
         for e in entries:

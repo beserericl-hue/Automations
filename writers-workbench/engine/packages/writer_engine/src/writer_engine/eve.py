@@ -15,6 +15,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from writer_engine.errors import HTTP_ERRORS
 from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("eve")
@@ -125,9 +126,12 @@ class EveClient:
 
 
 def _suppress():
+    """One KB doc that will not delete (in use by a live call) is skipped, not fatal."""
     import contextlib
 
-    return contextlib.suppress(Exception)
+    from writer_engine.errors import HTTP_ERRORS
+
+    return contextlib.suppress(*HTTP_ERRORS)
 
 
 def _doc_created_at(doc: dict[str, Any]) -> float | None:
@@ -190,7 +194,7 @@ async def prune_stale_kb_docs(
         try:
             await c.delete_kb_doc(str(d.get("id")))
             deleted += 1
-        except Exception as exc:
+        except HTTP_ERRORS as exc:
             failed += 1
             logger.warning("eve.kb_prune.delete_failed", doc_id=d.get("id"), error=str(exc)[:160])
     undated = len(docs) - len(dated)  # no timestamp: age unknown, so left alone

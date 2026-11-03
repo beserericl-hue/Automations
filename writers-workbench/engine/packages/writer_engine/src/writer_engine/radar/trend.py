@@ -268,7 +268,7 @@ async def fetch(http: httpx.AsyncClient, feeds: Sequence[tuple[str, str]]) -> tu
     for label, url in feeds:
         try:
             entries = await feedlib.fetch_feed(url, url_type="rss", client=http)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - untrusted third-party feed: the failure is recorded in the run's errors and the next source is tried
             errors.append(f"{label}: {type(exc).__name__}: {exc}"[:200])
             continue
         for e in entries:

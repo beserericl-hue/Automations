@@ -21,6 +21,7 @@ from writer_engine.auth import require_admin_token, require_service_secret
 from writer_engine.cadence import INTERVAL_DAYS, is_due, latest_baseline
 from writer_engine.config import get_settings
 from writer_engine.drain import is_draining
+from writer_engine.errors import HTTP_ERRORS, REDIS_ERRORS, SUPABASE_ERRORS
 from writer_engine.health import (
     probe_arq_worker,
     probe_drain,
@@ -129,7 +130,7 @@ async def lifespan(app: FastAPI) -> Any:
     # unreachable (e.g. tests without fakeredis-wired arq), fall back to driving advance() inline.
     try:
         app.state.arq_pool = await create_pool(build_redis_settings())
-    except Exception as exc:
+    except REDIS_ERRORS as exc:
         logger.warning("arq pool unavailable; saga driver will run advance() inline", error=str(exc))
         app.state.arq_pool = None
 
@@ -273,7 +274,7 @@ def build_app() -> FastAPI:
                 )
                 resp.raise_for_status()
                 out["steps_loaded"] = int((resp.json() or {}).get("loaded", 0))
-        except Exception as exc:
+        except HTTP_ERRORS as exc:
             logger.warning("orchestrator.reload_prompts.steps_failed", error=str(exc)[:200])
             out["steps_error"] = f"{type(exc).__name__}: {str(exc)[:160]}"
         return out
@@ -335,7 +336,7 @@ def build_app() -> FastAPI:
                 if app.state.arq_pool is not None:
                     try:
                         entry["depth"] = int(await app.state.arq_pool.zcard(name) or 0)
-                    except Exception as exc:
+                    except Exception as exc:  # noqa: BLE001 - a metrics read must not break the dashboard
                         entry["error"] = f"{type(exc).__name__}: {str(exc)[:120]}"
             elif name in samples:
                 sample = samples[name].as_dict()
@@ -446,7 +447,7 @@ def build_app() -> FastAPI:
         if status == JobStatus.complete:
             try:
                 out["result"] = await job.result(timeout=1)
-            except Exception as exc:  # job failed inside the worker
+            except Exception as exc:  # noqa: BLE001 - job.result() re-raises whatever the job raised; reported as the job's error
                 out["status"] = "error"
                 out["error"] = str(exc)[:300]
         return out
@@ -464,7 +465,7 @@ def build_app() -> FastAPI:
         job, _status, _queue = await _locate_job(job_id)
         try:
             aborted = await job.abort(timeout=2)
-        except Exception as exc:  # already finished / result expired — nothing to abort
+        except Exception as exc:  # noqa: BLE001 - abort() re-raises the job's own error or a timeout; either way there is nothing to abort
             logger.info("write_job.abort.noop", job_id=job_id, error=str(exc)[:200])
             aborted = False
         logger.info("write_job.abort", job_id=job_id, aborted=aborted)
@@ -533,6 +534,7 @@ def build_app() -> FastAPI:
     async def resolve_approval_route(token: str, body: dict[str, Any]) -> dict[str, Any]:
         from writer_engine.state_machine.hitl import (
             ApprovalDecision,
+            ApprovalNotPersisted,
             get_approval,
             resolve_approval,
         )
@@ -550,7 +552,13 @@ def build_app() -> FastAPI:
 
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="bad decision value") from exc
 
-        await resolve_approval(token, decision=decision, feedback=body.get("feedback"))
+        try:
+            await resolve_approval(token, decision=decision, feedback=body.get("feedback"))
+        except ApprovalNotPersisted as exc:
+            from fastapi import HTTPException, status
+
+            # Nothing was applied (resolve_approval undid it), so the user can simply try again.
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
 
         driver = _make_saga_driver()
         await driver.apply_decision(
@@ -601,7 +609,10 @@ def build_app() -> FastAPI:
             from writer_engine.redis_client import client as redis_module
 
             raw = await (await redis_module.get_redis()).get(_CADENCE_STARTED_KEY.format(edition_id))
-        except Exception:
+        except REDIS_ERRORS as exc:
+            # Documented fallback (above): the approvals and sends still bound the next start. Logged,
+            # because without the marker a run that failed before its first gate can start again.
+            logger.warning("cron.cadence.read_failed", edition=edition_id, error=str(exc)[:120])
             return None
         return raw.decode() if isinstance(raw, bytes) else raw
 
@@ -612,7 +623,7 @@ def build_app() -> FastAPI:
             await (await redis_module.get_redis()).set(
                 _CADENCE_STARTED_KEY.format(edition_id), when.isoformat(), ex=_CADENCE_STARTED_TTL
             )
-        except Exception as exc:
+        except REDIS_ERRORS as exc:
             logger.warning("cron.cadence.mark_failed", edition=edition_id, error=str(exc)[:120])
 
     async def _cadence_tick() -> dict[str, Any]:
@@ -629,7 +640,7 @@ def build_app() -> FastAPI:
 
         try:
             client = await get_supabase_admin()
-        except Exception:
+        except SUPABASE_ERRORS:
             return {"enqueued": 0, "skipped_reason": "supabase not configured"}
 
         # "Due" is derived from cadence + the last send, mirroring the WW computeDueEditions path
@@ -719,7 +730,12 @@ def build_app() -> FastAPI:
                     await driver.advance(eid)
                 await _mark_cadence_started(str(edition_id), now)
                 enqueued.append(str(eid))
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - per-edition isolation: one edition's start failure must not stop the others
+                logger.warning(
+                    "cron.cadence.start_failed",
+                    edition=edition_id,
+                    error=f"{type(exc).__name__}: {exc}"[:200],
+                )
                 skipped.append({"edition_id": edition_id, "error": str(exc)[:120]})
 
         return {
@@ -810,7 +826,7 @@ def build_app() -> FastAPI:
 
         try:
             due, unreadable = await find_due()
-        except Exception as exc:
+        except SUPABASE_ERRORS as exc:
             logger.warning("cron.publisher.query_failed", error=f"{type(exc).__name__}: {exc}"[:160])
             return {"published": 0, "error": f"{type(exc).__name__}: {exc}"[:160]}
 
@@ -837,7 +853,7 @@ def build_app() -> FastAPI:
                         timeout_s=120.0,
                     )
                 enqueued.append(item.content_id)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - one unpublishable item must not strand the rest of the day's schedule; recorded in failed
                 # One unpublishable item must not strand the rest of the day's schedule.
                 failed.append({"content_id": item.content_id, "error": f"{type(exc).__name__}: {exc}"[:140]})
         logger.info(
@@ -892,7 +908,7 @@ def build_app() -> FastAPI:
                     subject=subject,
                     html=html,
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - the summary email is a convenience; the posts already went out
                 logger.warning("cron.social.summary_failed", error=f"{type(exc).__name__}: {exc}"[:200])
         return result.as_dict()
 

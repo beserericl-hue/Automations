@@ -84,7 +84,7 @@ async def check_public_https_url(url: str, *, resolve: Resolver | None = None) -
         return None if is_public_ip(str(literal)) else f"{host} is not a public address"
     try:
         addresses = await (resolve or system_resolve)(host, port)
-    except Exception:
+    except (OSError, ValueError):
         return f"{host} does not resolve"
     if not addresses:
         return f"{host} does not resolve"

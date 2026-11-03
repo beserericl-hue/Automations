@@ -32,7 +32,7 @@ def get_prime_directive() -> str:
         override = store.get(PRIME_DIRECTIVE_KEY)
         if override and override.strip():
             return override
-    except Exception:
+    except (ImportError, KeyError):
         pass
     return PRIME_DIRECTIVE
 

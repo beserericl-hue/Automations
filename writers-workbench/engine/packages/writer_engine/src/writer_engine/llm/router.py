@@ -141,7 +141,7 @@ class LLMRouter:
                     output_tokens=max_tokens,
                     max_wait_s=self._budget_max_wait_s,
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - budget wait is advisory: any failure (incl. BudgetExhausted) proceeds, the adapter's 429 backoff is the backstop; logged
                 # Logged, not swallowed: a suppressed TypeError here (a budget whose signature has
                 # drifted) would silently disable rate limiting across the whole engine, and the
                 # first symptom would be a wall of 429s under load.
@@ -168,7 +168,7 @@ class LLMRouter:
                     input_tokens=resp.input_tokens,
                     output_tokens=resp.output_tokens,
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - a lost usage record under-counts the window; it must never fail a call that already succeeded; logged
                 logger.warning(
                     "router.budget_record_failed",
                     provider=provider,
@@ -241,6 +241,13 @@ class LLMRouter:
                 request_id=resp.request_id or None,
                 metadata={"response_model": resp.model} if resp.model and resp.model != model else None,
             )
-        except Exception:  # accounting must never break a generation
-            pass
+        except Exception as exc:  # noqa: BLE001 - accounting must never break a generation that succeeded
+            # record() catches its own failures; this guards reading the response's usage fields.
+            # Logged, because a call that is never costed is money the cost view cannot show.
+            logger.warning(
+                "router.accounting_failed",
+                provider=provider,
+                model=model,
+                error=f"{type(exc).__name__}: {str(exc)[:160]}",
+            )
         return resp

@@ -181,7 +181,7 @@ async def run_lens(
             max_tokens=LENS_MAX_TOKENS,
             temperature=0.2,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - one lens failing is reported with its detail; provider/schema errors are not enumerable
         detail = f"{type(exc).__name__}: {exc}"[:200]
         logger.warning("review.lens_failed", lens=lens, error=detail)
         return None, detail
@@ -247,7 +247,7 @@ async def synthesize(
             max_tokens=LENS_MAX_TOKENS,
             temperature=0.3,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - a synthesis failure is reported with its detail; provider/schema errors are not enumerable
         detail = f"{type(exc).__name__}: {exc}"[:200]
         logger.warning("review.synthesis_failed", orchestrator=orchestrator, error=detail)
         return None, detail

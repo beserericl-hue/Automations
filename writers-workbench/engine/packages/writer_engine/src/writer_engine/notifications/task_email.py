@@ -207,7 +207,7 @@ async def send_lifecycle_email(
             "lifecycle_email.sent", to=rec.to, status=new_status, message_id=getattr(res, "message_id", None)
         )
         return True
-    except Exception as exc:  # never let a mail failure touch the DB write
+    except Exception as exc:  # noqa: BLE001 - a mail failure must never touch the DB write; Postal errors vary
         logger.warning("lifecycle_email.failed", status=new_status, error=str(exc)[:200])
         return False
 
@@ -251,6 +251,6 @@ async def send_task_completion_email(tool: str, body: dict, result: dict | None)
             message_id=getattr(res, "message_id", None),
         )
         return True
-    except Exception as exc:  # never let a mail failure touch the job
+    except Exception as exc:  # noqa: BLE001 - a mail failure must never touch the job; Postal errors vary
         logger.warning("task_email.failed", tool=tool, error=str(exc)[:200])
         return False

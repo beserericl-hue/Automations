@@ -1303,7 +1303,7 @@ async def route_message(
         return _apply_conversation_context(req, decision)
     except ProviderNotRegistered:
         logger.warning("hub.route.no_gemini", msg_preview=req.message[:120])
-    except Exception as exc:  # the failure the stress test must be able to see
+    except Exception as exc:  # noqa: BLE001 - any Gemini failure falls back to deterministic routing and is logged; SDK errors are not enumerable
         logger.warning("hub.route.gemini_failed", error=str(exc)[:300], msg_preview=req.message[:120])
 
     # 3. deterministic regex fallback

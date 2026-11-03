@@ -63,7 +63,9 @@ src = [
 ]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "ASYNC", "SIM", "RUF"]
+# BLE (blind except): a handler that catches Exception must name what it expects
+# (writer_engine.errors) or say why it is deliberately broad: `# noqa: BLE001 - <reason>`.
+select = ["E", "F", "I", "B", "BLE", "UP", "ASYNC", "SIM", "RUF"]
 ignore = [
     "E501",   # line length — formatter owns this
     "B008",   # FastAPI `Depends()` in defaults is idiomatic

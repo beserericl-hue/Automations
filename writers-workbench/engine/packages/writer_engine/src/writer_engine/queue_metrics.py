@@ -158,7 +158,7 @@ async def sample_queue(redis: Any, queue: str, *, health_key: str) -> QueueSampl
                 # for its own schedule is not a backlog.
                 score = float(head[0][1])
                 oldest = max(0.0, (time.time() * 1000 - score) / 1000)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - documented never-raises: a metrics read must not break the dashboard
         return QueueSample(
             queue=queue,
             depth=0,
@@ -218,7 +218,8 @@ async def budget_stalls(redis: Any) -> int:
         from writer_engine.rate_limit import window
 
         return int(await window.stalls_in_window(redis))
-    except Exception:
+    except Exception as exc:  # noqa: BLE001 - a metrics read must not break the dashboard (as sample_queue)
+        logger.debug("queue_metrics.stalls_unavailable", error=f"{type(exc).__name__}: {exc}"[:120])
         return 0
 
 

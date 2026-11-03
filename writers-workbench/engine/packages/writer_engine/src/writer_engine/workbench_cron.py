@@ -28,6 +28,7 @@ from typing import Any
 import httpx
 
 from writer_engine.config import get_settings
+from writer_engine.errors import HTTP_ERRORS
 from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("workbench_cron")
@@ -82,7 +83,7 @@ async def run_lifecycle(*, client: httpx.AsyncClient | None = None) -> dict[str,
                     },
                     json={},
                 )
-            except Exception as exc:
+            except HTTP_ERRORS as exc:
                 results[path] = {"ok": False, "error": f"{type(exc).__name__}: {exc}"[:160]}
                 logger.warning("workbench_cron.call_failed", path=path, error=str(exc)[:160])
                 continue
@@ -93,7 +94,7 @@ async def run_lifecycle(*, client: httpx.AsyncClient | None = None) -> dict[str,
                 continue
             try:
                 body = resp.json()
-            except Exception:
+            except ValueError:
                 body = {"raw": resp.text[:200]}
             data = body.get("data") if isinstance(body, dict) else None
             results[path] = {"ok": True, "data": data if data is not None else body}

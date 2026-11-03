@@ -299,7 +299,7 @@ async def _retry_collapsed(
         second = await call_provider(
             "stealthgpt", _again, model=use_model, input_tokens=len(chunk.split()), attempts=2
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - a StealthGPT failure keeps the original chunk and is recorded in the humanize report
         out.retried[i] = f"{retry_mode}:error:{type(exc).__name__}"
         return payload, result, verdict
     second_text = str(second.get("result") or "").strip()
@@ -405,7 +405,7 @@ async def humanize_text(
                 input_tokens=len(chunk.split()),
                 attempts=3,  # retry, then fall back — the 2026-10-17 decision
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - a StealthGPT failure keeps the original chunk and is recorded in failed_chunks
             logger.warning(
                 "humanize.chunk_failed",
                 chunk=i,

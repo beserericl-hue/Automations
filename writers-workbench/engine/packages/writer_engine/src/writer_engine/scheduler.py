@@ -142,7 +142,7 @@ class Scheduler:
             self._results[job.name] = _summarise(result)
         except asyncio.CancelledError:
             raise
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - scheduler job isolation: one job's failure is recorded and logged, the others keep running
             self._errors[job.name] = f"{type(exc).__name__}: {exc}"[:240]
             logger.warning("scheduler.tick_failed", job=job.name, error=self._errors[job.name])
         finally:

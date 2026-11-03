@@ -13,6 +13,7 @@ from typing import Any
 
 from writer_engine import outline_keys
 from writer_engine.config import get_settings
+from writer_engine.errors import SUPABASE_ERRORS
 from writer_engine.rate_limit.provider_budget import call_provider
 from writer_engine.telemetry.logging import get_logger
 
@@ -159,7 +160,7 @@ async def match_project_canon(
         params["p_project_id"] = str(project_id)
     try:
         resp = await client.rpc(settings.embedding_match_rpc, params).execute()
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         # Most likely PGRST202 — migration 027 not applied in this environment yet.
         logger.warning("embeddings.match_unavailable", rpc=settings.embedding_match_rpc, error=str(exc)[:160])
         return []
@@ -644,7 +645,7 @@ async def index_chapter_prose(
             "embeddings.prose_indexed", project_id=str(project_id), chapter=chapter_number, scenes=len(rows)
         )
         return len(rows)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - prose indexing is a retrieval aid run after the chapter is saved (embeddings provider + DB); reported as 0
         logger.warning(
             "embeddings.prose_index_failed",
             project_id=str(project_id),
@@ -785,7 +786,7 @@ async def canon_staleness(*, user_id: str, project_id: str) -> dict[str, Any]:
             out["reason"] = "no canon indexed for this project"
             return out
         out["canon_indexed_at"] = newest[0].get("created_at")
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         out["reason"] = f"freshness probe failed: {type(exc).__name__}"
         return out
 
@@ -818,7 +819,7 @@ async def reindex_if_stale(*, user_id: str, project_id: str) -> dict[str, Any]:
         return {"reindexed": False, **state}
     try:
         chunks = await index_project_canon(user_id=user_id, project_id=project_id)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - a stale-canon reindex is advisory (embeddings provider + DB); the failure is returned in the result
         logger.warning(
             "embeddings.stale_reindex_failed",
             project_id=str(project_id),

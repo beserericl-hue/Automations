@@ -32,6 +32,7 @@ from typing import Any
 import httpx
 
 from writer_engine.config import get_settings
+from writer_engine.errors import HTTP_ERRORS
 from writer_engine.integrations import UserCredentials, load_user_credentials
 from writer_engine.social import channels as ch
 from writer_engine.telemetry.logging import get_logger
@@ -293,7 +294,7 @@ async def post_row(
                     api_key=creds.blotato_api_key,
                     base_url=settings.blotato_base_url,
                 )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - any channel failure becomes a 'failed' delivery the user sees; channel HTTP/SDK errors vary
             result = ch.SendResult("failed", detail=f"{type(exc).__name__}: {exc}"[:500])
         if result.status == "failed" and creds.problems:
             result.detail = f"{result.detail}; {'; '.join(creds.problems)}"
@@ -397,7 +398,7 @@ async def reconcile_submitted(
                 api_key=api_key,
                 base_url=settings.blotato_base_url,
             )
-        except Exception as exc:
+        except HTTP_ERRORS as exc:
             logger.warning("social.reconcile_failed", ref=d.get("provider_ref"), error=str(exc)[:200])
             continue
         if result.status == "submitted":
@@ -445,7 +446,7 @@ async def run_tick(
         result.claimed += 1
         try:
             deliveries = await post_row(client, transport, row, now, live=live)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - per-row isolation: logged at error, deliveries re-read, the tick continues with the next row
             logger.error(
                 "social.post_row_failed", schedule_id=row["id"], error=f"{type(exc).__name__}: {exc}"[:300]
             )
@@ -466,7 +467,7 @@ async def run_tick(
         if after_posted is not None and state != "failed":
             try:
                 await after_posted(row, deliveries)
-            except Exception as exc:  # feeding the newsletter must never undo a post
+            except Exception as exc:  # noqa: BLE001 - feeding the newsletter must never undo a post that went out
                 logger.warning("social.after_posted_failed", schedule_id=row["id"], error=str(exc)[:200])
     if result.claimed:
         logger.info("social.tick", **{k: v for k, v in result.as_dict().items() if k != "rows"})

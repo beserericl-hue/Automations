@@ -167,7 +167,7 @@ def _pid_alive(pid: int) -> bool:
             check=False,
             timeout=5,
         )
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         return False
     state = out.stdout.strip()
     # Empty = gone. 'Z' = zombie, already exited and awaiting reap.

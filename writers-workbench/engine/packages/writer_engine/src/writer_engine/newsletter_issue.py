@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Any
 
 from writer_engine.config import get_settings
+from writer_engine.errors import SUPABASE_ERRORS
 from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("newsletter_issue")
@@ -37,7 +38,7 @@ async def peek_issue_number(edition_id: str, send_date: str) -> int | None:
             "newsletter_peek_issue_number", {"p_edition_id": edition_id, "p_send_date": send_date}
         ).execute()
         return _as_int(getattr(resp, "data", None))
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         logger.warning(
             "newsletter_issue.peek_failed",
             edition_id=edition_id,

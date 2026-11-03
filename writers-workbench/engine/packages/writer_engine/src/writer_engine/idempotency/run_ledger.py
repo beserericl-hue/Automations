@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from writer_engine.errors import SUPABASE_ERRORS
 from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("idempotency")
@@ -108,7 +109,7 @@ async def claim_run(
     try:
         await client.table(TABLE).insert(row).execute()
         return RunClaim(run_id=run_id, won=True, status=STATUS_IN_PROGRESS)
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         # A duplicate primary key is the expected path for a retry, and is indistinguishable here
         # from a genuine outage, so read the row back: if it is there, this was a conflict.
         prior = await _read(client, run_id)
@@ -177,7 +178,11 @@ def _small_enough(result: dict[str, Any] | None) -> dict[str, Any] | None:
     try:
         if len(json.dumps(result, default=str).encode()) <= MAX_RESULT_BYTES:
             return result
-    except Exception:  # pragma: no cover - a non-serialisable output is simply not kept
+    except (
+        TypeError,
+        ValueError,
+        RecursionError,
+    ):  # pragma: no cover - a non-serialisable output is simply not kept
         return None
     return None
 
@@ -185,7 +190,7 @@ def _small_enough(result: dict[str, Any] | None) -> dict[str, Any] | None:
 async def _read(client: Any, run_id: str) -> dict[str, Any] | None:
     try:
         resp = await client.table(TABLE).select("*").eq("run_id", run_id).limit(1).execute()
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         logger.warning("idempotency.read_failed", run_id=run_id, error=str(exc)[:160])
         return None
     rows = await _rows(resp)
@@ -200,7 +205,7 @@ async def _update(client: Any, run_id: str, patch: dict[str, Any]) -> None:
             .eq("run_id", run_id)
             .execute()
         )
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         # Losing a ledger write is a bookkeeping failure, never a reason to fail the user's job.
         logger.warning("idempotency.update_failed", run_id=run_id, error=str(exc)[:160])
 

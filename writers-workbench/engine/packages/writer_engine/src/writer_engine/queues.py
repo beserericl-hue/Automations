@@ -26,6 +26,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+from writer_engine.errors import REDIS_ERRORS
 from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("queues")
@@ -225,7 +226,7 @@ async def record_dead_letter(
         trim: Any = client.ltrim(DLQ_KEY, 0, DLQ_MAX - 1)
         await trim
         logger.error("queue.dead_letter", kind=kind, queue=queue, function=function, job_id=job_id)
-    except Exception as exc:  # pragma: no cover - best effort by design
+    except REDIS_ERRORS as exc:  # pragma: no cover - best effort by design
         logger.warning("queue.dead_letter_write_failed", error=str(exc)[:160])
 
 
@@ -237,14 +238,14 @@ async def read_dead_letters(limit: int = 50) -> list[dict[str, Any]]:
         client = await get_redis()
         pending: Any = client.lrange(DLQ_KEY, 0, max(limit, 1) - 1)
         raw = await pending
-    except Exception as exc:
+    except REDIS_ERRORS as exc:
         logger.warning("queue.dead_letter_read_failed", error=str(exc)[:160])
         return []
     out: list[dict[str, Any]] = []
     for item in raw or []:
         try:
             out.append(json.loads(item.decode() if isinstance(item, bytes) else item))
-        except Exception:
+        except (ValueError, TypeError):
             continue
     return out
 

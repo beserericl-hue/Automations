@@ -171,7 +171,7 @@ class NewsletterSagaDriver:
                 return SagaResult.PAUSED
             try:
                 await self._run_stage(execution_id, state.stage, state.state)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - saga error boundary: any stage failure is recorded as Stage.ERROR and shown to the user
                 await self._repo.update(
                     execution_id,
                     stage=Stage.ERROR,
@@ -335,7 +335,7 @@ class NewsletterSagaDriver:
                 scraped = (
                     [] if scrape_out.status is StepStatus.ERROR else (scrape_out.payload.get("scraped") or [])
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - a scrape failure must not fail the edition; logged (C4)
                 # C4: this was a bare `scraped = []`, so a scrape step that threw produced an
                 # edition built from headlines alone and looked exactly like a story with no
                 # external links. The send still goes out — one story's sources are not worth
@@ -629,8 +629,13 @@ class NewsletterSagaDriver:
             await notify_workbench_stage(
                 execution_id, next_stage.value, cfg=state.state.get("cfg"), message=message
             )
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001 - the stage callback is advisory; the stage is already persisted above
+            logger.warning(
+                "saga.stage_callback_failed",
+                execution_id=str(execution_id),
+                stage=next_stage.value,
+                error=f"{type(exc).__name__}: {exc}"[:160],
+            )
 
     # ---------- resolve hook ----------
 

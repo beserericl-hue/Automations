@@ -31,6 +31,7 @@ from typing import Any
 
 from writer_engine.alerting import LEVEL_CRITICAL, LEVEL_WARNING, Alert, clear_alert, send_alert
 from writer_engine.drain import is_draining
+from writer_engine.errors import REDIS_ERRORS
 from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("watchdog")
@@ -124,7 +125,7 @@ class Watchdog:
             return
         try:
             entries = await self._dead_letters(limit=1)
-        except Exception as exc:  # pragma: no cover - the DLQ read is already best-effort
+        except REDIS_ERRORS as exc:  # pragma: no cover - the DLQ read is already best-effort
             logger.warning("watchdog.dlq_read_failed", error=str(exc)[:160])
             return
         if not entries:
@@ -167,7 +168,7 @@ class Watchdog:
             except asyncio.CancelledError:
                 logger.info("watchdog.stop")
                 raise
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - watchdog loop: one failed tick is logged and the next tick runs
                 logger.warning("watchdog.tick_failed", error=f"{type(exc).__name__}: {str(exc)[:200]}")
             await asyncio.sleep(self._interval_s)
 
