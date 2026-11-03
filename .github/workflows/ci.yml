@@ -126,6 +126,8 @@ jobs:
       E2E_BASE_URL: https://writersworkbench-develop.up.railway.app
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # the wait step checks whether DEV's commit contains this one
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -134,15 +136,25 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - name: Wait for DEV to serve this commit
+        id: wait
+        # When merges land back to back, DEV deploys only the newest commit and never serves this one.
+        # If DEV serves a later commit that CONTAINS this one, this run is superseded: that commit's own
+        # run tests DEV. Skip the specs here instead of failing after 30 minutes.
         run: |
           for i in $(seq 1 120); do
             v=$(curl -s -m 10 "$E2E_BASE_URL/api/health" | jq -r '.version // empty')
             if [ "$v" = "$GITHUB_SHA" ]; then echo "DEV is serving $GITHUB_SHA"; exit 0; fi
+            if [ -n "$v" ] && git fetch -q origin develop && git merge-base --is-ancestor "$GITHUB_SHA" "$v" 2>/dev/null; then
+              echo "::notice::Superseded: DEV is serving $v, which contains $GITHUB_SHA; its own run tests DEV."
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
             sleep 15
           done
           echo "::error::DEV did not serve $GITHUB_SHA within 30 minutes (serving: ${v:-unknown})"
           exit 1
       - run: npx playwright test --project=chromium-noauth --reporter=line
+        if: steps.wait.outputs.superseded != 'true'
         env:
           CI: true
       - uses: actions/upload-artifact@v4
