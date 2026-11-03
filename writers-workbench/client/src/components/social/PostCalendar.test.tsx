@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithProviders, screen, fireEvent, waitFor } from '../../test/test-utils';
 import PostCalendar, { addDays, mondayOf } from './PostCalendar';
 import RadarPanel from './RadarPanel';
+import PostEditor, { type SocialChannel } from './PostEditor';
 import { apiFetch } from '../../lib/api';
 
 vi.mock('../../lib/api', async (orig) => ({ ...(await orig<typeof import('../../lib/api')>()), apiFetch: vi.fn() }));
@@ -32,7 +33,7 @@ const POSTS = [
     deliveries: [{ channel: 'li_agile', status: 'dry_run', attempts: 1, public_url: null, detail: 'dry run', updated_at: '' }],
   },
 ];
-const CHANNELS = [
+const CHANNELS: SocialChannel[] = [
   { channel: 'website', kind: 'website', label: 'TechAhir website', enabled: true },
   { channel: 'li_agile', kind: 'linkedin', label: 'Agile Ad Testing page', enabled: true },
 ];
@@ -81,6 +82,36 @@ describe('PostCalendar', () => {
     expect(deliveries).toHaveTextContent('TechAhir website: Posted');
     expect(deliveries).toHaveTextContent('Account connection has expired (5002)');
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+});
+
+describe('PostEditor (new post)', () => {
+  const save = () => screen.getByRole('button', { name: 'Schedule post' });
+
+  it('defaults to the enabled channels even when the channel list arrives after the editor opened', async () => {
+    const { rerender } = renderWithProviders(
+      <PostEditor post={null} channels={[]} defaultDate={monday} defaultSlot="morning" onClose={() => {}} onSaved={() => {}} onAction={() => {}} />,
+    );
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Late channels' } });
+    expect(save()).toBeDisabled();
+    rerender(
+      <PostEditor post={null} channels={CHANNELS} defaultDate={monday} defaultSlot="morning" onClose={() => {}} onSaved={() => {}} onAction={() => {}} />,
+    );
+    expect(screen.getByRole('checkbox', { name: 'TechAhir website' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Agile Ad Testing page' })).toBeChecked();
+    expect(save()).toBeEnabled();
+  });
+
+  it('keeps the author\'s own channel picks when the list refreshes', () => {
+    const { rerender } = renderWithProviders(
+      <PostEditor post={null} channels={CHANNELS} defaultDate={monday} defaultSlot="morning" onClose={() => {}} onSaved={() => {}} onAction={() => {}} />,
+    );
+    fireEvent.click(screen.getByRole('checkbox', { name: 'TechAhir website' }));
+    rerender(
+      <PostEditor post={null} channels={[...CHANNELS]} defaultDate={monday} defaultSlot="morning" onClose={() => {}} onSaved={() => {}} onAction={() => {}} />,
+    );
+    expect(screen.getByRole('checkbox', { name: 'TechAhir website' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Agile Ad Testing page' })).toBeChecked();
   });
 });
 
