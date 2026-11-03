@@ -153,7 +153,7 @@ describe('Sprint 8 — credit cost lookup', () => {
     expect(await getCreditCost('repurpose_to_social_posts')).toBe(3);
   });
 
-  it('returns 0 for unknown jobTypes', async () => {
+  it('returns 0 for unknown jobTypes (and warns — see credit-costs-coverage.test.ts)', async () => {
     expect(await getCreditCost('made_up_op')).toBe(0);
   });
 

@@ -165,3 +165,5 @@ export function classifyJob(userMessage: string): Classification {
 
 /** Export for tests / admin tooling. */
 export const CLASSIFIER_RULES = RULES;
+/** The jobType of the catch-all (unmatched messages). */
+export const CLASSIFIER_DEFAULT_JOB_TYPE = DEFAULT.jobType;
