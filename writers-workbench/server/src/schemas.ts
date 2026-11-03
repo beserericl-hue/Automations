@@ -160,6 +160,12 @@ export const ApprovalResolveSchema = z.object({
   // lib/approvals.ts accepts it only on a 'send' row.
   decision: z.enum(['approve', 'revise', 'reject']),
   feedback: z.string().max(5000).optional().default(''),
+  // Image gate only: story title -> the chosen image URL ("" = no image). The engine accepts only
+  // an image the gate offered. Without this key zod stripped the choice and the engine never saw it.
+  chosen_images: z
+    .record(z.string().max(500), z.union([z.string().url().max(2000).regex(/^https:\/\//, 'https only'), z.literal('')]))
+    .refine((m) => Object.keys(m).length <= 50, 'too many stories')
+    .optional(),
 });
 
 // Compose Newsletter 2a (S5/S8) — query schema for the in-app

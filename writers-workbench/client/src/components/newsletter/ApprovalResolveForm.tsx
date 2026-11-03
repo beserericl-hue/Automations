@@ -42,11 +42,13 @@ interface Props {
   stage?: string;
   /** Final gate only: active subscribers the send will reach (for the button label). */
   subscriberCount?: number | null;
+  /** Image gate only: story title -> chosen image URL ("" = none), sent with an approval. */
+  chosenImages?: Record<string, string>;
 }
 
 type Decision = 'approve' | 'revise' | 'reject';
 
-export default function ApprovalResolveForm({ token, onResolved, disabled, stage, subscriberCount }: Props) {
+export default function ApprovalResolveForm({ token, onResolved, disabled, stage, subscriberCount, chosenImages }: Props) {
   const isSend = stage === 'send';
   const [decision, setDecision] = useState<Decision>('approve');
   const [feedback, setFeedback] = useState('');
@@ -64,7 +66,14 @@ export default function ApprovalResolveForm({ token, onResolved, disabled, stage
     try {
       const res = await apiFetch<ResolveResponse>(
         `/api/newsletter/approvals/${encodeURIComponent(token)}/resolve`,
-        { method: 'POST', body: JSON.stringify({ decision, feedback: feedback.trim() }) },
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            decision,
+            feedback: feedback.trim(),
+            ...(stage === 'image' && decision === 'approve' && chosenImages ? { chosen_images: chosenImages } : {}),
+          }),
+        },
       );
       // 200 path returns success: true / resumed: true.
       // The 502 path returns 200-shaped { success: true, resumed: false } per

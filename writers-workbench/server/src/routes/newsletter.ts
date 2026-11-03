@@ -1205,6 +1205,8 @@ newsletterRouter.post(
       decision: body.decision,
       feedback: body.feedback,
       sessionUserId: userId,
+      // The image gate's picks. Never passed before, so the reviewer could not change an image.
+      chosenImages: body.chosen_images,
     });
 
     switch (result.status) {

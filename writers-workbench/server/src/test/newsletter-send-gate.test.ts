@@ -189,3 +189,31 @@ describe('final send gate: run status', () => {
     }
   });
 });
+
+describe('image gate: the chosen images reach the engine (2026-11-03)', () => {
+  const IMG_TOKEN = 'tok-image-aaaaaaaaaaaaaaaa';
+  beforeEach(() => {
+    db.newsletter_approvals_v2.push({ token: IMG_TOKEN, user_id: 'owner', edition_id: 'ed', execution_id: 'ex1', stage: 'image', resolved_at: null, expires_at: FUTURE, payload: {} });
+  });
+
+  it('the in-app approve forwards chosen_images to the engine resolve', async () => {
+    const chosen = { 'Story one': 'https://img.example/c.png', 'Story two': '' };
+    const r = await call('POST', `/approvals/${IMG_TOKEN}/resolve`, { decision: 'approve', chosen_images: chosen });
+    expect(r.status).toBe(200);
+    expect(engineCalls).toHaveLength(1);
+    expect(engineCalls[0].url).toBe(`${ENGINE}/internal/newsletter/approvals/${IMG_TOKEN}/resolve`);
+    expect(engineCalls[0].body).toMatchObject({ decision: 'approve', chosen_images: chosen });
+  });
+
+  it('refuses a non-https image URL before anything is resolved', async () => {
+    const r = await call('POST', `/approvals/${IMG_TOKEN}/resolve`, { decision: 'approve', chosen_images: { 'Story one': 'javascript:alert(1)' } });
+    expect(r.status).toBe(400);
+    expect(engineCalls).toHaveLength(0);
+  });
+
+  it('does not forward chosen_images from any other gate', async () => {
+    const r = await call('POST', '/approvals/tok-stories-aaaaaaaaaaaaa/resolve', { decision: 'approve', chosen_images: { x: 'https://img.example/c.png' } });
+    expect(r.status).toBe(200);
+    expect(engineCalls[0].body.chosen_images).toBeUndefined();
+  });
+});

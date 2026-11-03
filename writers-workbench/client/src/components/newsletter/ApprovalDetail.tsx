@@ -9,12 +9,13 @@
  * Renders the same payload + resolve-form components as the
  * ExecutionStatus page so the in-app flow stays consistent.
  */
+import { useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../../lib/api';
 import ApprovalPayloadStories from './ApprovalPayloadStories';
 import ApprovalPayloadSubject from './ApprovalPayloadSubject';
-import ApprovalPayloadImage from './ApprovalPayloadImage';
+import ApprovalPayloadImage, { defaultImageChoices } from './ApprovalPayloadImage';
 import ApprovalPayloadSend from './ApprovalPayloadSend';
 import ApprovalEmailPreview from './ApprovalEmailPreview';
 import ApprovalResolveForm from './ApprovalResolveForm';
@@ -52,6 +53,9 @@ export default function ApprovalDetail() {
   });
 
   const approval = query.data?.approvals?.[0] ?? null;
+  // The image gate's picks; null = untouched (what each section already carries).
+  const [imagePicks, setImagePicks] = useState<Record<string, string> | null>(null);
+  const picks = approval?.stage === 'image' ? imagePicks ?? defaultImageChoices(approval.payload) : undefined;
 
   function handleResolved() {
     void queryClient.invalidateQueries({ queryKey: ['newsletter-approvals-open'] });
@@ -118,7 +122,7 @@ export default function ApprovalDetail() {
           {approval.stage === 'stories' ? (
             <ApprovalPayloadStories payload={approval.payload} />
           ) : approval.stage === 'image' ? (
-            <ApprovalPayloadImage payload={approval.payload} />
+            <ApprovalPayloadImage payload={approval.payload} selected={picks} onChange={setImagePicks} />
           ) : approval.stage === 'send' ? (
             <ApprovalPayloadSend token={approval.token} payload={approval.payload} />
           ) : (
@@ -130,6 +134,7 @@ export default function ApprovalDetail() {
             onResolved={handleResolved}
             stage={approval.stage}
             subscriberCount={approval.stage === 'send' ? (approval.payload.subscriber_count as number | null | undefined) : undefined}
+            chosenImages={picks}
           />
         </div>
       )}

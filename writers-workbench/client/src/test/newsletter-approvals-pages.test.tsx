@@ -264,3 +264,58 @@ describe('StageStrip — send gate', () => {
     expect(sent?.getAttribute('data-state')).toBe('pending');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Image gate: the reviewer's pick reaches the resolve call (2026-11-03)
+// ---------------------------------------------------------------------------
+describe('ApprovalDetail — image gate picks', () => {
+  const TOKEN = 'tok-detail-aaaaaaaaaaaaaaaaaaaaaaaa';
+  const A = 'https://img.example/a.png';
+  const B = 'https://img.example/b.png';
+  const imageRow = {
+    id: '1', token: TOKEN, execution_id: 'exec-9', stage: 'image',
+    payload: {
+      image_options_by_story: [{ story_title: 'Story one', options: [A, B], auto_pick: A }],
+      segments: [{ story_title: 'Story one', chosen_image_url: A }],
+    },
+    created_at: '', expires_at: new Date(Date.now() + 3600_000).toISOString(),
+  };
+
+  function stub(bodies: Array<Record<string, unknown>>) {
+    apiFetchImplRef.current = (path: string, options?: unknown) => {
+      const o = options as { method?: string; body?: string } | undefined;
+      if (path.startsWith('/api/newsletter/approvals/open?token=')) return { success: true, approvals: [imageRow] };
+      if (path.endsWith('/preview')) return { success: true, html: '<p>p</p>' };
+      if (path === `/api/newsletter/approvals/${TOKEN}/resolve` && o?.method === 'POST') {
+        bodies.push(JSON.parse(o.body ?? '{}'));
+        return { success: true, resumed: true };
+      }
+      return Promise.reject(new Error('unstubbed: ' + path));
+    };
+  }
+
+  it('approving after picking a non-default image sends it as chosen_images', async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    stub(bodies);
+    const ApprovalDetail = (await import('../components/newsletter/ApprovalDetail')).default;
+    renderWithProviders(<ApprovalDetail />);
+    const second = await screen.findByRole('button', { name: /Use option 2 for Story one/i });
+    expect(screen.getByRole('button', { name: /Use option 1 for Story one/i })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(second);
+    expect(second).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: /^Approve/i }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ decision: 'approve', chosen_images: { 'Story one': B } });
+  });
+
+  it('"No image for this story" sends an empty choice', async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    stub(bodies);
+    const ApprovalDetail = (await import('../components/newsletter/ApprovalDetail')).default;
+    renderWithProviders(<ApprovalDetail />);
+    fireEvent.click(await screen.findByRole('button', { name: /No image for this story/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Approve/i }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ chosen_images: { 'Story one': '' } });
+  });
+});

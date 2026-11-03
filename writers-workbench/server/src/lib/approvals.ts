@@ -168,7 +168,10 @@ export async function resolveApproval(opts: ResolveOptions): Promise<ResolveResu
     } else {
       try {
         const engineBody: Record<string, unknown> = { decision, feedback };
-        if (chosenImages !== undefined) engineBody.chosen_images = chosenImages;
+        // Only the image gate takes a choice of images, and only an approval applies it.
+        if (chosenImages !== undefined && row.stage === 'image' && decision === 'approve') {
+          engineBody.chosen_images = chosenImages;
+        }
         const resp = await fetch(
           `${engineUrl.replace(/\/+$/, '')}/internal/newsletter/approvals/${encodeURIComponent(token)}/resolve`,
           {
