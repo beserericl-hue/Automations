@@ -108,6 +108,9 @@ export async function startSaveCardCheckout(userId: string): Promise<string | nu
     mode: 'setup',
     customer,
     currency: 'usd',
+    // Cards only: the saved method is charged off-session by auto-recharge, and Stripe otherwise
+    // offers Klarna / Cash App / bank here, which cannot back an off-session top-up the same way.
+    allowed_payment_method_types: ['card'],
     client_reference_id: userId,
     metadata: { kind: 'save_card', user_id: userId },
     setup_intent_data: { metadata: { kind: 'save_card', user_id: userId } },

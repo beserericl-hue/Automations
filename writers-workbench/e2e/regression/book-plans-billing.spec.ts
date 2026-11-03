@@ -26,9 +26,14 @@ test.use({ storageState: { cookies: [], origins: [] } });
 async function fillStripe(page: Page, card: string): Promise<void> {
   await page.waitForURL(/checkout\.stripe\.com/, { timeout: 30_000 });
   const label = page.locator('#payment-method-label-card');
-  if (await label.isVisible({ timeout: 15_000 }).catch(() => false)) {
-    const box = await label.boundingBox();
-    if (box) await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await page.locator('#cardNumber, #payment-method-label-card, [role="radio"]').first().waitFor({ timeout: 60_000 });
+  if (!(await page.locator('#cardNumber').isVisible().catch(() => false))) {
+    if (await label.isVisible().catch(() => false)) {
+      const box = await label.boundingBox();
+      if (box) await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    } else {
+      await page.getByRole('radio', { name: /^Card/ }).first().check({ force: true }).catch(() => undefined);
+    }
   }
   await page.locator('#cardNumber').fill(card);
   await page.locator('#cardExpiry').fill('12 / 34');
