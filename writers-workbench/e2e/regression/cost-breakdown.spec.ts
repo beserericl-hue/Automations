@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { apiClient, seedProject, deleteProject, seedCostRow, supaDelete } from '../pages/api';
+import { apiClient, seedProject, deleteProject, seedCostRow, supaDelete, supaGet } from '../pages/api';
 
 /**
  * Per-operation cost view (migration 044 + GET /api/costs/breakdown) — RESULT-asserting.
@@ -78,5 +78,45 @@ test.describe('Cost breakdown (result-asserting)', () => {
     // Live DEV can record new costs between the two reads, so compare the seeded row (stable), not the total.
     const write = j.rows.find((x: { operation: string }) => x.operation === OP_WRITE);
     await expect(page.getByTestId(testId(OP_WRITE)).getByTestId('cost-row-cost')).toHaveText(`$${Number(write.cost_usd).toFixed(4)}`);
+  });
+});
+
+/**
+ * Migration 049: n8n workflows still write token_usage_v2 directly and name Gemini "google". The
+ * insert trigger stores it as gemini, so the provider view shows ONE Gemini row, not two. Its own
+ * project, because the suite runs fully parallel and the block above asserts exact totals.
+ */
+test.describe('Provider names (result-asserting)', () => {
+  let gProject = '';
+  let gRow = '';
+
+  test.beforeAll(async () => {
+    gProject = await seedProject({ title: `E2E Cost Provider ${STAMP}`, genre_slug: 'post-apocalyptic' });
+    gRow = await seedCostRow({
+      projectId: gProject, operation: `e2e.hub-${STAMP}`, provider: 'google', model: 'gemini-2.5-pro', costUsd: 0.0011,
+    });
+  });
+
+  test.afterAll(async () => {
+    if (gRow) await supaDelete('token_usage_v2', `id=eq.${gRow}`).catch(() => undefined);
+    if (gProject) await deleteProject(gProject).catch(() => undefined);
+  });
+
+  test('a row written as provider "google" is stored, served and shown as gemini', async ({ page }) => {
+    const [stored] = await supaGet<{ provider: string; metadata: Record<string, unknown> }>(
+      'token_usage_v2', `id=eq.${gRow}&select=provider,metadata`,
+    );
+    expect(stored.provider).toBe('gemini');
+    expect(stored.metadata.provider_from).toBe('google');
+
+    const api = await apiClient();
+    const j = (await (await api.get(`/api/costs/breakdown?group=provider&project_id=${gProject}`)).json()).data;
+    expect(j.rows.map((x: { provider: string }) => x.provider)).toEqual(['gemini']);
+
+    await page.goto(`/projects/${gProject}?tab=cost`);
+    await expect(page.getByTestId('cost-dashboard')).toBeVisible({ timeout: 20_000 });
+    await page.getByTestId('cost-group-select').selectOption('provider');
+    await expect(page.getByTestId(testId('gemini')).getByTestId('cost-row-cost')).toHaveText('$0.0011', { timeout: 20_000 });
+    await expect(page.getByTestId(testId('google'))).toHaveCount(0);
   });
 });
