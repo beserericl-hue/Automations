@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Done on DEV (audited 2026-10-26, see §0) |
+| **Status** | Done on DEV (audited 2026-10-26, see §0; re-checked 2026-11-03). Not on PROD — engine cutover, see `docs/prod-release-checklist.md` |
 | **Opened** | 2026-06-05 |
 | **Tier** | DEV only (no PROD flip in this CR) |
 | **Owner** | Eric Beser |
@@ -22,6 +22,16 @@ W1–W6 were done in code before this audit. The audit found gaps, now fixed:
 - **W7** works through each step's `persist` chain plus the arq run ledger (B6). There is no separate `chapter-orch` service, and dedupe is per job/run id, not per `chapter_run_id`.
 - **W8** is `engine/scripts/cr001_topdown.py`: one new project, outline → plans → research → chapters, all persisted, with a database read-back. `--chapters 84` is the full Burial Mound.
 - **W9** is `e2e/regression/engine-readback.spec.ts`, which checks that an engine-written project's outline, chapters, bible and research render. `project-plan-write.spec.ts` now also checks that the sub-chapter brief renders; its old fallback passed on any object.
+
+**Since the audit (2026-11-02/03):**
+
+- **Outline writes are validated.** `persist_outline` first runs `writer_engine/outline_schema.py`
+  `normalize_outline`: the two legacy shapes are normalised to one canonical schema, an unknown shape
+  is refused (#242). The server validates the same way (`server/src/lib/outline-schema.ts`).
+- **Lifecycle actions changed the wrong row** when a title matched fuzzily; fixed (#245).
+- **Chat "edit the outline" was a silent no-op** (R118); it now persists (#248).
+- **Each job runs once across replicas** — run lease on top of the W7 run ledger (#236); runs whose
+  worker died are reaped by the `run-reaper` job (#258).
 
 ## 1. Summary
 

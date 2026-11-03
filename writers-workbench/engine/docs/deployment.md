@@ -1,9 +1,19 @@
 # Engine deployment — Railway DEV
 
+Current as of 2026-11-03 (`develop` at PR #260). The engine runs on DEV only; the PROD cutover is
+`writers-workbench/docs/prod-release-checklist.md`.
+
 ## Live URLs
 
 - **Gateway:** https://writer-engine-gateway-develop.up.railway.app
-- **Runtime (orchestrator + arq + 11 step services):** https://writer-engine-runtime-develop.up.railway.app
+- **Runtime (supervisor → orchestrator + 2 arq workers + one `steps_app` serving all 20 steps):** https://writer-engine-runtime-develop.up.railway.app
+
+## How it deploys
+
+Both services are **repo-connected**: a merge to `develop` builds and deploys them. **Never
+`railway up`.** Each service reads its own config-as-code file (`railway.gateway.toml`,
+`railway.runtime.toml`, root directory `/writers-workbench/engine`), which sets the Dockerfile and the
+`/admin/health` healthcheck. Replica counts are set per environment on Railway (below), not in the toml.
 
 ## Required service env (gotchas)
 
@@ -14,39 +24,62 @@ it Railway's edge proxy 502s "Application failed to respond" even though the con
 | Service | PORT | Notes |
 |---|---|---|
 | `writer-engine-gateway` | `8000` | Gateway uvicorn binds 8000 in its Dockerfile CMD |
-| `writer-engine-runtime` | `8001` | entrypoint.sh uses `${PORT:-8001}` for the orchestrator; step services bind localhost:8002 + 8010-8019 internally |
+| `writer-engine-runtime` | `8001` | The orchestrator binds `$PORT` (default 8001). Inside the container the steps run in one uvicorn on localhost:8030, told apart by mount path (`/steps/<name>`); process table in `writer_engine/runtime_processes.py` |
 
-## What's done
+## The two services
 
-- 2 Railway services created in `bubbly-solace` / `develop` env:
+- Railway project `bubbly-solace`, environment `develop`:
   - `writer-engine-gateway` (id `f87274f7-9068-4065-b7cf-c8c993435e6c`)
   - `writer-engine-runtime` (id `8e87e53d-9f25-4ee5-b345-6ab8e5fd68c8`)
-- 19 env vars bulk-set on each via `railway variables --set` (Anthropic / Gemini / Perplexity / OpenAI / Firecrawl (since replaced by ScraperAPI) / KIE.AI / Postal / Supabase / shared Redis at `redis.railway.internal` / Ingestion secret / etc.). Fresh `SERVICE_SHARED_SECRET` + `ADMIN_TOKEN` generated; `ARCHIVE_BASE_URL` pointed at Supabase Storage public bucket.
 - Gateway has `ORCHESTRATOR_URL=http://writer-engine-runtime.railway.internal:8001` so it reaches the runtime over Railway's private network.
-- Engine uses a 2-service runtime architecture (per `engine-framework-sprints` F2-3 pragmatic deploy): one image for the gateway, one for everything else. The `runtime` image starts orchestrator + arq worker + all 10 step services as background uvicorn processes; the orchestrator calls each step via `localhost:801x` set in `services/runtime/entrypoint.sh`.
+- The runtime container is supervised (`python -m writer_engine.supervisor`; `services/runtime/entrypoint.sh` is a one-line `exec`): orchestrator, `arq_worker_heavy`, `arq_worker_interactive` and `steps_app`. A dead child is restarted in place; repeated deaths exit the container so Railway restarts it.
+- Redis is the HA set (`redis-ha.railway.internal`, HAProxy in front of 5 nodes), shared by the gateway, the runtime and the Workbench.
 
-## What's left — 2 minutes of UI click + 1 deploy each
+## Variables (names as set on DEV, 2026-11-03)
 
-Railway API requires UI-level permissions to set per-service Root Directory + Dockerfile Path, which the CLI access token doesn't have. Set them by hand:
+Secrets are never in GitHub. Each environment generates its own; never copy a DEV secret to PROD.
 
-1. https://railway.com/project/87cb760d-784b-42cc-920f-712483a81664 → `writer-engine-gateway` → Settings → Source:
-   - **Root Directory:** `engine`
-   - **Builder:** `Dockerfile`
-   - **Dockerfile Path:** `services/gateway/Dockerfile`
-   - **Networking:** add a public domain → "Generate Domain" (port `8000`)
-2. Same on `writer-engine-runtime` with:
-   - **Root Directory:** `engine`
-   - **Dockerfile Path:** `services/runtime/Dockerfile`
-   - **Networking:** add a public domain → port `8001` (or leave private if only the gateway calls it)
+| Variable | Gateway | Runtime | Notes |
+|---|---|---|---|
+| `PORT` | 8000 | 8001 | see above |
+| `RAILWAY_DOCKERFILE_PATH` | ✓ | ✓ | |
+| `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | 60 | 60 | Railway's default 0 SIGKILLs at once and the graceful drain never runs |
+| `SERVICE_SHARED_SECRET` | ✓ | ✓ | same value on the Workbench |
+| `ADMIN_TOKEN` | ✓ | ✓ | the Workbench holds the same value as `ENGINE_ADMIN_TOKEN` (it falls back to `ADMIN_TOKEN`); used for Admin → Engine Fleet and the scheduler view |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `REDIS_URL` | ✓ | ✓ | |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_WORKSPACE_ID`, `GEMINI_API_KEY`, `PERPLEXITY_API_KEY`, `OPENAI_API_KEY`, `KIEAI_API_KEY` | ✓ | ✓ | |
+| `POSTAL_API_KEY`, `POSTAL_API_URL`, `ALERT_EMAIL` | ✓ | ✓ | |
+| `ARCHIVE_BASE_URL`, `WORKBENCH_API_URL`, `INGESTION_SECRET` | ✓ | ✓ | |
+| `ENABLE_PYTHON_EMBEDDINGS` | ✓ | ✓ | code default **false**; without it chapters get no canon retrieval |
+| `PICKER_MODEL`, `LOG_LEVEL`, `METRICS_PORT` | ✓ | ✓ | |
+| `ORCHESTRATOR_URL` | ✓ | | |
+| `NEWSLETTER_CALLBACK_SECRET` | | ✓ | same value on the Workbench |
+| `WORKBENCH_CRON_SECRET` | | ✓ | equals the Workbench's `CRON_SECRET`; drives the hourly trial/credit lifecycle |
+| `INTEGRATIONS_ENCRYPTION_KEY` | | ✓ | same value on the Workbench (section below) |
+| `SCRAPERAPI_API_KEY` | | ✓ | section below |
+| `STEALTHGPT_API_KEY` | | ✓ | humanizer, section below |
+| `AUTOSCALE_*`, `RAILWAY_AUTOSCALE_TOKEN` | | ✓ | section below |
 
-Then deploy each from the repo root:
+Read by the code but not set on DEV (defaults apply): `HUB_MEMORY_ENABLED` (true),
+`HUB_CONVERSATION_TTL_SECONDS` (43200), `HUB_VOICE_CONVERSATION_TTL_SECONDS` (1800),
+`RUN_REAPER_POLL_SECONDS` (900), `EVE_KB_PRUNE_POLL_SECONDS` (21600), `EVE_KB_MAX_AGE_HOURS` (24),
+`SOCIAL_POSTING_MODE` (`dry_run`), `YOUTUBE_API_KEY`, and `ELEVENLABS_API_KEY` / `ELEVENLABS_AGENT_ID` /
+`ELEVENLABS_PHONE_NUMBER_ID` (read with `os.environ` in `writer_engine/eve.py`; unset = the Eve callback
+and the KB prune job are dry runs). Every setting is in `packages/writer_engine/src/writer_engine/config.py`.
 
-```bash
-cd /Users/ericbeser/Documents/GitHub/Automations
-railway up --service writer-engine-runtime -e develop --detach
-# wait for /admin/health to be 200
-railway up --service writer-engine-gateway -e develop --detach
-```
+### Humanizer (StealthGPT, non-fiction only)
+
+| Variable | Default | What it does |
+|---|---|---|
+| `STEALTHGPT_API_KEY` | — | without it nothing is humanized |
+| `STEALTHGPT_MODEL` / `STEALTHGPT_MODE` / `STEALTHGPT_OUTPUT_FORMAT` | `standard` / `Low` / `markdown` | |
+| `HUMANIZE_NON_FICTION` | true | blog, newsletter op, social posts, editor passage |
+| `HUMANIZE_NEWSLETTER_SEGMENTS` | true | the newsletter saga's story sections (prose only; headings and labels kept) |
+| `HUMANIZE_RADAR_DRAFTS` | true | posts the radars draft onto the calendar (`social_schedule_v2.humanize`) |
+| `HUMANIZE_COLLAPSE_RETRY_MODE` | `Medium` | retry a `structure_collapsed` chunk once at this mode; empty = no retry |
+| `HUMANIZE_MAX_WORDS_PER_RUN` | 20000 | spend ceiling per run (a newsletter shares one ceiling across its sections) |
+
+A rejected chunk still bills. Every call writes a `token_usage_v2` row (provider `stealthgpt`).
 
 ## Verify
 
@@ -208,3 +241,8 @@ radar subscriptions, the `ai-mvp` and `ai-dev-roundup` editions with their `rada
 sources). It inserts missing channels only and never overwrites what was changed in the UI, and it
 seeds no keys: those are entered in Settings → Integrations. DEV only; it
 refuses any other Supabase URL.
+
+For PROD use `python scripts/seed_social.py` (PR #233), which reuses the same row definitions: a dry
+run by default (`--apply` writes), `--target prod` refuses to touch the network without `--confirm`
+and refuses a DEV key, rows are written `enabled=false` on PROD unless `--enable`, and `--offline`
+prints the plan without reading any database. Run it only at the cutover, with Eric's go-ahead.

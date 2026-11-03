@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress (engine + migration done; UI read-path + backfill pending) |
+| **Status** | Done on DEV (checked 2026-11-03): migration 026, the engine link insert, the project Research tab filtered by `research_report_projects_v2` (also on the impersonation path), and the backfill script (`scripts/backfill_research_project_links.py` at the repo root). Left: the general "unassigned" bucket — the Research list does not group by project yet. PROD: apply 026, then run the backfill |
 | **Opened** | 2026-06-06 |
 | **Tier** | DEV (build + migrate + backfill); PROD at go-live |
 | **Goal** | Fix the standing bug where the UI research tab shows **every** project's research mixed together. Each project's research tab must show only that project's research. |
