@@ -163,3 +163,27 @@ describe('SeriesPanel', () => {
     });
   });
 });
+
+describe('SeriesPanel — the series description has the copy assistant', () => {
+  it('drafts into the empty description without saving, and Save sends the author\'s text', async () => {
+    const assist = {
+      price: 3, charged: true, package_fields: [],
+      fields: {
+        series_description: { label: 'Series description', kind: 'text', limit: 3000, max_items: null, free: false },
+        series_tagline: { label: 'Series tagline', kind: 'text', limit: 200, max_items: null, free: false },
+      },
+    };
+    mockFetch.mockImplementation(async (p) => {
+      const path = String(p);
+      if (path.endsWith('/copy')) return { success: true, data: { books: {}, also_by: [], assist } } as never;
+      if (path.endsWith('/assist')) return { success: true, data: { field: 'series_description', value: 'Three books, one box.', items: [], chars: 21, limit: 3000, over_limit: false, warnings: [], credits_charged: 3 } } as never;
+      return { success: true, data: { series: SERIES } } as never;
+    });
+    render();
+    fireEvent.click(await screen.findByTestId('ai-draft-series_description'));
+    await waitFor(() => expect(screen.getByLabelText('Description')).toHaveValue('Three books, one box.'));
+    expect(mockFetch.mock.calls.some(([p, o]) => String(p).endsWith('/series') && (o as { method?: string })?.method === 'PUT')).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Save description' }));
+    await waitFor(() => expect(bodyOf('/series')).toEqual({ description: { text: 'Three books, one box.', tagline: '' } }));
+  });
+});

@@ -34,17 +34,28 @@ export interface CallContext {
   chapterNumber?: number | null;
 }
 
+/**
+ * `prefix`, when given, is sent first as its own cached block: a long shared context (a whole book's
+ * facts) that several calls in a row repeat is then billed at the cache-read rate after the first.
+ */
 export async function parseWith<T extends z.ZodType>(
   schema: T,
   prompt: string,
   ctx: CallContext,
   effort: 'low' | 'medium' | 'high' = 'medium',
+  prefix?: string,
 ): Promise<z.infer<T>> {
+  const content = prefix
+    ? [
+        { type: 'text' as const, text: prefix, cache_control: { type: 'ephemeral' as const } },
+        { type: 'text' as const, text: prompt },
+      ]
+    : prompt;
   const response = await anthropic().messages.parse({
     model: MODEL,
     max_tokens: 16000,
     output_config: { effort, format: zodOutputFormat(schema) },
-    messages: [{ role: 'user', content: prompt }],
+    messages: [{ role: 'user', content }],
   });
   // Recorded before any of the checks below: a refusal or a max_tokens stop was still billed.
   await recordUsage({

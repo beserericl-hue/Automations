@@ -13,7 +13,7 @@
 
 import { describe, it, expect } from 'vitest';
 import JSZip from 'jszip';
-import { buildKdpPackage, listingText, type PackageSettings } from '../lib/kdp-package.js';
+import { buildKdpPackage, listingText, type BuildPackageOptions, type PackageSettings } from '../lib/kdp-package.js';
 import { spineWidthInches } from '../lib/cover.js';
 import { hasSubstantiveFacts } from '../routes/author.js';
 import {
@@ -118,6 +118,56 @@ describe('the listing file', () => {
     expect(text).toContain('The Ossuary: Volume Two');
     expect(text).toContain('book 2 of 3');
   });
+});
+
+describe("the author's own copy (book_copy_v2): subtitle, inside flap, Also by", () => {
+  it('the listing names the subtitle and the inside flap when they are written, and omits them when not', () => {
+    const text = listingText('The Ossuary', 'A', MARKETING['1'], '', undefined, { subtitle: 'A Novel', inside_flap: 'Ohio, 1150.' });
+    expect(text).toContain('=== SUBTITLE ===\n\nA Novel');
+    expect(text).toContain('=== INSIDE FLAP  (hardcover jacket, front flap; not a KDP field) ===\n\nOhio, 1150.');
+    const bare = listingText('The Ossuary', 'A', MARKETING['1'], '');
+    expect(bare).not.toContain('SUBTITLE');
+    expect(bare).not.toContain('INSIDE FLAP');
+  });
+
+  it('the title page prints the subtitle, and the Also-by page lists the author\'s other books', async () => {
+    const { volumeParts, plannedVolumes } = await import('../lib/kdp-package.js');
+    const all = chapters(3);
+    const opts: BuildPackageOptions = {
+      title: 'The Ossuary',
+      author: 'Eric L Beser',
+      authorBio: '',
+      chapters: all,
+      settings: SETTINGS,
+      marketing: MARKETING,
+      copy: { '1': { subtitle: 'A Novel of the Mound Builders', inside_flap: '' } },
+      alsoBy: ['The Signal Beneath', 'The Accord'],
+    };
+    const planned = plannedVolumes(opts, all);
+    const parts = volumeParts(opts, planned, all, planned[0]);
+    const title = parts.matter.front.find((s) => s.kind === 'title')!;
+    expect(title.blocks.map((b) => b.text)).toEqual(['The Ossuary', 'A Novel of the Mound Builders', 'Eric L Beser', 'Owl Hill']);
+    const alsoBy = parts.matter.back.find((s) => s.kind === 'also-by')!;
+    expect(alsoBy.heading).toBe('Also by Eric L Beser');
+    expect(alsoBy.blocks.map((b) => b.text)).toEqual(['The Signal Beneath', 'The Accord']);
+  });
+
+  it('the package\'s listing file carries the saved subtitle', async () => {
+    const zip = await buildKdpPackage({
+      title: 'Short Book',
+      author: 'A. Author',
+      authorBio: '',
+      chapters: chapters(2),
+      settings: SETTINGS,
+      marketing: MARKETING,
+      copy: { '1': { subtitle: 'A Novella', inside_flap: 'The flap.' } },
+    });
+    const files = await JSZip.loadAsync(zip.zip);
+    const listing = Object.keys(files.files).find((f) => f.endsWith('kdp-listing.txt'))!;
+    const text = await files.file(listing)!.async('string');
+    expect(text).toContain('=== SUBTITLE ===\n\nA Novella');
+    expect(text).toContain('The flap.');
+  }, 120_000);
 });
 
 describe('where the publishing state lives', () => {

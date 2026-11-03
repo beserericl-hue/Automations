@@ -45,7 +45,7 @@ Related: [stripe-billing.md](stripe-billing.md) (live-mode steps), [workflow-gov
 
 Apply in file order, each once, after step A3. `018`–`022` were never written. All of these are applied
 on DEV (checked 2026-11-03: every table, column, function, trigger and policy below exists on DEV).
-Every doc records 023 onwards as DEV-only; confirm against the dump. 050 and 051 were applied to DEV on 2026-11-03; 052 on 2026-11-03.
+Every doc records 023 onwards as DEV-only; confirm against the dump. 050 and 051 were applied to DEV on 2026-11-03; 052 on 2026-11-03; 054 on 2026-11-03.
 
 | # | What it does | PROD note |
 |---|---|---|
@@ -79,6 +79,7 @@ Every doc records 023 onwards as DEV-only; confirm against the dump. 050 and 051
 | 051 | `newsletter_sends_v2`: one saved issue per **edition** per day instead of one per user per day (drops `idx_newsletter_sends_v2_user_date_unique`, adds a partial unique index for edition-less n8n-era rows) | Indexes only, no data change. Without it, a user's second edition on the same day fails before sending |
 | 052 | Final "Send to subscribers" gate: `newsletter_approvals_v2` stage CHECK gains `send`, decision CHECK gains `reject`; new `newsletter_owner_emails_v2` (test copies + slate emails sent to the owner). Owner-only RLS | **Apply before deploying the engine/Workbench release that contains the send gate**: without it the engine cannot mirror the final gate and every newsletter run errors at the send gate (nothing is sent). CHECKs only widen; new table |
 | 053 | Book plans + Billing page: `credit_packs_v2` (Half Book 1,000/$99, Full Book 2,000/$199, Top-up 250/$29, Top-up 500/$55) and `billing_settings_v2` (auto-recharge settings + once-per-crossing claim). Owner-only / read-only RLS | Then run the Stripe seed (section D, **live** key) so each pack gets its Product + one-time Price, and add `payment_intent.payment_failed` to the PROD webhook endpoint's events (docs/stripe-billing.md) |
+| 054 | Promotion copy assistant: `book_copy_v2` (per-book subtitle, inside-flap copy, the Also-by list), one FK each to `users_v2` and `writing_projects_v2`. Owner-read / service-role RLS | New table only. Without it the Publish tab's subtitle / inside flap / Also by cannot be saved (the save answers 503 MIGRATION_PENDING) and the exports print none of them; everything else works. The assistant's price is the new credit key `promo_copy` (3 per field), editable in the superuser panel |
 
 After the migrations:
 

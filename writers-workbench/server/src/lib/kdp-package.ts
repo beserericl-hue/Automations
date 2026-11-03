@@ -36,6 +36,12 @@ import {
 import { buildEpub, type EpubChapter } from './epub.js';
 import { logger } from './logger.js';
 
+/** The author's per-book copy that is not part of the listing JSON (book_copy_v2, migration 054). */
+export interface BookCopy {
+  subtitle?: string;
+  inside_flap?: string;
+}
+
 /** The listing copy, as the engine and the publishing route store it. */
 export interface Marketing {
   blurb?: string;
@@ -98,6 +104,10 @@ export interface BuildPackageOptions {
    * by book index as a string. Without it a multi-volume book is printed as "Volume Two".
    */
   series?: { name: string; titles: Record<string, string> };
+  /** Subtitle and inside flap per book (volume index as a string), from book_copy_v2. */
+  copy?: Record<string, BookCopy>;
+  /** The author's "Also by" list, printed in every book. */
+  alsoBy?: string[];
 }
 
 export interface VolumeArtifact {
@@ -144,6 +154,7 @@ export function listingText(
   m: Marketing | null,
   isbn: string,
   volume?: VolumeInfo,
+  copy?: BookCopy,
 ): string {
   const lines: string[] = [];
   const push = (heading: string, body: string): void => {
@@ -151,6 +162,7 @@ export function listingText(
   };
   lines.push(`KDP LISTING — ${volumeTitle(title, volume)}`, '='.repeat(60), '');
   push('TITLE', volumeTitle(title, volume));
+  if (copy?.subtitle?.trim()) push('SUBTITLE', copy.subtitle);
   if (volume && volume.total > 1) {
     push('SERIES', `${volume.seriesName?.trim() || title}  (book ${volume.index} of ${volume.total})`);
   }
@@ -172,6 +184,7 @@ export function listingText(
     (m?.comparable_titles ?? []).filter(Boolean).map((c) => `• ${c}`).join('\n'),
   );
   push('AUTHOR BIO  (Author Central, and the back cover)', m?.author_bio ?? '');
+  if (copy?.inside_flap?.trim()) push('INSIDE FLAP  (hardcover jacket, front flap; not a KDP field)', copy.inside_flap);
   push('ISBN  (paperback; leave blank to let KDP assign one free)', isbn);
   return lines.join('\n');
 }
@@ -281,6 +294,8 @@ export function volumeParts(
     authorsNote: opts.settings.authors_note || undefined,
     acknowledgements: opts.settings.acknowledgements || undefined,
     aboutTheAuthor: bio || undefined,
+    alsoBy: opts.alsoBy?.length ? opts.alsoBy : undefined,
+    bookSubtitle: opts.copy?.[String(v.index)]?.subtitle || undefined,
     volume,
     fiction: true,
   });
@@ -490,7 +505,7 @@ export async function buildKdpPackage(opts: BuildPackageOptions): Promise<Packag
     findings.push(epubCheck);
     report.push(formatFindings('Kindle EPUB', epubCheck), '');
 
-    dir.file('kdp-listing.txt', listingText(opts.title, opts.author, marketing, isbn, volume));
+    dir.file('kdp-listing.txt', listingText(opts.title, opts.author, marketing, isbn, volume, opts.copy?.[String(v.index)]));
     files.push(`${label}/kdp-listing.txt`);
     if (!marketing?.blurb?.trim()) {
       errors.push(`${label}: the description is empty — KDP requires one`);

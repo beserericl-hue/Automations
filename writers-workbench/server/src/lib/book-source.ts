@@ -10,6 +10,7 @@ import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import { downloadCover, findCover } from './book-cover.js';
 import { marketingKey, publishingOf } from '../routes/publishing.js';
 import { logger } from './logger.js';
+import { loadSavedCopy } from './book-copy.js';
 import type { BuildPackageOptions, PackageChapter, PackageSettings } from './kdp-package.js';
 
 export type BookSource = Omit<BuildPackageOptions, 'onlyVolume' | 'onlyApproved'>;
@@ -92,8 +93,13 @@ export async function loadBookSource(projectId: string, userId: string): Promise
     Object.entries(stored.books ?? {}).map(([k, b]) => [k, String(b?.title ?? '').trim()]),
   );
 
+  // The author's subtitle, inside flap and Also-by list (book_copy_v2).
+  const saved = await loadSavedCopy(projectId, userId);
+
   return {
     title: String(project.title ?? ''),
+    copy: saved.books,
+    alsoBy: saved.also_by,
     // The series exists as soon as there is more than one book; its name defaults to the title.
     series: { name: String(stored.name ?? '').trim() || String(project.title ?? ''), titles },
     author: authorName,

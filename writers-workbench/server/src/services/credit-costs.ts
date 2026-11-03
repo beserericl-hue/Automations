@@ -52,6 +52,14 @@ export const DEFAULT_CREDIT_COSTS: Record<string, number> = {
   qa_chapter: 4,
   repair_chapter: 4,
   humanize_passage: 4,
+  // The copy assistant on the promotion / publishing fields (routes/copy-assist.ts): one draft or one
+  // revision of ONE field (description, back cover, keywords, inside flap, dedication, author's note,
+  // bio, announcement email...). Measured on DEV 2026-11-03 (token_usage_v2, operation copy-assist.*,
+  // claude-opus-5-5, a 21-chapter book): 16 drafts averaged $0.021. The book's material is a cached
+  // prefix, so the first draft in a 5-minute window pays the cache write ($0.060-$0.084) and the rest
+  // read it ($0.005-$0.036). 3 credits = $0.037 at ~82 credits/$, the per-field cost of a typical
+  // session of two or more drafts. "Draft all missing" is this x the fields drafted. "Also by" is free.
+  promo_copy: 3,
   // Still explicitly zero: not charged on any entry point (not part of the 2026-11-03 decision).
   review_chapter: 0,
   format_kindle: 0, // the Export tab builds the .docx server-side, free
@@ -152,6 +160,7 @@ export const CREDIT_COST_INFO: Record<string, { label: string; group: CreditGrou
   qa_chapter: { label: 'Q/A consistency check', group: 'Editing & QA' },
   repair_chapter: { label: 'Repair chapter (fix drift, fix Q/A, rewrite with research)', group: 'Editing & QA' },
   humanize_passage: { label: 'Humanize a passage', group: 'Editing & QA', unit: 'per 100 words' },
+  promo_copy: { label: 'Promotion copy assistant (draft or revise a field)', group: 'Writing', unit: 'per field' },
   review_chapter: { label: 'Review chapter', group: 'Editing & QA' },
   cover_art: { label: 'Cover art', group: 'Media & social' },
   generate_cover_art: { label: 'Cover art (n8n name)', group: 'Media & social' },

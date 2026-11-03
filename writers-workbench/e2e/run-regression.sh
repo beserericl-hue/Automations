@@ -43,6 +43,7 @@ HEAVY=(
   regression/credit-pricing.spec.ts
   regression/book-plans-billing.spec.ts
   regression/content-studio-full.spec.ts
+  regression/promotion-copy-assist.spec.ts
 )
 
 # Light = every other regression spec (computed so new light specs are picked up automatically).
