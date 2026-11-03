@@ -22,7 +22,7 @@ import {
   loadTier,
 } from '../services/billing.js';
 import { fulfilReaderPrintOrder, readerOrderPaymentFailed } from '../services/reader-print.js';
-import { applySavedCardSession, pauseAutoRecharge, releaseAutoRechargeClaim, setDefaultPaymentMethod } from '../services/credit-packs.js';
+import { applySavedCardSession, autoRechargeFailureReason, pauseAutoRecharge, releaseAutoRechargeClaim, setDefaultPaymentMethod } from '../services/credit-packs.js';
 import { sendEmail } from '../lib/email.js';
 import { logger } from '../lib/logger.js';
 
@@ -150,7 +150,8 @@ export async function processStripeEvent(event: Stripe.Event): Promise<string | 
       const pi = event.data.object as Stripe.PaymentIntent;
       if (pi.metadata?.kind !== 'credits' || pi.metadata?.source !== 'auto_recharge' || !pi.metadata.user_id) return null;
       // Usually already paused by the synchronous decline; this covers a failure Stripe reports later.
-      await pauseAutoRecharge(pi.metadata.user_id, pi.last_payment_error?.message ?? 'The auto-recharge payment failed', autoRechargePausedEmail);
+      // Pauses (and emails) only if the synchronous decline has not already done so.
+      await pauseAutoRecharge(pi.metadata.user_id, autoRechargeFailureReason(pi.last_payment_error ?? {}), autoRechargePausedEmail);
       return pi.metadata.user_id;
     }
     default:

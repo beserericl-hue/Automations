@@ -247,6 +247,7 @@ describe('book plans and top-ups', () => {
     expect(balance()).toBe(6150);
     expect(purchases()).toHaveLength(1);
     expect(purchases()[0]).toMatchObject({ amount: 6000, stripe_payment_intent_id: pi.id, metadata: expect.objectContaining({ pack: 'full_book', quantity: 3, source: 'saved_card' }) });
+    expect(purchases()[0].description).toBe('Purchased 6000 credits (3 x full_book) for $597.00');
   });
 
   it('a Checkout purchase and its PaymentIntent event grant once between them', async () => {
@@ -401,7 +402,23 @@ describe('evergreen auto-recharge', () => {
   it('a Stripe-reported failure later (payment_intent.payment_failed) pauses it too', async () => {
     db.billing_settings_v2 = [{ user_id: 'u1', auto_recharge_enabled: true, auto_recharge_paused: false }];
     await deliver('payment_intent.payment_failed', { id: 'pi_x', amount: 2900, metadata: { kind: 'credits', user_id: 'u1', credits: '250', source: 'auto_recharge' }, last_payment_error: { message: 'Your card has insufficient funds.' } });
-    expect(settings()).toMatchObject({ auto_recharge_paused: true, auto_recharge_paused_reason: 'Your card has insufficient funds.' });
+    expect(settings()).toMatchObject({ auto_recharge_paused: true, auto_recharge_paused_reason: 'The card was declined: Your card has insufficient funds.' });
+  });
+
+  it('the decline and Stripe\'s payment_failed event for it pause once and email once, keeping the friendly reason', async () => {
+    await app();
+    await enable(100, 'topup_250');
+    const settle = await wired();
+    piMode = 'auth_required';
+    await deduct(80);
+    await settle();
+    const reason = settings().auto_recharge_paused_reason;
+    expect(reason).toBe('Your bank asked to confirm the payment (authentication required)');
+    await deliver('payment_intent.payment_failed', { id: pis[0].id, amount: 2900,
+      metadata: { kind: 'credits', user_id: 'u1', credits: '250', source: 'auto_recharge' },
+      last_payment_error: { code: 'authentication_required', message: 'This payment requires authentication. If the customer is off session, ask them to return to your application and complete the payment.' } });
+    expect(settings().auto_recharge_paused_reason).toBe(reason);
+    expect(sent.filter((m) => /Auto-recharge is paused/.test(m.subject))).toHaveLength(1);
   });
 
   it('respects the monthly cap', async () => {

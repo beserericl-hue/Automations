@@ -267,7 +267,7 @@ export async function grantPurchasedCredits(
     transaction_type: 'purchase',
     description: extra.source === 'auto_recharge'
       ? `Auto-recharge: ${credits} credits for $${(amountCents / 100).toFixed(2)}`
-      : `Purchased ${extra.quantity && extra.quantity > 1 ? `${extra.quantity} x ` : ''}${credits} credits for $${(amountCents / 100).toFixed(2)}`,
+      : `Purchased ${credits} credits${extra.pack ? ` (${extra.quantity && extra.quantity > 1 ? `${extra.quantity} x ` : ''}${extra.pack})` : ''} for $${(amountCents / 100).toFixed(2)}`,
     reference_id: paymentIntentId,
     stripe_payment_intent_id: paymentIntentId,
     metadata: {
