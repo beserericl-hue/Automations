@@ -42,10 +42,17 @@ export const DEFAULT_CREDIT_COSTS: Record<string, number> = {
   content_action: 0,
   create_project: 0,
   scrape_url: 0,
-  // Explicitly zero: not charged on ANY entry point today. Their price is a pending decision by the
-  // owner — named here so they are a deliberate 0, not a lookup miss.
-  qa_chapter: 0,
-  repair_chapter: 0,
+  // Editing / QA (owner decision 2026-11-03: these are no longer free). Priced from their measured
+  // API cost on DEV (token_usage_v2) at the same credits-per-dollar as the chapter ops (~82 credits
+  // per $1 of API cost: write_chapter 5 cr / $0.059, short story 5 / $0.061, plan 3 / $0.038):
+  //   chapter.qa      avg $0.053 per run (487 runs)  -> 4
+  //   chapter.repair  avg $0.043 per run (425 runs)  -> 4 (every repair entry point)
+  //   humanize        StealthGPT bills ~2.15 words per input word at $0.0002 -> $0.043 per 100
+  //                   words of the passage -> 4 credits PER STARTED 100 WORDS (see CREDIT_UNIT)
+  qa_chapter: 4,
+  repair_chapter: 4,
+  humanize_passage: 4,
+  // Still explicitly zero: not charged on any entry point (not part of the 2026-11-03 decision).
   review_chapter: 0,
   format_kindle: 0, // the Export tab builds the .docx server-side, free
   email_content: 0,
@@ -87,6 +94,7 @@ export const CREDIT_KEY_ALIASES: Record<string, string> = {
   'chapter.repair': 'repair_chapter',
   'chapter.qa': 'qa_chapter',
   'chapter.review': 'review_chapter',
+  'chapter.humanize-passage': 'humanize_passage', // = POST /api/content/:id/humanize
   'chapter.blog': 'write_blog',
   'chapter.newsletter': 'write_newsletter',
   'chapter.short-story': 'write_short_story',
@@ -111,6 +119,71 @@ export const CREDIT_KEY_ALIASES: Record<string, string> = {
   'studio.issue': 'content_action',
   'studio.batch': 'social_repurpose', // x the topics drafted + drafts revised among its steps (assistantUnits)
 };
+
+/** Keys whose price is per unit rather than per operation; the route multiplies by the units. */
+export const CREDIT_UNIT: Record<string, { words: number }> = {
+  humanize_passage: { words: 100 },
+};
+
+/** Units of a humanize request: one per started 100 words, never less than one. */
+export function humanizeUnits(text: string): number {
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.ceil(words / CREDIT_UNIT.humanize_passage.words));
+}
+
+export type CreditGroup = 'Writing' | 'Brainstorm & outline' | 'Research' | 'Editing & QA' | 'Media & social' | 'Free operations';
+
+/**
+ * What the superuser panel shows for each key. Every key in DEFAULT_CREDIT_COSTS has an entry and
+ * nothing else does (credit-costs-coverage.test.ts), so a new key appears in the panel the moment it
+ * is added to the table — the panel renders this list; it has no list of its own.
+ */
+export const CREDIT_COST_INFO: Record<string, { label: string; group: CreditGroup; unit?: string }> = {
+  write_chapter: { label: 'Write / rewrite chapter', group: 'Writing' },
+  write_short_story: { label: 'Write short story', group: 'Writing' },
+  write_blog: { label: 'Write blog post (from a chapter)', group: 'Writing' },
+  write_blog_post: { label: 'Write blog post', group: 'Writing' },
+  write_newsletter: { label: 'Write newsletter', group: 'Writing' },
+  brainstorm: { label: 'Brainstorm (short story)', group: 'Brainstorm & outline' },
+  brainstorm_story: { label: 'Brainstorm a book (screen or chat)', group: 'Brainstorm & outline' },
+  brainstorm_chapter: { label: 'Plan a chapter', group: 'Brainstorm & outline' },
+  revise_outline: { label: 'Revise / edit outline', group: 'Brainstorm & outline' },
+  research: { label: 'Research report', group: 'Research' },
+  qa_chapter: { label: 'Q/A consistency check', group: 'Editing & QA' },
+  repair_chapter: { label: 'Repair chapter (fix drift, fix Q/A, rewrite with research)', group: 'Editing & QA' },
+  humanize_passage: { label: 'Humanize a passage', group: 'Editing & QA', unit: 'per 100 words' },
+  review_chapter: { label: 'Review chapter', group: 'Editing & QA' },
+  cover_art: { label: 'Cover art', group: 'Media & social' },
+  generate_cover_art: { label: 'Cover art (n8n name)', group: 'Media & social' },
+  social_repurpose: { label: 'Social posts / drafts', group: 'Media & social', unit: 'per topic or draft' },
+  repurpose_to_social_posts: { label: 'Social posts (n8n name)', group: 'Media & social' },
+  chat_generic: { label: 'Chat: plain answer', group: 'Free operations' },
+  list_outlines: { label: 'List outlines', group: 'Free operations' },
+  retrieve_content: { label: 'Retrieve content', group: 'Free operations' },
+  approve_content: { label: 'Approve content', group: 'Free operations' },
+  list_story_arcs: { label: 'List story arcs', group: 'Free operations' },
+  story_bible_edit: { label: 'Story bible edit', group: 'Free operations' },
+  list_content: { label: 'List content', group: 'Free operations' },
+  outline_versions: { label: 'Outline versions', group: 'Free operations' },
+  revert_outline: { label: 'Revert outline', group: 'Free operations' },
+  content_action: { label: 'Content state change', group: 'Free operations' },
+  create_project: { label: 'Create project', group: 'Free operations' },
+  scrape_url: { label: 'Scrape a URL', group: 'Free operations' },
+  format_kindle: { label: 'Kindle export', group: 'Free operations' },
+  email_content: { label: 'Email content', group: 'Free operations' },
+  eve_callback: { label: 'Eve callback', group: 'Free operations' },
+};
+
+/** The panel's catalog: every key, its default, label, group and unit. */
+export function creditCostCatalog(): Array<{ key: string; default: number; label: string; group: CreditGroup; unit?: string }> {
+  return Object.entries(DEFAULT_CREDIT_COSTS).map(([key, def]) => ({
+    key,
+    default: def,
+    label: CREDIT_COST_INFO[key]?.label ?? key,
+    group: CREDIT_COST_INFO[key]?.group ?? 'Free operations',
+    ...(CREDIT_COST_INFO[key]?.unit ? { unit: CREDIT_COST_INFO[key].unit } : {}),
+  }));
+}
 
 /** The credit key an operation name is charged under, or null when it has no entry at all. */
 export function resolveCreditKey(op: string): string | null {
@@ -152,6 +225,11 @@ export async function getCreditCost(jobType: string): Promise<number> {
     logger.warn({ jobType }, 'credit-costs: operation has no credit entry; charging 0. Add it to DEFAULT_CREDIT_COSTS or CREDIT_KEY_ALIASES.');
   }
   return 0;
+}
+
+/** Every key's effective price (defaults overlaid with the superuser's overrides). */
+export async function getAllCreditCosts(): Promise<Record<string, number>> {
+  return { ...(await loadCosts()) };
 }
 
 export function clearCreditCostCache(): void {

@@ -519,34 +519,71 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 // System Configuration (S8-7)
 // ============================================================
 
-function SystemConfigSection() {
-  const [config, setConfig] = useState<SystemConfig>({});
+export interface CreditCatalogEntry {
+  key: string;
+  default: number;
+  label: string;
+  group: string;
+  unit?: string;
+}
+
+/** A credit price the panel accepts: a whole number of credits, 0 or more (the server caps at 1000). */
+export function validCreditCost(raw: string): number | null {
+  if (!/^\d+$/.test(raw.trim())) return null;
+  const n = Number(raw.trim());
+  return Number.isSafeInteger(n) && n >= 0 && n <= 1000 ? n : null;
+}
+
+/**
+ * Every credit key the server charges by. The list comes from the server's credit table
+ * (credit-costs.ts via GET /api/superuser/config `credit_cost_catalog`), so a key added there appears
+ * here with no change to this file.
+ */
+export function SystemConfigSection() {
+  const [config, setConfig] = useState<SystemConfig & { credit_cost_catalog?: CreditCatalogEntry[] }>({});
+  const [draft, setDraft] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
       try {
-        const res = await apiFetch<ApiEnvelope<SystemConfig>>('/api/superuser/config', { skipImpersonation: true });
-        setConfig(res.data ?? {});
+        const res = await apiFetch<ApiEnvelope<SystemConfig & { credit_cost_catalog?: CreditCatalogEntry[] }>>('/api/superuser/config', { skipImpersonation: true });
+        const data = res.data ?? {};
+        setConfig(data);
+        setDraft(Object.fromEntries(Object.entries(data.credit_costs ?? {}).map(([k, v]) => [k, String(v)])));
       } catch {
         setConfig({});
       }
     })();
   }, []);
 
+  const catalog = config.credit_cost_catalog ?? [];
+  const groups = useMemo(() => {
+    const out = new Map<string, CreditCatalogEntry[]>();
+    for (const e of catalog) out.set(e.group, [...(out.get(e.group) ?? []), e]);
+    return [...out.entries()];
+  }, [catalog]);
+  const invalid = catalog.filter((e) => validCreditCost(draft[e.key] ?? '') === null).map((e) => e.key);
+
   const handleSave = async () => {
+    if (invalid.length) {
+      setError(`Credit costs must be whole numbers from 0 to 1000: ${invalid.join(', ')}`);
+      return;
+    }
     setSaving(true);
     setError(null);
-    setSaved(false);
+    setSaved(null);
     try {
-      await apiFetch('/api/superuser/config', {
+      const credit_costs = Object.fromEntries(catalog.map((e) => [e.key, validCreditCost(draft[e.key])!]));
+      const res = await apiFetch<ApiEnvelope<{ changes?: Array<{ key: string; from: number; to: number }> }>>('/api/superuser/config', {
         method: 'PUT',
-        body: JSON.stringify(config),
+        body: JSON.stringify({ maintenance_mode: !!config.maintenance_mode, credit_costs }),
         skipImpersonation: true,
       });
-      setSaved(true);
+      const changes = res.data?.changes ?? [];
+      setSaved(changes.length ? `Saved: ${changes.map((c) => `${c.key} ${c.from} → ${c.to}`).join(', ')}` : 'Saved (no price changed).');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed');
     } finally {
@@ -554,42 +591,39 @@ function SystemConfigSection() {
     }
   };
 
-  const updateCost = (op: string, value: number) => {
-    setConfig({
-      ...config,
-      credit_costs: { ...(config.credit_costs ?? {}), [op]: value },
-    });
-  };
-
-  const costOps: Array<[string, string]> = [
-    ['write_chapter', 'Write Chapter'],
-    ['write_short_story', 'Write Short Story'],
-    ['write_blog', 'Write Blog Post'],
-    ['write_newsletter', 'Write Newsletter'],
-    ['brainstorm', 'Brainstorm / Outline'],
-    ['research', 'Research'],
-    ['cover_art', 'Cover Art'],
-    ['social_repurpose', 'Social Repurpose'],
-  ];
-
   return (
     <div className="space-y-6">
-      <section>
+      <section data-testid="credit-costs">
         <h2 className="text-lg font-semibold">Credit Costs per Operation</h2>
-        <p className="mt-1 text-sm text-gray-600">How many credits each operation deducts from the user's balance.</p>
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          {costOps.map(([key, label]) => (
-            <Field key={key} label={label}>
-              <input
-                type="number"
-                min={0}
-                value={config.credit_costs?.[key] ?? 0}
-                onChange={(e) => updateCost(key, Number(e.target.value))}
-                className="w-full rounded border border-gray-300 px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-900"
-              />
-            </Field>
-          ))}
-        </div>
+        <p className="mt-1 text-sm text-gray-600">
+          How many credits each operation deducts from the user's balance ({catalog.length} operations). Admins and superusers are never charged.
+        </p>
+        {groups.map(([group, entries]) => (
+          <fieldset key={group} className="mt-4">
+            <legend className="text-sm font-semibold uppercase text-gray-500">{group}</legend>
+            <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-3">
+              {entries.map((e) => {
+                const bad = invalid.includes(e.key);
+                return (
+                  <Field key={e.key} label={e.label} hint={`${e.key}${e.unit ? `, ${e.unit}` : ''} · default ${e.default}`}>
+                    <input
+                      type="number"
+                      min={0}
+                      max={1000}
+                      step={1}
+                      aria-label={e.key}
+                      aria-invalid={bad}
+                      data-testid={`cost-${e.key}`}
+                      value={draft[e.key] ?? ''}
+                      onChange={(ev) => setDraft({ ...draft, [e.key]: ev.target.value })}
+                      className={`w-full rounded border px-2 py-1 text-sm dark:bg-gray-900 ${bad ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'}`}
+                    />
+                  </Field>
+                );
+              })}
+            </div>
+          </fieldset>
+        ))}
       </section>
 
       <section>
@@ -603,13 +637,13 @@ function SystemConfigSection() {
         </label>
       </section>
 
-      {error && <div className="text-sm text-red-700">{error}</div>}
-      {saved && <div className="text-sm text-green-700">Saved.</div>}
+      {error && <div className="text-sm text-red-700" role="alert">{error}</div>}
+      {saved && <div className="text-sm text-green-700" role="status">{saved}</div>}
 
       <button
         type="button"
         onClick={() => void handleSave()}
-        disabled={saving}
+        disabled={saving || invalid.length > 0}
         className="rounded bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
       >
         {saving ? 'Saving…' : 'Save Configuration'}

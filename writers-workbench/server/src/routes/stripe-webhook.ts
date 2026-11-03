@@ -22,6 +22,7 @@ import {
   loadTier,
 } from '../services/billing.js';
 import { fulfilReaderPrintOrder, readerOrderPaymentFailed } from '../services/reader-print.js';
+import { applySavedCardSession, pauseAutoRecharge, releaseAutoRechargeClaim, setDefaultPaymentMethod } from '../services/credit-packs.js';
 import { sendEmail } from '../lib/email.js';
 import { logger } from '../lib/logger.js';
 
@@ -44,6 +45,29 @@ async function paymentFailedEmail(userId: string, failures: number): Promise<voi
   );
 }
 
+export async function autoRechargePausedEmail(userId: string, reason: string): Promise<void> {
+  await emailUser(
+    userId,
+    'Auto-recharge is paused: please update your card',
+    `<p>We tried to recharge your Writers Workbench credits automatically, but the payment did not go through.</p>` +
+      `<p>${reason}.</p><p>Auto-recharge is paused and will not try again until you update your card on the Billing page and switch it back on.</p>`,
+  );
+}
+
+/** A credit payment's metadata -> the grant (any source: Checkout, saved card, auto-recharge). */
+async function grantFromPaymentIntent(pi: Stripe.PaymentIntent): Promise<string | null> {
+  const m = pi.metadata ?? {};
+  if (m.kind !== 'credits') return null;
+  const userId = m.user_id;
+  const credits = Number(m.credits ?? 0);
+  if (!userId || !credits) throw new Error(`credit payment ${pi.id} is missing user or credits`);
+  await grantPurchasedCredits(userId, credits, pi.amount_received || pi.amount, pi.id, {
+    pack: m.pack, quantity: m.quantity ? Number(m.quantity) : undefined, source: m.source,
+  });
+  if (m.source === 'auto_recharge') await releaseAutoRechargeClaim(userId, pi.id, `Recharged ${credits} credits`);
+  return userId;
+}
+
 /** What one event does. Returns the user it concerned (for the log), or null. */
 export async function processStripeEvent(event: Stripe.Event): Promise<string | null> {
   switch (event.type) {
@@ -51,6 +75,7 @@ export async function processStripeEvent(event: Stripe.Event): Promise<string | 
       const session = event.data.object as Stripe.Checkout.Session;
       const kind = session.metadata?.kind;
       if (kind === 'reader_print') return fulfilReaderPrintOrder(session);
+      if (session.mode === 'setup' && kind === 'save_card') return applySavedCardSession(session);
       if (session.mode === 'subscription' && session.subscription) {
         const subId = typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
         const sub = await getStripeClient().subscriptions.retrieve(subId);
@@ -67,7 +92,22 @@ export async function processStripeEvent(event: Stripe.Event): Promise<string | 
         const credits = Number(session.metadata?.credits ?? 0);
         const pi = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
         if (!userId || !credits || !pi) throw new Error(`credit checkout ${session.id} is missing user, credits or payment`);
-        await grantPurchasedCredits(userId, credits, session.amount_total ?? 0, pi);
+        await grantPurchasedCredits(userId, credits, session.amount_total ?? 0, pi, {
+          pack: session.metadata?.pack,
+          quantity: session.metadata?.quantity ? Number(session.metadata.quantity) : undefined,
+          source: session.metadata?.source,
+        });
+        // The card Checkout saved (setup_future_usage) becomes the default if the user has none yet.
+        const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
+        if (customerId && session.metadata?.pack) {
+          try {
+            const intent = await getStripeClient().paymentIntents.retrieve(pi);
+            const pm = typeof intent.payment_method === 'string' ? intent.payment_method : intent.payment_method?.id;
+            if (pm) await setDefaultPaymentMethod(customerId, pm, true);
+          } catch (err) {
+            logger.warn({ err }, 'stripe webhook: default card not set after checkout');
+          }
+        }
         return userId;
       }
       return null;
@@ -102,8 +142,19 @@ export async function processStripeEvent(event: Stripe.Event): Promise<string | 
     }
     case 'customer.subscription.deleted':
       return handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+    case 'payment_intent.succeeded':
+      // Saved-card purchases and auto-recharges are PaymentIntents with no Checkout session. A
+      // Checkout purchase arrives here too and is granted once (unique per PaymentIntent).
+      return grantFromPaymentIntent(event.data.object as Stripe.PaymentIntent);
+    case 'payment_intent.payment_failed': {
+      const pi = event.data.object as Stripe.PaymentIntent;
+      if (pi.metadata?.kind !== 'credits' || pi.metadata?.source !== 'auto_recharge' || !pi.metadata.user_id) return null;
+      // Usually already paused by the synchronous decline; this covers a failure Stripe reports later.
+      await pauseAutoRecharge(pi.metadata.user_id, pi.last_payment_error?.message ?? 'The auto-recharge payment failed', autoRechargePausedEmail);
+      return pi.metadata.user_id;
+    }
     default:
-      return null; // subscribed to, but nothing to do (payment_intent.succeeded is covered by Checkout)
+      return null;
   }
 }
 

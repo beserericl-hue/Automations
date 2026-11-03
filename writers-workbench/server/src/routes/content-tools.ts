@@ -34,6 +34,8 @@ import { parseWith } from '../lib/claude-structured.js';
 import { normalize, rankResearch, type ResearchReport } from '../lib/landing-page.js';
 import { applyRename, findMentions, nameAmbiguity, namesInText, type Mention } from '../lib/manuscript-tools.js';
 import { normalizeOutline } from '../lib/outline-schema.js';
+import { getCreditCost, humanizeUnits } from '../services/credit-costs.js';
+import { chargeCredits, refuseIfInsufficient } from '../lib/credit-charge.js';
 
 export const contentToolsRouter = Router();
 contentToolsRouter.use(requireAuth);
@@ -357,6 +359,10 @@ contentToolsRouter.post('/:id/humanize', validateBody(HumanizeBody), async (req,
   const chapter = await loadChapter(req, res);
   if (!chapter) return;
   const { text } = req.body as z.infer<typeof HumanizeBody>;
+  // Priced 2026-11-03: per started 100 words of the passage (StealthGPT bills by the word).
+  const units = humanizeUnits(text);
+  const cost = (await getCreditCost('humanize_passage')) * units;
+  if (refuseIfInsufficient(req, res, cost)) return;
   try {
     const result = await callEngineWriteToolSync<Record<string, unknown>>('chapter', {
       op: 'humanize-passage',
@@ -364,8 +370,13 @@ contentToolsRouter.post('/:id/humanize', validateBody(HumanizeBody), async (req,
       user_id: req.userId!,
       project_id: chapter.project_id ?? undefined,
     });
-    logger.info({ userId: req.userId, contentId: chapter.id, words: result.words, changed: result.changed, skipped: result.skipped }, 'content-tools: humanize');
-    res.json({ success: true, data: result });
+    // A passage the humanizer skipped (no key, guard refused, provider down) came back unchanged and
+    // cost us nothing to speak of: not charged, like any op that did not do its work.
+    const paid = result.skipped
+      ? { charged: 0, remaining: req.creditsRemaining ?? 0 }
+      : await chargeCredits(req, res, cost, `content.humanize:humanize_passage x${units}`, chapter.id);
+    logger.info({ userId: req.userId, contentId: chapter.id, words: result.words, changed: result.changed, skipped: result.skipped, charged: paid.charged }, 'content-tools: humanize');
+    res.json({ success: true, data: { ...result, credits_charged: paid.charged, credits_remaining: paid.remaining } });
   } catch (err) {
     await sendError(res, err, 'HUMANIZE_FAILED', 'humanize');
   }

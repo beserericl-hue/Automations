@@ -36,6 +36,15 @@ export async function atomicCreditAdd(userId: string, delta: number, countUsage 
   return Number(value);
 }
 
+/**
+ * Called after every successful deduction with the new balance (fire-and-forget). index.ts wires the
+ * evergreen auto-recharge here; this module stays free of Stripe so its tests need no billing mocks.
+ */
+let balanceLoweredHook: ((userId: string, balance: number) => Promise<unknown>) | null = null;
+export function onBalanceLowered(fn: ((userId: string, balance: number) => Promise<unknown>) | null): void {
+  balanceLoweredHook = fn;
+}
+
 export type CreditTransactionType =
   | 'monthly_reset'
   | 'usage'
@@ -142,6 +151,13 @@ export async function deductCredits(
     })
     .select('id')
     .single();
+
+  if (balanceLoweredHook) {
+    const hook = balanceLoweredHook;
+    void Promise.resolve()
+      .then(() => hook(userId, newRemaining))
+      .catch((err) => logger.error({ err, userId }, 'deductCredits: balance hook failed'));
+  }
 
   if (txErr) {
     logger.error({ err: txErr, userId }, 'deductCredits: transaction insert failed (balance already updated)');

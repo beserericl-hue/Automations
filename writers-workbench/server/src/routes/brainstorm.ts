@@ -7,6 +7,8 @@ import { BrainstormSubmitSchema } from '../schemas.js';
 import { logger } from '../lib/logger.js';
 import { anthropicTokens, recordUsage } from '../lib/cost-recorder.js';
 import { hubBackend, callEngineWriteTool } from '../lib/engine-hub.js';
+import { getCreditCost } from '../services/credit-costs.js';
+import { chargeCredits, refuseIfInsufficient } from '../lib/credit-charge.js';
 
 export const brainstormRouter = Router();
 
@@ -223,6 +225,11 @@ brainstormRouter.post(
       const { title, genre_slug, story_arc, target_chapter_count } = parsed.data;
       const userId = (req as { userId?: string }).userId || '';
 
+      // Price parity (2026-11-03): the same key a book brainstorm started from chat is charged under
+      // (the engine's brainstorm.story -> brainstorm_story). This screen used to charge nothing.
+      const cost = await getCreditCost('brainstorm_story');
+      if (refuseIfInsufficient(req, res, cost)) return;
+
       // B1 (CR-010): when HUB_BACKEND=engine, generate the outline via the engine's brainstorm.story
       // op instead of the n8n brainstorm webhook. brainstorm.story only persists into an EXISTING
       // project, so we first create the project (engine create-project, synchronous) — mirroring n8n's
@@ -255,11 +262,14 @@ brainstormRouter.post(
           persist: true,
           async: true,
         });
+        const paid = await chargeCredits(req, res, cost, 'brainstorm.submit:brainstorm_story', job.job_id);
         res.json({
           status: 'accepted',
           engineJob: true,
           jobId: job.job_id,
           projectId,
+          creditsCharged: paid.charged,
+          creditsRemaining: paid.remaining,
           message:
             'Brainstorm submitted. Your outline will appear in Projects and be emailed to you.',
         });
@@ -302,8 +312,11 @@ brainstormRouter.post(
       }
 
       const data = await response.json() as Record<string, unknown>;
+      const paid = await chargeCredits(req, res, cost, 'brainstorm.submit:brainstorm_story');
       res.json({
         status: 'accepted',
+        creditsCharged: paid.charged,
+        creditsRemaining: paid.remaining,
         message: 'Brainstorm submitted. Your outline will appear in Projects and be emailed to you.',
         ...data,
       });

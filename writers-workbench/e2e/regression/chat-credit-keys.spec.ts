@@ -106,7 +106,8 @@ test.describe('Chat operations are charged under the same credit key as their sc
       `user_id=eq.${encodeURIComponent(user.userId)}&transaction_type=eq.usage&select=amount,balance_after,description`);
     expect(usage).toHaveLength(1);
     expect(usage[0]).toMatchObject({ amount: -expected, balance_after: before - expected });
-    expect(usage[0].description).toMatch(/^chat\.[a-z-]+:research_report$/);
+    // Since 2026-11-03 chat is charged by the op the engine ROUTED to, and the ledger names it.
+    expect(usage[0].description).toBe('chat.engine:research.run');
   });
 });
 

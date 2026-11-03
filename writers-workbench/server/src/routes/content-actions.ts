@@ -23,6 +23,8 @@ import { logger } from '../lib/logger.js';
 import { getNamedQueue } from '../lib/queue.js';
 import { addTrackedJob } from '../lib/jobs/job-tracker.js';
 import type { N8nWebhookJob } from '../lib/jobs/types.js';
+import { getCreditCost } from '../services/credit-costs.js';
+import { chargeCredits, refuseIfInsufficient } from '../lib/credit-charge.js';
 
 export const contentActionsRouter = Router();
 
@@ -719,6 +721,10 @@ contentActionsRouter.post(
       const resolvedCitationMode =
         body.citation_mode === 'auto' ? (isNonFiction ? 'inline' : 'invisible') : body.citation_mode;
 
+      // Priced 2026-11-03: a rewrite-with-research is a chapter repair (the engine runs chapter.repair).
+      const repairCost = await getCreditCost('repair_chapter');
+      if (refuseIfInsufficient(req, res, repairCost)) return;
+
       // B1 (CR-010): when HUB_BACKEND=engine, route to the engine's chapter.repair op — its research-
       // weave path re-detects drift, fetches focused research bound to the author's research_focus,
       // weaves it in (invisible for fiction / inline footnotes for non-fiction), applies the style
@@ -737,8 +743,9 @@ contentActionsRouter.post(
           persist: true,
           async: true,
         });
+        const paid = await chargeCredits(req, res, repairCost, `content.rewrite-with-research:repair_chapter`, job.job_id);
         logger.info(
-          { userId, contentId: id, jobId: job.job_id },
+          { userId, contentId: id, jobId: job.job_id, charged: paid.charged },
           'content-actions: rewrite-with-research queued via engine',
         );
         res.status(202).json({
@@ -746,6 +753,8 @@ contentActionsRouter.post(
           jobId: job.job_id,
           engineJob: true,
           status: job.status ?? 'queued',
+          creditsCharged: paid.charged,
+          creditsRemaining: paid.remaining,
         });
         return;
       }
@@ -810,8 +819,9 @@ contentActionsRouter.post(
         jobTypeTag: 'rewrite_chapter_with_research',
       });
 
+      const paid = await chargeCredits(req, res, repairCost, `content.rewrite-with-research:repair_chapter`, bullJobId);
       logger.info(
-        { userId, contentId: id, bullJobId, trackerRowId },
+        { userId, contentId: id, bullJobId, trackerRowId, charged: paid.charged },
         'content-actions: rewrite-with-research enqueued',
       );
       res.status(202).json({
@@ -820,6 +830,8 @@ contentActionsRouter.post(
         trackerRowId,
         status: 'queued',
         queue: 'heavy-ops',
+        creditsCharged: paid.charged,
+        creditsRemaining: paid.remaining,
       });
     } catch (err) {
       logger.error({ err, userId, contentId: id }, 'content-actions: rewrite-with-research failed');
@@ -861,6 +873,8 @@ contentActionsRouter.post('/:id/repair', async (req: Request, res: Response) => 
       res.status(400).json({ success: false, error: { code: 'NOT_A_CHAPTER', message: 'Repair targets chapters' } });
       return;
     }
+    const cost = await getCreditCost('repair_chapter');
+    if (refuseIfInsufficient(req, res, cost)) return;
     const job = await callEngineWriteTool('chapter', {
       op: 'repair',
       project_id: chapter.project_id,
@@ -869,8 +883,12 @@ contentActionsRouter.post('/:id/repair', async (req: Request, res: Response) => 
       persist: true,
       async: true,
     });
-    logger.info({ userId, contentId: id, jobId: job.job_id }, 'content-actions: engine repair queued');
-    res.status(202).json({ success: true, jobId: job.job_id, engineJob: true, status: job.status ?? 'queued' });
+    const paid = await chargeCredits(req, res, cost, 'content.repair:repair_chapter', job.job_id);
+    logger.info({ userId, contentId: id, jobId: job.job_id, charged: paid.charged }, 'content-actions: engine repair queued');
+    res.status(202).json({
+      success: true, jobId: job.job_id, engineJob: true, status: job.status ?? 'queued',
+      creditsCharged: paid.charged, creditsRemaining: paid.remaining,
+    });
   } catch (err) {
     logger.error({ err, userId, contentId: id }, 'content-actions: repair failed');
     res.status(502).json({
@@ -920,6 +938,8 @@ contentActionsRouter.post('/:id/rewrite-to-fix-qa', async (req: Request, res: Re
           .join(' | ')}`
       : 'Strengthen every paragraph — remove flat/expository prose, sharpen imagery and dialogue, keep the plot and roster identical.';
 
+    const cost = await getCreditCost('repair_chapter');
+    if (refuseIfInsufficient(req, res, cost)) return;
     const job = await callEngineWriteTool('chapter', {
       op: 'repair',
       project_id: chapter.project_id,
@@ -931,11 +951,15 @@ contentActionsRouter.post('/:id/rewrite-to-fix-qa', async (req: Request, res: Re
       persist: true,
       async: true,
     });
+    const paid = await chargeCredits(req, res, cost, 'content.rewrite-to-fix-qa:repair_chapter', job.job_id);
     logger.info(
-      { userId, contentId: id, jobId: job.job_id, flagged: flagged.length },
+      { userId, contentId: id, jobId: job.job_id, flagged: flagged.length, charged: paid.charged },
       'content-actions: rewrite-to-fix-qa queued via engine',
     );
-    res.status(202).json({ success: true, jobId: job.job_id, engineJob: true, status: job.status ?? 'queued' });
+    res.status(202).json({
+      success: true, jobId: job.job_id, engineJob: true, status: job.status ?? 'queued',
+      creditsCharged: paid.charged, creditsRemaining: paid.remaining,
+    });
   } catch (err) {
     logger.error({ err, userId, contentId: id }, 'content-actions: rewrite-to-fix-qa failed');
     res.status(502).json({
@@ -974,6 +998,8 @@ contentActionsRouter.post('/:id/run-qa', async (req: Request, res: Response) => 
       res.status(400).json({ success: false, error: { code: 'NOT_A_CHAPTER', message: 'Q/A targets chapters' } });
       return;
     }
+    const cost = await getCreditCost('qa_chapter');
+    if (refuseIfInsufficient(req, res, cost)) return;
     const job = await callEngineWriteTool('chapter', {
       op: 'qa',
       project_id: chapter.project_id,
@@ -982,8 +1008,12 @@ contentActionsRouter.post('/:id/run-qa', async (req: Request, res: Response) => 
       persist: true,
       async: true,
     });
-    logger.info({ userId, contentId: id, jobId: job.job_id }, 'content-actions: run-qa queued via engine');
-    res.status(202).json({ success: true, jobId: job.job_id, engineJob: true, status: job.status ?? 'queued' });
+    const paid = await chargeCredits(req, res, cost, 'content.run-qa:qa_chapter', job.job_id);
+    logger.info({ userId, contentId: id, jobId: job.job_id, charged: paid.charged }, 'content-actions: run-qa queued via engine');
+    res.status(202).json({
+      success: true, jobId: job.job_id, engineJob: true, status: job.status ?? 'queued',
+      creditsCharged: paid.charged, creditsRemaining: paid.remaining,
+    });
   } catch (err) {
     logger.error({ err, userId, contentId: id }, 'content-actions: run-qa failed');
     res.status(502).json({

@@ -10,6 +10,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, ApiError } from '../../lib/api';
 import { useUser } from '../../contexts/UserContext';
 import type { SubscriptionTier } from '../../types/database';
+import BillingWallet from './BillingWallet';
 
 export interface BillingStatus {
   managed: boolean;
@@ -202,6 +203,8 @@ export default function BillingPage() {
           </div>
         </section>
       )}
+
+      <BillingWallet />
 
       {s.invoices.length > 0 && (
         <section data-testid="billing-invoices">

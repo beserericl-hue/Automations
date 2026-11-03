@@ -24,7 +24,7 @@ import {
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import { logger } from '../lib/logger.js';
 import { getGlobalJson, setGlobalConfig } from '../lib/app-config.js';
-import { clearCreditCostCache } from '../services/credit-costs.js';
+import { clearCreditCostCache, creditCostCatalog, DEFAULT_CREDIT_COSTS } from '../services/credit-costs.js';
 
 export const superuserRouter = Router();
 
@@ -323,40 +323,88 @@ const SUPERUSER_CONFIG_KEY = 'sprint8_superuser_config';
  *     responses:
  *       200: { description: Config object }
  */
+interface StoredSuperuserConfig {
+  credit_costs?: Record<string, number>;
+  maintenance_mode?: boolean;
+  [k: string]: unknown;
+}
+
+/**
+ * The config as the panel edits it: EVERY credit key (from credit-costs.ts, the same table the
+ * charging code reads — so a new key appears here without touching the panel), its effective price
+ * (the superuser's override, else the default), and the catalog (label, group, default, unit).
+ */
+export function configForPanel(stored: StoredSuperuserConfig | null): Record<string, unknown> & { credit_costs: Record<string, number> } {
+  const overrides = stored?.credit_costs ?? {};
+  const credit_costs: Record<string, number> = {};
+  for (const key of Object.keys(DEFAULT_CREDIT_COSTS)) {
+    credit_costs[key] = Object.prototype.hasOwnProperty.call(overrides, key) ? Number(overrides[key]) : DEFAULT_CREDIT_COSTS[key];
+  }
+  return {
+    ...(stored ?? {}),
+    maintenance_mode: Boolean(stored?.maintenance_mode),
+    credit_costs,
+    credit_cost_catalog: creditCostCatalog(),
+  };
+}
+
 superuserRouter.get('/config', async (_req: Request, res: Response) => {
   // Item 8: a system-wide value lives in the global settings table (migration 045). It used to be
   // upserted into the per-user app_config_v2 with no user_id, which that table's NOT NULL rejects,
   // so this config was never actually saved.
-  let stored: unknown;
+  let stored: StoredSuperuserConfig | null;
   try {
-    stored = await getGlobalJson(SUPERUSER_CONFIG_KEY);
+    stored = (await getGlobalJson<StoredSuperuserConfig>(SUPERUSER_CONFIG_KEY)) ?? null;
   } catch (err) {
     res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: err instanceof Error ? err.message : 'read failed' } });
     return;
   }
-
-  res.json({
-    success: true,
-    data: stored ?? {
-      credit_costs: {
-        write_chapter: 5, write_short_story: 5, write_blog: 5, write_newsletter: 5,
-        brainstorm: 3, research: 2, cover_art: 10, social_repurpose: 3,
-      },
-      maintenance_mode: false,
-    },
-  });
+  res.json({ success: true, data: configForPanel(stored) });
 });
 
 superuserRouter.put('/config', validateBody(SuperuserConfigSchema), async (req: Request, res: Response) => {
+  const body = { ...(req.body as StoredSuperuserConfig) };
+  delete body.credit_cost_catalog; // display-only; the panel echoes it back
+  const incoming = body.credit_costs ?? {};
+  const unknownKeys = Object.keys(incoming).filter((k) => !Object.prototype.hasOwnProperty.call(DEFAULT_CREDIT_COSTS, k));
+  if (unknownKeys.length) {
+    res.status(400).json({ success: false, error: { code: 'UNKNOWN_CREDIT_KEY', message: `Not a credit key: ${unknownKeys.join(', ')}` } });
+    return;
+  }
+
+  let before: StoredSuperuserConfig | null = null;
   try {
-    await setGlobalConfig(SUPERUSER_CONFIG_KEY, JSON.stringify(req.body), {
+    before = (await getGlobalJson<StoredSuperuserConfig>(SUPERUSER_CONFIG_KEY)) ?? null;
+  } catch { /* nothing saved yet */ }
+  const beforeCosts = configForPanel(before).credit_costs;
+
+  // Store only what differs from the code default: a key left at its default keeps following the
+  // code, so a default changed in a later release is not frozen by an old save of the whole table.
+  const merged: Record<string, number> = { ...beforeCosts, ...incoming };
+  const overrides: Record<string, number> = {};
+  for (const [k, v] of Object.entries(merged)) if (v !== DEFAULT_CREDIT_COSTS[k]) overrides[k] = v;
+  const toStore: StoredSuperuserConfig = { ...(before ?? {}), ...body, credit_costs: overrides };
+
+  const changes = Object.keys(DEFAULT_CREDIT_COSTS)
+    .filter((k) => merged[k] !== beforeCosts[k])
+    .map((k) => ({ key: k, from: beforeCosts[k], to: merged[k] }));
+  const by = req.realUserId ?? req.userId ?? null;
+  try {
+    await setGlobalConfig(SUPERUSER_CONFIG_KEY, JSON.stringify(toStore), {
       description: 'Superuser system config: credit costs and maintenance mode',
-      updatedBy: req.realUserId ?? req.userId ?? null,
+      updatedBy: by,
     });
     clearCreditCostCache();
   } catch (err) {
     res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: err instanceof Error ? err.message : 'write failed' } });
     return;
   }
-  res.json({ success: true, data: req.body });
+  // Audit: who changed which price from what to what (the row itself keeps updated_by/updated_at).
+  if (changes.length || Boolean(before?.maintenance_mode) !== Boolean(toStore.maintenance_mode)) {
+    logger.info(
+      { audit: 'superuser.config', by, credit_cost_changes: changes, maintenance_mode: Boolean(toStore.maintenance_mode) },
+      'superuser: config changed',
+    );
+  }
+  res.json({ success: true, data: { ...configForPanel(toStore), changes } });
 });

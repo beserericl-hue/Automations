@@ -2,6 +2,7 @@
 // transaction history, and a Buy More Credits section available to all tiers.
 
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useUser } from '../../contexts/UserContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import { apiFetch, type ApiEnvelope } from '../../lib/api';
@@ -79,7 +80,16 @@ export default function CreditsPage() {
       </div>
 
       <PurchaseReturn onCredited={refreshSubscription} />
-      <PurchaseSection onPurchase={refreshSubscription} />
+      {/* Buying credits lives on the Billing page (books, top-ups, the saved card, auto-recharge). */}
+      <section className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950" data-testid="credits-buy-link">
+        <h2 className="text-lg font-semibold text-blue-900 dark:text-blue-100">Need more credits?</h2>
+        <p className="mt-1 text-sm text-blue-800 dark:text-blue-200">
+          Add whole books (Half Book: 1,000 credits for $99, Full Book: 2,000 credits for $199), recharge, or switch on auto-recharge.
+        </p>
+        <Link to="/billing" className="mt-2 inline-block rounded bg-blue-700 px-4 py-1 text-sm font-semibold text-white hover:bg-blue-800">
+          Buy books or credits
+        </Link>
+      </section>
 
       {Object.keys(breakdown).length > 0 && (
         <section>

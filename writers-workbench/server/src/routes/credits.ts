@@ -8,10 +8,27 @@ import { getStripeClient, paymentsReady, appUrl } from '../services/stripe.js';
 import { getOrCreateStripeCustomer } from '../services/stripe-sync.js';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import { logger } from '../lib/logger.js';
+import { findCreditPack, listCreditPacks, publicPack, startPackCheckout } from '../services/credit-packs.js';
 
 export const creditsRouter = Router();
 
 creditsRouter.use(requireAuth);
+
+/**
+ * GET /api/credits/packs — the book plans on sale (Half Book, Full Book), with whether a purchase can
+ * go through on this server right now.
+ */
+creditsRouter.get('/packs', async (_req: Request, res: Response) => {
+  const packs = await listCreditPacks();
+  res.json({
+    success: true,
+    data: {
+      packs: packs.map(publicPack),
+      purchases_available: purchasesAvailable(),
+      unavailable_reason: purchasesAvailable() ? null : PURCHASES_UNAVAILABLE,
+    },
+  });
+});
 
 /**
  * @openapi
@@ -184,12 +201,29 @@ creditsRouter.post('/purchase', validateBody(CreditPurchaseSchema), async (req: 
     res.status(503).json({ success: false, error: { code: 'PAYMENTS_NOT_CONFIGURED', message: PURCHASES_UNAVAILABLE } });
     return;
   }
-  const { amount } = req.body as { amount: number };
+  const { amount, pack: packName } = req.body as { amount?: number; pack?: string };
   const tier = req.subscriptionTier;
   if (!tier) {
     res.status(404).json({ success: false, error: { code: 'NO_SUBSCRIPTION', message: 'No active subscription tier' } });
     return;
   }
+  if (packName) {
+    const pack = await findCreditPack(packName);
+    if (!pack) {
+      res.status(404).json({ success: false, error: { code: 'NO_SUCH_PACK', message: 'That plan is not on sale.' } });
+      return;
+    }
+    try {
+      const out = await startPackCheckout(req.userId!, pack);
+      logger.info({ userId: req.userId, pack: pack.name }, 'credits/purchase: book plan checkout started');
+      res.json({ success: true, data: { ...out, amount: pack.credits, pack: pack.name } });
+    } catch (err) {
+      logger.error({ err, userId: req.userId, pack: pack.name }, 'credits/purchase: pack checkout failed');
+      res.status(502).json({ success: false, error: { code: 'STRIPE_ERROR', message: 'Could not start the purchase.' } });
+    }
+    return;
+  }
+  if (amount === undefined) return; // unreachable: the schema requires one of the two
   try {
     const customer = await getOrCreateStripeCustomer(req.userId!);
     const unit = tier.credit_purchase_price_cents;

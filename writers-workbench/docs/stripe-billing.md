@@ -17,6 +17,24 @@ Stripe is the source of truth for billing. Supabase is the source of truth for a
 
 Admins, superusers and the comp tier (`free_full`) are never charged.
 
+## Book plans, top-ups, the saved card and auto-recharge (2026-11-03, migration 053)
+
+All on the Billing page (`/billing`, `client/src/components/billing/BillingWallet.tsx`); the Credits
+page links there. Server: `server/src/services/credit-packs.ts`, routes under `/api/billing`
+(`wallet`, `card/setup`, `card/confirm`, `DELETE card`, `purchase`, `auto-recharge`, `purchases`).
+
+| What | How |
+|---|---|
+| Packs | `credit_packs_v2`: Half Book 1,000 credits $99, Full Book 2,000 credits $199 (kind `book`), Top-up 250 $29, Top-up 500 $55 (kind `topup`). One Stripe Product + one-time Price each, lookup key `ww_pack_<name>`, created by the seed script. |
+| The card | A Stripe PaymentMethod on the Stripe Customer, set as `invoice_settings.default_payment_method` and on the subscription. Collected by Checkout in **setup** mode. Brand/last4/expiry are read from Stripe; our DB stores no card data. Remove = Stripe detach. Invoices and cancelling: the Customer Portal. |
+| Buy N books / a top-up | On-session PaymentIntent on the default card (`metadata.kind=credits`, `credits`, `pack`, `quantity`, `source=saved_card`). No card, or the bank wants 3-D Secure: Checkout instead (it saves the card, `setup_future_usage=off_session`). |
+| Auto-recharge | Stripe cannot see our balance, so the trigger is app-side: after every deduction (`onBalanceLowered` in `services/credits.ts`). Off-session PaymentIntent on the default card (`source=auto_recharge`). Once per crossing: `billing_settings_v2.auto_recharge_claimed_at` is taken by one conditional UPDATE and released by the webhook that grants the credits. A decline or `authentication_required` pauses it, records why, emails the user; it never retries by itself. Optional monthly cap (from the ledger). |
+| Credits | Only the webhook: `payment_intent.succeeded` (and `checkout.session.completed`) → `grantPurchasedCredits`, unique per PaymentIntent. |
+| History | Stripe PaymentIntents (receipt URLs) joined to `credit_transactions` (credited or not). |
+
+Recurring plan payments stay Stripe Subscriptions (renewal, retries, proration, receipts are Stripe's);
+no app-side job charges anyone on a schedule.
+
 ## Rules worth knowing
 
 - **The key decides the mode.** An `sk_test_` key means test mode, and `sk_live_` means live.
@@ -49,7 +67,8 @@ Admins, superusers and the comp tier (`free_full`) are never charged.
    - `checkout.session.completed`, `checkout.session.expired`
    - `invoice.paid`, `invoice.payment_failed`
    - `customer.subscription.created`, `.updated`, `.deleted`
-   - `payment_intent.succeeded`, `charge.refunded`
+   - `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded`
+     (`payment_intent.*` grant saved-card purchases and auto-recharges, and pause a failed recharge)
 
    Set its signing secret as `STRIPE_WEBHOOK_SECRET`. Set this LAST, together with the code that
    handles it.

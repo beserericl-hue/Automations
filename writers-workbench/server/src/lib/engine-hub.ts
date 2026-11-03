@@ -111,6 +111,8 @@ export interface HubResponse {
   data?: unknown;
   job_id?: string | null;
   status?: string | null;
+  /** A message that fanned out to several tasks (V31): one entry per queued op. */
+  jobs?: Array<{ tool?: string | null; op?: string | null; job_id?: string | null; status?: string | null }> | null;
   error?: string | null;
   /** The conversation the engine remembered this turn under (writer_engine.hub.memory). */
   conversation_id?: string | null;

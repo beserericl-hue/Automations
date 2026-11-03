@@ -24,6 +24,10 @@ import { appUrl, getStripeClient, isoFromUnix, paymentsReady, subscriptionPeriod
 import { getOrCreateStripeCustomer, existingCustomerId } from '../services/stripe-sync.js';
 import { TIER_COLUMNS, isPaidTier, loadTier, priceFor, type TierRow } from '../services/billing.js';
 import { logger } from '../lib/logger.js';
+import {
+  MAX_PACK_QUANTITY, applySavedCardSession, defaultCard, findCreditPack, getAutoRecharge, listCreditPacks,
+  maybeAutoRecharge, publicPack, purchaseHistory, purchasePack, removeDefaultCard, saveAutoRecharge, startSaveCardCheckout,
+} from '../services/credit-packs.js';
 
 export const billingRouter = Router();
 billingRouter.use(requireAuth);
@@ -294,6 +298,147 @@ billingRouter.get('/credits/checkout/:sessionId', async (req: Request, res: Resp
     res.json({ success: true, data: { payment_status: session.payment_status, credited, credits: Number(session.metadata?.credits ?? 0) } });
   } catch {
     fail(res, 404, 'NOT_FOUND', 'Purchase not found');
+  }
+});
+
+// ------------------------------------------------------------------------------------------------
+// Book plans, top-ups, the saved card and auto-recharge (2026-11-03). See services/credit-packs.ts.
+// ------------------------------------------------------------------------------------------------
+
+const PackPurchase = z.object({
+  pack: z.string().regex(/^[a-z][a-z0-9_]{1,40}$/),
+  quantity: z.number().int().min(1).max(MAX_PACK_QUANTITY).default(1),
+});
+const AutoRechargeBody = z.object({
+  enabled: z.boolean(),
+  threshold: z.number().int().min(0).max(100_000),
+  pack: z.string().regex(/^[a-z][a-z0-9_]{1,40}$/),
+  monthly_cap_cents: z.number().int().min(100).max(1_000_000).nullable().default(null),
+});
+
+/** Everything the Billing page's credits sections need in one call. */
+billingRouter.get('/wallet', async (req: Request, res: Response) => {
+  const packs = (await listCreditPacks()).map(publicPack);
+  const auto = await getAutoRecharge(req.userId!);
+  let card: Awaited<ReturnType<typeof defaultCard>> = null;
+  let hasCustomer = false;
+  if (paymentsReady() && !isManaged(req)) {
+    try {
+      const customerId = await existingCustomerId(req.userId!);
+      hasCustomer = Boolean(customerId);
+      if (customerId) card = await defaultCard(customerId);
+    } catch (err) {
+      logger.warn({ err, userId: req.userId }, 'billing/wallet: card unavailable');
+    }
+  }
+  res.json({
+    success: true,
+    data: {
+      payments_ready: paymentsReady(),
+      managed: isManaged(req),
+      packs,
+      card: card ? { brand: card.brand, last4: card.last4, exp_month: card.exp_month, exp_year: card.exp_year } : null,
+      has_customer: hasCustomer,
+      auto_recharge: {
+        enabled: auto.auto_recharge_enabled,
+        threshold: auto.auto_recharge_threshold,
+        pack: auto.auto_recharge_pack,
+        monthly_cap_cents: auto.auto_recharge_monthly_cap_cents,
+        paused: auto.auto_recharge_paused,
+        paused_reason: auto.auto_recharge_paused_reason,
+        paused_at: auto.auto_recharge_paused_at,
+        in_flight: Boolean(auto.auto_recharge_claimed_at),
+        last_event: auto.auto_recharge_last_event,
+        last_event_at: auto.auto_recharge_last_event_at,
+      },
+    },
+  });
+});
+
+/** Save a card: Stripe Checkout in setup mode. The card never reaches this server. */
+billingRouter.post('/card/setup', async (req: Request, res: Response) => {
+  if (!ready(res)) return;
+  if (isManaged(req)) return fail(res, 403, 'MANAGED_ACCOUNT', 'Your plan is managed by an administrator.');
+  try {
+    res.json({ success: true, data: { checkout_url: await startSaveCardCheckout(req.userId!) } });
+  } catch (err) {
+    logger.error({ err }, 'billing/card/setup failed');
+    fail(res, 502, 'STRIPE_ERROR', 'Could not open the card form.');
+  }
+});
+
+/** Back from the card form: make it the default now (the webhook does the same; both are idempotent). */
+billingRouter.post('/card/confirm', validateBody(z.object({ session_id: z.string().startsWith('cs_') })), async (req: Request, res: Response) => {
+  if (!ready(res)) return;
+  try {
+    const session = await getStripeClient().checkout.sessions.retrieve(String(req.body.session_id));
+    if (session.metadata?.user_id !== req.userId || session.mode !== 'setup') return fail(res, 404, 'NOT_FOUND', 'Card setup not found');
+    const done = await applySavedCardSession(session);
+    res.json({ success: true, data: { saved: Boolean(done) } });
+  } catch (err) {
+    logger.warn({ err }, 'billing/card/confirm failed');
+    fail(res, 404, 'NOT_FOUND', 'Card setup not found');
+  }
+});
+
+billingRouter.delete('/card', async (req: Request, res: Response) => {
+  if (!ready(res)) return;
+  if (isManaged(req)) return fail(res, 403, 'MANAGED_ACCOUNT', 'Your plan is managed by an administrator.');
+  try {
+    const removed = await removeDefaultCard(req.userId!);
+    res.json({ success: true, data: { removed } });
+  } catch (err) {
+    logger.error({ err }, 'billing/card delete failed');
+    fail(res, 502, 'STRIPE_ERROR', 'Could not remove the card.');
+  }
+});
+
+/** Buy N of a pack (books or a top-up): the saved card, else Checkout. Credits arrive by webhook. */
+billingRouter.post('/purchase', validateBody(PackPurchase), async (req: Request, res: Response) => {
+  if (!ready(res)) return;
+  if (isManaged(req)) return fail(res, 403, 'MANAGED_ACCOUNT', 'Your plan is managed by an administrator.');
+  const { pack: name, quantity } = req.body as z.infer<typeof PackPurchase>;
+  const pack = await findCreditPack(name);
+  if (!pack) return fail(res, 404, 'NO_SUCH_PACK', 'That plan is not on sale.');
+  try {
+    const out = await purchasePack(req.userId!, pack, quantity);
+    logger.info({ userId: req.userId, pack: pack.name, quantity, status: out.status }, 'billing/purchase');
+    if (out.status === 'failed') return fail(res, 402, 'PAYMENT_FAILED', out.message);
+    res.json({ success: true, data: out });
+  } catch (err) {
+    logger.error({ err, userId: req.userId }, 'billing/purchase failed');
+    fail(res, 502, 'STRIPE_ERROR', 'Could not start the purchase.');
+  }
+});
+
+billingRouter.put('/auto-recharge', validateBody(AutoRechargeBody), async (req: Request, res: Response) => {
+  if (isManaged(req)) return fail(res, 403, 'MANAGED_ACCOUNT', 'Your plan is managed by an administrator.');
+  const body = req.body as z.infer<typeof AutoRechargeBody>;
+  if (!(await findCreditPack(body.pack))) return fail(res, 400, 'NO_SUCH_PACK', 'Choose a pack that is on sale.');
+  if (body.enabled) {
+    if (!ready(res)) return;
+    const customerId = await existingCustomerId(req.userId!);
+    if (!customerId || !(await defaultCard(customerId))) return fail(res, 409, 'NO_CARD', 'Save a card first: auto-recharge charges your saved card.');
+  }
+  try {
+    const saved = await saveAutoRecharge(req.userId!, { enabled: body.enabled, threshold: body.threshold, pack: body.pack, monthly_cap_cents: body.monthly_cap_cents });
+    logger.info({ userId: req.userId, enabled: body.enabled, threshold: body.threshold, pack: body.pack, cap: body.monthly_cap_cents }, 'billing: auto-recharge settings saved');
+    res.json({ success: true, data: saved });
+    // Already below the new threshold: the next deduction would fire it anyway; do it now.
+    if (body.enabled) void maybeAutoRecharge(req.userId!, req.creditsRemaining ?? Number.MAX_SAFE_INTEGER);
+  } catch (err) {
+    fail(res, 500, 'DB_ERROR', err instanceof Error ? err.message : 'save failed');
+  }
+});
+
+/** Credit purchases, from Stripe (receipts) joined to the ledger (credited?). */
+billingRouter.get('/purchases', async (req: Request, res: Response) => {
+  if (!paymentsReady() || isManaged(req)) return void res.json({ success: true, data: [] });
+  try {
+    res.json({ success: true, data: await purchaseHistory(req.userId!) });
+  } catch (err) {
+    logger.warn({ err, userId: req.userId }, 'billing/purchases: Stripe unavailable');
+    fail(res, 502, 'STRIPE_ERROR', 'Could not load the purchase history.');
   }
 });
 

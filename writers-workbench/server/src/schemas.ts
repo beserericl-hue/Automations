@@ -198,8 +198,10 @@ export const ApprovalTokenParamSchema = z.object({
 const PhoneE164 = z.string().regex(/^\+[1-9]\d{1,14}$/, 'Phone must be E.164 format (e.g. +14105551234)');
 
 export const CreditPurchaseSchema = z.object({
-  amount: z.coerce.number().int().min(1, 'amount must be at least 1').max(10000, 'max 10000 per purchase'),
-});
+  amount: z.coerce.number().int().min(1, 'amount must be at least 1').max(10000, 'max 10000 per purchase').optional(),
+  // A book plan (credit_packs_v2.name), e.g. 'half_book'. Either a pack or an amount.
+  pack: z.string().regex(/^[a-z][a-z0-9_]{1,40}$/, 'not a pack name').optional(),
+}).refine((b) => (b.amount === undefined) !== (b.pack === undefined), 'give either an amount or a pack');
 
 export const ImpersonateStartSchema = z.object({
   target_user_id: PhoneE164,
