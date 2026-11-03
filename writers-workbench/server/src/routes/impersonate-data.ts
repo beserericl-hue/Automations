@@ -175,9 +175,14 @@ impersonateDataRouter.get('/content', async (req: Request, res: Response) => {
   const projectId = typeof req.query.project_id === 'string' ? req.query.project_id : null;
   const limit = Math.min(500, Math.max(1, parseInt(typeof req.query.limit === 'string' ? req.query.limit : '100', 10) || 100));
 
+  // view=list: only the Content Library's columns, not every row's full text and metadata.
+  const columns = req.query.view === 'list'
+    ? 'id, title, content_type, status, genre_slug, project_id, chapter_number, created_at, updated_at'
+    : '*';
+
   let q = getSupabaseAdmin()
     .from('published_content_v2')
-    .select('*')
+    .select(columns)
     .eq('user_id', userId)
     .is('deleted_at', null)
     .order('updated_at', { ascending: false })
