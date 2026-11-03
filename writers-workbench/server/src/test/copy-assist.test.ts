@@ -188,6 +188,14 @@ describe('runAssist', () => {
     expect(r.warnings.join(' ')).toMatch(/the limit is 4,000/);
   });
 
+  it('every prompt forbids new facts about the author, even when a revision asks for "more suspense"', async () => {
+    const call = vi.fn<Caller>().mockResolvedValue(reply('Thanks.'));
+    await runAssist({ field: 'acknowledgements', mode: 'revise', current: 'Thanks to [editor].', instruction: 'warmer, more suspense' }, facts(), { userId: 'u1' }, call);
+    const prompt = call.mock.calls[0][0];
+    expect(prompt).toContain('Say nothing about the author that <author> does not state');
+    expect(prompt).toContain('never licenses new facts about the author');
+  });
+
   it('a revision carries the current text and the author\'s instruction', async () => {
     const call = vi.fn<Caller>().mockResolvedValue(reply('Shorter.'));
     await runAssist({ field: 'hook', mode: 'revise', current: 'A long hook about Cogwheel.', instruction: 'shorter, more suspense' }, facts(), { userId: 'u1' }, call);
@@ -277,23 +285,23 @@ beforeEach(async () => {
 });
 
 describe('POST /assist', () => {
-  it('drafts one field, charges promo_copy (3 credits) once, and saves nothing', async () => {
+  it('drafts one field, charges promo_copy (2 credits) once, and saves nothing', async () => {
     await server(async (base) => {
       const r = await call(base, 'POST', '/api/copy-assist/project/p1/assist', { field: 'blurb' });
       expect(r.status).toBe(200);
-      expect(r.json.data).toMatchObject({ field: 'blurb', value: 'Cogwheel wakes in a gaslit room.', limit: 4000, credits_charged: 3, credits_remaining: 97 });
-      expect(deducted).toEqual([{ amount: 3, description: 'copy-assist.draft:promo_copy blurb' }]);
-      expect(r.headers.get('X-Credits-Remaining')).toBe('97');
+      expect(r.json.data).toMatchObject({ field: 'blurb', value: 'Cogwheel wakes in a gaslit room.', limit: 4000, credits_charged: 2, credits_remaining: 98 });
+      expect(deducted).toEqual([{ amount: 2, description: 'copy-assist.draft:promo_copy blurb' }]);
+      expect(r.headers.get('X-Credits-Remaining')).toBe('98');
       expect(writes).toEqual([]);
     });
   });
 
   it('answers 402 before calling the model when the balance is short', async () => {
-    auth = { creditsRemaining: 2 };
+    auth = { creditsRemaining: 1 };
     await server(async (base) => {
       const r = await call(base, 'POST', '/api/copy-assist/project/p1/assist', { field: 'hook' });
       expect(r.status).toBe(402);
-      expect(r.json.error).toMatchObject({ code: 'INSUFFICIENT_CREDITS', creditsRequired: 3, creditsRemaining: 2 });
+      expect(r.json.error).toMatchObject({ code: 'INSUFFICIENT_CREDITS', creditsRequired: 2, creditsRemaining: 1 });
       expect(modelCalls).not.toHaveBeenCalled();
       expect(deducted).toEqual([]);
     });
@@ -315,7 +323,7 @@ describe('POST /assist', () => {
       expect(bad.status).toBe(400);
       const ok = await call(base, 'POST', '/api/copy-assist/project/p1/assist', { field: 'hook', mode: 'revise', instruction: 'shorter', current: 'A long hook.' });
       expect(ok.status).toBe(200);
-      expect(deducted).toEqual([{ amount: 3, description: 'copy-assist.revise:promo_copy hook' }]);
+      expect(deducted).toEqual([{ amount: 2, description: 'copy-assist.revise:promo_copy hook' }]);
     });
   });
 
@@ -352,9 +360,9 @@ describe('POST /assist', () => {
 describe('POST /assist/all', () => {
   it('refuses a total the author was not shown (409) and runs nothing', async () => {
     await server(async (base) => {
-      const r = await call(base, 'POST', '/api/copy-assist/project/p1/assist/all', { fields: ['blurb', 'hook'], expected_cost: 3 });
+      const r = await call(base, 'POST', '/api/copy-assist/project/p1/assist/all', { fields: ['blurb', 'hook'], expected_cost: 2 });
       expect(r.status).toBe(409);
-      expect(r.json.error.total).toBe(6);
+      expect(r.json.error.total).toBe(4);
       expect(modelCalls).not.toHaveBeenCalled();
     });
   });
@@ -365,18 +373,18 @@ describe('POST /assist/all', () => {
       return ctx.operation === 'copy-assist.keywords' ? reply('', ['steampunk']) : reply('Cogwheel wakes.');
     });
     await server(async (base) => {
-      const r = await call(base, 'POST', '/api/copy-assist/project/p1/assist/all', { fields: ['blurb', 'hook', 'keywords'], expected_cost: 9 });
+      const r = await call(base, 'POST', '/api/copy-assist/project/p1/assist/all', { fields: ['blurb', 'hook', 'keywords'], expected_cost: 6 });
       expect(r.status).toBe(200);
       expect(Object.keys(r.json.data.results).sort()).toEqual(['blurb', 'keywords']);
       expect(r.json.data.errors).toEqual({ hook: 'model down' });
-      expect(deducted).toEqual([{ amount: 6, description: 'copy-assist.all:promo_copy x2' }]);
+      expect(deducted).toEqual([{ amount: 4, description: 'copy-assist.all:promo_copy x2' }]);
       expect(writes).toEqual([]);
     });
   });
 
   it('only package fields can be batch-drafted (not the dedication)', async () => {
     await server(async (base) => {
-      const r = await call(base, 'POST', '/api/copy-assist/project/p1/assist/all', { fields: ['dedication'], expected_cost: 3 });
+      const r = await call(base, 'POST', '/api/copy-assist/project/p1/assist/all', { fields: ['dedication'], expected_cost: 2 });
       expect(r.status).toBe(400);
     });
   });
@@ -396,7 +404,7 @@ describe('the saved copy', () => {
       const got = await call(base, 'GET', '/api/copy-assist/project/p1/copy');
       expect(got.json.data.books['1']).toEqual({ subtitle: 'A Novel', inside_flap: 'London, 1888.' });
       expect(got.json.data.also_by).toEqual(['The Signal Beneath']);
-      expect(got.json.data.assist).toMatchObject({ price: 3, charged: true });
+      expect(got.json.data.assist).toMatchObject({ price: 2, charged: true });
       expect(got.json.data.assist.fields.blurb).toMatchObject({ limit: 4000 });
       expect(got.json.data.assist.fields.keywords).toMatchObject({ limit: 50, max_items: 7 });
       expect(got.json.data.assist.fields.also_by.free).toBe(true);
