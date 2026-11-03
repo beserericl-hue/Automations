@@ -58,9 +58,28 @@ def _index() -> dict[tuple[str, str], dict[str, Any]]:
     return out
 
 
+# Other names a provider has been recorded under. n8n's "Hub V2" and the engine before 2026-05 wrote
+# Gemini calls as provider "google"; left as-is they group as a separate provider in the cost view and
+# miss the price table. The server keeps the same map (server/src/lib/cost-recorder.ts).
+PROVIDER_ALIASES: dict[str, str] = {
+    "google": "gemini",
+    "google-genai": "gemini",
+    "google_genai": "gemini",
+    "googleai": "gemini",
+    "google-ai": "gemini",
+    "claude": "anthropic",
+}
+
+
+def normalize_provider(provider: str | None) -> str:
+    """The canonical provider name: lower-case, aliases (``google``) mapped to ``gemini`` etc."""
+    key = (provider or "").strip().lower()
+    return PROVIDER_ALIASES.get(key, key)
+
+
 def price_entry(provider: str, model: str) -> dict[str, Any] | None:
     """The table entry for ``provider``/``model`` (aliases included), or None."""
-    return _index().get((provider or "", model or ""))
+    return _index().get((normalize_provider(provider), (model or "").strip()))
 
 
 def _env_override(entry: dict[str, Any]) -> dict[str, Any]:
