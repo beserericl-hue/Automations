@@ -105,7 +105,10 @@ class EngineSettings(BaseSettings):
     humanize_collapse_retry_mode: str = Field(default="Medium", alias="HUMANIZE_COLLAPSE_RETRY_MODE")
     # Per-surface switches (each still needs HUMANIZE_NON_FICTION + a key). The newsletter saga's
     # per-story sections, and the posts the Trend / Dev radars draft onto the post calendar.
-    humanize_newsletter_segments: bool = Field(default=True, alias="HUMANIZE_NEWSLETTER_SEGMENTS")
+    # Newsletter sections default OFF (Eric, 2026-11-03): on DEV they mostly failed the layout /
+    # terms guards, so the original text was kept and the pass still billed. Opt back in with
+    # HUMANIZE_NEWSLETTER_SEGMENTS=true.
+    humanize_newsletter_segments: bool = Field(default=False, alias="HUMANIZE_NEWSLETTER_SEGMENTS")
     humanize_radar_drafts: bool = Field(default=True, alias="HUMANIZE_RADAR_DRAFTS")
 
     # Delivery

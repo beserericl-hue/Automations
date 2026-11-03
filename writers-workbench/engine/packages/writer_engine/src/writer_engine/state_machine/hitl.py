@@ -72,10 +72,13 @@ _TABLE_STAGE: dict[str, str] = {
     "awaiting_stories_approval": "stories",
     "awaiting_subject_approval": "subject_line",
     "awaiting_image_approval": "image",
+    # The final "Send to subscribers" gate (migration 052 adds 'send' to the table's CHECK).
+    "awaiting_send_approval": "send",
     # pass-throughs so callers may use either form
     "stories": "stories",
     "subject_line": "subject_line",
     "image": "image",
+    "send": "send",
 }
 
 
@@ -219,6 +222,7 @@ _ENGINE_STAGE: dict[str, str] = {
     "stories": "awaiting_stories_approval",
     "subject_line": "awaiting_subject_approval",
     "image": "awaiting_image_approval",
+    "send": "awaiting_send_approval",
 }
 
 

@@ -40,7 +40,9 @@ newsletter" is six steps:
 5. **Step 3: Subscriber.** Your own email is pre-filled. Click **Add**.
 6. Click **Generate now →** to trigger a real run. The pipeline drafts
    stories → asks you to approve them → drafts a subject line → asks you
-   to approve that → renders the email and saves it to **Sends**.
+   to approve that → asks you to approve the images → renders the email and
+   saves it to **Sends** → asks you, one last time, whether to **Send to
+   subscribers**. Nothing is mailed to anyone until you approve that last step.
 
 When you see the rendered email in Sends, you're done.
 
@@ -258,12 +260,30 @@ status updates as the workflow advances stage by stage.
 Route: `/newsletter/approvals` (list) and `/newsletter/approvals/:token`
 (detail)
 
-Two checkpoints per generation:
+Four checkpoints per generation (Writer Engine backend):
 
 1. **Stories.** The AI produces a list of candidate articles for the
    issue; you review and approve / revise. **Revise** sends your
    feedback back into the AI loop.
 2. **Subject line.** Same flow for the email subject.
+3. **Images.** Pick an image per story (or none). Approving renders and
+   saves the issue. It does **not** send it.
+4. **Send to subscribers** (since 2026-11-03). Shows the rendered email
+   exactly as it will go out, the issue number and how many active
+   subscribers it will reach. **Send me a test copy** mails it to your own
+   account address only, with `[TEST]` in the subject (each copy is
+   recorded with its Postal message id and listed under the button; at
+   most 10 per issue). **Send to N subscribers** delivers it. **Don't send**
+   cancels the issue: it stays in Sends as `cancelled` and nobody gets it.
+   The test copy is only offered here, because before this step there is
+   no rendered email to send.
+
+Scheduled (cadence) editions go through the same four checkpoints: the
+engine's cron starts the run, and the run waits at each checkpoint for you.
+There is no auto-approve setting for any checkpoint, so a scheduled issue
+never reaches subscribers until someone approves **Send to subscribers**.
+An issue left waiting expires with its approval (7 days for engine runs)
+and is never sent.
 
 Each row in the list shows the stage, edition, created/expires
 timestamps, and a short excerpt. Click into a row to see the draft,

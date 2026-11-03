@@ -13,6 +13,8 @@ import { apiFetch } from '../../lib/api';
 interface PreviewResponse {
   success: boolean;
   html: string;
+  /** True at the final send gate: this is the saved, rendered issue itself, not a template approximation. */
+  rendered?: boolean;
   warnings?: string[];
 }
 
@@ -29,7 +31,9 @@ export default function ApprovalEmailPreview({ token }: { token: string }) {
     <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
       <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2 dark:border-gray-700">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Email preview</h3>
-        <span className="text-xs text-gray-400">How this issue will look when sent</span>
+        <span className="text-xs text-gray-400">
+          {data?.rendered ? 'The rendered issue exactly as subscribers will receive it' : 'How this issue will look when sent'}
+        </span>
       </div>
       {isLoading ? (
         <div className="p-6 text-sm text-gray-400">Rendering preview…</div>

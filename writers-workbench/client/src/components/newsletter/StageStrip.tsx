@@ -31,7 +31,9 @@ export type PhaseId =
   | 'subject_approval'
   | 'writing'
   | 'assembling'
-  | 'saved';
+  | 'saved'
+  | 'send_approval'
+  | 'sent';
 
 export const PHASE_ORDER: readonly PhaseId[] = [
   'gathering',
@@ -41,6 +43,8 @@ export const PHASE_ORDER: readonly PhaseId[] = [
   'writing',
   'assembling',
   'saved',
+  'send_approval',
+  'sent',
 ] as const;
 
 const PHASE_LABEL: Record<PhaseId, string> = {
@@ -51,6 +55,8 @@ const PHASE_LABEL: Record<PhaseId, string> = {
   writing: 'Writing',
   assembling: 'Assembling',
   saved: 'Saved',
+  send_approval: 'Send approval',
+  sent: 'Sent',
 };
 
 /** Map a server stage value to its visible phase. */
@@ -65,6 +71,11 @@ export function phaseForStage(stage: NewsletterStage): PhaseId | null {
     case 'writing_segment':            return 'writing';
     case 'segments_done':              return 'assembling';
     case 'saved':                      return 'saved';
+    // The final gate: nothing reaches subscribers until "Send to subscribers" is approved.
+    case 'awaiting_send_approval':
+    case 'cancelled':                  return 'send_approval';
+    case 'sending':
+    case 'sent':                       return 'sent';
     case 'error':                      return null; // overlay only
     default:                           return null;
   }
@@ -82,7 +93,7 @@ interface StageStripProps {
 interface PillState {
   phase: PhaseId;
   state: 'pending' | 'active' | 'done' | 'error';
-  approvalSubState?: 'awaiting' | 'approved';
+  approvalSubState?: 'awaiting' | 'approved' | 'cancelled';
 }
 
 function pillStates(props: StageStripProps): PillState[] {
@@ -95,8 +106,9 @@ function pillStates(props: StageStripProps): PillState[] {
     if (errorPhase === phase) state = 'error';
     else if (phaseIdx < currentIdx) state = 'done';
     else if (phaseIdx === currentIdx) state = 'active';
-    // saved is special: when reached, it's done (terminal), not active.
+    // saved and sent are reached, not worked on: done, not active.
     if (phase === 'saved' && props.currentStage === 'saved') state = 'done';
+    if (phase === 'sent' && props.currentStage === 'sent') state = 'done';
 
     let approvalSubState: PillState['approvalSubState'];
     if (state === 'active' || state === 'done') {
@@ -107,6 +119,11 @@ function pillStates(props: StageStripProps): PillState[] {
       if (phase === 'subject_approval') {
         if (props.currentStage === 'awaiting_subject_approval') approvalSubState = 'awaiting';
         else if (props.currentStage === 'subject_approved' || phaseIdx < currentIdx) approvalSubState = 'approved';
+      }
+      if (phase === 'send_approval') {
+        if (props.currentStage === 'awaiting_send_approval') approvalSubState = 'awaiting';
+        else if (props.currentStage === 'cancelled') approvalSubState = 'cancelled';
+        else if (phaseIdx < currentIdx) approvalSubState = 'approved';
       }
     }
     return { phase, state, approvalSubState };
@@ -133,6 +150,7 @@ export default function StageStrip(props: StageStripProps) {
         const subIcon =
           pill.approvalSubState === 'awaiting' ? '⌛' :
           pill.approvalSubState === 'approved' ? '✓' :
+          pill.approvalSubState === 'cancelled' ? '✕' :
           pill.state === 'done' ? '✓' :
           pill.state === 'error' ? '!' :
           null;

@@ -85,8 +85,14 @@ describe('execution status — engine-backed (NEWSLETTER_BACKEND=python)', () =>
     });
   });
 
-  it('maps saved -> success', async () => {
+  it('maps saved -> running (the final send gate follows) and sent -> success', async () => {
     engineStatePayload = { stage: 'saved', status: 'ok' };
+    await withServer(async (base) => {
+      const r = await fetch(`${base}/api/newsletter/execution/exec-abc/status`);
+      const j = (await r.json()) as { status: string };
+      expect(j.status).toBe('running');
+    });
+    engineStatePayload = { stage: 'sent', status: 'ok' };
     await withServer(async (base) => {
       const r = await fetch(`${base}/api/newsletter/execution/exec-abc/status`);
       const j = (await r.json()) as { status: string };

@@ -18,6 +18,7 @@
  *   POST   /api/studio/:ed/posts/actions              approve / unapprove / discard / cancel / requeue / unschedule / image_on / image_off
  *   POST   /api/studio/:ed/posts/schedule             next free slots | a day + slot | an exact time | now
  *   POST   /api/studio/:ed/digest/email               email the week's slate to the caller
+ *   GET    /api/studio/:ed/digest/emails              the record of those emails (migration 052)
  *   GET    /api/studio/:ed/issue                      the next issue's chosen stories
  *   PUT    /api/studio/:ed/issue                      choose them (ordered)
  *   POST   /api/studio/:ed/issue/new                  start a fresh selection
@@ -321,6 +322,23 @@ contentStudioRouter.post('/:ed/digest/email', validateBody(DigestSchema), async 
   if (!ed) return;
   const out = await studioSync(req, res, ed, { op: 'email', target: 'digest', ...(req.body as object) });
   if (out) res.json({ success: true, data: out });
+});
+
+// The record of each "Email me the week's slate" (migration 052, written by the engine): to whom,
+// which subject, which Postal message, when, and which week. Newest first.
+contentStudioRouter.get('/:ed/digest/emails', async (req: Request, res: Response) => {
+  const ed = await edition(req, res);
+  if (!ed) return;
+  const { data, error } = await getSupabaseAdmin()
+    .from('newsletter_owner_emails_v2')
+    .select('id, to_email, subject, postal_message_id, sent_at, week_of')
+    .eq('user_id', req.userId!)
+    .eq('edition_id', ed.edition_id)
+    .eq('kind', 'slate')
+    .order('sent_at', { ascending: false })
+    .limit(10);
+  if (error) return bad(res, 500, 'DB_QUERY_FAILED', error.message);
+  res.json({ success: true, data: data ?? [] });
 });
 
 export const ActionSchema = z.object({

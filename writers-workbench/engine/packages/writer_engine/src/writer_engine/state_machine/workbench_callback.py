@@ -40,8 +40,12 @@ _WW_STAGE: dict[str, str] = {
     "assembling": "segments_done",
     "rendering": "segments_done",
     "saved": "saved",
-    "sending": "saved",
-    "sent": "saved",
+    # The final gate (2026-11-03). The WW enum gained these four values in the same change.
+    "awaiting_send_approval": "awaiting_send_approval",
+    "send_approved": "sending",
+    "sending": "sending",
+    "sent": "sent",
+    "cancelled": "cancelled",
     "skipped_no_content": "saved",
     "error": "error",
 }

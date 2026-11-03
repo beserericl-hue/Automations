@@ -46,6 +46,7 @@ const STAGE_LABEL: Record<NewsletterApprovalStage, string> = {
   stories: 'Stories',
   subject_line: 'Subject',
   image: 'Cover Image',
+  send: 'Send to subscribers',
 };
 
 export default function PendingApprovals() {
@@ -126,7 +127,7 @@ export default function PendingApprovals() {
                     className="cursor-pointer border-t border-gray-100 hover:bg-gray-50 focus:bg-gray-50 focus:outline-none dark:border-gray-800 dark:hover:bg-gray-800 dark:focus:bg-gray-800"
                   >
                     <td className="px-4 py-2">
-                      <StatusPill status={a.stage === 'stories' ? 'awaiting_stories_approval' : 'awaiting_subject_approval'} />
+                      <StatusPill status={a.stage === 'stories' ? 'awaiting_stories_approval' : a.stage === 'send' ? 'awaiting_send_approval' : 'awaiting_subject_approval'} />
                       <span className="ml-2 text-xs text-gray-400">{STAGE_LABEL[a.stage]}</span>
                     </td>
                     <td className="px-4 py-2">
@@ -173,6 +174,10 @@ function excerpt(a: OpenApproval): string {
   } else if (a.stage === 'subject_line') {
     const subj = p.subject_line as string | undefined;
     if (subj) return truncate(subj, 140);
+  } else if (a.stage === 'send') {
+    const subj = p.subject as string | undefined;
+    const n = p.subscriber_count;
+    if (subj) return truncate(`${subj} · ${typeof n === 'number' ? `${n} subscriber${n === 1 ? '' : 's'}` : 'ready to send'}`, 140);
   }
   return '(no excerpt)';
 }

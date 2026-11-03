@@ -264,3 +264,21 @@ describe('content studio: RSS feeds', () => {
     expect((await call('GET', `/${'B'.repeat(32)}/items.xml`, undefined, '/feeds')).status).toBe(404);
   });
 });
+
+describe('content studio: the slate email record (migration 052)', () => {
+  it('lists the caller\'s slate emails for the edition: to, subject, Postal id, sent_at, week', async () => {
+    db.newsletter_owner_emails_v2 = [
+      { id: 'e1', user_id: 'owner', edition_id: 'ai-dev-roundup', kind: 'slate', to_email: 'o@x.com', subject: 'AI Dev Roundup — week of 2026-11-02 (1+1)', postal_message_id: 'm-1', sent_at: '2026-11-03T18:00:00Z', week_of: '2026-11-02' },
+      { id: 'e2', user_id: 'owner', edition_id: 'ai-dev-roundup', kind: 'test_copy', to_email: 'o@x.com', subject: '[TEST] x', postal_message_id: 'm-2', sent_at: '2026-11-03T18:01:00Z' },
+      { id: 'e3', user_id: 'other', edition_id: 'ai-dev-roundup', kind: 'slate', to_email: 't@x.com', subject: 'theirs', postal_message_id: 'm-3', sent_at: '2026-11-03T18:02:00Z' },
+    ];
+    const r = await call('GET', '/ai-dev-roundup/digest/emails');
+    expect(r.status).toBe(200);
+    const rows = r.json.data as Row[];
+    expect(rows.map((x) => x.id)).toEqual(['e1']);
+    expect(rows[0]).toMatchObject({ to_email: 'o@x.com', postal_message_id: 'm-1', week_of: '2026-11-02', sent_at: '2026-11-03T18:00:00Z' });
+    currentUser = 'other';
+    expect((await call('GET', '/ai-dev-roundup/digest/emails')).status).toBe(404);
+    expect(engine).not.toHaveBeenCalled();
+  });
+});

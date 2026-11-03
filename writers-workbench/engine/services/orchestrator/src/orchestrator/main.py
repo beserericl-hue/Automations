@@ -54,6 +54,7 @@ from writer_engine.scheduler import Job as CronJob
 from writer_engine.scheduler import Scheduler
 from writer_engine.scheduler import start as scheduler_start
 from writer_engine.scheduler import stop as scheduler_stop
+from writer_engine.schemas import Stage
 from writer_engine.state_machine.durable import RedisSagaRepo
 from writer_engine.state_machine.orchestrator import InMemoryStateStore
 from writer_engine.state_machine.saga import StepRef, run_step_via_http
@@ -560,6 +561,29 @@ def build_app() -> FastAPI:
         if app.state.arq_pool is None:
             await driver.advance(gate.execution_id)
         return {"execution_id": str(gate.execution_id), "resumed": True}
+
+    @app.post(
+        "/pipelines/newsletter/executions/{execution_id}/test-copy",
+        dependencies=[Depends(require_service_secret)],
+    )
+    async def newsletter_test_copy(execution_id: str, body: dict[str, Any]) -> dict[str, Any]:
+        """Mail the rendered issue to its owner only ("[TEST]" subject) while it waits at the final
+        gate, and record it (newsletter_owner_emails_v2). Body: ``{"user_id": <session user>}``."""
+        from fastapi import HTTPException
+
+        from writer_engine.newsletter_send import OwnerCopyError
+
+        try:
+            eid = UUID(execution_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail="execution not found") from exc
+        try:
+            return await _make_saga_driver().send_test_copy(eid, user_id=str(body.get("user_id") or ""))
+        except OwnerCopyError as exc:
+            code = {"NOT_FOUND": 404, "FORBIDDEN": 403, "NOT_READY": 409, "LIMIT": 429, "NO_RECIPIENT": 409}
+            raise HTTPException(
+                status_code=code.get(exc.code, 502), detail={"code": exc.code, "message": exc.message}
+            ) from exc
 
     @app.get(
         "/pipelines/newsletter/saga-state/{execution_id}",
@@ -1255,6 +1279,22 @@ def build_app() -> FastAPI:
                 "stories": stories,
             }
 
+        if stage_norm in ("send", "awaiting_send_approval"):
+            if saga_state.stage is not Stage.AWAITING_SEND_APPROVAL and not st.get("send_gate_token"):
+                raise HTTPException(status_code=http_status.HTTP_409_CONFLICT, detail="not yet at send gate")
+            subj = st.get("subject_proposal") or {}
+            return {
+                "stage": "awaiting_send_approval",
+                "execution_id": execution_id,
+                "title": "Send to subscribers",
+                "token": st.get("send_gate_token"),
+                "subject": subj.get("subject_line"),
+                "pre_header_text": subj.get("pre_header_text"),
+                "subscriber_count": st.get("subscriber_count"),
+                "send_row": st.get("send_row") or {},
+                "permalink": st.get("permalink_placeholder"),
+            }
+
         if stage_norm in ("final", "preview", "saved"):
             return {
                 "stage": "saved",
@@ -1267,7 +1307,7 @@ def build_app() -> FastAPI:
 
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
-            detail=f"unknown review stage '{stage}' (expected: stories|subject|images|final)",
+            detail=f"unknown review stage '{stage}' (expected: stories|subject|images|send|final)",
         )
 
     return app

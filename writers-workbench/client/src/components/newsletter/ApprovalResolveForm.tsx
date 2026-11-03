@@ -10,6 +10,10 @@
  *
  * The component is uncontrolled in form-state but exposes onResolved so the
  * parent can advance its strip / clear the panel optimistically.
+ *
+ * The final "Send to subscribers" gate (stage 'send', 2026-11-03) offers
+ * Send / Don't send instead: approve delivers the issue, reject cancels it
+ * and nothing is ever sent.
  */
 import { useState } from 'react';
 import { apiFetch, ApiError } from '../../lib/api';
@@ -22,7 +26,7 @@ interface ResolveResponseErr {
   success: false;
   error: { code: string; message: string };
   resolved_at?: string | null;
-  decision?: 'approve' | 'revise' | null;
+  decision?: 'approve' | 'revise' | 'reject' | null;
   expires_at?: string;
 }
 type ResolveResponse = ResolveResponseOk | ResolveResponseErr;
@@ -31,13 +35,20 @@ interface Props {
   token: string;
   /** Notifies the parent on a successful resolve (200 OR 502 — the
    *  decision IS persisted in both). resumed=false signals n8n didn't ack. */
-  onResolved: (decision: 'approve' | 'revise', resumed: boolean) => void;
+  onResolved: (decision: Decision, resumed: boolean) => void;
   /** Optional disable while parent is in a busy state (e.g. another approval). */
   disabled?: boolean;
+  /** The gate being decided. 'send' shows Send / Don't send. */
+  stage?: string;
+  /** Final gate only: active subscribers the send will reach (for the button label). */
+  subscriberCount?: number | null;
 }
 
-export default function ApprovalResolveForm({ token, onResolved, disabled }: Props) {
-  const [decision, setDecision] = useState<'approve' | 'revise'>('approve');
+type Decision = 'approve' | 'revise' | 'reject';
+
+export default function ApprovalResolveForm({ token, onResolved, disabled, stage, subscriberCount }: Props) {
+  const isSend = stage === 'send';
+  const [decision, setDecision] = useState<Decision>('approve');
   const [feedback, setFeedback] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +83,7 @@ export default function ApprovalResolveForm({ token, onResolved, disabled }: Pro
         if (err.status === 409) setError('This approval was already resolved.');
         else if (err.status === 410) setError('This approval has expired.');
         else if (err.status === 403) setError('You can only resolve your own approvals.');
+        else if (err.status === 400) setError(err.message || 'That decision is not available here.');
         else if (err.status === 502) setError('Decision saved, but the workflow resume failed. The on-call operator can rerun.');
         else setError(err.message || `Request failed (${err.status})`);
       } else {
@@ -88,28 +100,57 @@ export default function ApprovalResolveForm({ token, onResolved, disabled }: Pro
         <legend className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
           Your decision
         </legend>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="radio"
-            name="decision"
-            value="approve"
-            checked={decision === 'approve'}
-            onChange={() => setDecision('approve')}
-            className="text-brand-600"
-          />
-          <span><strong>Approve</strong> — proceed with the workflow as proposed.</span>
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="radio"
-            name="decision"
-            value="revise"
-            checked={decision === 'revise'}
-            onChange={() => setDecision('revise')}
-            className="text-brand-600"
-          />
-          <span><strong>Revise</strong> — send back with feedback below.</span>
-        </label>
+        {isSend ? (
+          <>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="decision"
+                value="approve"
+                checked={decision === 'approve'}
+                onChange={() => setDecision('approve')}
+                className="text-brand-600"
+              />
+              <span><strong>Send to subscribers</strong> — deliver this issue now.</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="decision"
+                value="reject"
+                checked={decision === 'reject'}
+                onChange={() => setDecision('reject')}
+                className="text-brand-600"
+              />
+              <span><strong>Don&apos;t send</strong> — cancel this issue. Nothing goes to subscribers.</span>
+            </label>
+          </>
+        ) : (
+          <>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="decision"
+                value="approve"
+                checked={decision === 'approve'}
+                onChange={() => setDecision('approve')}
+                className="text-brand-600"
+              />
+              <span><strong>Approve</strong> — proceed with the workflow as proposed.</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="decision"
+                value="revise"
+                checked={decision === 'revise'}
+                onChange={() => setDecision('revise')}
+                className="text-brand-600"
+              />
+              <span><strong>Revise</strong> — send back with feedback below.</span>
+            </label>
+          </>
+        )}
       </fieldset>
 
       <label className="block text-sm">
@@ -139,7 +180,15 @@ export default function ApprovalResolveForm({ token, onResolved, disabled }: Pro
           disabled={submitting || disabled}
           className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {submitting ? 'Submitting…' : decision === 'approve' ? 'Approve →' : 'Send back to revise →'}
+          {submitting
+            ? 'Submitting…'
+            : isSend
+            ? decision === 'approve'
+              ? `Send to ${typeof subscriberCount === 'number' ? `${subscriberCount} ` : ''}subscriber${subscriberCount === 1 ? '' : 's'} →`
+              : 'Cancel this issue →'
+            : decision === 'approve'
+            ? 'Approve →'
+            : 'Send back to revise →'}
         </button>
       </div>
     </form>

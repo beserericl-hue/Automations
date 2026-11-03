@@ -47,12 +47,12 @@ interface ApprovalRow {
   user_id: string;
   execution_id: string;
   resume_url: string | null;
-  stage: 'stories' | 'subject_line' | 'image';
+  stage: 'stories' | 'subject_line' | 'image' | 'send';
   payload: Record<string, unknown>;
   created_at: string;
   resolved_at: string | null;
   expires_at: string;
-  decision: 'approve' | 'revise' | null;
+  decision: 'approve' | 'revise' | 'reject' | null;
   feedback: string | null;
 }
 
@@ -105,7 +105,29 @@ ${bodyHtml}
 </html>`;
 }
 
+function renderSendForm(row: ApprovalRow): string {
+  const p = row.payload ?? {};
+  const count = typeof p.subscriber_count === 'number' ? String(p.subscriber_count) : 'an unknown number of';
+  return pageShell(
+    'Newsletter approval — Send to subscribers',
+    `
+      <h1>Send to subscribers <span class="stage-badge">send</span></h1>
+      <p>Expires ${htmlEscape(row.expires_at)}. The issue is rendered and saved. Nothing has been sent yet.</p>
+      <h2>${htmlEscape(String(p.subject ?? ''))}</h2>
+      <p>Approving sends it to <strong>${htmlEscape(count)} active subscriber(s)</strong>. To see the email first or mail yourself a test copy, open this approval in the Workbench.</p>
+      <form method="POST" action="/approvals/${htmlEscape(row.token)}/resolve">
+        <label class="radio"><input type="radio" name="decision" value="approve" required/> Send to subscribers</label>
+        <label class="radio"><input type="radio" name="decision" value="reject"/> Don't send (cancel this issue)</label>
+        <h2>Note <small>(optional)</small></h2>
+        <textarea name="feedback" placeholder="Optional note"></textarea>
+        <button type="submit">Submit decision</button>
+      </form>
+    `,
+  );
+}
+
 function renderForm(row: ApprovalRow): string {
+  if (row.stage === 'send') return renderSendForm(row);
   const stageLabel =
     row.stage === 'stories' ? 'Top Stories' : row.stage === 'image' ? 'Cover Image' : 'Subject Line';
   const payloadJson = JSON.stringify(row.payload, null, 2);
@@ -391,6 +413,9 @@ approvalsPublicRouter.post(
         return;
       case 'not_found':
         res.status(404).type('html').send(pageShell('Not found', '<h1>Not found</h1>'));
+        return;
+      case 'invalid_decision':
+        res.status(400).type('html').send(pageShell('Bad request', '<h1>That decision is not available for this approval</h1>'));
         return;
       case 'already_resolved':
         res.status(409).type('html').send(row ? renderResolved(row) : pageShell('Already resolved', '<h1>Already resolved</h1>'));

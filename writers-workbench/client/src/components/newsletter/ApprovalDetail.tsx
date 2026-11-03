@@ -15,6 +15,7 @@ import { apiFetch } from '../../lib/api';
 import ApprovalPayloadStories from './ApprovalPayloadStories';
 import ApprovalPayloadSubject from './ApprovalPayloadSubject';
 import ApprovalPayloadImage from './ApprovalPayloadImage';
+import ApprovalPayloadSend from './ApprovalPayloadSend';
 import ApprovalEmailPreview from './ApprovalEmailPreview';
 import ApprovalResolveForm from './ApprovalResolveForm';
 import StatusPill from './StatusPill';
@@ -72,6 +73,8 @@ export default function ApprovalDetail() {
               ? 'Subject line approval'
               : approval.stage === 'image'
               ? 'Cover image approval'
+              : approval.stage === 'send'
+              ? 'Send to subscribers'
               : 'Stories approval'
             : 'Approval'}
         </h1>
@@ -103,6 +106,8 @@ export default function ApprovalDetail() {
                   ? 'awaiting_stories_approval'
                   : approval.stage === 'image'
                   ? 'writing_segment'
+                  : approval.stage === 'send'
+                  ? 'awaiting_send_approval'
                   : 'awaiting_subject_approval'
               }
             />
@@ -114,11 +119,18 @@ export default function ApprovalDetail() {
             <ApprovalPayloadStories payload={approval.payload} />
           ) : approval.stage === 'image' ? (
             <ApprovalPayloadImage payload={approval.payload} />
+          ) : approval.stage === 'send' ? (
+            <ApprovalPayloadSend token={approval.token} payload={approval.payload} />
           ) : (
             <ApprovalPayloadSubject payload={approval.payload} />
           )}
           <ApprovalEmailPreview token={approval.token} />
-          <ApprovalResolveForm token={approval.token} onResolved={handleResolved} />
+          <ApprovalResolveForm
+            token={approval.token}
+            onResolved={handleResolved}
+            stage={approval.stage}
+            subscriberCount={approval.stage === 'send' ? (approval.payload.subscriber_count as number | null | undefined) : undefined}
+          />
         </div>
       )}
     </div>

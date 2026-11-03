@@ -140,6 +140,10 @@ export const IngestionSearchQuerySchema = z.object({
 
 export const ApprovalStageSchema = z.enum(['stories', 'subject_line']);
 
+// Every stage an approval row can carry (the n8n create route above only mints the first two; the
+// engine also mirrors 'image' (migration 023) and the final 'send' gate (migration 052)).
+export const AnyApprovalStageSchema = z.enum(['stories', 'subject_line', 'image', 'send']);
+
 export const ApprovalCreateSchema = z.object({
   user_id: z.string().min(1, 'user_id is required'),
   stage: ApprovalStageSchema,
@@ -152,7 +156,9 @@ export const ApprovalCreateSchema = z.object({
 });
 
 export const ApprovalResolveSchema = z.object({
-  decision: z.enum(['approve', 'revise']),
+  // 'reject' declines the final "Send to subscribers" gate (migration 052): the issue is never sent.
+  // lib/approvals.ts accepts it only on a 'send' row.
+  decision: z.enum(['approve', 'revise', 'reject']),
   feedback: z.string().max(5000).optional().default(''),
 });
 
@@ -164,7 +170,7 @@ export const ApprovalResolveSchema = z.object({
 // visibility wiring.
 export const ApprovalsOpenQuerySchema = z.object({
   execution_id: z.string().min(1).max(200).optional(),
-  stage: ApprovalStageSchema.optional(),
+  stage: AnyApprovalStageSchema.optional(),
   token: z.string().regex(/^[A-Za-z0-9_-]{20,128}$/, 'token format invalid').optional(),
 });
 
@@ -626,6 +632,11 @@ export const NewsletterStageSchema = z.enum([
   'writing_segment',
   'segments_done',
   'saved',
+  // The final gate (2026-11-03): the saved issue waits for "Send to subscribers".
+  'awaiting_send_approval',
+  'sending',
+  'sent',
+  'cancelled',
   'error',
 ]);
 

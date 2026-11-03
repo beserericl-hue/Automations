@@ -45,7 +45,7 @@ Related: [stripe-billing.md](stripe-billing.md) (live-mode steps), [workflow-gov
 
 Apply in file order, each once, after step A3. `018`–`022` were never written. All of these are applied
 on DEV (checked 2026-11-03: every table, column, function, trigger and policy below exists on DEV).
-Every doc records 023 onwards as DEV-only; confirm against the dump. 050 and 051 were applied to DEV on 2026-11-03.
+Every doc records 023 onwards as DEV-only; confirm against the dump. 050 and 051 were applied to DEV on 2026-11-03; 052 on 2026-11-03.
 
 | # | What it does | PROD note |
 |---|---|---|
@@ -77,6 +77,7 @@ Every doc records 023 onwards as DEV-only; confirm against the dump. 050 and 051
 | 049 | Provider aliasing in the 048 trigger | Requires 048 |
 | 050 | Content Studio: `social_schedule_v2` gains `draft`/`approved` states (undated), `edition_id`, `post_at`, `image_url`, `studio`, source `studio`, and a new posting-time trigger; `newsletter_issue_selections_v2` / `_items_v2`; `newsletter_edition_feeds_v2` (RSS tokens). Owner-only RLS | Requires 038. **Backfills** `edition_id` on existing `trend_batch` / `roundup_batch` rows from the radar subscriptions (on PROD that is only rows made after 038). Replaces the trigger function `social_schedule_before_write` |
 | 051 | `newsletter_sends_v2`: one saved issue per **edition** per day instead of one per user per day (drops `idx_newsletter_sends_v2_user_date_unique`, adds a partial unique index for edition-less n8n-era rows) | Indexes only, no data change. Without it, a user's second edition on the same day fails before sending |
+| 052 | Final "Send to subscribers" gate: `newsletter_approvals_v2` stage CHECK gains `send`, decision CHECK gains `reject`; new `newsletter_owner_emails_v2` (test copies + slate emails sent to the owner). Owner-only RLS | **Apply before deploying the engine/Workbench release that contains the send gate**: without it the engine cannot mirror the final gate and every newsletter run errors at the send gate (nothing is sent). CHECKs only widen; new table |
 
 After the migrations:
 
@@ -126,7 +127,7 @@ Gateway only: `ORCHESTRATOR_URL=http://writer-engine-runtime.railway.internal:80
 |---|---|
 | `INTEGRATIONS_ENCRYPTION_KEY` | new PROD key (`openssl rand -base64 32`), **same value on the Workbench**; never DEV's |
 | `SCRAPERAPI_API_KEY` | optional tuning: `SCRAPERAPI_MAX_CONCURRENCY` (default 3, plan allows 5), `SCRAPER_ENABLED`, `SCRAPER_RENDER_FALLBACK`, `SCRAPERAPI_COUNTRY_CODE`. Watch credit burn (5,000/month plan) |
-| `STEALTHGPT_API_KEY` | optional. Humanizer switches default on: `HUMANIZE_NEWSLETTER_SEGMENTS`, `HUMANIZE_RADAR_DRAFTS`, `HUMANIZE_COLLAPSE_RETRY_MODE=Medium`. Consider `HUMANIZE_NEWSLETTER_SEGMENTS=false` on PROD: on DEV the sections mostly fail the guards and still bill |
+| `STEALTHGPT_API_KEY` | optional. Humanizer switches default on: `HUMANIZE_RADAR_DRAFTS`, `HUMANIZE_COLLAPSE_RETRY_MODE=Medium`. `HUMANIZE_NEWSLETTER_SEGMENTS` defaults **off** since 2026-11-03 (on DEV the sections mostly failed the guards and still billed); leave it unset on PROD |
 | `NEWSLETTER_CALLBACK_SECRET` | same as the Workbench |
 | `WORKBENCH_CRON_SECRET` | equal to the Workbench's `CRON_SECRET` |
 | `AUTOSCALE_ENABLED`, `AUTOSCALE_MIN_REPLICAS=4`, `AUTOSCALE_MAX_REPLICAS`, `RAILWAY_AUTOSCALE_TOKEN` (production-scoped), `AUTOSCALE_ALLOW_PRODUCTION=true` | |

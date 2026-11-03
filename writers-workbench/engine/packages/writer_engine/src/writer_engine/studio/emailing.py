@@ -169,10 +169,54 @@ async def email_digest(client: Any, ed: StudioEdition, week_of: str | None = Non
         subject=subject,
         html=digest_html(ed.name, view["week_of"], topics),
     )
+    record = await _record_digest(
+        client,
+        ed,
+        to=to,
+        subject=subject,
+        message_id=res.message_id,
+        week_of=view["week_of"],
+        topics=len(topics),
+        bcc=bcc,
+    )
     return {
         "to": to,
         "subject": subject,
         "week_of": view["week_of"],
         "message_id": res.message_id,
+        "sent_at": (record or {}).get("sent_at"),
+        "recorded": record is not None,
         "message": f"Emailed the week's slate to {to}.",
     }
+
+
+async def _record_digest(
+    client: Any,
+    ed: StudioEdition,
+    *,
+    to: str,
+    subject: str,
+    message_id: str | None,
+    week_of: str | None,
+    topics: int,
+    bcc: str | None = None,
+) -> dict[str, Any] | None:
+    """Keep a record of the slate email (``newsletter_owner_emails_v2``, kind ``slate``, migration 052):
+    to whom, which subject, which Postal message, when, for which edition and week. Mirrors the record
+    a draft's email keeps on its post (``studio.emails``); a slate has no row of its own to hang it on,
+    so it gets one. The email has gone out by now, so a failed record is logged, not raised."""
+    from writer_engine.newsletter_send import record_owner_email
+
+    return await record_owner_email(
+        {
+            "user_id": ed.user_id,
+            "edition_id": ed.edition_id,
+            "kind": "slate",
+            "to_email": to,
+            "subject": subject,
+            "postal_message_id": message_id,
+            "week_of": str(week_of)[:10] if week_of else None,
+            "metadata": {"topics": topics, "radar": ed.radar, **({"bcc": bcc} if bcc else {})},
+        },
+        client=client,
+    )

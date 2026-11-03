@@ -12,8 +12,16 @@ PROD cutover.
 
 ```
 gather → pick →[stories gate]→ subject →[subject gate]→ writing_segments
-       → proposing_images →[image gate]→ assembling → rendering → saved → sending → SENT
+       → proposing_images →[image gate]→ assembling → rendering → saved
+       →[send gate]→ send_approved → sending → SENT        (declined: → CANCELLED, nothing sent)
 ```
+
+The send gate (`awaiting_send_approval`, mirror stage `send`, migration 052) was added 2026-11-03:
+approving the images used to deliver straight away. Its payload carries `send_id`, `subject`,
+`issue_number` and `subscriber_count`; the Workbench previews the saved `html_body`. While it is open,
+`POST /internal/newsletter/executions/{id}/test-copy` (`{user_id}`) mails the rendered issue to the
+owner's own `users_v2.email` only, `[TEST]` subject, via the deliver step's `test_recipient` mode, and
+records it in `newsletter_owner_emails_v2`. No path auto-approves any gate, cron-started runs included.
 
 - Durable saga (`/pipelines/newsletter/run-durable`), arq worker drives between HITL pauses.
 - Gateway exposes `/internal/newsletter/{generate, executions/{id}/state, executions/{id}/review/{stage}, approvals/{token}/resolve}` (X-Service-Secret).

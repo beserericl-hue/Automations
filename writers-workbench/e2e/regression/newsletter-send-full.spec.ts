@@ -4,7 +4,8 @@ import { supaGet } from '../pages/api';
 /**
  * Newsletter FULL send — the complete data path a real user drives, end to end:
  *   Generate (from the Generate page) → approve the STORIES gate → approve the SUBJECT gate →
- *   approve the IMAGE gate (each from the Approval detail screen) → the saga renders + delivers →
+ *   approve the IMAGE gate (each from the Approval detail screen) → the saga renders + saves and
+ *   STOPS at the final "Send to subscribers" gate (nothing sent yet; 2026-11-03) → approve it → delivers →
  *   a newsletter_sends_v2 row is created (status saved/sent, html_body populated, and a Postal
  *   provider_message_id once delivery completes) → the sent newsletter is DISPLAYED on
  *   /newsletter/sends and its detail page.
@@ -76,6 +77,31 @@ test.describe('Newsletter FULL send (data path)', () => {
         }, { timeout: 30_000, message: `gate ${gate + 1} approve did not persist` })
         .toBe('approve');
     }
+
+    // ── 2b) The final "Send to subscribers" gate: the issue is rendered and saved, NOT sent ──
+    let sendGate: { token: string; payload: Record<string, unknown> } | undefined;
+    await expect
+      .poll(async () => {
+        [sendGate] = await supaGet<{ token: string; payload: Record<string, unknown> }>(
+          'newsletter_approvals_v2',
+          `execution_id=eq.${encodeURIComponent(execId)}&stage=eq.send&select=token,payload`,
+        ).catch(() => []);
+        return sendGate?.token ?? null;
+      }, { timeout: 7 * 60_000, message: 'the final send gate never opened after the image gate' })
+      .not.toBeNull();
+    const held = (await supaGet<{ status: string; sent_at: string | null }>(
+      'newsletter_sends_v2', `id=eq.${String(sendGate!.payload.send_id)}&select=status,sent_at`,
+    ))[0];
+    expect(held?.status, 'approving the images must not send').not.toBe('sent');
+    expect(held?.sent_at ?? null).toBeNull();
+    await page.goto(`/newsletter/approvals/${sendGate!.token}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: /Send to subscribers/i })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('send-test-copy')).toBeVisible();
+    await page.getByRole('button', { name: /^Send to \d* ?subscribers?/i }).click();
+    await expect
+      .poll(async () => (await supaGet<{ decision: string | null }>('newsletter_approvals_v2', `token=eq.${encodeURIComponent(sendGate!.token)}&select=decision`).catch(() => []))[0]?.decision ?? null,
+        { timeout: 30_000, message: 'send approval did not persist' })
+      .toBe('approve');
 
     // ── 3) DATA CREATED: the send row for this run with real content ──────────
     // The persist step UPSERTs on (edition_id, send_date), so a re-send for the same day updates

@@ -481,10 +481,12 @@ async function triggerEngine(
 
 // Map an engine saga stage to the coarse UI status the Execution Status page expects
 // (same vocabulary the n8n branch returns: running | waiting | success | error | unknown).
-function mapSagaStageToStatus(stage: string | undefined, sagaStatus: string | undefined): string {
+// 'saved' is no longer the end: the saved issue goes on to the final "Send to subscribers" gate
+// (awaiting_send_approval -> waiting), so only sent / cancelled / skipped are terminal.
+export function mapSagaStageToStatus(stage: string | undefined, sagaStatus: string | undefined): string {
   if (sagaStatus === 'error' || stage === 'error') return 'error';
   if (typeof stage === 'string' && stage.startsWith('awaiting_')) return 'waiting';
-  if (stage === 'saved' || stage === 'sending' || stage === 'sent' || stage === 'skipped_no_content') {
+  if (stage === 'sent' || stage === 'cancelled' || stage === 'skipped_no_content') {
     return 'success';
   }
   return 'running';
@@ -1037,6 +1039,32 @@ newsletterRouter.get('/approvals/:token/preview', requireAuth, async (req: Reque
   }
   const editionId = approval.edition_id as string;
   const payload = (approval.payload ?? {}) as Record<string, unknown>;
+
+  // The final "Send to subscribers" gate previews the real thing: the issue the saga rendered and
+  // saved (newsletter_sends_v2.html_body), not a template approximation built from the stories.
+  if (approval.stage === 'send') {
+    const sendId = typeof payload.send_id === 'string' ? payload.send_id : '';
+    const { data: sendRow, error: sErr } = sendId
+      ? await supabase
+          .from('newsletter_sends_v2')
+          .select('id, html_body, subject, status, issue_number')
+          .eq('id', sendId)
+          .eq('user_id', userId)
+          .maybeSingle()
+      : { data: null, error: null };
+    if (sErr) {
+      res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: sErr.message } });
+      return;
+    }
+    const html = (sendRow as { html_body?: string | null } | null)?.html_body ?? '';
+    if (!html) {
+      res.status(404).json({ success: false, error: { code: 'NO_RENDERED_ISSUE', message: 'The rendered issue for this approval was not found.' } });
+      return;
+    }
+    res.json({ success: true, html, rendered: true, send: { id: sendId, subject: (sendRow as { subject?: string }).subject ?? null, status: (sendRow as { status?: string }).status ?? null, issue_number: (sendRow as { issue_number?: number | null }).issue_number ?? null }, warnings: [] });
+    return;
+  }
+
   let stories = (payload.top_selected_stories as Array<Record<string, unknown>> | undefined) ?? [];
   // Only the stories gate carries the stories. The subject and image gates (the image gate is the last
   // one before the issue renders and goes out) previewed "0 stories this issue" — found on DEV
@@ -1143,7 +1171,7 @@ newsletterRouter.get('/approvals/:token/preview', requireAuth, async (req: Reque
  *             type: object
  *             required: [decision]
  *             properties:
- *               decision: { type: string, enum: [approve, revise] }
+ *               decision: { type: string, enum: [approve, revise, reject], description: "reject only on the final send gate" }
  *               feedback: { type: string }
  *     responses:
  *       200: { description: "{success: true, resumed: true}" }
@@ -1195,6 +1223,9 @@ newsletterRouter.post(
       case 'not_found':
         res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Approval not found' } });
         return;
+      case 'invalid_decision':
+        res.status(400).json({ success: false, error: { code: 'INVALID_DECISION', message: 'Reject is only available on the final "Send to subscribers" approval' } });
+        return;
       case 'forbidden':
         res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'This approval belongs to another user' } });
         return;
@@ -1220,6 +1251,132 @@ newsletterRouter.post(
     }
   },
 );
+
+// --------------------------------------------------------------------
+// The final gate's "Send me a test copy" (2026-11-03).
+//
+//   POST /api/newsletter/approvals/:token/test-copy
+//        Mails the rendered issue to the CALLER's own address only ("[TEST]" subject) through the
+//        engine's deliver step (the same Postal path the real send uses). Allowed on an open 'send'
+//        approval the caller owns. The engine records it in newsletter_owner_emails_v2.
+//   GET  /api/newsletter/approvals/:token/test-copies
+//        The test copies already sent for this approval's run (who, when, Postal message id).
+// --------------------------------------------------------------------
+
+async function loadOwnSendApproval(
+  token: string,
+  userId: string,
+): Promise<{ ok: true; row: { execution_id: string; stage: string; resolved_at: string | null; expires_at: string } } | { ok: false; status: number; code: string; message: string }> {
+  if (!/^[A-Za-z0-9_-]{20,128}$/.test(token)) return { ok: false, status: 400, code: 'VALIDATION_ERROR', message: 'token format invalid' };
+  const { data, error } = await getSupabaseAdmin()
+    .from('newsletter_approvals_v2')
+    .select('execution_id, stage, resolved_at, expires_at')
+    .eq('token', token)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) return { ok: false, status: 500, code: 'DB_QUERY_FAILED', message: error.message };
+  if (!data) return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Approval not found' };
+  const row = data as { execution_id: string; stage: string; resolved_at: string | null; expires_at: string };
+  if (row.stage !== 'send') {
+    return { ok: false, status: 409, code: 'NOT_READY', message: 'A test copy is available at the final "Send to subscribers" approval, once the issue is rendered.' };
+  }
+  return { ok: true, row };
+}
+
+newsletterRouter.post('/approvals/:token/test-copy', requireAuth, async (req: Request, res: Response) => {
+  const userId = req.userId!;
+  const found = await loadOwnSendApproval(String(req.params.token || ''), userId);
+  if (!found.ok) {
+    res.status(found.status).json({ success: false, error: { code: found.code, message: found.message } });
+    return;
+  }
+  if (found.row.resolved_at) {
+    res.status(409).json({ success: false, error: { code: 'ALREADY_RESOLVED', message: 'This issue has already been decided.' } });
+    return;
+  }
+  if (new Date(found.row.expires_at).getTime() <= Date.now()) {
+    res.status(410).json({ success: false, error: { code: 'EXPIRED', message: 'Approval window has closed' } });
+    return;
+  }
+  const engineUrl = process.env.NEWSLETTER_SERVICE_URL;
+  const serviceSecret = process.env.SERVICE_SHARED_SECRET;
+  if (getBackend() !== 'python' || !engineUrl || !serviceSecret) {
+    res.status(500).json({ success: false, error: { code: 'NOT_CONFIGURED', message: 'Test copies need the Writer Engine newsletter backend' } });
+    return;
+  }
+  let upstream: globalThis.Response;
+  try {
+    upstream = await fetch(
+      `${engineUrl.replace(/\/+$/, '')}/internal/newsletter/executions/${encodeURIComponent(found.row.execution_id)}/test-copy`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Service-Secret': serviceSecret },
+        // The engine sends to this user's own users_v2.email and checks they own the run.
+        body: JSON.stringify({ user_id: userId }),
+      },
+    );
+  } catch (err) {
+    logger.error({ err }, 'test copy: engine fetch threw');
+    res.status(502).json({ success: false, error: { code: 'UPSTREAM_FETCH_FAILED', message: 'Could not reach Writer Engine' } });
+    return;
+  }
+  let body: Record<string, unknown> = {};
+  try {
+    body = (await upstream.json()) as Record<string, unknown>;
+  } catch {
+    body = {};
+  }
+  if (!upstream.ok) {
+    // The gateway passes the orchestrator's {detail: "<json>"} through; dig the message out.
+    let message = `engine returned ${upstream.status}`;
+    let code = 'UPSTREAM_ERROR';
+    const detail = body.detail;
+    try {
+      const parsed = typeof detail === 'string' ? JSON.parse(detail) : detail;
+      const inner = (parsed as { detail?: { code?: string; message?: string } })?.detail ?? (parsed as { code?: string; message?: string });
+      if (inner?.message) message = inner.message;
+      if (inner?.code) code = inner.code;
+    } catch {
+      if (typeof detail === 'string' && detail) message = detail.slice(0, 300);
+    }
+    const status = [403, 404, 409, 429].includes(upstream.status) ? upstream.status : 502;
+    res.status(status).json({ success: false, error: { code, message } });
+    return;
+  }
+  res.json({
+    success: true,
+    data: {
+      to: body.to ?? null,
+      subject: body.subject ?? null,
+      message_id: body.message_id ?? null,
+      sent_at: body.sent_at ?? null,
+      recorded: body.recorded === true,
+      message: `Test copy sent to ${String(body.to ?? 'you')}. Subscribers have not been sent anything.`,
+    },
+  });
+});
+
+newsletterRouter.get('/approvals/:token/test-copies', requireAuth, async (req: Request, res: Response) => {
+  const userId = req.userId!;
+  const found = await loadOwnSendApproval(String(req.params.token || ''), userId);
+  if (!found.ok) {
+    res.status(found.status).json({ success: false, error: { code: found.code, message: found.message } });
+    return;
+  }
+  const { data, error } = await getSupabaseAdmin()
+    .from('newsletter_owner_emails_v2')
+    .select('id, to_email, subject, postal_message_id, sent_at')
+    .eq('user_id', userId)
+    .eq('execution_id', found.row.execution_id)
+    .eq('kind', 'test_copy')
+    .order('sent_at', { ascending: false })
+    .limit(20);
+  if (error) {
+    res.status(500).json({ success: false, error: { code: 'DB_QUERY_FAILED', message: error.message } });
+    return;
+  }
+  res.json({ success: true, data: data ?? [] });
+});
 
 // --------------------------------------------------------------------
 // Newsletter Templates Sprint (T2) — template CRUD + preview render.

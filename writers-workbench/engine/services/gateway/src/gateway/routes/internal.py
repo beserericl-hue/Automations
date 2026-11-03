@@ -368,6 +368,18 @@ async def newsletter_resolve(token: str, body: dict[str, Any]) -> dict[str, Any]
     return await _forward("POST", f"{settings.orchestrator_url}/approvals/{token}/resolve", json=body)
 
 
+@router.post("/newsletter/executions/{execution_id}/test-copy")
+async def newsletter_test_copy(execution_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    """The final gate's "Send me a test copy": the rendered issue to its owner only."""
+    settings = get_settings()
+    return await _forward(
+        "POST",
+        f"{settings.orchestrator_url}/pipelines/newsletter/executions/{execution_id}/test-copy",
+        json=body,
+        timeout_s=90.0,
+    )
+
+
 @router.get("/fleet")
 async def fleet_view() -> dict[str, Any]:
     """Engine instances, fleet-wide queues, the scaling verdict and the autoscaler's last decision

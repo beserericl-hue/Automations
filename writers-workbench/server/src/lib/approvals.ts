@@ -26,12 +26,12 @@ export interface ApprovalRow {
   execution_id: string;
   /** n8n Wait-node resume URL. NULL for engine-backed rows (migration 023). */
   resume_url: string | null;
-  stage: 'stories' | 'subject_line' | 'image';
+  stage: 'stories' | 'subject_line' | 'image' | 'send';
   payload: Record<string, unknown>;
   created_at: string;
   resolved_at: string | null;
   expires_at: string;
-  decision: 'approve' | 'revise' | null;
+  decision: 'approve' | 'revise' | 'reject' | null;
   feedback: string | null;
 }
 
@@ -39,6 +39,7 @@ export type ResolveStatus =
   | 'ok'
   | 'not_found'
   | 'forbidden'
+  | 'invalid_decision'
   | 'already_resolved'
   | 'expired'
   | 'lookup_error'
@@ -47,7 +48,8 @@ export type ResolveStatus =
 
 export interface ResolveOptions {
   token: string;
-  decision: 'approve' | 'revise';
+  /** 'reject' is valid only on the final 'send' gate (it cancels the issue: nothing is sent). */
+  decision: 'approve' | 'revise' | 'reject';
   feedback: string;
   /**
    * When provided, enforces `row.user_id === sessionUserId` and returns
@@ -107,6 +109,12 @@ export async function resolveApproval(opts: ResolveOptions): Promise<ResolveResu
     // The public surface SKIPS this branch by passing undefined — it relies
     // on token secrecy.
     return { status: 'forbidden', row };
+  }
+
+  // 'reject' exists for the final "Send to subscribers" gate only. The n8n gates and the engine's
+  // earlier gates speak approve / revise; a reject there would be read as something it is not.
+  if (decision === 'reject' && row.stage !== 'send') {
+    return { status: 'invalid_decision', row };
   }
 
   if (row.resolved_at) {
