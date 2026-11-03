@@ -15,6 +15,7 @@ user to clarify) rather than 500-ing.
 from __future__ import annotations
 
 import re
+import uuid
 from typing import Any
 
 from writer_engine.config import get_settings
@@ -1176,7 +1177,8 @@ async def _gemini_route(req: HubRequest, router: LLMRouter, model: str) -> HubDe
         workflow=f"hub.route.{req.source}",
         user_id=req.user_id,
         project_id=(str(req.context.get("project_id")) if req.context.get("project_id") else None),
-        run_id=req.conversation_id,
+        # A turn with no conversation still gets a run id, so every hub row can be told apart.
+        run_id=req.conversation_id or f"hub-{uuid.uuid4().hex}",
         wait=False,  # a voice turn must not wait on a billing insert
     ):
         decision, _resp = await complete_structured(
