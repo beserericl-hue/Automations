@@ -45,7 +45,7 @@ Related: [stripe-billing.md](stripe-billing.md) (live-mode steps), [workflow-gov
 
 Apply in file order, each once, after step A3. `018`–`022` were never written. All of these are applied
 on DEV (checked 2026-11-03: every table, column, function, trigger and policy below exists on DEV).
-Every doc records 023 onwards as DEV-only; confirm against the dump. 050 was applied to DEV on 2026-11-03.
+Every doc records 023 onwards as DEV-only; confirm against the dump. 050 and 051 were applied to DEV on 2026-11-03.
 
 | # | What it does | PROD note |
 |---|---|---|
@@ -76,6 +76,7 @@ Every doc records 023 onwards as DEV-only; confirm against the dump. 050 was app
 | 048 | `token_usage_v2_default_labels` insert trigger | Its backfill filters `created_at >= '2026-11-02'` for one DEV shape; on PROD it should match nothing. Harmless |
 | 049 | Provider aliasing in the 048 trigger | Requires 048 |
 | 050 | Content Studio: `social_schedule_v2` gains `draft`/`approved` states (undated), `edition_id`, `post_at`, `image_url`, `studio`, source `studio`, and a new posting-time trigger; `newsletter_issue_selections_v2` / `_items_v2`; `newsletter_edition_feeds_v2` (RSS tokens). Owner-only RLS | Requires 038. **Backfills** `edition_id` on existing `trend_batch` / `roundup_batch` rows from the radar subscriptions (on PROD that is only rows made after 038). Replaces the trigger function `social_schedule_before_write` |
+| 051 | `newsletter_sends_v2`: one saved issue per **edition** per day instead of one per user per day (drops `idx_newsletter_sends_v2_user_date_unique`, adds a partial unique index for edition-less n8n-era rows) | Indexes only, no data change. Without it, a user's second edition on the same day fails before sending |
 
 After the migrations:
 
