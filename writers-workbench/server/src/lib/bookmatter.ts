@@ -82,6 +82,8 @@ export interface BookMatterOptions {
   aboutTheAuthor?: string;
   /** Other titles, for the "also by" page. A series lists its own siblings. */
   alsoBy?: string[];
+  /** The book's own subtitle (the author's, from the Publish tab), printed under the title. */
+  bookSubtitle?: string;
   volume?: VolumeInfo;
   /** Fiction gets the disclaimer; a memoir or history must not claim to be invented. */
   fiction?: boolean;
@@ -193,6 +195,7 @@ export function frontMatter(o: BookMatterOptions): MatterSection[] {
       heading: '',
       blocks: [
         { text: isSeries ? full : o.title, style: 'title' },
+        ...(o.bookSubtitle?.trim() ? [{ text: o.bookSubtitle.trim(), style: 'italic' as const }] : []),
         ...(isSeries
           ? series
             ? [{ text: series, style: 'italic' as const }]

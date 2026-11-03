@@ -389,7 +389,7 @@ export function buyOf(outline: Outline | null): BuyLink | null {
   return b?.url ? { url: b.url, label: b.label || 'Buy the book' } : null;
 }
 
-function publicOf(outline: Outline | null): PublicState | null {
+export function publicOf(outline: Outline | null): PublicState | null {
   return (outline?._landing_page_public as PublicState | undefined) ?? null;
 }
 
@@ -786,7 +786,7 @@ const MailingSchema = z.object({
 });
 
 /** Addresses in the links a reader gets: the public page and their unsubscribe link. */
-function publicBase(req: { protocol: string; get(name: string): string | undefined }): string {
+export function publicBase(req: { protocol: string; get(name: string): string | undefined }): string {
   const configured = process.env.PUBLIC_APP_URL?.trim();
   if (configured) return configured.replace(/\/$/, '');
   const host = req.get('x-forwarded-host') ?? req.get('host') ?? '';

@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, ApiError, type ApiEnvelope } from '../../lib/api';
 import { useToast } from '../../contexts/ToastContext';
+import AiField, { useFieldHistory, useSavedCopy } from './AiField';
 
 export interface Mailing {
   id: string;
@@ -52,6 +53,9 @@ export default function ReaderFollowUp({ projectId, published, subscribed, buy, 
   const [body, setBody] = useState('');
   const [tested, setTested] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const { data: copy } = useSavedCopy(projectId);
+  const fieldHistory = useFieldHistory();
+  const placeholders = /\[[^\]]+\]/.test(`${subject}\n${body}`);
 
   useEffect(() => {
     setBuyUrl(buy?.url ?? '');
@@ -129,19 +133,37 @@ export default function ReaderFollowUp({ projectId, published, subscribed, buy, 
           line saying they reserved a copy on your page.{buy ? ' Your buy link goes in as a button.' : ''} Replies come
           to you.
         </p>
-        <input aria-label="Subject" value={subject} onChange={(e) => { setSubject(e.target.value); setTested(false); }} placeholder="Subject" className={inputClass} />
-        <textarea
-          aria-label="Message"
-          value={body}
-          onChange={(e) => { setBody(e.target.value); setTested(false); }}
-          rows={6}
-          placeholder="Plain text. A blank line starts a new paragraph."
-          className={inputClass}
+        <AiField
+          projectId={projectId}
+          field="announcement_subject"
+          label="Subject"
+          rows={1}
+          value={subject}
+          onChange={(v) => { setSubject(v); setTested(false); }}
+          placeholder="Subject"
+          assist={copy?.assist}
+          history={fieldHistory}
         />
+        <AiField
+          projectId={projectId}
+          field="announcement_body"
+          label="Message"
+          rows={6}
+          value={body}
+          onChange={(v) => { setBody(v); setTested(false); }}
+          placeholder="Plain text. A blank line starts a new paragraph."
+          assist={copy?.assist}
+          history={fieldHistory}
+        />
+        {placeholders ? (
+          <p data-testid="email-placeholders" className="text-xs text-amber-700 dark:text-amber-400">
+            Fill in the [placeholders] before sending — readers would see them as written.
+          </p>
+        ) : null}
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => send.mutate(true)}
-            disabled={!published || !subject.trim() || !body.trim() || send.isPending}
+            disabled={!published || !subject.trim() || !body.trim() || placeholders || send.isPending}
             className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300"
           >
             Send a test to me
@@ -162,7 +184,7 @@ export default function ReaderFollowUp({ projectId, published, subscribed, buy, 
           ) : (
             <button
               onClick={() => setConfirming(true)}
-              disabled={!published || !tested || !subscribed}
+              disabled={!published || !tested || !subscribed || placeholders}
               title={tested ? undefined : 'Send yourself a test first'}
               className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50"
             >

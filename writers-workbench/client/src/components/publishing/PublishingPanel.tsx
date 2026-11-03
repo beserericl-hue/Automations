@@ -16,7 +16,7 @@
  * All of it is stored on the project. Nothing here lives only in this tab.
  */
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, type ApiEnvelope } from '../../lib/api';
@@ -26,6 +26,8 @@ import { useEngineJobQueue } from '../../hooks/useEngineJobQueue';
 import PrintCopies from './PrintCopies';
 import SeriesPanel, { type SeriesView } from './SeriesPanel';
 import CoverChooser, { type CoverOption } from './CoverChooser';
+import AiField, { assistErrorMessage, useFieldHistory, useSavedCopy, type AssistResult } from './AiField';
+import { ApiError } from '../../lib/api';
 
 interface Settings {
   trim: string;
@@ -93,6 +95,24 @@ interface Marketing {
   role_warnings?: string[];
 }
 
+/**
+ * The listing copy as it is being edited: every field a string, lists one item per line (blank lines
+ * are dropped only on save, so typing a new line works), plus the book's subtitle and inside flap,
+ * which are saved on book_copy_v2 rather than with the listing.
+ */
+interface EditCopy {
+  blurb: string;
+  back_cover: string;
+  hook: string;
+  keywords: string;
+  categories: string;
+  comparable_titles: string;
+  subtitle: string;
+  inside_flap: string;
+}
+type EditKey = keyof EditCopy;
+const lines = (s: string): string[] => s.split('\n').map((x) => x.trim()).filter(Boolean);
+
 interface HistoryEntry {
   volume_index: number;
   saved_at: string;
@@ -150,7 +170,21 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
   const [settings, setSettings] = useState<Settings | null>(null);
   const [volumeTab, setVolumeTab] = useState(1);
   const [instructions, setInstructions] = useState('');
-  const [edit, setEdit] = useState<Marketing | null>(null);
+  const [edit, setEdit] = useState<EditCopy | null>(null);
+  // The editor as it is now, for a batch draft that returns after the author kept typing.
+  const editRef = useRef(edit);
+  editRef.current = edit;
+  const history = useFieldHistory();
+  const { data: saved } = useSavedCopy(projectId);
+  const assist = saved?.assist;
+  // The last AI draft put in each field, so a save can record which were kept exactly as drafted.
+  const [aiValues, setAiValues] = useState<Record<string, string>>({});
+  const noteAi = (r: AssistResult) => setAiValues((v) => ({ ...v, [r.field]: r.value }));
+  const [confirmAll, setConfirmAll] = useState<EditKey[] | null>(null);
+  const [draftingAll, setDraftingAll] = useState(false);
+  const [batchWarnings, setBatchWarnings] = useState<string[]>([]);
+  const [bio, setBio] = useState<string | null>(null);
+  const [alsoBy, setAlsoBy] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [lastPackage, setLastPackage] = useState<{ blocking: number; warnings: number; volumes: number } | null>(null);
@@ -162,7 +196,23 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
   const plan = data?.volume_plan ?? null;
   const volumeCount = Math.max(1, plan?.volume_count ?? 1);
   const marketing = data?.marketing?.[String(volumeTab)] ?? null;
-  const history = (data?.marketing_history ?? []).filter((h) => h.volume_index === volumeTab);
+  const draftHistory = (data?.marketing_history ?? []).filter((h) => h.volume_index === volumeTab);
+  const volumeIndex = volumeCount > 1 ? volumeTab : null;
+  const bookCopy = saved?.books?.[String(volumeTab)] ?? { subtitle: '', inside_flap: '' };
+  const bioValue = bio ?? data?.author.bio ?? '';
+  const alsoByValue = alsoBy ?? (saved?.also_by ?? []).join('\n');
+
+  /** The editor's starting point: the saved listing copy and the book's saved subtitle / flap. */
+  const editFrom = (m: Marketing | null): EditCopy => ({
+    blurb: m?.blurb ?? '',
+    back_cover: m?.back_cover ?? '',
+    hook: m?.hook ?? '',
+    keywords: (m?.keywords ?? []).join('\n'),
+    categories: (m?.categories ?? []).join('\n'),
+    comparable_titles: (m?.comparable_titles ?? []).join('\n'),
+    subtitle: bookCopy.subtitle,
+    inside_flap: bookCopy.inside_flap,
+  });
 
   const planning = stateOf(`${projectId}:volumes`) === 'queued';
   const drafting = stateOf(`${projectId}:marketing`) === 'queued';
@@ -237,19 +287,38 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
   });
 
   const saveMarketing = useMutation({
-    mutationFn: async (patch: Marketing) => {
+    mutationFn: async (e: EditCopy) => {
       const res = await apiFetch<ApiEnvelope<Marketing>>(
         `/api/publishing/project/${projectId}/marketing`,
         {
           method: 'PUT',
-          body: JSON.stringify({ volume_index: volumeCount > 1 ? volumeTab : null, ...patch }),
+          body: JSON.stringify({
+            volume_index: volumeIndex,
+            blurb: e.blurb,
+            back_cover: e.back_cover,
+            hook: e.hook,
+            keywords: lines(e.keywords),
+            categories: lines(e.categories),
+            comparable_titles: lines(e.comparable_titles),
+          }),
         },
       );
+      // The subtitle and inside flap live on book_copy_v2.
+      await apiFetch(`/api/copy-assist/project/${projectId}/copy`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          volume_index: volumeIndex,
+          subtitle: e.subtitle,
+          inside_flap: e.inside_flap,
+          generated: (['subtitle', 'inside_flap'] as const).filter((k) => e[k].trim() && aiValues[k] === e[k]),
+        }),
+      });
       return res.data!;
     },
     onSuccess: () => {
       setEdit(null);
       void queryClient.invalidateQueries({ queryKey: stateKey });
+      void queryClient.invalidateQueries({ queryKey: ['copy-assist', projectId] });
       void queryClient.invalidateQueries({ queryKey: ['publishing-readiness', projectId] });
       addToast('Listing copy saved', 'success');
     },
@@ -269,6 +338,83 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
     },
     onError: (err: Error) => addToast(err.message || 'Could not restore', 'error'),
   });
+
+  /** "Draft all missing": only the package fields that are empty in the editor, at a total shown first. */
+  const askDraftAll = () => {
+    const start = edit ?? editFrom(marketing);
+    if (!edit) setEdit(start);
+    const empty = ((assist?.package_fields ?? []) as EditKey[]).filter((k) => k in start && !start[k].trim());
+    if (!empty.length) {
+      addToast('Every field already has text. Use Revise with AI on the one you want to change.', 'info');
+      return;
+    }
+    setConfirmAll(empty);
+  };
+
+  const draftAll = async (fields: EditKey[]) => {
+    setDraftingAll(true);
+    setBatchWarnings([]);
+    try {
+      const res = await apiFetch<ApiEnvelope<{ results: Record<string, AssistResult>; errors: Record<string, string>; credits_charged: number; credits_remaining: number }>>(
+        `/api/copy-assist/project/${projectId}/assist/all`,
+        { method: 'POST', body: JSON.stringify({ volume_index: volumeIndex, fields, expected_cost: assist?.charged ? (assist.price * fields.length) : 0 }) },
+      );
+      const { results, errors, credits_charged } = res.data!;
+      const warnings: string[] = [];
+      const next = { ...(editRef.current ?? editFrom(marketing)) };
+      for (const [f, r] of Object.entries(results)) {
+        const k = f as EditKey;
+        // Only fields still empty: the author may have typed in one while this ran.
+        if (!r.value.trim() || next[k].trim()) continue;
+        history.push(k, next[k]);
+        next[k] = r.value;
+        for (const w of r.warnings) warnings.push(`${assist?.fields[k]?.label ?? k}: ${w}`);
+      }
+      setEdit(next);
+      setAiValues((v) => ({ ...v, ...Object.fromEntries(Object.entries(results).map(([f, r]) => [f, r.value])) }));
+      setBatchWarnings(warnings);
+      const failed = Object.keys(errors);
+      addToast(
+        `Drafted ${Object.keys(results).length} field${Object.keys(results).length === 1 ? '' : 's'} · ${credits_charged} credits${failed.length ? ` · failed (not charged): ${failed.join(', ')}` : ''}. Review, then save.`,
+        failed.length ? 'error' : 'success',
+      );
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'PRICE_CHANGED') void queryClient.invalidateQueries({ queryKey: ['copy-assist', projectId] });
+      addToast(assistErrorMessage(err), 'error');
+    } finally {
+      setDraftingAll(false);
+      setConfirmAll(null);
+    }
+  };
+
+  const saveBio = useMutation({
+    mutationFn: async (text: string) =>
+      apiFetch(`/api/author/bio`, {
+        method: 'PUT',
+        body: JSON.stringify({ bio: text, source: aiValues.author_bio === text ? 'generated' : 'edited' }),
+      }),
+    onSuccess: () => {
+      setBio(null);
+      void queryClient.invalidateQueries({ queryKey: stateKey });
+      void queryClient.invalidateQueries({ queryKey: ['publishing-readiness', projectId] });
+      addToast('Bio saved to your Author Profile', 'success');
+    },
+    onError: (err: Error) => addToast(err.message || 'Could not save the bio', 'error'),
+  });
+
+  const saveMatter = async () => {
+    if (!settings) return;
+    saveSettings.mutate(settings);
+    if (alsoBy !== null) {
+      try {
+        await apiFetch(`/api/copy-assist/project/${projectId}/copy`, { method: 'PUT', body: JSON.stringify({ also_by: lines(alsoBy) }) });
+        setAlsoBy(null);
+        void queryClient.invalidateQueries({ queryKey: ['copy-assist', projectId] });
+      } catch (err) {
+        addToast(assistErrorMessage(err), 'error');
+      }
+    }
+  };
 
   /**
    * Download the package.
@@ -526,6 +672,8 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
             <Copy label="Description" value={marketing.blurb} />
             <Copy label="Back cover" value={marketing.back_cover} />
             <Copy label="Hook" value={marketing.hook} />
+            {bookCopy.subtitle ? <Copy label="Subtitle" value={bookCopy.subtitle} /> : null}
+            {bookCopy.inside_flap ? <Copy label="Inside flap" value={bookCopy.inside_flap} /> : null}
             <Chips label={`Keywords (${marketing.keywords?.length ?? 0} of 7)`} values={marketing.keywords} />
             <Chips label="Categories" values={marketing.categories} />
             <Chips label="Comparable titles" values={marketing.comparable_titles} />
@@ -575,63 +723,35 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
         ) : null}
 
         {edit ? (
-          <div className="space-y-3 rounded-lg border border-brand-200 bg-brand-50/30 p-3 dark:border-brand-800 dark:bg-brand-950/20">
-            <Field label="Description">
-              <textarea
-                value={edit.blurb ?? ''}
-                onChange={(e) => setEdit({ ...edit, blurb: e.target.value })}
-                rows={8}
-                className={inputClass}
+          <div data-testid="listing-editor" className="space-y-3 rounded-lg border border-brand-200 bg-brand-50/30 p-3 dark:border-brand-800 dark:bg-brand-950/20">
+            <p className="text-xs text-gray-600 dark:text-gray-400">
+              Write each field yourself or ask the assistant. A draft goes into the field (or beside your text, for you to
+              choose) and nothing is saved until you press Save. It writes from this book only and never invents reviews,
+              awards or sales claims.
+            </p>
+            {LISTING_FIELDS.map(({ key, label, hint, rows }) => (
+              <AiField
+                key={key}
+                projectId={projectId}
+                volumeIndex={volumeIndex}
+                field={key}
+                label={label}
+                hint={hint}
+                rows={rows}
+                value={edit[key]}
+                onChange={(v) => setEdit((e) => (e ? { ...e, [key]: v } : e))}
+                onApplied={noteAi}
+                assist={assist}
+                history={history}
               />
-            </Field>
-            <Field label="Back cover" hint="Shorter and harder — read standing up in a shop.">
-              <textarea
-                value={edit.back_cover ?? ''}
-                onChange={(e) => setEdit({ ...edit, back_cover: e.target.value })}
-                rows={4}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="Hook" hint="One sentence.">
-              <input
-                value={edit.hook ?? ''}
-                onChange={(e) => setEdit({ ...edit, hook: e.target.value })}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="Keywords" hint="One per line. KDP gives exactly 7 slots; unused ones are wasted reach.">
-              <textarea
-                value={(edit.keywords ?? []).join('\n')}
-                onChange={(e) =>
-                  setEdit({ ...edit, keywords: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean) })
-                }
-                rows={7}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="Categories" hint="One per line, up to 3, as Amazon words them.">
-              <textarea
-                value={(edit.categories ?? []).join('\n')}
-                onChange={(e) =>
-                  setEdit({ ...edit, categories: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean) })
-                }
-                rows={3}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="Comparable titles" hint="One per line.">
-              <textarea
-                value={(edit.comparable_titles ?? []).join('\n')}
-                onChange={(e) =>
-                  setEdit({
-                    ...edit,
-                    comparable_titles: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean),
-                  })
-                }
-                rows={4}
-                className={inputClass}
-              />
-            </Field>
+            ))}
+            {batchWarnings.length ? (
+              <ul data-testid="batch-warnings" className="list-disc rounded bg-amber-50 py-1 pl-5 pr-2 text-[11px] text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+                {batchWarnings.map((w) => (
+                  <li key={w}>Check: {w}</li>
+                ))}
+              </ul>
+            ) : null}
             <div className="flex gap-2">
               <button
                 onClick={() => saveMarketing.mutate(edit)}
@@ -641,9 +761,52 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
                 Save my version
               </button>
               <button
-                onClick={() => setEdit(null)}
+                data-testid="draft-all-missing-edit"
+                onClick={askDraftAll}
+                disabled={!assist || draftingAll || Boolean(confirmAll)}
+                className="rounded-lg border border-brand-300 px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50 dark:border-brand-700 dark:text-brand-300"
+              >
+                Draft all missing
+              </button>
+              <button
+                onClick={() => {
+                  setEdit(null);
+                  setBatchWarnings([]);
+                }}
                 className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-600 dark:border-gray-600 dark:text-gray-400"
               >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Draft all missing: the total is shown and agreed before anything runs. */}
+        {confirmAll ? (
+          <div data-testid="draft-all-confirm" className="rounded-lg border border-brand-300 bg-white p-3 text-xs dark:border-brand-700 dark:bg-gray-900">
+            <p className="text-gray-800 dark:text-gray-200">
+              Draft {confirmAll.length} empty field{confirmAll.length === 1 ? '' : 's'} (
+              {confirmAll.map((k) => assist?.fields[k]?.label ?? k).join(', ')})
+              {assist?.charged ? (
+                <>
+                  {' '}for <strong data-testid="draft-all-total">{assist.price * confirmAll.length} credits</strong> ({assist.price} each, charged
+                  only for the fields that come back)
+                </>
+              ) : (
+                ' (no charge for your account)'
+              )}
+              ? Fields you have written are not touched.
+            </p>
+            <div className="mt-2 flex gap-2">
+              <button
+                data-testid="draft-all-go"
+                onClick={() => void draftAll(confirmAll)}
+                disabled={draftingAll}
+                className="rounded-lg bg-brand-600 px-3 py-1.5 font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              >
+                {draftingAll ? 'Drafting…' : 'Draft them'}
+              </button>
+              <button onClick={() => setConfirmAll(null)} disabled={draftingAll} className="rounded-lg border border-gray-300 px-3 py-1.5 text-gray-600 dark:border-gray-600 dark:text-gray-400">
                 Cancel
               </button>
             </div>
@@ -683,7 +846,7 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
               {marketing ? (
                 <>
                   <button
-                    onClick={() => setEdit({ ...marketing })}
+                    onClick={() => setEdit(editFrom(marketing))}
                     className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
                   >
                     Edit it myself
@@ -696,13 +859,29 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
                     Start over
                   </button>
                 </>
-              ) : null}
-              {history.length ? (
+              ) : (
+                <button
+                  data-testid="write-field-by-field"
+                  onClick={() => setEdit(editFrom(null))}
+                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
+                >
+                  Write it field by field (with the assistant)
+                </button>
+              )}
+              <button
+                data-testid="draft-all-missing"
+                onClick={askDraftAll}
+                disabled={!assist || draftingAll}
+                className="rounded-lg border border-brand-300 px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50 dark:border-brand-700 dark:text-brand-300"
+              >
+                Draft all missing
+              </button>
+              {draftHistory.length ? (
                 <button
                   onClick={() => setShowHistory((s) => !s)}
                   className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
                 >
-                  {showHistory ? 'Hide' : `${history.length} earlier draft${history.length === 1 ? '' : 's'}`}
+                  {showHistory ? 'Hide' : `${draftHistory.length} earlier draft${draftHistory.length === 1 ? '' : 's'}`}
                 </button>
               ) : null}
             </div>
@@ -710,7 +889,7 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
         ) : null}
 
         {showHistory
-          ? history.map((h) => {
+          ? draftHistory.map((h) => {
               const absolute = (data.marketing_history ?? []).indexOf(h);
               return (
                 <div
@@ -765,64 +944,89 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
             />
           </Field>
         ))}
-        <Field label="Dedication">
-          <textarea
-            value={settings.dedication}
-            onChange={(e) => setSettings({ ...settings, dedication: e.target.value })}
-            rows={2}
-            className={inputClass}
-          />
-        </Field>
-        <Field label="Epigraph">
-          <textarea
-            value={settings.epigraph}
-            onChange={(e) => setSettings({ ...settings, epigraph: e.target.value })}
-            rows={2}
-            className={inputClass}
-          />
-        </Field>
-        <Field label="Epigraph attribution">
-          <input
-            value={settings.epigraph_attribution}
-            onChange={(e) => setSettings({ ...settings, epigraph_attribution: e.target.value })}
-            className={inputClass}
-          />
-        </Field>
-        <Field
-          label="Author's note"
-          hint="For a book built on documented history this is close to obligatory — it is where the record is separated from the invention."
-        >
-          <textarea
-            value={settings.authors_note}
-            onChange={(e) => setSettings({ ...settings, authors_note: e.target.value })}
-            rows={6}
-            className={inputClass}
-          />
-        </Field>
-        <Field label="Acknowledgements">
-          <textarea
-            value={settings.acknowledgements}
-            onChange={(e) => setSettings({ ...settings, acknowledgements: e.target.value })}
-            rows={4}
-            className={inputClass}
-          />
-        </Field>
-        <Field label="Why this book" hint="Used by the bio for this project, in place of the one on your profile.">
-          <textarea
-            value={settings.why_this_book}
-            onChange={(e) => setSettings({ ...settings, why_this_book: e.target.value })}
-            rows={3}
-            className={inputClass}
-            placeholder={data.author.profile_why_this_book || undefined}
-          />
-        </Field>
+        {MATTER_FIELDS.map(({ key, label, hint, rows }) => (
+          <div key={key} className="space-y-3">
+            <AiField
+              projectId={projectId}
+              field={key}
+              label={label}
+              hint={hint}
+              rows={rows}
+              value={settings[key]}
+              onChange={(v) => setSettings((st) => (st ? { ...st, [key]: v } : st))}
+              onApplied={(r) => {
+                noteAi(r);
+                // The epigraph's speaker comes with it, into an empty attribution only.
+                if (key === 'epigraph' && r.attribution) {
+                  setSettings((st) => (st && !st.epigraph_attribution.trim() ? { ...st, epigraph_attribution: r.attribution! } : st));
+                }
+              }}
+              assist={assist}
+              history={history}
+              placeholder={key === 'why_this_book' ? data.author.profile_why_this_book || undefined : undefined}
+            />
+            {key === 'epigraph' ? (
+              <Field label="Epigraph attribution">
+                <input
+                  aria-label="Epigraph attribution"
+                  value={settings.epigraph_attribution}
+                  onChange={(e) => setSettings({ ...settings, epigraph_attribution: e.target.value })}
+                  className={inputClass}
+                />
+              </Field>
+            ) : null}
+          </div>
+        ))}
+        <AiField
+          projectId={projectId}
+          field="also_by"
+          label="Also by"
+          hint="Your other books, one per line, for the Also-by page at the back of every book. A series' own books are listed for you."
+          rows={3}
+          value={alsoByValue}
+          onChange={(v) => setAlsoBy(v)}
+          assist={assist}
+          history={history}
+        />
         <button
-          onClick={() => saveSettings.mutate(settings)}
+          data-testid="save-matter"
+          onClick={() => void saveMatter()}
           disabled={saveSettings.isPending}
           className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
         >
           {saveSettings.isPending ? 'Saving…' : 'Save matter'}
         </button>
+
+        <div className="border-t border-gray-200 pt-3 dark:border-gray-800">
+          <AiField
+            projectId={projectId}
+            field="author_bio"
+            label="About the author"
+            hint="Printed at the back of every one of your books and used on Author Central. Written only from your Author Profile; anything it does not know is left as a [placeholder]."
+            rows={4}
+            value={bioValue}
+            onChange={(v) => setBio(v)}
+            onApplied={noteAi}
+            assist={assist}
+            history={history}
+          />
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              data-testid="save-bio"
+              onClick={() => saveBio.mutate(bioValue)}
+              disabled={saveBio.isPending || bio === null || !bioValue.trim() || PLACEHOLDER.test(bioValue)}
+              className="rounded-lg border border-brand-300 px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50 dark:border-brand-700 dark:text-brand-300"
+            >
+              Save as my bio
+            </button>
+            {PLACEHOLDER.test(bioValue) ? (
+              <span className="text-xs text-amber-700 dark:text-amber-400">Fill in or remove the [placeholders] first.</span>
+            ) : null}
+            <Link to="/settings/author" className="text-xs text-brand-600 underline">
+              Add facts in your Author Profile
+            </Link>
+          </div>
+        </div>
       </Section>
 
       {/* 4. The package */}
@@ -879,6 +1083,30 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
     </div>
   );
 }
+
+/** A [placeholder] the assistant left for the author to fill. */
+const PLACEHOLDER = /\[[^\]]+\]/;
+
+/** The front and back matter the author writes (stored with the publishing settings). */
+const MATTER_FIELDS: { key: 'dedication' | 'epigraph' | 'authors_note' | 'acknowledgements' | 'why_this_book'; label: string; hint?: string; rows: number }[] = [
+  { key: 'dedication', label: 'Dedication', hint: 'Personal: the assistant leaves the name as a [placeholder].', rows: 2 },
+  { key: 'epigraph', label: 'Epigraph', hint: 'The assistant picks a line from your own manuscript, word for word.', rows: 2 },
+  { key: 'authors_note', label: "Author's note", hint: 'For a book built on documented history this is close to obligatory — it is where the record is separated from the invention.', rows: 6 },
+  { key: 'acknowledgements', label: 'Acknowledgements', hint: 'The assistant writes [placeholders] for the people to thank; it never guesses a name.', rows: 4 },
+  { key: 'why_this_book', label: 'Why this book', hint: 'Used by the bio for this project, in place of the one on your profile.', rows: 3 },
+];
+
+/** The listing editor's fields, in the order the KDP form asks for them. */
+const LISTING_FIELDS: { key: EditKey; label: string; hint?: string; rows: number }[] = [
+  { key: 'subtitle', label: 'Subtitle', hint: 'Optional. Printed on the title page; KDP allows 200 characters for title and subtitle together.', rows: 1 },
+  { key: 'blurb', label: 'Description', hint: 'What Amazon shows a buyer. KDP allows 4,000 characters.', rows: 8 },
+  { key: 'back_cover', label: 'Back cover', hint: 'Shorter and harder — read standing up in a shop.', rows: 4 },
+  { key: 'inside_flap', label: 'Inside flap', hint: 'The hardcover jacket’s front flap: fuller than the back cover. In the listing file.', rows: 6 },
+  { key: 'hook', label: 'Hook', hint: 'One sentence, for ads, posts and the landing page.', rows: 1 },
+  { key: 'keywords', label: 'Keywords', hint: 'One per line. KDP gives exactly 7 slots of 50 characters; unused ones are wasted reach.', rows: 7 },
+  { key: 'categories', label: 'Categories', hint: 'One per line, up to 3, as Amazon words them.', rows: 3 },
+  { key: 'comparable_titles', label: 'Comparable titles', hint: 'One per line. Check each one exists.', rows: 4 },
+];
 
 const inputClass =
   'block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white';

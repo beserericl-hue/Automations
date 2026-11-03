@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, ApiError, type ApiEnvelope } from '../../lib/api';
 import { useToast } from '../../contexts/ToastContext';
+import AiField, { useFieldHistory, useSavedCopy } from './AiField';
 
 export interface EndingDraft {
   chapter_number: number;
@@ -95,6 +96,8 @@ export default function SeriesPanel({
   const [titles, setTitles] = useState<Record<string, string>>({});
   const [desc, setDesc] = useState<{ text: string; tagline: string } | null>(null);
   const [drafting, setDrafting] = useState<number | null>(null);
+  const { data: copy } = useSavedCopy(projectId);
+  const fieldHistory = useFieldHistory();
   // The chapter that ends each book but the last, as the author is editing them.
   const [breaks, setBreaks] = useState<string[]>([]);
 
@@ -131,12 +134,6 @@ export default function SeriesPanel({
     onError: (err) => addToast(messageOf(err), 'error'),
   });
 
-  const describe = useMutation({
-    mutationFn: async () =>
-      (await apiFetch<ApiEnvelope<{ series: SeriesView }>>(`${base}/description`, { method: 'POST' })).data!.series,
-    onSuccess: (s) => refresh(s),
-    onError: (err) => addToast(messageOf(err), 'error'),
-  });
 
   const ending = useMutation({
     mutationFn: async ({ index, what }: { index: number; what: 'draft' | 'apply' | 'discard' }) => {
@@ -428,44 +425,38 @@ export default function SeriesPanel({
             })}
           </ul>
 
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300">Series description</h3>
-              <button
-                onClick={() => describe.mutate()}
-                disabled={describe.isPending}
-                className="rounded-lg border border-brand-300 px-3 py-1 text-xs font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50 dark:border-brand-700 dark:text-brand-300"
-              >
-                {describe.isPending ? 'Writing…' : desc ? 'Write it again' : 'Write the series description'}
-              </button>
-            </div>
+          <div className="space-y-2" data-testid="series-description">
+            <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300">Series description</h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              What the whole series is, with Book 1 as the way in. Written from each book’s own description; it names no
-              one those descriptions do not.
+              What the whole series is, with Book 1 as the way in. The assistant writes it from each book’s own description
+              and checks it names no one those descriptions do not. Nothing is saved until you press Save.
             </p>
-            {desc ? (
-              <>
-                <textarea
-                  aria-label="Series description"
-                  value={desc.text}
-                  onChange={(e) => setDesc({ ...desc, text: e.target.value })}
-                  rows={6}
-                  className="block w-full rounded border border-gray-300 px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                />
-                <input
-                  aria-label="Series tagline"
-                  value={desc.tagline}
-                  onChange={(e) => setDesc({ ...desc, tagline: e.target.value })}
-                  className="block w-full rounded border border-gray-300 px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                />
-                <button
-                  onClick={() => save.mutate({ description: desc })}
-                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300"
-                >
-                  Save description
-                </button>
-              </>
-            ) : null}
+            <AiField
+              projectId={projectId}
+              field="series_description"
+              label="Description"
+              rows={6}
+              value={desc?.text ?? ''}
+              onChange={(v) => setDesc((d) => ({ text: v, tagline: d?.tagline ?? '' }))}
+              assist={copy?.assist}
+              history={fieldHistory}
+            />
+            <AiField
+              projectId={projectId}
+              field="series_tagline"
+              label="Tagline"
+              rows={1}
+              value={desc?.tagline ?? ''}
+              onChange={(v) => setDesc((d) => ({ text: d?.text ?? '', tagline: v }))}
+              assist={copy?.assist}
+              history={fieldHistory}
+            />
+            <button
+              onClick={() => save.mutate({ description: desc?.text.trim() || desc?.tagline.trim() ? desc : null })}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300"
+            >
+              Save description
+            </button>
           </div>
         </>
       ) : null}
