@@ -36,6 +36,7 @@ if "gvbvwcnmjkdpclcisqrr" not in SUPA_URL or "develop" not in GATEWAY:
 SUITE = "knowledgebase/Writers Workbench Wiki/Engineering/testing/engine-chat-e2e-suite.md"
 OUT = "scripts/e2e_out/verify"
 RUN_START = datetime.now(timezone.utc) - timedelta(minutes=2)  # rows created after this count as "new"
+RUN_ID = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")  # makes conversation ids unique per run
 
 
 # --------------------------------------------------------------------------- HTTP
@@ -545,7 +546,10 @@ def main():
         else:
             runs = []
             ctx = {}  # conversation context carried across steps of THIS test ("publish it", "that")
-            conv_id = f"e2e-{t['id']}"  # stable per-test conversation id (multi-turn correlation)
+            # Per-test AND per-run: the engine keeps conversation history by id, so a fixed "e2e-R02" carried
+            # an earlier run's turns into this one and the router answered "I'm already working on that"
+            # (R02, V03) instead of doing the work.
+            conv_id = f"e2e-{t['id']}-{RUN_ID}"
             steps, seed = seed_lifecycle(t)  # isolate lifecycle data (disposable known-state row)
             t["_seed"] = seed
             for src, prompt in steps:
