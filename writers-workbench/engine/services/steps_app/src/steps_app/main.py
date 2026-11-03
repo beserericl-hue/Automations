@@ -52,7 +52,6 @@ from segment_step.main import app as segment_app
 from story_bible_step.main import app as story_bible_app
 from subject_step.main import app as subject_app
 
-from library_retrieve_step.main import app as library_retrieve_app
 from writer_engine.auth import require_admin_token
 from writer_engine.config import get_settings
 from writer_engine.prompt_store import get_prompt_store
@@ -66,7 +65,6 @@ SERVICE = "steps"
 # name -> the step's FastAPI app. Keys MUST match writer_engine.runtime_processes.STEP_NAMES; a test
 # asserts that, because a step missing here is a step the orchestrator cannot reach.
 STEP_APPS: dict[str, FastAPI] = {
-    "library_retrieve": library_retrieve_app,
     # Newsletter saga steps (F2).
     "gather": gather_app,
     "pick": pick_app,

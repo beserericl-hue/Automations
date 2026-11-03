@@ -297,13 +297,6 @@ async def hub_voice(body: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-@router.post("/library/retrieve")
-async def library_retrieve(body: dict[str, Any]) -> dict[str, Any]:
-    """F0-8 vertical slice — forward to orchestrator's library.retrieve endpoint."""
-    settings = get_settings()
-    return await _forward("POST", f"{settings.orchestrator_url}/pipelines/library_retrieve/run", json=body)
-
-
 @router.post("/newsletter/generate")
 async def newsletter_generate(body: dict[str, Any]) -> dict[str, Any]:
     """Forward to the durable newsletter pipeline; the response carries execution_id immediately."""

@@ -31,7 +31,6 @@ COPY uv.lock ./
 COPY pyproject.toml ./
 COPY packages/writer_engine/pyproject.toml packages/writer_engine/README.md ./packages/writer_engine/
 COPY services/orchestrator/pyproject.toml ./services/orchestrator/
-COPY services/library_retrieve_step/pyproject.toml ./services/library_retrieve_step/
 COPY services/gather_step/pyproject.toml ./services/gather_step/
 COPY services/pick_step/pyproject.toml ./services/pick_step/
 COPY services/subject_step/pyproject.toml ./services/subject_step/
@@ -67,7 +66,6 @@ COPY services/gateway/pyproject.toml ./services/gateway/
 # Source for everything that runs in this container.
 COPY packages/writer_engine/src ./packages/writer_engine/src
 COPY services/orchestrator/src ./services/orchestrator/src
-COPY services/library_retrieve_step/src ./services/library_retrieve_step/src
 COPY services/gather_step/src ./services/gather_step/src
 COPY services/pick_step/src ./services/pick_step/src
 COPY services/subject_step/src ./services/subject_step/src

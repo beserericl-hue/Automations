@@ -180,15 +180,58 @@ async def _humanize_section(seg: StorySegment, payload: dict) -> dict | None:
     if not report.get("applied") or rewritten.strip() == prose_text.strip():
         seg.newsletter_section_content = original
         return report
-    if len(new_prose) != len(prose) or any(
-        _bullets(a) != _bullets(b) for a, b in zip(prose, new_prose, strict=True)
-    ):
-        report["rejected_layout"] = {"paragraphs": [len(prose), len(new_prose)]}
+    if len(new_prose) != len(prose):
+        # StealthGPT sometimes puts a blank line between list items. Same items, same order: put
+        # the list back together. Only whole bullet paragraphs are merged, and the bullet count of
+        # every block is still checked below, so a dropped or merged item still gets rejected.
+        new_prose = _merge_split_bullets(new_prose)
+    reason = _layout_change(prose, new_prose)
+    if reason:
+        # Recorded where every other rejection is (report["rejected"]), so the send's humanize
+        # summary says WHY this section kept its original, not just "applied=false".
+        rejected = {str(k): v for k, v in (report.get("rejected") or {}).items()}
+        rejected["layout"] = reason
+        report["rejected"] = rejected
+        report["rejected_layout"] = {"paragraphs": [len(prose), len(new_prose)], "reason": reason}
         report["applied"] = False
+        logger.warning(
+            "humanize.rejected",
+            content_type="newsletter_segment",
+            story_title=seg.story_title,
+            chunk="layout",
+            reason=reason,
+        )
         seg.newsletter_section_content = original
         return report
     seg.newsletter_section_content = _join_section(fixed, new_prose)
     return report
+
+
+def _layout_change(before: list[str], after: list[str]) -> str:
+    """Why the rewritten prose cannot be put back by position ("" = it can)."""
+    if len(after) != len(before):
+        return f"layout_changed:paragraphs:{len(before)}->{len(after)}"
+    for i, (a, b) in enumerate(zip(before, after, strict=True)):
+        if _bullets(a) != _bullets(b):
+            return f"layout_changed:bullets[{i}]:{_bullets(a)}->{_bullets(b)}"
+    return ""
+
+
+def _is_bullet_block(paragraph: str) -> bool:
+    """Every line is a list item (or a wrapped continuation of one)."""
+    lines = [ln for ln in paragraph.splitlines() if ln.strip()]
+    return bool(lines) and lines[0].lstrip().startswith(("- ", "* "))
+
+
+def _merge_split_bullets(paragraphs: list[str]) -> list[str]:
+    """Rejoin a list whose items came back as separate paragraphs ("- a\n\n- b" -> "- a\n- b")."""
+    merged: list[str] = []
+    for para in paragraphs:
+        if merged and _is_bullet_block(para) and _is_bullet_block(merged[-1]):
+            merged[-1] = merged[-1] + "\n" + para
+        else:
+            merged.append(para)
+    return merged
 
 
 _LABEL_RE = re.compile(r"\*\*[^*\n]{1,40}:\*\*")

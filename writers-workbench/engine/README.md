@@ -15,7 +15,8 @@ engine/
 ├── services/
 │   ├── gateway/            # FastAPI gateway (/internal, /v1, /admin, SSE relay)
 │   ├── orchestrator/       # saga coordinator + arq worker for long-running pipelines
-│   └── library_retrieve_step/  # F0-8 vertical-slice step service (read-only Supabase query)
+│   ├── steps_app/          # mounts every step app under /steps/<name> in one process (runtime)
+│   └── <name>_step/        # one service per pipeline step (library, chapter, segment, ...)
 ├── docs/                   # architecture, "adding a step service", deployment
 ├── load/                   # k6 smoke load (L6 harness)
 ├── scripts/                # dev-up.sh and friends
@@ -40,9 +41,9 @@ make compose-up
 # 4) hit it
 curl -s http://localhost:8000/admin/health
 curl -s -H "X-Service-Secret: $SERVICE_SHARED_SECRET" \
-  -X POST http://localhost:8000/internal/library/retrieve \
+  -X POST http://localhost:8000/internal/write/library \
   -H 'content-type: application/json' \
-  -d '{"user_id":"00000000-0000-0000-0000-000000000000","limit":5}'
+  -d '{"op":"retrieve","user_id":"00000000-0000-0000-0000-000000000000"}'
 ```
 
 ## Adding a step service

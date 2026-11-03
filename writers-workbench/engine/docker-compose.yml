@@ -1,5 +1,5 @@
-# Local engine stack — redis + gateway + orchestrator + all 19 step services.
-# Each step service runs on its own port; the orchestrator's NewsletterOrchestrator + LibraryRetrieveOrchestrator
+# Local engine stack — redis + gateway + orchestrator + the step services.
+# Each step service runs on its own port; the orchestrator's pipelines
 # pick the right URL from env or fall back to the docker-compose service hostname.
 x-step-defaults: &step-defaults
   env_file: .env
@@ -37,7 +37,6 @@ services:
     env_file: .env
     environment:
       REDIS_URL: redis://redis:6379/0
-      LIBRARY_RETRIEVE_STEP_URL: http://library-retrieve-step:8002
       GATHER_STEP_URL: http://gather-step:8010
       PICK_STEP_URL: http://pick-step:8011
       SUBJECT_STEP_URL: http://subject-step:8012
@@ -50,12 +49,6 @@ services:
       DELIVER_STEP_URL: http://deliver-step:8019
     depends_on:
       redis: { condition: service_healthy }
-
-  library-retrieve-step:
-    build: { context: ., dockerfile: services/library_retrieve_step/Dockerfile }
-    image: writer-engine/library-retrieve-step
-    ports: ["8002:8002"]
-    <<: *step-defaults
 
   # ----- F2 newsletter step services -----
   gather-step:

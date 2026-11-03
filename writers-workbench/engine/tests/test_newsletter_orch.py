@@ -1,7 +1,7 @@
 """L2 — newsletter orchestrator end-to-end with mocked step services.
 
 We patch :class:`httpx.AsyncClient` to dispatch to the actual step apps in-process over an ASGI transport — same
-trick the F0 library_retrieve test uses. The HITL gates auto-approve via a test hook so the saga flows
+trick the gateway/orchestrator tests use. The HITL gates auto-approve via a test hook so the saga flows
 synchronously without a UI in the loop.
 """
 

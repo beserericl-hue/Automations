@@ -11,7 +11,6 @@ members = [
     "services/gateway",
     "services/steps_app",
     "services/orchestrator",
-    "services/library_retrieve_step",
     "services/gather_step",
     "services/pick_step",
     "services/subject_step",
@@ -58,7 +57,6 @@ src = [
     "packages/writer_engine/src",
     "services/gateway/src",
     "services/orchestrator/src",
-    "services/library_retrieve_step/src",
     "services/steps_app/src",
 ]
 
@@ -83,7 +81,6 @@ files = [
     "services/gateway/src",
     "services/steps_app/src",
     "services/orchestrator/src",
-    "services/library_retrieve_step/src",
     "services/gather_step/src",
     "services/pick_step/src",
     "services/subject_step/src",
@@ -125,7 +122,6 @@ testpaths = [
     "services/gateway/tests",
     "services/steps_app/tests",
     "services/orchestrator/tests",
-    "services/library_retrieve_step/tests",
     "services/gather_step/tests",
     "services/pick_step/tests",
     "services/subject_step/tests",
@@ -153,4 +149,4 @@ markers = [
 
 [tool.coverage.run]
 branch = true
-source = ["writer_engine", "gateway", "orchestrator", "library_retrieve_step"]
+source = ["writer_engine", "gateway", "orchestrator"]

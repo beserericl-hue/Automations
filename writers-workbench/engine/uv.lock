@@ -19,7 +19,6 @@ members = [
     "gather-step",
     "image-step",
     "ingestion-step",
-    "library-retrieve-step",
     "library-step",
     "media-step",
     "notify-step",
@@ -1324,23 +1323,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/49/f3/45890c1b314f0d04e19c1c83d534e611513150939a7cf039664d9ab1e649/justext-3.0.2.tar.gz", hash = "sha256:13496a450c44c4cd5b5a75a5efcd9996066d2a189794ea99a49949685a0beb05", size = 828521, upload-time = "2025-02-25T20:21:49.934Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f2/ac/52f4e86d1924a7fc05af3aeb34488570eccc39b4af90530dd6acecdf16b5/justext-3.0.2-py2.py3-none-any.whl", hash = "sha256:62b1c562b15c3c6265e121cc070874243a443bfd53060e869393f09d6b6cc9a7", size = 837940, upload-time = "2025-02-25T20:21:44.179Z" },
-]
-
-[[package]]
-name = "library-retrieve-step"
-version = "0.1.0"
-source = { editable = "services/library_retrieve_step" }
-dependencies = [
-    { name = "fastapi" },
-    { name = "uvicorn", extra = ["standard"] },
-    { name = "writer-engine" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fastapi", specifier = ">=0.115.0" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.30.0" },
-    { name = "writer-engine", editable = "packages/writer_engine" },
 ]
 
 [[package]]
@@ -3046,7 +3028,6 @@ dependencies = [
     { name = "fastapi" },
     { name = "gather-step" },
     { name = "image-step" },
-    { name = "library-retrieve-step" },
     { name = "library-step" },
     { name = "media-step" },
     { name = "notify-step" },
@@ -3072,7 +3053,6 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "gather-step", editable = "services/gather_step" },
     { name = "image-step", editable = "services/image_step" },
-    { name = "library-retrieve-step", editable = "services/library_retrieve_step" },
     { name = "library-step", editable = "services/library_step" },
     { name = "media-step", editable = "services/media_step" },
     { name = "notify-step", editable = "services/notify_step" },

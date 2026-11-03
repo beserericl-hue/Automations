@@ -39,8 +39,6 @@ from writer_engine.supervisor import ManagedProcess
 # Every step, in startup/mount order. Names match each step service's STEP_NAME, the keys of
 # orchestrator.write_tools.ALL_STEP_URLS, and the keys of steps_app.main.STEP_APPS.
 STEP_NAMES: tuple[str, ...] = (
-    # F0 vertical-slice demo, superseded by `library` (A9 — remove with its entry here).
-    "library_retrieve",
     # Newsletter saga steps (F2).
     "gather",
     "pick",

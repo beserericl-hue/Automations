@@ -17,8 +17,6 @@ from fastapi.testclient import TestClient
 
 # (pip-installed package name, step_name)
 SERVICES: list[tuple[str, str, dict[str, Any]]] = [
-    # F0 vertical slice
-    ("library_retrieve_step.main", "library_retrieve", {"user_id": "u1", "limit": 2}),
     # F2 newsletter
     ("gather_step.main", "gather", {"send_date": "2026-05-30", "user_id": "+14105914612", "limit": 5}),
     ("pick_step.main", "pick", {"articles": [], "max_stories": 3}),

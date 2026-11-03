@@ -52,8 +52,19 @@ def test_liveness_does_not_depend_on_orchestrator() -> None:
 
 def test_internal_requires_service_secret() -> None:
     client = TestClient(app)
-    r = client.post("/internal/library/retrieve", json={"user_id": "u1", "limit": 1})
+    r = client.post("/internal/write/library", json={"op": "retrieve", "user_id": "u1"})
     assert r.status_code == 401
+
+
+def test_the_retired_library_retrieve_route_is_gone() -> None:
+    """The F0 demo step (library_retrieve) was removed; the library step's retrieve op replaces it."""
+    client = TestClient(app)
+    r = client.post(
+        "/internal/library/retrieve",
+        json={"user_id": "u1", "limit": 1},
+        headers={"x-service-secret": "test-secret"},
+    )
+    assert r.status_code in (404, 405)
 
 
 def test_v1_requires_api_key() -> None:
@@ -74,7 +85,7 @@ def test_admin_requires_admin_token() -> None:
 
 
 def test_internal_forwards_to_orchestrator(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Patch httpx so /internal/library/retrieve "calls" a fake orchestrator and returns its JSON."""
+    """Patch httpx so /internal/write/library "calls" a fake orchestrator and returns its JSON."""
 
     class _FakeAsyncClient:
         def __init__(self, *args: object, **kwargs: object) -> None:
@@ -87,15 +98,15 @@ def test_internal_forwards_to_orchestrator(monkeypatch: pytest.MonkeyPatch) -> N
             return None
 
         async def request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
-            assert "library_retrieve" in url
+            assert url.endswith("/pipelines/write/library/run")
             assert kwargs["headers"]["x-service-secret"] == "test-secret"
             return httpx.Response(200, json={"status": "ok", "items": [{"id": "x"}]})
 
     monkeypatch.setattr("gateway.routes.internal.httpx.AsyncClient", _FakeAsyncClient)
     client = TestClient(app)
     r = client.post(
-        "/internal/library/retrieve",
-        json={"user_id": "u1", "limit": 1},
+        "/internal/write/library",
+        json={"op": "retrieve", "user_id": "u1"},
         headers={"x-service-secret": "test-secret"},
     )
     assert r.status_code == 200

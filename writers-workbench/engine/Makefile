@@ -18,7 +18,7 @@ test:
 	uv run pytest -q
 
 cov:
-	uv run pytest --cov=writer_engine --cov=gateway --cov=orchestrator --cov=library_retrieve_step --cov-report=term-missing
+	uv run pytest --cov=writer_engine --cov=gateway --cov=orchestrator --cov-report=term-missing
 
 compose-build:
 	docker compose build
