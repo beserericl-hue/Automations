@@ -1272,11 +1272,22 @@ _STUDIO_ACKS = {
     "generate": "Drafting those now. They appear under Drafts for review; nothing is scheduled.",
     "revise": "Revising it now. The draft updates when it is done.",
     "email": "Sending the email now.",
+    "batch": "On it, one step at a time. The posts update as each step finishes.",
 }
 
 
 def is_studio_request(req: HubRequest) -> bool:
     return str((req.context or {}).get("surface") or "") == STUDIO_SURFACE
+
+
+def task_clauses(req: HubRequest) -> list[str]:
+    """The task clauses a hub turn fans out to (V31 ``split_tasks``) — except on the studio page.
+
+    There a compound message is ONE ``studio.batch`` (the steps share "it" and run in order), and a
+    fanned-out turn came back with no tool or params, so the Workbench could not see — or charge for —
+    the drafting jobs it started ("generate 1-3 and then email the digest" drafted for free).
+    """
+    return [req.message] if is_studio_request(req) else split_tasks(req.message)
 
 
 def _studio_help(message: str = "") -> HubDecision:
@@ -1295,9 +1306,55 @@ def _studio_system() -> str:
         "short sentence).\n\nCAPABILITIES (tool + op verbatim):\n"
         f"{render_catalog_prompt(studio=True)}\n\nRULES:\n- Plain numbers after generate (and in 'put N "
         "in the newsletter') are SLATE ranks; elsewhere a number is a POST number. Pass number lists as "
-        "text like '1-5, 8'.\n- Never invent an edition, project or URL.\n"
+        "text like '1-5, 8'.\n- An ordinal ('the second draft', 'the first one', 'the last post') means "
+        "that position in the REVIEW LIST given with the message (top to bottom); pass that post's #number, "
+        "never the ordinal itself. If the message names a post that is not in the list, ask which one "
+        "(kind='conversation').\n- A message asking for two or more actions is ONE studio.batch whose "
+        "steps run in order (each step: {op, and that op's params}); never refuse it as 'one at a time'.\n"
+        "- Never invent an edition, project or URL.\n"
         "Output JSON: {kind: conversation|info|task, tool, op, params, assistant_message, confidence}."
     )
+
+
+def _studio_review_list(req: HubRequest) -> str:
+    """The Review tab's posts (top to bottom) the Workbench put in the context, as a numbered list."""
+    posts = (req.context or {}).get("studio_posts")
+    lines: list[str] = []
+    for p in posts[:40] if isinstance(posts, list) else []:
+        if isinstance(p, dict) and p.get("display_number"):
+            title = str(p.get("title") or "")[:100]
+            lines.append(f"{len(lines) + 1}. #{p['display_number']} ({p.get('state') or 'draft'}) {title}")
+    if not lines:
+        return "REVIEW LIST: (no drafts or approved posts)"
+    return "REVIEW LIST (top to bottom):\n" + "\n".join(lines)
+
+
+STUDIO_BATCH_OPS = ("slate", "queue", "update", "schedule", "issue", "generate", "revise", "email")
+STUDIO_BATCH_MAX = 4
+
+
+def studio_batch_steps(params: dict[str, Any]) -> list[dict[str, Any]] | None:
+    """The validated steps of a studio.batch decision, or None when they are not usable.
+
+    Each step is ``{op, ...params}`` (a nested ``params`` dict is flattened in). Only studio ops, at
+    most four; the edition and the user are never taken from a step (dispatch pins them from the page).
+    """
+    raw = params.get("steps")
+    if not isinstance(raw, list) or not (1 <= len(raw) <= STUDIO_BATCH_MAX):
+        return None
+    steps: list[dict[str, Any]] = []
+    for step in raw:
+        if not isinstance(step, dict):
+            return None
+        sub: dict[str, Any] = dict(step["params"]) if isinstance(step.get("params"), dict) else {}
+        sub.update({k: v for k, v in step.items() if k not in ("op", "tool", "params")})
+        op = str(step.get("op") or "").strip().lower().removeprefix("studio.").removeprefix("studio_")
+        if op not in STUDIO_BATCH_OPS:
+            return None
+        for key in ("edition_id", "user_id", "steps", "async", "persist"):
+            sub.pop(key, None)
+        steps.append({"op": op, **sub})
+    return steps
 
 
 async def _studio_route(req: HubRequest, llm_router: LLMRouter | None, model: str | None) -> HubDecision:
@@ -1327,7 +1384,7 @@ async def _studio_route(req: HubRequest, llm_router: LLMRouter | None, model: st
             provider="gemini",
             model=model or get_settings().hub_router_model,
             system=_studio_system(),
-            prompt=f"User message:\n{req.message}",
+            prompt=f"{_studio_review_list(req)}\n\nUser message:\n{req.message}",
             schema=HubDecision,
             max_tokens=512,
             temperature=0.1,
@@ -1342,6 +1399,25 @@ async def _studio_route(req: HubRequest, llm_router: LLMRouter | None, model: st
         return decision if decision.assistant_message else _studio_help()
     if decision.tool != STUDIO_TOOL:
         return _studio_help("That isn't something the studio does.")
+    if decision.op == "batch":
+        steps = studio_batch_steps(decision.params)
+        if steps is None:
+            return _studio_help("I couldn't split that into studio steps.")
+        if len(steps) == 1:  # one step is just that op
+            only = dict(steps[0])
+            spec = lookup(STUDIO_TOOL, str(only.pop("op")))
+            if spec is None or spec.tool != STUDIO_TOOL:
+                return _studio_help("I couldn't split that into studio steps.")
+            decision = HubDecision(
+                kind=spec.kind,
+                tool=STUDIO_TOOL,
+                op=spec.op,
+                params=only,
+                assistant_message=decision.assistant_message,
+                confidence=decision.confidence,
+            )
+        else:
+            decision.params = {"steps": steps}
     if decision.kind == "task" and not decision.assistant_message:
         decision.assistant_message = _STUDIO_ACKS.get(str(decision.op), "Working on it.")
     logger.info("hub.route.studio_gemini", op=decision.op, msg_preview=req.message[:120])

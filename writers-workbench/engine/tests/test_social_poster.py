@@ -198,6 +198,32 @@ async def test_dry_run_sends_nothing_and_records_the_exact_request(db: FakeSupab
 
 
 @pytest.mark.asyncio
+async def test_a_dry_run_records_the_chosen_image_in_both_requests(db: FakeSupabase) -> None:
+    """Found on DEV 2026-11-03 (#363): the dry-run note said "would use the chosen image" while the
+    recorded requests carried no cover and ``mediaUrls: []`` — a post that would go out without it."""
+    img = "https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png"
+    _row(db, image_url=img, include_image=True)
+    net = _Net()
+    await poster.run_tick(db, net.transport(), now=NOW, mode="dry_run")
+    assert net.calls == []  # nothing fetched, nothing sent
+    d = _deliveries(db)
+    assert d["website"]["request"]["coverImage"] == {"sourceUrl": img, "fetchedWhenLive": True}
+    assert d["li_techahir"]["request"]["post"]["content"]["mediaUrls"] == [img]
+    assert "would use the chosen image" in d["website"]["detail"]
+
+
+@pytest.mark.asyncio
+async def test_a_dry_run_refuses_a_chosen_image_a_live_run_would_refuse(db: FakeSupabase) -> None:
+    _row(db, image_url="https://10.0.0.5/private.png", include_image=True)
+    net = _Net()
+    await poster.run_tick(db, net.transport(), now=NOW, mode="dry_run")
+    d = _deliveries(db)
+    assert "coverImage" not in d["website"]["request"]
+    assert d["li_techahir"]["request"]["post"]["content"]["mediaUrls"] == []
+    assert "would not be used" in d["li_techahir"]["detail"]
+
+
+@pytest.mark.asyncio
 async def test_live_posts_each_channel_once_and_builds_the_public_url(db: FakeSupabase) -> None:
     _row(db)
     net = _Net()

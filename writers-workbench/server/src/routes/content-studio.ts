@@ -401,7 +401,29 @@ export function assistantUnits(op: string | null | undefined, params: Record<str
     return countSelection(String(params?.numbers ?? ''));
   }
   if (op === 'revise') return String(params?.mode ?? 'revise') === 'undo' ? 0 : 1;
+  if (op === 'batch' && Array.isArray(params?.steps)) {
+    // Several studio ops from one message ("make #3 punchier and schedule it thursday"): each step's units.
+    return (params.steps as unknown[]).reduce<number>((sum, step) => {
+      if (!step || typeof step !== 'object') return sum;
+      const { op: stepOp, ...rest } = step as Record<string, unknown>;
+      return stepOp === 'batch' ? sum : sum + assistantUnits(String(stepOp ?? ''), rest);
+    }, 0);
+  }
   return 0;
+}
+
+/**
+ * The Review tab's posts, top to bottom (the order StudioReview lists them), for the assistant: "the
+ * second draft" is a position on that list, and the router can only resolve it to a #number if it sees it.
+ */
+async function reviewList(userId: string, editionId: string): Promise<Array<Record<string, unknown>>> {
+  const { data } = await getSupabaseAdmin().from('social_schedule_v2')
+    .select('display_number, title, state')
+    .eq('user_id', userId).eq('edition_id', editionId).in('state', STATUS_STATES.review!)
+    .order('display_number', { ascending: false }).limit(40);
+  return ((data ?? []) as Array<Record<string, unknown>>).map((p) => ({
+    display_number: p.display_number, title: String(p.title ?? '').slice(0, 100), state: p.state,
+  }));
 }
 
 contentStudioRouter.post('/:ed/assistant', validateBody(AssistantSchema), async (req: Request, res: Response) => {
@@ -418,7 +440,12 @@ contentStudioRouter.post('/:ed/assistant', validateBody(AssistantSchema), async 
       userId: req.userId!,
       // The conversation is the studio's own, per edition, so "#3" never resolves against the chat drawer's list.
       conversationId: body.conversation_id || `studio:${ed.edition_id}`,
-      context: { surface: 'content_studio', edition_id: ed.edition_id, ...(body.week_of ? { week_of: body.week_of } : {}) },
+      context: {
+        surface: 'content_studio',
+        edition_id: ed.edition_id,
+        studio_posts: await reviewList(req.userId!, ed.edition_id),
+        ...(body.week_of ? { week_of: body.week_of } : {}),
+      },
     });
     let charged = 0;
     if (hub.tool === 'studio' && hub.kind === 'queued' && chargeable(req)) {

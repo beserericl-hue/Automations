@@ -319,6 +319,7 @@ async def _ensure_story(
     markdown: str,
     source_name: str,
     source_url: str | None,
+    image_url: str | None = None,
 ) -> dict[str, Any] | None:
     """One content_ingestion_v2 story for this issue (written once; a rerun reuses it)."""
     from writer_engine.ingestion import keys, store
@@ -337,6 +338,8 @@ async def _ensure_story(
             authors=None,
             source_name=source_name or edition_id,
             source_url=source_url,
+            # The post's chosen image is the story's picture: the image gate offers it.
+            image_urls=[image_url] if image_url else None,
             markdown=markdown,
             html=_html(markdown),
             published_timestamp=datetime(d.year, d.month, d.day, 12, tzinfo=UTC).isoformat(),
@@ -415,6 +418,7 @@ async def take_selection(
                 markdown=_post_markdown(p, website),
                 source_name="TechAhir" if website else str(p.get("category") or "Roundup").title(),
                 source_url=website or p.get("source_url"),
+                image_url=str(p.get("image_url") or "") or None,
             )
         else:
             t = topics.get(str(i.get("radar_topic_id")))

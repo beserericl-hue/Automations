@@ -109,6 +109,7 @@ export const CREDIT_KEY_ALIASES: Record<string, string> = {
   'studio.update': 'content_action',
   'studio.schedule': 'content_action',
   'studio.issue': 'content_action',
+  'studio.batch': 'social_repurpose', // x the topics drafted + drafts revised among its steps (assistantUnits)
 };
 
 /** The credit key an operation name is charged under, or null when it has no entry at all. */

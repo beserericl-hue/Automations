@@ -185,11 +185,15 @@ async def generate(
     }
 
 
+_TEXT_FIELDS = ("title", "body_md", "linkedin_content", "seo_title", "meta_description", "category")
+
+
 def _previous(post: dict[str, Any]) -> dict[str, Any]:
-    return {
-        k: post.get(k)
-        for k in ("title", "body_md", "linkedin_content", "seo_title", "meta_description", "category")
-    }
+    """The version an undo goes back to: the text, and the humanizer record that describes THAT text
+    (a regenerate replaces it; without it, undo showed the redraft's "humanized" record on the old text)."""
+    prev = {k: post.get(k) for k in _TEXT_FIELDS}
+    prev["humanize"] = post.get("humanize")
+    return prev
 
 
 def _bookkeeping(post: dict[str, Any], what: str) -> dict[str, Any]:
@@ -275,6 +279,9 @@ async def revise(
         raise StudioError(
             "REVISE_FAILED", "The revised LinkedIn text is over 3,000 characters; the draft is unchanged"
         )
+    # The rewrite is the model's text, not the humanizer's: the old record would label it "humanized".
+    # It is kept in studio.previous, so an undo brings it back with the text it describes.
+    patch["humanize"] = None
     patch["studio"] = _bookkeeping(post, f"revise: {instruction}")
     row = await _save(client, ed, post, patch)
     return {
@@ -300,15 +307,10 @@ async def regenerate(
     if fresh is None:
         raise StudioError("REGENERATE_FAILED", f"Could not redraft #{post.get('display_number')}: {error}")
     await D.humanize_drafts([fresh])
-    patch = {
-        k: fresh.get(k)
-        for k in ("title", "body_md", "linkedin_content", "seo_title", "meta_description", "category")
-        if fresh.get(k) is not None
-    }
+    patch = {k: fresh.get(k) for k in _TEXT_FIELDS if fresh.get(k) is not None}
     patch["category"] = str(patch.get("category") or "INSIGHTS").upper()[:60]
     patch["studio"] = _bookkeeping(post, "regenerate")
-    if isinstance(fresh.get("humanize"), dict):
-        patch["humanize"] = fresh["humanize"]
+    patch["humanize"] = fresh["humanize"] if isinstance(fresh.get("humanize"), dict) else None
     row = await _save(client, ed, post, patch)
     return {
         "post": {"id": row.get("id"), "display_number": row.get("display_number"), "title": row.get("title")},
@@ -321,7 +323,9 @@ async def restore_previous(client: Any, ed: StudioEdition, post: dict[str, Any])
     prev = (post.get("studio") or {}).get("previous")
     if not isinstance(prev, dict):
         raise StudioError("NOTHING_TO_UNDO", f"#{post.get('display_number')} has no earlier version")
-    patch: dict[str, Any] = {k: v for k, v in prev.items() if v is not None}
+    patch: dict[str, Any] = {k: v for k, v in prev.items() if k in _TEXT_FIELDS and v is not None}
+    if "humanize" in prev:  # versions saved before the record was kept leave it alone
+        patch["humanize"] = prev["humanize"]
     patch["studio"] = _bookkeeping(post, "undo")
     row = await _save(client, ed, post, patch)
     return {

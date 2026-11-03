@@ -13,6 +13,7 @@ interface FakeSend {
   scheduled_send_at: string | null;
   status: string;
   metadata: Record<string, unknown>;
+  edition_id?: string | null;
 }
 
 interface FakeState {
@@ -35,10 +36,12 @@ function reset() {
 function buildChain(initialRows: () => FakeSend[], onResult: (rows: FakeSend[]) => { data: unknown; error: unknown }) {
   const filters: Record<string, unknown> = {};
   const notFilters: Record<string, unknown> = {};
+  const isFilters: Record<string, unknown> = {};
   const lte: Record<string, unknown> = {};
   const builder: Record<string, unknown> = {
     eq(col: string, val: unknown) { filters[col] = val; return builder; },
     neq(col: string, val: unknown) { notFilters[col] = val; return builder; },
+    is(col: string, val: unknown) { isFilters[col] = val; return builder; },
     lte(col: string, val: unknown) { lte[col] = val; return builder; },
     order() { return builder; },
     select() { return builder; },
@@ -49,6 +52,9 @@ function buildChain(initialRows: () => FakeSend[], onResult: (rows: FakeSend[]) 
         }
         for (const k of Object.keys(notFilters)) {
           if ((r as unknown as Record<string, unknown>)[k] === notFilters[k]) return false;
+        }
+        for (const k of Object.keys(isFilters)) {
+          if (((r as unknown as Record<string, unknown>)[k] ?? null) !== isFilters[k]) return false;
         }
         return true;
       });
@@ -222,6 +228,24 @@ describe('Newsletter sends save (S11)', () => {
       expect(state.rows).toHaveLength(1);
       expect(state.rows[0].subject).toBe('second draft');
     });
+  });
+
+  it('never overwrites an edition\'s issue of the same day (migration 051: one send per edition per day)', async () => {
+    state.rows.push({
+      id: 'edition-row', user_id: '+14105914612', send_date: '2026-04-25', subject: 'Edition issue',
+      preheader: null, html_body: '<p>e</p>', markdown_body: null, scheduled_send_at: null, status: 'sent',
+      metadata: {}, edition_id: 'wasteland-wire',
+    } as FakeSend);
+    await withServer(async (base) => {
+      const r = await fetch(`${base}/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Ingestion-Secret': TEST_SECRET },
+        body: JSON.stringify({ user_id: '+14105914612', send_date: '2026-04-25', subject: 'Legacy', html_body: '<p>l</p>' }),
+      });
+      expect(r.status).toBe(200);
+    });
+    expect(state.rows.find((r) => r.id === 'edition-row')?.subject).toBe('Edition issue');
+    expect(state.rows.map((r) => r.subject).sort()).toEqual(['Edition issue', 'Legacy']);
   });
 
   it('FK violation on bad user_id surfaces as 400', async () => {

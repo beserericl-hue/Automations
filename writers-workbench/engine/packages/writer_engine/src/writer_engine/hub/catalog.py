@@ -375,6 +375,17 @@ CATALOG: tuple[ToolSpec, ...] = (
         aliases=("studio_email",),
     ),
     ToolSpec(
+        "studio",
+        "batch",
+        "task",
+        intent="CONTENT STUDIO: TWO OR MORE of the studio actions above in one message, run in order "
+        "('make #3 punchier and schedule it thursday afternoon', 'approve #4 and email it to me'). "
+        "steps = a list of {op, ...that op's params}, each naming its posts by #number (resolve 'it' to "
+        "the post named earlier); at most 4 steps",
+        params=("steps",),
+        aliases=("studio_batch",),
+    ),
+    ToolSpec(
         "library",
         "email-content",
         "task",
