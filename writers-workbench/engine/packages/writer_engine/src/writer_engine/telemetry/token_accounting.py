@@ -245,6 +245,7 @@ def record(
     ``input_tokens`` is uncached input; ``cache_write`` is 5-minute cache writes and
     ``cache_write_1h`` 1-hour ones (Anthropic bills them at 1.25x / 2x input).
     """
+    provider = pricing.normalize_provider(provider)
     try:
         cost = pricing.token_cost(
             provider,
@@ -298,6 +299,7 @@ def record_units(
     ``credits`` is the provider's own credit count when it reports one. For token-priced non-chat
     calls (embeddings) pass ``input_tokens`` and the token price is used.
     """
+    provider = pricing.normalize_provider(provider)
     try:
         if cost is None:
             if input_tokens and pricing.price_entry(provider, model) and unit_type == "tokens":

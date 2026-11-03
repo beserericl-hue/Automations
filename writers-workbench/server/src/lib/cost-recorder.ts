@@ -19,8 +19,28 @@ import { PROVIDER_PRICES, type PriceEntry } from './provider-prices.js';
 
 export type CostSource = 'provider_reported' | 'computed' | 'estimated' | 'unpriced';
 
+/**
+ * Other names a provider has been recorded under. n8n's "Hub V2" and the engine before 2026-05 wrote
+ * Gemini calls as provider "google"; left as-is they group as a separate provider in the cost view and
+ * miss the price table. Same map as the engine's pricing.PROVIDER_ALIASES.
+ */
+export const PROVIDER_ALIASES: Readonly<Record<string, string>> = {
+  google: 'gemini',
+  'google-genai': 'gemini',
+  google_genai: 'gemini',
+  googleai: 'gemini',
+  'google-ai': 'gemini',
+  claude: 'anthropic',
+};
+
+/** The canonical provider name: lower-case, aliases ("google") mapped to "gemini" etc. */
+export function normalizeProvider(provider: string | null | undefined): string {
+  const key = (provider ?? '').trim().toLowerCase();
+  return PROVIDER_ALIASES[key] ?? key;
+}
+
 export function findPrice(provider: string, model: string): PriceEntry | undefined {
-  const p = provider.toLowerCase();
+  const p = normalizeProvider(provider);
   const m = model.trim();
   return PROVIDER_PRICES.entries.find(
     (e) => e.provider === p && (e.model === m || e.aliases.includes(m)),
@@ -141,6 +161,7 @@ export interface UsageRecord {
 
 /** The token_usage_v2 row for one call. Exported for tests. */
 export function buildUsageRow(r: UsageRecord): Record<string, unknown> {
+  const provider = normalizeProvider(r.provider);
   const t = r.tokens ?? { input: 0, output: 0 };
   const cost = r.cost ?? computeTokenCost(r.provider, r.model, t);
   const cacheRead = t.cacheRead ?? 0;
@@ -150,7 +171,7 @@ export function buildUsageRow(r: UsageRecord): Record<string, unknown> {
     user_id: r.userId ?? null,
     workflow_name: r.operation,
     operation: r.operation,
-    provider: r.provider,
+    provider,
     model: r.model,
     input_tokens: t.input,
     output_tokens: t.output,
@@ -169,7 +190,7 @@ export function buildUsageRow(r: UsageRecord): Record<string, unknown> {
     chapter_number: r.chapterNumber ?? null,
     run_id: r.runId ?? null,
     request_id: r.requestId ?? null,
-    metadata: { ...(r.metadata ?? {}), provider: r.provider, project_id: r.projectId ?? null },
+    metadata: { ...(r.metadata ?? {}), provider, project_id: r.projectId ?? null },
   };
 }
 
@@ -185,7 +206,7 @@ export async function settleUsage(provider: string, requestId: string, r: UsageR
     const { data, error } = await getSupabaseAdmin()
       .from('token_usage_v2')
       .select('id, metadata, user_id, project_id')
-      .eq('provider', provider)
+      .eq('provider', normalizeProvider(provider))
       .eq('request_id', requestId)
       .limit(1);
     if (error) {

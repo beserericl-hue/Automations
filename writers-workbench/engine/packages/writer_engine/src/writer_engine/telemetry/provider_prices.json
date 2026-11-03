@@ -35,6 +35,15 @@
       "checked": "2026-11-02"
     },
     {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "aliases": ["claude-sonnet-4-0"],
+      "per_mtok": { "input": 3.0, "output": 15.0, "cache_read": 0.3, "cache_write_5m": 3.75, "cache_write_1h": 6.0 },
+      "note": "Claude Sonnet 4 (retired on the Claude API). Kept so the n8n-era and early-engine rows that used it can be priced (migration 047).",
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "checked": "2026-11-02"
+    },
+    {
       "provider": "gemini",
       "model": "gemini-2.5-flash",
       "aliases": [],

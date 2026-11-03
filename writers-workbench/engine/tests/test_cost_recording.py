@@ -131,6 +131,19 @@ async def test_a_call_with_no_context_is_written_as_unattributed(sink: list[dict
     assert sink[0]["operation"] == "unattributed.gemini" and sink[0]["user_id"] is None
 
 
+async def test_provider_google_is_recorded_and_priced_as_gemini(sink: list[dict[str, Any]]) -> None:
+    """n8n and the early engine wrote Gemini calls as provider "google"; that must not recur."""
+    ta.begin(user_id="u1", workflow="hub.route.chat")
+    ta.record(provider="Google", model="gemini-2.5-pro", input_tokens=100_000, output_tokens=0)
+    ta.record_units(
+        provider="google", model="gemini-2.5-flash", units=10, unit_type="tokens", input_tokens=10
+    )
+    await ta.flush()
+    assert [r["provider"] for r in sink] == ["gemini", "gemini"]
+    assert all(r["metadata"]["provider"] == "gemini" for r in sink)
+    assert sink[0]["cost_usd"] == 0.125 and sink[0]["cost_source"] == pricing.COST_COMPUTED
+
+
 async def test_unknown_model_is_written_flagged_unpriced(sink: list[dict[str, Any]]) -> None:
     ta.begin(user_id="u1", workflow="chapter.write")
     ta.record(provider="anthropic", model="claude-next", input_tokens=10, output_tokens=10)
