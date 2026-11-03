@@ -491,17 +491,21 @@ class NewsletterSagaDriver:
         # What the gate offered per story: its image options plus the image the section already had.
         # A choice must be one of those (or "" for no image): the chosen URL goes into every
         # subscriber's email, so an arbitrary URL from the resolve call is never accepted.
-        offered: dict[str, set[str]] = {}
-        for opts in st.get("image_options_by_story") or []:
-            offered.setdefault(str(opts.get("story_title") or ""), set()).update(
-                str(u) for u in (opts.get("options") or []) if u
-            )
-        for seg in segments:
-            title = seg.get("story_title")
-            if title not in chosen:
+        #
+        # Options and sections are built in the same loop (_stage_writing_segments), so the i-th
+        # option set belongs to the i-th section. Match by POSITION: the section writer rewrites
+        # story_title ("Story 1" becomes "Send Gate Check: What We Learned"), so a choice keyed by
+        # the picked story's title never matched its section and was silently dropped (found
+        # verifying live on DEV, 2026-11-03). The section's own title is still accepted as a key.
+        options = list(st.get("image_options_by_story") or [])
+        for i, seg in enumerate(segments):
+            opts = options[i] if i < len(options) else {}
+            keys = [str(opts.get("story_title") or ""), str(seg.get("story_title") or "")]
+            title = next((k for k in keys if k and k in chosen), None)
+            if title is None:
                 continue
             pick = str(chosen[title] or "")
-            allowed = offered.get(str(title), set()) | (
+            allowed = {str(u) for u in (opts.get("options") or []) if u} | (
                 {str(seg["chosen_image_url"])} if seg.get("chosen_image_url") else set()
             )
             if pick == "":

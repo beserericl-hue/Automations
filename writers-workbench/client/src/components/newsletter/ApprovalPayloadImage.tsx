@@ -32,9 +32,11 @@ interface Props {
 export function defaultImageChoices(payload: Record<string, unknown>): Record<string, string> {
   const p = payload as ImagePayload;
   const out: Record<string, string> = {};
-  for (const s of p.image_options_by_story ?? []) {
+  // Options and sections pair by POSITION (the engine builds them in one loop); the section writer
+  // rewrites story_title, so matching by title showed "no image" for a section that had one.
+  for (const [i, s] of (p.image_options_by_story ?? []).entries()) {
     if (!s.story_title) continue;
-    const seg = (p.segments ?? []).find((x) => x.story_title === s.story_title);
+    const seg = (p.segments ?? [])[i] ?? (p.segments ?? []).find((x) => x.story_title === s.story_title);
     out[s.story_title] = seg?.chosen_image_url ?? '';
   }
   return out;

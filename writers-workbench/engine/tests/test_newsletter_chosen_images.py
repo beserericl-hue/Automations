@@ -28,7 +28,9 @@ def _clear() -> None:
     _in_memory.clear()
 
 
-async def _at_image_gate(monkeypatch: pytest.MonkeyPatch) -> tuple[Any, Any, Any, list[dict[str, Any]]]:
+async def _at_image_gate(
+    monkeypatch: pytest.MonkeyPatch, *, section_title: str | None = None
+) -> tuple[Any, Any, Any, list[dict[str, Any]]]:
     async def selection(cfg: dict[str, Any], execution_id: Any) -> list[dict[str, Any]]:
         return [{"id": "ci1", "key": "k1", "title": "Story one", "image_urls": [A, B, C], "_summary": "a"}]
 
@@ -50,7 +52,7 @@ async def _at_image_gate(monkeypatch: pytest.MonkeyPatch) -> tuple[Any, Any, Any
         elif name == "segment":
             # The section writer picked the first option itself.
             out = {
-                "story_title": payload["story"]["title"],
+                "story_title": section_title or payload["story"]["title"],
                 "newsletter_section_content": "x",
                 "chosen_image_url": A,
             }
@@ -98,6 +100,28 @@ async def test_a_non_default_choice_is_the_image_in_the_assembled_email(
     await _approve(driver, eid, {"Story one": C})
     assert assembled[0]["segments"][0]["chosen_image_url"] == C
     assert (await repo.load(eid)).stage is Stage.AWAITING_SEND_APPROVAL
+
+
+@pytest.mark.asyncio
+async def test_a_choice_reaches_a_section_whose_writer_rewrote_the_title(
+    monkeypatch: pytest.MonkeyPatch, fake_redis: Any
+) -> None:
+    """Found verifying live on DEV (run d75ad9db): the section writer titled "Story 1" as "Send Gate
+    Check: What We Learned", so the reviewer's pick, keyed by the gate's story title, was dropped and
+    the email kept the section's own image. Options and sections pair by position."""
+    driver, _repo, eid, assembled = await _at_image_gate(monkeypatch, section_title="A Rewritten Headline")
+    await _approve(driver, eid, {"Story one": C})
+    assert assembled[0]["segments"][0]["story_title"] == "A Rewritten Headline"
+    assert assembled[0]["segments"][0]["chosen_image_url"] == C
+
+
+@pytest.mark.asyncio
+async def test_a_choice_keyed_by_the_sections_own_title_still_applies(
+    monkeypatch: pytest.MonkeyPatch, fake_redis: Any
+) -> None:
+    driver, _repo, eid, assembled = await _at_image_gate(monkeypatch, section_title="A Rewritten Headline")
+    await _approve(driver, eid, {"A Rewritten Headline": B})
+    assert assembled[0]["segments"][0]["chosen_image_url"] == B
 
 
 @pytest.mark.asyncio
