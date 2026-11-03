@@ -93,7 +93,11 @@ test.describe('Credit pricing on DEV (non-admin user)', () => {
     let before = await balanceOf(user.userId);
     const plain = await userApi(user, 'POST', '/api/chat/proxy', { user_message_request: 'In one sentence, what is a story arc?', user_id: user.userId });
     expect(plain.status, JSON.stringify(plain.json).slice(0, 300)).toBe(200);
-    expect(plain.json.chargedOps).toEqual(['chat_generic']);
+    // The router may answer directly (chat_generic) or look something up first (a free library read,
+    // seen on DEV: library.retrieve). Either way the turn costs what its op costs, which is the chat rate.
+    const plainOps = plain.json.chargedOps as string[];
+    expect(plainOps.every((o) => o === 'chat_generic' || /^library\.|^story_bible\.list$/.test(o)), `routed to ${plainOps.join(',')}`).toBe(true);
+    expect(plain.json.creditsCharged).toBe(plainOps.reduce((n, o) => n + price(o), 0));
     expect(plain.json.creditsCharged).toBe(price('chat_generic'));
     expect(await balanceOf(user.userId)).toBe(before - price('chat_generic'));
 

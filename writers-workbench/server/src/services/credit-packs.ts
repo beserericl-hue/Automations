@@ -363,8 +363,22 @@ async function noteEvent(userId: string, event: string, extra: Record<string, un
 }
 
 /** Pause after a failed off-session charge. Never retried automatically; the user is told. */
-export async function pauseAutoRecharge(userId: string, reason: string, notify?: (userId: string, reason: string) => Promise<void>): Promise<void> {
-  await getSupabaseAdmin().from('billing_settings_v2').update({
+/**
+ * The sentence the user sees for a failed off-session charge (banner + email). Stripe's own message
+ * for authentication_required is written for developers ("ask them to return to your application").
+ */
+export function autoRechargeFailureReason(e: { code?: string | null; decline_code?: string | null; message?: string | null }): string {
+  if (e.code === 'authentication_required') return 'Your bank asked to confirm the payment (authentication required)';
+  return `The card was declined${e.decline_code ? ` (${e.decline_code})` : ''}: ${e.message ?? 'payment failed'}`;
+}
+
+/**
+ * Pause after a failed off-session charge. Never retried automatically; the user is told ONCE: the
+ * synchronous decline and Stripe's payment_intent.payment_failed both report the same failure, and
+ * only the first to pause records its reason and sends the email. Returns whether this call paused it.
+ */
+export async function pauseAutoRecharge(userId: string, reason: string, notify?: (userId: string, reason: string) => Promise<void>): Promise<boolean> {
+  const { data } = await getSupabaseAdmin().from('billing_settings_v2').update({
     auto_recharge_paused: true,
     auto_recharge_paused_reason: reason.slice(0, 500),
     auto_recharge_paused_at: new Date().toISOString(),
@@ -372,9 +386,11 @@ export async function pauseAutoRecharge(userId: string, reason: string, notify?:
     auto_recharge_claim_pi: null,
     auto_recharge_last_event: `Paused: ${reason}`.slice(0, 500),
     auto_recharge_last_event_at: new Date().toISOString(),
-  }).eq('user_id', userId);
+  }).eq('user_id', userId).eq('auto_recharge_paused', false).select('user_id');
+  if (!data || data.length === 0) return false; // already paused (and already told)
   logger.warn({ userId, reason }, 'billing: auto-recharge paused');
   if (notify) await notify(userId, reason).catch((err) => logger.warn({ err }, 'billing: auto-recharge pause email not sent'));
+  return true;
 }
 
 /** The webhook granted (or Stripe failed) the recharge: release the claim so the next crossing can fire. */
@@ -461,10 +477,7 @@ export async function maybeAutoRecharge(userId: string, balance: number): Promis
       return pi.status;
     } catch (err) {
       const e = err as { type?: string; code?: string; message?: string; decline_code?: string };
-      const reason = e.code === 'authentication_required'
-        ? 'Your bank asked to confirm the payment (authentication required)'
-        : `The card was declined${e.decline_code ? ` (${e.decline_code})` : ''}: ${e.message ?? 'payment failed'}`;
-      await pauseAutoRecharge(userId, reason, pauseNotifier);
+      await pauseAutoRecharge(userId, autoRechargeFailureReason(e), pauseNotifier);
       return e.code === 'authentication_required' ? 'requires-action' : 'declined';
     }
   } catch (err) {
