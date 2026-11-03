@@ -15,6 +15,7 @@ import {
   isVerbatim,
   lengthProblems,
   limitOf,
+  personalFactProblems,
   renderBook,
   runAssist,
   unknownNames,
@@ -149,6 +150,42 @@ describe('the honesty and length checks', () => {
     expect(text).not.toContain('LATE Ch 0');
     expect(text).toContain('Background: Restored Victorian clocks.');
     expect(text).not.toContain('Lives:');
+  });
+});
+
+describe('personal facts about the author the profile does not give (live DEV outputs, 2026-11-03)', () => {
+  const author = facts().author;
+  it.each([
+    ['acknowledgements', 'To [agent\'s name], for believing a retired mechanical engineer had a novel in him.', /"him"/],
+    ['acknowledgements', 'Finally, to [family members or loved ones], for winding me up each morning and letting me tick away at the desk.', /routine or habits/],
+    ['dedication', 'For [name],\nwho taught me that the gentlest hands keep the truest time.', /did or believed/],
+    ['dedication', 'For [name], with all my love, for every hour we have shared,\nand for everyone who was ever treated as a cog.', /relationship/],
+    ['why_this_book', 'My late wife gave me the idea over coffee.', /family|routine/],
+  ] as const)('%s: flags %j', (field, text, expected) => {
+    expect(personalFactProblems(field, text, author, ['Mary Kellerton']).join(' ')).toMatch(expected);
+  });
+
+  it('allows what the profile states, placeholders, and a character\'s pronoun', () => {
+    expect(personalFactProblems('dedication', 'For [name, and what they taught you],\nand for everyone treated as a cog.', author)).toEqual([]);
+    expect(personalFactProblems('acknowledgements', 'Mary Kellerton and her fellow workers stand on their courage.', author, ['Mary Kellerton'])).toEqual([]);
+    expect(personalFactProblems('author_bio', 'He restored clocks.', { ...author, pronouns: 'he/him' })).toEqual([]);
+    expect(personalFactProblems('why_this_book', 'I restored clocks every morning.', { ...author, personal: 'Restores clocks every morning before breakfast.' })).toEqual([]);
+    // The author's note is about the book; its pronouns are the characters'.
+    expect(personalFactProblems('authors_note', 'He taught me nothing.', author)).toEqual([]);
+  });
+
+  it('a "warmer and more personal" dedication that describes the dedicatee gets one corrective pass naming it', async () => {
+    const call = vi
+      .fn<Caller>()
+      .mockResolvedValueOnce(reply('For [name], who taught me that the gentlest hands can mend what others call broken.'))
+      .mockResolvedValueOnce(reply('For [name], [a line about what they mean to you].'));
+    const r = await runAssist({ field: 'dedication', mode: 'revise', current: 'For [name].', instruction: 'make it warmer and more personal' }, facts(), { userId: 'u1' }, call);
+    expect(call).toHaveBeenCalledTimes(2);
+    expect(call.mock.calls[0][0]).toContain('Never describe the person or the author\'s relationship with them');
+    expect(call.mock.calls[0][0]).toContain('not even whether they exist');
+    expect(call.mock.calls[1][0]).toContain('"taught me"');
+    expect(r.value).toBe('For [name], [a line about what they mean to you].');
+    expect(r.warnings.join(' ')).not.toMatch(/profile does not say/);
   });
 });
 
