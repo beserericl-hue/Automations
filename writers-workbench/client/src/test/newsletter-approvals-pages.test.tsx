@@ -185,3 +185,82 @@ describe('ApprovalDetail', () => {
     expect(navigateMock).toHaveBeenCalledWith('/newsletter/approvals');
   });
 });
+
+// ---------------------------------------------------------------------------
+// The final "Send to subscribers" gate (2026-11-03)
+// ---------------------------------------------------------------------------
+describe('ApprovalDetail — final send gate', () => {
+  const TOKEN = 'tok-detail-aaaaaaaaaaaaaaaaaaaaaaaa';
+  const sendRow = {
+    id: '1', token: TOKEN, execution_id: 'exec-9', stage: 'send',
+    payload: { send_id: 's1', subject: 'Issue seven', issue_number: 7, subscriber_count: 0 },
+    created_at: '', expires_at: new Date(Date.now() + 3600_000).toISOString(),
+  };
+
+  function stub(calls: Array<{ path: string; body?: string }>) {
+    apiFetchImplRef.current = (path: string, options?: unknown) => {
+      const o = options as { method?: string; body?: string } | undefined;
+      if (path.startsWith('/api/newsletter/approvals/open?token=')) return { success: true, approvals: [sendRow] };
+      if (path === `/api/newsletter/approvals/${TOKEN}/preview`) return { success: true, html: '<h1>Rendered issue</h1>', rendered: true };
+      if (path === `/api/newsletter/approvals/${TOKEN}/test-copies`) return { success: true, data: [] };
+      if (o?.method === 'POST') {
+        calls.push({ path, body: o.body });
+        if (path.endsWith('/test-copy')) {
+          return { success: true, data: { to: 'eric@example.com', subject: '[TEST] Issue seven', message_id: 'm-1', sent_at: '', message: 'Test copy sent to eric@example.com. Subscribers have not been sent anything.' } };
+        }
+        return { success: true, resumed: true };
+      }
+      return Promise.reject(new Error('unstubbed: ' + path));
+    };
+  }
+
+  it('shows the send gate with the subscriber count, the rendered issue and a test-copy button', async () => {
+    stub([]);
+    const ApprovalDetail = (await import('../components/newsletter/ApprovalDetail')).default;
+    renderWithProviders(<ApprovalDetail />);
+    expect(await screen.findByRole('heading', { name: /Send to subscribers/i })).toBeInTheDocument();
+    expect(screen.getByText(/Nothing has been sent yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/no active subscribers/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Send me a test copy/i })).toBeInTheDocument();
+    expect(await screen.findByText(/exactly as subscribers will receive it/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Send to 0 subscribers/i })).toBeInTheDocument();
+    expect(screen.queryByText(/^Revise$/)).not.toBeInTheDocument();
+  });
+
+  it('"Send me a test copy" posts to the test-copy route and does not resolve the gate', async () => {
+    const calls: Array<{ path: string; body?: string }> = [];
+    stub(calls);
+    const ApprovalDetail = (await import('../components/newsletter/ApprovalDetail')).default;
+    renderWithProviders(<ApprovalDetail />);
+    fireEvent.click(await screen.findByRole('button', { name: /Send me a test copy/i }));
+    expect(await screen.findByText(/Test copy sent to eric@example.com/i)).toBeInTheDocument();
+    expect(calls.map((c) => c.path)).toEqual([`/api/newsletter/approvals/${TOKEN}/test-copy`]);
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it('"Don\'t send" resolves the gate with reject', async () => {
+    const calls: Array<{ path: string; body?: string }> = [];
+    stub(calls);
+    const ApprovalDetail = (await import('../components/newsletter/ApprovalDetail')).default;
+    renderWithProviders(<ApprovalDetail />);
+    fireEvent.click(await screen.findByLabelText(/Don.t send/i));
+    fireEvent.click(screen.getByRole('button', { name: /Cancel this issue/i }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0].path).toBe(`/api/newsletter/approvals/${TOKEN}/resolve`);
+    expect(JSON.parse(calls[0].body ?? '{}')).toMatchObject({ decision: 'reject' });
+  });
+});
+
+describe('StageStrip — send gate', () => {
+  it('shows a Send approval phase awaiting while the issue waits, after Saved', async () => {
+    const StageStrip = (await import('../components/newsletter/StageStrip')).default;
+    renderWithProviders(<StageStrip currentStage="awaiting_send_approval" />);
+    const saved = document.querySelector('[data-phase="saved"]');
+    const send = document.querySelector('[data-phase="send_approval"]');
+    const sent = document.querySelector('[data-phase="sent"]');
+    expect(saved?.getAttribute('data-state')).toBe('done');
+    expect(send?.getAttribute('data-state')).toBe('active');
+    expect(send?.textContent).toContain('⌛');
+    expect(sent?.getAttribute('data-state')).toBe('pending');
+  });
+});

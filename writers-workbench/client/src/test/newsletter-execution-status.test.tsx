@@ -2,7 +2,7 @@
  * S7 — ExecutionStatus components.
  *
  * Six unit tests per the sprint doc verification table:
- *   1. StageStrip renders 7 pills, current pill has aria-current="step"
+ *   1. StageStrip renders 9 pills, current pill has aria-current="step"
  *   2. LiveLog auto-scrolls when at bottom; does not when scrolled up
  *   3. ApprovalPayloadStories with 0 stories → empty state; with 7 → 7 cards
  *   4. ApprovalPayloadSubject reasoning collapsed by default; expands on click
@@ -45,10 +45,10 @@ beforeEach(() => {
 // 1. StageStrip
 // ---------------------------------------------------------------------------
 describe('StageStrip', () => {
-  it('renders 7 pills with the current one carrying aria-current="step"', () => {
+  it('renders 9 pills (7 + the final Send approval and Sent, 2026-11-03) with the current one carrying aria-current="step"', () => {
     renderWithProviders(<StageStrip currentStage="writing_segment" />);
     const pills = screen.getAllByRole('listitem');
-    expect(pills).toHaveLength(7);
+    expect(pills).toHaveLength(9);
     const current = pills.find((el) => el.getAttribute('aria-current') === 'step');
     expect(current).toBeTruthy();
     expect(current?.getAttribute('data-phase')).toBe('writing');

@@ -37,6 +37,11 @@ export type NewsletterStage =
   | 'writing_segment'
   | 'segments_done'
   | 'saved'
+  // The final gate (2026-11-03): the saved issue waits for "Send to subscribers".
+  | 'awaiting_send_approval'
+  | 'sending'
+  | 'sent'
+  | 'cancelled'
   | 'error';
 
 /** Ordered list used by progress strips in S7. `error` is an overlay, not a step. */
@@ -50,6 +55,9 @@ export const NEWSLETTER_STAGE_ORDER: readonly Exclude<NewsletterStage, 'error'>[
   'writing_segment',
   'segments_done',
   'saved',
+  'awaiting_send_approval',
+  'sending',
+  'sent',
 ] as const;
 
 // ---------------------------------------------------------------------------

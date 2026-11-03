@@ -147,6 +147,8 @@ export const studioApi = {
   email: (ed: string, id: string) => apiFetch<{ data: { message: string } }>(`/api/studio/${encodeURIComponent(ed)}/posts/${id}/email`, { method: 'POST' }),
   emailDigest: (ed: string, week_of?: string | null) =>
     apiFetch<{ data: { message: string } }>(`/api/studio/${encodeURIComponent(ed)}/digest/email`, { method: 'POST', body: JSON.stringify(week_of ? { week_of } : {}) }),
+  digestEmails: (ed: string) =>
+    apiFetch<{ data: SlateEmailRecord[] }>(`/api/studio/${encodeURIComponent(ed)}/digest/emails`),
   action: (ed: string, ids: string[], action: string) =>
     apiFetch<{ data: { message: string } }>(`/api/studio/${encodeURIComponent(ed)}/posts/actions`, { method: 'POST', body: JSON.stringify({ ids, action }) }),
   schedule: (ed: string, body: { ids: string[]; mode: 'next' | 'slot' | 'at' | 'now'; day?: string; slot?: string; at?: string; channels?: string[] }) =>
@@ -161,6 +163,16 @@ export const studioApi = {
   feeds: (ed: string) => apiFetch<{ data: { items: string; digest: string; enabled: boolean } }>(`/api/studio/${encodeURIComponent(ed)}/feeds`),
   rotateFeeds: (ed: string) => apiFetch<{ data: { items: string; digest: string; enabled: boolean } }>(`/api/studio/${encodeURIComponent(ed)}/feeds/rotate`, { method: 'POST' }),
 };
+
+/** One "Email me the week's slate" send (newsletter_owner_emails_v2, migration 052). */
+export interface SlateEmailRecord {
+  id: string;
+  to_email: string;
+  subject: string;
+  postal_message_id: string | null;
+  sent_at: string;
+  week_of: string | null;
+}
 
 export interface JobOutcome {
   status: 'complete' | 'error';

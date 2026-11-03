@@ -99,4 +99,22 @@ describe('ContentStudio', () => {
     fireEvent.click(screen.getByTestId('assistant-send'));
     expect(await screen.findByTestId('assistant-reply')).toHaveTextContent('#7 | not scheduled | draft | A talk');
   });
+
+  it('shows the record of the last slate email (to, week, Postal id) and says nothing is sent before the send step', async () => {
+    const base = vi.mocked(apiFetch).getMockImplementation()!;
+    vi.mocked(apiFetch).mockImplementation(async (path: string, opts?: RequestInit) => {
+      if (path === '/api/studio/ai-dev-roundup/digest/emails') {
+        return { data: [{ id: 'e1', to_email: 'eric@example.com', subject: 'S', postal_message_id: 'postal-77', sent_at: '2026-11-03T18:00:00Z', week_of: '2026-11-02' }] };
+      }
+      if (path === '/api/studio/ai-dev-roundup/issue') return { data: { selection_id: null, items: [], last_issue: null } };
+      if (path === '/api/studio/ai-dev-roundup/feeds') return { data: { items: 'https://f/items.xml', digest: 'https://f/digest.xml', enabled: true } };
+      return base(path, opts);
+    });
+    render('/newsletter/studio/ai-dev-roundup');
+    fireEvent.click(await screen.findByTestId('studio-tab-issue'));
+    const last = await screen.findByTestId('slate-email-last');
+    expect(last).toHaveTextContent('week of 2026-11-02 to eric@example.com');
+    expect(last).toHaveTextContent('postal-77');
+    expect(screen.getByText(/Nothing reaches subscribers until you approve the final/i)).toBeInTheDocument();
+  });
 });

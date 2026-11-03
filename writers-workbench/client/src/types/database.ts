@@ -426,7 +426,8 @@ export interface ContentIngestion {
   deleted_at: string | null;
 }
 
-export type NewsletterApprovalStage = 'stories' | 'subject_line' | 'image';
+/** 'send' is the final "Send to subscribers" gate (migration 052). */
+export type NewsletterApprovalStage = 'stories' | 'subject_line' | 'image' | 'send';
 export type NewsletterApprovalDecision = 'approve' | 'revise';
 
 export interface NewsletterApproval {

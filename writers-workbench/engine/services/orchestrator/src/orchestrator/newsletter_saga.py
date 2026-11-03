@@ -27,6 +27,7 @@ from uuid import UUID, uuid4
 from writer_engine.config import get_settings
 from writer_engine.merge_tags import fill_merge_tags
 from writer_engine.newsletter_issue import peek_issue_number, saved_issue_number
+from writer_engine.newsletter_send import count_active_subscribers, mark_send_cancelled
 from writer_engine.schemas import Stage, StepOutput, StepStatus
 from writer_engine.schemas.newsletter import (
     AssembledNewsletter,
@@ -87,13 +88,16 @@ PAUSE_STAGES = {
     Stage.AWAITING_STORIES_APPROVAL,
     Stage.AWAITING_SUBJECT_APPROVAL,
     Stage.AWAITING_IMAGE_APPROVAL,
+    # The final gate: the issue is rendered and saved, and nothing reaches a subscriber until a
+    # person approves "Send to subscribers" (newsletter_send).
+    Stage.AWAITING_SEND_APPROVAL,
 }
-TERMINAL_STAGES = {Stage.SENT, Stage.SCHEDULED, Stage.SKIPPED_NO_CONTENT, Stage.ERROR}
+TERMINAL_STAGES = {Stage.SENT, Stage.SCHEDULED, Stage.SKIPPED_NO_CONTENT, Stage.CANCELLED, Stage.ERROR}
 
 
 class SagaResult(str, Enum):
     PAUSED = "paused"  # waiting on a HITL gate
-    DONE = "done"  # reached SENT/SCHEDULED/SKIPPED_NO_CONTENT
+    DONE = "done"  # reached SENT/SCHEDULED/SKIPPED_NO_CONTENT/CANCELLED
     ERROR = "error"
 
 
@@ -627,6 +631,45 @@ class NewsletterSagaDriver:
         return Stage.SAVED
 
     async def _stage_saved(self, execution_id: UUID, st: dict[str, Any]) -> Stage | None:
+        """Open the final "Send to subscribers" gate. Approving the images no longer sends.
+
+        The rendered issue is saved; the gate shows it (the Workbench previews the saved send row's
+        HTML) with the number of active subscribers it will reach, and offers a test copy to the
+        owner. Every run pauses here, cron-started ones included: the durable saga has no
+        auto-approval, so a scheduled edition waits for a person exactly like a manual one.
+        """
+        cfg = st["cfg"]
+        subj = SubjectLineProposal.model_validate(st["subject_proposal"])
+        send_row = st.get("send_row") or {}
+        edition_id = str(cfg.get("edition_id") or "")
+        subscribers = await count_active_subscribers(edition_id)
+        gate = await create_approval(
+            execution_id=execution_id,
+            stage="awaiting_send_approval",
+            payload={
+                "send_id": send_row.get("id"),
+                "edition_id": edition_id,
+                "send_date": str(cfg.get("send_date") or ""),
+                "subject": subj.subject_line,
+                "pre_header_text": subj.pre_header_text,
+                "issue_number": saved_issue_number(send_row),
+                "subscriber_count": subscribers,
+                "permalink_url": st.get("permalink_placeholder") or "",
+                "test_copy_available": True,
+            },
+            user_id=cfg.get("user_id") or None,
+            edition_id=edition_id or None,
+        )
+        who = "subscriber count unknown" if subscribers is None else f"{subscribers} active subscriber(s)"
+        await self._advance(
+            execution_id,
+            Stage.AWAITING_SEND_APPROVAL,
+            f"awaiting send approval ({who})",
+            patch={"send_gate_token": gate.token, "subscriber_count": subscribers},
+        )
+        return None
+
+    async def _stage_send_approved(self, execution_id: UUID, st: dict[str, Any]) -> Stage | None:
         await self._advance(execution_id, Stage.SENDING, "delivering to subscribers + publishing permalink")
         return Stage.SENDING
 
@@ -656,6 +699,82 @@ class NewsletterSagaDriver:
             patch={"delivery": delivery.model_dump(mode="json")},
         )
         return None
+
+    # ---------- the owner's test copy ----------
+
+    async def send_test_copy(self, execution_id: UUID, *, user_id: str) -> dict[str, Any]:
+        """Mail the rendered issue to its owner only, with "[TEST]" in the subject, and record it.
+
+        Allowed while the issue waits at the final gate. ``user_id`` must be the edition owner the
+        run belongs to (the Workbench passes the session user); the address is that user's own
+        ``users_v2.email``, never a caller-supplied one. Raises :class:`OwnerCopyError`.
+        """
+        from writer_engine.newsletter_send import (
+            MAX_TEST_COPIES_PER_ISSUE,
+            OwnerCopyError,
+            count_test_copies,
+            owner_email,
+            record_owner_email,
+        )
+
+        try:
+            state = await self._repo.load(execution_id)
+        except KeyError as exc:
+            raise OwnerCopyError("NOT_FOUND", "newsletter run not found") from exc
+        st = state.state
+        cfg = st.get("cfg") or {}
+        owner = str(cfg.get("user_id") or "")
+        if not user_id or user_id != owner:
+            raise OwnerCopyError("FORBIDDEN", "only the edition owner can send a test copy")
+        if state.stage is not Stage.AWAITING_SEND_APPROVAL or not st.get("rendered_html"):
+            raise OwnerCopyError(
+                "NOT_READY", "a test copy is available once the issue is rendered and waiting to be sent"
+            )
+        if await count_test_copies(str(execution_id)) >= MAX_TEST_COPIES_PER_ISSUE:
+            raise OwnerCopyError(
+                "LIMIT", f"this issue has already sent {MAX_TEST_COPIES_PER_ISSUE} test copies"
+            )
+        to = await owner_email(owner)
+        if not to:
+            raise OwnerCopyError("NO_RECIPIENT", "there is no email address on your account")
+        subj = SubjectLineProposal.model_validate(st["subject_proposal"])
+        out = await self._run_step(
+            st,
+            _step("deliver"),
+            execution_id=execution_id,
+            payload={
+                "test_recipient": to,
+                "html_body": st.get("rendered_html", ""),
+                "subject": subj.subject_line,
+                "permalink_url": st.get("permalink_placeholder", ""),
+            },
+            timeout_s=60.0,
+        )
+        if out.status is StepStatus.ERROR or not out.payload.get("test_copy"):
+            raise OwnerCopyError("SEND_FAILED", f"the test copy was not sent: {out.error}")
+        send_row = st.get("send_row") or {}
+        record = await record_owner_email(
+            {
+                "user_id": owner,
+                "edition_id": str(cfg.get("edition_id") or "") or None,
+                "kind": "test_copy",
+                "to_email": to,
+                "subject": out.payload.get("subject"),
+                "postal_message_id": out.payload.get("message_id"),
+                "execution_id": str(execution_id),
+                "send_id": send_row.get("id") or None,
+                "stage": "send",
+            }
+        )
+        await emit_progress(execution_id, state.stage, message=f"test copy sent to {to}")
+        return {
+            "to": to,
+            "subject": out.payload.get("subject"),
+            "message_id": out.payload.get("message_id"),
+            "sent_at": (record or {}).get("sent_at"),
+            "record_id": (record or {}).get("id"),
+            "recorded": record is not None,
+        }
 
     # ---------- helpers ----------
 
@@ -760,6 +879,27 @@ class NewsletterSagaDriver:
                 )
             else:
                 await self._advance(execution_id, Stage.ERROR, "images rejected")
+        elif gate_stage == "awaiting_send_approval":
+            if state.stage is not Stage.AWAITING_SEND_APPROVAL:
+                # A decision for a gate the saga has already left (a replayed resolve) must never
+                # start a second delivery or cancel a sent issue.
+                logger.warning(
+                    "saga.send_decision_ignored", execution_id=str(execution_id), stage=state.stage.value
+                )
+                return
+            if decision is ApprovalDecision.APPROVE:
+                await self._advance(execution_id, Stage.SEND_APPROVED, "send to subscribers approved")
+            else:
+                # Declined (reject, or a "revise" from a surface that only knows approve/revise):
+                # the issue is kept as a cancelled record and NEVER delivered.
+                send_id = str((state.state.get("send_row") or {}).get("id") or "")
+                await mark_send_cancelled(send_id)
+                await self._advance(
+                    execution_id,
+                    Stage.CANCELLED,
+                    "send cancelled by the owner; nothing was sent to subscribers",
+                    patch={"cancel_feedback": feedback or ""},
+                )
         else:
             raise ValueError(f"unknown gate stage: {gate_stage}")
 
@@ -781,5 +921,6 @@ NewsletterSagaDriver._HANDLERS = {  # type: ignore[attr-defined]
     Stage.ASSEMBLING: NewsletterSagaDriver._stage_assembling,
     Stage.RENDERING: NewsletterSagaDriver._stage_rendering,
     Stage.SAVED: NewsletterSagaDriver._stage_saved,
+    Stage.SEND_APPROVED: NewsletterSagaDriver._stage_send_approved,
     Stage.SENDING: NewsletterSagaDriver._stage_sending,
 }

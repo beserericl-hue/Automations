@@ -30,6 +30,9 @@ import StageStrip from './StageStrip';
 import LiveLog from './LiveLog';
 import ApprovalPayloadStories from './ApprovalPayloadStories';
 import ApprovalPayloadSubject from './ApprovalPayloadSubject';
+import ApprovalPayloadImage from './ApprovalPayloadImage';
+import ApprovalPayloadSend from './ApprovalPayloadSend';
+import ApprovalEmailPreview from './ApprovalEmailPreview';
 import ApprovalResolveForm from './ApprovalResolveForm';
 import type {
   NewsletterStage,
@@ -162,7 +165,7 @@ export default function ExecutionStatus() {
   const n8nUiUrl = (import.meta as unknown as { env?: { VITE_N8N_UI_URL?: string } }).env?.VITE_N8N_UI_URL
     ?? 'https://n8n.agileadautomation.com';
 
-  function handleResolved(decision: 'approve' | 'revise') {
+  function handleResolved(decision: 'approve' | 'revise' | 'reject') {
     // Optimistically advance the strip so the user sees movement before
     // the next stage event lands. The approval-resolved SSE will trigger
     // a refetch that clears `activeApproval`; the real next stage event
@@ -171,6 +174,9 @@ export default function ExecutionStatus() {
     if (decision === 'approve') {
       if (activeApproval.stage === 'stories') setOptimisticStage('stories_approved');
       else if (activeApproval.stage === 'subject_line') setOptimisticStage('subject_approved');
+      else if (activeApproval.stage === 'send') setOptimisticStage('sending');
+    } else if (decision === 'reject' && activeApproval.stage === 'send') {
+      setOptimisticStage('cancelled');
     }
     // On revise the workflow loops back; no optimistic strip move.
     void queryClient.invalidateQueries({ queryKey: ['approvals-open', executionId] });
@@ -224,7 +230,13 @@ export default function ExecutionStatus() {
             <div className="space-y-3 rounded-lg border border-amber-300 bg-amber-50/60 p-4 dark:border-amber-700 dark:bg-amber-950/30">
               <header>
                 <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-900 dark:bg-amber-900/60 dark:text-amber-200">
-                  {activeApproval.stage === 'stories' ? 'Stories approval' : 'Subject approval'}
+                  {activeApproval.stage === 'stories'
+                    ? 'Stories approval'
+                    : activeApproval.stage === 'image'
+                    ? 'Image approval'
+                    : activeApproval.stage === 'send'
+                    ? 'Send to subscribers'
+                    : 'Subject approval'}
                 </span>
                 <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                   Token: <code className="font-mono">{activeApproval.token.slice(0, 12)}…</code>
@@ -232,12 +244,21 @@ export default function ExecutionStatus() {
               </header>
               {activeApproval.stage === 'stories' ? (
                 <ApprovalPayloadStories payload={activeApproval.payload} />
+              ) : activeApproval.stage === 'image' ? (
+                <ApprovalPayloadImage payload={activeApproval.payload} />
+              ) : activeApproval.stage === 'send' ? (
+                <>
+                  <ApprovalPayloadSend token={activeApproval.token} payload={activeApproval.payload} />
+                  <ApprovalEmailPreview token={activeApproval.token} />
+                </>
               ) : (
                 <ApprovalPayloadSubject payload={activeApproval.payload} />
               )}
               <ApprovalResolveForm
                 token={activeApproval.token}
                 onResolved={handleResolved}
+                stage={activeApproval.stage}
+                subscriberCount={activeApproval.stage === 'send' ? (activeApproval.payload.subscriber_count as number | null | undefined) : undefined}
               />
             </div>
           )}

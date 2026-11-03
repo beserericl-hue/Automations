@@ -562,7 +562,7 @@ export async function deleteSend(id: string): Promise<void> {
 /** Insert a disposable OPEN newsletter_approvals_v2 row (owned by the demo user) and return {id, token}. */
 export async function seedApproval(fields: {
   edition_id: string;
-  stage?: 'stories' | 'subject_line';
+  stage?: 'stories' | 'subject_line' | 'image' | 'send';
   payload?: Record<string, unknown>;
 }): Promise<{ id: string; token: string }> {
   // Token must satisfy the server's ^[A-Za-z0-9_-]{20,128}$ (ApprovalTokenParamSchema).

@@ -37,8 +37,13 @@ class Stage(str, Enum):
     ASSEMBLING = "assembling"
     RENDERING = "rendering"
     SAVED = "saved"
+    # The final gate (2026-11-03): the rendered issue waits here for "Send to subscribers".
+    AWAITING_SEND_APPROVAL = "awaiting_send_approval"
+    SEND_APPROVED = "send_approved"
     SENDING = "sending"
     SENT = "sent"
+    # The owner declined the final gate: the issue is saved (status cancelled) and never sent.
+    CANCELLED = "cancelled"
     SCHEDULED = "scheduled"
     SKIPPED_NO_CONTENT = "skipped_no_content"
     ERROR = "error"

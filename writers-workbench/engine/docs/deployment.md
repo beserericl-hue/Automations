@@ -74,7 +74,7 @@ and the KB prune job are dry runs). Every setting is in `packages/writer_engine/
 | `STEALTHGPT_API_KEY` | — | without it nothing is humanized |
 | `STEALTHGPT_MODEL` / `STEALTHGPT_MODE` / `STEALTHGPT_OUTPUT_FORMAT` | `standard` / `Low` / `markdown` | |
 | `HUMANIZE_NON_FICTION` | true | blog, newsletter op, social posts, editor passage |
-| `HUMANIZE_NEWSLETTER_SEGMENTS` | true | the newsletter saga's story sections (prose only; headings and labels kept) |
+| `HUMANIZE_NEWSLETTER_SEGMENTS` | **false** | the newsletter saga's story sections (prose only; headings and labels kept). Off by default since 2026-11-03: on DEV the sections mostly failed the guards and still billed; set `true` to opt in |
 | `HUMANIZE_RADAR_DRAFTS` | true | posts the radars draft onto the calendar (`social_schedule_v2.humanize`) |
 | `HUMANIZE_COLLAPSE_RETRY_MODE` | `Medium` | retry a `structure_collapsed` chunk once at this mode; empty = no retry |
 | `HUMANIZE_MAX_WORDS_PER_RUN` | 20000 | spend ceiling per run (a newsletter shares one ceiling across its sections) |

@@ -300,14 +300,25 @@ test.describe('Content Studio full path (engine + publisher + newsletter)', () =
       expect(sent[0]).toMatchObject({ subject: `Draft #${p.display_number}: E2E ${fx.edition} emailed`, image_url: img });
       expect(sent[0].message_id).toBeTruthy();
       await page.getByTestId('studio-tab-issue').click();
+      const before = new Date(Date.now() - 5_000).toISOString();
       await page.getByRole('button', { name: /Email me the week.s slate/ }).click();
       await expect(page.getByTestId('studio-activity')).toContainText("Emailed the week's slate to", { timeout: 30_000 });
+      // The slate email leaves a record (migration 052): to, subject, Postal id, sent_at, edition, week.
+      let rec: any;
+      await expect.poll(async () => {
+        [rec] = await supaGet('newsletter_owner_emails_v2', `edition_id=eq.${enc(fx!.edition)}&kind=eq.slate&sent_at=gte.${enc(before)}&select=to_email,subject,postal_message_id,sent_at,week_of`);
+        return rec?.postal_message_id ?? null;
+      }, { timeout: 30_000 }).not.toBeNull();
+      expect(rec.to_email).toContain('@');
+      expect(rec.week_of).toBeTruthy();
+      // ...and it is displayed under the button.
+      await expect(page.getByTestId('slate-email-last')).toContainText(rec.postal_message_id, { timeout: 20_000 });
     } finally {
       await cleanupStudio(fx);
     }
   });
 
-  test('a studio-chosen issue: stories → subject → images → the final email has exactly the chosen stories, in order (no subscribers)', async ({ page }) => {
+  test('a studio-chosen issue: stories → subject → images → final send gate → the email has exactly the chosen stories, in order (no subscribers)', async ({ page }) => {
     test.setTimeout(30 * 60_000);
     let fx: StudioFixture | null = null;
     try {
@@ -346,6 +357,44 @@ test.describe('Content Studio full path (engine + publisher + newsletter)', () =
         await page.getByRole('button', { name: /^Approve/i }).click();
         await expect.poll(async () => (await supaGet('newsletter_approvals_v2', `token=eq.${gate.token}&select=decision`))[0]?.decision, { timeout: 30_000 }).toBe('approve');
       }
+
+      // ── The final "Send to subscribers" gate (2026-11-03) ───────────────────────────────
+      // Approving the images renders and saves the issue but sends NOTHING: the run waits here.
+      let sendGate: any;
+      await expect.poll(async () => {
+        [sendGate] = await supaGet('newsletter_approvals_v2', `execution_id=eq.${enc(execId)}&stage=eq.send&select=token,payload,resolved_at`);
+        return sendGate?.token ?? null;
+      }, { timeout: 10 * 60_000, intervals: [10_000] }).not.toBeNull();
+      expect(sendGate.payload.subscriber_count).toBe(0);
+      let saved: any;
+      [saved] = await supaGet('newsletter_sends_v2', `edition_id=eq.${enc(fx.edition)}&select=id,status,sent_at,html_body`);
+      expect(saved?.html_body, 'the issue is rendered and saved at the send gate').toBeTruthy();
+      expect(saved.status, 'approving the images did not send').not.toBe('sent');
+      expect(saved.sent_at).toBeNull();
+      expect(sendGate.payload.send_id).toBe(saved.id);
+
+      await page.goto(`/newsletter/approvals/${sendGate.token}`, { waitUntil: 'domcontentloaded' });
+      await expect(page.getByRole('heading', { name: /Send to subscribers/i })).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByTestId('send-gate-subscribers')).toContainText('no active subscribers');
+      // The preview IS the saved, rendered issue.
+      const finalPreview = page.frameLocator('iframe[title="Approval email preview"]');
+      for (const t of chosen) await expect(finalPreview.getByText(t).first()).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByText(/exactly as subscribers will receive it/i)).toBeVisible();
+      const testCopy = page.getByTestId('send-test-copy');
+      await expect(testCopy).toBeVisible();
+      if (process.env.E2E_STUDIO_EMAIL === '1') {
+        // Opt-in: one real email to the demo user's own address.
+        await testCopy.click();
+        await expect(page.getByTestId('test-copy-result')).toContainText('Test copy sent to', { timeout: 60_000 });
+        const [copy] = await supaGet<any>('newsletter_owner_emails_v2', `execution_id=eq.${enc(execId)}&kind=eq.test_copy&select=to_email,subject,postal_message_id`);
+        expect(copy.subject).toMatch(/^\[TEST\] /);
+        expect(copy.postal_message_id).toBeTruthy();
+        await expect(page.getByTestId('test-copy-log')).toContainText(copy.postal_message_id);
+        // Still nothing sent to subscribers.
+        expect((await supaGet<any>('newsletter_sends_v2', `id=eq.${saved.id}&select=status`))[0].status).not.toBe('sent');
+      }
+      await page.getByRole('button', { name: /^Send to 0 subscribers/i }).click();
+      await expect.poll(async () => (await supaGet('newsletter_approvals_v2', `token=eq.${sendGate.token}&select=decision`))[0]?.decision, { timeout: 30_000 }).toBe('approve');
 
       let send: any;
       await expect.poll(async () => {

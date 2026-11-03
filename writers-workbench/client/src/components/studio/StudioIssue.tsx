@@ -2,9 +2,11 @@
  * The next issue: which posts (and slate topics) go into the edition's next newsletter, in what order.
  * While a selection has stories, the newsletter run for this edition uses exactly these instead of
  * picking by itself; the issue then goes through the usual approvals (stories, subject, images, each
- * with an email preview). Approving the images renders the issue and SENDS it to the edition's active
- * subscribers straight away: there is no later send step. This replaces the n8n weekly digest
- * email. Also here: the edition's public RSS feeds for Substack.
+ * with an email preview). Approving the images renders and saves the issue; it then waits at a final
+ * "Send to subscribers" approval that shows the rendered email and the subscriber count, offers a
+ * test copy to the owner, and sends nothing until it is approved (2026-11-03). This replaces the n8n
+ * weekly digest email. Also here: the edition's public RSS feeds for Substack, and the record of
+ * each "Email me the week's slate" (migration 052).
  */
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -74,6 +76,7 @@ export default function StudioIssue({ ctx }: { ctx: StudioContext }) {
           {items.length
             ? 'The next newsletter run for this edition uses exactly these stories, in this order (no automatic pick).'
             : 'Nothing chosen: the next run picks from the week’s slate and posts by itself.'}
+          {' '}Nothing reaches subscribers until you approve the final “Send to subscribers” step.
           {last?.send_date ? ` Last chosen issue: ${last.send_date}.` : ''}
         </p>
         <ol className="space-y-1" data-testid="issue-items">
@@ -138,8 +141,13 @@ function StudioFeeds({ ctx }: { ctx: StudioContext }) {
   const ed = ctx.edition.edition_id;
   const feeds = useQuery({ queryKey: ['studio', ed, 'feeds'], queryFn: () => studioApi.feeds(ed) });
   const rotate = useMutation({ mutationFn: () => studioApi.rotateFeeds(ed), onSuccess: () => { void feeds.refetch(); ctx.notify('New feed URLs made; the old ones no longer work. Update Substack.'); } });
-  const emailDigest = useMutation({ mutationFn: () => studioApi.emailDigest(ed, ctx.week), onSuccess: (r) => ctx.notify(r.data.message) });
+  const sentSlates = useQuery({ queryKey: ['studio', ed, 'digest-emails'], queryFn: () => studioApi.digestEmails(ed) });
+  const emailDigest = useMutation({
+    mutationFn: () => studioApi.emailDigest(ed, ctx.week),
+    onSuccess: (r) => { ctx.notify(r.data.message); void sentSlates.refetch(); },
+  });
   const f = feeds.data?.data;
+  const lastSlate = sentSlates.data?.data?.[0];
   return (
     <div className="space-y-2 rounded border border-gray-200 bg-white p-3 text-sm dark:border-gray-700 dark:bg-gray-900" data-testid="studio-feeds">
       <h3 className="font-semibold text-gray-700 dark:text-gray-200">RSS feeds (Substack)</h3>
@@ -154,6 +162,12 @@ function StudioFeeds({ ctx }: { ctx: StudioContext }) {
         <button type="button" onClick={() => { if (window.confirm('Make new feed URLs? The current ones stop working.')) rotate.mutate(); }} className="rounded border border-gray-300 px-3 py-1.5 dark:border-gray-600">New URLs</button>
         <button type="button" onClick={() => emailDigest.mutate()} disabled={emailDigest.isPending} className="rounded border border-gray-300 px-3 py-1.5 dark:border-gray-600 disabled:opacity-50">Email me the week’s slate</button>
       </div>
+      {lastSlate && (
+        <p className="text-xs text-gray-500" data-testid="slate-email-last">
+          Last slate email: week of {lastSlate.week_of ?? '—'} to {lastSlate.to_email}, {new Date(lastSlate.sent_at).toLocaleString()}
+          {lastSlate.postal_message_id ? <span className="font-mono"> · {lastSlate.postal_message_id}</span> : null}
+        </p>
+      )}
     </div>
   );
 }

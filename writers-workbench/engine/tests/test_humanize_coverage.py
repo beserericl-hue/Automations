@@ -29,6 +29,8 @@ PARAS = "\n\n".join(f"Paragraph {n} talks about the harbour at Ugarit and its tr
 @pytest.fixture(autouse=True)
 def _env(monkeypatch: pytest.MonkeyPatch) -> Any:
     monkeypatch.setenv("STEALTHGPT_API_KEY", "test-token")
+    # Newsletter sections are off by default since 2026-11-03; these tests exercise the opt-in path.
+    monkeypatch.setenv("HUMANIZE_NEWSLETTER_SEGMENTS", "true")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

@@ -78,15 +78,61 @@ async def _fetch_subscribers(edition_id: str) -> list[dict[str, Any]]:
     return list(getattr(resp, "data", None) or [])
 
 
+def _with_permalink(html_body: str, permalink: str) -> str:
+    """The "Read on web" footer every delivered copy carries."""
+    permalink_block = (
+        f'<p style="font-size:12px;color:#555">Read on web: <a href="{permalink}">{permalink}</a></p>'
+    )
+    if "</body>" in html_body:
+        return html_body.replace("</body>", permalink_block + "</body>")
+    return html_body + permalink_block
+
+
+async def _send_test_copy(inp: StepInput, *, to: str, from_addr: str) -> StepOutput:
+    """One copy of the rendered issue to the owner, never to a subscriber (the final gate's button).
+
+    Same HTML and Postal path as the real delivery, ``[TEST]`` in the subject. It reads no
+    subscribers, publishes no permalink and leaves the send row alone: the issue is still waiting at
+    the "Send to subscribers" gate after a test copy.
+    """
+    from writer_engine.newsletter_send import tagged_subject
+
+    settings = get_settings()
+    if not settings.postal_api_key:
+        raise RuntimeError("Postal is not configured (POSTAL_API_KEY); no test copy was sent")
+    html_body = str(inp.payload.get("html_body") or "")
+    if not html_body.strip():
+        raise RuntimeError("the issue has no rendered HTML yet; no test copy was sent")
+    permalink = str(inp.payload.get("permalink_url") or "")
+    html = fill_merge_tags(_with_permalink(html_body, permalink) if permalink else html_body)
+    subject = tagged_subject(fill_merge_tags(str(inp.payload.get("subject") or "Newsletter")))
+    client = PostalClient()
+    try:
+        res = await client.send(to=[to], from_addr=from_addr, subject=subject, html=html)
+    finally:
+        await client.aclose()
+    return StepOutput(
+        execution_id=inp.execution_id,
+        step_name=STEP_NAME,
+        status=StepStatus.OK,
+        payload={"test_copy": True, "to": to, "subject": subject, "message_id": res.message_id},
+    )
+
+
 async def handler(inp: StepInput) -> StepOutput:
     settings = get_settings()
+    # Postal authenticates the From domain — the default must be an authorised courseworx.media
+    # sender, not a placeholder .local address (which Postal rejects as UnauthenticatedFromAddress).
+    from_addr = str(inp.payload.get("from_addr") or settings.newsletter_from_address)
+    test_recipient = str(inp.payload.get("test_recipient") or "").strip()
+    if test_recipient:
+        # A test copy goes to this one address and returns before anything below can read the
+        # edition's subscribers or mark the issue sent.
+        return await _send_test_copy(inp, to=test_recipient, from_addr=from_addr)
     edition_id = str(inp.payload.get("edition_id") or "")
     send_id = str(inp.payload.get("send_id") or inp.execution_id)
     html_body = str(inp.payload.get("html_body") or "")
     subject = str(inp.payload.get("subject") or "Newsletter")
-    # Postal authenticates the From domain — the default must be an authorised courseworx.media
-    # sender, not a placeholder .local address (which Postal rejects as UnauthenticatedFromAddress).
-    from_addr = str(inp.payload.get("from_addr") or settings.newsletter_from_address)
 
     # Prefer the caller-supplied permalink (the Workbench view route, which serves html_body as
     # text/html so it renders in a browser). Only archive to Supabase Storage when no permalink was
@@ -99,14 +145,7 @@ async def handler(inp: StepInput) -> StepOutput:
 
     message_ids: list[str] = []
     if settings.postal_api_key and subscribers:
-        permalink_block = (
-            f'<p style="font-size:12px;color:#555">Read on web: <a href="{permalink}">{permalink}</a></p>'
-        )
-        html_with_link = (
-            html_body.replace("</body>", permalink_block + "</body>")
-            if "</body>" in html_body
-            else (html_body + permalink_block)
-        )
+        html_with_link = _with_permalink(html_body, permalink)
         errors: list[str] = []
         client = PostalClient()
         try:

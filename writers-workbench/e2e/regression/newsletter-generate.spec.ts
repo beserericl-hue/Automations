@@ -238,6 +238,41 @@ test.describe('Newsletter Generate / Sends / Detail / Approvals (result-assertin
       .toBe('revise');
   });
 
+  test('Final send gate: shows the saved issue + subscriber count + test-copy button; Don\'t send persists reject and sends nothing', async ({ page }) => {
+    // A saved (unsent) issue and its open 'send' approval, as the saga leaves them after the image gate.
+    const sendId = await seedSend({
+      edition_id: editionId, subject: `E2E Final gate ${STAMP}`, status: 'draft', send_date: uniqueSendDate(5),
+      html_body: `<!doctype html><html><body><h1>E2E rendered issue ${STAMP}</h1></body></html>`,
+    });
+    sendsToClean.push(sendId);
+    const { id, token } = await seedApproval({
+      edition_id: editionId,
+      stage: 'send',
+      payload: { send_id: sendId, subject: `E2E Final gate ${STAMP}`, issue_number: 3, subscriber_count: 0, test_copy_available: true },
+    });
+    approvalsToClean.push(id);
+
+    await page.goto('/newsletter/approvals');
+    await expect(page.locator('tr', { hasText: `E2E Final gate ${STAMP}` }).first()).toContainText(/Send to subscribers/i, { timeout: 15_000 });
+
+    await page.goto(`/newsletter/approvals/${token}`);
+    await expect(page.getByRole('heading', { name: /Send to subscribers/i })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('send-gate-subscribers')).toContainText('Nothing has been sent yet');
+    await expect(page.getByTestId('send-gate-subscribers')).toContainText('no active subscribers');
+    // The preview is the saved issue's own HTML.
+    await expect(page.frameLocator('iframe[title="Approval email preview"]').getByText(`E2E rendered issue ${STAMP}`)).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('send-test-copy')).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Send to 0 subscribers/i })).toBeVisible();
+
+    await page.getByRole('radio', { name: /Don.t send/i }).check();
+    await page.getByRole('button', { name: /Cancel this issue/i }).click();
+    await expect
+      .poll(async () => (await supaGet('newsletter_approvals_v2', `id=eq.${id}&select=decision`))[0]?.decision,
+        { timeout: 20_000, message: 'Don\'t send did not persist decision=reject' })
+      .toBe('reject');
+    expect((await supaGet('newsletter_sends_v2', `id=eq.${sendId}&select=status`))[0]?.status).not.toBe('sent');
+  });
+
   test('HelpButtons: generate / sends / approvals open and close', async ({ page }) => {
     // HelpButton's accessible name is its "?" text; target the title attribute instead.
     for (const [path, title] of [

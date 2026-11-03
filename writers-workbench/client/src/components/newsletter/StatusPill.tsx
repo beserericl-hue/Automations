@@ -27,6 +27,7 @@ const STYLE_MAP: Record<Status, string> = {
   writing_segment: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
   segments_done: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
   saved: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
+  awaiting_send_approval: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
   error: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
   // Synthetic
   in_flight: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
@@ -36,6 +37,7 @@ const STYLE_MAP: Record<Status, string> = {
 const LABEL_MAP: Partial<Record<Status, string>> = {
   awaiting_stories_approval: 'awaiting stories',
   awaiting_subject_approval: 'awaiting subject',
+  awaiting_send_approval: 'awaiting send',
   stories_approved: 'stories approved',
   subject_approved: 'subject approved',
   writing_segment: 'writing',

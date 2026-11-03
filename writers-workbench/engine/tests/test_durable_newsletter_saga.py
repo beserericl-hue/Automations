@@ -87,7 +87,7 @@ def _clear_hitl_state() -> None:
 
 
 @pytest.mark.asyncio
-async def test_durable_saga_runs_through_three_gates(fake_redis) -> None:  # type: ignore[no-untyped-def]
+async def test_durable_saga_runs_through_four_gates(fake_redis) -> None:  # type: ignore[no-untyped-def]
     repo = InMemorySagaRepo()
     driver = NewsletterSagaDriver(repo)
     eid = await driver.start(
@@ -135,7 +135,21 @@ async def test_durable_saga_runs_through_three_gates(fake_redis) -> None:  # typ
         chosen_images={},
     )
 
-    # Round 4: IMAGES_APPROVED -> ASSEMBLING -> RENDERING -> SAVED -> SENDING -> SENT.
+    # Round 4: IMAGES_APPROVED -> ASSEMBLING -> RENDERING -> SAVED -> AWAITING_SEND_APPROVAL.
+    # Approving the images no longer sends: the rendered issue waits at the final gate.
+    result = await driver.advance(eid)
+    assert result is SagaResult.PAUSED
+    state = await repo.load(eid)
+    assert state.stage is Stage.AWAITING_SEND_APPROVAL
+    assert state.state.get("delivery") is None
+    send_token = state.state["send_gate_token"]
+
+    await resolve_approval(send_token, decision=ApprovalDecision.APPROVE)
+    await driver.apply_decision(
+        eid, gate_stage="awaiting_send_approval", decision=ApprovalDecision.APPROVE, feedback=None
+    )
+
+    # Round 5: SEND_APPROVED -> SENDING -> SENT.
     result = await driver.advance(eid)
     assert result is SagaResult.DONE
     state = await repo.load(eid)
