@@ -34,6 +34,9 @@ test.describe('Post calendar (result-asserting)', () => {
     const dialog = page.getByRole('dialog', { name: 'New post' });
     await dialog.getByLabel('Title').fill(title);
     await dialog.getByLabel('LinkedIn post').fill(`${title} — the LinkedIn text`);
+    // The channel list is fetched separately from the calendar; wait for it before reading the boxes
+    // (`.all()` is a snapshot, and taken too early it saw no channels at all).
+    await expect(dialog.getByRole('checkbox', { name: 'Personal LinkedIn profile' })).toBeEnabled({ timeout: 15_000 });
     // Only the personal profile: uncheck every other channel.
     for (const box of await dialog.getByRole('checkbox').all()) {
       const label = (await box.evaluate((el) => el.parentElement?.textContent ?? '')).trim();
@@ -42,6 +45,7 @@ test.describe('Post calendar (result-asserting)', () => {
         else await box.uncheck();
       }
     }
+    await expect(dialog.getByRole('checkbox', { name: 'Personal LinkedIn profile' })).toBeChecked();
     await dialog.getByRole('button', { name: 'Schedule post' }).click();
     await expect(dialog).toBeHidden({ timeout: 15_000 });
 

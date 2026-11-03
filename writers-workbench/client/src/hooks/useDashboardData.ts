@@ -164,6 +164,11 @@ function useDashboardData() {
           .eq('user_id', userId).is('deleted_at', null).order('updated_at', { ascending: false }).limit(5),
       ]);
 
+      // A failed count query must surface as an error ("!" on the card), never as a plausible 0.
+      const failed = [projectsRes, draftsRes, publishedRes, researchRes, contentRes, projectsListRes, researchListRes]
+        .find((r) => r.error);
+      if (failed?.error) throw failed.error;
+
       const counts: DashboardCounts = {
         projects: projectsRes.count ?? 0,
         drafts: draftsRes.count ?? 0,

@@ -1,7 +1,7 @@
 /**
  * Create, edit, cancel or requeue one calendar post, and see what each channel did with it.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { apiFetch, ApiError } from '../../lib/api';
 
 export interface SocialDelivery {
@@ -72,6 +72,14 @@ export default function PostEditor({ post, channels, defaultDate, defaultSlot, o
   const [date, setDate] = useState(post?.scheduled_date ?? defaultDate);
   const [slot, setSlot] = useState<string>(post?.slot ?? defaultSlot);
   const [chosen, setChosen] = useState<string[]>(post?.channels ?? channels.filter((c) => c.enabled).map((c) => c.channel));
+  // A new post defaults to every enabled channel. The channel list is fetched separately, so the editor
+  // can open before it arrives; apply the defaults when it does, unless the author has already picked.
+  // Keyed on the enabled channels' names, not the array (the caller passes a fresh [] while loading).
+  const [pickedChannels, setPickedChannels] = useState(false);
+  const enabledKey = channels.filter((c) => c.enabled).map((c) => c.channel).join(',');
+  useEffect(() => {
+    if (!post && !pickedChannels) setChosen(enabledKey ? enabledKey.split(',') : []);
+  }, [post, enabledKey, pickedChannels]);
   const [image, setImage] = useState(post?.include_image ?? false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -156,7 +164,7 @@ export default function PostEditor({ post, channels, defaultDate, defaultSlot, o
               {channels.map((c) => (
                 <label key={c.channel} className="inline-flex items-center gap-1.5">
                   <input type="checkbox" checked={chosen.includes(c.channel)} disabled={!c.enabled}
-                    onChange={(e) => setChosen(e.target.checked ? [...chosen, c.channel] : chosen.filter((x) => x !== c.channel))} />
+                    onChange={(e) => { setPickedChannels(true); setChosen(e.target.checked ? [...chosen, c.channel] : chosen.filter((x) => x !== c.channel)); }} />
                   {c.label}
                 </label>
               ))}
