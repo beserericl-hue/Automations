@@ -69,6 +69,10 @@ impersonateDataRouter.get('/dashboard', async (req: Request, res: Response) => {
         .eq('user_id', userId).is('deleted_at', null).order('updated_at', { ascending: false }).limit(5),
     ]);
 
+    // A failed count query is a 500, never a plausible 0 on the dashboard.
+    const failed = [projects, drafts, published, research, contentList, projectList, researchList].find((r) => r.error);
+    if (failed?.error) throw failed.error;
+
     // Resolve project titles for content rows (one extra query)
     const projectIds = new Set<string>();
     for (const c of (contentList.data ?? []) as Array<{ project_id: string | null }>) {
@@ -330,9 +334,9 @@ impersonateDataRouter.get('/projects-summary', async (req: Request, res: Respons
   const userId = targetUserId(req);
   const limit = Math.min(100, Math.max(1, parseInt(typeof req.query.limit === 'string' ? req.query.limit : '20', 10) || 20));
 
-  const { data, error } = await getSupabaseAdmin()
+  const { data, error, count } = await getSupabaseAdmin()
     .from('writing_projects_v2')
-    .select('id, title, status, updated_at')
+    .select('id, title, status, updated_at', { count: 'exact' })
     .eq('user_id', userId)
     .is('deleted_at', null)
     .order('updated_at', { ascending: false })
@@ -342,7 +346,8 @@ impersonateDataRouter.get('/projects-summary', async (req: Request, res: Respons
     res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: error.message } });
     return;
   }
-  res.json({ success: true, data: data ?? [] });
+  // `total` is every live project, not just the `limit` returned — the sidebar badge shows it.
+  res.json({ success: true, data: data ?? [], total: count ?? (data ?? []).length });
 });
 
 /** Content version history (read-only audit) for a content item. */
