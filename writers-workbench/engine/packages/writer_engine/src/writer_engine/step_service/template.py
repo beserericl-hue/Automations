@@ -96,8 +96,15 @@ def build_step_app(step_name: str, handler: StepHandler) -> FastAPI:
         # leaving CostDashboard under-reporting and the credit model ungrounded. One owner in the
         # template covers all 19 steps and any step added later.
         op = inp.payload.get("op")
+        # Callers that do not otherwise send a user (the newsletter saga's steps) name the run's
+        # owner in a reserved ``accounting`` block: {"user_id": ..., "metadata": {...}}. Without it
+        # every newsletter cost row was written with no user.
+        acct = inp.payload.get("accounting")
+        acct = acct if isinstance(acct, dict) else {}
+        acct_meta = acct.get("metadata")
         token_accounting.begin(
-            user_id=inp.payload.get("user_id"),
+            user_id=inp.payload.get("user_id") or acct.get("user_id") or None,
+            metadata=acct_meta if isinstance(acct_meta, dict) else None,
             project_id=inp.payload.get("project_id"),
             chapter_number=inp.payload.get("chapter_number"),
             workflow=f"{step_name}.{op}" if op else step_name,

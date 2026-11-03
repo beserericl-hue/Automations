@@ -36,6 +36,7 @@ import httpx
 
 from writer_engine.config import get_settings
 from writer_engine.ingestion import enrich, feeds, keys, sources, store
+from writer_engine.telemetry import token_accounting
 from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("ingestion.pipeline")
@@ -259,6 +260,26 @@ async def ingest_feed(
     now: datetime | None = None,
 ) -> FeedRunResult:
     """Ingest one feed. Always returns a result; the only exception it lets out is cancellation."""
+    # One ingestion tick walks feeds owned by different users and editions, so the step's own
+    # accounting context has no owner. Bill each feed's scrapes and LLM calls to that feed's owner.
+    with token_accounting.attribute(
+        user_id=feed.user_id or None,
+        metadata={"edition_id": feed.edition_id, "feed_source_id": feed.id},
+    ):
+        return await _ingest_feed(
+            feed, max_items=max_items, genre=genre, client=client, log_run=log_run, now=now
+        )
+
+
+async def _ingest_feed(
+    feed: store.FeedSource,
+    *,
+    max_items: int | None,
+    genre: str | None,
+    client: httpx.AsyncClient | None,
+    log_run: bool,
+    now: datetime | None,
+) -> FeedRunResult:
     started = now or datetime.now(UTC)
     if feed.url_type in store.ENGINE_WRITTEN_URL_TYPES:
         # Filled by the radar run / the post publisher, never fetched (writer_engine.social.feed).
