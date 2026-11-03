@@ -81,12 +81,24 @@ test.describe('Dashboard (result-asserting)', () => {
     });
   });
 
-  test('a project row opens its detail page', async ({ page }) => {
-    await page.goto('/projects');
-    const row = page.getByRole('button', { name: /^Open project / }).first();
-    await expect(row).toBeVisible({ timeout: 20_000 });
-    await row.click();
-    await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{8,}/, { timeout: 15_000 });
-    await expect(page.getByRole('button', { name: 'Overview', exact: true })).toBeVisible({ timeout: 15_000 });
+  // Opens a row for a project of its own. It clicked the first row, which is the most recently
+  // updated project: during Pass A that is another spec's disposable fixture, and when that spec's
+  // teardown deleted it between the list render and the click, the detail page said "Project not found".
+  test.describe('project row', () => {
+    test.skip(!HAS_KEY, 'requires service key');
+    let projectId = '';
+    const title = `E2E Dash Row ${RUN_TAG}`;
+    test.beforeAll(async () => { projectId = await seedProject({ title }); });
+    test.afterAll(async () => { if (projectId) await deleteProject(projectId); });
+
+    test('a project row opens its detail page', async ({ page }) => {
+      await page.goto('/projects');
+      const row = page.getByRole('button', { name: `Open project ${title}`, exact: true });
+      await expect(row).toBeVisible({ timeout: 20_000 });
+      await row.click();
+      await expect(page).toHaveURL(new RegExp(`/projects/${projectId}(\\?|$)`), { timeout: 15_000 });
+      await expect(page.getByRole('button', { name: 'Overview', exact: true })).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole('heading', { name: title })).toBeVisible();
+    });
   });
 });
