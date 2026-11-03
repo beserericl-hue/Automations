@@ -323,7 +323,7 @@ async def apply_action(
         "image_on": "Image on",
         "image_off": "Image off",
     }[action]
-    message = f"{verb}:{', '.join('#' + str(d['display_number']) for d in done) or 'nothing'}."
+    message = f"{verb}: {', '.join('#' + str(d['display_number']) for d in done) or 'nothing'}."
     if skipped:
         message += " Skipped " + ", ".join(f"#{s['display_number']} ({s['reason']})" for s in skipped) + "."
     return {"done": done, "skipped": skipped, "message": message}
