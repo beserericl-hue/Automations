@@ -62,10 +62,9 @@ async def _radar(inp: StepInput, op: str) -> StepOutput:
     """The radar ops. Here because a radar is content intake for the newsletter, like a feed."""
     from datetime import UTC, datetime
 
-    import httpx
-
     from writer_engine.radar import drafts
     from writer_engine.radar.run import SUBSCRIPTIONS, latest_slate, run_radar
+    from writer_engine.safe_http import safe_async_client
     from writer_engine.supabase.client import get_supabase_admin
 
     user_id = str(inp.payload.get("user_id") or "").strip()
@@ -83,7 +82,8 @@ async def _radar(inp: StepInput, op: str) -> StepOutput:
     ).data
     settings_row = (sub[0].get("settings") if sub else None) or {}
     if op == "radar":
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as http:
+        # A subscription can override the radar feed list: user-typed URLs, checked per connection.
+        async with safe_async_client(timeout=30.0, follow_redirects=True) as http:
             out = await run_radar(
                 client,
                 http,
