@@ -110,6 +110,7 @@ def _humanize_summary(segments: list[dict[str, Any]]) -> dict[str, Any]:
                     "chunks": r.get("chunks"),
                     "humanized_chunks": r.get("humanized_chunks"),
                     "rejected": r.get("rejected"),
+                    "rejected_layout": r.get("rejected_layout"),
                     "retried": r.get("retried"),
                     "words_spent": r.get("words_spent"),
                     "skipped": r.get("skipped"),

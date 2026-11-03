@@ -14,7 +14,6 @@ dependencies = [
     "deliver-step",
     "gather-step",
     "image-step",
-    "library-retrieve-step",
     "library-step",
     "media-step",
     "notify-step",
@@ -44,7 +43,6 @@ chapter-step = { workspace = true }
 deliver-step = { workspace = true }
 gather-step = { workspace = true }
 image-step = { workspace = true }
-library-retrieve-step = { workspace = true }
 library-step = { workspace = true }
 media-step = { workspace = true }
 notify-step = { workspace = true }

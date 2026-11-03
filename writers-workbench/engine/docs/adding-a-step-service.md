@@ -15,7 +15,7 @@ services/<my_step>/
 └── tests/
 ```
 
-Copy `services/library_retrieve_step/` as a starting point.
+Copy `services/scrape_step/` as a starting point (a small step with its own Dockerfile; its tests live in `tests/`).
 
 ## 2. Implement `main.py`
 

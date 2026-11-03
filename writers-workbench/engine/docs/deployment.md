@@ -90,8 +90,8 @@ curl https://writer-engine-gateway-<railway-id>.up.railway.app/admin/health
 curl -X POST \
   -H "X-Service-Secret: $SERVICE_SHARED_SECRET" \
   -H "Content-Type: application/json" \
-  https://writer-engine-gateway-<railway-id>.up.railway.app/internal/library/retrieve \
-  -d '{"user_id":"00000000-0000-0000-0000-000000000000","limit":3}'
+  https://writer-engine-gateway-<railway-id>.up.railway.app/internal/write/library \
+  -d '{"op":"retrieve","user_id":"00000000-0000-0000-0000-000000000000"}'
 ```
 
 ## Wire WW DEV to the engine

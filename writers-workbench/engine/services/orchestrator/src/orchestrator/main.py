@@ -64,7 +64,6 @@ from writer_engine.watchdog import start as watchdog_start
 from writer_engine.watchdog import stop as watchdog_stop
 from writer_engine.workbench_cron import run_lifecycle
 
-from .library_orch import LibraryRetrieveOrchestrator
 from .newsletter_orch import NewsletterOrchestrator, resolution_hook_installed
 from .newsletter_saga import NewsletterSagaDriver
 from .worker import ARQ_HEALTH_CHECK_KEY, build_redis_settings, instance_health_key
@@ -357,17 +356,6 @@ def build_app() -> FastAPI:
     @app.get("/metrics")
     async def metrics() -> Any:
         return metrics_app()
-
-    @app.post("/pipelines/library_retrieve/run", dependencies=[Depends(require_service_secret)])
-    async def run_library_retrieve(body: dict[str, Any]) -> dict[str, Any]:
-        orch = LibraryRetrieveOrchestrator(app.state.store)
-        exec_id_str = body.get("execution_id")
-        if exec_id_str:
-            execution_id: UUID = UUID(exec_id_str)
-            await orch.start(execution_id=execution_id, initial_state=body)
-        else:
-            execution_id = await orch.start(initial_state=body)
-        return await orch.run(execution_id, payload=body)
 
     async def _locate_job(job_id: str) -> tuple[Any, Any, str | None]:
         """Find which queue holds ``job_id``.

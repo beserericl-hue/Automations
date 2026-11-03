@@ -40,12 +40,9 @@ NEWSLETTER_STEP_URLS: dict[str, Callable[[Any], str]] = {
 
 # Every step service the orchestrator can dial — the set /admin/health probes (B2). Keep in sync when
 # a step is added, or health will report a container as fine while one of its processes is dead.
-# library_retrieve is the F0 vertical-slice demo, superseded by `library` (A9) — probed so long as the
-# entrypoint still starts it; drop both together.
 ALL_STEP_URLS: dict[str, Callable[[Any], str]] = {
     **WRITE_TOOL_URLS,
     **NEWSLETTER_STEP_URLS,
-    "library_retrieve": lambda s: s.library_retrieve_step_url,
 }
 
 # Tools whose generation routinely exceeds the synchronous edge limit — default to async.

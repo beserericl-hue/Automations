@@ -221,7 +221,6 @@ class EngineSettings(BaseSettings):
     render_step_url: str = Field(default="http://localhost:8017", alias="RENDER_STEP_URL")
     persist_step_url: str = Field(default="http://localhost:8018", alias="PERSIST_STEP_URL")
     deliver_step_url: str = Field(default="http://localhost:8019", alias="DELIVER_STEP_URL")
-    library_retrieve_step_url: str = Field(default="http://localhost:8002", alias="LIBRARY_RETRIEVE_STEP_URL")
     # Write-workshop step services (F1-B) — same in-container localhost convention.
     chapter_step_url: str = Field(default="http://localhost:8020", alias="CHAPTER_STEP_URL")
     research_step_url: str = Field(default="http://localhost:8021", alias="RESEARCH_STEP_URL")

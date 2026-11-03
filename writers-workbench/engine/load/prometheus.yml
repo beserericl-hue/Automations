@@ -8,6 +8,3 @@ scrape_configs:
   - job_name: orchestrator
     static_configs:
       - targets: ["orchestrator:8001"]
-  - job_name: library_retrieve_step
-    static_configs:
-      - targets: ["library-retrieve-step:8002"]
