@@ -377,6 +377,14 @@ async def _op_edit_outline(payload: dict) -> dict:
     outline = dict(payload.get("outline") or {})
     edits = list(payload.get("edits") or [])
     if not edits:
+        # From chat / Eve the router sends a free-text directive + project title, never a structured edit
+        # list or the outline itself. This op then returned applied=0 and changed nothing while the user
+        # had been told "I'm revising the outline" (engine E2E R118, 2026-11-02). A directive IS a
+        # revision: hand it to revise-outline, which loads the project's saved outline by title, applies
+        # the directive and persists it.
+        if str(payload.get("directive") or "").strip():
+            result = await _op_revise_outline(payload)
+            return {"applied": 1 if result.get("revised") else 0, **result}
         return {"applied": 0, "outline": outline}
     store = get_prompt_store()
     lock = store.get("follett_seeds.character.locked_roster").format(

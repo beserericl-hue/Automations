@@ -39,3 +39,40 @@ async def test_edit_outline_no_edits_is_noop() -> None:
     out = await _op_edit_outline({"outline": base, "edits": []})
     assert out["applied"] == 0
     assert out["outline"] == base
+
+
+@pytest.mark.asyncio
+async def test_edit_outline_directive_without_edits_revises(monkeypatch) -> None:
+    """R118: chat sends {directive, project_title} and no edit list. That must revise the saved outline
+    (via revise-outline), not return applied=0 after telling the user it is revising."""
+    import brainstorm_step.main as bs
+
+    seen: dict = {}
+
+    async def fake_revise(payload: dict) -> dict:
+        seen.update(payload)
+        return {"revised": True, "outline": {"title": "The Signal Beneath"}, "persist": {"persisted": True}}
+
+    monkeypatch.setattr(bs, "_op_revise_outline", fake_revise)
+    payload = {
+        "directive": "Make sub-chapter 2 about trust.",
+        "project_title": "The Signal Beneath",
+        "persist": True,
+    }
+    out = await _op_edit_outline(payload)
+    assert seen["directive"] == "Make sub-chapter 2 about trust."
+    assert seen["project_title"] == "The Signal Beneath"
+    assert out["applied"] == 1 and out["revised"] is True
+    assert out["persist"] == {"persisted": True}
+
+
+@pytest.mark.asyncio
+async def test_edit_outline_directive_revision_failure_reports_not_applied(monkeypatch) -> None:
+    import brainstorm_step.main as bs
+
+    async def fake_revise(payload: dict) -> dict:
+        return {"revised": False, "outline": {}, "error": "no outline to revise"}
+
+    monkeypatch.setattr(bs, "_op_revise_outline", fake_revise)
+    out = await _op_edit_outline({"directive": "Add a scene.", "project_title": "Nope"})
+    assert out["applied"] == 0 and out["error"] == "no outline to revise"
