@@ -6,6 +6,7 @@
 // Research: 2, Cover art: 10, Social repurpose: 3, list/retrieve: 0").
 
 import { getGlobalJson } from '../lib/app-config.js';
+import { logger } from '../lib/logger.js';
 
 export const DEFAULT_CREDIT_COSTS: Record<string, number> = {
   // Writing operations
@@ -34,7 +35,78 @@ export const DEFAULT_CREDIT_COSTS: Record<string, number> = {
   list_story_arcs: 0,
   story_bible_edit: 0,
   chat_generic: 0,
+  // More free sync ops the chat classifier / engine hub emit (library reads and state changes).
+  list_content: 0,
+  outline_versions: 0,
+  revert_outline: 0,
+  content_action: 0,
+  create_project: 0,
+  scrape_url: 0,
+  // Explicitly zero: not charged on ANY entry point today. Their price is a pending decision by the
+  // owner — named here so they are a deliberate 0, not a lookup miss.
+  qa_chapter: 0,
+  repair_chapter: 0,
+  review_chapter: 0,
+  format_kindle: 0, // the Export tab builds the .docx server-side, free
+  email_content: 0,
+  eve_callback: 0,
 };
+
+/**
+ * Operation names that are NOT credit keys themselves, mapped to the key the equivalent
+ * operation is charged under elsewhere. The chat classifier and the engine hub name operations
+ * their own way ("research_report", "media.social-posts"); without this map those names missed
+ * the table and were charged 0 while the same work through its own screen was charged.
+ *
+ * Rules (enforced by credit-costs-coverage.test.ts): every name the classifier, the engine catalog
+ * or a route can emit resolves to an entry in DEFAULT_CREDIT_COSTS, an alias never shadows a key,
+ * and every alias points at a key that exists.
+ */
+export const CREDIT_KEY_ALIASES: Record<string, string> = {
+  // ---- chat classifier (server/src/lib/jobs/classifier.ts) ----
+  research_report: 'research', // = POST /api/research/run
+  repurpose_social: 'social_repurpose', // = social-generate / social-calendar
+  edit_outline: 'revise_outline', // = POST /api/projects/:id/outline/revise
+
+  // ---- engine hub catalog (engine/.../hub/catalog.py), as tool.op ----
+  'library.list-outlines': 'list_outlines',
+  'library.retrieve': 'retrieve_content',
+  'library.lifecycle': 'content_action',
+  'library.versions': 'outline_versions',
+  'library.revert': 'revert_outline',
+  'library.email-content': 'email_content',
+  'story_bible.list': 'retrieve_content',
+  'story_bible.add': 'story_bible_edit',
+  'story_bible.update': 'story_bible_edit',
+  'media.scrape-url': 'scrape_url',
+  'media.cover-art': 'cover_art',
+  'media.social-posts': 'social_repurpose',
+  'chapter.write': 'write_chapter',
+  'chapter.rewrite': 'write_chapter', // chapter-actions charges a rewrite as write_chapter
+  'chapter.plan': 'brainstorm_chapter', // chapter-actions "outline" action -> engine plan op
+  'chapter.repair': 'repair_chapter',
+  'chapter.qa': 'qa_chapter',
+  'chapter.review': 'review_chapter',
+  'chapter.blog': 'write_blog',
+  'chapter.newsletter': 'write_newsletter',
+  'chapter.short-story': 'write_short_story',
+  'brainstorm.story': 'brainstorm_story',
+  'brainstorm.short-story': 'brainstorm',
+  'brainstorm.revise-outline': 'revise_outline',
+  'brainstorm.edit-outline': 'revise_outline',
+  'brainstorm.create-project': 'create_project',
+  'research.run': 'research',
+  'notify.eve-callback': 'eve_callback',
+};
+
+/** The credit key an operation name is charged under, or null when it has no entry at all. */
+export function resolveCreditKey(op: string): string | null {
+  if (Object.prototype.hasOwnProperty.call(DEFAULT_CREDIT_COSTS, op)) return op;
+  const alias = CREDIT_KEY_ALIASES[op];
+  return alias && Object.prototype.hasOwnProperty.call(DEFAULT_CREDIT_COSTS, alias) ? alias : null;
+}
+
+const warnedUnmapped = new Set<string>();
 
 let cachedCosts: Record<string, number> | null = null;
 let cacheLoadedAt = 0;
@@ -57,10 +129,20 @@ async function loadCosts(): Promise<Record<string, number>> {
 
 export async function getCreditCost(jobType: string): Promise<number> {
   const costs = await loadCosts();
-  return costs[jobType] ?? 0;
+  // A superuser-configured key (even one with no default) is honoured as-is.
+  if (Object.prototype.hasOwnProperty.call(costs, jobType)) return costs[jobType];
+  const key = resolveCreditKey(jobType);
+  if (key !== null) return costs[key] ?? DEFAULT_CREDIT_COSTS[key];
+  // Still 0 (never block a user on a naming slip), but loudly: an unmapped name is a billing gap.
+  if (!warnedUnmapped.has(jobType)) {
+    warnedUnmapped.add(jobType);
+    logger.warn({ jobType }, 'credit-costs: operation has no credit entry; charging 0. Add it to DEFAULT_CREDIT_COSTS or CREDIT_KEY_ALIASES.');
+  }
+  return 0;
 }
 
 export function clearCreditCostCache(): void {
   cachedCosts = null;
   cacheLoadedAt = 0;
+  warnedUnmapped.clear();
 }

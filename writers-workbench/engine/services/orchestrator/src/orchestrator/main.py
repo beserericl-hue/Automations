@@ -867,8 +867,7 @@ def build_app() -> FastAPI:
         ``SOCIAL_POSTING_MODE=live`` — see ``writer_engine.social.poster``. A live run that posted
         anything mails a summary to ALERT_EMAIL, as the n8n cron mailed Eric.
         """
-        import httpx
-
+        from writer_engine.safe_http import safe_async_client
         from writer_engine.social import poster
         from writer_engine.social.feed import feed_posted_item
         from writer_engine.supabase.client import get_supabase_admin
@@ -877,7 +876,8 @@ def build_app() -> FastAPI:
         if not (settings.supabase_url and settings.supabase_service_role_key):
             return {"claimed": 0, "reason": "no supabase"}
         client = await get_supabase_admin()
-        async with httpx.AsyncClient() as http:
+        # Blog endpoints are user-typed: the connection itself is checked (anti DNS-rebinding).
+        async with safe_async_client() as http:
             result = await poster.run_tick(client, poster.Transport(http=http), after_posted=feed_posted_item)
         if result.claimed and result.mode == "live" and settings.alert_email:
             from datetime import UTC, datetime

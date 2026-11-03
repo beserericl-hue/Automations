@@ -36,6 +36,7 @@ import httpx
 
 from writer_engine.config import get_settings
 from writer_engine.ingestion import enrich, feeds, keys, sources, store
+from writer_engine.safe_http import safe_async_client
 from writer_engine.telemetry import token_accounting
 from writer_engine.telemetry.logging import get_logger
 
@@ -295,7 +296,7 @@ async def _ingest_feed(
     result = FeedRunResult(feed_id=feed.id, feed_name=feed.name)
 
     owned = client is None
-    http = client or httpx.AsyncClient(timeout=feeds.FETCH_TIMEOUT_S, follow_redirects=True)
+    http = client or safe_async_client(timeout=feeds.FETCH_TIMEOUT_S, follow_redirects=True)
     try:
         try:
             if feed.url_type == "source":
@@ -440,7 +441,8 @@ async def ingest_due_feeds(
     logger.info("ingestion.tick", feeds=len(claimed))
     genres = await store.edition_genres([f.edition_id for f in claimed])
     results: list[FeedRunResult] = []
-    async with httpx.AsyncClient(timeout=feeds.FETCH_TIMEOUT_S, follow_redirects=True) as client:
+    # Feed URLs are typed by users: every connection is checked against the address it reaches.
+    async with safe_async_client(timeout=feeds.FETCH_TIMEOUT_S, follow_redirects=True) as client:
         for feed in claimed:
             results.append(
                 await ingest_feed(
