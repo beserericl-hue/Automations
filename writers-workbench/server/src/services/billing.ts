@@ -247,7 +247,13 @@ export async function handleSubscriptionDeleted(sub: Stripe.Subscription): Promi
  * A credit pack was paid for (Checkout in payment mode). Idempotent on the PaymentIntent: the
  * unique index on credit_transactions.stripe_payment_intent_id refuses a second grant.
  */
-export async function grantPurchasedCredits(userId: string, credits: number, amountCents: number, paymentIntentId: string): Promise<boolean> {
+export async function grantPurchasedCredits(
+  userId: string,
+  credits: number,
+  amountCents: number,
+  paymentIntentId: string,
+  extra: { pack?: string; quantity?: number; source?: string } = {},
+): Promise<boolean> {
   const sb = getSupabaseAdmin();
   const { data: done } = await sb.from('credit_transactions').select('id').eq('stripe_payment_intent_id', paymentIntentId).eq('transaction_type', 'purchase').limit(1);
   if (done && done.length) return false;
@@ -259,10 +265,17 @@ export async function grantPurchasedCredits(userId: string, credits: number, amo
     amount: credits,
     balance_after: estimated,
     transaction_type: 'purchase',
-    description: `Purchased ${credits} credits for $${(amountCents / 100).toFixed(2)}`,
+    description: extra.source === 'auto_recharge'
+      ? `Auto-recharge: ${credits} credits for $${(amountCents / 100).toFixed(2)}`
+      : `Purchased ${extra.quantity && extra.quantity > 1 ? `${extra.quantity} x ` : ''}${credits} credits for $${(amountCents / 100).toFixed(2)}`,
     reference_id: paymentIntentId,
     stripe_payment_intent_id: paymentIntentId,
-    metadata: { price_paid_cents: amountCents },
+    metadata: {
+      price_paid_cents: amountCents,
+      ...(extra.pack ? { pack: extra.pack } : {}),
+      ...(extra.quantity ? { quantity: extra.quantity } : {}),
+      ...(extra.source ? { source: extra.source } : {}),
+    },
   }).select('id').single();
   // The unique index is the real guard against a concurrent second delivery: record first, then add.
   if (txErr) {

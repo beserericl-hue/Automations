@@ -35,8 +35,15 @@ import { publishingRouter } from './routes/publishing.js';
 import { landingPageRouter } from './routes/landing-page.js';
 import { bookPagesRouter } from './routes/book-pages.js';
 import { printRouter, printWebhookRouter } from './routes/print.js';
-import { stripeWebhookRouter } from './routes/stripe-webhook.js';
+import { stripeWebhookRouter, autoRechargePausedEmail } from './routes/stripe-webhook.js';
 import { billingRouter } from './routes/billing.js';
+import { onBalanceLowered } from './services/credits.js';
+import { maybeAutoRecharge, setAutoRechargePauseNotifier } from './services/credit-packs.js';
+
+// Evergreen auto-recharge (2026-11-03): every deduction checks the user's threshold. Stripe cannot see
+// our balance, so this trigger is app-side; the charge itself is a Stripe off-session PaymentIntent.
+onBalanceLowered(maybeAutoRecharge);
+setAutoRechargePauseNotifier(autoRechargePausedEmail);
 import { billingAdminRouter, billingSuperuserRouter } from './routes/billing-admin.js';
 import { bookPrintRouter } from './routes/book-print.js';
 import { seriesRouter } from './routes/series.js';

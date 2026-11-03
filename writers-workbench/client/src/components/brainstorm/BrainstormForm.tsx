@@ -211,7 +211,9 @@ export default function BrainstormForm() {
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Submit failed');
+        // A priced op answers 402 with { error: { code, message } }; older errors are { error: string }.
+        if (res.status === 402) throw new Error(`Not enough credits: ${err.error?.message ?? 'buy more on the Billing page.'}`);
+        throw new Error(typeof err.error === 'string' ? err.error : err.error?.message || 'Submit failed');
       }
 
       setResult({

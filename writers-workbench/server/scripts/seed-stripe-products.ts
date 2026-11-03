@@ -115,6 +115,65 @@ async function main(): Promise<void> {
     }
   }
 
+  // Book plans and top-ups (migration 052): one Product + one ONE-TIME Price per pack, lookup key
+  // `ww_pack_<name>`. Same rule as the tiers: a changed amount gets a new Price that takes the key.
+  const { data: packs, error: packErr } = await sb.from('credit_packs_v2')
+    .select('id, name, kind, display_name, description, credits, price_cents, active, stripe_product_id, stripe_price_id')
+    .order('sort_order');
+  if (packErr) {
+    console.log(`packs: skipped (${packErr.message})`);
+  }
+  for (const pack of (packs ?? []) as Array<{ id: string; name: string; kind: string; display_name: string; description: string | null; credits: number; price_cents: number; active: boolean; stripe_product_id: string | null; stripe_price_id: string | null }>) {
+    let productId = pack.stripe_product_id;
+    if (productId) {
+      try {
+        const p = await stripe.products.retrieve(productId);
+        if (p.deleted) productId = null;
+      } catch {
+        productId = null;
+      }
+    }
+    if (!productId) {
+      const found = await stripe.products.search({ query: `metadata['pack_id']:'${pack.id}'` });
+      productId = found.data[0]?.id ?? null;
+    }
+    const fields = {
+      name: `Writers Workbench — ${pack.display_name}`,
+      description: pack.description || `${pack.credits} credits`,
+      metadata: { pack_id: pack.id, pack_name: pack.name, pack_kind: pack.kind, credits: String(pack.credits) },
+      active: pack.active,
+    };
+    if (dry) {
+      console.log(`- pack ${pack.name}: product ${productId ?? '(new)'}`);
+    } else if (productId) {
+      await stripe.products.update(productId, fields);
+    } else {
+      productId = (await stripe.products.create(fields)).id;
+    }
+    const lookup = `ww_pack_${pack.name}`;
+    const existing = (await stripe.prices.list({ lookup_keys: [lookup], active: true, limit: 1 })).data[0];
+    let priceId: string | null = null;
+    if (existing && existing.unit_amount === pack.price_cents && existing.product === productId && !existing.recurring) {
+      priceId = existing.id;
+      console.log(`  ${pack.name}: ${existing.id} $${(pack.price_cents / 100).toFixed(2)} (unchanged)`);
+    } else if (dry) {
+      console.log(`  ${pack.name}: would ${existing ? 'replace' : 'create'} price $${(pack.price_cents / 100).toFixed(2)}`);
+    } else {
+      const price = await stripe.prices.create({
+        product: productId!, currency: 'usd', unit_amount: pack.price_cents,
+        lookup_key: lookup, transfer_lookup_key: true, metadata: { pack_id: pack.id, credits: String(pack.credits) },
+      });
+      if (existing) await stripe.prices.update(existing.id, { active: false });
+      priceId = price.id;
+      console.log(`  ${pack.name}: ${price.id} $${(pack.price_cents / 100).toFixed(2)} (${existing ? 'replaced' : 'new'})`);
+    }
+    if (!dry) {
+      const { error: upErr } = await sb.from('credit_packs_v2').update({ stripe_product_id: productId, stripe_price_id: priceId }).eq('id', pack.id);
+      if (upErr) throw new Error(upErr.message);
+      console.log(`- pack ${pack.name}: saved (${productId})`);
+    }
+  }
+
   // The Customer Portal refuses to open until a configuration exists in this mode.
   const configs = await stripe.billingPortal.configurations.list({ is_default: true, limit: 1 });
   if (configs.data.length) {

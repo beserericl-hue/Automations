@@ -40,6 +40,8 @@ HEAVY=(
   regression/social-publish.spec.ts
   regression/sprint9-billing.spec.ts
   regression/chat-credit-keys.spec.ts
+  regression/credit-pricing.spec.ts
+  regression/book-plans-billing.spec.ts
   regression/content-studio-full.spec.ts
 )
 

@@ -10,7 +10,9 @@ import { addTrackedJob } from '../lib/jobs/job-tracker.js';
 import type { N8nWebhookJob } from '../lib/jobs/types.js';
 import { getCreditCost } from '../services/credit-costs.js';
 import { deductCredits } from '../services/credits.js';
-import { hubBackend, callEngineHub } from '../lib/engine-hub.js';
+import { hubBackend, callEngineHub, abortEngineJob, type HubResponse } from '../lib/engine-hub.js';
+import { assistantUnits } from './content-studio.js';
+import { chargeCredits, sendInsufficient } from '../lib/credit-charge.js';
 
 export const chatRouter = Router();
 
@@ -63,6 +65,43 @@ function setCreditsHeader(res: Response, remaining: number): void {
   res.setHeader('X-Credits-Remaining', String(remaining));
 }
 
+/**
+ * What one engine-hub turn costs, from what the hub ACTUALLY ran (2026-11-03). The server's regex
+ * classifier only guesses; the engine's router decides. Each dispatched op is priced under its own
+ * credit key (chapter.write -> write_chapter, research.run -> research, brainstorm.story ->
+ * brainstorm_story, library reads -> 0 ...). A turn that ran no op (a plain answer, or a fan-out whose
+ * clauses were all answers) costs the chat rate. A Content Studio op is priced per topic/draft, as on
+ * the studio page.
+ */
+export async function hubTurnCost(hub: HubResponse): Promise<{ cost: number; ops: string[] }> {
+  if (hub.kind === 'error') return { cost: 0, ops: [] };
+  const dispatched: Array<{ tool: string; op: string; params?: Record<string, unknown> | null }> = [];
+  if (Array.isArray(hub.jobs) && hub.jobs.length > 0) {
+    for (const j of hub.jobs) {
+      if (j?.tool && j?.op) dispatched.push({ tool: j.tool, op: j.op });
+    }
+  } else if (hub.kind !== 'reply' && hub.tool && hub.op) {
+    dispatched.push({ tool: hub.tool, op: hub.op, params: hub.params });
+  }
+  if (dispatched.length === 0) {
+    return { cost: await getCreditCost('chat_generic'), ops: ['chat_generic'] };
+  }
+  let cost = 0;
+  for (const d of dispatched) {
+    const unit = await getCreditCost(`${d.tool}.${d.op}`);
+    // Studio drafting is per topic / per draft revised; a studio op that drafts nothing is free.
+    cost += d.tool === 'studio' ? unit * (hub.kind === 'queued' ? assistantUnits(d.op, d.params ?? null) : 0) : unit;
+  }
+  return { cost, ops: dispatched.map((d) => `${d.tool}.${d.op}`) };
+}
+
+/** Engine job ids a hub turn started (the fan-out's jobs, or the single job). */
+function hubJobIds(hub: HubResponse): string[] {
+  const ids = Array.isArray(hub.jobs) ? hub.jobs.map((j) => j?.job_id).filter((x): x is string => Boolean(x)) : [];
+  if (ids.length === 0 && hub.job_id) ids.push(hub.job_id);
+  return ids;
+}
+
 chatRouter.post('/proxy', requireAuth, validateBody(ChatProxySchema), async (req, res) => {
   const webhookUrl = resolveWebhookUrl();
 
@@ -87,12 +126,84 @@ chatRouter.post('/proxy', requireAuth, validateBody(ChatProxySchema), async (req
     return;
   }
 
-  // Sprint 8: pre-flight credit check. Cost is dynamic per jobType, sourced
-  // from app_config_v2 with hard-coded defaults. Superusers/admins bypass.
-  // Users with NO subscription record (e.g. mid-onboarding, test fixtures) are
-  // also let through — the credit gate only fires once a subscription exists.
-  const cost = await getCreditCost(classification.jobType);
   const hasSubscription = req.subscriptionTier !== null && req.subscriptionTier !== undefined;
+
+  // CR-008 Workstream C: Path B cutover. When HUB_BACKEND=engine, route to the engine hub instead of
+  // n8n — its Gemini router picks the tool, info ops return data synchronously, load-bearing ops are
+  // queued (returning an engine job_id the client polls via /api/jobs/engine/:id). Default is n8n.
+  //
+  // Charging (2026-11-03): by the op the engine ROUTED to, once, after it is known (hubTurnCost). The
+  // pre-flight gate can only check the chat rate, since nothing is known before routing; the real
+  // charge is then an atomic deduction that refuses to overdraw. If the balance does not cover the
+  // routed op, the queued job(s) are aborted and the turn answers 402 like any other priced op.
+  if (hubBackend() === 'engine') {
+    const chatRate = await getCreditCost('chat_generic');
+    if (!bypassCredits(req) && hasSubscription && chatRate > 0 && (req.creditsRemaining ?? 0) < chatRate) {
+      sendInsufficient(res, chatRate, req.creditsRemaining ?? 0);
+      return;
+    }
+    let hub: HubResponse;
+    try {
+      // The page's project rides in `context`; the conversation id keys the engine's memory of this
+      // drawer session (last list shown, current project, recent turns), which the engine loads
+      // before routing and saves after it answers.
+      hub = await callEngineHub({
+        message,
+        userId,
+        conversationId: req.body.conversation_id,
+        context: {
+          ...(req.body.project_id ? { project_id: req.body.project_id } : {}),
+          ...(req.body.project_title ? { project_title: req.body.project_title } : {}),
+        },
+      });
+    } catch (error) {
+      logger.error({ err: error, userId }, 'chat: engine hub failed');
+      res.status(502).json({ error: 'Failed to reach engine hub' });
+      return;
+    }
+    const { cost: turnCost, ops } = await hubTurnCost(hub);
+    const jobIds = hubJobIds(hub);
+    const paid = await chargeCredits(req, res, turnCost, `chat.engine:${ops.join('+')}`, jobIds[0]);
+    if (paid.refused) {
+      // The routed op costs more than the balance: the work must not run for free.
+      await Promise.all(jobIds.map((id) => abortEngineJob(id).catch(() => ({ aborted: false }))));
+      logger.warn({ userId, ops, turnCost, jobIds }, 'chat: routed op unaffordable; engine job(s) aborted');
+      sendInsufficient(res, turnCost, paid.remaining);
+      return;
+    }
+    const balance = paid.remaining;
+    const classBlock = {
+      tier: classification.tier,
+      queue: classification.queue,
+      jobType: classification.jobType,
+    };
+    const conversation = hub.conversation_id ? { conversationId: hub.conversation_id } : {};
+    const charged = { creditsCharged: paid.charged, creditsRemaining: balance, chargedOps: ops, ...(jobIds.length > 1 ? { jobIds } : {}) };
+    if (hub.kind === 'queued' && hub.job_id) {
+      res.json({
+        mode: 'async', jobId: hub.job_id, engineJob: true, status: hub.status ?? 'queued',
+        assistantMessage: hub.assistant_message, classification: classBlock,
+        ...charged,
+        ...conversation,
+      });
+    } else {
+      res.json({
+        mode: 'sync', classification: classBlock,
+        ...charged,
+        assistantMessage: hub.assistant_message,
+        data: hub.kind === 'data' ? hub.data : { reply: hub.assistant_message },
+        ...(hub.tool ? { tool: hub.tool, op: hub.op } : {}),
+        ...conversation,
+      });
+    }
+    return;
+  }
+
+  // Sprint 8: pre-flight credit check (n8n backend). Cost is dynamic per jobType, sourced from the
+  // global config with hard-coded defaults. Superusers/admins bypass. Users with NO subscription
+  // record (e.g. mid-onboarding, test fixtures) are also let through — the credit gate only fires
+  // once a subscription exists. n8n does not report what it ran, so the classifier's guess prices it.
+  const cost = await getCreditCost(classification.jobType);
   if (!bypassCredits(req) && cost > 0 && hasSubscription && (req.creditsRemaining ?? 0) < cost) {
     setCreditsHeader(res, req.creditsRemaining ?? 0);
     res.status(402).json({
@@ -107,59 +218,6 @@ chatRouter.post('/proxy', requireAuth, validateBody(ChatProxySchema), async (req
     return;
   }
   const shouldDeduct = !bypassCredits(req) && cost > 0 && hasSubscription;
-
-  // CR-008 Workstream C: Path B cutover. When HUB_BACKEND=engine, route to the engine hub instead of
-  // n8n — its Gemini router picks the tool, info ops return data synchronously, load-bearing ops are
-  // queued (returning an engine job_id the client polls via /api/jobs/engine/:id). Default is n8n.
-  if (hubBackend() === 'engine') {
-    try {
-      // The page's project rides in `context`; the conversation id keys the engine's memory of this
-      // drawer session (last list shown, current project, recent turns), which the engine loads
-      // before routing and saves after it answers.
-      const hub = await callEngineHub({
-        message,
-        userId,
-        conversationId: req.body.conversation_id,
-        context: {
-          ...(req.body.project_id ? { project_id: req.body.project_id } : {}),
-          ...(req.body.project_title ? { project_title: req.body.project_title } : {}),
-        },
-      });
-      let balance = req.creditsRemaining ?? 0;
-      if (shouldDeduct) {
-        const result = await deductCredits(userId, cost, `chat.engine:${classification.jobType}`);
-        if (result.ok) balance = result.balance_after;
-      }
-      setCreditsHeader(res, balance);
-      const classBlock = {
-        tier: classification.tier,
-        queue: classification.queue,
-        jobType: classification.jobType,
-      };
-      const conversation = hub.conversation_id ? { conversationId: hub.conversation_id } : {};
-      if (hub.kind === 'queued' && hub.job_id) {
-        res.json({
-          mode: 'async', jobId: hub.job_id, engineJob: true, status: hub.status ?? 'queued',
-          assistantMessage: hub.assistant_message, classification: classBlock,
-          creditsCharged: bypassCredits(req) ? 0 : cost, creditsRemaining: balance,
-          ...conversation,
-        });
-      } else {
-        res.json({
-          mode: 'sync', classification: classBlock,
-          creditsCharged: bypassCredits(req) ? 0 : cost, creditsRemaining: balance,
-          assistantMessage: hub.assistant_message,
-          data: hub.kind === 'data' ? hub.data : { reply: hub.assistant_message },
-          ...(hub.tool ? { tool: hub.tool, op: hub.op } : {}),
-          ...conversation,
-        });
-      }
-    } catch (error) {
-      logger.error({ err: error, userId }, 'chat: engine hub failed');
-      res.status(502).json({ error: 'Failed to reach engine hub' });
-    }
-    return;
-  }
 
   // Sync tier: keep the low-latency direct call so the client gets an
   // immediate response (list/retrieve/approve and friends).

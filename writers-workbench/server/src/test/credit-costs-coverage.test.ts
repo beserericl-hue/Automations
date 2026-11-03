@@ -17,8 +17,11 @@ const warn = vi.fn();
 vi.mock('../lib/logger.js', () => ({ logger: { warn: (...a: unknown[]) => warn(...a), info: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
 
 import {
+  CREDIT_COST_INFO,
   CREDIT_KEY_ALIASES,
   DEFAULT_CREDIT_COSTS,
+  creditCostCatalog,
+  humanizeUnits,
   clearCreditCostCache,
   getCreditCost,
   resolveCreditKey,
@@ -84,6 +87,17 @@ describe('credit keys: every emitted operation has an explicit entry', () => {
     }
   });
 
+  it('every credit key has a panel entry (label + group) and the panel lists nothing else', () => {
+    expect(Object.keys(CREDIT_COST_INFO).sort()).toEqual(Object.keys(DEFAULT_CREDIT_COSTS).sort());
+    const catalog = creditCostCatalog();
+    expect(catalog.map((e) => e.key).sort()).toEqual(Object.keys(DEFAULT_CREDIT_COSTS).sort());
+    for (const e of catalog) {
+      expect(e.label.length, e.key).toBeGreaterThan(0);
+      expect(e.default).toBe(DEFAULT_CREDIT_COSTS[e.key]);
+      expect(Number.isInteger(e.default) && e.default >= 0).toBe(true);
+    }
+  });
+
   it('no emitted name hits the unmapped path (no warning, explicit cost)', async () => {
     for (const op of [...classifierNames, ...engineCatalogNames()]) await getCreditCost(op);
     expect(warn).not.toHaveBeenCalled();
@@ -108,11 +122,32 @@ describe('credit keys: chat names cost the same as the equivalent screen operati
     expect(await getCreditCost(chatName)).toBe(amount);
   });
 
-  it('pending-pricing ops stay an explicit 0 (not newly charged)', async () => {
-    for (const op of ['qa_chapter', 'format_kindle', 'chapter.qa', 'chapter.repair', 'chapter.review', 'notify.eve-callback']) {
+  it('repair, Q/A and humanize are priced (owner decision 2026-11-03), from chat and from their screens', async () => {
+    for (const [op, amount] of [
+      ['qa_chapter', 4], ['chapter.qa', 4], ['repair_chapter', 4], ['chapter.repair', 4],
+      ['humanize_passage', 4], ['chapter.humanize-passage', 4],
+    ] as const) {
+      expect(await getCreditCost(op), op).toBe(amount);
+    }
+  });
+
+  it('ops outside that decision stay an explicit 0', async () => {
+    for (const op of ['format_kindle', 'chapter.review', 'notify.eve-callback', 'chat_generic']) {
       expect(resolveCreditKey(op)).not.toBeNull();
       expect(await getCreditCost(op)).toBe(0);
     }
+  });
+
+  it('a book brainstorm costs the same from chat (brainstorm.story) and from the Brainstorm screen (brainstorm_story)', async () => {
+    expect(await getCreditCost('brainstorm.story')).toBe(await getCreditCost('brainstorm_story'));
+    expect(await getCreditCost('brainstorm_story')).toBe(3);
+  });
+
+  it('humanize is priced per started 100 words, minimum one unit', () => {
+    expect(humanizeUnits('one')).toBe(1);
+    expect(humanizeUnits(Array(100).fill('w').join(' '))).toBe(1);
+    expect(humanizeUnits(Array(101).fill('w').join(' '))).toBe(2);
+    expect(humanizeUnits(`  ${Array(250).fill('w').join('\n')}  `)).toBe(3);
   });
 
   it('an unknown name still costs 0 but logs a warning (once)', async () => {

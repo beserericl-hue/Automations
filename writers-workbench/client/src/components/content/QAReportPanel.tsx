@@ -25,6 +25,8 @@ export default function QAReportPanel({ metadata, contentId, userId, contentText
   // reports written before that carry no fingerprint and are flagged as unverifiable rather than
   // silently trusted.
   const [staleness, setStaleness] = useState<'current' | 'stale' | 'unknown'>('unknown');
+  // Q/A and the Q/A fix are priced (2026-11-03): a 402 says why nothing started.
+  const [creditError, setCreditError] = useState<string | null>(null);
   useEffect(() => {
     const scored = report?.scored_sha256;
     if (!report) return;
@@ -71,7 +73,8 @@ export default function QAReportPanel({ metadata, contentId, userId, contentText
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
-      const body = (await res.json()) as { jobId?: string };
+      const body = (await res.json()) as { jobId?: string; error?: { message?: string } };
+      setCreditError(res.status === 402 ? `Not enough credits: ${body.error?.message ?? 'buy more on the Billing page.'}` : null);
       if (body.jobId) jobQueue.trackJob('qa', body.jobId, [['content-detail', contentId]]);
     } catch {
       /* button re-enables on next render */
@@ -91,7 +94,8 @@ export default function QAReportPanel({ metadata, contentId, userId, contentText
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
-      const body = (await res.json()) as { jobId?: string };
+      const body = (await res.json()) as { jobId?: string; error?: { message?: string } };
+      setCreditError(res.status === 402 ? `Not enough credits: ${body.error?.message ?? 'buy more on the Billing page.'}` : null);
       if (body.jobId) jobQueue.trackJob('qa-fix', body.jobId, [['content-detail', contentId], ['content-versions', contentId]]);
     } catch {
       /* button re-enables on next render */
@@ -126,6 +130,7 @@ export default function QAReportPanel({ metadata, contentId, userId, contentText
             Failed to start Q/A check. Try again.
           </p>
         )}
+        {creditError && <p className="mt-2 text-xs text-red-600" role="alert" data-testid="qa-credit-error">{creditError}</p>}
       </div>
     );
   }
@@ -136,6 +141,7 @@ export default function QAReportPanel({ metadata, contentId, userId, contentText
 
   return (
     <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+      {creditError && <p className="px-4 py-2 text-xs text-red-600" role="alert" data-testid="qa-credit-error">{creditError}</p>}
       {staleness !== 'current' && (
         <div
           className={`px-4 py-2 text-xs ${

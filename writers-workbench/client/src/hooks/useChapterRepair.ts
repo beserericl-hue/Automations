@@ -55,7 +55,8 @@ export function useChapterRepair(contentId: string, invalidateKeys: QueryKey[]) 
       KEY,
       async () => {
         const r = await fetch(`/api/content/${contentId}/repair`, { method: 'POST', headers: await authHeaders() });
-        const j = (await r.json()) as { jobId?: string };
+        const j = (await r.json()) as { jobId?: string; error?: { message?: string } };
+        if (r.status === 402) throw new Error(`Not enough credits: ${j.error?.message ?? 'buy more on the Billing page.'}`);
         if (!r.ok || !j.jobId) throw new Error('repair failed to queue');
         return j.jobId;
       },
