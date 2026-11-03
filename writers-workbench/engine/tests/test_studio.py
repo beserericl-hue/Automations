@@ -366,6 +366,7 @@ async def test_actions_move_only_posts_in_the_right_state() -> None:
     ]
     out = await core.apply_action(db, ed, await core.own_posts(db, ed, numbers=[1, 2, 9]), "approve")
     assert [d["display_number"] for d in out["done"]] == [1]
+    assert out["message"].startswith("Approved: #1.")
     assert [s["display_number"] for s in out["skipped"]] == [2]  # #9 is another edition's: not even found
     assert db.tables["social_schedule_v2"][0]["state"] == "approved"
     await core.apply_action(db, ed, await core.own_posts(db, ed, numbers=[3]), "discard")
