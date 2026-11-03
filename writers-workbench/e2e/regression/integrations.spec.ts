@@ -53,6 +53,7 @@ test.describe('Settings → Integrations (result-asserting)', () => {
   });
 
   test('renders every section and field, secrets masked, nothing secret sent to the browser', async ({ page }) => {
+    test.setTimeout(90_000);
     const bodies: string[] = [];
     page.on('response', async (r) => {
       if (r.url().includes('/api/integrations')) bodies.push(await r.text().catch(() => ''));
@@ -65,13 +66,22 @@ test.describe('Settings → Integrations (result-asserting)', () => {
     await expect(key).toHaveValue('');
     await expect(page.getByTestId('blotato-account-id')).toBeVisible();
     for (const b of ['blotato-save', 'blotato-test', 'li-add', 'web-add']) await expect(page.getByTestId(b)).toBeEnabled();
-    // The DEV channels from the seed are listed, with their non-secret config.
-    const rows = await channels();
-    for (const r of rows.filter((c) => c.kind === 'linkedin')) await expect(page.getByTestId(`li-row-${r.channel}`)).toBeVisible();
-    for (const r of rows.filter((c) => c.kind === 'website')) {
-      await expect(page.getByTestId(`web-endpoint-${r.channel}`)).toContainText(r.config.endpoint);
-      expect(r.config.auth_env, 'migration 043 drops auth_env').toBeUndefined();
-    }
+    // The DEV channels from the seed are listed, with their non-secret config. Other runs of this
+    // spec (the writer-e2e service runs it on every deploy, concurrently with manual runs) add and
+    // remove websites/LinkedIn targets for the same user, so the page is compared with the channel
+    // set read just before it loaded and again after; if that set moved in between, reload and retry.
+    const key2 = (rs: any[]) => rs.map((c) => c.channel).sort().join(',');
+    await expect(async () => {
+      const before = await channels();
+      await open(page);
+      const rows = await channels();
+      expect(key2(rows), 'channels changed while the page loaded; retrying').toBe(key2(before));
+      for (const r of rows.filter((c) => c.kind === 'linkedin')) await expect(page.getByTestId(`li-row-${r.channel}`)).toBeVisible({ timeout: 5_000 });
+      for (const r of rows.filter((c) => c.kind === 'website')) {
+        await expect(page.getByTestId(`web-endpoint-${r.channel}`)).toContainText(r.config.endpoint, { timeout: 5_000 });
+        expect(r.config.auth_env, 'migration 043 drops auth_env').toBeUndefined();
+      }
+    }).toPass({ timeout: 60_000, intervals: [1_000, 2_000, 3_000] });
     expect(bodies.length).toBeGreaterThan(0);
     for (const b of bodies) expect(b).not.toMatch(/"v1\.[A-Za-z0-9_-]+\./);
   });
