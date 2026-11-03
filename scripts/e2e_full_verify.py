@@ -175,6 +175,10 @@ def _lifecycle_action(prompt):
         return "undelete"
     if "unpublish" in low:
         return "unpublish"
+    # Before publish/approve: "Delete the published content titled …" (R95) is a DELETE of a published
+    # row (the engine must refuse), not a publish — `\bpublish` also matches "published".
+    if re.search(r"\bdelete\b", low):
+        return "delete"
     if re.search(r"\brejec", low):
         return "reject"
     if re.search(r"\bpublish", low):
@@ -183,8 +187,6 @@ def _lifecycle_action(prompt):
         return "schedule"
     if re.search(r"\bapprov", low):
         return "approve"
-    if re.search(r"\bdelete\b", low):
-        return "delete"
     return None
 
 
