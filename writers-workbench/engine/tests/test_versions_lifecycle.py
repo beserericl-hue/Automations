@@ -214,7 +214,9 @@ def test_revert_outline_refuses_when_the_snapshot_cannot_be_saved(monkeypatch):
     )
     store.fail_inserts.add("outline_versions_v2")
     out = asyncio.run(
-        lib._op_revert({"scope": "outline", "project_title": "The Accord", "version_number": 1, "user_id": "u1"})
+        lib._op_revert(
+            {"scope": "outline", "project_title": "The Accord", "version_number": 1, "user_id": "u1"}
+        )
     )
     assert out["reverted"] is False and "nothing was changed" in out["error_message"]
     assert not [u for u in store.updates if u[0] == "writing_projects_v2"]
