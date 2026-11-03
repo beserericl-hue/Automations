@@ -308,6 +308,22 @@ describe('ApprovalDetail — image gate picks', () => {
     expect(bodies[0]).toMatchObject({ decision: 'approve', chosen_images: { 'Story one': B } });
   });
 
+  it('shows the section\'s current image as chosen even when the section writer rewrote its title', async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    stub(bodies);
+    imageRow.payload.segments = [{ story_title: 'A Rewritten Headline', chosen_image_url: B }];
+    try {
+      const ApprovalDetail = (await import('../components/newsletter/ApprovalDetail')).default;
+      renderWithProviders(<ApprovalDetail />);
+      expect(await screen.findByRole('button', { name: /Use option 2 for Story one/i })).toHaveAttribute('aria-pressed', 'true');
+      fireEvent.click(screen.getByRole('button', { name: /^Approve/i }));
+      await waitFor(() => expect(bodies).toHaveLength(1));
+      expect(bodies[0]).toMatchObject({ chosen_images: { 'Story one': B } });
+    } finally {
+      imageRow.payload.segments = [{ story_title: 'Story one', chosen_image_url: A }];
+    }
+  });
+
   it('"No image for this story" sends an empty choice', async () => {
     const bodies: Array<Record<string, unknown>> = [];
     stub(bodies);
