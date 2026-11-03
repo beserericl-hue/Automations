@@ -45,6 +45,8 @@ import { chapterActionsRouter } from './routes/chapter-actions.js';
 import { researchRunRouter } from './routes/research-run.js';
 import { socialGenerateRouter } from './routes/social-generate.js';
 import { socialCalendarRouter } from './routes/social-calendar.js';
+import { contentStudioRouter } from './routes/content-studio.js';
+import { studioFeedsRouter } from './routes/studio-feeds.js';
 import { integrationsRouter } from './routes/integrations.js';
 import { startHealthWatch } from './lib/health-watch.js';
 import { creditsRouter } from './routes/credits.js';
@@ -135,6 +137,8 @@ app.use(
 app.use('/books', bookPrintRouter);
 app.use('/books', bookPagesRouter);
 app.use('/blog', blogPagesRouter);
+// Content Studio public RSS feeds (Substack polls them; no login, the token is the secret).
+app.use('/feeds', studioFeedsRouter);
 
 // CORS with origin whitelist
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
@@ -303,6 +307,8 @@ app.use('/api/content', blogWebRouter);
 app.use('/api/content', socialGenerateRouter);
 app.use('/api/social', generalLimiter);
 app.use('/api/social', socialCalendarRouter);
+app.use('/api/studio', generalLimiter);
+app.use('/api/studio', contentStudioRouter);
 app.use('/api/integrations', generalLimiter);
 app.use('/api/integrations', integrationsRouter);
 app.use('/api/projects', generalLimiter);

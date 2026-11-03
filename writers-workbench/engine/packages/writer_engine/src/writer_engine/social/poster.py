@@ -203,8 +203,17 @@ async def _cover(
     live: bool,
     creds: UserCredentials,
 ) -> tuple[tuple[bytes, str] | None, str | None, str]:
-    """The sketchnote for this post: (website cover, Blotato media url, note). Made once, shared."""
-    if not row.get("include_image") or not wanted:
+    """The sketchnote for this post: (website cover, Blotato media url, note). Made once, shared.
+
+    A post with an ``image_url`` chosen in the Content Studio (migration 050) uses that image instead
+    of generating a sketchnote.
+    """
+    if not wanted:
+        return None, None, ""
+    chosen = str(row.get("image_url") or "").strip()
+    if chosen:
+        return await _chosen_image(transport, chosen, wanted, live=live, creds=creds)
+    if not row.get("include_image"):
         return None, None, ""
     if not live:
         return None, None, "would generate a sketchnote image (dry run: no image made)"
@@ -226,6 +235,47 @@ async def _cover(
             transport.http, src, api_key=creds.blotato_api_key, base_url=settings.blotato_base_url
         )
     return (data, content_type), media, ""
+
+
+MAX_IMAGE_BYTES = 8 * 1024 * 1024
+
+
+async def _chosen_image(
+    transport: Transport,
+    url: str,
+    wanted: list[ch.Channel],
+    *,
+    live: bool,
+    creds: UserCredentials,
+) -> tuple[tuple[bytes, str] | None, str | None, str]:
+    """Fetch the owner's chosen image (public https only) for the website cover and Blotato."""
+    if not live:
+        return None, None, f"would use the chosen image {url[:120]} (dry run: not fetched)"
+    problem = await check_public_https_url(url, resolve=transport.resolve)
+    if problem:
+        return None, None, f"the chosen image was not used ({problem}): posted without an image"
+    try:
+        resp = await transport.http.get(url, timeout=30.0)
+        data = resp.content
+        ctype = str(resp.headers.get("content-type") or "").split(";")[0].strip()
+        if resp.status_code >= 300 or not ctype.startswith("image/") or len(data) > MAX_IMAGE_BYTES:
+            return (
+                None,
+                None,
+                f"the chosen image could not be used ({resp.status_code}, {ctype or 'no type'}): posted without an image",
+            )
+    except Exception as exc:  # noqa: BLE001 - a bad image URL must not stop the post; the note says why
+        return (
+            None,
+            None,
+            f"the chosen image could not be fetched ({type(exc).__name__}): posted without an image",
+        )
+    media = None
+    if any(c.kind == "linkedin" for c in wanted) and creds.blotato_api_key:
+        media = await ch.blotato_upload_media(
+            transport.http, url, api_key=creds.blotato_api_key, base_url=get_settings().blotato_base_url
+        )
+    return (data, ctype), media, ""
 
 
 async def post_row(

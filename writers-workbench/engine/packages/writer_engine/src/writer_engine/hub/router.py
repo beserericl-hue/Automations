@@ -24,7 +24,7 @@ from writer_engine.llm.router import LLMRouter, ProviderNotRegistered
 from writer_engine.llm.structured import complete_structured
 from writer_engine.telemetry.logging import get_logger
 
-from .catalog import ToolSpec, lookup, render_catalog_prompt
+from .catalog import STUDIO_TOOL, ToolSpec, lookup, render_catalog_prompt
 from .schemas import HubDecision, HubRequest
 
 logger = get_logger("hub.router")
@@ -1264,10 +1264,96 @@ def _apply_conversation_context(req: HubRequest, decision: HubDecision) -> HubDe
     return decision
 
 
+# --------------------------------------------------------------------------- Content Studio
+
+STUDIO_SURFACE = "content_studio"
+
+_STUDIO_ACKS = {
+    "generate": "Drafting those now. They appear under Drafts for review; nothing is scheduled.",
+    "revise": "Revising it now. The draft updates when it is done.",
+    "email": "Sending the email now.",
+}
+
+
+def is_studio_request(req: HubRequest) -> bool:
+    return str((req.context or {}).get("surface") or "") == STUDIO_SURFACE
+
+
+def _studio_help(message: str = "") -> HubDecision:
+    from writer_engine.studio.commands import HELP
+
+    return HubDecision(
+        kind="conversation", assistant_message=(message + " " if message else "") + HELP, confidence=0.3
+    )
+
+
+def _studio_system() -> str:
+    return (
+        "You route messages typed into the Content Studio assistant of a newsletter edition. The page "
+        "shows the week's radar slate (topics numbered by rank) and the edition's posts (numbered #N). "
+        "Choose exactly ONE capability below, or kind='conversation' when none fits (then answer in one "
+        "short sentence).\n\nCAPABILITIES (tool + op verbatim):\n"
+        f"{render_catalog_prompt(studio=True)}\n\nRULES:\n- Plain numbers after generate (and in 'put N "
+        "in the newsletter') are SLATE ranks; elsewhere a number is a POST number. Pass number lists as "
+        "text like '1-5, 8'.\n- Never invent an edition, project or URL.\n"
+        "Output JSON: {kind: conversation|info|task, tool, op, params, assistant_message, confidence}."
+    )
+
+
+async def _studio_route(req: HubRequest, llm_router: LLMRouter | None, model: str | None) -> HubDecision:
+    """The studio page's assistant: the command grammar first, then Gemini over the studio ops only."""
+    from writer_engine.studio import commands
+
+    parsed = commands.parse(req.message)
+    if parsed is not None:
+        op, params = parsed
+        if op == "help":
+            return _studio_help()
+        spec = lookup(STUDIO_TOOL, op)
+        if spec is not None and spec.tool == STUDIO_TOOL:
+            logger.info("hub.route.studio", op=op, msg_preview=req.message[:120])
+            return HubDecision(
+                kind=spec.kind,
+                tool=STUDIO_TOOL,
+                op=op,
+                params=params,
+                assistant_message=_STUDIO_ACKS.get(op, ""),
+                confidence=0.95,
+            )
+    router = llm_router or get_router(service="hub")
+    try:
+        decision, _resp = await complete_structured(
+            router,
+            provider="gemini",
+            model=model or get_settings().hub_router_model,
+            system=_studio_system(),
+            prompt=f"User message:\n{req.message}",
+            schema=HubDecision,
+            max_tokens=512,
+            temperature=0.1,
+        )
+    except ProviderNotRegistered:
+        return _studio_help("I didn't catch that.")
+    except Exception as exc:  # noqa: BLE001 - any Gemini failure degrades to the command list; SDK errors are not enumerable
+        logger.warning("hub.route.studio_gemini_failed", error=str(exc)[:200])
+        return _studio_help("I didn't catch that.")
+    decision = _normalise(decision)
+    if decision.kind == "conversation":
+        return decision if decision.assistant_message else _studio_help()
+    if decision.tool != STUDIO_TOOL:
+        return _studio_help("That isn't something the studio does.")
+    if decision.kind == "task" and not decision.assistant_message:
+        decision.assistant_message = _STUDIO_ACKS.get(str(decision.op), "Working on it.")
+    logger.info("hub.route.studio_gemini", op=decision.op, msg_preview=req.message[:120])
+    return decision
+
+
 async def route_message(
     req: HubRequest, *, llm_router: LLMRouter | None = None, model: str | None = None
 ) -> HubDecision:
     """Route a normalised request to a :class:`HubDecision`. Never raises."""
+    if is_studio_request(req):
+        return await _studio_route(req, llm_router, model)
     # 1. numbered-list selection (needs conversation context the LLM can't see)
     sel = _numbered_selection(req)
     if sel is not None:
@@ -1291,6 +1377,13 @@ async def route_message(
     settings = get_settings()
     try:
         decision = await _gemini_route(req, router, model or settings.hub_router_model)
+        if decision.tool == STUDIO_TOOL:
+            # The studio's ops need the edition open in the studio page; a chat turn cannot name one.
+            decision = HubDecision(
+                kind="conversation",
+                assistant_message="That is done in Newsletter → Content Studio, where the edition is open.",
+                confidence=0.3,
+            )
         logger.info(
             "hub.route.gemini",
             source=req.source,

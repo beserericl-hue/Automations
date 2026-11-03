@@ -63,6 +63,16 @@ def build_dispatch_plan(decision: HubDecision, req: HubRequest) -> DispatchPlan:
     if req.user_id:
         body["user_id"] = req.user_id
 
+    # Content Studio ops act on the edition open in the studio page. It comes from the caller's context
+    # (the Workbench put it there after checking the user owns it) and NEVER from the message: a
+    # message that names another edition must not reach it. The step checks ownership again.
+    if decision.tool == "studio":
+        body.pop("edition_id", None)
+        if req.context.get("edition_id"):
+            body["edition_id"] = str(req.context["edition_id"])
+        if req.context.get("week_of") and not body.get("week_of"):
+            body["week_of"] = str(req.context["week_of"])
+
     # Fill missing project anchors from conversation context — only for ops scoped to a project, and
     # only when the message named no project of its own (a remembered id must never ride along with
     # a different title the user just typed).

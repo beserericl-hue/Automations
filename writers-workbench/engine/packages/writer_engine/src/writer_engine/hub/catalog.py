@@ -298,6 +298,82 @@ CATALOG: tuple[ToolSpec, ...] = (
         params=("scope", "project_title", "chapter_number", "version_number"),
         aliases=("revert_outline", "revert_chapter", "rollback"),
     ),
+    # ---------- Content Studio (newsletter admin; only routed from the studio page) ----------
+    # The studio ops act on ONE edition the caller owns; the edition always comes from the page's
+    # context (dispatch fills it), never from the message. See writer_engine.studio.
+    ToolSpec(
+        "studio",
+        "slate",
+        "info",
+        intent="CONTENT STUDIO: show this week's radar slate / topics / menu for the edition",
+        params=("week_of",),
+        aliases=("studio_slate", "show_slate"),
+    ),
+    ToolSpec(
+        "studio",
+        "queue",
+        "info",
+        intent="CONTENT STUDIO: list the drafts, approved posts, or the scheduled queue ('list the queue', "
+        "'show my drafts', 'show #3')",
+        params=("status", "posts"),
+        aliases=("studio_queue", "list_queue"),
+    ),
+    ToolSpec(
+        "studio",
+        "update",
+        "info",
+        intent="CONTENT STUDIO: approve / unapprove / discard / cancel / requeue / unschedule posts, or "
+        "turn the image on/off ('approve #3', 'cancel 4', 'no image on #2'). action is one of approve, "
+        "unapprove, discard, cancel, requeue, unschedule, image_on, image_off; posts = '#3, 5-7' or 'all'",
+        params=("action", "posts"),
+        aliases=("studio_update",),
+    ),
+    ToolSpec(
+        "studio",
+        "schedule",
+        "info",
+        intent="CONTENT STUDIO: schedule or publish posts ('schedule all approved', 'schedule #3 tuesday "
+        "afternoon', 'publish #5 now'). posts = '#3' | 'approved' | 'drafts'; mode = next|slot|at|now; "
+        "day, slot (morning|afternoon), time, channels",
+        params=("posts", "mode", "day", "slot", "time", "channels"),
+        aliases=("studio_schedule",),
+    ),
+    ToolSpec(
+        "studio",
+        "issue",
+        "info",
+        intent="CONTENT STUDIO: choose the posts in the edition's next newsletter issue ('put 1-6 in this "
+        "week's newsletter', 'remove #3 from the newsletter', 'show the newsletter'). action = show|set|add|"
+        "remove|new; ranks = slate numbers; posts = post numbers",
+        params=("action", "ranks", "posts"),
+        aliases=("studio_issue",),
+    ),
+    ToolSpec(
+        "studio",
+        "generate",
+        "task",
+        intent="CONTENT STUDIO: generate / draft posts from slate topics ('generate 1-5 and 8'); numbers = "
+        "slate ranks or 'all'",
+        params=("numbers", "week_of", "redo"),
+        aliases=("studio_generate",),
+    ),
+    ToolSpec(
+        "studio",
+        "revise",
+        "task",
+        intent="CONTENT STUDIO: revise a draft with an instruction ('make #3 shorter'), regenerate it, or "
+        "undo the last revision. mode = revise|regenerate|undo",
+        params=("posts", "instruction", "mode"),
+        aliases=("studio_revise",),
+    ),
+    ToolSpec(
+        "studio",
+        "email",
+        "task",
+        intent="CONTENT STUDIO: email me a draft ('email #3') or the week's slate digest ('email the roundup')",
+        params=("posts", "target"),
+        aliases=("studio_email",),
+    ),
     ToolSpec(
         "library",
         "email-content",
@@ -314,7 +390,10 @@ CATALOG: tuple[ToolSpec, ...] = (
 _BY_NAME: dict[str, ToolSpec] = {}
 for _spec in CATALOG:
     _BY_NAME[_spec.name] = _spec
-    _BY_NAME[_spec.op] = _spec  # bare-op convenience (unique enough across tools we care about)
+    if _spec.tool != "studio":
+        # bare-op convenience (unique enough across tools we care about). Not for the studio, whose
+        # bare ops ("schedule", "email", "generate") are other tools' words.
+        _BY_NAME[_spec.op] = _spec
     for _alias in _spec.aliases:
         _BY_NAME.setdefault(_alias, _spec)
 
@@ -337,10 +416,19 @@ def lookup(tool: str | None, op: str | None) -> ToolSpec | None:
     return None
 
 
-def render_catalog_prompt() -> str:
-    """Render the catalog as a numbered tool menu for the router's system prompt."""
+STUDIO_TOOL = "studio"
+
+
+def render_catalog_prompt(*, studio: bool = False) -> str:
+    """Render the catalog as a numbered tool menu for the router's system prompt.
+
+    The general chat sees every tool except the studio's (those act on the edition open in the
+    Content Studio page, which a chat message has no way to name); the studio page sees only its own.
+    """
     lines: list[str] = []
     for spec in CATALOG:
+        if (spec.tool == STUDIO_TOOL) != studio:
+            continue
         req = f" (requires: {', '.join(spec.required)})" if spec.required else ""
         params = f" — params: {', '.join(spec.params)}" if spec.params else ""
         lines.append(f"- {spec.name} [{spec.kind}]: {spec.intent}{params}{req}")

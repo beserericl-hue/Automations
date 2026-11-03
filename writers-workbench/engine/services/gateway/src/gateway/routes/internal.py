@@ -121,11 +121,24 @@ async def _execute_hub(req: HubRequest) -> HubResponse:
     outlines" then "pick #3" resolves on the second turn. A turn that fails is not remembered."""
     state = await hub_memory.load_state(req)
     resp, body = await _route_and_dispatch(hub_memory.with_memory(req, state))
+    if body is not None and resp.tool == "studio":
+        # Echo what was dispatched (minus identity) so the Workbench can charge per drafted topic.
+        resp.params = {k: v for k, v in body.items() if k not in ("user_id", "async", "persist")}
     if state is not None:
         hub_memory.record_turn(state, req=req, resp=resp, body=body)
         if await hub_memory.save_state(req, state):
             resp.conversation_id = state.conversation_id
     return resp
+
+
+def _error_message(data: Any) -> str:
+    """A sync op's refusal (``error.message``), so "No post #9" reaches the user instead of the ack."""
+    if not isinstance(data, dict):
+        return ""
+    err = data.get("error")
+    if isinstance(err, dict) and isinstance(err.get("message"), str):
+        return str(err["message"])
+    return err if isinstance(err, str) else ""
 
 
 def _result_message(data: Any) -> str:
@@ -185,8 +198,8 @@ async def _route_and_dispatch(req: HubRequest) -> tuple[HubResponse, dict[str, A
             message = plan.assistant_message
             # A story-bible write says what it actually did ("Added Mara Voss (character) …", "No
             # entry named X …"); the router's ack was written before the op ran and can't know.
-            if plan.tool == "story_bible":
-                message = _result_message(data) or message
+            if plan.tool in ("story_bible", "studio"):
+                message = _result_message(data) or _error_message(data) or message
             return (
                 HubResponse(
                     kind="data",

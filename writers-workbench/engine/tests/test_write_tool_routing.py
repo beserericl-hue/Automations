@@ -23,6 +23,7 @@ EXPECTED_TOOLS = {
     "story_bible",
     "approval",
     "notify",
+    "studio",
 }
 
 

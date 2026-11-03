@@ -27,6 +27,16 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
   // Fetch projects for expandable sidebar section. The list shows the 20 most recent; the badge is the
   // user's real project count (it used to be the list's length, so anyone with more than 20 saw "20").
   type SidebarProject = Pick<WritingProject, 'id' | 'title' | 'status' | 'updated_at'>;
+  // Content Studio: only for users with an edition fed by one of their radars (the server decides).
+  const { data: studioData } = useQuery({
+    queryKey: ['studio', 'editions'],
+    queryFn: () => apiFetch<{ data: Array<{ edition_id: string }> }>('/api/studio/editions'),
+    enabled: Boolean(profile?.user_id),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  const hasStudio = (studioData?.data?.length ?? 0) > 0;
+
   const { data: projectsData } = useQuery({
     queryKey: ['sidebar-projects', userId, isImpersonating],
     queryFn: async (): Promise<{ rows: SidebarProject[]; total: number }> => {
@@ -261,6 +271,21 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
               >
                 Sends
               </NavLink>
+              {hasStudio && (
+                <NavLink
+                  to="/newsletter/studio"
+                  data-testid="nav-content-studio"
+                  className={({ isActive }) =>
+                    `flex items-center gap-2 px-3 py-1.5 text-xs whitespace-nowrap ${
+                      isActive
+                        ? 'text-brand-700 font-medium dark:text-brand-300'
+                        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                    }`
+                  }
+                >
+                  Content Studio
+                </NavLink>
+              )}
               <NavLink
                 to="/newsletter/calendar"
                 className={({ isActive }) =>

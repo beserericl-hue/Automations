@@ -137,6 +137,9 @@ HEAVY_OPS: frozenset[tuple[str, str]] = frozenset(
         # `metadata.review_report` and the UI polls /api/jobs/engine/:id rather than holding a
         # request open.
         ("chapter", "review"),
+        # Content Studio: drafting a Trend slate is one 8k-token blog call per topic, serially (the
+        # radar_schedule path above, without the scheduling).
+        ("studio", "generate"),
     }
 )
 
@@ -155,6 +158,8 @@ INTERACTIVE_OPS: frozenset[tuple[str, str]] = frozenset(
         ("notify", "eve-callback"),
         ("library", "revert"),  # version swap
         ("library", "email-content"),  # one Postal send
+        ("studio", "revise"),  # one draft: an 8k-token blog rewrite at most
+        ("studio", "email"),  # one Postal send
     }
 )
 

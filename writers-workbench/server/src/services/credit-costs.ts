@@ -97,6 +97,18 @@ export const CREDIT_KEY_ALIASES: Record<string, string> = {
   'brainstorm.create-project': 'create_project',
   'research.run': 'research',
   'notify.eve-callback': 'eve_callback',
+  // ---- Content Studio (engine studio step; server/src/routes/content-studio.ts) ----
+  // Drafting and revising are the radar drafting prompts, priced like the radar schedule route
+  // (social_repurpose per topic). Reads, state changes, scheduling and the issue selection are free,
+  // like library reads/lifecycle. No new price: pricing is a pending owner decision.
+  'studio.generate': 'social_repurpose', // x topics drafted
+  'studio.revise': 'social_repurpose', // x 1 (undo is not charged)
+  'studio.email': 'email_content',
+  'studio.slate': 'list_content',
+  'studio.queue': 'list_content',
+  'studio.update': 'content_action',
+  'studio.schedule': 'content_action',
+  'studio.issue': 'content_action',
 };
 
 /** The credit key an operation name is charged under, or null when it has no entry at all. */

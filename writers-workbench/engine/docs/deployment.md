@@ -246,3 +246,63 @@ For PROD use `python scripts/seed_social.py` (PR #233), which reuses the same ro
 run by default (`--apply` writes), `--target prod` refuses to touch the network without `--confirm`
 and refuses a DEV key, rows are written `enabled=false` on PROD unless `--enable`, and `--offline`
 prints the plan without reading any database. Run it only at the cutover, with Eric's go-ahead.
+
+### Content Studio (port of the n8n studio chat agents)
+
+Migration 050. **Newsletter → Content Studio** (`/newsletter/studio/<edition>`), shown only to a user
+with an edition fed by one of their own radars (today only Eric's `ai-mvp` and `ai-dev-roundup`).
+Replaces the interactive n8n agents `Content - AI & MVP Content Studio (Workflow B)` (fTRYiQOaQgdAmu7w)
+and `Content - AI Dev Roundup (Social Studio)` (y0vIznzMeiGoxouX), their queue tool `Sub - Manage
+Scheduled Posts` (HgRagIb4C3klIJa0), `Studio - Email Post with Featured Image` (oYxlkOY7J0eK4yxo),
+`Dev Roundup - Weekly Digest Email` (WiG2AmTTf6rUj6gS) and the two Substack RSS webhooks
+(uSFq6y6YombFzzfT per item, K6peMqAydbdr7Ldt weekly digest).
+
+- **Studio edition** = the caller owns the edition AND subscribes to the radar that feeds it
+  (`radar_subscriptions_v2.settings.edition_id`, or an active `radar://<radar>` feed source). Anything
+  else is a 404 on every route (server `lib/studio.ts`, engine `studio.core.resolve_edition`); the new
+  tables' RLS is owner-only (no admin read).
+- **Draft → review → publish.** Drafts are `social_schedule_v2` rows in state `draft` / `approved`
+  with no day or slot, so neither the publisher (claims `pending`) nor the calendar (reads by date)
+  sees them. Scheduling sets `pending` with the next free slot, a day + slot, or an exact `post_at`
+  ("publish now" = the next 5-minute publisher tick). A chosen `image_url` replaces the sketchnote.
+  `SOCIAL_POSTING_MODE` still decides whether anything is sent (dry run on DEV).
+- **Engine:** step service `studio` (`services/studio_step`, mounted in the runtime like every step;
+  `STUDIO_STEP_URL` is set by `runtime_processes`, nothing to configure). Ops `slate`, `queue`,
+  `generate` (heavy queue), `revise` (revise / regenerate / undo), `update`, `schedule`, `issue`,
+  `email`. Drafting reuses the radar prompts (`radar/drafts.py`) and the humanizer.
+- **Assistant:** `POST /api/studio/<ed>/assistant` calls the hub with `context.surface=content_studio`
+  and the edition. The hub parses the studio command grammar first (`studio/commands.py`: "generate
+  1-5, 8", "revise #3 to be shorter", "schedule all approved", "cancel 4", "put 1-6 in the
+  newsletter"), then falls back to Gemini over the studio ops only. The general chat never routes to
+  studio ops. The edition always comes from the page context, never from the message.
+- **Credits:** `studio.generate` = `social_repurpose` × topics, `studio.revise` = `social_repurpose`,
+  the rest free (`credit-costs.ts`; no new prices — pricing is pending Eric's decision).
+- **Newsletter:** an edition's open selection (`newsletter_issue_selections_v2` / `_items_v2`) is
+  authoritative. The saga's gathering stage writes one `content_ingestion_v2` story per chosen item
+  (key `<send_date>/<slug>.<edition>`, feed_url `studio://<edition>`), skips the LLM pick, puts exactly
+  those stories in order on the stories gate, and locks the selection to the run. Without a selection
+  the edition behaves as before (radar:// + social:// sources, LLM pick). Generate / approve / send
+  use the existing screens.
+- **RSS:** `GET /feeds/<token>/items.xml` (posts that went out; subscribe-CTA and hashtag lines
+  removed) and `/feeds/<token>/digest.xml` (one item per week: the whole slate). The token
+  (`newsletter_edition_feeds_v2`, 32 url-safe random characters) is made on first view in the studio
+  and can be rotated there. Public, no login, no private data.
+
+**n8n workflows this makes redundant — deactivate in this order at the cutover, with Eric's
+go-ahead (never delete; archive):**
+
+1. Point Substack at the new feed URLs (Studio → Next issue & feeds) and wait for one successful sync;
+   then deactivate `uSFq6y6YombFzzfT` and `K6peMqAydbdr7Ldt` (the old feed URLs stop).
+2. The two chat studios `fTRYiQOaQgdAmu7w`, `y0vIznzMeiGoxouX` and their tools `HgRagIb4C3klIJa0`,
+   `oYxlkOY7J0eK4yxo`, `kw8qbViDZjaiDPeV`, `6eQyuNp2A2bEIx1a`, `rkwZa88G7EJc7HY8`, `427jMgRQEYzDA1IN`,
+   `hZq4ix2Te4vtPIuo`, `oxYeY4EXPctC7L3o`, `FaxRBqptjRfk8YuB` — after the calendar cutover above
+   (Se2X0fmkLUFK6CCq, q1yDjiztjdGRDblT, czBKvhON08FzFydK off; `SOCIAL_POSTING_MODE=live`), because the
+   chat studios can post directly through Blotato.
+3. `Dev Roundup - Weekly Digest Email` (WiG2AmTTf6rUj6gS): once `ai-dev-roundup` has a cadence and
+   its first studio-chosen issue has gone out.
+
+Not ported on purpose: the n8n studios' Perplexity research step before an interactive draft (the
+radar slate already carries the summary the drafting prompt cites), posting a **condensed blog** to
+LinkedIn ("post blog to linkedin" — use Revise with AI on the LinkedIn text instead), and Blotato's
+native scheduling (every scheduled post is on the calendar instead, so it can be listed and edited).
+The KIE.ai key that n8n hard-codes in four of these workflows should be rotated after they are off.

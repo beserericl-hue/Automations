@@ -231,6 +231,8 @@ class EngineSettings(BaseSettings):
     approval_step_url: str = Field(default="http://localhost:8026", alias="APPROVAL_STEP_URL")
     notify_step_url: str = Field(default="http://localhost:8027", alias="NOTIFY_STEP_URL")
     ingestion_step_url: str = Field(default="http://localhost:8028", alias="INGESTION_STEP_URL")
+    # Content Studio (migration 050): drafts in review, scheduling, the issue selection, the assistant.
+    studio_step_url: str = Field(default="http://localhost:8029", alias="STUDIO_STEP_URL")
 
     # Alerting (C2). Empty recipient = log only, which is what the engine did for its whole life:
     # the 2026-05-19 Redis outage ran nine days because nothing ever told anyone.

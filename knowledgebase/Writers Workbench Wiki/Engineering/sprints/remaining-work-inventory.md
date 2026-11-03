@@ -56,6 +56,7 @@ Shipped alongside the list (2026-11-02 → 11-03):
 | n8n-era zero-cost rows priced; Gemini recorded as one provider | #259 (migrations **047**, **049**) |
 | Dashboard/sidebar counts; post-calendar channel defaults; Content Library no longer fetches 14 MB of chapter text | #250, #254 |
 | E2E hardening (approvals fixture, manual tests reported as MANUAL, race-proof specs, superseded commits) | #230, #234, #244, #246, #247, #249, #255, #256, #257 |
+| **Content Studio** (Newsletter → Content Studio): radar slate → drafts in review → revise / regenerate / image → publish now or schedule → queue; the next issue's posts chosen in order and used by the newsletter saga instead of the LLM pick; studio assistant on the engine hub (`studio.*` ops); public RSS feeds per edition (Substack). Owner-only (404 for anyone else, owner-only RLS). Replaces the n8n studio chat agents, their tools, the weekly digest email and the two RSS webhooks — cutover order in `engine/docs/deployment.md` | Content Studio PR (migration **050**) |
 
 ### What remains before PROD
 
@@ -74,10 +75,12 @@ Code that is still open (none of it blocks a release by itself; each is a decisi
   ceiling (a tier decision) · **J1** canon backfill for older projects · **J2** scene breaks on a live
   write · CR-006's "unassigned research" bucket · `library_retrieve_step` still deployed though
   deprecated · I3 cross-chapter continuity, I5 storage, I6 model bake-off.
-- **E4/E8/E9** the parallel n8n content system, Blotato LinkedIn and the RSS feeds — out of the Workbench,
-  but they keep n8n alive.
+- **E4/E8/E9** the parallel n8n content system, Blotato LinkedIn and the RSS feeds — **ported** (post
+  calendar #192–#194, Content Studio migration 050); n8n stays on until the cutover in
+  `engine/docs/deployment.md` (deactivate the publisher cron + radars, set `SOCIAL_POSTING_MODE=live`,
+  move Substack to the new feed URLs, then the studio workflows).
 
-PROD-only steps (all in the release checklist): migrations 023–049 (and 013–017 if the dump says
+PROD-only steps (all in the release checklist): migrations 023–050 (and 013–017 if the dump says
 so), the engine services + HA Redis, new PROD secrets (`SERVICE_SHARED_SECRET`, `ADMIN_TOKEN` /
 `ENGINE_ADMIN_TOKEN`, `INTEGRATIONS_ENCRYPTION_KEY`, `CRON_SECRET`), `RAILWAY_DEPLOYMENT_DRAINING_SECONDS=60`,
 ScraperAPI/StealthGPT keys, Stripe live mode, Supabase Auth URLs (I9), `seed_social.py --target prod`,

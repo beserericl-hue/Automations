@@ -46,6 +46,7 @@ const BillingPage = lazyRetry(() => import('./components/billing/BillingPage'));
 const BillingSuccess = lazyRetry(() => import('./components/billing/BillingPage').then((m) => ({ default: m.BillingSuccess })));
 const BillingCancel = lazyRetry(() => import('./components/billing/BillingPage').then((m) => ({ default: m.BillingCancel })));
 const RadarPanel = lazyRetry(() => import('./components/social/RadarPanel'));
+const ContentStudio = lazyRetry(() => import('./components/studio/ContentStudio'));
 const NewsletterGenerate = lazyRetry(() => import('./components/newsletter/NewsletterGenerate'));
 const ExecutionStatus = lazyRetry(() => import('./components/newsletter/ExecutionStatus'));
 const PendingApprovals = lazyRetry(() => import('./components/newsletter/PendingApprovals'));
@@ -131,6 +132,8 @@ export default function App() {
                     <Route path="newsletter/sends" element={<ScheduledSends />} />
                     <Route path="newsletter/calendar" element={<PostCalendar />} />
                     <Route path="newsletter/radar" element={<RadarPanel />} />
+                    <Route path="newsletter/studio" element={<ContentStudio />} />
+                    <Route path="newsletter/studio/:editionId" element={<ContentStudio />} />
                     <Route path="newsletter/sends/:id" element={<NewsletterDetail />} />
                     <Route path="newsletter/ingestion" element={<IngestionBrowser />} />
                     {/* Newsletter Templates Sprint (T3) — list + editor.
