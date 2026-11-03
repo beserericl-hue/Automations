@@ -26,7 +26,7 @@ from uuid import UUID, uuid4
 
 from writer_engine.config import get_settings
 from writer_engine.newsletter_issue import peek_issue_number, saved_issue_number
-from writer_engine.schemas import Stage, StepStatus
+from writer_engine.schemas import Stage, StepOutput, StepStatus
 from writer_engine.schemas.newsletter import (
     AssembledNewsletter,
     DeliveryResult,
@@ -120,6 +120,19 @@ def _humanize_summary(segments: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def newsletter_accounting(st: dict[str, Any]) -> dict[str, Any]:
+    """The ``accounting`` block for a newsletter step: who pays, and which edition/send it was."""
+    cfg = st.get("cfg") or {}
+    meta: dict[str, Any] = {"pipeline": "newsletter"}
+    for key in ("edition_id", "send_date"):
+        if cfg.get(key):
+            meta[key] = str(cfg[key])
+    send_id = (st.get("send_row") or {}).get("id")
+    if send_id:
+        meta["send_id"] = str(send_id)
+    return {"user_id": str(cfg.get("user_id") or "") or None, "metadata": meta}
+
+
 class NewsletterSagaDriver:
     """Durable newsletter saga. Stateless; all state lives in :class:`SagaStateRepo`."""
 
@@ -197,7 +210,8 @@ class NewsletterSagaDriver:
 
     async def _stage_gathering(self, execution_id: UUID, st: dict[str, Any]) -> Stage | None:
         cfg = st["cfg"]
-        out = await run_step_via_http(
+        out = await self._run_step(
+            st,
             _step("gather"),
             execution_id=execution_id,
             payload={
@@ -219,7 +233,8 @@ class NewsletterSagaDriver:
         articles = st["articles"]
         cfg = st["cfg"]
         feedback = st.get("pick_feedback")
-        out = await run_step_via_http(
+        out = await self._run_step(
+            st,
             _step("pick"),
             execution_id=execution_id,
             payload={
@@ -258,7 +273,8 @@ class NewsletterSagaDriver:
     async def _stage_subject(self, execution_id: UUID, st: dict[str, Any]) -> Stage | None:
         picked = PickedStories.model_validate(st["picked"])
         feedback = st.get("subject_feedback")
-        out = await run_step_via_http(
+        out = await self._run_step(
+            st,
             _step("subject"),
             execution_id=execution_id,
             payload={
@@ -309,7 +325,8 @@ class NewsletterSagaDriver:
             # story's URLs side by side and cuts each off at 120s (ScraperAPI alone can spend 70s on
             # one hard page), so 180s covers the step with room for the hop.
             try:
-                scrape_out = await run_step_via_http(
+                scrape_out = await self._run_step(
+                    st,
                     _step("scrape"),
                     execution_id=execution_id,
                     payload={"urls": story.external_source_links},
@@ -333,7 +350,8 @@ class NewsletterSagaDriver:
             # Image + segment are LLM-backed and routinely exceed the 60s default; give them headroom so
             # a normal-latency generation isn't misread as a timeout — a raised timeout here aborts the
             # whole run (advance() moves the saga to ERROR), which was silently killing sends on DEV.
-            image_out = await run_step_via_http(
+            image_out = await self._run_step(
+                st,
                 _step("image"),
                 execution_id=execution_id,
                 payload={"story": story_payload, "scraped_images": []},
@@ -342,7 +360,8 @@ class NewsletterSagaDriver:
             if image_out.status is StepStatus.ERROR:
                 raise RuntimeError(f"image step error for {story.title!r}: {image_out.error}")
             image_options_by_story.append(image_out.payload)
-            seg_out = await run_step_via_http(
+            seg_out = await self._run_step(
+                st,
                 _step("segment"),
                 execution_id=execution_id,
                 payload={
@@ -417,7 +436,8 @@ class NewsletterSagaDriver:
         picked = PickedStories.model_validate(st["picked"])
         used_ids = {i for s in picked.top_selected_stories for i in s.identifiers}
         remaining = [a for a in st.get("articles", []) if a.get("id") not in used_ids]
-        out = await run_step_via_http(
+        out = await self._run_step(
+            st,
             _step("assemble"),
             execution_id=execution_id,
             payload={
@@ -472,7 +492,8 @@ class NewsletterSagaDriver:
         humanize_meta = _humanize_summary(st.get("segments_data") or [])
 
         async def _render_and_persist(number: int | None) -> tuple[RenderedNewsletter, dict[str, Any]]:
-            out = await run_step_via_http(
+            out = await self._run_step(
+                st,
                 _step("render"),
                 execution_id=execution_id,
                 payload={**render_payload, "issue_number": number},
@@ -495,7 +516,8 @@ class NewsletterSagaDriver:
                     **humanize_meta,
                 },
             )
-            persist_out = await run_step_via_http(
+            persist_out = await self._run_step(
+                st,
                 _step("persist"),
                 execution_id=execution_id,
                 payload={"row": row.model_dump(mode="json")},
@@ -541,7 +563,8 @@ class NewsletterSagaDriver:
         subj = SubjectLineProposal.model_validate(st["subject_proposal"])
         send_row = st.get("send_row") or {}
         send_id = send_row.get("id") or f"{cfg.get('edition_id', '')}-{cfg.get('send_date', '')}"
-        out = await run_step_via_http(
+        out = await self._run_step(
+            st,
             _step("deliver"),
             execution_id=execution_id,
             payload={
@@ -563,6 +586,31 @@ class NewsletterSagaDriver:
         return None
 
     # ---------- helpers ----------
+
+    async def _run_step(
+        self,
+        st: dict[str, Any],
+        step: StepRef,
+        *,
+        execution_id: UUID,
+        payload: dict[str, Any],
+        idempotency_key: str | None = None,
+        timeout_s: float = 60.0,
+    ) -> StepOutput:
+        """Call a step with the edition owner attached for cost accounting.
+
+        Every paid call a newsletter step makes is written to ``token_usage_v2`` by the step template,
+        which takes the owner from the payload. The saga sent no user, so every pick / subject /
+        segment / humanize / intro row was written with ``user_id`` NULL. The run id stays the
+        execution id (the template's default), which ties the rows to this send.
+        """
+        return await run_step_via_http(
+            step,
+            execution_id=execution_id,
+            payload={**payload, "accounting": newsletter_accounting(st)},
+            idempotency_key=idempotency_key,
+            timeout_s=timeout_s,
+        )
 
     async def _advance(
         self,

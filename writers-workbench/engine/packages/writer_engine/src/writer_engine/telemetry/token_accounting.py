@@ -33,7 +33,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import contextvars
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
 from writer_engine.telemetry import pricing
@@ -56,6 +56,7 @@ def _new_ctx(
     workflow: str,
     run_id: str | None = None,
     content_id: str | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return {
         "user_id": user_id,
@@ -64,6 +65,9 @@ def _new_ctx(
         "content_id": content_id,
         "run_id": run_id,
         "workflow": workflow,
+        # Merged into every row's metadata: what owns the run beyond user/project (a newsletter's
+        # edition + send date, an ingestion feed).
+        "metadata": dict(metadata or {}),
         "calls": [],
         "pending": [],
         "drain": None,
@@ -72,6 +76,34 @@ def _new_ctx(
 
 # Rows recorded with no active context collect here and are written the same way.
 _ORPHAN: dict[str, Any] = _new_ctx(user_id=None, project_id=None, chapter_number=None, workflow="")
+
+# A task-local override of WHO a call is billed to, layered over the active context by
+# :func:`attribute`. A separate contextvar, not a mutation of the shared ctx dict, so parallel
+# children of one context can each be attributed without seeing each other's owner.
+_attr: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar(
+    "token_usage_attr", default=None
+)
+
+
+@contextlib.contextmanager
+def attribute(*, user_id: str | None = None, metadata: dict[str, Any] | None = None) -> Iterator[None]:
+    """Bill calls made inside this block to ``user_id`` and tag their rows with ``metadata``.
+
+    For one context that does work for several owners: an ingestion tick walks feeds that belong to
+    different users and editions. The calls stay in the enclosing context (its snapshot, run id and
+    flush); only the row's owner and metadata change. A falsy ``user_id`` keeps the enclosing owner.
+    """
+    outer = _attr.get() or {}
+    token = _attr.set(
+        {
+            "user_id": user_id or outer.get("user_id"),
+            "metadata": {**(outer.get("metadata") or {}), **(metadata or {})},
+        }
+    )
+    try:
+        yield
+    finally:
+        _attr.reset(token)
 
 
 def cost_usd(
@@ -102,6 +134,7 @@ def begin(
     workflow: str = "",
     run_id: str | None = None,
     content_id: str | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> None:
     """Start a request-scoped accounting context."""
     _ctx.set(
@@ -112,6 +145,7 @@ def begin(
             workflow=workflow,
             run_id=run_id,
             content_id=content_id,
+            metadata=metadata,
         )
     )
 
@@ -130,11 +164,13 @@ def _chapter(value: Any) -> int | None:
 
 def _row(ctx: dict[str, Any], call: dict[str, Any], operation: str | None) -> dict[str, Any]:
     op = operation or ctx.get("workflow") or f"unattributed.{call['provider']}"
+    override = _attr.get() or {}
+    user_id = override.get("user_id") or ctx.get("user_id")
     inp, out = call["input_tokens"], call["output_tokens"]
     cr, cw, cw1h = call["cache_read_tokens"], call["cache_write_tokens"], call["cache_write_1h_tokens"]
     project_id = ctx.get("project_id")
     return {
-        "user_id": str(ctx["user_id"]) if ctx.get("user_id") else None,
+        "user_id": str(user_id) if user_id else None,
         "workflow_name": op,
         "operation": op,
         "provider": call["provider"],
@@ -164,6 +200,8 @@ def _row(ctx: dict[str, Any], call: dict[str, Any], operation: str | None) -> di
             "chapter_number": ctx.get("chapter_number"),
             "cache_read_tokens": cr,
             "cache_write_tokens": cw,
+            **(ctx.get("metadata") or {}),
+            **(override.get("metadata") or {}),
             **(call.get("metadata") or {}),
         },
     }
@@ -427,6 +465,7 @@ async def scope(
     chapter_number: Any = None,
     run_id: str | None = None,
     content_id: str | None = None,
+    metadata: dict[str, Any] | None = None,
     wait: bool = True,
 ) -> AsyncIterator[None]:
     """A labelled accounting context for paid calls made OUTSIDE a step (the hub's Gemini router,
@@ -440,6 +479,7 @@ async def scope(
             workflow=workflow,
             run_id=run_id,
             content_id=content_id,
+            metadata=metadata,
         )
     )
     try:

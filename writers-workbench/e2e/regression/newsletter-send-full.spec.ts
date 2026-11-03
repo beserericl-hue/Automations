@@ -120,5 +120,29 @@ test.describe('Newsletter FULL send (data path)', () => {
     await page.goto(`/newsletter/sends/${send!.id}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByText(new RegExp(send!.subject.slice(0, 24).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')).first())
       .toBeVisible({ timeout: 20_000 });
+
+    // ── 5) COST ROWS carry the edition owner ──────────────────────────────────
+    // Every paid call of this run (pick, subject, segment + humanize, assemble) is written to
+    // token_usage_v2 with run_id = the execution id. They used to be written with user_id NULL
+    // because the saga never told its steps whose edition it was.
+    const owner = (await supaGet<{ user_id: string }>(
+      'newsletter_editions_v2', `id=eq.${EDITION}&select=user_id&limit=1`,
+    ))[0]?.user_id;
+    expect(owner, 'edition owner').toBeTruthy();
+    type CostRow = { operation: string; user_id: string | null; metadata: Record<string, unknown> | null };
+    let costRows: CostRow[] = [];
+    await expect
+      .poll(async () => {
+        costRows = await supaGet<CostRow>(
+          'token_usage_v2', `run_id=eq.${encodeURIComponent(execId)}&select=operation,user_id,metadata`,
+        ).catch(() => []);
+        return costRows.length;
+      }, { timeout: 60_000, message: 'no token_usage_v2 rows recorded for this newsletter run' })
+      .toBeGreaterThan(0);
+    const ops = new Set(costRows.map((r) => r.operation));
+    expect([...ops], 'the LLM steps were all costed').toEqual(expect.arrayContaining(['pick', 'subject', 'segment']));
+    const ownerless = costRows.filter((r) => r.user_id !== owner);
+    expect(ownerless.map((r) => `${r.operation}:${r.user_id}`), 'every cost row is billed to the edition owner').toEqual([]);
+    expect(costRows.every((r) => r.metadata?.edition_id === EDITION), 'cost rows name the edition').toBe(true);
   });
 });
