@@ -160,7 +160,7 @@ export const FIELD_SPECS = {
     kind: 'text',
     maxChars: 300,
     purpose:
-      'A short dedication for the front of the book, one or two lines. You do not know who the author wants to dedicate it to: use a [placeholder] for the person ("For [name]"), optionally with a line that echoes the book\'s themes.',
+      'A short dedication for the front of the book, one or two lines. You do not know who the author wants to dedicate it to, or anything about them: use a [placeholder] for the person ("For [name]"), optionally with a line that echoes the book\'s themes. Never describe the person or the author\'s relationship with them (what they taught the author, time shared, love between them): if a warmer line is wanted, leave it as a [placeholder: a line about what they mean to you].',
   },
   epigraph: {
     label: 'Epigraph',
@@ -444,6 +444,52 @@ export function unknownNames(text: string, material: string): string[] {
 
 const PRONOUN_RE = /\b(he|she|him|his|her|hers|himself|herself)\b/i;
 
+/** Fields written in the author's own voice, about the author's life. */
+const PERSONAL_FIELDS: ReadonlySet<FieldKey> = new Set(['acknowledgements', 'dedication', 'why_this_book', 'author_bio']);
+
+/**
+ * Things a model adds to "make it warmer and more personal" that are facts about the author's life
+ * nobody gave it (found live on DEV 2026-11-03: a writing routine, a dedicatee who "taught me", "every
+ * hour we have shared", "had a novel in him"). Each is a phrase, with what it claims.
+ */
+const PERSONAL_PATTERNS: { re: RegExp; what: string }[] = [
+  { re: /\b(?:taught|showed|gave|told) me\b|\bwho (?:knew|believed|always|never|first)\b/i, what: 'describes what someone in the author\'s life did or believed' },
+  { re: /\bwe (?:have )?(?:shared|spent|built|lived)\b|\b(?:every|each) (?:hour|day|year|moment) we\b|\bour (?:life|lives|years|home|time|marriage|family)\b/i, what: 'describes the author\'s relationship with someone' },
+  { re: /\b(?:each|every) (?:morning|night|evening|weekend)\b|\bat (?:my|the) (?:desk|kitchen table)\b|\bover (?:coffee|tea)\b/i, what: 'describes the author\'s routine or habits' },
+  { re: /\bmy (?:late )?(?:wife|husband|partner|children|kids|son|daughter|mother|father|mum|mom|dad|grandmother|grandfather|sister|brother|dog|cat)\b/i, what: 'names a member of the author\'s family or household' },
+];
+
+/**
+ * Personal facts about the author (or the people in their life) that the profile does not state, in
+ * a field written in the author's voice. A phrase the profile itself contains is allowed. Also a
+ * gendered pronoun for an author who gave none — outside the author's note, where pronouns are
+ * mostly the characters'.
+ */
+export function personalFactProblems(field: FieldKey, raw: string, author: AuthorFacts, bookNames: string[] = []): string[] {
+  if (!PERSONAL_FIELDS.has(field)) return [];
+  // A [placeholder] is the author's to fill, not a claim.
+  const text = raw.replace(/\[[^\]]*\]/g, ' ');
+  const profile = renderAuthor(author).toLowerCase();
+  const out: string[] = [];
+  for (const { re, what } of PERSONAL_PATTERNS) {
+    const m = re.exec(text);
+    if (m && !profile.includes(m[0].toLowerCase())) out.push(`it ${what} ("${m[0]}"), which the author profile does not say`);
+  }
+  if (!author.pronouns.trim()) {
+    // A pronoun in a sentence that names one of the book's characters is the character's.
+    const names = bookNames.map((n) => n.split(/\s+/)[0]?.toLowerCase()).filter((n): n is string => Boolean(n && n.length > 2));
+    for (const sentence of text.split(/(?<=[.!?])\s+/)) {
+      const m = PRONOUN_RE.exec(sentence);
+      if (!m) continue;
+      const lower = sentence.toLowerCase();
+      if (names.some((n) => lower.includes(n))) continue;
+      out.push(`it uses "${m[1]}", but the profile gives no pronouns: refer to the author by name or "I", and to anyone else as a [placeholder]`);
+      break;
+    }
+  }
+  return out;
+}
+
 // ------------------------------------------------------------------------------------------------
 // The prompt
 // ------------------------------------------------------------------------------------------------
@@ -473,6 +519,7 @@ const HONESTY = [
   '- Do not reveal the ending or anything from chapters marked LATE.',
   '- Where the text needs a fact you do not have (a name, a date, a place, a price), write a [placeholder in square brackets] for the author to fill. Never make the fact up.',
   '- Say nothing about the author that <author> does not state: no memories, anecdotes, scenes from their life, habits, people, places, dates or story of how the book began beyond what is written there. A revision instruction ("more suspense", "warmer") never licenses new facts about the author.',
+  '- The same goes for the people in the author\'s life (family, partner, friends, the dedicatee, an editor or agent): you know nothing about them, not even whether they exist. Never describe them or the author\'s relationship with them; leave each as an optional [placeholder]. Never refer to the author with he, she, him, his or her unless <author> gives pronouns.',
   '- Plain text. No markdown, no title or heading line (the page already has its heading), no em dashes.',
 ];
 
@@ -561,10 +608,7 @@ function problemsOf(field: FieldKey, d: Draft, limit: number, facts: BookFacts):
   if (field === 'epigraph' && d.value && !isVerbatim(d.value, facts.excerpts.map((e) => e.text))) {
     problems.push('the epigraph is not copied word for word from one of the excerpts');
   }
-  if ((field === 'author_bio') && !facts.author.pronouns.trim()) {
-    const m = PRONOUN_RE.exec(d.value);
-    if (m) problems.push(`it calls the author "${m[1]}", but the profile gives no pronouns: use the author's name instead`);
-  }
+  problems.push(...personalFactProblems(field, d.value, facts.author, facts.bible.map((b) => b.name)));
   return problems;
 }
 
