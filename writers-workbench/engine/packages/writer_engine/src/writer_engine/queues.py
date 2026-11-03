@@ -140,6 +140,8 @@ HEAVY_OPS: frozenset[tuple[str, str]] = frozenset(
         # Content Studio: drafting a Trend slate is one 8k-token blog call per topic, serially (the
         # radar_schedule path above, without the scheduling).
         ("studio", "generate"),
+        # Up to four studio ops from one assistant message, serially; one of them may be a generate.
+        ("studio", "batch"),
     }
 )
 

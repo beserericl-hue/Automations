@@ -248,10 +248,18 @@ async def _chosen_image(
     live: bool,
     creds: UserCredentials,
 ) -> tuple[tuple[bytes, str] | None, str | None, str]:
-    """Fetch the owner's chosen image (public https only) for the website cover and Blotato."""
-    if not live:
-        return None, None, f"would use the chosen image {url[:120]} (dry run: not fetched)"
+    """Fetch the owner's chosen image (public https only) for the website cover and Blotato.
+
+    A dry run fetches nothing, but it applies the same URL check and hands the URL back as the media
+    url, so the recorded requests show the image they would carry (``post_row`` marks the website
+    cover). It used to record ``mediaUrls: []`` and no cover — a request that would post without the
+    image — and to promise "would use" for a URL a live run refuses (found on DEV 2026-11-03, #363).
+    """
     problem = await check_public_https_url(url, resolve=transport.resolve)
+    if not live:
+        if problem:
+            return None, None, f"the chosen image would not be used ({problem}): would post without an image"
+        return None, url, f"would use the chosen image {url[:120]} (dry run: not fetched)"
     if problem:
         return None, None, f"the chosen image was not used ({problem}): posted without an image"
     try:
@@ -318,6 +326,9 @@ async def post_row(
             )
         existing = deliveries.get(channel.channel)
         if not live:
+            if channel.kind == "website" and media_url and cover is None:
+                # The live request carries the fetched bytes; a dry run records where they come from.
+                request["coverImage"] = {"sourceUrl": media_url, "fetchedWhenLive": True}
             problem = await _dry_run_problem(channel, request, creds, transport)
             note = "dry run: nothing sent; " + (
                 f"would fail: {problem}" if problem else _credentials_note(channel, request)

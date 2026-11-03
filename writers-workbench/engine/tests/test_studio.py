@@ -336,6 +336,58 @@ async def test_revise_keeps_the_previous_version_and_refuses_a_dropped_link() ->
     assert db.tables["social_schedule_v2"][0]["linkedin_content"].startswith("Long post")
 
 
+@pytest.mark.asyncio
+async def test_the_humanizer_record_follows_the_text_through_revise_regenerate_and_undo(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Found on DEV 2026-11-03 (#363): after regenerate → undo the post had the revised text back but
+    the redraft's humanizer record, and a revise kept saying "humanized" about the model's rewrite."""
+    from writer_engine.radar import drafts as D
+
+    async def humanize(posts: list[dict[str, Any]]) -> None:
+        for p in posts:
+            p["humanize"] = {"applied": True, "body_md": {"words_spent": 99}}
+
+    monkeypatch.setattr(D, "humanize_drafts", humanize)
+    db = _db()
+    ed = await core.resolve_edition(db, OWNER, "ai-mvp")
+    first = {"applied": True, "body_md": {"words_spent": 10}}
+    db.tables["social_schedule_v2"] = [
+        {
+            "id": "p1",
+            "display_number": 1,
+            "user_id": OWNER,
+            "edition_id": "ai-mvp",
+            "state": "draft",
+            "title": "T0",
+            "body_md": "## Body 0",
+            "linkedin_content": "LI 0",
+            "seo_title": "S0",
+            "meta_description": "M0",
+            "category": "AI",
+            "radar_topic_id": "x1",
+            "humanize": first,
+            "studio": {},
+        }
+    ]
+    row = db.tables["social_schedule_v2"][0]
+
+    async def post() -> dict[str, Any]:
+        return (await core.own_posts(db, ed, numbers=[1]))[0]
+
+    await drafting.revise(db, ed, await post(), "punchier", router=FakeRouter())
+    assert row["title"] == "A title" and row["humanize"] is None  # the rewrite is not humanized text
+    assert row["studio"]["previous"]["humanize"] == first
+    await drafting.regenerate(db, ed, await post(), router=FakeRouter())
+    assert row["humanize"]["body_md"]["words_spent"] == 99
+    await drafting.restore_previous(db, ed, await post())
+    # Back to the revised version: its text AND its (absent) humanizer record.
+    assert row["title"] == "A title" and row["body_md"].startswith("## Body")
+    assert row["humanize"] is None
+    await drafting.restore_previous(db, ed, await post())  # undo the undo: the redraft, with its record
+    assert row["humanize"]["body_md"]["words_spent"] == 99
+
+
 # ----------------------------------------------------------------------------- states + scheduling
 
 
@@ -466,6 +518,7 @@ async def test_take_selection_writes_the_stories_in_order_and_locks_the_selectio
             "posted",
             linkedin_content="Post five text https://example.com/2",
             source_url="https://example.com/2",
+            image_url="https://example.com/five.png",
         )
     ]
     db.tables["social_schedule_deliveries_v2"] = []
@@ -498,6 +551,8 @@ async def test_take_selection_writes_the_stories_in_order_and_locks_the_selectio
     )
     assert arts is not None and [a["title"] for a in arts] == ["Post 5", "Dev topic 1"]
     assert all(k["key"].endswith(".ai-dev-roundup") and k["key"].startswith("2026-11-06/") for k in uploaded)
+    # The post's chosen image is its story's picture (the image gate offers it); a topic has none.
+    assert [k["image_urls"] for k in uploaded] == [["https://example.com/five.png"], None]
     sel = db.tables["newsletter_issue_selections_v2"][0]
     assert sel["status"] == "locked" and sel["execution_id"] == "ex1"
     picked = issue.picked_from_selection(arts)
@@ -553,3 +608,199 @@ async def test_general_chat_schedule_alias_still_means_library_lifecycle() -> No
 
     spec = lookup(None, "schedule")
     assert spec is not None and spec.name == "library.lifecycle"
+
+
+@pytest.mark.asyncio
+async def test_emailing_a_draft_shows_the_chosen_image_and_records_the_send(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Found on DEV 2026-11-03: the preview linked the chosen image instead of showing it, and nothing
+    recorded that a preview had gone out (or with which image)."""
+    from writer_engine.postal import client as postal
+    from writer_engine.studio import emailing
+
+    sent: list[dict[str, Any]] = []
+
+    class _Sent:
+        message_id = "m-1"
+
+    async def send_email(**kw: Any) -> _Sent:
+        sent.append(kw)
+        return _Sent()
+
+    monkeypatch.setattr(postal, "send_email", send_email)
+    db = _db()
+    db.tables["users_v2"] = [{"user_id": OWNER, "email": "owner@example.com", "bcc_email": None}]
+    img = "https://example.com/cover.png"
+    db.tables["social_schedule_v2"] = [
+        _post(
+            9,
+            "draft",
+            "ai-mvp",
+            body_md="## Blog\n\ntext",
+            linkedin_content="LI",
+            image_url=img,
+            include_image=True,
+        )
+    ]
+    ed = await core.resolve_edition(db, OWNER, "ai-mvp")
+    post = (await core.own_posts(db, ed, numbers=[9]))[0]
+    out = await emailing.email_post(db, ed, post)
+    assert sent[0]["to"] == ["owner@example.com"] and sent[0]["subject"] == "Draft #9: Post 9"
+    assert f'<img src="{img}"' in sent[0]["html"]
+    assert out["subject"] == "Draft #9: Post 9" and out["message_id"] == "m-1"
+    record = db.tables["social_schedule_v2"][0]["studio"]["emails"]
+    assert record[-1]["to"] == "owner@example.com" and record[-1]["message_id"] == "m-1"
+    assert record[-1]["image_url"] == img and record[-1]["subject"] == "Draft #9: Post 9"
+
+
+class FakeGemini:
+    """Answers the studio router with a fixed decision; records the prompt it was given."""
+
+    def __init__(self, decision: dict[str, Any]) -> None:
+        import json
+
+        self.text = json.dumps(decision)
+        self.prompts: list[str] = []
+
+    async def complete(self, **kw: Any) -> _Resp:
+        self.prompts.append(str(kw.get("prompt")))
+        return _Resp(self.text)
+
+
+_REVIEW = [
+    {"display_number": 366, "title": "Python 3.13", "state": "draft"},
+    {"display_number": 365, "title": "MCP explained", "state": "draft"},
+    {"display_number": 364, "title": "Copilot agent mode", "state": "draft"},
+]
+
+
+@pytest.mark.asyncio
+async def test_a_compound_studio_message_is_one_batch_and_ordinals_see_the_review_list() -> None:
+    """Found on DEV 2026-11-03: "make the second draft punchier and schedule it for Thursday afternoon"
+    was refused ("one action at a time"), and "make the second draft punchier" revised post #2 — the
+    router never saw the edition's posts, so the ordinal became a post number that does not exist."""
+    gemini = FakeGemini(
+        {
+            "kind": "task",
+            "tool": "studio",
+            "op": "batch",
+            "params": {
+                "steps": [
+                    {
+                        "op": "revise",
+                        "params": {"posts": "#365", "instruction": "punchier", "mode": "revise"},
+                    },
+                    {
+                        "op": "studio.schedule",
+                        "posts": "365",
+                        "mode": "slot",
+                        "day": "thursday",
+                        "slot": "afternoon",
+                        "edition_id": "theirs",
+                    },
+                ]
+            },
+            "assistant_message": "",
+            "confidence": 0.9,
+        }
+    )
+    req = HubRequest(
+        message="make the second draft punchier and schedule it for Thursday afternoon",
+        user_id=OWNER,
+        context={"surface": "content_studio", "edition_id": "ai-dev-roundup", "studio_posts": _REVIEW},
+    )
+    decision = await route_message(req, llm_router=gemini)  # type: ignore[arg-type]
+    assert (
+        "REVIEW LIST (top to bottom):\n1. #366 (draft) Python 3.13\n2. #365 (draft) MCP explained"
+        in (gemini.prompts[0])
+    )
+    assert (decision.tool, decision.op, decision.kind) == ("studio", "batch", "task")
+    assert decision.params["steps"] == [
+        {"op": "revise", "posts": "#365", "instruction": "punchier", "mode": "revise"},
+        {"op": "schedule", "posts": "365", "mode": "slot", "day": "thursday", "slot": "afternoon"},
+    ]
+    plan = build_dispatch_plan(decision, req)
+    assert plan.action == "enqueue" and plan.body["edition_id"] == "ai-dev-roundup"
+    # A batch that names something other than studio ops is not run.
+    bad = FakeGemini(
+        {"kind": "task", "tool": "studio", "op": "batch", "params": {"steps": [{"op": "chapter"}]}}
+    )
+    refused = await route_message(req, llm_router=bad)  # type: ignore[arg-type]
+    assert refused.kind == "conversation"
+    # One step is just that op.
+    one = FakeGemini(
+        {
+            "kind": "task",
+            "tool": "studio",
+            "op": "batch",
+            "params": {"steps": [{"op": "email", "posts": "#364"}]},
+        }
+    )
+    single = await route_message(req, llm_router=one)  # type: ignore[arg-type]
+    assert (single.op, single.params) == ("email", {"posts": "#364"})
+
+
+def test_the_studio_page_does_not_fan_a_message_out_into_untracked_jobs() -> None:
+    """The V31 split returned no tool/params, so the Workbench charged nothing for the drafting it
+    started ("generate 1-3 and then email the digest")."""
+    from writer_engine.hub import task_clauses
+
+    msg = "generate 1-3 and then email the digest"
+    studio = HubRequest(message=msg, user_id=OWNER, context={"surface": "content_studio"})
+    assert task_clauses(studio) == [msg]
+    assert len(task_clauses(HubRequest(message=msg, user_id=OWNER))) == 2
+
+
+@pytest.mark.asyncio
+async def test_the_batch_op_runs_its_steps_in_order_and_stops_at_a_refusal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from studio_step import main as step
+
+    db = _db()
+    db.tables["social_schedule_v2"] = [_post(5, "draft"), _post(6, "posted")]
+
+    async def client() -> FakeSupabase:
+        return db
+
+    monkeypatch.setattr(step, "_client", client)
+
+    async def run(steps: list[dict[str, Any]]) -> Any:
+        return await step.handler(
+            StepInput(
+                execution_id=uuid4(),
+                step_name="studio",
+                payload={"op": "batch", "user_id": OWNER, "edition_id": "ai-dev-roundup", "steps": steps},
+            )
+        )
+
+    out = await run(
+        [
+            {"op": "update", "action": "approve", "posts": "#5"},
+            {"op": "schedule", "posts": "5", "mode": "slot", "day": "2026-11-12", "slot": "afternoon"},
+        ]
+    )
+    assert out.status is StepStatus.OK, out.error
+    row = db.tables["social_schedule_v2"][0]
+    assert (row["state"], row["scheduled_date"], row["slot"]) == ("pending", "2026-11-12", "afternoon")
+    assert out.payload["result"]["message"].startswith("Approved: #5.")
+    # The first step refused: an error, and nothing after it ran.
+    first = await run(
+        [
+            {"op": "revise", "posts": "#2", "instruction": "x"},
+            {"op": "update", "action": "cancel", "posts": "5"},
+        ]
+    )
+    assert first.status is StepStatus.ERROR and first.error is not None
+    assert "No post #2" in first.error.message and "Not done: update" in first.error.message
+    assert db.tables["social_schedule_v2"][0]["state"] == "pending"
+    # A later step refused: what was done, and what was not.
+    later = await run(
+        [
+            {"op": "update", "action": "cancel", "posts": "5"},
+            {"op": "revise", "posts": "#6", "instruction": "x"},
+        ]
+    )
+    assert later.status is StepStatus.OK and later.payload["result"]["failed"]["op"] == "revise"
+    assert db.tables["social_schedule_v2"][0]["state"] == "cancelled"

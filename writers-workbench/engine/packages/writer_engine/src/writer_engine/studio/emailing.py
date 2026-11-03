@@ -50,9 +50,15 @@ def post_email_html(post: dict[str, Any]) -> str:
             f'<h2>LinkedIn ({len(text)} characters)</h2><div style="white-space:pre-wrap;border-left:3px solid '
             f'#2563eb;padding-left:12px">{escape(text)}</div>'
         )
-    image = "a generated sketchnote" if post.get("include_image") else "none"
+    image = "a generated sketchnote when published" if post.get("include_image") else "none"
     if post.get("image_url"):
-        image = f'<a href="{escape(str(post["image_url"]))}">chosen image</a>'
+        # The chosen image is shown, not just linked: this preview is where the owner checks it.
+        url = escape(str(post["image_url"]))
+        parts.insert(
+            0,
+            f'<p><img src="{url}" alt="Chosen image" style="max-width:100%;height:auto;border-radius:6px"></p>',
+        )
+        image = f'<a href="{url}">the chosen image</a> (shown above)'
     parts.append(
         f'<p style="font-size:13px;color:#6b7280">Image: {image}. State: {escape(str(post.get("state")))}.</p>'
     )
@@ -68,18 +74,58 @@ async def email_post(client: Any, ed: StudioEdition, post: dict[str, Any]) -> di
     from writer_engine.postal.client import send_email
 
     to, bcc = await _recipient(client, ed.user_id)
+    subject = f"Draft #{post.get('display_number')}: {str(post.get('title') or '')[:120]}"
     res = await send_email(
         to=[to],
         bcc=[bcc] if bcc else None,
         from_addr=get_settings().newsletter_from_address,
-        subject=f"Draft #{post.get('display_number')}: {str(post.get('title') or '')[:120]}",
+        subject=subject,
         html=post_email_html(post),
     )
+    await _record_email(client, ed, post, to=to, subject=subject, message_id=res.message_id)
     return {
         "to": to,
+        "subject": subject,
         "message_id": res.message_id,
         "message": f"Emailed #{post.get('display_number')} to {to}.",
     }
+
+
+async def _record_email(
+    client: Any, ed: StudioEdition, post: dict[str, Any], *, to: str, subject: str, message_id: str | None
+) -> None:
+    """Keep a record of the preview on the post (``studio.emails``, last 10): when, to whom, which
+    Postal message, and which version of the text and image went out. Nothing recorded the send before,
+    so "did my preview go out, and with which image?" had no answer outside Postal's own logs."""
+    from datetime import UTC, datetime
+
+    studio = dict(post.get("studio") or {})
+    sent = list(studio.get("emails") or [])[-9:]
+    sent.append(
+        {
+            "at": datetime.now(UTC).isoformat(),
+            "to": to,
+            "subject": subject,
+            "message_id": message_id,
+            "image_url": post.get("image_url"),
+            "include_image": bool(post.get("include_image")),
+            "state": post.get("state"),
+            "updated_at": post.get("updated_at"),
+        }
+    )
+    studio["emails"] = sent
+    try:
+        await (
+            client.table("social_schedule_v2")
+            .update({"studio": studio})
+            .eq("id", str(post["id"]))
+            .eq("user_id", ed.user_id)
+            .execute()
+        )
+    except Exception as exc:  # noqa: BLE001 - the email went out; failing to note it must not report a failed send
+        from writer_engine.telemetry.logging import get_logger
+
+        get_logger("studio.emailing").warning("studio.email_record_failed", error=str(exc)[:200])
 
 
 def digest_html(name: str, week_of: str | None, topics: list[dict[str, Any]]) -> str:
@@ -115,11 +161,18 @@ async def email_digest(client: Any, ed: StudioEdition, week_of: str | None = Non
     to, bcc = await _recipient(client, ed.user_id)
     topics = view["topics"]
     arts = sum(1 for t in topics if t.get("item_type") != "video")
+    subject = f"{ed.name} — week of {view['week_of']} ({arts}+{len(topics) - arts})"
     res = await send_email(
         to=[to],
         bcc=[bcc] if bcc else None,
         from_addr=get_settings().newsletter_from_address,
-        subject=f"{ed.name} — week of {view['week_of']} ({arts}+{len(topics) - arts})",
+        subject=subject,
         html=digest_html(ed.name, view["week_of"], topics),
     )
-    return {"to": to, "message_id": res.message_id, "message": f"Emailed the week's slate to {to}."}
+    return {
+        "to": to,
+        "subject": subject,
+        "week_of": view["week_of"],
+        "message_id": res.message_id,
+        "message": f"Emailed the week's slate to {to}.",
+    }

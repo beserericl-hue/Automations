@@ -31,6 +31,17 @@ def _fixture_intro(stories: list[StorySegment]) -> str:
     return f"Today: {titles}."
 
 
+def _usable_roundup(text: str) -> str:
+    """The "Other top stories" section, or "" when the model did not write one.
+
+    The section is a list of linked stories; a reply with no link in it is the model talking to us
+    ("I cannot complete this task… What I Need to Proceed"), not content. Found on DEV 2026-11-03: a
+    Content Studio issue uses every gathered article, the list it was asked to pick from was empty,
+    and that refusal was rendered into the email under "Other top stories".
+    """
+    return text if "](http" in text or "http://" in text or "https://" in text else ""
+
+
 def _fixture_other(remaining: list[dict]) -> str:
     bullets = "\n".join(f"- {r.get('title', '')}" for r in remaining[:5])
     return bullets or "(none)"
@@ -58,21 +69,25 @@ async def handler(inp: StepInput) -> StepOutput:
     except ProviderNotRegistered:
         intro = _fixture_intro(segments)
 
-    try:
-        other = await _short(
-            router,
-            "newsletter.other_top_stories.system",
-            "newsletter.other_top_stories.user_template",
-            model,
-            story_sections="\n".join(s.story_title for s in segments),
-            articles="\n".join(
-                f"- ({r.get('id')}) {r.get('title')} — {r.get('source_name')}" for r in remaining_items
-            ),
-            subject_line=str(inp.payload.get("subject_line") or ""),
-            newsletter_date=str(inp.payload.get("newsletter_date") or ""),
-        )
-    except ProviderNotRegistered:
-        other = _fixture_other(remaining_items)
+    other = ""
+    if remaining_items:
+        try:
+            other = await _short(
+                router,
+                "newsletter.other_top_stories.system",
+                "newsletter.other_top_stories.user_template",
+                model,
+                story_sections="\n".join(s.story_title for s in segments),
+                articles="\n".join(
+                    f"- ({r.get('id')}) {r.get('title')} — {r.get('source_name')}" for r in remaining_items
+                ),
+                subject_line=str(inp.payload.get("subject_line") or ""),
+                newsletter_date=str(inp.payload.get("newsletter_date") or ""),
+            )
+        except ProviderNotRegistered:
+            other = _fixture_other(remaining_items)
+        else:
+            other = _usable_roundup(other)
 
     body_parts: list[str] = [intro, ""]
     for seg in segments:

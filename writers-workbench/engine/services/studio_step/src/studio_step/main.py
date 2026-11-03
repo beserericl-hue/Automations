@@ -255,7 +255,36 @@ async def op_email(client: Any, ed: StudioEdition, p: dict[str, Any]) -> dict[st
     return await emailing.email_post(client, ed, posts[0])
 
 
+async def op_batch(client: Any, ed: StudioEdition, p: dict[str, Any]) -> dict[str, Any]:
+    """Several studio ops from one assistant message, in order ("make #3 punchier and schedule it
+    thursday afternoon"). Stops at the first refusal: a later step usually depends on an earlier one
+    (no point scheduling a draft whose revision failed), and the message says what was not done."""
+    from writer_engine.hub.router import studio_batch_steps
+
+    steps = studio_batch_steps({"steps": p.get("steps")})
+    if not steps:
+        raise StudioError("VALIDATION", "Nothing to do")
+    done: list[dict[str, Any]] = []
+    messages: list[str] = []
+    for i, step in enumerate(steps):
+        op = str(step.pop("op"))
+        try:
+            result = await OPS[op](client, ed, {**step, "op": op})
+        except StudioError as exc:
+            rest = ", ".join(str(s.get("op")) for s in steps[i + 1 :])
+            msg = " ".join([*messages, f"{op} failed: {exc.message}"])
+            if rest:
+                msg += f" Not done: {rest}."
+            if not done:
+                raise StudioError(exc.code, msg) from exc
+            return {"steps": done, "failed": {"op": op, "code": exc.code}, "message": msg}
+        done.append({"op": op, "result": result})
+        messages.append(str(result.get("message") or f"{op} done."))
+    return {"steps": done, "message": " ".join(messages)}
+
+
 OPS = {
+    "batch": op_batch,
     "help": op_help,
     "slate": op_slate,
     "queue": op_queue,

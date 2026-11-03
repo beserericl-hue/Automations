@@ -9,7 +9,7 @@
  *   - a throwaway second user (auth user + users_v2 row) for the non-owner checks.
  * Teardown deletes exactly those rows.
  */
-import { DEMO_USER_ID, RUN_TAG, hardDeleteEdition, seedEdition, seedFeed, supaDelete, supaGet, supaInsert, supaRemoveObject } from './api';
+import { DEMO_USER_ID, RUN_TAG, getToken, hardDeleteEdition, seedEdition, seedFeed, supaDelete, supaGet, supaInsert, supaRemoveObject } from './api';
 
 const SUPA_URL = (process.env.SUPABASE_URL || process.env.E2E_SUPA_URL || '').replace(/\/$/, '');
 const SUPA_SERVICE = process.env.E2E_SUPA_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -30,11 +30,46 @@ export interface StudioFixture {
   topics: Array<{ id: string; rank: number; title: string; url: string }>;
 }
 
-export async function seedStudio(edition = STUDIO_EDITION): Promise<StudioFixture> {
-  await seedEdition(edition, `E2E Studio ${RUN_TAG}`);
-  await seedFeed({ edition_id: edition, name: 'Dev Radar', url: 'radar://dev', url_type: 'radar' });
+/** Real, public sources for Trend Radar topics: the blog prompt grounds the post in them. */
+const TREND_TOPICS = [
+  {
+    title: 'Anthropic makes prompt caching generally available for Claude',
+    url: 'https://www.anthropic.com/news/prompt-caching',
+    angle: 'Cheaper, faster long-context apps for MVP builders',
+    summary: 'Prompt caching is generally available on the Claude API: repeated long prompt prefixes are cached, '
+      + 'cutting cost by up to 90% and latency by up to 85% for long prompts.',
+  },
+];
+
+export async function seedStudio(
+  edition = STUDIO_EDITION,
+  opts: { radar?: 'dev' | 'trend'; viaApi?: boolean } = {},
+): Promise<StudioFixture> {
+  const radar = opts.radar ?? 'dev';
+  if (opts.viaApi) {
+    // The real create route: it also seeds the edition's default template, which rendering an issue needs.
+    const made = await apiAs(await getToken(), 'POST', '/api/newsletter/editions', {
+      id: edition, display_name: `E2E Studio ${RUN_TAG}`, newsletter_name: `E2E Studio ${RUN_TAG}`,
+      genre: 'ai-marketing', subheader: 'Disposable regression edition',
+    });
+    if (made.status !== 201) throw new Error(`create edition ${made.status}: ${made.text.slice(0, 200)}`);
+  } else {
+    await seedEdition(edition, `E2E Studio ${RUN_TAG}`);
+  }
+  await seedFeed({ edition_id: edition, name: radar === 'trend' ? 'Trend Radar' : 'Dev Radar', url: `radar://${radar}`, url_type: 'radar' });
   const week = fakeWeek();
   const topics = [];
+  if (radar === 'trend') {
+    for (const [i, t] of TREND_TOPICS.entries()) {
+      const title = `E2E ${RUN_TAG}: ${t.title}`;
+      const row = await supaInsert<{ id: string }>('radar_topics_v2', {
+        user_id: DEMO_USER_ID, radar: 'trend', week_of: week, rank: i + 1, title, url: t.url,
+        source: 'E2E', item_type: 'article', angle: t.angle, category: 'AI', summary: t.summary,
+      });
+      topics.push({ id: row.id, rank: i + 1, title, url: t.url });
+    }
+    return { edition, week, topics };
+  }
   for (const [rank, kind] of [[1, 'article'], [2, 'video'], [3, 'article']] as Array<[number, string]>) {
     const url = kind === 'video' ? `https://www.youtube.com/watch?v=e2e${RUN_TAG}${rank}` : `https://example.com/e2e-${RUN_TAG}/${rank}`;
     const row = await supaInsert<{ id: string }>('radar_topics_v2', {
@@ -47,12 +82,23 @@ export async function seedStudio(edition = STUDIO_EDITION): Promise<StudioFixtur
   return { edition, week, topics };
 }
 
+/** The next Thursday in US Eastern after today (what "Thursday" means to the studio). */
+export function nextThursdayEt(): string {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
+  const d = new Date(`${today}T12:00:00Z`);
+  const ahead = ((4 - d.getUTCDay() + 7) % 7) || 7;
+  d.setUTCDate(d.getUTCDate() + ahead);
+  return d.toISOString().slice(0, 10);
+}
+
 export async function seedStudioPost(fx: StudioFixture, fields: {
   title: string;
   state: 'draft' | 'approved' | 'posted' | 'pending';
   topicId?: string;
   linkedin?: string;
   scheduledAt?: string;
+  imageUrl?: string;
+  channels?: string[];
 }): Promise<{ id: string; display_number: number }> {
   const dated = fields.state === 'posted' || fields.state === 'pending';
   const at = fields.scheduledAt ?? new Date(Date.now() - 3600_000).toISOString();
@@ -60,7 +106,8 @@ export async function seedStudioPost(fx: StudioFixture, fields: {
     user_id: DEMO_USER_ID, external_id: `e2e-${RUN_TAG}-${Math.random().toString(36).slice(2, 7)}`,
     edition_id: fx.edition, title: fields.title, body_md: '',
     linkedin_content: fields.linkedin ?? `${fields.title}\n🔗 Read: https://example.com/e2e\n💬 Want these every week? Comment 'newsletter' and we'll add you.\n#AI #E2E`,
-    channels: ['li_personal'], state: fields.state, source: 'studio', item_type: 'article', include_image: false,
+    channels: fields.channels ?? ['li_personal'], state: fields.state, source: 'studio', item_type: 'article',
+    include_image: Boolean(fields.imageUrl), image_url: fields.imageUrl ?? null,
     radar_topic_id: fields.topicId ?? null, source_url: 'https://example.com/e2e',
     scheduled_date: dated ? at.slice(0, 10) : null, slot: 'morning', scheduled_at: dated ? at : null,
     post_at: dated ? at : null, posted_at: fields.state === 'posted' ? at : null,

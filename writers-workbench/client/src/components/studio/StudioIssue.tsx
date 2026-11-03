@@ -1,8 +1,9 @@
 /**
  * The next issue: which posts (and slate topics) go into the edition's next newsletter, in what order.
  * While a selection has stories, the newsletter run for this edition uses exactly these instead of
- * picking by itself; the issue then goes through the usual approvals (stories, subject, images),
- * preview, and send / schedule on the Approvals and Sends screens. This replaces the n8n weekly digest
+ * picking by itself; the issue then goes through the usual approvals (stories, subject, images, each
+ * with an email preview). Approving the images renders the issue and SENDS it to the edition's active
+ * subscribers straight away: there is no later send step. This replaces the n8n weekly digest
  * email. Also here: the edition's public RSS feeds for Substack.
  */
 import { useEffect, useState } from 'react';

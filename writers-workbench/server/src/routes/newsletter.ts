@@ -1023,7 +1023,7 @@ newsletterRouter.get('/approvals/:token/preview', requireAuth, async (req: Reque
   // 1) Load the approval (ownership enforced by user_id).
   const { data: approval, error: aErr } = await supabase
     .from('newsletter_approvals_v2')
-    .select('edition_id, stage, payload')
+    .select('edition_id, execution_id, stage, payload')
     .eq('token', token)
     .eq('user_id', userId)
     .maybeSingle();
@@ -1037,7 +1037,23 @@ newsletterRouter.get('/approvals/:token/preview', requireAuth, async (req: Reque
   }
   const editionId = approval.edition_id as string;
   const payload = (approval.payload ?? {}) as Record<string, unknown>;
-  const stories = (payload.top_selected_stories as Array<Record<string, unknown>> | undefined) ?? [];
+  let stories = (payload.top_selected_stories as Array<Record<string, unknown>> | undefined) ?? [];
+  // Only the stories gate carries the stories. The subject and image gates (the image gate is the last
+  // one before the issue renders and goes out) previewed "0 stories this issue" — found on DEV
+  // 2026-11-03 — so they show the stories approved at this run's stories gate.
+  if (!stories.length && approval.execution_id) {
+    const { data: storiesGate } = await supabase
+      .from('newsletter_approvals_v2')
+      .select('payload')
+      .eq('execution_id', approval.execution_id as string)
+      .eq('user_id', userId)
+      .eq('stage', 'stories')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const approved = ((storiesGate?.payload ?? {}) as Record<string, unknown>).top_selected_stories;
+    if (Array.isArray(approved)) stories = approved as Array<Record<string, unknown>>;
+  }
 
   // 2) Load the edition's active default template + brand identity.
   const [{ data: tpl }, { data: editionRow }] = await Promise.all([

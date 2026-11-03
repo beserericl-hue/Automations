@@ -25,6 +25,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from writer_engine.config import get_settings
+from writer_engine.merge_tags import fill_merge_tags
 from writer_engine.newsletter_issue import peek_issue_number, saved_issue_number
 from writer_engine.schemas import Stage, StepOutput, StepStatus
 from writer_engine.schemas.newsletter import (
@@ -403,11 +404,21 @@ class NewsletterSagaDriver:
             # Image + segment are LLM-backed and routinely exceed the 60s default; give them headroom so
             # a normal-latency generation isn't misread as a timeout — a raised timeout here aborts the
             # whole run (advance() moves the saga to ERROR), which was silently killing sends on DEV.
+            # The story's own pictures are on its source articles (content_ingestion_v2.image_urls);
+            # the picked story carries only title / summary / links. Passing none here left every
+            # image gate with zero options (all DEV runs to 2026-11-03), and a Content Studio post's
+            # chosen image never reached its issue.
+            source_images = [
+                str(u)
+                for a in sources
+                for u in (a.get("image_urls") or [])
+                if isinstance(u, str) and u.startswith("https://")
+            ]
             image_out = await self._run_step(
                 st,
                 _step("image"),
                 execution_id=execution_id,
-                payload={"story": story_payload, "scraped_images": []},
+                payload={"story": story_payload, "scraped_images": source_images},
                 timeout_s=240.0,
             )
             if image_out.status is StepStatus.ERROR:
@@ -559,8 +570,10 @@ class NewsletterSagaDriver:
                 send_date=send_date,
                 subject=subj.subject_line,
                 pre_header_text=subj.pre_header_text,
-                markdown_body=assembled.markdown_body,
-                html_body=rendered.html_body,
+                # The stored copy is the archive / "view in browser": it gets the merge tag's fallback;
+                # deliver-svc fills it per reader from the unfilled rendered_html.
+                markdown_body=fill_merge_tags(assembled.markdown_body),
+                html_body=fill_merge_tags(rendered.html_body),
                 status="saved",
                 issue_number=number,
                 metadata={
@@ -578,7 +591,13 @@ class NewsletterSagaDriver:
                 # back the first save and keep the stale HTML.
                 idempotency_key=f"{execution_id}:persist:{number}",
             )
-            return rendered, dict(persist_out.payload.get("send_row") or {})
+            saved_row = dict(persist_out.payload.get("send_row") or {})
+            # A send that could not be recorded must not go out: no archive, no permalink, no issue
+            # number, nothing for the Sends page. This was unchecked, and on DEV 2026-11-03 a run whose
+            # save hit a unique index went on to "sent" with send_row {} (e2e-studio-lv3).
+            if persist_out.status is StepStatus.ERROR or not saved_row.get("id"):
+                raise RuntimeError(f"persist step error: {persist_out.error or 'no row saved'}")
+            return rendered, saved_row
 
         # Issue number: the database assigns it on save (migration 041), but the email prints it, so
         # ask for the number this save will get, render with it, and propose it on the save.

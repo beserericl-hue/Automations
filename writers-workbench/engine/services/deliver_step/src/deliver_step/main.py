@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from writer_engine.config import get_settings
+from writer_engine.merge_tags import fill_merge_tags, first_name_of
 from writer_engine.postal import PostalClient
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
 from writer_engine.schemas.newsletter import DeliveryResult
@@ -69,7 +70,7 @@ async def _fetch_subscribers(edition_id: str) -> list[dict[str, Any]]:
     client = await get_supabase_admin()
     resp = await (
         client.table("newsletter_subscribers_v2")
-        .select("email,status")
+        .select("email,status,display_name")
         .eq("edition_id", edition_id)
         .eq("status", "active")
         .execute()
@@ -93,7 +94,7 @@ async def handler(inp: StepInput) -> StepOutput:
     # raw archive for older callers.
     permalink = str(inp.payload.get("permalink_url") or "")
     if not permalink:
-        permalink = await _publish_permalink(edition_id, send_id, html_body)
+        permalink = await _publish_permalink(edition_id, send_id, fill_merge_tags(html_body))
     subscribers = await _fetch_subscribers(edition_id)
 
     message_ids: list[str] = []
@@ -115,8 +116,8 @@ async def handler(inp: StepInput) -> StepOutput:
                     res = await client.send(
                         to=[sub["email"]],
                         from_addr=from_addr,
-                        subject=subject,
-                        html=html_with_link,
+                        subject=fill_merge_tags(subject, first_name_of(sub.get("display_name"))),
+                        html=fill_merge_tags(html_with_link, first_name_of(sub.get("display_name"))),
                     )
                     if res.message_id:
                         message_ids.append(res.message_id)

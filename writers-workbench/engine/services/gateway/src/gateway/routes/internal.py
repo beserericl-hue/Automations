@@ -15,7 +15,7 @@ from writer_engine.hub import (
     HubResponse,
     build_dispatch_plan,
     route_message,
-    split_tasks,
+    task_clauses,
 )
 from writer_engine.hub import memory as hub_memory
 from writer_engine.telemetry.logging import get_logger
@@ -157,8 +157,9 @@ async def _route_and_dispatch(req: HubRequest) -> tuple[HubResponse, dict[str, A
     response and the step body that was dispatched (None when nothing was)."""
     logger.info("hub.request", source=req.source, user_id=req.user_id, msg_preview=req.message[:160])
 
-    # V31: fan a multi-task message ("… and also …") out to one job per task.
-    clauses = split_tasks(req.message)
+    # V31: fan a multi-task message ("… and also …") out to one job per task (not on the studio page,
+    # where a compound message is one studio.batch).
+    clauses = task_clauses(req)
     if len(clauses) > 1:
         return await _execute_multi(req, clauses), None
 

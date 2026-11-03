@@ -199,6 +199,28 @@ describe('content studio: the assistant', () => {
     expect(deduct).toHaveBeenCalledWith('owner', 18, 'studio.assistant.generate:ai-dev-roundup');
   });
 
+  it('sends the Review list for ordinals, and charges a compound message for the steps it runs', async () => {
+    // Found on DEV 2026-11-03: "make the second draft punchier and schedule it for Thursday afternoon".
+    db.social_schedule_v2.push(
+      { id: 'p8', user_id: 'owner', edition_id: 'ai-dev-roundup', display_number: 8, state: 'approved', title: 'Approved one' },
+      { id: 'p9', user_id: 'owner', edition_id: 'ai-dev-roundup', display_number: 9, state: 'posted', title: 'Posted one' },
+      { id: 'px', user_id: 'other', edition_id: 'ai-dev-roundup', display_number: 10, state: 'draft', title: 'Not mine' },
+    );
+    hub.mockResolvedValue({
+      kind: 'queued', tool: 'studio', op: 'batch', job_id: 'j10', assistant_message: 'On it',
+      params: { steps: [
+        { op: 'revise', posts: '#8', instruction: 'punchier', mode: 'revise' },
+        { op: 'schedule', posts: '8', mode: 'slot', day: 'thursday', slot: 'afternoon' },
+      ] },
+    });
+    const r = await call('POST', '/ai-dev-roundup/assistant', { message: 'make the second draft punchier and schedule it for Thursday afternoon' });
+    const posts = (hub.mock.calls[0][0] as { context: { studio_posts: Row[] } }).context.studio_posts;
+    expect(posts.map((p) => p.display_number).sort()).toEqual([7, 8]); // the Review tab: drafts + approved, the caller's own
+    expect(posts.find((p) => p.display_number === 8)).toEqual({ display_number: 8, title: 'Approved one', state: 'approved' });
+    expect(r.json.data).toMatchObject({ kind: 'queued', op: 'batch', creditsCharged: 3 }); // one revise; scheduling is free
+    expect(deduct).toHaveBeenCalledWith('owner', 3, 'studio.assistant.batch:ai-dev-roundup');
+  });
+
   it('returns a sync op\'s result and refusal without charging', async () => {
     hub.mockResolvedValue({ kind: 'data', tool: 'studio', op: 'update', assistant_message: 'No post #9 in this edition',
       data: { status: 'error', error: { code: 'NOT_FOUND', message: 'No post #9 in this edition' } } });

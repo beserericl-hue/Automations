@@ -34,8 +34,9 @@ const requireIngestionSecret = requireSharedSecret('X-Ingestion-Secret', 'INGEST
  *     summary: Park a finished newsletter for the future calendar cron (n8n -> server)
  *     description: |
  *       Upserts a row in newsletter_sends_v2 with status='scheduled'. The
- *       unique index on (user_id, send_date) where status != 'cancelled'
- *       means a re-run for the same date replaces the previous draft.
+ *       unique index on (user_id, send_date) for edition-less rows where
+ *       status != 'cancelled' (migration 051) means a re-run for the same date
+ *       replaces the previous draft.
  *     parameters:
  *       - in: header
  *         name: X-Ingestion-Secret
@@ -77,7 +78,8 @@ newsletterSendsRouter.post(
     const supabase = getSupabaseAdmin();
 
     // Table has a PARTIAL unique index on (user_id, send_date) WHERE status !=
-    // 'cancelled' (migration 009 — allows multiple cancelled rows per date).
+    // 'cancelled' AND edition_id IS NULL (migrations 009 / 051 — allows multiple
+    // cancelled rows per date, and one row per edition per date besides).
     // Partial indexes don't work with Supabase's ON CONFLICT upsert. Do an
     // explicit find-then-update-or-insert instead.
     const rowShape = {
@@ -92,11 +94,14 @@ newsletterSendsRouter.post(
       metadata: body.metadata ?? {},
     };
 
+    // Only this route's own rows (no edition): with several editions a user has several sends a day
+    // (migration 051), and this must never overwrite an edition's issue.
     const { data: existing, error: lookupErr } = await supabase
       .from('newsletter_sends_v2')
       .select('id')
       .eq('user_id', body.user_id)
       .eq('send_date', body.send_date)
+      .is('edition_id', null)
       .neq('status', 'cancelled')
       .maybeSingle();
 
