@@ -24,31 +24,36 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
   const [referenceExpanded, setReferenceExpanded] = useState(false);
   const [newsletterExpanded, setNewsletterExpanded] = useState(false);
 
-  // Fetch projects for expandable sidebar section
-  const { data: projects } = useQuery({
+  // Fetch projects for expandable sidebar section. The list shows the 20 most recent; the badge is the
+  // user's real project count (it used to be the list's length, so anyone with more than 20 saw "20").
+  type SidebarProject = Pick<WritingProject, 'id' | 'title' | 'status' | 'updated_at'>;
+  const { data: projectsData } = useQuery({
     queryKey: ['sidebar-projects', userId, isImpersonating],
-    queryFn: async () => {
+    queryFn: async (): Promise<{ rows: SidebarProject[]; total: number }> => {
       if (isImpersonating) {
-        const res = await apiFetch<ApiEnvelope<Pick<WritingProject, 'id' | 'title' | 'status' | 'updated_at'>[]>>(
+        const res = await apiFetch<ApiEnvelope<SidebarProject[]> & { total?: number }>(
           '/api/impersonate/data/projects-summary?limit=20',
         );
-        return res.data ?? [];
+        const rows = res.data ?? [];
+        return { rows, total: res.total ?? rows.length };
       }
-      const { data, error } = await supabase
+      const { data, error, count } = await supabase
         .from('writing_projects_v2')
-        .select('id, title, status, updated_at')
+        .select('id, title, status, updated_at', { count: 'exact' })
         .eq('user_id', userId!)
         .is('deleted_at', null)
         .order('updated_at', { ascending: false })
         .limit(20);
       if (error) throw error;
-      return data as Pick<WritingProject, 'id' | 'title' | 'status' | 'updated_at'>[];
+      const rows = (data ?? []) as SidebarProject[];
+      return { rows, total: count ?? rows.length };
     },
     enabled: !!userId,
     staleTime: 30_000,
   });
 
-  const projectCount = projects?.length ?? 0;
+  const projects = projectsData?.rows;
+  const projectCount = projectsData?.total ?? 0;
   const isProjectRoute = location.pathname.startsWith('/projects');
   const isReferenceRoute = ['/genres', '/story-arcs', '/research', '/sources', '/cost'].some(p => location.pathname.startsWith(p));
   // Newsletter section: distinct prefix from the legacy /newsletters redirect
@@ -163,7 +168,7 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
                   <StatusDot status={project.status} />
                 </NavLink>
               ))}
-              {projectCount === 0 && (
+              {(projects?.length ?? 0) === 0 && (
                 <div className="px-3 py-1.5 text-xs text-gray-400 italic">No projects yet</div>
               )}
             </div>
