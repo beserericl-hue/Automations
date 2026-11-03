@@ -29,3 +29,7 @@ knowledgebase/*/.obsidian/themes
 *cshse*
 *CSHSE*
 *[Ss]tevenson*
+
+# Python bytecode (never commit: it changes whenever a script is imported or compiled)
+__pycache__/
+*.pyc
