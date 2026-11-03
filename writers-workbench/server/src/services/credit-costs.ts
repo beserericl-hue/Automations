@@ -55,11 +55,13 @@ export const DEFAULT_CREDIT_COSTS: Record<string, number> = {
   // The copy assistant on the promotion / publishing fields (routes/copy-assist.ts): one draft or one
   // revision of ONE field (description, back cover, keywords, inside flap, dedication, author's note,
   // bio, announcement email...). Measured on DEV 2026-11-03 (token_usage_v2, operation copy-assist.*,
-  // claude-opus-5-5, a 21-chapter book): 16 drafts averaged $0.021. The book's material is a cached
-  // prefix, so the first draft in a 5-minute window pays the cache write ($0.060-$0.084) and the rest
-  // read it ($0.005-$0.036). 3 credits = $0.037 at ~82 credits/$, the per-field cost of a typical
-  // session of two or more drafts. "Draft all missing" is this x the fields drafted. "Also by" is free.
-  promo_copy: 3,
+  // claude-opus-5-5, a 21-chapter book): 48 drafts and revisions averaged $0.0189 (16 local + 32
+  // through the deployed route) -> 1.55 credits at ~82 credits/$ -> 2, rounded the way qa (4.3 -> 4) and
+  // repair (3.5 -> 4) were. The book's material is a cached prefix: the first call in a 5-minute
+  // window pays the cache write ($0.058-$0.084, ~5-7 credits' worth, more for a long book) and the rest
+  // read it ($0.004-$0.036), so an isolated single draft costs more than it is charged; the average
+  // covers a working session. "Draft all missing" is this x the fields drafted. "Also by" is free.
+  promo_copy: 2,
   // Still explicitly zero: not charged on any entry point (not part of the 2026-11-03 decision).
   review_chapter: 0,
   format_kindle: 0, // the Export tab builds the .docx server-side, free

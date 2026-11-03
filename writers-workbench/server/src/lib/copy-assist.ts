@@ -472,6 +472,7 @@ const HONESTY = [
   '- Never invent reviews, review quotes, endorsements, blurbs from other authors, awards, prizes, "bestseller" or chart claims, star ratings, sales figures or reader numbers. Do not call the book acclaimed, award-winning or bestselling. This book has no reviews yet.',
   '- Do not reveal the ending or anything from chapters marked LATE.',
   '- Where the text needs a fact you do not have (a name, a date, a place, a price), write a [placeholder in square brackets] for the author to fill. Never make the fact up.',
+  '- Say nothing about the author that <author> does not state: no memories, anecdotes, scenes from their life, habits, people, places, dates or story of how the book began beyond what is written there. A revision instruction ("more suspense", "warmer") never licenses new facts about the author.',
   '- Plain text. No markdown, no title or heading line (the page already has its heading), no em dashes.',
 ];
 
