@@ -8,6 +8,11 @@ import ConfirmDialog from '../shared/ConfirmDialog';
 import Pagination from '../shared/Pagination';
 import type { PublishedContent } from '../../types/database';
 
+/** The library list's columns (the server's `view=list` selects the same ones). */
+export const LIBRARY_COLUMNS = 'id, title, content_type, status, genre_slug, project_id, chapter_number, created_at, updated_at';
+type LibraryItem = Pick<PublishedContent,
+  'id' | 'title' | 'content_type' | 'status' | 'genre_slug' | 'project_id' | 'chapter_number' | 'created_at' | 'updated_at'>;
+
 type ContentType = 'all' | 'chapter' | 'short_story' | 'blog_post' | 'newsletter';
 type SortField = 'updated_at' | 'title' | 'status' | 'content_type';
 
@@ -47,22 +52,25 @@ export default function ContentLibrary() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
-  // Fetch all content (Sprint 8: routes through impersonation proxy when active)
+  // Fetch all content (Sprint 8: routes through impersonation proxy when active). Only the columns the
+  // table shows, filters and sorts on: `select('*')` pulled every chapter's full text and metadata
+  // (14 MB for the DEV demo user's 471 rows) to render six short columns, and under concurrent load
+  // the page sat on "Loading..." for 20s+.
   const { data: items, isLoading, isError, error } = useQuery({
     queryKey: ['content-library', userId, isImpersonating],
     queryFn: async () => {
       if (isImpersonating) {
-        const res = await apiFetch<ApiEnvelope<PublishedContent[]>>('/api/impersonate/data/content?limit=500');
+        const res = await apiFetch<ApiEnvelope<LibraryItem[]>>('/api/impersonate/data/content?limit=500&view=list');
         return res.data ?? [];
       }
       const { data, error } = await supabase
         .from('published_content_v2')
-        .select('*')
+        .select(LIBRARY_COLUMNS)
         .eq('user_id', userId!)
         .is('deleted_at', null)
         .order('updated_at', { ascending: false });
       if (error) throw error;
-      return data as PublishedContent[];
+      return (data ?? []) as unknown as LibraryItem[];
     },
     enabled: !!userId,
   });
