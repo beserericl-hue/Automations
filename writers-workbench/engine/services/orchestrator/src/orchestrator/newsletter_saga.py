@@ -488,10 +488,33 @@ class NewsletterSagaDriver:
     async def _stage_images_approved(self, execution_id: UUID, st: dict[str, Any]) -> Stage | None:
         chosen = dict(st.get("chosen_images") or {})
         segments = list(st.get("segments_data") or [])
+        # What the gate offered per story: its image options plus the image the section already had.
+        # A choice must be one of those (or "" for no image): the chosen URL goes into every
+        # subscriber's email, so an arbitrary URL from the resolve call is never accepted.
+        offered: dict[str, set[str]] = {}
+        for opts in st.get("image_options_by_story") or []:
+            offered.setdefault(str(opts.get("story_title") or ""), set()).update(
+                str(u) for u in (opts.get("options") or []) if u
+            )
         for seg in segments:
             title = seg.get("story_title")
-            if title in chosen:
-                seg["chosen_image_url"] = chosen[title]
+            if title not in chosen:
+                continue
+            pick = str(chosen[title] or "")
+            allowed = offered.get(str(title), set()) | (
+                {str(seg["chosen_image_url"])} if seg.get("chosen_image_url") else set()
+            )
+            if pick == "":
+                seg["chosen_image_url"] = None
+            elif pick in allowed:
+                seg["chosen_image_url"] = pick
+            else:
+                logger.warning(
+                    "saga.chosen_image_refused",
+                    execution_id=str(execution_id),
+                    story=str(title)[:80],
+                    url=pick[:120],
+                )
         await self._advance(
             execution_id,
             Stage.ASSEMBLING,
@@ -875,7 +898,12 @@ class NewsletterSagaDriver:
                     execution_id,
                     Stage.IMAGES_APPROVED,
                     "images approved",
-                    patch={"chosen_images": chosen_images or {}},
+                    patch={
+                        "chosen_images": {
+                            str(k): "" if v is None else str(v)
+                            for k, v in (chosen_images.items() if isinstance(chosen_images, dict) else [])
+                        }
+                    },
                 )
             else:
                 await self._advance(execution_id, Stage.ERROR, "images rejected")

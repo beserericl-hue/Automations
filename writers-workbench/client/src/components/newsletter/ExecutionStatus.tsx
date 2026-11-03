@@ -30,7 +30,7 @@ import StageStrip from './StageStrip';
 import LiveLog from './LiveLog';
 import ApprovalPayloadStories from './ApprovalPayloadStories';
 import ApprovalPayloadSubject from './ApprovalPayloadSubject';
-import ApprovalPayloadImage from './ApprovalPayloadImage';
+import ApprovalPayloadImage, { defaultImageChoices } from './ApprovalPayloadImage';
 import ApprovalPayloadSend from './ApprovalPayloadSend';
 import ApprovalEmailPreview from './ApprovalEmailPreview';
 import ApprovalResolveForm from './ApprovalResolveForm';
@@ -154,6 +154,14 @@ export default function ExecutionStatus() {
   // outstanding approval at a time per the workflow design (stories OR
   // subject_line, never both).
   const activeApproval = (approvalsQuery.data?.approvals ?? [])[0] ?? null;
+  // The image gate's picks, per approval token; absent = untouched (each section's own image).
+  const [imagePicks, setImagePicks] = useState<{ token: string; picks: Record<string, string> } | null>(null);
+  const picks =
+    activeApproval?.stage === 'image'
+      ? imagePicks?.token === activeApproval.token
+        ? imagePicks.picks
+        : defaultImageChoices(activeApproval.payload)
+      : undefined;
 
   // The execution's edition_id rides on stage events (data.editionId). If
   // we have any event, prefer that; otherwise fall back to ai-news for
@@ -245,7 +253,11 @@ export default function ExecutionStatus() {
               {activeApproval.stage === 'stories' ? (
                 <ApprovalPayloadStories payload={activeApproval.payload} />
               ) : activeApproval.stage === 'image' ? (
-                <ApprovalPayloadImage payload={activeApproval.payload} />
+                <ApprovalPayloadImage
+                  payload={activeApproval.payload}
+                  selected={picks}
+                  onChange={(next) => setImagePicks({ token: activeApproval.token, picks: next })}
+                />
               ) : activeApproval.stage === 'send' ? (
                 <>
                   <ApprovalPayloadSend token={activeApproval.token} payload={activeApproval.payload} />
@@ -259,6 +271,7 @@ export default function ExecutionStatus() {
                 onResolved={handleResolved}
                 stage={activeApproval.stage}
                 subscriberCount={activeApproval.stage === 'send' ? (activeApproval.payload.subscriber_count as number | null | undefined) : undefined}
+                chosenImages={picks}
               />
             </div>
           )}

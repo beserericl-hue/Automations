@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { supaGet } from '../pages/api';
+import { DEMO_USER_ID, supaGet, supaInsert } from '../pages/api';
+import { cleanupStudio, seedStudio, STUDIO_EDITION, type StudioFixture } from '../pages/studio';
 
 /**
  * Newsletter FULL send — the complete data path a real user drives, end to end:
@@ -14,10 +15,15 @@ import { supaGet } from '../pages/api';
  *       subject renders on the Sends list; delivery records a provider_message_id.
  * FAIL: a gate never appears, the saga errors, no send row materialises, or it isn't displayed.
  *
- * HEAVY (engine segments + images take minutes) — run in Pass B (workers=1). Uses the seeded
- * wasteland-wire edition; its 5 subscribers are @example.invalid so delivery bounces harmlessly.
+ * HEAVY (engine segments + images take minutes) — run in Pass B (workers=1).
+ *
+ * SAFE TO RUN (2026-11-03): the spec makes its OWN throwaway edition (through the real create route,
+ * so it has the default template), with ZERO subscribers, and a chosen selection of two of its own
+ * slate topics so the run has content without gathering anything. It used to generate a real
+ * wasteland-wire issue, which overwrote that edition's issue for the day and mailed its subscribers.
+ * The edition and everything the run wrote are deleted afterwards (cleanupStudio). Delivery to zero
+ * subscribers still marks the issue sent, with recipient_count 0.
  */
-const EDITION = 'wasteland-wire';
 const HAS_KEY = !!(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.E2E_SUPA_SERVICE_KEY);
 
 async function openApprovalToken(execId: string): Promise<string | null> {
@@ -33,6 +39,16 @@ test.describe('Newsletter FULL send (data path)', () => {
   test.setTimeout(20 * 60_000); // full pipeline: 3 HITL gates + per-story segments + images + render + deliver
 
   test('generate → approve stories/subject/image → sent newsletter created and displayed', async ({ page }) => {
+    let fx: StudioFixture | null = null;
+    try {
+    fx = await seedStudio(`${STUDIO_EDITION}-send`, { viaApi: true });
+    const EDITION = fx.edition;
+    expect(await supaGet('newsletter_subscribers_v2', `edition_id=eq.${encodeURIComponent(EDITION)}&select=email`),
+      'the throwaway edition has no subscribers').toEqual([]);
+    const selection = await supaInsert<{ id: string }>('newsletter_issue_selections_v2', { user_id: DEMO_USER_ID, edition_id: EDITION, status: 'open' });
+    for (const [i, t] of [fx.topics[0], fx.topics[2]].entries()) {
+      await supaInsert('newsletter_issue_items_v2', { selection_id: selection.id, position: i + 1, kind: 'topic', radar_topic_id: t.id });
+    }
     const startIso = new Date(Date.now() - 5_000).toISOString();
 
     // ── 1) Generate from the Generate page ────────────────────────────────────
@@ -136,6 +152,8 @@ test.describe('Newsletter FULL send (data path)', () => {
         return r[0]?.status === 'sent' || r[0]?.status === 'failed' ? r[0].status : null;
       }, { timeout: 5 * 60_000, message: 'send never reached a delivered/sent state' })
       .toBe('sent');
+    expect((await supaGet<{ recipient_count: number | null }>('newsletter_sends_v2', `id=eq.${send!.id}&select=recipient_count`))[0]?.recipient_count,
+      'nobody was mailed (zero subscribers)').toBe(0);
 
     // ── 4) DATA DISPLAYED: the sent newsletter shows on the Sends screen ──────
     // The list defaults to the 'scheduled' filter; a real user flips Status → 'sent' to see it.
@@ -167,9 +185,13 @@ test.describe('Newsletter FULL send (data path)', () => {
       }, { timeout: 60_000, message: 'no token_usage_v2 rows recorded for this newsletter run' })
       .toBeGreaterThan(0);
     const ops = new Set(costRows.map((r) => r.operation));
-    expect([...ops], 'the LLM steps were all costed').toEqual(expect.arrayContaining(['pick', 'subject', 'segment']));
+    // No 'pick': a chosen selection IS the issue, so the LLM story pick never runs.
+    expect([...ops], 'the LLM steps were all costed').toEqual(expect.arrayContaining(['subject', 'segment']));
     const ownerless = costRows.filter((r) => r.user_id !== owner);
     expect(ownerless.map((r) => `${r.operation}:${r.user_id}`), 'every cost row is billed to the edition owner').toEqual([]);
     expect(costRows.every((r) => r.metadata?.edition_id === EDITION), 'cost rows name the edition').toBe(true);
+    } finally {
+      await cleanupStudio(fx);
+    }
   });
 });
