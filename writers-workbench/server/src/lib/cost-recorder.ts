@@ -140,7 +140,25 @@ export interface UsageRecord {
 }
 
 /** The token_usage_v2 row for one call. Exported for tests. */
-export function buildUsageRow(r: UsageRecord): Record<string, unknown> {
+export function buildUsageRow(input: UsageRecord): Record<string, unknown> {
+  // The types require both, but an empty string or a value from untyped JSON still gets through. A
+  // row that cannot be grouped or priced is written (dropping it would lose billing data) but never
+  // silently: defaulted, tagged label_defaulted, logged at error. Mirrors the engine's
+  // persist_helpers.label_token_rows.
+  const missing: string[] = [];
+  let r = input;
+  if (!String(r.provider ?? '').trim()) {
+    missing.push('provider');
+    r = { ...r, provider: 'unknown' };
+  }
+  if (!String(r.operation ?? '').trim()) {
+    missing.push('operation');
+    r = { ...r, operation: `unattributed.${r.provider}` };
+  }
+  if (missing.length) {
+    logger.error({ missing, provider: r.provider, operation: r.operation, model: r.model }, 'cost.unlabelled_row');
+    r = { ...r, metadata: { ...(r.metadata ?? {}), label_defaulted: missing } };
+  }
   const t = r.tokens ?? { input: 0, output: 0 };
   const cost = r.cost ?? computeTokenCost(r.provider, r.model, t);
   const cacheRead = t.cacheRead ?? 0;

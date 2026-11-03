@@ -421,6 +421,78 @@ async def _finish(ctx: dict[str, Any]) -> None:
         await _drain(ctx)  # one retry: a transient Supabase blip should not drop billing data
     if ctx["pending"]:
         logger.error("token_accounting.rows_lost", rows=len(ctx["pending"]), workflow=ctx.get("workflow"))
+    if ctx.get("late"):
+        await _stamp_late(ctx)
+
+
+# Fields a step can learn only part-way through (see :func:`annotate`), and how each is stored.
+_LATE_FIELDS: dict[str, Any] = {
+    "project_id": lambda v: str(v),
+    "content_id": lambda v: str(v),
+    "chapter_number": _chapter,
+}
+
+
+def annotate(*, project_id: Any = None, content_id: Any = None, chapter_number: Any = None) -> None:
+    """Fill in what a step learned after its accounting context was opened.
+
+    The context is opened from the request payload, but a chat/voice "write chapter 3 of <title>"
+    only names the project — the chapter step resolves the title to an id inside the op — and a
+    content row's id exists only once the content is saved, after every paid call. So 410 chapter
+    write rows on DEV had no project and none had a content id, and a cost audit had to match rows
+    by operation + chapter + timestamp.
+
+    Sets each field on the active context when it is still empty (an explicit value from the payload
+    is never overridden), patches rows not yet written, and on flush stamps the rows this context
+    already wrote (same run id + operation, field still NULL). No-op outside a context.
+    """
+    ctx = _ctx.get()
+    if ctx is None:
+        return
+    learned: dict[str, Any] = {}
+    for field, value in (
+        ("project_id", project_id),
+        ("content_id", content_id),
+        ("chapter_number", chapter_number),
+    ):
+        if value is None or str(value).strip() == "" or ctx.get(field) not in (None, ""):
+            continue
+        stored = _LATE_FIELDS[field](value)
+        if stored is None:
+            continue
+        ctx[field] = value
+        learned[field] = stored
+    if not learned:
+        return
+    for row in ctx["pending"]:
+        for field, stored in learned.items():
+            if row.get(field) is None:
+                row[field] = stored
+    ctx.setdefault("late", {}).update(learned)
+
+
+async def _stamp_late(ctx: dict[str, Any]) -> None:
+    """Stamp late-learned fields onto the rows this context already wrote."""
+    run_id, op = ctx.get("run_id"), ctx.get("workflow")
+    if not run_id or not op or not _persistence_enabled():
+        return
+    from writer_engine.supabase.client import get_supabase_admin
+
+    try:
+        client = await get_supabase_admin()
+        for field, stored in ctx["late"].items():
+            await (
+                client.table("token_usage_v2")
+                .update({field: stored})
+                .eq("run_id", str(run_id))
+                .eq("operation", op)
+                .is_(field, "null")
+                .execute()
+            )
+    except Exception as exc:
+        logger.warning(
+            "token_accounting.stamp_failed", run_id=run_id, error=f"{type(exc).__name__}: {exc}"[:200]
+        )
 
 
 async def flush(*, wait: bool = True) -> dict[str, Any]:

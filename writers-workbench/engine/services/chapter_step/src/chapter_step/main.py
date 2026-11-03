@@ -47,6 +47,7 @@ from writer_engine.schemas.chapter import (
     WriteChapterResponse,
 )
 from writer_engine.step_service import build_step_app
+from writer_engine.telemetry import token_accounting
 from writer_engine.telemetry.logging import get_logger
 
 STEP_NAME = "chapter"
@@ -176,6 +177,8 @@ async def _resolve_project_for_payload(payload: dict, *, create: bool) -> dict |
     )
     if pid:
         payload["project_id"] = pid
+        # The step's cost context was opened from the title-only payload, with no project.
+        token_accounting.annotate(project_id=pid)
         logger.info(
             "chapter.project_resolved",
             project_id=pid,
@@ -1920,6 +1923,7 @@ async def _op_write(payload: dict) -> dict:
     # "write chapter N of X" failed with ValidationError: project_id required.
     await _resolve_project_for_payload(payload, create=True)
     payload["chapter_number"] = _coerce_chapter_number(payload.get("chapter_number"), 1)
+    token_accounting.annotate(chapter_number=payload["chapter_number"])
     req = WriteChapterRequest.model_validate(payload)
     ctx = await _load_context(str(req.project_id), payload)
 

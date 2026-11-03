@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
+from writer_engine.telemetry import token_accounting
 from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("persist_helpers")
@@ -330,6 +331,8 @@ async def persist_chapter(
         )
         .execute()
     )
+    # The cost rows of this run were recorded before the chapter existed: tie them to it.
+    token_accounting.annotate(project_id=project_id, content_id=content_id, chapter_number=chapter_number)
     return content_id
 
 
@@ -780,6 +783,7 @@ async def persist_content(
         )
         .execute()
     )
+    token_accounting.annotate(project_id=project_id, content_id=content_id)
     return content_id
 
 
@@ -798,10 +802,15 @@ async def persist_token_usage(
     columns: operation, provider, units, unit_prices, cost_source, run_id, ...); they are inserted
     as-is. Rows carrying a ``request_id`` are upserted on ``(provider, request_id)`` with
     ignore-duplicates, so a provider task recorded twice cannot be billed twice. The older
-    ``calls``/``workflow`` form is kept for callers written before 044. Returns rows written."""
-    if rows is not None:
-        if not rows:
-            return 0
+    ``calls``/``workflow`` form is kept for callers written before 044. Returns rows written.
+
+    Every row leaves here with ``provider``, ``operation`` and ``source`` set (:func:`label_token_rows`):
+    47 DEV rows were written with all three NULL by the pre-044 form, which put the provider only in
+    metadata, and the cost view cannot group or price a row it cannot label."""
+    if rows is None:
+        rows = _legacy_token_rows(user_id=user_id, workflow=workflow, calls=calls, metadata=metadata)
+    rows = label_token_rows(rows)
+    if rows:
         keyed = [r for r in rows if r.get("request_id")]
         plain = [r for r in rows if not r.get("request_id")]
         if plain:
@@ -812,7 +821,13 @@ async def persist_token_usage(
             except Exception as exc:  # 23505 = already recorded under this request id
                 if "23505" not in str(exc) and "duplicate key" not in str(exc):
                     raise
-        return len(rows)
+    return len(rows)
+
+
+def _legacy_token_rows(
+    *, user_id: str | None, workflow: str, calls: list[dict] | None, metadata: dict | None
+) -> list[dict]:
+    """Rows for the pre-044 ``calls``/``workflow`` form, now with the 044 label columns filled."""
     rows = []
     for c in calls or []:
         inp = int(c.get("input_tokens") or 0)
@@ -823,6 +838,8 @@ async def persist_token_usage(
             {
                 "user_id": user_id,
                 "workflow_name": workflow,
+                "operation": workflow,
+                "provider": c.get("provider"),
                 "model": c.get("model"),
                 "input_tokens": inp,
                 "output_tokens": out,
@@ -837,10 +854,49 @@ async def persist_token_usage(
                 },
             }
         )
-    if not rows:
-        return 0
-    await client.table("token_usage_v2").insert(rows).execute()
-    return len(rows)
+    return rows
+
+
+UNKNOWN_PROVIDER = "unknown"
+
+
+def label_token_rows(rows: list[dict]) -> list[dict]:
+    """Make sure every cost row names its provider, operation and source before it is written.
+
+    A row missing one is still written — dropping it would lose billing data — but never silently:
+    it is logged at ERROR with what was missing, defaulted (provider from metadata, else ``unknown``;
+    operation from ``workflow_name``, else ``unattributed.<provider>``; source ``engine``) and tagged
+    ``metadata.label_defaulted`` so the cost view and an audit can find it.
+    """
+    out = []
+    for row in rows:
+        row = dict(row)
+        meta = dict(row.get("metadata") or {})
+        missing = []
+        if not str(row.get("provider") or "").strip():
+            missing.append("provider")
+            row["provider"] = str(meta.get("provider") or "").strip() or UNKNOWN_PROVIDER
+        if not str(row.get("operation") or "").strip():
+            missing.append("operation")
+            row["operation"] = (
+                str(row.get("workflow_name") or "").strip() or f"unattributed.{row['provider']}"
+            )
+        if not str(row.get("workflow_name") or "").strip():
+            row["workflow_name"] = row["operation"]
+        if not str(row.get("source") or "").strip():
+            row["source"] = "engine"
+        if missing:
+            meta["label_defaulted"] = missing
+            row["metadata"] = meta
+            logger.error(
+                "token_usage.unlabelled_row",
+                missing=missing,
+                provider=row["provider"],
+                operation=row["operation"],
+                model=row.get("model"),
+            )
+        out.append(row)
+    return out
 
 
 async def persist_chapter_qa(

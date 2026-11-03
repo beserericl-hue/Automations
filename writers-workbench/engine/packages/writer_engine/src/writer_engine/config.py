@@ -304,6 +304,9 @@ class EngineSettings(BaseSettings):
     # for a KB that changes a few times a day; the tick is a no-op without ELEVENLABS_API_KEY.
     eve_kb_prune_poll_seconds: float = Field(default=21600.0, alias="EVE_KB_PRUNE_POLL_SECONDS")
     eve_kb_max_age_hours: float = Field(default=24.0, alias="EVE_KB_MAX_AGE_HOURS")
+    # Close engine_job_runs rows left in_progress by a job arq killed (job_timeout) or gave up on
+    # (cancelled past max_tries) without the worker ever reaching fail_run. 0 disables it.
+    run_reaper_poll_seconds: float = Field(default=900.0, alias="RUN_REAPER_POLL_SECONDS")
 
     # Observability
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")

@@ -964,6 +964,16 @@ def build_app() -> FastAPI:
     def _health_key_for(queue: str) -> str:
         return f"{ARQ_HEALTH_CHECK_KEY}:{queue}"
 
+    async def _run_reaper_tick() -> dict[str, Any]:
+        """Close engine_job_runs rows a killed job left in_progress (writer_engine.idempotency.run_reaper).
+
+        The run lease lives in arq's Redis (the worker takes it from ``ctx["redis"]``), so a row whose
+        lease is still held is left alone."""
+        from writer_engine.idempotency.run_reaper import reap_stale_runs
+        from writer_engine.supabase.client import get_supabase_admin
+
+        return await reap_stale_runs(await get_supabase_admin(), redis=getattr(app.state, "arq_pool", None))
+
     async def _queue_metrics_tick() -> dict[str, Any]:
         """Sample queue depth into the Prometheus gauges (B12).
 
@@ -1150,6 +1160,11 @@ def build_app() -> FastAPI:
             name="eve-kb-prune",
             interval_s=settings_for_jobs.eve_kb_prune_poll_seconds,
             run=_eve_kb_prune_tick,
+        ),
+        CronJob(
+            name="run-reaper",
+            interval_s=settings_for_jobs.run_reaper_poll_seconds,
+            run=_run_reaper_tick,
         ),
     ]
 
