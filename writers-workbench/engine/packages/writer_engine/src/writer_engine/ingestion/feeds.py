@@ -436,7 +436,7 @@ async def fetch_reddit_post(url: str, *, client: httpx.AsyncClient | None = None
         )
         resp.raise_for_status()
         items = parse_reddit_listing(resp.json())
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - untrusted Reddit payload: one unreadable post is logged and skipped, never stops the feed
         logger.warning(
             "ingestion.reddit_post_failed", url=url[:120], error=f"{type(exc).__name__}: {exc}"[:140]
         )

@@ -36,6 +36,7 @@ import contextvars
 from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
+from writer_engine.errors import SUPABASE_ERRORS
 from writer_engine.telemetry import pricing
 from writer_engine.telemetry.logging import get_logger
 
@@ -276,7 +277,7 @@ def record(
             },
             operation,
         )
-    except Exception as exc:  # accounting must never break a generation
+    except Exception as exc:  # noqa: BLE001 - accounting must never break a generation
         logger.warning("token_accounting.record_failed", error=f"{type(exc).__name__}: {exc}"[:200])
 
 
@@ -326,7 +327,7 @@ def record_units(
             },
             operation,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - accounting must never break a generation
         logger.warning("token_accounting.record_failed", error=f"{type(exc).__name__}: {exc}"[:200])
 
 
@@ -368,7 +369,7 @@ def _persistence_enabled() -> bool:
 
         s = get_settings()
         return bool(s.supabase_url and s.supabase_service_role_key)
-    except Exception:
+    except (ImportError, ValueError):
         return False
 
 
@@ -387,7 +388,7 @@ async def _drain(ctx: dict[str, Any]) -> None:
         ctx["pending"].clear()
         try:
             await _write_rows(batch)
-        except Exception as exc:
+        except SUPABASE_ERRORS as exc:
             ctx["pending"][:0] = batch
             ctx.setdefault("failures", 0)
             ctx["failures"] += 1
@@ -489,7 +490,7 @@ async def _stamp_late(ctx: dict[str, Any]) -> None:
                 .is_(field, "null")
                 .execute()
             )
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         logger.warning(
             "token_accounting.stamp_failed", run_id=run_id, error=f"{type(exc).__name__}: {exc}"[:200]
         )
@@ -520,7 +521,7 @@ async def flush(*, wait: bool = True) -> dict[str, Any]:
         except asyncio.CancelledError:
             logger.warning("token_accounting.flush_cancelled_write_continues", workflow=ctx.get("workflow"))
             raise
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - the write task handles its own failures; a flush must never fail the step it accounts for
             logger.warning("token_accounting.flush_failed", error=str(exc)[:200], **snap)
     logger.info(
         "token_accounting.flushed", workflow=ctx.get("workflow"), chapter=ctx.get("chapter_number"), **snap

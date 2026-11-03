@@ -120,7 +120,7 @@ async def handler(inp: StepInput) -> StepOutput:
                     )
                     if res.message_id:
                         message_ids.append(res.message_id)
-                except Exception as exc:  # collect + decide after the loop
+                except Exception as exc:  # noqa: BLE001 - per-recipient isolation: errors are collected and decided after the loop; Postal errors vary
                     errors.append(f"{sub.get('email')}: {exc}")
         finally:
             await client.aclose()

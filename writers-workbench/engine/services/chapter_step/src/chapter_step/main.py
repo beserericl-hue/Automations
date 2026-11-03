@@ -16,6 +16,7 @@ from typing import Any, NamedTuple
 from uuid import UUID, uuid4
 
 from writer_engine import outline_keys
+from writer_engine.errors import SUPABASE_ERRORS
 from writer_engine.humanize import humanize_draft
 from writer_engine.library_helpers import optional_int
 from writer_engine.llm import ProviderNotRegistered, complete_structured, get_router
@@ -600,7 +601,7 @@ async def _persist_chapter_outline(
                 )
                 .execute()
             )
-        except Exception as exc:
+        except SUPABASE_ERRORS as exc:
             # No history, no overwrite: the brainstorm path already refuses, and a chapter outline the
             # author cannot get back is worse than one that was not updated (CR-001 audit).
             logger.warning("plan.snapshot_failed", error=str(exc)[:160])
@@ -626,7 +627,7 @@ async def _persist_chapter_outline(
             .execute()
         )
         return {"persisted": True, "chapter_number": chapter_number}
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         logger.warning("plan.persist_failed", error=str(exc)[:200])
         return {"persisted": False, "error": str(exc)[:200]}
 
@@ -865,7 +866,7 @@ async def _refresh_stale_canon(ctx: dict[str, Any], *, user_id: str) -> None:
                 chunks=state.get("chunks"),
                 reason=state.get("reason"),
             )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - stale-canon refresh is advisory (embeddings provider + DB); logged
         logger.warning("chapter.canon_refresh_failed", error=f"{type(exc).__name__}: {exc}"[:160])
 
 
@@ -895,7 +896,7 @@ async def _canon_grounding(ctx: dict[str, Any], beat: str, *, user_id: str | Non
             match_count=8,
             match_threshold=0.35,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - canon grounding is advisory: the chapter writes without it, logged (embeddings provider + DB)
         logger.warning("chapter.canon_retrieval_failed", error=str(exc)[:160])
         return ""
     if not rows:
@@ -958,7 +959,7 @@ async def _prior_chapter_tail(project_id: str, chapter_number: int) -> str:
         return ""
     try:
         text = await _load_persisted_chapter(project_id, chapter_number - 1)
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         logger.warning("chapter.prior_tail_failed", chapter=chapter_number, error=str(exc)[:160])
         return ""
     if not text.strip():
@@ -1462,7 +1463,7 @@ async def _chapter_research(beat: str, *, period: str, title: str, focus: str = 
     except ProviderNotRegistered:
         logger.warning("chapter.research.no_provider", reason="perplexity not registered")
         return "", []
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - research failure is logged and the chapter writes unresearched; provider errors vary
         # The Piscataway-blindness path: if grounding fails the chapter still writes, but UNRESEARCHED.
         # Must be visible, not a silent empty-string.
         logger.warning("chapter.research.failed", error=str(exc)[:200], beat=str(beat)[:120])
@@ -2281,7 +2282,7 @@ async def _persist_chapter_if_requested(
             title=chapter_title,
             text=clean_text,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - prose indexing is a retrieval aid after the chapter is saved; logged
         logger.warning("chapter.prose_index_failed", chapter=chapter_number, error=str(exc)[:160])
 
     # Bible extraction/persist is a SEPARATE best-effort step — a failure here must NOT mask the
@@ -2298,7 +2299,7 @@ async def _persist_chapter_if_requested(
             entries=bible.get("entries") or [],
             chapter_number=chapter_number,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - bible extraction (LLM) + persist: recorded in bible_error, the saved chapter stands
         logger.warning("chapter.bible.failed", chapter=chapter_number, error=str(exc)[:200])
         bible_info["bible_error"] = str(exc)[:200]
 
@@ -2326,7 +2327,7 @@ async def _persist_chapter_if_requested(
             # report, so they were pure duplication. They also polluted the Story Bible tab with a
             # type no consumer rendered. Research belongs in research_reports_v2, not the bible.
             bible_info["research_persisted"] = True
-        except Exception as exc:
+        except SUPABASE_ERRORS as exc:
             logger.warning("chapter.research.persist_failed", chapter=chapter_number, error=str(exc)[:200])
             bible_info["research_error"] = str(exc)[:200]
 
@@ -2357,7 +2358,7 @@ async def _persist_chapter_if_requested(
             },
         )
         bible_info["telemetry"] = True
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         logger.warning("chapter.telemetry.failed", chapter=chapter_number, error=str(exc)[:200])
         bible_info["telemetry_error"] = str(exc)[:200]
 
@@ -3201,7 +3202,7 @@ async def _persist_qa_artifacts(
                 .execute()
             )
         return {"qa_report_checks": len(qa_report["checks"]), "drift_characters": len(new_chars)}
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - merges stored outline JSON of mixed vintage; any failure is returned as persisted=False and logged
         logger.warning("qa.persist_failed", error=str(exc)[:200])
         return {"persisted": False, "error": str(exc)[:200]}
 
@@ -3321,7 +3322,7 @@ async def _persist_review_report(payload: dict, report: dict) -> dict | None:
             .execute()
         )
         return {"persisted": True, "checks": len(report.get("checks") or [])}
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         # C4: a review that could not be saved must say so — the user is looking at findings that
         # will be gone on reload otherwise.
         logger.warning("review.persist_failed", error=str(exc)[:200])
@@ -3703,7 +3704,7 @@ async def _record_repair(payload: dict, record: dict, drift: DriftReport | None)
         await (
             client.table("published_content_v2").update({"metadata": meta}).eq("id", rows[0]["id"]).execute()
         )
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         logger.warning("chapter.repair.record_failed", error=str(exc)[:200])
 
 
@@ -4085,7 +4086,8 @@ async def _persist_bible_if_requested(payload: dict, entries: list[dict]) -> dic
             chapter_number=payload.get("chapter_number"),
         )
         return {"persisted": True, "bible_entries": added}
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
+        logger.warning("bible.persist_failed", error=f"{type(exc).__name__}: {exc}"[:200])
         return {"persisted": False, "error": str(exc)[:200]}
 
 
@@ -4121,7 +4123,11 @@ async def _load_genre_guidelines(genre_slug: str) -> tuple[str, str]:
         )
         row = (getattr(r, "data", None) or [{}])[0]
         return (row.get("genre_name") or genre_slug, row.get("writing_guidelines") or "")
-    except Exception:
+    except SUPABASE_ERRORS as exc:
+        # The piece still writes, without the genre's house rules; said so in the log.
+        logger.warning(
+            "genre_guidelines.unreadable", genre=genre_slug, error=f"{type(exc).__name__}: {exc}"[:160]
+        )
         return (genre_slug, "")
 
 
@@ -4163,7 +4169,7 @@ async def _persist_simple(
             "compose.persisted", content_type=content_type, content_id=cid, words=len(content_text.split())
         )
         return {"persisted": True, "content_id": cid}
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         logger.warning("compose.persist.failed", content_type=content_type, error=str(exc)[:200])
         return {"persisted": False, "error": str(exc)[:200]}
 
@@ -4243,7 +4249,7 @@ async def _project_research(user_id: str, project_title: str, topic: str, keywor
             .execute()
         )
         rows = getattr(r, "data", None) or []
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         logger.warning("blog.project_research_unreadable", error=str(exc)[:200])
         return ""
     if not rows:
@@ -4300,7 +4306,7 @@ async def _book_facts(project_id: str, author: str) -> str:
             .execute()
         )
         rows = getattr(r, "data", None) or []
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         logger.warning("blog.book_facts_unreadable", error=str(exc)[:200])
         return ""
     if not rows:
@@ -4318,6 +4324,28 @@ async def _book_facts(project_id: str, author: str) -> str:
     if row.get("genre_slug"):
         lines.append(f"GENRE: {row['genre_slug']}")
     return "\n".join(lines)
+
+
+def _model_json(text: str) -> tuple[dict[str, Any], str | None]:
+    """The JSON object a structured write op (blog, newsletter) asked the model for.
+
+    Returns ``(data, problem)``. A reply with no JSON at all is not a problem: the caller uses it as
+    prose. A reply that IS JSON-shaped but does not parse (cut off at max_tokens, or malformed) is.
+    Both ops used to swallow that and save the raw reply, so the "article" was a JSON blob, humanized
+    at StealthGPT's per-word price, persisted and reported as written.
+    """
+    stripped = text.lstrip()
+    json_shaped = stripped.startswith("{") or stripped.startswith("```json")
+    m = re.search(r"\{.*\}", text, re.S)
+    if not m:
+        return {}, ("the model's JSON reply was cut off before it closed" if json_shaped else None)
+    try:
+        data = json.loads(m.group(0))
+    except ValueError as exc:
+        return {}, (f"the model returned malformed JSON ({exc.__class__.__name__})" if json_shaped else None)
+    if not isinstance(data, dict):
+        return {}, ("the model returned JSON that is not an object" if json_shaped else None)
+    return data, None
 
 
 async def _op_blog(payload: dict) -> dict:
@@ -4431,18 +4459,16 @@ async def _op_blog(payload: dict) -> dict:
         )
     except ProviderNotRegistered:
         return {"written": False, "reason": "no provider"}
-    import json as _json
-
     title, body, meta = (required_title or topic[:80] or "Untitled Blog Post"), resp.text.strip(), {}
-    try:
-        m = re.search(r"\{.*\}", resp.text, re.S)
-        data = _json.loads(m.group(0)) if m else {}
+    data, problem = _model_json(resp.text)
+    if problem:
+        logger.warning("blog.unparseable_reply", problem=problem, chars=len(resp.text))
+        return {"written": False, "reason": f"{problem}; nothing was saved, try again"}
+    if data:
         # A requested title wins over whatever the model chose: the author asked for that headline.
-        title = required_title or data.get("title") or title
-        body = data.get("body_markdown") or body
+        title = str(required_title or data.get("title") or title)
+        body = str(data.get("body_markdown") or body)
         meta = {"meta_description": data.get("meta_description"), "tags": data.get("tags")}
-    except Exception:
-        pass
     # The no-pronoun rule holds in a four-sentence bio and lapses across 1,700 words, so it is
     # measured here too. Not rewritten: a corrective pass over a whole researched article to fix
     # four words risks the 26 sourced facts in it. Reported instead, with the fix named.
@@ -4486,7 +4512,6 @@ async def _op_newsletter(payload: dict) -> dict:
     (citation URLs preserved), structured as subject_line / pre_header / intro / sections / outro, and
     persisted to published_content_v2 (content_type=newsletter). This is the topic newsletter the suite
     drives (R07/R16/R44) — distinct from the F2 curated multi-story saga (newsletter_sends)."""
-    import json as _json
 
     from writer_engine.config import get_settings
 
@@ -4526,12 +4551,10 @@ async def _op_newsletter(payload: dict) -> dict:
         )
     except ProviderNotRegistered:
         return {"written": False, "reason": "no provider"}
-    data: dict = {}
-    try:
-        m = re.search(r"\{.*\}", resp.text, re.S)
-        data = _json.loads(m.group(0)) if m else {}
-    except Exception:
-        data = {}
+    data, problem = _model_json(resp.text)
+    if problem:
+        logger.warning("newsletter.unparseable_reply", problem=problem, chars=len(resp.text))
+        return {"written": False, "reason": f"{problem}; nothing was saved, try again"}
     subject_line = str(data.get("subject_line") or (topic[:80] or "Newsletter"))
     title = str(data.get("title") or subject_line)
     sections = [s for s in (data.get("sections") or []) if isinstance(s, dict)]
@@ -4877,7 +4900,7 @@ async def _op_plan_volumes(payload: dict) -> dict:
                 .execute()
             )
             out["persisted"] = True
-        except Exception as exc:
+        except SUPABASE_ERRORS as exc:
             logger.warning("volume.persist_failed", error=str(exc)[:200])
             out["persisted"] = False
     return out
@@ -5028,7 +5051,7 @@ async def _load_author_profile(user_id: str) -> dict | None:
             .execute()
         )
         rows = getattr(r, "data", None) or []
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         logger.warning("author_bio.profile_unreadable", error=str(exc)[:200])
         return None
     if not rows:
@@ -5232,7 +5255,7 @@ async def _load_canon_dates(project_id: str, *, book_text: str = "") -> tuple[li
             .execute()
         )
         rows = getattr(r, "data", None) or []
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         logger.warning("marketing.canon_dates_unreadable", error=str(exc)[:200])
         return [], ""
     dated: list[tuple[bool, int, str]] = []
@@ -5584,7 +5607,7 @@ async def _op_marketing(payload: dict) -> dict:
                 .execute()
             )
             out["persisted"] = True
-        except Exception as exc:
+        except SUPABASE_ERRORS as exc:
             logger.warning("marketing.persist_failed", error=str(exc)[:200])
             out["persisted"] = False
     out["ok"] = True

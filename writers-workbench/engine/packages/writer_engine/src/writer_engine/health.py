@@ -62,7 +62,7 @@ async def probe_http(
         if 200 <= resp.status_code < 300:
             return CheckResult(name=name, ok=True, required=required)
         return CheckResult(name=name, ok=False, detail=f"HTTP {resp.status_code}", required=required)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - a health probe reports any failure as a failed check; it must never raise out of /ready
         return CheckResult(
             name=name, ok=False, detail=f"{type(exc).__name__}: {str(exc)[:120]}", required=required
         )
@@ -76,7 +76,7 @@ async def probe_redis(*, timeout_s: float = DEFAULT_TIMEOUT_S, required: bool = 
         client = await get_redis()
         await asyncio.wait_for(client.ping(), timeout=timeout_s)
         return CheckResult(name="redis", ok=True, required=required)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - a health probe reports any failure as a failed check; it must never raise out of /ready
         return CheckResult(
             name="redis", ok=False, detail=f"{type(exc).__name__}: {str(exc)[:120]}", required=required
         )
@@ -95,7 +95,7 @@ async def probe_supabase(*, timeout_s: float = DEFAULT_TIMEOUT_S, required: bool
             client.table("users_v2").select("user_id").limit(1).execute(), timeout=timeout_s
         )
         return CheckResult(name="supabase", ok=True, required=required)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - a health probe reports any failure as a failed check; it must never raise out of /ready
         return CheckResult(
             name="supabase",
             ok=False,
@@ -131,7 +131,7 @@ async def probe_arq_worker(
             )
         detail = raw.decode() if isinstance(raw, bytes) else str(raw)
         return CheckResult(name=name, ok=True, detail=detail[:120], required=required)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - a health probe reports any failure as a failed check; it must never raise out of /ready
         return CheckResult(
             name=name,
             ok=False,

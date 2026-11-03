@@ -310,7 +310,7 @@ async def _ingest_feed(
                 items = await feeds.fetch_feed(feed.url, url_type=feed.url_type, client=http)
                 if feed.url_type == "reddit":
                     items = await _resolve_reddit_items(items, client=http)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - per-feed isolation: the failure is recorded on the feed's run row and the other feeds continue
             result.error = f"{type(exc).__name__}: {exc}"[:300]
             logger.warning("ingestion.feed_fetch_failed", feed=feed.name[:48], error=result.error)
             if log_run:
@@ -377,7 +377,7 @@ async def _ingest_feed(
                     client=http,
                     result=result,
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - per-item isolation: counted in items_failed and logged; one item must not stop the feed
                 result.items_failed += 1
                 logger.warning("ingestion.item_failed", key=key, error=f"{type(exc).__name__}: {exc}"[:200])
     finally:

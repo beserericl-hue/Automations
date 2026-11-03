@@ -156,7 +156,7 @@ async def draft_trend(
                 temperature=0.7,
             )
             parsed = parse_blog(resp.text or "")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - per-topic isolation: one draft's provider/parse failure is logged and the topic is kept undrafted
             logger.warning(
                 "radar.draft_failed",
                 topic=str(t.get("title"))[:80],

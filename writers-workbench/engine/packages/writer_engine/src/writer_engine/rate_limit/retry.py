@@ -71,7 +71,7 @@ def retry_after_of(exc: BaseException) -> float | None:
         return None
     try:
         raw = headers.get("retry-after") or headers.get("Retry-After")
-    except Exception:
+    except (AttributeError, TypeError):
         return None
     if not raw:
         return None

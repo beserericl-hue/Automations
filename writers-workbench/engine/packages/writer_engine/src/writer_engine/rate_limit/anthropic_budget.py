@@ -36,6 +36,7 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from writer_engine.errors import REDIS_ERRORS
 from writer_engine.rate_limit import window as _window
 from writer_engine.redis_client import client as _redis_module
 from writer_engine.telemetry.logging import get_logger
@@ -125,7 +126,7 @@ class AnthropicBudget:
             return self._redis
         try:
             return await _redis_module.get_redis()
-        except Exception as exc:
+        except REDIS_ERRORS as exc:
             # NOT silent: callers treat None as "no budget to check" and proceed.
             _warn_ungated("anthropic_budget", f"{type(exc).__name__}: {exc}")
             return None
@@ -143,7 +144,7 @@ class AnthropicBudget:
         """
         try:
             return await _window.current(client, self._key(model, kind))
-        except Exception as exc:
+        except REDIS_ERRORS as exc:
             logger.warning("budget.unavailable", model=model, error=f"{type(exc).__name__}: {str(exc)[:120]}")
             return 0
 
@@ -238,7 +239,7 @@ class AnthropicBudget:
             await _window.record(client, self._key(model, "input"), input_tokens, token=token)
             await _window.record(client, self._key(model, "output"), output_tokens, token=token)
             await _window.record(client, self._key(model, "requests"), 1, token=token)
-        except Exception as exc:
+        except REDIS_ERRORS as exc:
             logger.warning(
                 "budget.record_failed", model=model, error=f"{type(exc).__name__}: {str(exc)[:120]}"
             )

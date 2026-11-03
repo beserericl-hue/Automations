@@ -11,6 +11,7 @@ import asyncio
 from types import SimpleNamespace
 
 import library_step.main as lib
+from postgrest.exceptions import APIError
 
 
 class _Resp:
@@ -49,6 +50,8 @@ class _Table:
         if self._op == "select":
             return _Resp([r for r in rows if all(r.get(c) == v for c, v in self._filters.items())])
         if self._op == "insert":
+            if self.name in self.store.fail_inserts:
+                raise APIError({"code": "57014", "message": "canceling statement due to statement timeout"})
             self.store.inserts.append((self.name, self._payload))
             if isinstance(self._payload, dict):
                 rows.append(self._payload)
@@ -67,6 +70,7 @@ class _Store:
         self.rows = rows
         self.inserts: list = []
         self.updates: list = []
+        self.fail_inserts: set[str] = set()
 
 
 class _Client:
@@ -187,6 +191,53 @@ def test_revert_outline_snapshots_then_overwrites(monkeypatch):
     assert proj_updates and len(proj_updates[-1]["outline"]["chapters"]) == 2
     # Item 7: the restored legacy-shaped version is written back in the canonical shape.
     assert proj_updates[-1]["outline"]["chapters"][0] == {"chapter_number": 1, "beat": "b", "title": ""}
+
+
+def test_revert_outline_refuses_when_the_snapshot_cannot_be_saved(monkeypatch):
+    """Item 9 defect: the snapshot failure was logged and the outline overwritten anyway, so the
+    current outline was lost for good while the user was told "reverted"."""
+    store, _ = _patch(
+        monkeypatch,
+        {
+            "writing_projects_v2": [
+                {
+                    "id": "p1",
+                    "title": "The Accord",
+                    "user_id": "u1",
+                    "outline": {"chapters": [{"number": 1}, {"number": 2}, {"number": 3}]},
+                },
+            ],
+            "outline_versions_v2": [
+                {"project_id": "p1", "version_number": 1, "outline": {"chapters": [{"number": 1}]}}
+            ],
+        },
+    )
+    store.fail_inserts.add("outline_versions_v2")
+    out = asyncio.run(
+        lib._op_revert({"scope": "outline", "project_title": "The Accord", "version_number": 1, "user_id": "u1"})
+    )
+    assert out["reverted"] is False and "nothing was changed" in out["error_message"]
+    assert not [u for u in store.updates if u[0] == "writing_projects_v2"]
+    assert len(store.rows["writing_projects_v2"][0]["outline"]["chapters"]) == 3
+
+
+def test_revert_chapter_refuses_when_the_snapshot_cannot_be_saved(monkeypatch):
+    store, _ = _patch(
+        monkeypatch,
+        {
+            "published_content_v2": [
+                {"id": "c1", "user_id": "u1", "content_type": "chapter", "content_text": "CURRENT TEXT"},
+            ],
+            "content_versions_v2": [{"content_id": "c1", "version_number": 1, "content_text": "OLD TEXT"}],
+        },
+    )
+    store.fail_inserts.add("content_versions_v2")
+    out = asyncio.run(
+        lib._op_revert({"scope": "chapter", "content_id": "c1", "version_number": 1, "user_id": "u1"})
+    )
+    assert out["reverted"] is False and "nothing was changed" in out["error_message"]
+    assert store.rows["published_content_v2"][0]["content_text"] == "CURRENT TEXT"
+    assert not [u for u in store.updates if u[0] == "published_content_v2"]
 
 
 def test_revert_refuses_a_version_the_schema_rejects(monkeypatch):

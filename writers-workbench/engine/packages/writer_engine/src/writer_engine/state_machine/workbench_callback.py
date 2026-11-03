@@ -18,6 +18,10 @@ from uuid import UUID
 import httpx
 
 from writer_engine.config import get_settings
+from writer_engine.errors import HTTP_ERRORS
+from writer_engine.telemetry.logging import get_logger
+
+logger = get_logger("workbench_callback")
 
 # Engine verbose stage → the WW NewsletterStageSchema enum (server/src/schemas.ts). The WW enum is
 # coarser; map each engine stage to the closest valid value so the client progress strip advances.
@@ -89,6 +93,11 @@ async def notify_workbench_stage(
                 json=body,
                 headers={"X-Callback-Secret": secret, "Content-Type": "application/json"},
             )
+        if resp.status_code >= 300:
+            logger.warning("workbench_callback.rejected", stage=ww_stage, status=resp.status_code)
         return resp.status_code < 300
-    except Exception:
+    except HTTP_ERRORS as exc:
+        logger.warning(
+            "workbench_callback.failed", stage=ww_stage, error=f"{type(exc).__name__}: {exc}"[:160]
+        )
         return False

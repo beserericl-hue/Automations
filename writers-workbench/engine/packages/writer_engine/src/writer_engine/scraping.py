@@ -196,7 +196,7 @@ def read_page(html: str, url: str) -> Page:
     try:
         meta = trafilatura.extract_metadata(html, default_url=url)
         title = str(getattr(meta, "title", "") or "")
-    except Exception:
+    except Exception:  # noqa: BLE001 - trafilatura on untrusted HTML; a page without readable metadata still has a body
         title = ""
     if not title:
         found = _TITLE_TAG.search(html)
@@ -237,7 +237,7 @@ async def fetch_page(url: str, *, client: httpx.AsyncClient | None = None) -> Pa
                 page = rendered
             else:
                 page.credits = rendered.credits
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - fetch_page returns any scrape/parse failure as Page.error for the caller; it never raises
         return Page(url=url, error=f"{type(exc).__name__}: {exc}"[:200])
     if not page.markdown:
         page.error = "no_main_content"
@@ -253,7 +253,7 @@ def _links_and_narrow_images(html: str, base: str) -> tuple[list[str], set[str]]
         import lxml.html
 
         tree = lxml.html.fromstring(html)
-    except Exception:
+    except Exception:  # noqa: BLE001 - lxml on untrusted HTML (ParserError, XMLSyntaxError, ValueError, ...); no links is the fallback
         return links, narrow
     seen: set[str] = set()
     for href in tree.xpath("//a/@href"):

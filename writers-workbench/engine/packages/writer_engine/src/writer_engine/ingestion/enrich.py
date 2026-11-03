@@ -222,7 +222,7 @@ async def judge_relevance(body: str, *, title: str = "", genre: str = "") -> tup
             max_tokens=2048,
             temperature=0.0,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - the relevance gate fails open by design (GATE_UNAVAILABLE recorded); LLM errors are not enumerable
         logger.warning("ingestion.relevance_unavailable", error=f"{type(exc).__name__}: {exc}"[:140])
         return True, GATE_UNAVAILABLE
     reason = (verdict.chain_of_thought or "").strip()[:200]
@@ -254,7 +254,7 @@ async def extract_external_sources(scraped: Scraped) -> list[str]:
             max_tokens=1024,
             temperature=0.0,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - source extraction is enrichment: any provider/parse failure yields no sources, logged
         logger.warning("ingestion.external_sources_unavailable", error=f"{type(exc).__name__}: {exc}"[:140])
         return []
 

@@ -70,7 +70,7 @@ def begin_drain(*, reason: str = "") -> bool:
     path = flag_path()
     try:
         path.write_text(f"{time.time():.0f} {reason}\n", encoding="utf-8")
-    except Exception as exc:
+    except OSError as exc:
         logger.warning("drain.flag_write_failed", path=str(path), error=f"{type(exc).__name__}: {exc}")
         return False
     logger.info("drain.begin", path=str(path), reason=reason)
@@ -86,7 +86,7 @@ def clear_drain() -> None:
     """
     try:
         flag_path().unlink(missing_ok=True)
-    except Exception as exc:  # pragma: no cover - unlink of an existing writable file
+    except OSError as exc:  # pragma: no cover - unlink of an existing writable file
         logger.warning("drain.flag_clear_failed", error=f"{type(exc).__name__}: {exc}")
 
 
@@ -94,7 +94,7 @@ def is_draining() -> bool:
     """Is this instance shutting down? Never raises."""
     try:
         return flag_path().exists()
-    except Exception:  # pragma: no cover - a stat that fails is not a drain
+    except OSError:  # pragma: no cover - a stat that fails is not a drain
         return False
 
 
@@ -103,5 +103,5 @@ def draining_since() -> float | None:
     try:
         raw = flag_path().read_text(encoding="utf-8").split()
         return float(raw[0]) if raw else None
-    except Exception:
+    except (OSError, ValueError):
         return None

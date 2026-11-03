@@ -37,6 +37,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from writer_engine.config import get_settings
+from writer_engine.errors import REDIS_ERRORS
 from writer_engine.telemetry.logging import get_logger
 
 from .schemas import HubRequest, HubResponse
@@ -122,14 +123,14 @@ async def load_state(req: HubRequest) -> ConversationState | None:
     try:
         r = await _redis()
         raw = await asyncio.wait_for(r.get(conversation_key(str(req.user_id), cid)), REDIS_TIMEOUT_S)
-    except Exception as exc:
+    except REDIS_ERRORS as exc:
         logger.warning("hub.memory.load_failed", error=f"{type(exc).__name__}: {str(exc)[:160]}")
         return None
     if not raw:
         return ConversationState(conversation_id=cid)
     try:
         return ConversationState.model_validate(json.loads(raw))
-    except Exception:
+    except (ValueError, TypeError):
         # A document from an older shape is not worth failing a turn over; start the memory afresh.
         return ConversationState(conversation_id=cid)
 
@@ -149,7 +150,7 @@ async def save_state(req: HubRequest, state: ConversationState) -> bool:
             REDIS_TIMEOUT_S,
         )
         return True
-    except Exception as exc:
+    except REDIS_ERRORS as exc:
         logger.warning("hub.memory.save_failed", error=f"{type(exc).__name__}: {str(exc)[:160]}")
         return False
 

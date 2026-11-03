@@ -66,7 +66,7 @@ def _exact_secrets() -> list[str]:
         from writer_engine.config import get_settings
 
         settings = get_settings()
-    except Exception:  # pragma: no cover - logging must work before settings do
+    except (ImportError, ValueError):  # pragma: no cover - logging must work before settings do
         return []
     candidates = [
         getattr(settings, name, "")
@@ -140,7 +140,7 @@ def redact(text: str) -> str:
             else:
                 out = pattern.sub(MASK, out)
         return out
-    except Exception:  # pragma: no cover - a redactor must not break logging
+    except Exception:  # pragma: no cover  # noqa: BLE001 - a log redactor must never break logging
         return text
 
 

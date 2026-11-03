@@ -373,7 +373,7 @@ async def kie_sketchnote(
             if state in ("fail", "error", "failed"):
                 return None
         return None
-    except Exception as exc:  # an image is decoration; the post goes out without it
+    except Exception as exc:  # noqa: BLE001 - an image is decoration; the post goes out without it
         logger.warning("social.image_failed", error=f"{type(exc).__name__}: {exc}"[:200])
         return None
 

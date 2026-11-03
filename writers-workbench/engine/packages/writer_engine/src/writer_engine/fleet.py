@@ -27,6 +27,7 @@ from typing import Any
 
 from prometheus_client import Gauge
 
+from writer_engine.errors import REDIS_ERRORS
 from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("fleet")
@@ -86,7 +87,7 @@ async def register(redis: Any, service: str, **extra: Any) -> None:
         await redis.set(
             f"{FLEET_PREFIX}:{service}:{body['instance']}", json.dumps(body), ex=REGISTRATION_TTL_S
         )
-    except Exception as exc:
+    except REDIS_ERRORS as exc:
         logger.warning("fleet.register_failed", service=service, error=f"{type(exc).__name__}: {exc}"[:160])
 
 
@@ -99,7 +100,7 @@ async def deregister(redis: Any, service: str) -> None:
     """
     try:
         await redis.delete(f"{FLEET_PREFIX}:{service}:{instance_id()}")
-    except Exception as exc:
+    except REDIS_ERRORS as exc:
         logger.warning("fleet.deregister_failed", service=service, error=f"{type(exc).__name__}: {exc}"[:160])
 
 
@@ -130,7 +131,7 @@ async def read_fleet(redis: Any) -> list[dict[str, Any]]:
                 out.append(json.loads(raw))
             except ValueError:
                 continue
-    except Exception as exc:
+    except REDIS_ERRORS as exc:
         logger.warning("fleet.read_failed", error=f"{type(exc).__name__}: {exc}"[:160])
         return []
     out.sort(key=lambda r: (str(r.get("service")), r.get("started_at") or 0))
@@ -161,7 +162,7 @@ async def run_once(redis: Any, name: str, *, ttl_s: float) -> bool:
             f"{SINGLETON_PREFIX}:{name}", instance_id(), nx=True, px=max(1000, int(ttl_s * 1000))
         )
         return bool(got)
-    except Exception as exc:
+    except REDIS_ERRORS as exc:
         logger.warning(
             "fleet.lock_failed_running_anyway", job=name, error=f"{type(exc).__name__}: {exc}"[:160]
         )

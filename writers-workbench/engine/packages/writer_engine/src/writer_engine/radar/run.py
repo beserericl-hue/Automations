@@ -16,8 +16,10 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import httpx
+from postgrest.exceptions import APIError
 
 from writer_engine.config import get_settings
+from writer_engine.errors import SUPABASE_ERRORS
 from writer_engine.radar import dev, sources, trend
 from writer_engine.social.feed import feed_radar_slate
 from writer_engine.social.schedule import ET
@@ -83,7 +85,13 @@ async def _claim_run(
             .insert({"user_id": user_id, "radar": radar, "week_of": week.isoformat(), "status": "running"})
             .execute()
         )
-    except Exception:  # another tick inserted the same week first
+    except SUPABASE_ERRORS as exc:
+        if isinstance(exc, APIError) and str(exc.code or "") == "23505":
+            return None  # unique_violation: another tick inserted the same week first
+        # Anything else is an outage, which used to be read as "someone else has it" in silence.
+        logger.warning(
+            "radar.claim_failed", radar=radar, user_id=user_id, error=f"{type(exc).__name__}: {exc}"[:200]
+        )
         return None
     return (made.data or [None])[0]
 
@@ -163,7 +171,7 @@ async def run_radar(
         await _finish(client, run, "ok", stats)
         logger.info("radar.done", radar=radar, user_id=user_id, week_of=week.isoformat(), topics=len(stored))
         return {"radar": radar, "week_of": week.isoformat(), "status": "ok", "stats": stats}
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - radar run boundary: any failure is written to the run row as failed and returned
         err = f"{type(exc).__name__}: {exc}"[:500]
         logger.error("radar.failed", radar=radar, user_id=user_id, error=err)
         await _finish(client, run, "failed", {}, err)

@@ -27,6 +27,7 @@ from typing import Any
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from writer_engine.errors import SUPABASE_ERRORS
 from writer_engine.telemetry import redaction
 from writer_engine.telemetry.logging import get_logger
 
@@ -73,7 +74,7 @@ def _configured_key() -> str:
         from writer_engine.config import get_settings
 
         return get_settings().integrations_encryption_key or ""
-    except Exception:  # pragma: no cover - settings unavailable
+    except (ImportError, ValueError):  # pragma: no cover - settings unavailable
         return os.environ.get(ENV_KEY, "")
 
 
@@ -121,7 +122,7 @@ async def load_user_credentials(client: Any, user_id: str) -> UserCredentials:
     creds = UserCredentials(user_id=user_id)
     try:
         resp = await client.table(TABLE).select("*").eq("user_id", user_id).execute()
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         creds.problems.append(f"could not read integrations: {type(exc).__name__}")
         return creds
     rows = list(resp.data or [])

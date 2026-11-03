@@ -32,6 +32,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, TypeVar
 
+from writer_engine.errors import REDIS_ERRORS
 from writer_engine.rate_limit import window as _window
 from writer_engine.rate_limit.retry import with_retry
 from writer_engine.redis_client import client as _redis_module
@@ -178,7 +179,7 @@ class ProviderBudget:
             return self._redis
         try:
             return await _redis_module.get_redis()
-        except Exception as exc:
+        except REDIS_ERRORS as exc:
             # NOT silent: callers treat None as "no budget to check" and proceed.
             _warn_ungated("provider_budget", f"{type(exc).__name__}: {exc}")
             return None
@@ -195,7 +196,7 @@ class ProviderBudget:
         """
         try:
             return await _window.current(client, self._key(provider, model, kind))
-        except Exception as exc:
+        except REDIS_ERRORS as exc:
             logger.warning(
                 "provider_budget.unavailable",
                 provider=provider,
@@ -304,7 +305,7 @@ class ProviderBudget:
             if limits.tpm > 0:
                 total = max(0, input_tokens) + max(0, output_tokens)
                 await _window.record(client, self._key(provider, model, "tokens"), total, token=token)
-        except Exception as exc:
+        except REDIS_ERRORS as exc:
             # Losing a usage record under-counts the window; raising would fail the user's call.
             logger.warning(
                 "provider_budget.record_failed",

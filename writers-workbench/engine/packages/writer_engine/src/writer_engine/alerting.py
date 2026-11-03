@@ -32,6 +32,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from writer_engine.config import get_settings
+from writer_engine.errors import REDIS_ERRORS
 from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("alerting")
@@ -66,7 +67,7 @@ def _instance() -> str:
     """Which instance is reporting. With several instances up, "Redis is down" needs a source."""
     try:
         return socket.gethostname()
-    except Exception:  # pragma: no cover
+    except OSError:  # pragma: no cover
         return "unknown"
 
 
@@ -99,7 +100,7 @@ async def _should_send(key: str, repeat_after_s: float) -> bool:
             # immediately re-send something Redis already claimed.
             _local_last_sent[key] = time.time()
         return allowed
-    except Exception:
+    except REDIS_ERRORS:
         # Redis unreachable — which is itself usually WHY we are alerting, so this still fails OPEN:
         # a duplicate email is a nuisance, a suppressed one is the nine-day outage again. But it
         # falls back to the PROCESS-LOCAL window rather than to no window at all, because
@@ -173,7 +174,7 @@ async def send_alert(alert: Alert, *, repeat_after_s: float | None = None, force
         if not ok:
             logger.error("alerting.send_rejected", key=alert.key, result=str(result)[:200])
         return ok
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - an alert must never raise into the code that is reporting a failure; Postal errors vary
         logger.error("alerting.send_failed", key=alert.key, error=f"{type(exc).__name__}: {str(exc)[:200]}")
         return False
 
@@ -191,8 +192,9 @@ async def clear_alert(key: str) -> None:
         client = await get_redis()
         deleted: Any = client.delete(f"{_PREFIX}:{key}")
         await deleted
-    except Exception:
-        pass
+    except REDIS_ERRORS as exc:
+        # The shared window then runs out on its own; the relapse alert is late, not lost.
+        logger.warning("alerting.clear_failed", key=key, error=f"{type(exc).__name__}: {exc}"[:160])
 
 
 __all__ = ["LEVEL_CRITICAL", "LEVEL_WARNING", "Alert", "clear_alert", "send_alert"]

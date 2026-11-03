@@ -106,9 +106,15 @@ def _fake_redis(
         # str, not bytes: get_redis() sets decode_responses=True, so this matches production.
         return [f"t{i}:1" for i in range(stalls)]
 
+    async def _set(_key: str, _value: Any, **_kw: Any) -> bool:
+        # The fleet registration writes here. It was missing, and the AttributeError used to be
+        # swallowed by a blanket `except Exception` in fleet.register (item 9 narrowed it).
+        return True
+
     pool = client.app.state.arq_pool  # type: ignore[attr-defined]
     pool.zcard = _zcard
     pool.get = _get
+    pool.set = _set
     pool.zrange = _zrange
     pool.zremrangebyscore = _zremrangebyscore
     pool.zrangebyscore = _zrangebyscore

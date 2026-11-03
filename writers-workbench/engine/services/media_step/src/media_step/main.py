@@ -17,6 +17,7 @@ from datetime import UTC
 import httpx
 
 from writer_engine.config import get_settings
+from writer_engine.errors import HTTP_ERRORS, SUPABASE_ERRORS, ErrorTypes
 from writer_engine.fixtures import guard_fixture_fallback
 from writer_engine.llm import ProviderNotRegistered, get_router
 from writer_engine.llm.structured import extract_json
@@ -29,6 +30,9 @@ from writer_engine.telemetry.logging import get_logger
 
 STEP_NAME = "media"
 logger = get_logger(STEP_NAME)
+
+# an OpenAI call failure, or a response body of an unexpected shape
+_DALLE_ERRORS: ErrorTypes = (*HTTP_ERRORS, KeyError, IndexError, TypeError, AttributeError)
 seed_default_prompts()
 
 _KIEAI_CREATE = "https://api.kie.ai/api/v1/playground/createTask"
@@ -94,9 +98,13 @@ async def _kieai_cover(prompt: str, *, key: str, timeout_s: int = 180) -> bytes 
                     img.raise_for_status()
                     return img.content
                 if state in ("fail", "error"):
+                    logger.warning("cover.kie_task_failed", task_id=task_id, state=state)
                     return None
+            logger.warning("cover.kie_timed_out", task_id=task_id, waited_s=waited)
             return None
-        except Exception:
+        except Exception as exc:  # noqa: BLE001 - untrusted provider payload; a failed KIE cover falls back to DALL-E
+            # Was silent: a broken KIE key looked exactly like "no image".
+            logger.warning("cover.kie_failed", error=f"{type(exc).__name__}: {exc}"[:200])
             return None
 
 
@@ -149,7 +157,9 @@ async def _dalle_cover(prompt: str, *, key: str) -> bytes | None:
                     metadata={"size": "1024x1792"},
                 )
             return base64.b64decode(b64) if b64 else None
-        except Exception:
+        except _DALLE_ERRORS as exc:
+            # binascii.Error (bad base64) is a ValueError, so HTTP_ERRORS covers it.
+            logger.warning("cover.dalle_failed", error=f"{type(exc).__name__}: {exc}"[:200])
             return None
 
 
@@ -181,7 +191,8 @@ async def _upload_cover(image: bytes, *, user_id: str, title: str, settings) -> 
             )
             r.raise_for_status()
             return f"{base}/storage/v1/object/public/cover-images/{path}", path
-        except Exception:
+        except HTTP_ERRORS as exc:
+            logger.error("cover.upload_failed", path=path, error=f"{type(exc).__name__}: {exc}"[:200])
             return None, None
 
 
@@ -230,7 +241,10 @@ async def _record_generated_image(
             )
             r.raise_for_status()
             return True
-        except Exception:
+        except HTTP_ERRORS as exc:
+            logger.warning(
+                "cover.record_failed", path=storage_path, error=f"{type(exc).__name__}: {exc}"[:200]
+            )
             return False
 
 
@@ -275,8 +289,16 @@ async def _op_cover_art(payload: dict) -> dict:
             title=title,
             settings=settings,
         )
+    if public_url:
+        image_url = public_url
+    elif settings.supabase_url and settings.supabase_service_role_key:
+        # Was reported as "storage unconfigured" whatever the cause, so a failed upload of a paid
+        # image read as a configuration gap.
+        image_url = "(generated, but the upload to storage failed; not saved)"
+    else:
+        image_url = "(generated, not persisted — storage unconfigured)"
     return {
-        "image_url": public_url or "(generated, not persisted — storage unconfigured)",
+        "image_url": image_url,
         "storage_path": storage_path,
         "provider": provider,
         "persisted": bool(public_url),
@@ -358,7 +380,7 @@ async def _persist_social_posts(payload: dict, posts: dict) -> dict | None:
             return {"persisted": False, "reason": "no valid-platform posts to save"}
         await client.table("social_posts_v2").insert(rows).execute()
         return {"persisted": True, "count": len(rows), "project_id": project_id}
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         # Persisting social posts is best-effort: the generated posts are already returned to the
         # caller, so a DB failure must not fail the op. Reported, not raised.
         return {"persisted": False, "error": str(exc)[:200]}

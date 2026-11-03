@@ -100,7 +100,7 @@ async def _pick(
         return picked
     except ProviderNotRegistered:
         raise
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - any Gemini failure falls back to Anthropic and is alerted; SDK errors are not enumerable
         # One provider's failure must not stop the newsletter. On DEV 2026-10-27 the Gemini key was
         # rejected ("API key not valid") and every newsletter died at the pick step before its first
         # approval gate. The same brief goes to Anthropic, and the failure is mailed once so the key
@@ -143,7 +143,7 @@ async def _alert_gemini_failed(exc: Exception) -> None:
                 context={"service": STEP_NAME, "provider": "gemini"},
             )
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 - an alert about a fallback must never break the fallback
         return
 
 

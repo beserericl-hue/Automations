@@ -10,6 +10,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from postgrest.exceptions import APIError
+
+from writer_engine.telemetry.logging import get_logger
+
+logger = get_logger("email_recipients")
+
+# The errors that mean "this table/column does not exist here" (an environment behind on migrations,
+# e.g. 045's global table): undefined_table, undefined_column, and PostgREST's schema-cache misses.
+_MISSING_RELATION_CODES = frozenset({"42P01", "42703", "PGRST204", "PGRST205"})
+
 
 @dataclass(frozen=True)
 class Recipients:
@@ -31,18 +41,28 @@ GLOBAL_TABLE = "app_config_global_v2"
 
 
 async def _key_values(client, table: str, keys, user_id=None) -> dict[str, str]:
-    import contextlib
+    """``key -> value`` for ``keys``. A table/column missing in this environment is "no values".
 
+    Any other failure raises. It used to be suppressed too, and an unreadable user setting then
+    looked like a user with no address of their own, so their content was mailed to the GLOBAL
+    recipient (an operator address) instead of to them. A caller that cannot read the settings now
+    sends nothing, which it reports.
+    """
     out: dict[str, str] = {}
-    with contextlib.suppress(Exception):  # a missing table/column is "no values", never an error
-        q = client.table(table).select("key,value").in_("key", list(keys))
-        if user_id is not None:
-            q = q.eq("user_id", str(user_id))
+    q = client.table(table).select("key,value").in_("key", list(keys))
+    if user_id is not None:
+        q = q.eq("user_id", str(user_id))
+    try:
         rows = await q.execute()
-        for r in getattr(rows, "data", None) or []:
-            v = r.get("value")
-            if v is not None and str(v).strip():
-                out[str(r["key"])] = str(v)
+    except APIError as exc:
+        if str(exc.code or "") in _MISSING_RELATION_CODES:
+            logger.info("email_recipients.table_missing", table=table, code=exc.code)
+            return out
+        raise
+    for r in getattr(rows, "data", None) or []:
+        v = r.get("value")
+        if v is not None and str(v).strip():
+            out[str(r["key"])] = str(v)
     return out
 
 
@@ -70,23 +90,17 @@ async def load_recipient_config(client, user_id=None) -> dict[str, str]:
 
     A global ``recipient_email`` therefore only reaches users with no address of their own, while a
     global ``bcc_email`` (an operator copy) applies to everyone who has not set a bcc."""
-    import contextlib
-
     user, glob = await load_config_layers(client, ["recipient_email", "bcc_email"], user_id)
     if user_id and not user.get("recipient_email"):
-        with contextlib.suppress(Exception):
-            ur = (
-                await client.table("users_v2")
-                .select("email,bcc_email")
-                .eq("user_id", user_id)
-                .limit(1)
-                .execute()
-            )
-            row = (getattr(ur, "data", None) or [{}])[0]
-            if row.get("email"):
-                user["recipient_email"] = str(row["email"])
-            if row.get("bcc_email") and not user.get("bcc_email"):
-                user["bcc_email"] = str(row["bcc_email"])
+        # Not suppressed: a failed read here would hand the user's mail to the global recipient.
+        ur = (
+            await client.table("users_v2").select("email,bcc_email").eq("user_id", user_id).limit(1).execute()
+        )
+        row = (getattr(ur, "data", None) or [{}])[0]
+        if row.get("email"):
+            user["recipient_email"] = str(row["email"])
+        if row.get("bcc_email") and not user.get("bcc_email"):
+            user["bcc_email"] = str(row["bcc_email"])
     return {**glob, **user}
 
 

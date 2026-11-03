@@ -42,6 +42,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
 
+from writer_engine.errors import REDIS_ERRORS
 from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("idempotency.lease")
@@ -122,7 +123,7 @@ async def acquire(
             await asyncio.sleep(poll_s)
     except asyncio.CancelledError:
         raise
-    except Exception as exc:
+    except REDIS_ERRORS as exc:
         logger.warning("lease.unavailable", run_id=run_id, error=f"{type(exc).__name__}: {str(exc)[:160]}")
         return Lease(run_id, owner, acquired=False, available=False)
 
@@ -144,7 +145,7 @@ async def _if_owner(redis: Any, run_id: str, owner: str, action: str, ttl_s: flo
                 pipe.delete(key)
             await pipe.execute()
             return True
-        except Exception as exc:  # WatchError included: someone else touched it, so it is not ours
+        except REDIS_ERRORS as exc:  # WatchError included: someone else touched it, so it is not ours
             logger.debug("lease.compare_failed", run_id=run_id, action=action, error=str(exc)[:120])
             return False
 
@@ -184,7 +185,7 @@ async def held(
                 if not await refresh(redis, lease.run_id, lease.owner, ttl_s=ttl_s):
                     logger.warning("lease.lost", run_id=lease.run_id, owner=lease.owner)
                     return
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - a keepalive that dies lets the lease lapse mid-run and a retry start the same work
                 logger.warning("lease.refresh_failed", run_id=lease.run_id, error=str(exc)[:160])
 
     task = asyncio.create_task(_keepalive())
@@ -196,11 +197,14 @@ async def held(
         raise
     finally:
         task.cancel()
-        with contextlib.suppress(asyncio.CancelledError, Exception):
-            await task
+        with contextlib.suppress(asyncio.CancelledError):
+            await task  # the keepalive catches its own failures, so only the cancel arrives here
         if not cancelled:
-            with contextlib.suppress(Exception):
+            try:
                 await release(redis, lease.run_id, lease.owner)
+            except REDIS_ERRORS as exc:
+                # The lease then expires on its own TTL; a retry waits that long, it is not blocked.
+                logger.warning("lease.release_failed", run_id=lease.run_id, error=str(exc)[:160])
         else:
             logger.info("lease.left_to_expire", run_id=lease.run_id, ttl_s=_ttl(ttl_s))
 

@@ -27,7 +27,20 @@ from enum import Enum
 from typing import Any
 from uuid import UUID
 
+from writer_engine.errors import REDIS_ERRORS, SUPABASE_ERRORS, ErrorTypes
 from writer_engine.redis_client import client as _redis_module
+from writer_engine.telemetry.logging import get_logger
+
+logger = get_logger("hitl")
+
+# a Redis failure, or a stored gate of an older shape
+_REDIS_READ_ERRORS: ErrorTypes = (*REDIS_ERRORS, KeyError, TypeError)
+# a Supabase failure, or a mirror row missing a field
+_MIRROR_READ_ERRORS: ErrorTypes = (*SUPABASE_ERRORS, KeyError, TypeError)
+
+
+class ApprovalNotPersisted(RuntimeError):
+    """A gate or a decision could not be stored anywhere the rest of the system can read it."""
 
 
 class ApprovalDecision(str, Enum):
@@ -102,13 +115,16 @@ def _deserialize(raw: str) -> HitlGate:
 
 
 async def _redis_write(gate: HitlGate) -> bool:
-    """Best-effort write to Redis. Returns True on success; False (silently) on any error."""
+    """Best-effort write to Redis. Returns True on success; False (logged) on a Redis failure."""
     try:
         client = await _redis_module.get_redis()
         ttl = max(60, (gate.expires_at_ms - _now_ms()) // 1000)
         await client.set(_key(gate.token), _serialize(gate), ex=ttl)
         return True
-    except Exception:
+    except REDIS_ERRORS as exc:
+        logger.warning(
+            "hitl.redis_write_failed", token=gate.token[:8], error=f"{type(exc).__name__}: {exc}"[:160]
+        )
         return False
 
 
@@ -119,7 +135,9 @@ async def _redis_read(token: str) -> HitlGate | None:
         if raw is None:
             return None
         return _deserialize(raw)
-    except Exception:
+    except _REDIS_READ_ERRORS as exc:  # ValueError (bad JSON/enum) is in REDIS_ERRORS
+        # Falls through to the in-memory copy and then the Supabase mirror.
+        logger.warning("hitl.redis_read_failed", token=token[:8], error=f"{type(exc).__name__}: {exc}"[:160])
         return None
 
 
@@ -154,12 +172,17 @@ async def create_approval(
     #    NOT NULL / FK / ownership-check all require. resume_url is omitted (n8n-only; nullable
     #    as of migration 023) — the Workbench resolves engine rows via the engine endpoint, not
     #    a Wait-node URL. The stage is mapped to the table's short vocabulary.
+    #    The mirror row is the ONLY thing the Workbench lists (PendingApprovals reads
+    #    newsletter_approvals_v2), so a gate without it waits a week for an answer nobody can give.
+    #    Failing to write it was a silent `pass`; it now raises, and the saga records the error.
+    mirror_required = False
     try:
         from writer_engine.config import get_settings
         from writer_engine.supabase.client import get_supabase_admin
 
         settings = get_settings()
         if settings.supabase_url and settings.supabase_service_role_key and user_id:
+            mirror_required = True
             row: dict[str, Any] = {
                 "token": gate.token,
                 "user_id": user_id,
@@ -172,8 +195,17 @@ async def create_approval(
                 row["edition_id"] = edition_id
             client = await get_supabase_admin()
             await client.table("newsletter_approvals_v2").insert(row).execute()
-    except Exception:
-        pass
+    except SUPABASE_ERRORS as exc:
+        logger.error(
+            "hitl.mirror_write_failed",
+            execution_id=str(execution_id),
+            stage=stage,
+            error=f"{type(exc).__name__}: {exc}"[:200],
+        )
+        if mirror_required:
+            raise ApprovalNotPersisted(
+                f"the {stage} approval could not be saved for the Workbench: {type(exc).__name__}"
+            ) from exc
 
     # 3. In-memory fallback (always — keeps the docker-compose demo + tests working).
     _in_memory[gate.token] = gate
@@ -246,7 +278,8 @@ async def _mirror_read(token: str) -> HitlGate | None:
             decision=ApprovalDecision(decision) if decision else None,
             feedback=row.get("feedback"),
         )
-    except Exception:
+    except _MIRROR_READ_ERRORS as exc:  # ValueError (UUID, enum) is in SUPABASE_ERRORS
+        logger.warning("hitl.mirror_read_failed", token=token[:8], error=f"{type(exc).__name__}: {exc}"[:160])
         return None
 
 
@@ -291,14 +324,16 @@ async def resolve_approval(
     gate.feedback = feedback
 
     # Persist updated gate everywhere we wrote it.
-    await _redis_write(gate)
+    redis_ok = await _redis_write(gate)
     _in_memory[gate.token] = gate
+    mirror_ok: bool | None = None  # None: no mirror in this environment (tests, compose demo)
     try:
         from writer_engine.config import get_settings
         from writer_engine.supabase.client import get_supabase_admin
 
         settings = get_settings()
         if settings.supabase_url and settings.supabase_service_role_key and gate.resolved_at_ms is not None:
+            mirror_ok = False
             client = await get_supabase_admin()
             await (
                 client.table("newsletter_approvals_v2")
@@ -312,9 +347,20 @@ async def resolve_approval(
                 .eq("token", token)
                 .execute()
             )
-    except Exception:
-        pass
+            mirror_ok = True
+    except SUPABASE_ERRORS as exc:
+        # The Workbench keeps showing the gate as pending until the mirror says otherwise.
+        logger.error(
+            "hitl.mirror_resolve_failed", token=token[:8], error=f"{type(exc).__name__}: {exc}"[:200]
+        )
 
+    if not redis_ok and mirror_ok is False:
+        # Held only in this process: a saga worker elsewhere would never see it, and the user would
+        # have been told it was saved. Undo it here so a retry applies it, and say so.
+        gate.resolved_at_ms = None
+        gate.decision = None
+        gate.feedback = None
+        raise ApprovalNotPersisted("the decision could not be saved; nothing was applied, try again")
     return gate
 
 
@@ -324,6 +370,7 @@ def _iso_from_ms(ms: int) -> str:
 
 __all__ = [
     "ApprovalDecision",
+    "ApprovalNotPersisted",
     "HitlGate",
     "create_approval",
     "get_approval",

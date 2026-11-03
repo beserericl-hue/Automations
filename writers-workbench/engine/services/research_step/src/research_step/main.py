@@ -12,6 +12,7 @@ from __future__ import annotations
 from uuid import uuid4
 
 from writer_engine.config import get_settings
+from writer_engine.errors import SUPABASE_ERRORS
 from writer_engine.llm import ProviderNotRegistered, complete_structured, get_router
 from writer_engine.prompt_store import compose_craft_system, get_prompt_store, seed_default_prompts
 from writer_engine.schemas import StepInput, StepOutput, StepStatus
@@ -157,7 +158,7 @@ async def _persist_research_if_requested(payload: dict, topic: str, report: str,
             genre_slug=genre,
         )
         return {"persisted": bool(rid), "research_id": rid}
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         return {"persisted": False, "error": str(exc)[:200]}
 
 

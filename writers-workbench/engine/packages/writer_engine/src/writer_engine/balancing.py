@@ -51,7 +51,7 @@ async def addresses(host: str, port: int) -> list[str]:
         # 0.0.0.0, so an IPv6 pick was refused: 21 of 30 calls failed on DEV the first time this
         # shipped. IPv4 when the name has any (that is what the services listen on), else IPv6.
         found = v4 or v6
-    except Exception as exc:
+    except (OSError, ValueError) as exc:
         logger.debug("balancing.resolve_failed", host=host, error=f"{type(exc).__name__}: {exc}"[:120])
         found = []
     _cache[key] = (now, found)

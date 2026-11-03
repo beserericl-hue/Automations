@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from writer_engine.errors import SUPABASE_ERRORS
 from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("ingestion.store")
@@ -114,7 +115,7 @@ async def claim_due_feeds(*, limit: int = 100, now: datetime | None = None) -> l
 
     try:
         candidates = await _select(FEED_COLUMNS)
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         # Engine deployed ahead of migration 029: fall back rather than stop ingesting.
         logger.warning("ingestion.item_type_column_missing", error=f"{type(exc).__name__}: {exc}"[:140])
         candidates = await _select(FEED_COLUMNS_PRE_029)
@@ -132,7 +133,7 @@ async def claim_due_feeds(*, limit: int = 100, now: datetime | None = None) -> l
         await (
             client.table(FEEDS_TABLE).update({"last_fetched_at": moment.isoformat()}).in_("id", ids).execute()
         )
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         # Refuse to proceed unclaimed: without the stamp the next tick picks the same feeds and
         # every feed gets fetched twice per interval, which is how a rate limit gets hit.
         logger.error("ingestion.claim_failed", count=len(ids), error=f"{type(exc).__name__}: {exc}"[:160])
@@ -147,7 +148,12 @@ async def get_feed(feed_id: str) -> FeedSource | None:
     client = await get_supabase_admin()
     try:
         resp = await client.table(FEEDS_TABLE).select(FEED_COLUMNS).eq("id", feed_id).limit(1).execute()
-    except Exception:
+    except SUPABASE_ERRORS as exc:
+        # Same pre-migration-029 fallback as list_due_feeds; said out loud so an outage that also
+        # fails the retry is not mistaken for a missing column.
+        logger.warning(
+            "ingestion.get_feed_fallback", feed_id=feed_id, error=f"{type(exc).__name__}: {exc}"[:140]
+        )
         resp = (
             await client.table(FEEDS_TABLE).select(FEED_COLUMNS_PRE_029).eq("id", feed_id).limit(1).execute()
         )
@@ -171,7 +177,7 @@ async def edition_genres(edition_ids: list[str]) -> dict[str, str]:
     try:
         client = await get_supabase_admin()
         resp = await client.table("newsletter_editions_v2").select("id,genre").in_("id", wanted).execute()
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         logger.warning("ingestion.edition_genres_failed", error=f"{type(exc).__name__}: {exc}"[:140])
         return {}
     return {str(r.get("id")): str(r.get("genre") or "") for r in (getattr(resp, "data", None) or [])}
@@ -279,7 +285,7 @@ async def _remove_quietly(paths: list[str]) -> None:
 
         client = await get_supabase_admin()
         await client.storage.from_(BUCKET).remove(paths)
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         # C4: an orphaned blob is a leak, not an outage — but it must not be invisible.
         logger.warning(
             "ingestion.orphan_cleanup_failed", paths=len(paths), error=f"{type(exc).__name__}: {exc}"[:140]
@@ -329,7 +335,7 @@ async def record_run(
             .eq("id", feed.id)
             .execute()
         )
-    except Exception as exc:
+    except SUPABASE_ERRORS as exc:
         logger.warning(
             "ingestion.run_log_failed", feed=feed.name[:48], error=f"{type(exc).__name__}: {exc}"[:140]
         )

@@ -9,7 +9,9 @@ from __future__ import annotations
 
 from typing import Any
 
+import httpx
 import pytest
+from postgrest.exceptions import APIError
 
 from writer_engine.library_helpers.email_recipients import (
     GLOBAL_TABLE,
@@ -74,15 +76,50 @@ async def test_a_users_own_address_outranks_a_global_recipient(db: Any) -> None:
     assert (await load_recipient_config(db, "u4"))["recipient_email"] == "fallback@x.com"
 
 
+class _Failing:
+    """A query on one table that fails at execute(), the way postgrest-py does."""
+
+    def __init__(self, exc: Exception) -> None:
+        self.exc = exc
+
+    def __getattr__(self, _name: str) -> Any:
+        return lambda *a, **k: self
+
+    async def execute(self) -> Any:
+        raise self.exc
+
+
+class _OneTableDown:
+    def __init__(self, fake: Any, table: str, exc: Exception) -> None:
+        self.fake, self.down, self.exc = fake, table, exc
+
+    def table(self, name: str) -> Any:
+        return _Failing(self.exc) if name == self.down else self.fake.table(name)
+
+
 @pytest.mark.asyncio
 async def test_a_missing_global_table_is_no_values_not_an_error(fake_supabase: Any) -> None:
     """Code ships before the migration is applied; the reader must keep working."""
-
-    class _NoGlobal:
-        def table(self, name: str) -> Any:
-            if name == GLOBAL_TABLE:
-                raise RuntimeError('relation "app_config_global_v2" does not exist')
-            return fake_supabase.table(name)
-
+    missing = APIError({"code": "42P01", "message": 'relation "app_config_global_v2" does not exist'})
     fake_supabase.tables[USER_TABLE] = [{"user_id": "u1", "key": "tone", "value": "dry"}]
-    assert await load_app_config(_NoGlobal(), ["tone"], "u1") == {"tone": "dry"}
+    client = _OneTableDown(fake_supabase, GLOBAL_TABLE, missing)
+    assert await load_app_config(client, ["tone"], "u1") == {"tone": "dry"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "outage",
+    [
+        APIError({"code": "57014", "message": "canceling statement due to statement timeout"}),
+        httpx.ReadTimeout("t"),
+    ],
+)
+async def test_an_unreadable_user_setting_never_falls_back_to_the_global_recipient(
+    db: Any, outage: Exception
+) -> None:
+    """Item 9 defect: a failed read of u1's settings used to look like "u1 has no address", so u1's
+    content was mailed to the global (operator) recipient. Now it raises and nothing is sent."""
+    with pytest.raises(type(outage)):
+        await load_recipient_config(_OneTableDown(db, USER_TABLE, outage), "u1")
+    with pytest.raises(type(outage)):
+        await load_recipient_config(_OneTableDown(db, "users_v2", outage), "u3")
