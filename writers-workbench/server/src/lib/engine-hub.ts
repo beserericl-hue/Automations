@@ -114,6 +114,8 @@ export interface HubResponse {
   error?: string | null;
   /** The conversation the engine remembered this turn under (writer_engine.hub.memory). */
   conversation_id?: string | null;
+  /** Content Studio ops: what was dispatched (no identity), e.g. the "generate" numbers to charge for. */
+  params?: Record<string, unknown> | null;
 }
 
 /**

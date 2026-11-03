@@ -82,3 +82,6 @@ class HubResponse(BaseModel):
     # The conversation this turn was remembered under (hub.memory) — echoed so a caller that did not
     # send one can thread it into its next turn.
     conversation_id: str | None = None
+    # Content Studio: the params the op was dispatched with (no identity), so the caller can see what
+    # ran ("generate" numbers -> how many topics to charge for).
+    params: dict[str, Any] | None = None

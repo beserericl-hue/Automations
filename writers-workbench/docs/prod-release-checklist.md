@@ -45,7 +45,7 @@ Related: [stripe-billing.md](stripe-billing.md) (live-mode steps), [workflow-gov
 
 Apply in file order, each once, after step A3. `018`–`022` were never written. All of these are applied
 on DEV (checked 2026-11-03: every table, column, function, trigger and policy below exists on DEV).
-Every doc records 023 onwards as DEV-only; confirm against the dump.
+Every doc records 023 onwards as DEV-only; confirm against the dump. 050 was applied to DEV on 2026-11-03.
 
 | # | What it does | PROD note |
 |---|---|---|
@@ -75,6 +75,7 @@ Every doc records 023 onwards as DEV-only; confirm against the dump.
 | 047 | Price n8n-era zero-cost rows; provider `google` → `gemini` | Data only. The row counts in its header are DEV's |
 | 048 | `token_usage_v2_default_labels` insert trigger | Its backfill filters `created_at >= '2026-11-02'` for one DEV shape; on PROD it should match nothing. Harmless |
 | 049 | Provider aliasing in the 048 trigger | Requires 048 |
+| 050 | Content Studio: `social_schedule_v2` gains `draft`/`approved` states (undated), `edition_id`, `post_at`, `image_url`, `studio`, source `studio`, and a new posting-time trigger; `newsletter_issue_selections_v2` / `_items_v2`; `newsletter_edition_feeds_v2` (RSS tokens). Owner-only RLS | Requires 038. **Backfills** `edition_id` on existing `trend_batch` / `roundup_batch` rows from the radar subscriptions (on PROD that is only rows made after 038). Replaces the trigger function `social_schedule_before_write` |
 
 After the migrations:
 
@@ -194,3 +195,9 @@ Workbench must not sleep.
     at the PROD gateway `/internal/hub/voice` (inventory A8; never the V1 agent); deactivate n8n
     `Se2X0fmkLUFK6CCq`, `q1yDjiztjdGRDblT`, `czBKvhON08FzFydK`, then set `SOCIAL_POSTING_MODE=live`;
     archive (never delete) the 24 `PROD - …` Workbench workflows with a 90-day rollback window.
+24. **Content Studio cutover** (after 23, with sign-off): point Substack at the edition feed URLs shown
+    in Newsletter → Content Studio → Next issue & feeds (PROD URLs, new tokens — DEV tokens do not
+    carry over), confirm one sync, then deactivate the RSS webhooks `uSFq6y6YombFzzfT` /
+    `K6peMqAydbdr7Ldt`, the studio chat agents `fTRYiQOaQgdAmu7w` / `y0vIznzMeiGoxouX` and their tools,
+    and later `WiG2AmTTf6rUj6gS` (weekly digest email). Full list and order: `engine/docs/deployment.md`
+    → Content Studio. No new variables: the `studio` step is part of the runtime image.

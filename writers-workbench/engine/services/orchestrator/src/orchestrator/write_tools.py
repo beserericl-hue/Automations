@@ -20,6 +20,8 @@ WRITE_TOOL_URLS: dict[str, Callable[[Any], str]] = {
     "story_bible": lambda s: s.story_bible_step_url,
     "approval": lambda s: s.approval_step_url,
     "notify": lambda s: s.notify_step_url,
+    # Content Studio (migration 050): the studio page and its assistant.
+    "studio": lambda s: s.studio_step_url,
 }
 
 # Newsletter saga step services (not hub-routable tools, so absent from WRITE_TOOL_URLS above).

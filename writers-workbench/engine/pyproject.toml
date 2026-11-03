@@ -30,6 +30,7 @@ members = [
     "services/approval_step",
     "services/notify_step",
     "services/ingestion_step",
+    "services/studio_step",
 ]
 
 [tool.uv.sources]
@@ -99,6 +100,7 @@ files = [
     "services/story_bible_step/src",
     "services/approval_step/src",
     "services/notify_step/src",
+    "services/studio_step/src",
 ]
 plugins = ["pydantic.mypy"]
 

@@ -61,6 +61,8 @@ STEP_NAMES: tuple[str, ...] = (
     "notify",
     # Content ingestion (E1) — the feed poller that fills content_ingestion_v2.
     "ingestion",
+    # Content Studio (migration 050).
+    "studio",
 )
 
 # All steps share one port now; they are told apart by mount path.

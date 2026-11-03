@@ -113,6 +113,15 @@ export default function NewsletterHome() {
   });
   const recentRuns = recentRunsQuery.data?.sends ?? [];
 
+  // Content Studio: shown only when one of the user's editions is fed by their radar.
+  const studioQuery = useQuery({
+    queryKey: ['studio', 'editions'],
+    queryFn: () => apiFetch<{ data: Array<{ edition_id: string; name: string }> }>('/api/studio/editions'),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  const studioEditions = studioQuery.data?.data ?? [];
+
   return (
     <div className="space-y-6">
       <header className="flex items-end justify-between gap-4">
@@ -124,6 +133,15 @@ export default function NewsletterHome() {
         </div>
         <div className="flex items-center gap-3">
           <HelpButton section="home" />
+          {studioEditions.length > 0 && (
+            <Link
+              to="/newsletter/studio"
+              data-testid="home-content-studio"
+              className="inline-flex items-center gap-2 rounded-md border border-brand-600 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 dark:text-brand-300"
+            >
+              Content Studio
+            </Link>
+          )}
           <Link
             to="/newsletter/generate"
             className="inline-flex items-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700"

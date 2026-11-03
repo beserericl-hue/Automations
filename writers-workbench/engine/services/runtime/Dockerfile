@@ -52,6 +52,8 @@ COPY services/approval_step/pyproject.toml ./services/approval_step/
 COPY services/notify_step/pyproject.toml ./services/notify_step/
 # E1: content ingestion — the engine's replacement for the n8n ingestion workflows.
 COPY services/ingestion_step/pyproject.toml ./services/ingestion_step/
+# Content Studio (migration 050).
+COPY services/studio_step/pyproject.toml ./services/studio_step/
 # B10: the aggregator that mounts every step in one process.
 COPY services/steps_app/pyproject.toml ./services/steps_app/
 # The gateway does NOT run in this container — it is its own Railway service. Its metadata and
@@ -85,6 +87,7 @@ COPY services/story_bible_step/src ./services/story_bible_step/src
 COPY services/approval_step/src ./services/approval_step/src
 COPY services/notify_step/src ./services/notify_step/src
 COPY services/ingestion_step/src ./services/ingestion_step/src
+COPY services/studio_step/src ./services/studio_step/src
 COPY services/steps_app/src ./services/steps_app/src
 COPY services/gateway/src ./services/gateway/src
 

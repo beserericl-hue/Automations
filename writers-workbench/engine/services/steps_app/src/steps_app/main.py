@@ -50,6 +50,7 @@ from research_step.main import app as research_app
 from scrape_step.main import app as scrape_app
 from segment_step.main import app as segment_app
 from story_bible_step.main import app as story_bible_app
+from studio_step.main import app as studio_app
 from subject_step.main import app as subject_app
 
 from writer_engine.auth import require_admin_token
@@ -87,6 +88,8 @@ STEP_APPS: dict[str, FastAPI] = {
     "notify": notify_app,
     # Content ingestion (E1) — the only writer of content_ingestion_v2 now that n8n is off.
     "ingestion": ingestion_app,
+    # Content Studio (migration 050).
+    "studio": studio_app,
 }
 
 

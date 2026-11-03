@@ -44,6 +44,29 @@ from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("newsletter_saga")
 
+
+async def _studio_selection(cfg: dict[str, Any], execution_id: UUID) -> list[dict[str, Any]] | None:
+    """The stories chosen in the Content Studio for this edition's issue, or None (then gather + pick).
+
+    A failure to READ the selection fails the run rather than quietly publishing an LLM pick the owner
+    did not choose; no Supabase (local demo) means no selection.
+    """
+    settings = get_settings()
+    if not (cfg.get("edition_id") and settings.supabase_url and settings.supabase_service_role_key):
+        return None
+    from writer_engine.studio.issue import take_selection
+    from writer_engine.supabase.client import get_supabase_admin
+
+    client = await get_supabase_admin()
+    return await take_selection(
+        client,
+        user_id=str(cfg.get("user_id") or ""),
+        edition_id=str(cfg.get("edition_id") or ""),
+        send_date=str(cfg.get("send_date") or ""),
+        execution_id=str(execution_id),
+    )
+
+
 DEFAULT_PORTS = {
     "gather": 8010,
     "pick": 8011,
@@ -211,6 +234,17 @@ class NewsletterSagaDriver:
 
     async def _stage_gathering(self, execution_id: UUID, st: dict[str, Any]) -> Stage | None:
         cfg = st["cfg"]
+        # Content Studio: the owner chose this issue's stories. Then those, in that order, ARE the
+        # issue — no week-pool gather, no LLM pick (writer_engine.studio.issue).
+        chosen = await _studio_selection(cfg, execution_id)
+        if chosen:
+            await self._advance(
+                execution_id,
+                Stage.PICKING,
+                f"using the {len(chosen)} stories chosen in the Content Studio",
+                patch={"articles": chosen, "studio_selection": True},
+            )
+            return Stage.PICKING
         out = await self._run_step(
             st,
             _step("gather"),
@@ -234,6 +268,24 @@ class NewsletterSagaDriver:
         articles = st["articles"]
         cfg = st["cfg"]
         feedback = st.get("pick_feedback")
+        if st.get("studio_selection"):
+            from writer_engine.studio.issue import picked_from_selection
+
+            chosen = PickedStories.model_validate(picked_from_selection(articles))
+            gate = await create_approval(
+                execution_id=execution_id,
+                stage="awaiting_stories_approval",
+                payload=chosen.model_dump(mode="json"),
+                user_id=cfg.get("user_id") or None,
+                edition_id=cfg.get("edition_id") or None,
+            )
+            await self._advance(
+                execution_id,
+                Stage.AWAITING_STORIES_APPROVAL,
+                "awaiting stories approval",
+                patch={"picked": chosen.model_dump(mode="json"), "stories_gate_token": gate.token},
+            )
+            return None
         out = await self._run_step(
             st,
             _step("pick"),
