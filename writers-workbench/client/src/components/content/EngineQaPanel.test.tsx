@@ -21,7 +21,7 @@ const FINDING =
   "introduces 'Taka-Maka' in the opening sentence ('Taka-Maka was still the one people came to').";
 
 describe('EngineQaPanel: show a drift finding in the chapter', () => {
-  it('asks the editor for the quoted sentence, not the name', () => {
+  it('offers one button per quoted passage, the sentence first, and asks the editor for the one clicked', () => {
     const onReveal = vi.fn().mockReturnValue('exact');
     renderWithProviders(
       <EngineQaPanel
@@ -30,23 +30,28 @@ describe('EngineQaPanel: show a drift finding in the chapter', () => {
         metadata={{ drift_report: { aligned: false, character_drift: [FINDING] } }}
       />,
     );
-    fireEvent.click(screen.getByTestId('show-in-chapter'));
+    const buttons = screen.getAllByTestId('show-in-chapter');
+    expect(buttons.map((b) => b.textContent)).toEqual([
+      '“Taka-Maka was still the one people came to”',
+      '“Maka-Taka”',
+      '“Taka-Maka”',
+    ]);
+    fireEvent.click(buttons[0]);
     expect(onReveal).toHaveBeenCalledTimes(1);
     expect(onReveal).toHaveBeenCalledWith('Taka-Maka was still the one people came to');
   });
 
-  it('falls through to the name when the sentence has been rewritten, and says when nothing is found', () => {
+  it('marks a quote the chapter no longer contains, and leaves the others clickable', () => {
     const onReveal = vi.fn((q: string) => (q === 'Taka-Maka' ? 'exact' : 'missing'));
     renderWithProviders(
       <EngineQaPanel contentId="c1" onReveal={onReveal} metadata={{ drift_report: { aligned: false, story_drift: [FINDING] } }} />,
     );
-    fireEvent.click(screen.getByTestId('show-in-chapter'));
-    expect(onReveal.mock.calls.map((c) => c[0])).toEqual(['Taka-Maka was still the one people came to', 'Maka-Taka', 'Taka-Maka']);
-    expect(screen.queryByText('not found in chapter')).toBeNull();
-
-    onReveal.mockReturnValue('missing');
-    fireEvent.click(screen.getByTestId('show-in-chapter'));
-    expect(screen.getByText('not found in chapter')).toBeTruthy();
+    const [sentence, , name] = screen.getAllByTestId('show-in-chapter');
+    fireEvent.click(sentence);
+    expect(sentence.textContent).toContain('not found in chapter');
+    fireEvent.click(name);
+    expect(name.textContent).toBe('“Taka-Maka”');
+    expect(onReveal.mock.calls.map((c) => c[0])).toEqual(['Taka-Maka was still the one people came to', 'Taka-Maka']);
   });
 
   it('says so when a finding quotes nothing to look for', () => {
