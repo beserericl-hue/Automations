@@ -619,3 +619,65 @@ class TestResearchGapsAreFindings:
         ):
             asyncio.run(M._verify_repair("a", "b", drift=drift, roster_text="", beat="", model="m"))
         assert "RESEARCH GAP: Was it Smithsonian Institution Press in 1952?" in seen["prompt"]
+
+
+class TestTheReportSaysWhere:
+    """A flagged check carries the passages its findings quote, so the panel can show them in the
+    chapter. Eric, 2026-11-04: "I want the Consistency Report items located too."
+    """
+
+    FINDINGS: ClassVar[list[dict]] = [
+        {
+            "dimension": "story_turn_density",
+            "problem": "no turn in the middle",
+            "fix": "add a setback",
+            "quote": "She sat with this idea for a moment.",
+            "quote_verified": True,
+        },
+        {
+            "dimension": "story_turn_density",
+            "problem": "second",
+            "quote": "The river moved.",
+            "quote_verified": True,
+        },
+        # A quote the chapter did not contain is not a place to send anyone.
+        {
+            "dimension": "prose_transparent",
+            "problem": "foggy",
+            "quote": "never in the text",
+            "quote_verified": False,
+        },
+    ]
+
+    def _row(self, report: dict, name: str) -> dict:
+        return next(c for c in report["checks"] if c["name"] == name)
+
+    def test_a_flagged_check_lists_its_verified_quotes(self) -> None:
+        r = M._build_qa_report(POOR, self.FINDINGS, None, "prose")
+        row = self._row(r, "Story turns / pacing")
+        assert row["status"] == "NEEDS_REVIEW"
+        assert row["dimension"] == "story_turn_density"
+        assert row["quotes"] == ["She sat with this idea for a moment.", "The river moved."]
+        assert row["details"] == "add a setback"
+
+    def test_an_unverified_quote_is_left_out(self) -> None:
+        r = M._build_qa_report(POOR, self.FINDINGS, None, "prose")
+        assert self._row(r, "Prose clarity")["quotes"] == []
+
+    def test_a_flagged_check_with_no_findings_says_so_with_an_empty_list(self) -> None:
+        r = M._build_qa_report(POOR, [], None, "prose")
+        assert self._row(r, "No flat paragraphs")["quotes"] == []
+
+    def test_a_passing_check_carries_no_quotes(self) -> None:
+        r = M._build_qa_report(POOR, self.FINDINGS, None, "prose")
+        assert "quotes" not in self._row(r, "Dialogue")
+
+    def test_name_drift_quotes_the_misspelt_names(self) -> None:
+        name_check = {
+            "consistent": False,
+            "possible_renames": [{"found": "Meara", "closest_roster_name": "mara"}],
+            "names_missing": [],
+            "roster": ["Mara"],
+        }
+        r = M._build_qa_report(GOOD, [], name_check, "prose")
+        assert self._row(r, "Character consistency")["quotes"] == ["Meara"]

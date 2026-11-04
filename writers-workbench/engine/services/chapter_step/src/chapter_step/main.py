@@ -3024,10 +3024,19 @@ def _build_qa_report(scores: dict, findings: list, name_check: dict | None, scor
     from datetime import UTC, datetime
 
     find_by_dim: dict[str, str] = {}
+    # The passages each dimension's findings point at, verified against the chapter by
+    # anchor_findings, so the report can say WHERE as well as what. Without them a flagged check was
+    # a sentence of advice with nowhere to click.
+    quotes_by_dim: dict[str, list[str]] = {}
     for f in findings or []:
         d = str(f.get("dimension") or "")
-        if d and d not in find_by_dim:
+        if not d:
+            continue
+        if d not in find_by_dim:
             find_by_dim[d] = str(f.get("fix") or f.get("problem") or "")
+        q = str(f.get("quote") or "").strip()
+        if q and f.get("quote_verified") is not False and q not in quotes_by_dim.setdefault(d, []):
+            quotes_by_dim[d].append(q)
     checks = []
     for dim, label in _QA_DIM_LABELS.items():
         if dim == "character_consistency":
@@ -3036,13 +3045,15 @@ def _build_qa_report(scores: dict, findings: list, name_check: dict | None, scor
         if not isinstance(v, (int, float)):
             continue
         ok = v >= CRAFT_THRESHOLD
-        checks.append(
-            {
-                "name": label,
-                "status": "PASS" if ok else "NEEDS_REVIEW",
-                "details": (find_by_dim.get(dim) or f"score {v:.2f}") if not ok else f"score {v:.2f}",
-            }
-        )
+        check: dict[str, Any] = {
+            "name": label,
+            "dimension": dim,
+            "status": "PASS" if ok else "NEEDS_REVIEW",
+            "details": (find_by_dim.get(dim) or f"score {v:.2f}") if not ok else f"score {v:.2f}",
+        }
+        if not ok:
+            check["quotes"] = quotes_by_dim.get(dim, [])[:5]
+        checks.append(check)
     # deterministic character-name consistency (drives the drift demo)
     if name_check is not None:
         renames = name_check.get("possible_renames") or []
@@ -3057,13 +3068,16 @@ def _build_qa_report(scores: dict, findings: list, name_check: dict | None, scor
                 + ("; missing: " + ", ".join(missing) if missing else "")
             )
         )
-        checks.append(
-            {
-                "name": "Character consistency",
-                "status": "PASS" if consistent else "NEEDS_REVIEW",
-                "details": detail,
-            }
-        )
+        name_check_row: dict[str, Any] = {
+            "name": "Character consistency",
+            "dimension": "character_consistency",
+            "status": "PASS" if consistent else "NEEDS_REVIEW",
+            "details": detail,
+        }
+        if not consistent:
+            # The misspelt names as they occur in the chapter: each is a place to look.
+            name_check_row["quotes"] = [str(r.get("found")) for r in renames if r.get("found")][:5]
+        checks.append(name_check_row)
     report: dict[str, Any] = {"generated_at": datetime.now(UTC).isoformat(), "checks": checks}
     if scored_text:
         report.update(qa_stamp(scored_text))

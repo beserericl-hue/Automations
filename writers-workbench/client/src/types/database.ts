@@ -325,6 +325,11 @@ export interface QACheck {
   name: string;
   status: 'PASS' | 'NEEDS_REVIEW';
   details: string;
+  /** The engine's dimension key behind `name`; absent on reports written before 2026-11-04. */
+  dimension?: string;
+  /** Passages in the chapter this check's findings point at, verified by the engine. Present on a
+   *  flagged check from 2026-11-04; an empty list means the findings quoted nothing. */
+  quotes?: string[];
 }
 
 export interface QAReport {
