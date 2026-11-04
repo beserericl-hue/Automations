@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 import { supabase } from '../../config/supabase';
 import { plainText } from '../../lib/plainText';
+import { driftQuotes } from '../../lib/driftQuotes';
+import { diffArrays } from 'diff';
 import { useUser } from '../../contexts/UserContext';
 import { apiFetch, type ApiEnvelope } from '../../lib/api';
 import RichTextEditor, { type RichTextEditorHandle } from '../editor/RichTextEditor';
@@ -745,7 +747,7 @@ export default function ContentDetail() {
             <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-4">
               {currentTab === 'qa' && isChapter && (
                 <>
-                  <EngineQaPanel metadata={item.metadata} contentId={id!} />
+                  <EngineQaPanel metadata={item.metadata} contentId={id!} onReveal={revealInEditor} />
                   <QAReportPanel
                     metadata={item.metadata}
                     contentId={id!}
@@ -823,7 +825,17 @@ export default function ContentDetail() {
 // CR-008 B: surface the engine's per-chapter QA + drift (stored in published_content_v2.metadata by
 // CR-005) on the chapter detail page — the old QAReportPanel only reads the n8n last_qa_report field.
 // CR-008/009: a "Fix drift" action runs the engine repair op, which edits only the paragraphs the drift concerns.
-function EngineQaPanel({ metadata, contentId }: { metadata: Record<string, unknown> | null | undefined; contentId: string }) {
+type Reveal = (quote: string) => 'exact' | 'approximate' | 'missing';
+
+export function EngineQaPanel({
+  metadata,
+  contentId,
+  onReveal,
+}: {
+  metadata: Record<string, unknown> | null | undefined;
+  contentId: string;
+  onReveal?: Reveal;
+}) {
   // CR-010 B2: non-blocking Fix Drift + Cancel, shared with the Chapters-table button via the hook —
   // the click queues the engine repair and returns immediately; a background poller refreshes this
   // panel when the new drift scan lands. (Was a blocking while/setTimeout loop.)
@@ -892,11 +904,16 @@ function EngineQaPanel({ metadata, contentId }: { metadata: Record<string, unkno
         <div className="mt-3 border-t border-gray-100 pt-2 dark:border-gray-800">
           <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Outstanding drift</p>
           <ul className="mt-1 list-disc pl-4 text-xs text-gray-600 dark:text-gray-400">
-            {[...story, ...chars].slice(0, 8).map((d, i) => <li key={i}>{d}</li>)}
+            {[...story, ...chars].slice(0, 8).map((d, i) => (
+              <li key={i}>
+                {d}
+                {onReveal && <ShowInChapter quotes={driftQuotes(d)} onReveal={onReveal} />}
+              </li>
+            ))}
           </ul>
         </div>
       )}
-      {lastRepair && state !== 'queued' && <LastRepair r={lastRepair} />}
+      {lastRepair && state !== 'queued' && <LastRepair r={lastRepair} onReveal={onReveal} />}
     </div>
   );
 }
@@ -916,7 +933,65 @@ type LastRepairRecord = {
   dropped?: string[];
 };
 
-function LastRepair({ r }: { r: LastRepairRecord }) {
+/**
+ * Scroll the editor to the passage a finding is about and mark it there. A finding quotes what it
+ * saw; the longest quote is tried first and a name last. "Not found in chapter" means every quote
+ * has since been rewritten — or the finding quotes nothing — and the author is told so rather than
+ * sent to the wrong line.
+ */
+function ShowInChapter({ quotes, onReveal, label = 'Show in chapter' }: { quotes: string[]; onReveal: Reveal; label?: string }) {
+  const [result, setResult] = useState<'exact' | 'approximate' | 'missing' | null>(null);
+  if (quotes.length === 0) return <span className="ml-2 text-[11px] italic opacity-60">no passage quoted</span>;
+  const go = () => {
+    let r: 'exact' | 'approximate' | 'missing' = 'missing';
+    for (const q of quotes) {
+      r = onReveal(q);
+      if (r !== 'missing') break;
+    }
+    setResult(r);
+  };
+  return (
+    <>
+      <button
+        type="button"
+        onClick={go}
+        data-testid="show-in-chapter"
+        className="ml-2 rounded border border-amber-400 px-1.5 py-px text-[11px] font-medium text-amber-700 hover:bg-amber-50 dark:border-amber-600 dark:text-amber-300 dark:hover:bg-amber-950"
+      >
+        {label}
+      </button>
+      {result === 'missing' && <span className="ml-1 text-[11px] italic text-rose-600 dark:text-rose-400">not found in chapter</span>}
+      {result === 'approximate' && <span className="ml-1 text-[11px] italic opacity-60">closest match shown</span>}
+    </>
+  );
+}
+
+/**
+ * A paragraph before and after a fix, word by word: what the fix took out and what it put in.
+ * Words are split on whitespace only, so a hyphenated name ("Taka-Maka" → "Maka-Taka") reads as one
+ * word out and one word in, not as three fragments shuffled.
+ */
+function WordDiff({ before, after }: { before: string; after: string }) {
+  const parts = useMemo(() => {
+    const words = (s: string) => s.split(/(\s+)/).filter((w) => w.length > 0);
+    return diffArrays(words(before), words(after)).map((p) => ({ ...p, text: p.value.join('') }));
+  }, [before, after]);
+  return (
+    <p data-testid="repair-diff" className="whitespace-pre-wrap">
+      {parts.map((p, i) =>
+        p.removed ? (
+          <del key={i} className="rounded bg-rose-100 px-0.5 text-rose-800 line-through dark:bg-rose-900/50 dark:text-rose-200">{p.text}</del>
+        ) : p.added ? (
+          <ins key={i} className="rounded bg-green-100 px-0.5 font-medium text-green-900 no-underline dark:bg-green-900/50 dark:text-green-100">{p.text}</ins>
+        ) : (
+          <span key={i}>{p.text}</span>
+        ),
+      )}
+    </p>
+  );
+}
+
+function LastRepair({ r, onReveal }: { r: LastRepairRecord; onReveal?: Reveal }) {
   const when = r.at ? new Date(r.at).toLocaleString() : '';
   const list = (title: string, items?: string[]) =>
     items?.length ? (
@@ -945,15 +1020,18 @@ function LastRepair({ r }: { r: LastRepairRecord }) {
       {r.kept ? list('Edits left out (they would have broken something)', r.dropped) : null}
       {list('Left as written', r.skipped)}
       {r.changes?.length ? (
-        <details data-testid="last-repair-changes" className="mt-1">
+        <details data-testid="last-repair-changes" className="mt-1" open={r.kept}>
           <summary className="cursor-pointer font-medium">
             {r.kept ? 'Paragraphs changed' : 'Paragraphs it would have changed'} ({r.changes.length})
+            <span className="ml-1 font-normal opacity-70">— removed words struck out, added words in green</span>
           </summary>
           {r.changes.map((c, i) => (
             <div key={i} className="mt-1 border-l-2 border-gray-300 pl-2 dark:border-gray-600">
-              <p className="opacity-70">Paragraph {c.paragraph}{c.before ? '' : ' (new paragraph after it)'}</p>
-              {c.before ? <p className="line-through opacity-70">{c.before}</p> : null}
-              <p>{c.after}</p>
+              <p className="opacity-70">
+                Paragraph {c.paragraph}{c.before ? '' : ' (new paragraph after it)'}
+                {r.kept && onReveal && <ShowInChapter quotes={[c.after]} onReveal={onReveal} label="Show in chapter" />}
+              </p>
+              <WordDiff before={c.before} after={c.after} />
             </div>
           ))}
         </details>
