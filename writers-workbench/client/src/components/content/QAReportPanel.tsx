@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../config/supabase';
 import { useEngineJobQueue } from '../../hooks/useEngineJobQueue';
 import type { QAReport, QACheck } from '../../types/database';
+import ShowInChapter, { type Reveal } from './ShowInChapter';
+import { driftQuotes } from '../../lib/driftQuotes';
 
 interface QAReportPanelProps {
   metadata: Record<string, unknown>;
@@ -12,11 +14,16 @@ interface QAReportPanelProps {
   userId: string;
   /** The prose currently on screen, so a report describing REPLACED prose can be called out. */
   contentText?: string;
+  /** Scroll the editor to a passage and highlight it; a flagged check offers its quoted passages. */
+  onReveal?: Reveal;
 }
 
-export default function QAReportPanel({ metadata, contentId, userId, contentText = '' }: QAReportPanelProps) {
+export default function QAReportPanel({ metadata, contentId, userId, contentText = '', onReveal }: QAReportPanelProps) {
   const [expanded, setExpanded] = useState(true);
   const report = metadata?.qa_report as QAReport | undefined;
+  // The findings behind the report, stored beside it with their verified quotes. A report written
+  // before 2026-11-04 has no `quotes` on its checks; the findings still say where they were looking.
+  const craftFindings = (metadata?.craft_findings as { findings?: { dimension?: string; quote?: string }[] } | undefined)?.findings ?? [];
 
   // Is this report describing the chapter you are reading, or one that has since been replaced?
   // It is not a hypothetical: the book run's repair pass rewrote chapters at 20:52 and left reports
@@ -222,7 +229,7 @@ export default function QAReportPanel({ metadata, contentId, userId, contentText
         <div className="border-t border-gray-200 dark:border-gray-700">
           <div className="divide-y divide-gray-100 dark:divide-gray-800">
             {report.checks.map((check, i) => (
-              <CheckRow key={i} check={check} />
+              <CheckRow key={i} check={check} quotes={quotesFor(check, craftFindings)} onReveal={onReveal} />
             ))}
           </div>
           {report.generated_at && (
@@ -236,7 +243,37 @@ export default function QAReportPanel({ metadata, contentId, userId, contentText
   );
 }
 
-function CheckRow({ check }: { check: QACheck }) {
+/** The engine's dimension key for each check name, for reports stored before checks carried one. */
+const DIMENSION_OF: Record<string, string> = {
+  'Character craft': 'character_follows_guide',
+  'Follows the outline': 'outline_follows_guide',
+  Dialogue: 'dialogue_follows_guide',
+  'Prose clarity': 'prose_transparent',
+  'Story turns / pacing': 'story_turn_density',
+  'No flat paragraphs': 'no_boring_paragraphs',
+  'Period language': 'period_language_ok',
+  'Character consistency': 'character_consistency',
+};
+
+/**
+ * Where a flagged check points. The engine now writes the passages its findings quote onto the
+ * check; an older check is matched to the stored findings by dimension; failing both, whatever the
+ * advice itself quotes. A passing check points nowhere — there is nothing to fix.
+ */
+export function quotesFor(check: QACheck, findings: { dimension?: string; quote?: string }[]): string[] {
+  if (check.status === 'PASS') return [];
+  if (check.quotes) return check.quotes;
+  const dim = check.dimension ?? DIMENSION_OF[check.name];
+  const fromFindings = findings.filter((f) => f.dimension === dim && f.quote).map((f) => f.quote as string);
+  if (fromFindings.length) return Array.from(new Set(fromFindings)).slice(0, 5);
+  if (check.name === 'Character consistency') {
+    // "Possible renames: Meara→Mara; missing: …" — the variants are what is in the chapter.
+    return Array.from(check.details.matchAll(/([^\s,:;]+)→/g), (m) => m[1]);
+  }
+  return driftQuotes(check.details);
+}
+
+function CheckRow({ check, quotes, onReveal }: { check: QACheck; quotes: string[]; onReveal?: Reveal }) {
   const isPass = check.status === 'PASS';
   return (
     <div className="flex items-start gap-3 px-4 py-2.5">
@@ -252,6 +289,11 @@ function CheckRow({ check }: { check: QACheck }) {
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{check.name}</p>
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{check.details}</p>
+        {!isPass && onReveal && (
+          <p className="mt-1 text-xs">
+            <ShowInChapter quotes={quotes} onReveal={onReveal} />
+          </p>
+        )}
       </div>
     </div>
   );
