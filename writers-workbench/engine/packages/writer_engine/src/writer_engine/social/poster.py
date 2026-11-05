@@ -4,7 +4,8 @@ The port of n8n's ``Cron - Post Scheduled Website Blogs`` (Se2X0fmkLUFK6CCq), wh
 and 14:00 ET and handed every pending row whose slot had passed to ``Sub - Publish Blog All
 Channels v2``. One tick here:
 
-1. **Reconciles** LinkedIn deliveries Blotato accepted earlier (``submitted``): published, failed
+1. **Reconciles** Blotato deliveries (LinkedIn, Facebook, Threads, X, …) it accepted earlier
+   (``submitted``): published, failed
    with Blotato's reason, or still working. n8n looked once, 40s after posting, and counted
    "in-progress" as success forever.
 2. **Claims** each due row by moving it ``pending`` → ``posting`` with an UPDATE that only matches
@@ -230,7 +231,7 @@ async def _cover(
         return None, None, "image generation failed or timed out: posted without an image"
     data, content_type, src = made
     media = None
-    if any(c.kind == "linkedin" for c in wanted) and creds.blotato_api_key:
+    if any(ch.is_blotato(c.kind) for c in wanted) and creds.blotato_api_key:
         media = await ch.blotato_upload_media(
             transport.http, src, api_key=creds.blotato_api_key, base_url=settings.blotato_base_url
         )
@@ -279,7 +280,7 @@ async def _chosen_image(
             f"the chosen image could not be fetched ({type(exc).__name__}): posted without an image",
         )
     media = None
-    if any(c.kind == "linkedin" for c in wanted) and creds.blotato_api_key:
+    if any(ch.is_blotato(c.kind) for c in wanted) and creds.blotato_api_key:
         media = await ch.blotato_upload_media(
             transport.http, url, api_key=creds.blotato_api_key, base_url=get_settings().blotato_base_url
         )
@@ -321,7 +322,7 @@ async def post_row(
         if channel.kind == "website":
             request = ch.website_request(row, channel, cover=cover, now=now)
         else:
-            request = ch.linkedin_request(
+            request = ch.blotato_request(
                 row, channel, media_url=media_url, account_id=creds.blotato_account_id
             )
         existing = deliveries.get(channel.channel)
@@ -348,7 +349,7 @@ async def post_row(
                     resolve=transport.resolve,
                 )
             else:
-                result = await ch.send_linkedin(
+                result = await ch.send_blotato(
                     transport.http,
                     channel,
                     request,
@@ -371,7 +372,8 @@ def _credentials_note(channel: ch.Channel, request: dict[str, Any]) -> str:
     if channel.kind == "website":
         header = str(channel.config.get("auth_header") or "Authorization")
         return f"would send the user's website token in {header} to {channel.config.get('endpoint')}"
-    return f"would send with the user's Blotato key (account {request['post']['accountId']})"
+    name = ch.PLATFORM_LABEL.get(channel.kind, channel.kind)
+    return f"would send to {name} with the user's Blotato key (account {request['post']['accountId']})"
 
 
 async def _dry_run_problem(
@@ -390,9 +392,11 @@ async def _dry_run_problem(
     elif not creds.blotato_api_key:
         problem = ch.NO_BLOTATO_KEY
     elif not request["post"]["accountId"]:
-        problem = "no Blotato account id is set (Settings → Integrations → Blotato)"
+        problem = (
+            f"no Blotato account for channel {channel.channel} (switch it on in Settings → Integrations)"
+        )
     else:
-        problem = None
+        problem = ch.blotato_problem(channel, request)
     if problem and creds.problems:
         problem = f"{problem}; {'; '.join(creds.problems)}"
     return problem

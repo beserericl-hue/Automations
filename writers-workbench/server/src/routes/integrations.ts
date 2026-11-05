@@ -4,12 +4,18 @@
  * settings — never Railway variables.
  *
  *   GET    /api/integrations                     everything below, secrets as set / last4 / updated_at only
- *   PUT    /api/integrations/blotato             { api_key?, account_id? }
+ *   PUT    /api/integrations/blotato             { api_key } — saves it, then syncs the accounts on it
  *   DELETE /api/integrations/blotato/key         forget the Blotato key
- *   POST   /api/integrations/blotato/test        { api_key? } — lists the Blotato account's connections
- *   POST   /api/integrations/linkedin            { label, page_id|null, enabled }
- *   PATCH  /api/integrations/linkedin/:channel
- *   DELETE /api/integrations/linkedin/:channel
+ *   POST   /api/integrations/blotato/test        { api_key? } — lists (and, for the saved key, stores) the
+ *                                                accounts on the key with their pages and boards
+ *   POST   /api/integrations/blotato/targets     { target_id, enabled } — switch one account/page on or off
+ *                                                as a channel the calendar can post to (migration 055)
+ *   PATCH  /api/integrations/social/:channel     { label?, enabled? }
+ *   DELETE /api/integrations/social/:channel
+ *
+ * Nothing about a Blotato account is typed by hand: the key says which accounts it holds, and each
+ * one's id (and LinkedIn / Facebook page ids, Pinterest board ids) is read from Blotato and written
+ * onto the channel. Eric, 2026-11-05: "Do you really need the service ID as well since you can read it?"
  *   POST   /api/integrations/websites            { label, endpoint, auth_header, auth_token?, public_base?, author?, enabled }
  *   PATCH  /api/integrations/websites/:channel
  *   DELETE /api/integrations/websites/:channel
@@ -101,12 +107,12 @@ const HTTPS_URL = z
     }
   }, 'must be an https:// URL');
 
-const BlotatoSchema = z
-  .object({ api_key: SECRET.optional(), account_id: z.union([ACCOUNT_ID, z.literal('')]).optional() })
-  .strict();
+const BlotatoSchema = z.object({ api_key: SECRET }).strict();
 const BlotatoTestSchema = z.object({ api_key: SECRET.optional() }).strict();
-const LinkedInCreate = z.object({ label: LABEL, page_id: PAGE_ID.nullable().optional(), enabled: z.boolean().optional() }).strict();
-const LinkedInPatch = LinkedInCreate.partial().strict();
+const TARGET_ID = z.string().trim().regex(/^[a-z]+:[A-Za-z0-9_-]{1,40}(:[A-Za-z0-9_-]{1,60})?$/, 'is not a synced account');
+const TargetSchema = z.object({ target_id: TARGET_ID, enabled: z.boolean() }).strict();
+const SocialPatch = z.object({ label: LABEL.optional(), enabled: z.boolean().optional() }).strict();
+void ACCOUNT_ID; void PAGE_ID; // ids are read from Blotato now (055); the shapes stay documented above
 const WebsiteFields = {
   label: LABEL,
   endpoint: HTTPS_URL,
@@ -142,15 +148,18 @@ async function channelRows(userId: string): Promise<Row[]> {
   return (data ?? []) as Row[];
 }
 
-async function ownChannel(userId: string, channel: string, kind: string): Promise<Row | null> {
+/** The user's channel of that kind; 'social' means any kind Blotato posts to (everything but website). */
+async function ownChannel(userId: string, channel: string, kind: 'website' | 'social'): Promise<Row | null> {
   const { data } = await getSupabaseAdmin()
     .from(CHANNELS)
     .select('channel, kind, label, config, enabled')
     .eq('user_id', userId)
     .eq('channel', channel)
-    .eq('kind', kind)
     .maybeSingle();
-  return (data as Row | null) ?? null;
+  const row = (data as Row | null) ?? null;
+  if (!row) return null;
+  const isWebsite = row.kind === 'website';
+  return (kind === 'website') === isWebsite ? row : null;
 }
 
 /** Insert or update the user's row for (provider, channel). The unique index is on an expression,
@@ -188,7 +197,7 @@ function slug(label: string): string {
   return label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30) || 'channel';
 }
 
-async function newChannelKey(userId: string, prefix: 'li' | 'web', label: string): Promise<string> {
+async function newChannelKey(userId: string, prefix: string, label: string): Promise<string> {
   const taken = new Set((await channelRows(userId)).map((r) => String(r.channel)));
   const base = `${prefix}_${slug(label)}`.slice(0, 36);
   if (!taken.has(base)) return base;
@@ -216,6 +225,110 @@ async function channelUses(userId: string, channel: string): Promise<string[]> {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Blotato accounts: read from the key, never typed (migration 055)
+// ---------------------------------------------------------------------------------------------
+
+/** What a post needs before Blotato will take it on this platform. */
+type Needs = 'text' | 'image' | 'video' | 'page';
+const PLATFORM_NEEDS: Record<string, Needs> = { youtube: 'video', instagram: 'image', pinterest: 'image', tiktok: 'image' };
+const PLATFORM_LABEL: Record<string, string> = {
+  linkedin: 'LinkedIn', facebook: 'Facebook', instagram: 'Instagram', threads: 'Threads', twitter: 'X',
+  bluesky: 'Bluesky', pinterest: 'Pinterest', tiktok: 'TikTok', youtube: 'YouTube',
+};
+const PLATFORMS = new Set(Object.keys(PLATFORM_LABEL));
+
+/** One place a post can go: an account, or one of its pages / boards. The id is what the engine
+ *  puts in Blotato's accountId / pageId / boardId; target_id is how the UI finds its channel. */
+export interface BlotatoTarget {
+  target_id: string;
+  platform: string;
+  account_id: string;
+  account_name: string;
+  page_id: string | null;
+  page_name: string | null;
+  board_id: string | null;
+  label: string;
+  needs: Needs;
+}
+
+async function blotatoGet(apiKey: string, path: string): Promise<{ status: number; items: Row[] }> {
+  const r = await fetch(`${BLOTATO_BASE()}${path}`, {
+    headers: { 'blotato-api-key': apiKey, Accept: 'application/json' },
+    redirect: 'manual',
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!r.ok) return { status: r.status, items: [] };
+  const json = (await r.json().catch(() => ({}))) as { items?: Row[]; data?: Row[] } | Row[];
+  return { status: r.status, items: (Array.isArray(json) ? json : (json.items ?? json.data ?? [])) as Row[] };
+}
+
+const nameOf = (a: Row): string => String(a.fullname ?? a.name ?? a.username ?? '').trim();
+
+/** Every account on the key, expanded into targets. LinkedIn and Facebook pages and Pinterest
+ *  boards are read too, so nothing about an account is ever typed. Read-only on Blotato's side. */
+export async function syncBlotato(apiKey: string): Promise<{ ok: boolean; status: number; message: string; targets: BlotatoTarget[] }> {
+  const accounts = await blotatoGet(apiKey, '/users/me/accounts');
+  if (accounts.status === 401 || accounts.status === 403) return { ok: false, status: accounts.status, message: 'Blotato rejected this API key', targets: [] };
+  if (accounts.status >= 300) return { ok: false, status: accounts.status, message: `Blotato answered HTTP ${accounts.status}`, targets: [] };
+  const targets: BlotatoTarget[] = [];
+  const expanded = await Promise.all(
+    accounts.items.slice(0, 30).map(async (a) => {
+      const platform = String(a.platform ?? '').toLowerCase();
+      const accountId = String(a.id ?? '');
+      if (!PLATFORMS.has(platform) || !accountId) return [];
+      const base = { platform, account_id: accountId, account_name: nameOf(a), board_id: null, page_id: null, page_name: null };
+      const name = base.account_name || `account ${accountId}`;
+      const own = (extra: Partial<BlotatoTarget>, suffix: string, needs: Needs = PLATFORM_NEEDS[platform] ?? 'text'): BlotatoTarget => ({
+        ...base, ...extra, needs,
+        target_id: `${platform}:${accountId}${suffix}`,
+        label: `${PLATFORM_LABEL[platform]} · ${extra.page_name ?? name}${extra.page_id || extra.board_id ? '' : platform === 'linkedin' ? ' (personal profile)' : ''}`,
+      });
+      const subs = async (path: string): Promise<Row[]> => {
+        try { return (await blotatoGet(apiKey, path)).items.slice(0, 50); } catch { return []; }
+      };
+      if (platform === 'linkedin') {
+        const pages = await subs(`/users/me/accounts/${encodeURIComponent(accountId)}/subaccounts`);
+        return [own({}, ''), ...pages.map((p) => own({ page_id: String(p.id ?? ''), page_name: nameOf(p) || `page ${String(p.id ?? '')}` }, `:${String(p.id ?? '')}`))];
+      }
+      if (platform === 'facebook') {
+        const pages = await subs(`/users/me/accounts/${encodeURIComponent(accountId)}/subaccounts`);
+        if (!pages.length) return [own({}, '', 'page')];
+        return pages.map((p) => own({ page_id: String(p.id ?? ''), page_name: nameOf(p) || `page ${String(p.id ?? '')}` }, `:${String(p.id ?? '')}`));
+      }
+      if (platform === 'pinterest') {
+        const boards = await subs(`/social/pinterest/boards?accountId=${encodeURIComponent(accountId)}`);
+        if (!boards.length) return [own({}, '', 'page')];
+        return boards.map((b) => own({ board_id: String(b.id ?? ''), page_name: nameOf(b) || `board ${String(b.id ?? '')}` }, `:${String(b.id ?? '')}`));
+      }
+      return [own({}, '')];
+    }),
+  );
+  for (const list of expanded) targets.push(...list);
+  return { ok: true, status: accounts.status, message: `Connected: ${accounts.items.length} account(s) on this Blotato key`, targets: targets.slice(0, 100) };
+}
+
+async function storeTargets(userId: string, targets: BlotatoTarget[]): Promise<void> {
+  const rows = await integrationRows(userId);
+  const config = { ...(((rows.find((r) => r.provider === 'blotato')?.config as Row | undefined) ?? {})) };
+  await saveIntegration(userId, 'blotato', null, { config: { ...config, accounts: targets, synced_at: new Date().toISOString() } });
+}
+
+function socialChannel(c: Row): Row {
+  const cfg = (c.config ?? {}) as Row;
+  return {
+    channel: c.channel,
+    kind: c.kind,
+    label: c.label,
+    enabled: c.enabled !== false,
+    account_id: (cfg.account_id as string | undefined) || null,
+    page_id: (cfg.page_id as string | undefined) || null,
+    board_id: (cfg.board_id as string | undefined) || null,
+    target_id: (cfg.target_id as string | undefined) || null,
+    needs: PLATFORM_NEEDS[String(c.kind)] ?? 'text',
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
 // Read
 // ---------------------------------------------------------------------------------------------
 
@@ -224,6 +337,7 @@ integrationsRouter.get('/', async (req: Request, res: Response) => {
   try {
     const [integrations, channels] = await Promise.all([integrationRows(userId), channelRows(userId)]);
     const blotato = integrations.find((r) => r.provider === 'blotato');
+    const bcfg = (blotato?.config ?? {}) as Row;
     const tokens = new Map(integrations.filter((r) => r.provider === 'website').map((r) => [String(r.channel), r]));
     res.json({
       success: true,
@@ -231,21 +345,11 @@ integrationsRouter.get('/', async (req: Request, res: Response) => {
         encryption_ready: encryptionReady(),
         read_only: Boolean(req.isImpersonating),
         blotato: {
-          account_id: String(((blotato?.config as Row | undefined)?.account_id as string | undefined) ?? ''),
           key: secretStatus(blotato),
+          accounts: Array.isArray(bcfg.accounts) ? (bcfg.accounts as BlotatoTarget[]) : [],
+          synced_at: (bcfg.synced_at as string | undefined) ?? null,
         },
-        linkedin: channels
-          .filter((c) => c.kind === 'linkedin')
-          .map((c) => {
-            const cfg = (c.config ?? {}) as Row;
-            return {
-              channel: c.channel,
-              label: c.label,
-              page_id: (cfg.page_id as string | undefined) || null,
-              account_override: (cfg.account_id as string | undefined) || null,
-              enabled: c.enabled !== false,
-            };
-          }),
+        social: channels.filter((c) => c.kind !== 'website').map(socialChannel),
         websites: channels
           .filter((c) => c.kind === 'website')
           .map((c) => {
@@ -290,19 +394,23 @@ integrationsRouter.put('/blotato', async (req: Request, res: Response) => {
   if (refuseImpersonation(req, res)) return;
   const body = parse(BlotatoSchema, req.body, res);
   if (!body) return;
-  if (body.api_key === undefined && body.account_id === undefined) return bad(res, 400, 'VALIDATION_ERROR', 'Nothing to save');
   const userId = req.userId!;
   try {
-    const patch: Row = {};
-    if (body.api_key !== undefined) Object.assign(patch, sealed(userId, 'blotato', null, body.api_key));
-    if (body.account_id !== undefined) patch.config = { account_id: body.account_id };
-    await saveIntegration(userId, 'blotato', null, patch);
-    res.json({ success: true });
+    await saveIntegration(userId, 'blotato', null, sealed(userId, 'blotato', null, body.api_key));
   } catch (err) {
     if (keyError(res, err)) return;
     logger.error({ err: (err as Error).message }, 'integrations: blotato save failed');
-    bad(res, 500, 'DB_ERROR', 'Could not save the Blotato settings');
+    return bad(res, 500, 'DB_ERROR', 'Could not save the Blotato settings');
   }
+  // The key is saved; now read what is on it. A Blotato outage leaves the key saved and says so.
+  let sync: Awaited<ReturnType<typeof syncBlotato>>;
+  try {
+    sync = await syncBlotato(body.api_key);
+    if (sync.ok) await storeTargets(userId, sync.targets);
+  } catch (err) {
+    sync = { ok: false, status: 0, message: `Key saved, but Blotato could not be reached (${(err as Error).name}); use Refresh accounts`, targets: [] };
+  }
+  res.json({ success: true, data: { ok: sync.ok, status: sync.status, message: sync.message, accounts: sync.targets } });
 });
 
 integrationsRouter.delete('/blotato/key', async (req: Request, res: Response) => {
@@ -320,7 +428,8 @@ integrationsRouter.post('/blotato/test', async (req: Request, res: Response) => 
   if (refuseImpersonation(req, res)) return;
   const body = parse(BlotatoTestSchema, req.body, res);
   if (!body) return;
-  let apiKey = body.api_key ?? null;
+  const typed = body.api_key ?? null;
+  let apiKey = typed;
   try {
     apiKey ??= await storedSecret(req.userId!, 'blotato', null);
   } catch (err) {
@@ -329,76 +438,78 @@ integrationsRouter.post('/blotato/test', async (req: Request, res: Response) => 
   }
   if (!apiKey) return bad(res, 400, 'NO_KEY', 'No Blotato API key is saved. Enter one first.');
   try {
-    // Read-only: lists the accounts connected to this Blotato key. Nothing is posted.
-    const r = await fetch(`${BLOTATO_BASE()}/users/me/accounts`, {
-      headers: { 'blotato-api-key': apiKey, Accept: 'application/json' },
-      redirect: 'manual',
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (r.status === 401 || r.status === 403) {
-      return res.json({ success: true, data: { ok: false, status: r.status, message: 'Blotato rejected this API key' } });
-    }
-    if (!r.ok) {
-      return res.json({ success: true, data: { ok: false, status: r.status, message: `Blotato answered HTTP ${r.status}` } });
-    }
-    const json = (await r.json().catch(() => ({}))) as { items?: Row[]; data?: Row[] } | Row[];
-    const items = (Array.isArray(json) ? json : (json.items ?? json.data ?? [])) as Row[];
-    const accounts = items.slice(0, 50).map((a) => ({
-      id: String(a.id ?? ''),
-      platform: String(a.platform ?? ''),
-      name: String(a.fullname ?? a.username ?? a.name ?? ''),
-    }));
-    res.json({ success: true, data: { ok: true, status: r.status, message: `Connected: ${accounts.length} account(s) on this Blotato key`, accounts } });
+    // Read-only on Blotato: lists the accounts (and pages / boards) on the key. Nothing is posted.
+    // With the SAVED key the list is stored too, so the switches below reflect it; a key typed
+    // but not saved is only looked at.
+    const sync = await syncBlotato(apiKey);
+    if (sync.ok && !typed) await storeTargets(req.userId!, sync.targets);
+    res.json({ success: true, data: { ok: sync.ok, status: sync.status, message: sync.message, accounts: sync.targets } });
   } catch (err) {
-    res.json({ success: true, data: { ok: false, status: 0, message: `Could not reach Blotato (${(err as Error).name})` } });
+    res.json({ success: true, data: { ok: false, status: 0, message: `Could not reach Blotato (${(err as Error).name})`, accounts: [] } });
   }
 });
 
-// ---------------------------------------------------------------------------------------------
-// LinkedIn targets
-// ---------------------------------------------------------------------------------------------
-
-integrationsRouter.post('/linkedin', async (req: Request, res: Response) => {
+/** Switch one synced account / page on or off as a channel. On first switch-on the channel is made
+ *  with everything the publisher needs copied from the synced target; after that it is a toggle. */
+integrationsRouter.post('/blotato/targets', async (req: Request, res: Response) => {
   if (refuseImpersonation(req, res)) return;
-  const body = parse(LinkedInCreate, req.body, res);
+  const body = parse(TargetSchema, req.body, res);
   if (!body) return;
   const userId = req.userId!;
   try {
-    const channel = await newChannelKey(userId, 'li', body.label);
-    const config: Row = body.page_id ? { page_id: body.page_id } : {};
-    const { error } = await getSupabaseAdmin()
-      .from(CHANNELS)
-      .insert({ user_id: userId, channel, kind: 'linkedin', label: body.label, config, enabled: body.enabled ?? true });
+    const rows = await integrationRows(userId);
+    const cfg = (rows.find((r) => r.provider === 'blotato')?.config ?? {}) as Row;
+    const target = (Array.isArray(cfg.accounts) ? (cfg.accounts as BlotatoTarget[]) : []).find((t) => t.target_id === body.target_id);
+    if (!target) return bad(res, 404, 'NOT_SYNCED', 'That account is not on the synced list. Use Refresh accounts first.');
+    const sb = getSupabaseAdmin();
+    const existing = (await channelRows(userId)).find((c) => ((c.config ?? {}) as Row).target_id === body.target_id);
+    if (existing) {
+      const { error } = await sb.from(CHANNELS).update({ enabled: body.enabled }).eq('user_id', userId).eq('channel', existing.channel as string);
+      if (error) throw new Error(error.message);
+      return res.json({ success: true, data: { channel: existing.channel, enabled: body.enabled } });
+    }
+    if (!body.enabled) return res.json({ success: true, data: { channel: null, enabled: false } });
+    if (target.needs === 'video') return bad(res, 400, 'VIDEO_ONLY', `${PLATFORM_LABEL[target.platform]} takes video only; the calendar has nothing to post there`);
+    if (target.needs === 'page') return bad(res, 400, 'NO_PAGE', `Connect a ${target.platform === 'pinterest' ? 'board' : 'page'} to this account in Blotato first, then Refresh accounts`);
+    const channel = await newChannelKey(userId, target.platform, target.page_name ?? target.account_name ?? target.account_id);
+    const config: Row = {
+      platform: target.platform,
+      account_id: target.account_id,
+      target_id: target.target_id,
+      account_name: target.account_name,
+      ...(target.page_id ? { page_id: target.page_id, page_name: target.page_name } : {}),
+      ...(target.board_id ? { board_id: target.board_id, page_name: target.page_name } : {}),
+    };
+    const { error } = await sb.from(CHANNELS).insert({ user_id: userId, channel, kind: target.platform, label: target.label, config, enabled: true });
     if (error) throw new Error(error.message);
-    res.status(201).json({ success: true, data: { channel } });
+    res.status(201).json({ success: true, data: { channel, enabled: true } });
   } catch (err) {
-    logger.error({ err: (err as Error).message }, 'integrations: linkedin create failed');
-    bad(res, 500, 'DB_ERROR', 'Could not add the LinkedIn target');
+    logger.error({ err: (err as Error).message }, 'integrations: blotato target failed');
+    bad(res, 500, 'DB_ERROR', 'Could not switch that account');
   }
 });
 
-integrationsRouter.patch('/linkedin/:channel', async (req: Request, res: Response) => {
+// ---------------------------------------------------------------------------------------------
+// Social channels (the switched-on Blotato targets)
+// ---------------------------------------------------------------------------------------------
+
+integrationsRouter.patch('/social/:channel', async (req: Request, res: Response) => {
   if (refuseImpersonation(req, res)) return;
-  const body = parse(LinkedInPatch, req.body, res);
+  const body = parse(SocialPatch, req.body, res);
   if (!body) return;
   const userId = req.userId!;
-  const existing = await ownChannel(userId, chanParam(req), 'linkedin');
-  if (!existing) return bad(res, 404, 'NOT_FOUND', 'No such LinkedIn target');
+  const existing = await ownChannel(userId, chanParam(req), 'social');
+  if (!existing) return bad(res, 404, 'NOT_FOUND', 'No such channel');
   const patch: Row = {};
   if (body.label !== undefined) patch.label = body.label;
   if (body.enabled !== undefined) patch.enabled = body.enabled;
-  if (body.page_id !== undefined) {
-    const config = { ...((existing.config ?? {}) as Row) };
-    if (body.page_id) config.page_id = body.page_id;
-    else delete config.page_id;
-    patch.config = config;
-  }
+  if (!Object.keys(patch).length) return bad(res, 400, 'VALIDATION_ERROR', 'Nothing to save');
   const { error } = await getSupabaseAdmin().from(CHANNELS).update(patch).eq('user_id', userId).eq('channel', chanParam(req));
-  if (error) return bad(res, 500, 'DB_ERROR', 'Could not save the LinkedIn target');
+  if (error) return bad(res, 500, 'DB_ERROR', 'Could not save the channel');
   res.json({ success: true });
 });
 
-async function deleteChannel(req: Request, res: Response, kind: 'linkedin' | 'website'): Promise<void> {
+async function deleteChannel(req: Request, res: Response, kind: 'social' | 'website'): Promise<void> {
   if (refuseImpersonation(req, res)) return;
   const userId = req.userId!;
   const channel = chanParam(req);
@@ -413,7 +524,7 @@ async function deleteChannel(req: Request, res: Response, kind: 'linkedin' | 'we
   res.json({ success: true });
 }
 
-integrationsRouter.delete('/linkedin/:channel', (req, res) => deleteChannel(req, res, 'linkedin'));
+integrationsRouter.delete('/social/:channel', (req, res) => deleteChannel(req, res, 'social'));
 
 // ---------------------------------------------------------------------------------------------
 // Website blogs

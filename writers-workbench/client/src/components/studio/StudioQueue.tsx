@@ -36,7 +36,7 @@ export default function StudioQueue({ ctx }: { ctx: StudioContext }) {
   );
 }
 
-function QueueRow({ ctx, post, channels }: { ctx: StudioContext; post: StudioPost; channels: Array<{ channel: string; kind: 'website' | 'linkedin'; label: string; enabled: boolean }> }) {
+function QueueRow({ ctx, post, channels }: { ctx: StudioContext; post: StudioPost; channels: Array<{ channel: string; kind: string; label: string; enabled: boolean }> }) {
   const ed = ctx.edition.edition_id;
   const [moving, setMoving] = useState(false);
   const [error, setError] = useState('');

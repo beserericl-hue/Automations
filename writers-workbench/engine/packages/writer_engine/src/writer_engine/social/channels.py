@@ -11,6 +11,10 @@ Differences from n8n, all deliberate:
   the Blotato key, Blotato account and each blog's token are the *user's* own, stored encrypted in
   ``user_integrations_v2`` (Settings → Integrations; see ``writer_engine.integrations``). There is
   no company key in a Railway variable. n8n typed the KIE key into six nodes.
+* Blotato posts to every platform on the user's key, not only LinkedIn (migration 055): a channel's
+  ``kind`` is the platform and its config carries the account (and page / board). The social text
+  is cut to each platform's limit with its link kept; platforms that need an image say so instead
+  of failing at Blotato.
 * A blog endpoint is user-supplied, so it is checked for SSRF (https, public addresses only) at
   send time as well as when it is saved.
 * The personal LinkedIn profile is its own channel (``li_personal``). n8n posted there silently
@@ -43,6 +47,43 @@ CHANNELS_TABLE = "social_channels_v2"
 LINKEDIN_MAX_CHARS = 2990
 """Blotato rejects LinkedIn text past 3,000 characters; n8n trimmed to 2,990."""
 
+TEXT_LIMITS: dict[str, int] = {
+    "linkedin": LINKEDIN_MAX_CHARS,
+    "facebook": 5000,
+    "instagram": 2200,
+    "threads": 500,
+    "twitter": 280,
+    "bluesky": 300,
+    "pinterest": 500,
+    "tiktok": 2200,
+    "youtube": 5000,
+}
+"""Each platform's text limit (migration 055). The social text is written once, LinkedIn-length;
+the shorter platforms get it cut at a sentence end with the link kept (``fit_text``)."""
+
+NEEDS_IMAGE = frozenset({"instagram", "pinterest", "tiktok"})
+"""Platforms Blotato will not post text alone to: the post must carry an image."""
+VIDEO_ONLY = frozenset({"youtube"})
+"""Platforms the calendar cannot post to at all: they take a video, and a post has none."""
+
+PLATFORM_LABEL: dict[str, str] = {
+    "linkedin": "LinkedIn",
+    "facebook": "Facebook",
+    "instagram": "Instagram",
+    "threads": "Threads",
+    "twitter": "X",
+    "bluesky": "Bluesky",
+    "pinterest": "Pinterest",
+    "tiktok": "TikTok",
+    "youtube": "YouTube",
+}
+
+
+def is_blotato(kind: str) -> bool:
+    """A channel Blotato posts to, i.e. anything that is not the website."""
+    return kind in TEXT_LIMITS
+
+
 KIE_CREATE = "https://api.kie.ai/api/v1/playground/createTask"
 KIE_RECORD = "https://api.kie.ai/api/v1/playground/recordInfo"
 KIE_TIMEOUT_S = 180
@@ -56,7 +97,7 @@ BLOTATO_PENDING = frozenset({"in-progress", "pending", "queued", "processing", "
 class Channel:
     user_id: str
     channel: str
-    kind: str  # 'website' | 'linkedin'
+    kind: str  # 'website', or a Blotato platform: 'linkedin' | 'facebook' | 'threads' | ... (055)
     label: str
     config: dict[str, Any] = field(default_factory=dict)
     enabled: bool = True
@@ -122,18 +163,39 @@ def sketchnote_prompt(title: str, body_md: str) -> str:
 
 def fit_linkedin(content: str, *, cta_marker: str = "www.techahir.com") -> str:
     """Trim a post to LinkedIn's limit, keeping the call-to-action tail intact (n8n's rule)."""
+    return fit_text(content, LINKEDIN_MAX_CHARS, cta_marker=cta_marker)
+
+
+_CLOSING_QUOTES = "\"'" + chr(0x201D) + chr(0x2019) + ")"  # closing quotes may follow the full stop
+_SENTENCE_END = re.compile(r"[.!?…][" + _CLOSING_QUOTES + r"]*(?=\s)")
+
+
+def fit_text(content: str, limit: int, *, cta_marker: str = "www.techahir.com") -> str:
+    """Cut a post to ``limit`` characters, keeping its link.
+
+    The tail is the call-to-action line (the line naming ``cta_marker``), or failing that the last
+    line with a URL in it. On a platform too short for the whole tail (X, Bluesky) only the URL is
+    kept. The body is cut at the last sentence end that fits, so an X post ends on a full stop and
+    the link, not mid-word; a single sentence longer than the room is cut with an ellipsis.
+    """
     content = (content or "").strip()
-    if len(content) <= LINKEDIN_MAX_CHARS:
+    if len(content) <= limit:
         return content
     lines = content.split("\n")
     cta_idx = next((i for i, line in enumerate(lines) if cta_marker in line.lower()), -1)
+    if cta_idx < 0:
+        cta_idx = next((i for i in range(len(lines) - 1, -1, -1) if _URL.search(lines[i])), -1)
     cta = "\n".join(lines[cta_idx:]).strip() if cta_idx >= 0 else ""
-    if len(cta) > 400:
-        cta = ""
-    room = LINKEDIN_MAX_CHARS - (len(cta) + 2 if cta else 0)
+    if len(cta) > min(400, limit // 2):
+        url = _URL.search(cta)
+        cta = url.group(0) if url and len(url.group(0)) <= limit // 2 else ""
+    room = limit - (len(cta) + 2 if cta else 0)
     body = ("\n".join(lines[:cta_idx]) if cta_idx >= 0 else content).strip()
     if len(body) > room:
-        body = body[: room - 1].strip() + "…"
+        cut = body[:room]
+        ends = [m.end() for m in _SENTENCE_END.finditer(cut + " ")]
+        last = max((e for e in ends if e <= room), default=0)
+        body = cut[:last].strip() if last >= room // 3 else cut[: room - 1].strip() + "…"
     return f"{body}\n\n{cta}" if cta else body
 
 
@@ -168,24 +230,88 @@ def website_request(
 def linkedin_request(
     row: dict[str, Any], channel: Channel, *, media_url: str | None, account_id: str = ""
 ) -> dict[str, Any]:
-    """``account_id`` is the user's Blotato account (Settings → Integrations). A channel config
-    ``account_id`` overrides it for that one channel (migration 043 keeps one only where it differs)."""
-    text = str(row.get("linkedin_content") or "") or blog_body(str(row.get("body_md") or ""))
-    target: dict[str, Any] = {"targetType": "linkedin"}
-    page_id = str(channel.config.get("page_id") or "").strip()
-    if page_id:
+    """A LinkedIn post through Blotato (kept for the callers that predate 055)."""
+    return blotato_request(row, channel, media_url=media_url, account_id=account_id)
+
+
+def blotato_target(channel: Channel, row: dict[str, Any], *, has_media: bool) -> dict[str, Any]:
+    """``post.target`` for the channel's platform, with what Blotato requires of each one."""
+    platform = channel.kind
+    cfg = channel.config
+    target: dict[str, Any] = {"targetType": platform}
+    page_id = str(cfg.get("page_id") or "").strip()
+    link = str(row.get("source_url") or "").strip()
+    if platform == "linkedin" and page_id:
         target["pageId"] = page_id
+    elif platform == "facebook":
+        target["pageId"] = page_id
+        if link and not has_media:
+            target["link"] = link
+    elif platform == "pinterest":
+        target["boardId"] = str(cfg.get("board_id") or "").strip()
+        title = str(row.get("title") or "").strip()[:100]
+        if title:
+            target["title"] = title
+        if link:
+            target["link"] = link[:2048]
+    elif platform == "tiktok":
+        target.update(
+            {
+                "privacyLevel": "PUBLIC_TO_EVERYONE",
+                "disabledComments": False,
+                "disabledDuet": False,
+                "disabledStitch": False,
+                "isBrandedContent": False,
+                "isYourBrand": False,
+                # The sketchnote is generated; an image the owner chose is theirs to declare.
+                "isAiGenerated": bool(row.get("include_image")) and not str(row.get("image_url") or ""),
+            }
+        )
+    elif platform == "youtube":
+        target.update(
+            {
+                "title": str(row.get("title") or "Untitled").strip()[:100].replace("<", "").replace(">", ""),
+                "privacyStatus": "public",
+                "shouldNotifySubscribers": False,
+            }
+        )
+    return target
+
+
+def blotato_request(
+    row: dict[str, Any], channel: Channel, *, media_url: str | None, account_id: str = ""
+) -> dict[str, Any]:
+    """One post for one Blotato channel. The platform is the channel's ``kind``; the account is the
+    channel's own (migration 055), falling back to the user's Blotato row for channels made before
+    that. The social text is cut to the platform's limit with its link kept."""
+    platform = channel.kind
+    text = str(row.get("linkedin_content") or "") or blog_body(str(row.get("body_md") or ""))
     return {
         "post": {
             "accountId": str(channel.config.get("account_id") or account_id or "").strip(),
             "content": {
-                "text": fit_linkedin(text),
-                "platform": "linkedin",
+                "text": fit_text(text, TEXT_LIMITS.get(platform, LINKEDIN_MAX_CHARS)),
+                "platform": platform,
                 "mediaUrls": [media_url] if media_url else [],
             },
-            "target": target,
+            "target": blotato_target(channel, row, has_media=bool(media_url)),
         }
     }
+
+
+def blotato_problem(channel: Channel, request: dict[str, Any]) -> str | None:
+    """Why Blotato would refuse this post on this platform, before anything is sent; None if fine."""
+    platform = channel.kind
+    name = PLATFORM_LABEL.get(platform, platform)
+    if platform in VIDEO_ONLY:
+        return f"{name} takes video only; the calendar has nothing to post there"
+    if platform in NEEDS_IMAGE and not request["post"]["content"]["mediaUrls"]:
+        return f"{name} needs an image: turn on the sketchnote image or choose one for this post"
+    if platform == "facebook" and not request["post"]["target"].get("pageId"):
+        return "Facebook posts go to a page: switch a Facebook page on in Settings → Integrations"
+    if platform == "pinterest" and not request["post"]["target"].get("boardId"):
+        return "Pinterest pins go to a board: switch a board on in Settings → Integrations"
+    return None
 
 
 def redact_request(request: dict[str, Any]) -> dict[str, Any]:
@@ -286,7 +412,7 @@ def _blotato_headers(api_key: str) -> dict[str, str]:
     return {"blotato-api-key": api_key, "Content-Type": "application/json"}
 
 
-async def send_linkedin(
+async def send_blotato(
     http: httpx.AsyncClient, channel: Channel, request: dict[str, Any], *, api_key: str, base_url: str
 ) -> SendResult:
     if not api_key:
@@ -294,8 +420,11 @@ async def send_linkedin(
     if not request["post"]["accountId"]:
         return SendResult(
             "failed",
-            detail=f"channel {channel.channel}: no Blotato account id is set (Settings → Integrations → Blotato)",
+            detail=f"channel {channel.channel}: no Blotato account for it (switch it on in Settings → Integrations)",
         )
+    problem = blotato_problem(channel, request)
+    if problem:
+        return SendResult("failed", detail=f"channel {channel.channel}: {problem}")
     resp = await http.post(f"{base_url}/posts", json=request, headers=_blotato_headers(api_key), timeout=60.0)
     data = _json(resp)
     if resp.status_code >= 400:
@@ -306,6 +435,9 @@ async def send_linkedin(
             "failed", detail=f"Blotato returned no postSubmissionId: {_short(data)}", response=data
         )
     return SendResult("submitted", provider_ref=ref, detail=f"submitted to {channel.label}", response=data)
+
+
+send_linkedin = send_blotato
 
 
 async def blotato_status(http: httpx.AsyncClient, ref: str, *, api_key: str, base_url: str) -> SendResult:

@@ -41,14 +41,14 @@ export interface SocialPost {
 
 export interface SocialChannel {
   channel: string;
-  kind: 'website' | 'linkedin';
+  kind: string; // 'website' or a Blotato platform (linkedin, facebook, threads, …)
   label: string;
   enabled: boolean;
 }
 
 const DELIVERY_LABEL: Record<string, string> = {
   published: 'Posted',
-  submitted: 'Sent to LinkedIn, waiting for confirmation',
+  submitted: 'Sent to Blotato, waiting for the platform to confirm',
   failed: 'Failed',
   dry_run: 'Dry run (not sent)',
 };
@@ -175,7 +175,7 @@ export default function PostEditor({ post, channels, defaultDate, defaultSlot, o
             <textarea value={bodyMd} onChange={(e) => setBodyMd(e.target.value)} rows={6} className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs dark:border-gray-600 dark:bg-gray-800" />
           </label>
           <label className="block text-sm">
-            <span className="text-gray-700 dark:text-gray-300">LinkedIn post</span>
+            <span className="text-gray-700 dark:text-gray-300">Social post (LinkedIn, Facebook, Threads, X, Bluesky… — shorter platforms get it cut at a sentence, link kept)</span>
             <textarea value={linkedin} onChange={(e) => setLinkedin(e.target.value)} rows={6} maxLength={3000} className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-xs dark:border-gray-600 dark:bg-gray-800" />
             <span className="text-xs text-gray-400">{linkedin.length} / 2,990</span>
           </label>

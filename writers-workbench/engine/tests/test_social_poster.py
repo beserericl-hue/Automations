@@ -444,7 +444,7 @@ async def test_dry_run_resolves_credentials_and_reports_what_is_missing(db: Fake
     await poster.run_tick(db, _Net().transport(), now=NOW, mode="dry_run")
     d = _deliveries(db)
     assert "would send the user's website token in x-api-key" in d["website"]["detail"]
-    assert "would send with the user's Blotato key (account 9115)" in d["li_techahir"]["detail"]
+    assert "would send to LinkedIn with the user's Blotato key (account 9115)" in d["li_techahir"]["detail"]
     # Nothing secret in what is stored.
     stored = json.dumps(d)
     assert "test-website-key-01" not in stored and "test-blotato-key-0001" not in stored
@@ -485,3 +485,170 @@ async def test_reconcile_uses_the_posts_owner_key(db: FakeSupabase) -> None:
     assert await poster.reconcile_submitted(db, net.transport()) == 1
     status_calls = [c for c in net.calls[before:] if c[0] == "GET"]
     assert status_calls and status_calls[0][3]["blotato-api-key"] == "test-blotato-key-0001"
+
+
+# ---------------------------------------------------------------------------
+# Every platform on the Blotato key (migration 055). Eric, 2026-11-05: "we also want to be able
+# to use blotato to post our other social media posts"; the account id is read, never typed.
+# ---------------------------------------------------------------------------
+
+
+def _blotato_channel(platform: str, **config: Any) -> ch.Channel:
+    return ch.Channel(
+        user_id=USER,
+        channel=f"{platform}_x",
+        kind=platform,
+        label=ch.PLATFORM_LABEL[platform],
+        config={"account_id": "22242", "platform": platform, **config},
+    )
+
+
+LONG_POST = (
+    "First sentence of the post. Second sentence that says a little more about the idea. "
+    "Third sentence, which goes on for a while so that the whole thing is longer than X allows. "
+    "Fourth sentence, added so that the post is well past the two hundred and eighty characters X allows "
+    "and the cut has to happen somewhere in the middle.\n\nRead the full post: https://www.techahir.com/blog/ship-it #MVP"
+)
+
+
+def test_x_gets_the_text_cut_at_a_sentence_with_the_link_kept() -> None:
+    req = ch.blotato_request({"linkedin_content": LONG_POST}, _blotato_channel("twitter"), media_url=None)
+    text = req["post"]["content"]["text"]
+    assert len(text) <= 280
+    assert text.endswith(
+        "Read the full post: https://www.techahir.com/blog/ship-it #MVP"
+    )  # the link line, whole
+    assert text.startswith("First sentence of the post. Second sentence")
+    assert "…" not in text and text.split("\n\n")[0].endswith(".")  # cut at a sentence end
+    assert "Fourth sentence" not in text
+    assert req["post"]["content"]["platform"] == "twitter"
+    assert req["post"]["target"] == {"targetType": "twitter"}
+    assert req["post"]["accountId"] == "22242"  # the channel's own account, nothing typed
+
+
+def test_each_platform_gets_its_own_target() -> None:
+    row = {"linkedin_content": "hi", "title": "Ship it", "source_url": "https://example.com/a"}
+    assert ch.blotato_request(row, _blotato_channel("threads"), media_url=None)["post"]["target"] == {
+        "targetType": "threads"
+    }
+    assert ch.blotato_request(row, _blotato_channel("bluesky"), media_url=None)["post"]["target"] == {
+        "targetType": "bluesky"
+    }
+    fb = ch.blotato_request(row, _blotato_channel("facebook", page_id="14159"), media_url=None)
+    assert fb["post"]["target"] == {
+        "targetType": "facebook",
+        "pageId": "14159",
+        "link": "https://example.com/a",
+    }
+    fb_img = ch.blotato_request(
+        row, _blotato_channel("facebook", page_id="14159"), media_url="https://b/x.png"
+    )
+    assert "link" not in fb_img["post"]["target"]  # an image post shows the image, not a link card
+    pin = ch.blotato_request(row, _blotato_channel("pinterest", board_id="b1"), media_url="https://b/x.png")
+    assert pin["post"]["target"] == {
+        "targetType": "pinterest",
+        "boardId": "b1",
+        "title": "Ship it",
+        "link": "https://example.com/a",
+    }
+    tt = ch.blotato_request(
+        {**row, "include_image": True}, _blotato_channel("tiktok"), media_url="https://b/x.png"
+    )
+    assert tt["post"]["target"]["privacyLevel"] == "PUBLIC_TO_EVERYONE"
+    assert tt["post"]["target"]["isAiGenerated"] is True  # the sketchnote is generated
+    li = ch.blotato_request(row, _blotato_channel("linkedin", page_id="104364682"), media_url=None)
+    assert li["post"]["target"] == {"targetType": "linkedin", "pageId": "104364682"}
+
+
+def test_platforms_that_need_an_image_say_so_before_anything_is_sent() -> None:
+    row = {"linkedin_content": "hi", "title": "t"}
+    ig = _blotato_channel("instagram")
+    assert "Instagram needs an image" in (
+        ch.blotato_problem(ig, ch.blotato_request(row, ig, media_url=None)) or ""
+    )
+    assert ch.blotato_problem(ig, ch.blotato_request(row, ig, media_url="https://b/x.png")) is None
+    yt = _blotato_channel("youtube")
+    assert "video only" in (
+        ch.blotato_problem(yt, ch.blotato_request(row, yt, media_url="https://b/x.png")) or ""
+    )
+    fb = _blotato_channel("facebook")  # no page
+    assert "Facebook posts go to a page" in (
+        ch.blotato_problem(fb, ch.blotato_request(row, fb, media_url=None)) or ""
+    )
+    th = _blotato_channel("threads")
+    assert ch.blotato_problem(th, ch.blotato_request(row, th, media_url=None)) is None
+
+
+@pytest.mark.asyncio
+async def test_a_post_goes_to_threads_and_facebook_through_blotato(db: FakeSupabase) -> None:
+    db.tables["social_channels_v2"] += [
+        {
+            "user_id": USER,
+            "channel": "threads_eric",
+            "kind": "threads",
+            "label": "Threads",
+            "enabled": True,
+            "config": {"account_id": "3949", "platform": "threads"},
+        },
+        {
+            "user_id": USER,
+            "channel": "facebook_eric",
+            "kind": "facebook",
+            "label": "Facebook · Eric L. Beser",
+            "enabled": True,
+            "config": {"account_id": "14159", "platform": "facebook", "page_id": "777"},
+        },
+        {
+            "user_id": USER,
+            "channel": "instagram_eric",
+            "kind": "instagram",
+            "label": "Instagram",
+            "enabled": True,
+            "config": {"account_id": "22242", "platform": "instagram"},
+        },
+    ]
+    _row(db, channels=["threads_eric", "facebook_eric", "instagram_eric"])
+    net = _Net()
+    result = await poster.run_tick(db, net.transport(), now=NOW, mode="live")
+    posts = [c[2]["post"] for c in net.calls if c[0] == "POST" and c[1].endswith("/v2/posts")]
+    assert {(p["content"]["platform"], p["accountId"]) for p in posts} == {
+        ("threads", "3949"),
+        ("facebook", "14159"),
+    }
+    assert next(p for p in posts if p["content"]["platform"] == "facebook")["target"]["pageId"] == "777"
+    d = _deliveries(db)
+    # Blotato accepts and works on a post; the reconcile pass later turns 'submitted' into published.
+    assert d["threads_eric"]["status"] == "submitted" and d["facebook_eric"]["status"] == "submitted"
+    # Instagram had no image: refused here with the reason, never sent to Blotato.
+    assert (
+        d["instagram_eric"]["status"] == "failed"
+        and "Instagram needs an image" in d["instagram_eric"]["detail"]
+    )
+    assert result.partial == 1
+
+
+@pytest.mark.asyncio
+async def test_a_dry_run_names_the_platform_and_the_missing_image(db: FakeSupabase) -> None:
+    db.tables["social_channels_v2"] += [
+        {
+            "user_id": USER,
+            "channel": "bluesky_eric",
+            "kind": "bluesky",
+            "label": "Bluesky",
+            "enabled": True,
+            "config": {"account_id": "5", "platform": "bluesky"},
+        },
+        {
+            "user_id": USER,
+            "channel": "pinterest_eric",
+            "kind": "pinterest",
+            "label": "Pinterest",
+            "enabled": True,
+            "config": {"account_id": "6", "platform": "pinterest", "board_id": "b9"},
+        },
+    ]
+    _row(db, channels=["bluesky_eric", "pinterest_eric"])
+    await poster.run_tick(db, _Net().transport(), now=NOW, mode="dry_run")
+    d = _deliveries(db)
+    assert "would send to Bluesky with the user's Blotato key (account 5)" in d["bluesky_eric"]["detail"]
+    assert "would fail: Pinterest needs an image" in d["pinterest_eric"]["detail"]

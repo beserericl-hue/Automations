@@ -2,23 +2,25 @@ import { test, expect, type Page } from '@playwright/test';
 import { DEMO_USER_ID, RUN_TAG, apiClient, getToken, supaDelete, supaGet } from '../pages/api';
 
 /**
- * Settings → Integrations (migration 043): the user's own Blotato account, LinkedIn targets and blog
- * websites. RESULT-asserting: each UI step is checked in social_channels_v2 / user_integrations_v2.
+ * Settings → Integrations (migrations 043 + 055): the user's own Blotato key, the accounts read from
+ * it (each a "post here" switch), and blog websites. RESULT-asserting: each UI step is checked in
+ * social_channels_v2 / user_integrations_v2.
  *
  * PASS:
  *  - the screen renders every section and field; secrets are masked (password inputs, empty, only
  *    "Set · ends ••••xxxx" / "Not set" shown) and no ciphertext or secret reaches the browser;
- *  - LinkedIn targets and websites can be added, edited and removed, in the DB and on screen;
+ *  - every synced Blotato account / page is listed with a switch; the switched-on ones are the
+ *    user's social channels; a hand-made channel is listed too; websites can be added, edited and removed;
  *  - a website token is stored as AES-GCM ciphertext (v1.…), never as plaintext, and Test sends it to
  *    the endpoint in the configured header (against https://httpbin.org/anything — an echo service,
  *    never the real blog) without the response coming back to the browser;
- *  - errors show: short key, non-numeric page id, http:// endpoint, metadata-IP endpoint (SSRF),
+ *  - errors show: short key, http:// endpoint, metadata-IP endpoint (SSRF),
  *    Test with nothing saved;
  *  - the table cannot be read through PostgREST with the user's own token;
  *  - another user's channel cannot be edited through the API.
  *
  * The owner's real Blotato key is never overwritten or removed: the Blotato key is only exercised
- * through paths that save nothing, and the account id is restored after the edit test.
+ * through paths that save nothing (an invalid key is refused; Test connection reads, never posts).
  */
 const HAS_KEY = !!(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.E2E_SUPA_SERVICE_KEY);
 const USER = encodeURIComponent(DEMO_USER_ID);
@@ -59,13 +61,13 @@ test.describe('Settings → Integrations (result-asserting)', () => {
       if (r.url().includes('/api/integrations')) bodies.push(await r.text().catch(() => ''));
     });
     await open(page);
-    for (const id of ['blotato-section', 'linkedin-section', 'websites-section']) await expect(page.getByTestId(id)).toBeVisible();
+    for (const id of ['blotato-section', 'websites-section']) await expect(page.getByTestId(id)).toBeVisible();
     await expect(page.getByTestId('blotato-key-status')).toHaveText(/^(Not set|Set( · ends ••••.{4})?( · saved .+)?)$/);
     const key = page.getByTestId('blotato-api-key');
     await expect(key).toHaveAttribute('type', 'password');
     await expect(key).toHaveValue('');
-    await expect(page.getByTestId('blotato-account-id')).toBeVisible();
-    for (const b of ['blotato-save', 'blotato-test', 'li-add', 'web-add']) await expect(page.getByTestId(b)).toBeEnabled();
+    await expect(page.getByTestId('blotato-account-id')).toHaveCount(0); // nothing typed: ids are read from the key (055)
+    for (const b of ['blotato-save', 'blotato-test', 'web-add']) await expect(page.getByTestId(b)).toBeEnabled();
     // The DEV channels from the seed are listed, with their non-secret config. Other runs of this
     // spec (the writer-e2e service runs it on every deploy, concurrently with manual runs) add and
     // remove websites/LinkedIn targets for the same user, so the page is compared with the channel
@@ -76,7 +78,12 @@ test.describe('Settings → Integrations (result-asserting)', () => {
       await open(page);
       const rows = await channels();
       expect(key2(rows), 'channels changed while the page loaded; retrying').toBe(key2(before));
-      for (const r of rows.filter((c) => c.kind === 'linkedin')) await expect(page.getByTestId(`li-row-${r.channel}`)).toBeVisible({ timeout: 5_000 });
+      // A social channel is either a switched-on synced account (its switch is checked) or a hand-made row.
+      for (const r of rows.filter((c) => c.kind !== 'website')) {
+        const synced = r.config?.target_id ? page.getByTestId(`target-switch-${r.config.target_id}`) : null;
+        if (synced && (await synced.count())) await expect(synced).toBeChecked({ checked: r.enabled !== false, timeout: 5_000 });
+        else await expect(page.getByTestId(`social-row-${r.channel}`)).toBeVisible({ timeout: 5_000 });
+      }
       for (const r of rows.filter((c) => c.kind === 'website')) {
         await expect(page.getByTestId(`web-endpoint-${r.channel}`)).toContainText(r.config.endpoint, { timeout: 5_000 });
         expect(r.config.auth_env, 'migration 043 drops auth_env').toBeUndefined();
@@ -90,34 +97,15 @@ test.describe('Settings → Integrations (result-asserting)', () => {
   // this suite on every deploy, concurrently with any manual run. So this test never changes it: an
   // edit-then-restore raced a concurrent run on DEV (2026-11-02) and left a test id behind. It proves
   // the save path with invalid input (refused, nothing written) and an idempotent re-save of the value.
-  test('Blotato: invalid key / account id are refused and nothing is saved; a re-save keeps the value', async ({ page }) => {
+  test('Blotato: an invalid key is refused and nothing is saved', async ({ page }) => {
     const read = async () => (await supaGet('user_integrations_v2', `user_id=eq.${USER}&provider=eq.blotato&select=*`))[0];
     const before = await read();
     await open(page);
-    await expect(page.getByTestId('blotato-account-id')).toHaveValue(String(before?.config?.account_id ?? ''));
     await page.getByTestId('blotato-api-key').fill('short');
     await page.getByTestId('blotato-save').click();
     await expect(page.getByTestId('blotato-error')).toContainText('api_key');
     expect((await read())?.secret_ciphertext ?? null).toBe(before?.secret_ciphertext ?? null);
-
-    await page.getByTestId('blotato-api-key').fill('');
-    await page.getByTestId('blotato-account-id').fill('bad id!');
-    await page.getByTestId('blotato-save').click();
-    await expect(page.getByTestId('blotato-error')).toContainText('account_id');
     expect((await read())?.config ?? null).toEqual(before?.config ?? null);
-
-    if (before?.config?.account_id) {
-      const api = await apiClient();
-      try {
-        const same = await api.put('/api/integrations/blotato', { data: { account_id: before.config.account_id } });
-        expect(same.status(), await same.text()).toBe(200);
-      } finally {
-        await api.dispose();
-      }
-      const after = await read();
-      expect(after.config.account_id).toBe(before.config.account_id);
-      expect(after.secret_ciphertext ?? null).toBe(before.secret_ciphertext ?? null);
-    }
   });
 
   test('Blotato: Test connection reports a missing key, and renders a result', async ({ page }) => {
@@ -131,47 +119,38 @@ test.describe('Settings → Integrations (result-asserting)', () => {
     }
     // Rendering of a successful test (stubbed in the browser: no fake key is ever sent to Blotato).
     await page.route('**/api/integrations/blotato/test', (r) =>
-      r.fulfill({ json: { success: true, data: { ok: true, status: 200, message: 'Connected: 1 account(s) on this Blotato key', accounts: [{ id: '9115', platform: 'linkedin', name: 'E2E' }] } } }));
+      r.fulfill({ json: { success: true, data: { ok: true, status: 200, message: 'Connected: 1 account(s) on this Blotato key', accounts: [] } } }));
     await page.getByTestId('blotato-test').click();
-    await expect(page.getByTestId('blotato-test-result')).toContainText('account id 9115');
+    await expect(page.getByTestId('blotato-test-result')).toContainText('Connected: 1 account(s)');
   });
 
-  test('LinkedIn targets: add, edit, remove (and validation)', async ({ page }) => {
-    const label = `E2E LI ${TAG}`;
+  test('Blotato targets: switching a synced account on makes a channel with its ids copied; off disables it', async ({ page }) => {
+    // Needs the owner's real synced list (Save/Refresh accounts reads it from Blotato). Pick a text
+    // platform that is not yet a channel, so the run adds and then removes only its own channel.
+    const blotato = (await supaGet('user_integrations_v2', `user_id=eq.${USER}&provider=eq.blotato&select=config`))[0];
+    const targets: any[] = blotato?.config?.accounts ?? [];
+    const taken = new Set((await channels()).map((c) => c.config?.target_id));
+    const pick = targets.find((t) => t.needs === 'text' && !taken.has(t.target_id));
+    test.skip(!pick, 'no synced text account free to switch on (save the Blotato key and Refresh accounts first)');
     await open(page);
-    await page.getByTestId('li-add').click();
-    await page.getByTestId('li-new-label').fill(label);
-    await page.getByTestId('li-new-page-id').fill('not-a-number');
-    await page.getByTestId('li-new-save').click();
-    await expect(page.getByTestId('li-new-error')).toContainText('page_id');
-    await page.getByTestId('li-new-page-id').fill('123456789');
-    await page.getByTestId('li-new-save').click();
-
+    await page.getByTestId(`target-switch-${pick.target_id}`).check();
     let row: any;
     await expect.poll(async () => {
-      row = (await channels()).find((c) => c.label === label);
-      return row?.config?.page_id;
-    }, { timeout: 15_000 }).toBe('123456789');
+      row = (await channels()).find((c) => c.config?.target_id === pick.target_id);
+      return row?.kind;
+    }, { timeout: 15_000 }).toBe(pick.platform);
     created.push(row.channel);
-    expect(row).toMatchObject({ kind: 'linkedin', enabled: true });
-    await expect(page.getByTestId(`li-row-${row.channel}`)).toContainText('company page 123456789');
+    expect(row.config).toMatchObject({ account_id: pick.account_id, platform: pick.platform, ...(pick.page_id ? { page_id: pick.page_id } : {}) });
+    expect(row).toMatchObject({ enabled: true, label: pick.label });
+    await expect(page.getByTestId(`target-switch-${pick.target_id}`)).toBeChecked();
 
-    // Edit → personal profile, disabled.
-    await page.getByTestId(`li-edit-${row.channel}`).click();
-    await page.getByTestId(`li-edit-${row.channel}-personal`).check();
-    await page.getByTestId(`li-edit-${row.channel}-enabled`).uncheck();
-    await page.getByTestId(`li-edit-${row.channel}-save`).click();
-    await expect.poll(async () => {
-      const r = (await channels()).find((c) => c.channel === row.channel);
-      return `${r?.enabled}|${r?.config?.page_id ?? 'none'}`;
-    }, { timeout: 15_000 }).toBe('false|none');
-    await expect(page.getByTestId(`li-row-${row.channel}`)).toContainText('personal profile');
-    await expect(page.getByTestId(`li-row-${row.channel}`)).toContainText('off');
+    await page.getByTestId(`target-switch-${pick.target_id}`).uncheck();
+    await expect.poll(async () => (await channels()).find((c) => c.channel === row.channel)?.enabled, { timeout: 15_000 }).toBe(false);
+    await expect(page.getByTestId(`target-switch-${pick.target_id}`)).not.toBeChecked();
 
-    // Remove.
-    await page.getByTestId(`li-remove-${row.channel}`).click();
-    await expect.poll(async () => (await channels()).some((c) => c.channel === row.channel), { timeout: 15_000 }).toBe(false);
-    await expect(page.getByTestId(`li-row-${row.channel}`)).toHaveCount(0);
+    // A video-only platform (YouTube) cannot be switched on at all.
+    const video = targets.find((t) => t.needs === 'video');
+    if (video) await expect(page.getByTestId(`target-switch-${video.target_id}`)).toBeDisabled();
   });
 
   test('Websites: add with an encrypted token, test it, edit, refuse unsafe endpoints, remove', async ({ page }) => {
@@ -280,8 +259,8 @@ test.describe('Settings → Integrations (result-asserting)', () => {
     expect(ins.status, await ins.text()).toBe(201);
     const api = await apiClient();
     try {
-      expect((await api.patch(`/api/integrations/linkedin/${ch}`, { data: { label: 'hijacked' } })).status()).toBe(404);
-      expect((await api.delete(`/api/integrations/linkedin/${ch}`)).status()).toBe(404);
+      expect((await api.patch(`/api/integrations/social/${ch}`, { data: { label: 'hijacked' } })).status()).toBe(404);
+      expect((await api.delete(`/api/integrations/social/${ch}`)).status()).toBe(404);
       const list = await (await api.get('/api/integrations')).text();
       expect(list).not.toContain(ch);
       expect((await supaGet('social_channels_v2', `user_id=eq.${other}&channel=eq.${ch}&select=label`))[0]?.label).toBe('not yours');

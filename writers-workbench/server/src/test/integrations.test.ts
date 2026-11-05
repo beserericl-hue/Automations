@@ -95,6 +95,32 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllGlobals(); });
 
+/** Blotato as the key sees it: six accounts, two LinkedIn pages, one Facebook page, no Pinterest boards. */
+function stubBlotato(seen: Array<{ url: string; key: string | null }> = []) {
+  const realFetch = fetch;
+  vi.stubGlobal('fetch', async (u: string, o: RequestInit) => {
+    if (!String(u).includes('blotato.com')) return realFetch(u, o);
+    seen.push({ url: String(u), key: new Headers(o.headers).get('blotato-api-key') });
+    const path = new URL(String(u)).pathname + new URL(String(u)).search;
+    const json = (items: unknown[]) => new Response(JSON.stringify({ items }), { status: 200 });
+    if (path === '/v2/users/me/accounts') {
+      return json([
+        { id: 14159, platform: 'facebook', fullname: 'Eric L. Beser' },
+        { id: 19905, platform: 'youtube', fullname: 'Eric Beser' },
+        { id: 22242, platform: 'instagram', username: 'ericb' },
+        { id: 9115, platform: 'linkedin', fullname: 'Eric Beser' },
+        { id: 3949, platform: 'threads', username: 'ericb' },
+        { id: 7, platform: 'pinterest', fullname: 'Eric' },
+      ]);
+    }
+    if (path === '/v2/users/me/accounts/9115/subaccounts') return json([{ id: '104364682', name: 'TechAhir' }, { id: '109837978', name: 'Agile Ad Testing' }]);
+    if (path === '/v2/users/me/accounts/14159/subaccounts') return json([{ id: '555', name: 'Tech Ahir page' }]);
+    if (path.startsWith('/v2/social/pinterest/boards')) return json([]);
+    return new Response('{}', { status: 404 });
+  });
+  return seen;
+}
+
 async function call(method: string, path: string, body?: unknown): Promise<{ status: number; json: Record<string, any>; text: string }> {
   const { integrationsRouter } = await import('../routes/integrations.js');
   const app = express(); app.use(express.json()); app.use('/api/integrations', integrationsRouter);
@@ -170,6 +196,7 @@ describe('SSRF guard at connect time', () => {
 
 describe('GET /api/integrations', () => {
   it('returns channels and secret status but never a secret', async () => {
+    stubBlotato();
     await call('PUT', '/blotato', { api_key: 'blotato-secret-key-AAAA1234' });
     const r = await call('GET', '/');
     expect(r.status).toBe(200);
@@ -177,8 +204,9 @@ describe('GET /api/integrations', () => {
     expect(r.text).not.toContain('v1.');
     const d = r.json.data;
     expect(d.encryption_ready).toBe(true);
-    expect(d.blotato).toMatchObject({ account_id: '9115', key: { set: true, last4: '1234' } });
-    expect(d.linkedin).toEqual([{ channel: 'li_agile', label: 'Agile page', page_id: '109837978', account_override: null, enabled: true }]);
+    expect(d.blotato).toMatchObject({ key: { set: true, last4: '1234' } });
+    expect(d.blotato.accounts.map((a: { target_id: string }) => a.target_id)).toContain('linkedin:9115:104364682'); // synced on save
+    expect(d.social).toEqual([{ channel: 'li_agile', kind: 'linkedin', label: 'Agile page', enabled: true, account_id: null, page_id: '109837978', board_id: null, target_id: null, needs: 'text' }]);
     expect(d.websites[0]).toMatchObject({ channel: 'website', endpoint: 'https://www.techahir.com/api/blog', token: { set: false, last4: null } });
     expect(JSON.stringify(d)).not.toContain('li_other'); // another user's channel
   });
@@ -186,12 +214,15 @@ describe('GET /api/integrations', () => {
 
 describe('Blotato', () => {
   it('stores the key encrypted, with last4 and a timestamp', async () => {
-    const r = await call('PUT', '/blotato', { api_key: 'blotato-secret-key-AAAA1234', account_id: '4242' });
+    stubBlotato();
+    const r = await call('PUT', '/blotato', { api_key: 'blotato-secret-key-AAAA1234' });
     expect(r.status).toBe(200);
+    expect(r.json.data).toMatchObject({ ok: true, message: 'Connected: 6 account(s) on this Blotato key' }); // synced on save
     const row = db.user_integrations_v2.find((x) => x.provider === 'blotato')!;
     expect(String(row.secret_ciphertext)).toMatch(/^v1\./);
     expect(JSON.stringify(row)).not.toContain('blotato-secret-key');
-    expect(row).toMatchObject({ secret_last4: '1234', config: { account_id: '4242' } });
+    expect(row).toMatchObject({ secret_last4: '1234' });
+    expect((row.config as { accounts: unknown[] }).accounts).toHaveLength(8);
     expect(decryptSecret(String(row.secret_ciphertext), { userId: 'u1', provider: 'blotato', channel: null })).toBe('blotato-secret-key-AAAA1234');
   });
   it('refuses to save a secret without the encryption key, and saves nothing', async () => {
@@ -203,7 +234,7 @@ describe('Blotato', () => {
   });
   it('validates input', async () => {
     expect((await call('PUT', '/blotato', { api_key: 'short' })).json.error.code).toBe('VALIDATION_ERROR');
-    expect((await call('PUT', '/blotato', { account_id: 'bad id!' })).status).toBe(400);
+    expect((await call('PUT', '/blotato', { account_id: '4242' })).status).toBe(400); // ids are read from Blotato, never typed
     expect((await call('PUT', '/blotato', {})).status).toBe(400);
   });
   it('removes the key', async () => {
@@ -232,46 +263,75 @@ describe('Blotato', () => {
     expect(seen).toEqual([{ url: 'https://backend.blotato.com/v2/users/me/accounts', key: 'blotato-secret-key-AAAA1234' }]);
     expect(r.json.data).toMatchObject({ ok: false, status: 401, message: 'Blotato rejected this API key' });
   });
-  it('test lists the connected accounts on success', async () => {
-    const realFetch = fetch;
-    vi.stubGlobal('fetch', async (u: string, o: RequestInit) =>
-      String(u).includes('blotato.com')
-        ? new Response(JSON.stringify({ items: [{ id: 9115, platform: 'linkedin', fullname: 'Eric' }] }), { status: 200 })
-        : realFetch(u, o));
-    const r = await call('POST', '/blotato/test', { api_key: 'typed-but-not-saved-key' });
-    expect(r.json.data).toMatchObject({ ok: true, accounts: [{ id: '9115', platform: 'linkedin', name: 'Eric' }] });
+  it('test reads every account on the key, with its pages, and stores them for the saved key only', async () => {
+    const seen = stubBlotato();
+    const typed = await call('POST', '/blotato/test', { api_key: 'typed-but-not-saved-key' });
+    const ids = (typed.json.data.accounts as Array<{ target_id: string; label: string; needs: string }>).map((a) => [a.target_id, a.label, a.needs]);
+    expect(ids).toEqual([
+      ['facebook:14159:555', 'Facebook · Tech Ahir page', 'text'],
+      ['youtube:19905', 'YouTube · Eric Beser', 'video'],
+      ['instagram:22242', 'Instagram · ericb', 'image'],
+      ['linkedin:9115', 'LinkedIn · Eric Beser (personal profile)', 'text'],
+      ['linkedin:9115:104364682', 'LinkedIn · TechAhir', 'text'],
+      ['linkedin:9115:109837978', 'LinkedIn · Agile Ad Testing', 'text'],
+      ['threads:3949', 'Threads · ericb', 'text'],
+      ['pinterest:7', 'Pinterest · Eric', 'page'],
+    ]);
+    expect(seen.every((c) => c.key === 'typed-but-not-saved-key')).toBe(true);
+    expect(db.user_integrations_v2[0].config).toEqual({ account_id: '9115' }); // a typed key is only looked at
+    await call('PUT', '/blotato', { api_key: 'blotato-secret-key-AAAA1234' });
+    expect((db.user_integrations_v2[0].config as { accounts: unknown[] }).accounts).toHaveLength(8); // the saved key's list is stored
   });
 });
 
-describe('LinkedIn targets', () => {
-  it('adds, edits and removes a target', async () => {
-    const add = await call('POST', '/linkedin', { label: 'My Company Page', page_id: '12345' });
-    expect(add.status).toBe(201);
-    expect(add.json.data.channel).toBe('li_my_company_page');
-    const personal = await call('POST', '/linkedin', { label: 'Me', page_id: null });
-    expect(db.social_channels_v2.find((c) => c.channel === personal.json.data.channel)!.config).toEqual({});
-    expect((await call('PATCH', '/linkedin/li_my_company_page', { label: 'Renamed', page_id: null, enabled: false })).status).toBe(200);
-    expect(db.social_channels_v2.find((c) => c.channel === 'li_my_company_page')).toMatchObject({ label: 'Renamed', enabled: false, config: {} });
-    expect((await call('DELETE', '/linkedin/li_my_company_page')).status).toBe(200);
-    expect(db.social_channels_v2.some((c) => c.channel === 'li_my_company_page')).toBe(false);
+describe('Blotato targets: switched on from the synced list, nothing typed', () => {
+  beforeEach(async () => {
+    stubBlotato();
+    await call('PUT', '/blotato', { api_key: 'blotato-secret-key-AAAA1234' });
   });
-  it('gives a second target with the same label its own key', async () => {
-    await call('POST', '/linkedin', { label: 'Page' });
-    const second = await call('POST', '/linkedin', { label: 'Page' });
-    expect(second.json.data.channel).toBe('li_page_2');
+  it('makes a channel with the account, page and platform copied from Blotato, then toggles it', async () => {
+    const on = await call('POST', '/blotato/targets', { target_id: 'facebook:14159:555', enabled: true });
+    expect(on.status).toBe(201);
+    expect(on.json.data).toEqual({ channel: 'facebook_tech_ahir_page', enabled: true });
+    const row = db.social_channels_v2.find((c) => c.channel === 'facebook_tech_ahir_page')!;
+    expect(row).toMatchObject({ kind: 'facebook', label: 'Facebook · Tech Ahir page', enabled: true });
+    expect(row.config).toEqual({ platform: 'facebook', account_id: '14159', page_id: '555', page_name: 'Tech Ahir page', account_name: 'Eric L. Beser', target_id: 'facebook:14159:555' });
+    const off = await call('POST', '/blotato/targets', { target_id: 'facebook:14159:555', enabled: false });
+    expect(off.json.data).toEqual({ channel: 'facebook_tech_ahir_page', enabled: false });
+    expect(row.enabled).toBe(false);
+    const threads = await call('POST', '/blotato/targets', { target_id: 'threads:3949', enabled: true });
+    expect(db.social_channels_v2.find((c) => c.channel === threads.json.data.channel)!.config).toMatchObject({ platform: 'threads', account_id: '3949' });
   });
-  it('rejects a non-numeric page id', async () => {
-    expect((await call('POST', '/linkedin', { label: 'x', page_id: 'abc' })).status).toBe(400);
+  it('refuses what the calendar cannot post to, and what is not on the list', async () => {
+    expect((await call('POST', '/blotato/targets', { target_id: 'youtube:19905', enabled: true })).json.error.code).toBe('VIDEO_ONLY');
+    expect((await call('POST', '/blotato/targets', { target_id: 'pinterest:7', enabled: true })).json.error.code).toBe('NO_PAGE');
+    expect((await call('POST', '/blotato/targets', { target_id: 'tiktok:1', enabled: true })).status).toBe(404);
+    expect((await call('POST', '/blotato/targets', { target_id: 'bad id', enabled: true })).status).toBe(400);
+    expect(db.social_channels_v2.filter((c) => c.user_id === 'u1')).toHaveLength(2);
+  });
+  it('switching off a target that was never switched on makes nothing', async () => {
+    const r = await call('POST', '/blotato/targets', { target_id: 'threads:3949', enabled: false });
+    expect(r.json.data).toEqual({ channel: null, enabled: false });
+  });
+});
+
+describe('Social channels', () => {
+  it('renames, disables and removes a channel', async () => {
+    expect((await call('PATCH', '/social/li_agile', { label: 'Renamed', enabled: false })).status).toBe(200);
+    expect(db.social_channels_v2.find((c) => c.channel === 'li_agile')).toMatchObject({ label: 'Renamed', enabled: false });
+    expect((await call('PATCH', '/social/website', { label: 'x' })).status).toBe(404); // the website is not a social channel
+    expect((await call('DELETE', '/social/li_agile')).status).toBe(200);
+    expect(db.social_channels_v2.some((c) => c.channel === 'li_agile')).toBe(false);
   });
   it('cannot touch another user\'s channel', async () => {
-    expect((await call('PATCH', '/linkedin/li_other', { label: 'mine now' })).status).toBe(404);
-    expect((await call('DELETE', '/linkedin/li_other')).status).toBe(404);
+    expect((await call('PATCH', '/social/li_other', { label: 'mine now' })).status).toBe(404);
+    expect((await call('DELETE', '/social/li_other')).status).toBe(404);
     expect(db.social_channels_v2.find((c) => c.channel === 'li_other')!.label).toBe('Not mine');
   });
   it('will not delete a channel a waiting post or a radar still uses', async () => {
     db.social_schedule_v2.push({ user_id: 'u1', display_number: 12, state: 'pending', channels: ['li_agile'] });
     db.radar_subscriptions_v2.push({ user_id: 'u1', radar: 'dev', settings: { channels: ['li_agile'] } });
-    const r = await call('DELETE', '/linkedin/li_agile');
+    const r = await call('DELETE', '/social/li_agile');
     expect(r.status).toBe(409);
     expect(r.json.error.message).toContain('#12');
     expect(r.json.error.message).toContain('dev radar');
@@ -354,7 +414,8 @@ describe('impersonation', () => {
     for (const [m, p, b] of [
       ['PUT', '/blotato', { api_key: 'blotato-secret-key-AAAA1234' }],
       ['POST', '/blotato/test', {}],
-      ['POST', '/linkedin', { label: 'x' }],
+      ['POST', '/blotato/targets', { target_id: 'threads:3949', enabled: true }],
+      ['PATCH', '/social/li_agile', { enabled: false }],
       ['POST', '/websites/website/test', undefined],
       ['DELETE', '/websites/website', undefined],
     ] as const) {
