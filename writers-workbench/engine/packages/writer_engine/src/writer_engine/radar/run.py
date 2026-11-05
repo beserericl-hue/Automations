@@ -109,6 +109,27 @@ async def _finish(
     )
 
 
+async def _email_slate(client: Any, user_id: str, radar: str, cfg: dict[str, Any]) -> str:
+    """Email the owner the new slate, as n8n's "Send Slate" node did after every run (Eric, 2026-11-05:
+    "where is the email that goes out to me, to remind me that new posts are available"). On unless the
+    subscription's settings say ``"slate_email": false``. Goes to the studio edition this radar feeds;
+    a radar with no studio edition has no slate to review, so nothing is sent. Never fails the run."""
+    if cfg.get("slate_email") is False:
+        return "off"
+    try:
+        from writer_engine.studio.core import studio_editions
+        from writer_engine.studio.emailing import email_digest
+
+        editions = [e for e in await studio_editions(client, user_id) if e.radar == radar]
+        if not editions:
+            return "no studio edition"
+        sent = await email_digest(client, editions[0])
+        return f"sent to {sent.get('to')}"
+    except Exception as exc:  # noqa: BLE001 - the slate is stored; a mail failure is reported in the run's stats, not raised
+        logger.warning("radar.slate_email_failed", radar=radar, user_id=user_id, error=str(exc)[:200])
+        return f"failed: {type(exc).__name__}"
+
+
 async def run_radar(
     client: Any,
     http: httpx.AsyncClient,
@@ -168,6 +189,7 @@ async def run_radar(
         stats["newsletter_items"] = await feed_radar_slate(
             client, user_id, radar, stored, now.astimezone(UTC).date()
         )
+        stats["slate_email"] = await _email_slate(client, user_id, radar, cfg)
         await _finish(client, run, "ok", stats)
         logger.info("radar.done", radar=radar, user_id=user_id, week_of=week.isoformat(), topics=len(stored))
         return {"radar": radar, "week_of": week.isoformat(), "status": "ok", "stats": stats}

@@ -47,6 +47,17 @@ beforeEach(() => {
     if (path === '/api/studio/ai-dev-roundup/generate') return { jobId: 'job-1', creditsCharged: 6 };
     if (path === '/api/studio/ai-dev-roundup/assistant') return { data: { kind: 'data', op: 'queue', message: '', jobId: null, result: { message: '#7 | not scheduled | draft | A talk' }, error: null, creditsCharged: 0 } };
     if (path === '/api/studio/ai-dev-roundup/posts/actions') return { data: { message: 'Approved: #7.' } };
+    if (path === '/api/studio/ai-dev-roundup/history') return { data: { radar: 'dev', totals: { not_drafted: 2, drafted: 1, discarded: 1 }, weeks: [
+      { week_of: '2026-11-02', counts: { not_drafted: 1, drafted: 1 }, topics: [
+        { ...TOPICS[0], bucket: 'not_drafted', post: null },
+        { ...TOPICS[1], bucket: 'drafted', post: { id: 'p1', display_number: 7, state: 'draft', scheduled_date: null, slot: 'morning', post_at: null, posted_at: null, edition_id: 'ai-dev-roundup' } },
+      ] },
+      { week_of: '2026-10-26', counts: { not_drafted: 1, discarded: 1 }, topics: [
+        { id: 'o1', rank: 1, title: 'Old never drafted', url: 'https://x/o1', source: 'HN', item_type: 'article', angle: '', week_of: '2026-10-26', bucket: 'not_drafted', post: null },
+        { id: 'o2', rank: 2, title: 'Old discarded', url: 'https://x/o2', source: 'HN', item_type: 'article', angle: '', week_of: '2026-10-26', bucket: 'discarded', post: { id: 'p9', display_number: 3, state: 'cancelled', scheduled_date: null, slot: 'morning', post_at: null, posted_at: null, edition_id: 'ai-dev-roundup' } },
+      ] },
+    ] } };
+    if (path === '/api/studio/ai-dev-roundup/topics') return { data: { id: 't-own', rank: 4, title: 'My own idea', week_of: '2026-11-02' } };
     return { data: {} };
   });
 });
@@ -116,5 +127,69 @@ describe('ContentStudio', () => {
     expect(last).toHaveTextContent('week of 2026-11-02 to eric@example.com');
     expect(last).toHaveTextContent('postal-77');
     expect(screen.getByText(/Nothing reaches subscribers until you approve the final/i)).toBeInTheDocument();
+  });
+});
+
+
+describe('ContentStudio: what Eric asked for on 2026-11-05', () => {
+  it('History: every week, bucketed, filterable, and an undrafted old topic can be drafted from there', async () => {
+    render('/newsletter/studio/ai-dev-roundup');
+    fireEvent.click(await screen.findByTestId('studio-tab-history'));
+    expect(await screen.findByTestId('history-week-2026-11-02')).toBeInTheDocument();
+    expect(screen.getByTestId('history-week-2026-10-26')).toBeInTheDocument();
+    expect(screen.getByTestId('history-topic-2026-10-26-2-bucket')).toHaveTextContent('Discarded');
+    expect(screen.getByTestId('history-topic-2026-11-02-2')).toHaveTextContent('#7 · Draft');
+    fireEvent.click(screen.getByTestId('history-filter-not_drafted'));
+    expect(screen.queryByTestId('history-topic-2026-11-02-2')).toBeNull();
+    expect(screen.getByTestId('history-topic-2026-10-26-1')).toHaveTextContent('Old never drafted');
+    fireEvent.click(screen.getByTestId('history-draft-2026-10-26-1'));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith('/api/studio/ai-dev-roundup/generate', expect.objectContaining({ method: 'POST' })));
+    const call = vi.mocked(apiFetch).mock.calls.find((c) => c[0] === '/api/studio/ai-dev-roundup/generate')!;
+    expect(JSON.parse(String((call[1] as RequestInit).body))).toEqual({ topic_ids: ['o1'], week_of: '2026-10-26' });
+  });
+
+  it('Assistant: "Commands" lists every command by group, "help" opens it, and the chat survives a reload', async () => {
+    // jsdom in this vitest config has no working localStorage: a Map-backed stub, as s10b3-chat-queue.test does.
+    const store = new Map<string, string>();
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, String(v)), removeItem: (k: string) => void store.delete(k), clear: () => store.clear() },
+      configurable: true, writable: true,
+    });
+    const { unmount } = render('/newsletter/studio/ai-dev-roundup');
+    await screen.findByTestId('studio-assistant');
+    expect(screen.queryByTestId('assistant-commands')).toBeNull();
+    fireEvent.click(screen.getByText('help'));
+    const panel = await screen.findByTestId('assistant-commands');
+    for (const cmd of ['schedule all approved', 'write about <topic>', 'discard #3', 'put 1-6 in the newsletter', 'requeue #4', 'email the digest']) {
+      expect(panel).toHaveTextContent(cmd);
+    }
+    expect(panel).toHaveTextContent('Scheduling');
+    fireEvent.change(screen.getByTestId('assistant-input'), { target: { value: 'list the queue' } });
+    fireEvent.click(screen.getByTestId('assistant-send'));
+    expect(await screen.findByTestId('assistant-reply')).toHaveTextContent('#7 | not scheduled | draft | A talk');
+    unmount();
+    render('/newsletter/studio/ai-dev-roundup');
+    expect(await screen.findByTestId('assistant-reply')).toHaveTextContent('#7 | not scheduled');
+    expect(screen.getByTestId('assistant-said')).toHaveTextContent('list the queue');
+  });
+
+  it('Slate: your own topic joins the slate and is drafted at once', async () => {
+    render('/newsletter/studio/ai-dev-roundup');
+    await screen.findByTestId('slate-topic-1');
+    fireEvent.change(screen.getByTestId('own-topic-title'), { target: { value: 'My own idea' } });
+    fireEvent.change(screen.getByTestId('own-topic-url'), { target: { value: 'https://example.com/a' } });
+    fireEvent.click(screen.getByTestId('own-topic-draft'));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith('/api/studio/ai-dev-roundup/topics', expect.objectContaining({ method: 'POST', body: JSON.stringify({ title: 'My own idea', url: 'https://example.com/a' }) })));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith('/api/studio/ai-dev-roundup/generate', expect.objectContaining({ body: JSON.stringify({ topic_ids: ['t-own'], week_of: '2026-11-02' }) })));
+    expect(await screen.findByTestId('studio-activity')).toHaveTextContent('Drafting “My own idea” (slate #4)');
+  });
+
+  it('Review: select all, then the bulk bar acts on every draft', async () => {
+    render('/newsletter/studio/ai-dev-roundup');
+    fireEvent.click(await screen.findByTestId('studio-tab-review'));
+    fireEvent.click(await screen.findByTestId('review-select-all'));
+    expect(screen.getByTestId('publish-bar')).toHaveTextContent('1 selected');
+    fireEvent.click(screen.getByTestId('bulk-approve'));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith('/api/studio/ai-dev-roundup/posts/actions', expect.objectContaining({ body: JSON.stringify({ ids: ['p1'], action: 'approve' }) })));
   });
 });

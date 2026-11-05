@@ -9,7 +9,7 @@ Post states (``social_schedule_v2.state``, migration 050):
 
     draft ──approve──▶ approved ──schedule──▶ pending ─▶ posting ─▶ posted / partial / failed
       ▲   ◀─unapprove──     │                    │
-      └──── discard (delete) ┘                    └── cancel ─▶ cancelled
+      └── discard ─▶ cancelled (studio.discarded_at; requeue brings it back here)  └── cancel ─▶ cancelled
 
 ``draft`` and ``approved`` have no day or slot, so the publisher (which claims ``pending`` only) and
 the calendar (which reads by date) never see them.
@@ -278,7 +278,10 @@ async def _update(
 TRANSITIONS: dict[str, tuple[tuple[str, ...], dict[str, Any] | None]] = {
     "approve": (("draft",), {"state": "approved"}),
     "unapprove": (("approved",), {"state": "draft"}),
-    "discard": (PRE_CALENDAR, None),  # delete: a draft never went anywhere
+    # A discarded draft is kept as 'cancelled' with studio.discarded_at, so the History tab can say
+    # what became of every topic (Eric, 2026-11-05: "the history of all the posts not generated or
+    # scheduled from week to week"). Before 055 it was deleted. Requeue brings it back as a draft.
+    "discard": (PRE_CALENDAR, {"state": "cancelled"}),
     "cancel": (("pending", "failed", "partial"), {"state": "cancelled"}),
     "requeue": (("failed", "partial", "cancelled"), {"state": "pending", "attempts": 0, "last_error": None}),
     "unschedule": (("pending",), {"state": "approved", "scheduled_date": None, "post_at": None}),
@@ -300,19 +303,16 @@ async def apply_action(
         if p.get("state") not in allowed:
             skipped.append({**_summary(p), "reason": f"it is {p.get('state')}"})
             continue
-        if patch is None:
-            await (
-                client.table(SCHEDULE)
-                .delete()
-                .eq("id", str(p["id"]))
-                .eq("user_id", ed.user_id)
-                .in_("state", list(PRE_CALENDAR))
-                .execute()
-            )
-            done.append({**_summary(p), "state": "discarded"})
-            continue
-        row = await _update(client, ed, p, dict(patch))
-        done.append(_summary(row))
+        bookkeeping = dict(p.get("studio") or {})
+        change = dict(patch or {})
+        if action == "discard":
+            change["studio"] = {**bookkeeping, "discarded_at": datetime.now(UTC).isoformat()}
+        elif action == "requeue" and bookkeeping.get("discarded_at"):
+            # A discarded draft never had a day; it goes back to review, not onto the calendar.
+            bookkeeping.pop("discarded_at", None)
+            change = {"state": "draft", "studio": bookkeeping}
+        row = await _update(client, ed, p, change)
+        done.append({**_summary(row), **({"state": "discarded"} if action == "discard" else {})})
     verb = {
         "approve": "Approved",
         "unapprove": "Back to draft",

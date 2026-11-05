@@ -36,6 +36,15 @@ export default function StudioReview({ ctx }: { ctx: StudioContext }) {
 
   return (
     <section className="space-y-3" data-testid="studio-review">
+      {list.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <button type="button" onClick={() => setTicked(list.map((p) => p.id))} disabled={ticked.length === list.length} data-testid="review-select-all"
+            className="rounded border border-gray-300 px-2 py-1 dark:border-gray-600 disabled:opacity-50">Select all {list.length}</button>
+          <button type="button" onClick={() => setTicked(list.filter((p) => p.state === 'approved').map((p) => p.id))} disabled={!list.some((p) => p.state === 'approved')} data-testid="review-select-approved"
+            className="rounded border border-gray-300 px-2 py-1 dark:border-gray-600 disabled:opacity-50">Select approved</button>
+          <button type="button" onClick={() => setTicked([])} disabled={!ticked.length} className="rounded px-2 py-1 text-gray-500 disabled:opacity-50">Clear</button>
+        </div>
+      )}
       <PublishBar ctx={ctx} ids={ticked} channels={channels} defaultChannels={ctx.edition.channels} onDone={() => setTicked([])} />
       {posts.isSuccess && list.length === 0 && (
         <p className="text-sm text-gray-500">No drafts. Pick topics on the Slate tab and generate drafts; they wait here for review.</p>

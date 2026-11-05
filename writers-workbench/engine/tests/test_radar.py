@@ -327,3 +327,44 @@ def test_radar_replies_with_the_wrong_field_names_fail_validation_instead_of_com
         trend.Summaries.model_validate({"items": []})
     assert '"posts": [{"i": 0, "content"' in drafts.ROUNDUP_SYSTEM
     assert '"scores": [{"i": 0' in trend.SCORING_SYSTEM and '"summaries": [{"i": 0' in trend.SUMMARY_SYSTEM
+
+
+@pytest.mark.asyncio
+async def test_a_run_emails_the_owner_the_new_slate(monkeypatch: pytest.MonkeyPatch) -> None:
+    """n8n's "Send Slate" node, ported: every run ends with the slate email to the owner, unless the
+    subscription says slate_email: false (Eric, 2026-11-05)."""
+    db = FakeSupabase()
+    db.tables["newsletter_editions_v2"] = [
+        {"id": "ai-dev-roundup", "display_name": "AI Dev Roundup", "user_id": USER, "enabled": True}
+    ]
+    db.tables["radar_subscriptions_v2"] = [
+        {"user_id": USER, "radar": "dev", "enabled": True, "settings": {"edition_id": "ai-dev-roundup"}}
+    ]
+    db.tables["newsletter_feed_sources_v2"] = []
+
+    async def no_feeds(*_a: Any, **_k: Any) -> list[Any]:
+        return []
+
+    async def no_editions(*_a: Any, **_k: Any) -> int:
+        return 0
+
+    emailed: list[str] = []
+
+    async def fake_digest(_client: Any, ed: Any, week_of: Any = None) -> dict[str, Any]:
+        emailed.append(ed.edition_id)
+        return {"to": "owner@example.com", "subject": "AI Dev Roundup — week of 2026-11-02"}
+
+    import writer_engine.ingestion.feeds as feedlib
+    import writer_engine.studio.emailing as emailing
+
+    monkeypatch.setattr(feedlib, "fetch_feed", no_feeds)
+    monkeypatch.setattr(run, "feed_radar_slate", no_editions)
+    monkeypatch.setattr(emailing, "email_digest", fake_digest)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(_dev_net)) as http:
+        out = await run.run_radar(db, http, user_id=USER, radar="dev", now=NOW)
+        assert out["stats"]["slate_email"] == "sent to owner@example.com" and emailed == ["ai-dev-roundup"]
+        # Switched off per subscription: the slate is stored, no mail.
+        off = await run.run_radar(
+            db, http, user_id=USER, radar="dev", now=NOW, force=True, settings_row={"slate_email": False}
+        )
+        assert off["stats"]["slate_email"] == "off" and emailed == ["ai-dev-roundup"]

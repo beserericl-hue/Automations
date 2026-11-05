@@ -20,9 +20,10 @@ import StudioSlate from './StudioSlate';
 import StudioReview from './StudioReview';
 import StudioQueue from './StudioQueue';
 import StudioIssue from './StudioIssue';
+import StudioHistory from './StudioHistory';
 import StudioAssistant from './StudioAssistant';
 
-type Tab = 'slate' | 'review' | 'queue' | 'issue';
+type Tab = 'slate' | 'review' | 'queue' | 'history' | 'issue';
 
 export interface RunningJob {
   id: string;
@@ -101,8 +102,8 @@ export default function ContentStudio() {
   }
   if (!edition) return null;
 
-  const ctx: StudioContext = { edition, week, setWeek, track, jobs, notify, refresh };
-  const TABS: Array<[Tab, string]> = [['slate', 'Slate'], ['review', 'Review'], ['queue', 'Queue'], ['issue', 'Next issue & feeds']];
+  const ctx: StudioContext = { edition, week, setWeek: (w) => { setWeek(w); setTab('slate'); }, track, jobs, notify, refresh };
+  const TABS: Array<[Tab, string]> = [['slate', 'Slate'], ['review', 'Review'], ['queue', 'Queue'], ['history', 'History'], ['issue', 'Next issue & feeds']];
 
   return (
     <div className="space-y-4" data-testid="content-studio">
@@ -144,6 +145,7 @@ export default function ContentStudio() {
           {tab === 'slate' && <StudioSlate ctx={ctx} />}
           {tab === 'review' && <StudioReview ctx={ctx} />}
           {tab === 'queue' && <StudioQueue ctx={ctx} />}
+          {tab === 'history' && <StudioHistory ctx={ctx} />}
           {tab === 'issue' && <StudioIssue ctx={ctx} />}
         </div>
         <StudioAssistant ctx={ctx} />

@@ -129,8 +129,40 @@ export function whenLabel(p: Pick<StudioPost, 'scheduled_date' | 'slot' | 'post_
   return `${p.scheduled_date} ${p.slot === 'afternoon' ? '2:00 PM' : '9:00 AM'} ET`;
 }
 
+/** What became of a slate topic (History tab). */
+export type HistoryBucket = 'not_drafted' | 'drafted' | 'scheduled' | 'published' | 'failed' | 'cancelled' | 'discarded';
+export const BUCKET_LABEL: Record<HistoryBucket, string> = {
+  not_drafted: 'Never drafted',
+  drafted: 'Drafted, not scheduled',
+  scheduled: 'Scheduled',
+  published: 'Published',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
+  discarded: 'Discarded',
+};
+export interface HistoryTopic {
+  id: string;
+  rank: number;
+  title: string;
+  url: string;
+  source: string;
+  item_type: 'article' | 'video';
+  angle: string;
+  week_of: string;
+  bucket: HistoryBucket;
+  post: { id: string; display_number: number; state: string; scheduled_date: string | null; slot: 'morning' | 'afternoon'; post_at: string | null; posted_at: string | null; edition_id: string | null } | null;
+}
+export interface HistoryView {
+  radar: string;
+  weeks: Array<{ week_of: string; topics: HistoryTopic[]; counts: Partial<Record<HistoryBucket, number>> }>;
+  totals: Partial<Record<HistoryBucket, number>>;
+}
+
 export const studioApi = {
   editions: () => apiFetch<{ data: StudioEdition[] }>('/api/studio/editions'),
+  history: (ed: string) => apiFetch<{ data: HistoryView }>(`/api/studio/${encodeURIComponent(ed)}/history`),
+  addTopic: (ed: string, body: { title: string; url?: string; angle?: string }) =>
+    apiFetch<{ data: { id: string; rank: number; title: string; week_of: string } }>(`/api/studio/${encodeURIComponent(ed)}/topics`, { method: 'POST', body: JSON.stringify(body) }),
   overview: (ed: string) => apiFetch<{ data: { edition: StudioEdition; channels: StudioChannel[]; weeks: string[]; run: Record<string, unknown> | null } }>(`/api/studio/${encodeURIComponent(ed)}`),
   slate: (ed: string, week?: string | null) => apiFetch<{ data: { radar: string; week_of: string | null; topics: SlateTopic[] } }>(
     `/api/studio/${encodeURIComponent(ed)}/slate${week ? `?week=${week}` : ''}`),

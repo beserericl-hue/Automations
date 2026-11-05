@@ -30,7 +30,7 @@
  * 404 otherwise (lib/studio.ts); the engine checks it again on every op. Generating the issue itself
  * uses the existing POST /api/newsletter/generate (the saga takes the chosen stories).
  */
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { validateBody } from '../middleware/validate.js';
@@ -227,6 +227,117 @@ contentStudioRouter.get('/:ed/posts', async (req: Request, res: Response) => {
   if (error) return bad(res, 500, 'DB_ERROR', error.message);
   res.json({ success: true, data: await withDeliveries((data ?? []) as unknown as Array<Record<string, unknown>>) });
 });
+
+// ---------------------------------------------------------------------------- history (every week)
+
+/** What became of a topic: the bucket the History tab groups by. */
+export function historyBucket(post: Record<string, unknown> | null): string {
+  if (!post) return 'not_drafted';
+  const state = String(post.state ?? '');
+  if (state === 'cancelled') return (post.studio as Record<string, unknown> | null)?.discarded_at ? 'discarded' : 'cancelled';
+  if (state === 'draft' || state === 'approved') return 'drafted';
+  if (state === 'pending' || state === 'posting') return 'scheduled';
+  if (state === 'posted' || state === 'partial') return 'published';
+  return state; // failed
+}
+
+/** Every slate week of this radar with what each topic became, newest first (Eric, 2026-11-05: "the
+ *  history of all the posts not generated or scheduled from week to week"). The Slate tab shows one
+ *  week; this is all of them, bucketed, so an ungenerated topic from October can still be drafted. */
+contentStudioRouter.get('/:ed/history', async (req: Request, res: Response) => {
+  const ed = await edition(req, res);
+  if (!ed) return;
+  const sb = getSupabaseAdmin();
+  const { data: topics, error } = await sb.from('radar_topics_v2')
+    .select('id, rank, title, url, source, item_type, angle, week_of')
+    .eq('user_id', req.userId!).eq('radar', ed.radar).order('week_of', { ascending: false }).order('rank').limit(2000);
+  if (error) return bad(res, 500, 'DB_ERROR', error.message);
+  const list = (topics ?? []) as Array<Record<string, unknown>>;
+  const posts: Record<string, Record<string, unknown>> = {};
+  if (list.length) {
+    const { data } = await sb.from('social_schedule_v2')
+      .select('id, display_number, state, scheduled_date, slot, post_at, posted_at, radar_topic_id, edition_id, studio')
+      .eq('user_id', req.userId!).in('radar_topic_id', list.map((t) => String(t.id)));
+    for (const p of (data ?? []) as Array<Record<string, unknown>>) {
+      const key = String(p.radar_topic_id);
+      if (p.state === 'cancelled' && posts[key]) continue; // a live post beats a discarded one for the same topic
+      posts[key] = p;
+    }
+  }
+  const weeks: Array<{ week_of: string; topics: Array<Record<string, unknown>>; counts: Record<string, number> }> = [];
+  const totals: Record<string, number> = {};
+  for (const t of list) {
+    const week = String(t.week_of).slice(0, 10);
+    let w = weeks[weeks.length - 1];
+    if (!w || w.week_of !== week) {
+      w = { week_of: week, topics: [], counts: {} };
+      weeks.push(w);
+    }
+    const post = posts[String(t.id)] ?? null;
+    const bucket = historyBucket(post);
+    w.topics.push({ ...t, post, bucket });
+    w.counts[bucket] = (w.counts[bucket] ?? 0) + 1;
+    totals[bucket] = (totals[bucket] ?? 0) + 1;
+  }
+  res.json({ success: true, data: { radar: ed.radar, weeks, totals } });
+});
+
+// ---------------------------------------------------------------------------- your own topic
+
+const OwnTopicSchema = z.object({
+  title: z.string().trim().min(3).max(300),
+  url: z.string().trim().url().max(2000).optional().or(z.literal('')),
+  angle: z.string().trim().max(2000).optional(),
+});
+
+/** The Monday (Eastern) of the week a topic added now belongs to — the engine's radar.run.week_of. */
+export function currentWeekOf(now = new Date()): string {
+  const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const day = et.getDay(); // 0 = Sunday
+  const monday = new Date(et);
+  monday.setDate(et.getDate() + (day === 0 ? 1 : 1 - day));
+  return `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+}
+
+/** Put the owner's own topic on this week's slate (the n8n studio's "paste your own topic"). It takes
+ *  the next rank, so "generate 25" and the History tab treat it like any radar topic. */
+async function addOwnTopic(userId: string, ed: StudioEdition, body: z.infer<typeof OwnTopicSchema>): Promise<Record<string, unknown>> {
+  const sb = getSupabaseAdmin();
+  const week = currentWeekOf();
+  const { data: existing } = await sb.from('radar_topics_v2').select('rank').eq('user_id', userId).eq('radar', ed.radar).eq('week_of', week);
+  const rank = Math.max(0, ...((existing ?? []) as Array<{ rank: number }>).map((r) => Number(r.rank))) + 1;
+  if (rank > 50) throw new Error('This week\'s slate is full (50 topics)');
+  const url = body.url || '';
+  const row = {
+    id: randomUUID(), user_id: userId, radar: ed.radar, week_of: week, rank,
+    title: body.title, url: url || `own://${userId}/${week}/${rank}`, source: 'you', item_type: url.includes('youtube.com') || url.includes('youtu.be') ? 'video' : 'article',
+    angle: body.angle ?? '', summary: '',
+  };
+  const { error } = await sb.from('radar_topics_v2').insert(row);
+  if (error) throw new Error(error.message);
+  return row;
+}
+
+contentStudioRouter.post('/:ed/topics', validateBody(OwnTopicSchema), async (req: Request, res: Response) => {
+  const ed = await edition(req, res);
+  if (!ed) return;
+  try {
+    const topic = await addOwnTopic(req.userId!, ed, req.body as z.infer<typeof OwnTopicSchema>);
+    res.status(201).json({ success: true, data: topic });
+  } catch (err) {
+    bad(res, 500, 'DB_ERROR', err instanceof Error ? err.message : 'Could not add the topic');
+  }
+});
+
+/** "write about <topic or URL>" / "draft about …" / a bare URL: the assistant's own-topic command. */
+export function ownTopicCommand(message: string): { title: string; url?: string } | null {
+  const m = message.trim().match(/^(?:write|draft|post|blog)\s+(?:about|on|from)\s*:?\s+(.+)$/i) ?? message.trim().match(/^(https?:\/\/\S+)$/i);
+  if (!m) return null;
+  const text = m[1].trim().replace(/^["“]|["”]$/g, '');
+  const url = text.match(/https?:\/\/\S+/)?.[0];
+  const title = url ? text.replace(url, '').replace(/[\s:—-]+$/g, '').trim() || url.replace(/^https?:\/\//, '').slice(0, 120) : text;
+  return { title: title.slice(0, 300), ...(url ? { url } : {}) };
+}
 
 // ---------------------------------------------------------------------------- radar + drafting
 
@@ -451,6 +562,26 @@ contentStudioRouter.post('/:ed/assistant', validateBody(AssistantSchema), async 
   const unitPrice = await getCreditCost('social_repurpose');
   if (chargeable(req) && unitPrice > 0 && (req.creditsRemaining ?? 0) < unitPrice) {
     return bad(res, 402, 'INSUFFICIENT_CREDITS', `The assistant needs at least ${unitPrice} credits for drafting.`);
+  }
+  const own = ownTopicCommand(body.message);
+  if (own) {
+    // The owner's own topic: onto this week's slate, then drafted like any other (charged as one topic).
+    try {
+      const topic = await addOwnTopic(req.userId!, ed, { title: own.title, url: own.url ?? '', angle: '' });
+      const job = await callEngineWriteTool('studio', { op: 'generate', topic_ids: [String(topic.id)], user_id: req.userId!, edition_id: ed.edition_id, async: true });
+      const charged = chargeable(req) ? unitPrice : 0;
+      if (charged > 0) await deductCredits(req.userId!, charged, `studio.assistant.generate:${ed.edition_id}`);
+      return res.json({
+        success: true,
+        data: {
+          kind: 'queued', op: 'generate',
+          message: `Added “${own.title}” to this week's slate as #${topic.rank} and started drafting it.`,
+          jobId: job.job_id ?? null, result: null, error: null, conversationId: null, creditsCharged: charged,
+        },
+      });
+    } catch (err) {
+      return bad(res, 502, 'ENGINE_UNREACHABLE', err instanceof Error ? err.message : 'Could not draft that topic');
+    }
   }
   try {
     const hub = await callEngineHub({
