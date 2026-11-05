@@ -59,6 +59,17 @@ export async function studioEditions(userId: string): Promise<StudioEdition[]> {
   return out;
 }
 
+/** Any edition the caller owns, as a StudioEdition (radar '' when no radar feeds it): for choosing an
+ *  issue's stories, which works on every edition (Eric, 2026-11-05: radar posts in any newsletter). */
+export async function findOwnedEdition(userId: string, editionId: string): Promise<StudioEdition | null> {
+  const studio = await findStudioEdition(userId, editionId);
+  if (studio) return studio;
+  const { data } = await getSupabaseAdmin().from('newsletter_editions_v2').select('id, display_name, cadence, user_id')
+    .eq('user_id', userId).eq('id', editionId).maybeSingle();
+  if (!data || data.user_id !== userId) return null;
+  return { edition_id: String(data.id), name: String(data.display_name ?? data.id), radar: '' as unknown as 'trend', channels: [], cadence: (data.cadence as string | null) ?? null };
+}
+
 export async function findStudioEdition(userId: string, editionId: string): Promise<StudioEdition | null> {
   return (await studioEditions(userId)).find((e) => e.edition_id === editionId) ?? null;
 }

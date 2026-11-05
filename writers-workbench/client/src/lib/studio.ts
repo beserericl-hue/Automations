@@ -158,8 +158,32 @@ export interface HistoryView {
   totals: Partial<Record<HistoryBucket, number>>;
 }
 
+/** A radar post or slate topic of the user's, from any edition or radar: what any newsletter can feature. */
+export interface LibraryPost {
+  id: string;
+  display_number: number;
+  title: string;
+  state: string;
+  source_url: string | null;
+  item_type: string;
+  edition_id: string | null;
+  scheduled_date: string | null;
+  posted_at: string | null;
+}
+export interface LibraryTopic {
+  id: string;
+  radar: string;
+  week_of: string;
+  rank: number;
+  title: string;
+  url: string;
+  item_type: string;
+  source: string;
+}
+
 export const studioApi = {
   editions: () => apiFetch<{ data: StudioEdition[] }>('/api/studio/editions'),
+  library: () => apiFetch<{ data: { posts: LibraryPost[]; topics: LibraryTopic[] } }>('/api/studio/library'),
   history: (ed: string) => apiFetch<{ data: HistoryView }>(`/api/studio/${encodeURIComponent(ed)}/history`),
   addTopic: (ed: string, body: { title: string; url?: string; angle?: string }) =>
     apiFetch<{ data: { id: string; rank: number; title: string; week_of: string } }>(`/api/studio/${encodeURIComponent(ed)}/topics`, { method: 'POST', body: JSON.stringify(body) }),

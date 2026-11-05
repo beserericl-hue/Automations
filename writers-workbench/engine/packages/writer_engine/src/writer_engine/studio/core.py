@@ -61,9 +61,12 @@ class StudioError(Exception):
 class StudioEdition:
     user_id: str
     edition_id: str
-    radar: str
+    radar: str  # 'trend' | 'dev', or '' for an owned edition no radar feeds (issue selection only)
     name: str
     channels: tuple[str, ...] = field(default_factory=tuple)
+    settings: dict[str, Any] = field(default_factory=dict)
+    """The radar subscription's settings (``brand``, ``slate_email``, …), so the drafts speak as this
+    account's brand (migration 038 settings; see ``writer_engine.radar.brand``)."""
 
 
 async def _rows(query: Any) -> list[dict[str, Any]]:
@@ -88,6 +91,7 @@ async def studio_editions(client: Any, user_id: str) -> list[StudioEdition]:
         .eq("url_type", "radar")
     )
     out: list[StudioEdition] = []
+    own_channels: tuple[str, ...] | None = None
     for e in editions:
         eid = str(e["id"])
         radar_urls = {
@@ -97,9 +101,15 @@ async def studio_editions(client: Any, user_id: str) -> list[StudioEdition]:
         }
         for sub in subs:
             radar = str(sub.get("radar") or "")
-            settings = sub.get("settings") or {}
+            settings = dict(sub.get("settings") or {})
             if settings.get("edition_id") == eid or f"radar://{radar}" in radar_urls:
-                chans = tuple(settings.get("channels") or DEFAULT_CHANNELS.get(radar, ("website",)))
+                chans = tuple(settings.get("channels") or ())
+                if not chans:
+                    # No channels chosen: every channel the user has switched on. The TechAhir defaults
+                    # apply only to the account that has those channels (another user has none of them).
+                    if own_channels is None:
+                        own_channels = await _own_enabled_channels(client, user_id)
+                    chans = own_channels or DEFAULT_CHANNELS.get(radar, ("website",))
                 out.append(
                     StudioEdition(
                         user_id=user_id,
@@ -107,10 +117,36 @@ async def studio_editions(client: Any, user_id: str) -> list[StudioEdition]:
                         radar=radar,
                         name=str(e.get("display_name") or eid),
                         channels=chans,
+                        settings=settings,
                     )
                 )
                 break
     return out
+
+
+async def _own_enabled_channels(client: Any, user_id: str) -> tuple[str, ...]:
+    rows = await _rows(client.table(CHANNELS).select("channel,enabled").eq("user_id", user_id))
+    return tuple(str(r["channel"]) for r in rows if r.get("enabled", True))
+
+
+async def resolve_owned_edition(client: Any, user_id: str, edition_id: str) -> StudioEdition:
+    """The caller's edition for choosing an issue's stories: the studio edition if a radar feeds it,
+    else any edition the caller owns (``radar`` empty). Eric, 2026-11-05: "I want to use any one or
+    more of those [radar] posts to be featured in any one of my newsletters." StudioError NOT_FOUND
+    otherwise, exactly as for a studio edition."""
+    if not user_id or not edition_id:
+        raise StudioError("NOT_FOUND", "No such edition")
+    for ed in await studio_editions(client, user_id):
+        if ed.edition_id == edition_id:
+            return ed
+    rows = await _rows(
+        client.table(EDITIONS).select("id,display_name,user_id").eq("user_id", user_id).eq("id", edition_id)
+    )
+    if not rows:
+        raise StudioError("NOT_FOUND", "No such edition")
+    return StudioEdition(
+        user_id=user_id, edition_id=edition_id, radar="", name=str(rows[0].get("display_name") or edition_id)
+    )
 
 
 async def resolve_edition(client: Any, user_id: str, edition_id: str) -> StudioEdition:

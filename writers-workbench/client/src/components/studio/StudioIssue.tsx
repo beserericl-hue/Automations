@@ -30,7 +30,7 @@ export default function StudioIssue({ ctx }: { ctx: StudioContext }) {
   const ed = ctx.edition.edition_id;
   const navigate = useNavigate();
   const issue = useQuery({ queryKey: ['studio', ed, 'issue'], queryFn: () => studioApi.issue(ed) });
-  const approved = useQuery({ queryKey: ['studio', ed, 'posts', 'all'], queryFn: () => studioApi.posts(ed, 'all') });
+  const library = useQuery({ queryKey: ['studio', 'library'], queryFn: () => studioApi.library() });
   const slate = useQuery({ queryKey: ['studio', ed, 'slate', ctx.week], queryFn: () => studioApi.slate(ed, ctx.week) });
   const [items, setItems] = useState<Item[]>([]);
   const [dirty, setDirty] = useState(false);
@@ -64,7 +64,7 @@ export default function StudioIssue({ ctx }: { ctx: StudioContext }) {
     next.splice(Math.max(0, Math.min(next.length, n + d)), 0, x);
     setItems(next); setDirty(true);
   };
-  const posts = (approved.data?.data ?? []).filter((p) => !['draft', 'cancelled'].includes(p.state));
+  const posts = library.data?.data.posts ?? []; // every radar post of yours, from any edition (approved, scheduled, posted)
   const topics = slate.data?.data.topics ?? [];
   const last = issue.data?.data.last_issue;
 
@@ -107,14 +107,15 @@ export default function StudioIssue({ ctx }: { ctx: StudioContext }) {
 
       <div className="grid gap-3 md:grid-cols-2">
         <div className="rounded border border-gray-200 bg-white p-3 text-sm dark:border-gray-700 dark:bg-gray-900">
-          <h3 className="mb-2 font-semibold text-gray-700 dark:text-gray-200">Add posts</h3>
-          {!posts.length && <p className="text-xs text-gray-500">Approved, scheduled and published posts of this edition appear here.</p>}
+          <h3 className="mb-2 font-semibold text-gray-700 dark:text-gray-200">Add posts (any edition)</h3>
+          {!posts.length && <p className="text-xs text-gray-500">Approved, scheduled and published radar posts appear here, whichever edition drafted them.</p>}
           <ul className="max-h-80 space-y-1 overflow-auto">
             {posts.map((p) => (
               <li key={p.id} className="flex items-center gap-2">
                 <button type="button" disabled={has('post', p.id)} onClick={() => add({ kind: 'post', id: p.id, title: p.title, note: `#${p.display_number} · ${STATE_LABEL[p.state] ?? p.state}` })}
                   className="rounded border border-gray-300 px-1.5 text-xs disabled:opacity-30 dark:border-gray-600" data-testid={`issue-add-post-${p.display_number}`}>Add</button>
                 <span className="truncate">#{p.display_number} {p.title}</span>
+                {p.edition_id && p.edition_id !== ed && <span className="ml-auto shrink-0 text-xs text-gray-400">{p.edition_id}</span>}
               </li>
             ))}
           </ul>

@@ -149,7 +149,7 @@ async def run_radar(
     try:
         if radar == "trend":
             feeds = [tuple(f) for f in cfg.get("feeds") or sources.TREND_FEEDS]
-            slate, stats = await trend.build_slate(http, feeds=feeds, now=now)  # type: ignore[arg-type]
+            slate, stats = await trend.build_slate(http, feeds=feeds, now=now, brand=cfg)  # type: ignore[arg-type]
             rows = trend.topic_rows(slate)
         else:
             archive = (await client.table(ARCHIVE).select("*").eq("user_id", user_id).execute()).data or []

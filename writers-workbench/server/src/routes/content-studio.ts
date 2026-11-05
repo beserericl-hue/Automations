@@ -39,7 +39,7 @@ import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import { callEngineHub, callEngineWriteTool, engineErrorMessage, type EngineStepEnvelope } from '../lib/engine-hub.js';
 import { getCreditCost } from '../services/credit-costs.js';
 import { deductCredits } from '../services/credits.js';
-import { findStudioEdition, studioEditions, type StudioEdition } from '../lib/studio.js';
+import { findOwnedEdition, findStudioEdition, studioEditions, type StudioEdition } from '../lib/studio.js';
 import { countSelection } from './social-calendar.js';
 import { logger } from '../lib/logger.js';
 
@@ -159,6 +159,24 @@ async function withDeliveries(posts: Array<Record<string, unknown>>): Promise<Ar
 
 contentStudioRouter.get('/editions', async (req: Request, res: Response) => {
   res.json({ success: true, data: await studioEditions(req.userId!) });
+});
+
+// ---------------------------------------------------------------------------- the library
+
+/** Every radar post and recent slate topic of the caller, across all their editions and radars: what
+ *  can be featured in ANY of their newsletters (Eric, 2026-11-05). Posts: approved, scheduled, posted. */
+contentStudioRouter.get('/library', async (req: Request, res: Response) => {
+  const sb = getSupabaseAdmin();
+  const [{ data: posts, error }, { data: topics }] = await Promise.all([
+    sb.from('social_schedule_v2')
+      .select('id, display_number, title, state, source_url, item_type, edition_id, scheduled_date, posted_at, radar_topic_id, source')
+      .eq('user_id', req.userId!).in('state', ['approved', 'pending', 'posting', 'posted', 'partial'])
+      .order('display_number', { ascending: false }).limit(150),
+    sb.from('radar_topics_v2').select('id, radar, week_of, rank, title, url, item_type, source')
+      .eq('user_id', req.userId!).order('week_of', { ascending: false }).order('rank').limit(120),
+  ]);
+  if (error) return bad(res, 500, 'DB_ERROR', error.message);
+  res.json({ success: true, data: { posts: posts ?? [], topics: topics ?? [] } });
 });
 
 contentStudioRouter.get('/:ed', async (req: Request, res: Response) => {
@@ -488,9 +506,16 @@ contentStudioRouter.post('/:ed/posts/schedule', validateBody(ScheduleSchema), as
 });
 
 // ---------------------------------------------------------------------------- the next issue
+// Any edition the caller owns can have chosen stories, not only a radar-fed one (findOwnedEdition).
+
+async function ownedEdition(req: Request, res: Response): Promise<StudioEdition | null> {
+  const ed = await findOwnedEdition(req.userId!, String(req.params.ed));
+  if (!ed) bad(res, 404, 'NOT_FOUND', 'No such edition');
+  return ed;
+}
 
 contentStudioRouter.get('/:ed/issue', async (req: Request, res: Response) => {
-  const ed = await edition(req, res);
+  const ed = await ownedEdition(req, res);
   if (!ed) return;
   const out = await studioSync(req, res, ed, { op: 'issue', action: 'show' });
   if (out) res.json({ success: true, data: out });
@@ -501,14 +526,14 @@ export const IssueSchema = z.object({
 });
 
 contentStudioRouter.put('/:ed/issue', validateBody(IssueSchema), async (req: Request, res: Response) => {
-  const ed = await edition(req, res);
+  const ed = await ownedEdition(req, res);
   if (!ed) return;
   const out = await studioSync(req, res, ed, { op: 'issue', action: 'set', items: (req.body as z.infer<typeof IssueSchema>).items });
   if (out) res.json({ success: true, data: out });
 });
 
 contentStudioRouter.post('/:ed/issue/new', async (req: Request, res: Response) => {
-  const ed = await edition(req, res);
+  const ed = await ownedEdition(req, res);
   if (!ed) return;
   const out = await studioSync(req, res, ed, { op: 'issue', action: 'new' });
   if (out) res.json({ success: true, data: out });

@@ -96,11 +96,11 @@ async def _existing_posts(
 
 
 async def _draft_one_by_one(
-    topics: Sequence[dict[str, Any]], router: Any
+    topics: Sequence[dict[str, Any]], router: Any, brand: dict[str, Any] | None = None
 ) -> list[tuple[dict[str, Any], dict[str, Any] | None, str]]:
     out: list[tuple[dict[str, Any], dict[str, Any] | None, str]] = []
     for t in topics:
-        drafted, _failed = await D.draft_trend([t], router=router)
+        drafted, _failed = await D.draft_trend([t], router=router, brand=brand)
         if drafted:
             out.append((t, drafted[0], ""))
         else:
@@ -109,13 +109,13 @@ async def _draft_one_by_one(
 
 
 async def _draft_roundup(
-    topics: Sequence[dict[str, Any]], router: Any
+    topics: Sequence[dict[str, Any]], router: Any, brand: dict[str, Any] | None = None
 ) -> list[tuple[dict[str, Any], dict[str, Any] | None, str]]:
     out: list[tuple[dict[str, Any], dict[str, Any] | None, str]] = []
     for i in range(0, len(topics), ROUNDUP_BATCH):
         chunk = list(topics[i : i + ROUNDUP_BATCH])
         try:
-            drafted, _ = await D.draft_roundup(chunk, router=router)
+            drafted, _ = await D.draft_roundup(chunk, router=router, brand=brand)
             error = "the draft came back empty or without the source link"
         except Exception as exc:  # noqa: BLE001 - one chunk's provider/parse failure is reported per topic, the rest go on
             logger.warning("studio.roundup_failed", error=f"{type(exc).__name__}: {exc}"[:200])
@@ -149,7 +149,11 @@ async def generate(
         if str(t["id"]) in existing and not redo
     ]
     todo = [t for t in topics if redo or str(t["id"]) not in existing]
-    results = await (_draft_one_by_one(todo, router) if ed.radar == "trend" else _draft_roundup(todo, router))
+    results = await (
+        _draft_one_by_one(todo, router, ed.settings)
+        if ed.radar == "trend"
+        else _draft_roundup(todo, router, ed.settings)
+    )
     drafted: list[dict[str, Any]] = []
     failed: list[dict[str, Any]] = []
     for topic, post, error in results:
@@ -301,7 +305,9 @@ async def regenerate(
         raise StudioError("NO_TOPIC", f"#{post.get('display_number')} has no slate topic to draft from")
     router = router or get_router(service="studio")
     results = await (
-        _draft_one_by_one(topics, router) if ed.radar == "trend" else _draft_roundup(topics, router)
+        _draft_one_by_one(topics, router, ed.settings)
+        if ed.radar == "trend"
+        else _draft_roundup(topics, router, ed.settings)
     )
     _topic, fresh, error = results[0]
     if fresh is None:

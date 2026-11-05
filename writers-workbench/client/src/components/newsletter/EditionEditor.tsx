@@ -19,6 +19,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, ApiError } from '../../lib/api';
 import HelpButton from './HelpButton';
+import FeaturedStories from './FeaturedStories';
 import type {
   NewsletterEdition,
   NewsletterSubscriber,
@@ -364,9 +365,12 @@ export default function EditionEditor() {
         </div>
       </form>
 
-      {/* Subscribers — inline section, shown only in edit mode. */}
+      {/* Featured stories (any radar post, from any edition) and subscribers — edit mode only. */}
       {isEdit && existing && (
-        <SubscribersPanel editionId={existing.id} />
+        <>
+          <FeaturedStories editionId={existing.id} />
+          <SubscribersPanel editionId={existing.id} />
+        </>
       )}
     </div>
   );

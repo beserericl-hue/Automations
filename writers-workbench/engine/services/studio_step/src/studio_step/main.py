@@ -314,7 +314,9 @@ async def handler(inp: StepInput) -> StepOutput:
     edition_id = str(inp.payload.get("edition_id") or "").strip()
     try:
         client = await _client()
-        ed = await core.resolve_edition(client, user_id, edition_id)
+        # Choosing an issue's stories works for any edition the caller owns; the rest needs a radar.
+        resolve = core.resolve_owned_edition if op == "issue" else core.resolve_edition
+        ed = await resolve(client, user_id, edition_id)
         result = await OPS[op](client, ed, dict(inp.payload))
     except StudioError as exc:
         logger.info("studio.refused", op=op, code=exc.code, message=exc.message[:200])
