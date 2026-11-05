@@ -506,10 +506,118 @@ async def test_issue_selection_uses_reviewed_posts_for_drafted_topics_and_reject
     assert [i["title"] for i in out["items"]] == ["Dev topic 1", "Post 5", "Dev topic 3"]
     removed = await issue.remove_items(db, ed, [{"kind": "post", "id": "p5"}])
     assert [i["position"] for i in removed["items"]] == [1, 2]
+    # The owner's posts and topics from ANY of their editions and radars can be featured here
+    # (Eric, 2026-11-05); another user's never can.
+    mine = await issue.set_items(db, ed, [{"kind": "post", "id": "p6"}, {"kind": "topic", "id": "x1"}])
+    assert [i["kind"] for i in mine["items"]] == ["post", "topic"]
+    db.tables["social_schedule_v2"].append({**_post(8, "approved"), "id": "p8", "user_id": "someone-else"})
     with pytest.raises(StudioError):
-        await issue.set_items(db, ed, [{"kind": "post", "id": "p6"}])  # another edition's post
+        await issue.set_items(db, ed, [{"kind": "post", "id": "p8"}])  # another user's post
+    db.tables["radar_topics_v2"].append(
+        {
+            "id": "z9",
+            "user_id": "someone-else",
+            "radar": "dev",
+            "week_of": "2026-11-02",
+            "rank": 1,
+            "title": "theirs",
+            "url": "https://t",
+        }
+    )
     with pytest.raises(StudioError):
-        await issue.set_items(db, ed, [{"kind": "topic", "id": "x1"}])  # the other radar's topic
+        await issue.set_items(db, ed, [{"kind": "topic", "id": "z9"}])  # another user's topic
+
+
+@pytest.mark.asyncio
+async def test_any_owned_edition_can_choose_its_stories_but_only_a_radar_edition_is_a_studio() -> None:
+    """A newsletter built from scraped blogs has no radar; it can still feature radar posts."""
+    db = _db()
+    db.tables["newsletter_editions_v2"].append(
+        {"id": "plain", "display_name": "Plain letter", "user_id": OWNER, "enabled": True}
+    )
+    plain = await core.resolve_owned_edition(db, OWNER, "plain")
+    assert (plain.edition_id, plain.radar, plain.name) == ("plain", "", "Plain letter")
+    with pytest.raises(StudioError):
+        await core.resolve_edition(db, OWNER, "plain")
+    with pytest.raises(StudioError):
+        await core.resolve_owned_edition(db, "someone-else", "plain")
+    db.tables["social_schedule_v2"] = [_post(5, "approved", radar_topic_id="t2")]
+    out = await issue.set_items(db, plain, [{"kind": "post", "id": "p5"}])
+    assert [i["title"] for i in out["items"]] == ["Post 5"]
+
+
+def test_the_drafts_speak_as_the_subscriptions_brand() -> None:
+    """Per-account radars: the prompts name the subscription's brand; blanks keep the TechAhir wording."""
+    from writer_engine.radar import brand as B
+
+    default = B.brand_of({})
+    assert default["name"] == "TechAhir" and "techahir.com" in B.blog_system(default)
+    mine = B.brand_of(
+        {
+            "brand": {
+                "name": "Kent Smith Studio",
+                "what_we_do": "ghostwrites business books in 90 days",
+                "cta_text": "Book a call",
+                "cta_url": "https://kentsmith.studio/call",
+                "audience": "founders who want a book",
+                "newsletter_name": "the Studio letter",
+                "pitch": "",
+            }
+        }
+    )
+    blog = B.blog_system(mine)
+    assert (
+        "Kent Smith Studio" in blog
+        and "[Book a call](https://kentsmith.studio/call)" in blog
+        and "TechAhir" not in blog
+    )
+    assert "speed WITH discipline" in blog  # a blank pitch keeps the default section
+    roundup = B.roundup_system(mine)
+    assert "the Studio letter" in roundup and "TechAhir" not in roundup
+    scoring = B.scoring_system(mine)
+    assert "founders who want a book" in scoring and "TechAhir" not in scoring
+    assert "Score TOP (90-100)" in scoring  # the default focus until the owner writes their own
+
+
+@pytest.mark.asyncio
+async def test_a_radar_with_no_chosen_channels_posts_to_every_channel_the_user_switched_on() -> None:
+    db = _db()
+    db.tables["radar_subscriptions_v2"] = [
+        {
+            "user_id": OWNER,
+            "radar": "dev",
+            "enabled": True,
+            "settings": {"edition_id": "ai-dev-roundup", "brand": {"name": "Me"}},
+        }
+    ]
+    db.tables["social_channels_v2"] = [
+        {
+            "user_id": OWNER,
+            "channel": "threads_me",
+            "kind": "threads",
+            "label": "Threads",
+            "enabled": True,
+            "config": {},
+        },
+        {
+            "user_id": OWNER,
+            "channel": "li_old",
+            "kind": "linkedin",
+            "label": "Old",
+            "enabled": False,
+            "config": {},
+        },
+        {
+            "user_id": "someone-else",
+            "channel": "website",
+            "kind": "website",
+            "label": "Theirs",
+            "enabled": True,
+            "config": {},
+        },
+    ]
+    ed = await core.resolve_edition(db, OWNER, "ai-dev-roundup")
+    assert ed.channels == ("threads_me",) and ed.settings["brand"] == {"name": "Me"}
 
 
 @pytest.mark.asyncio

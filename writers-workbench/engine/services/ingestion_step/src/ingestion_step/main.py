@@ -80,7 +80,8 @@ async def _radar(inp: StepInput, op: str) -> StepOutput:
         .limit(1)
         .execute()
     ).data
-    settings_row = (sub[0].get("settings") if sub else None) or {}
+    first = sub[0] if sub else None
+    settings_row: dict[str, Any] = dict(first.get("settings") or {}) if isinstance(first, dict) else {}
     if op == "radar":
         # A subscription can override the radar feed list: user-typed URLs, checked per connection.
         async with safe_async_client(timeout=30.0, follow_redirects=True) as http:
@@ -110,7 +111,13 @@ async def _radar(inp: StepInput, op: str) -> StepOutput:
 
     channels = normalise_channels(raw_channels) if raw_channels else None
     out = await drafts.schedule_slate(
-        client, user_id=user_id, radar=radar, topics=topics, channels=channels, now=datetime.now(UTC)
+        client,
+        user_id=user_id,
+        radar=radar,
+        topics=topics,
+        channels=channels,
+        now=datetime.now(UTC),
+        brand=settings_row,
     )
     out["week_of"] = slate[0]["week_of"]
     return StepOutput(execution_id=inp.execution_id, step_name=STEP_NAME, status=StepStatus.OK, payload=out)

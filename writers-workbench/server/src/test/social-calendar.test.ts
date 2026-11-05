@@ -148,3 +148,44 @@ describe('social calendar', () => {
     expect((data.queued as Record<string, Row>).t2.display_number).toBe(9);
   });
 });
+
+describe('radars are per account (Eric, 2026-11-05)', () => {
+  beforeEach(() => {
+    db.radar_subscriptions_v2 = [];
+    db.radar_runs_v2 = [{ user_id: 'u1', radar: 'dev', week_of: '2026-11-02', status: 'ok', finished_at: '2026-11-01T11:00:00Z' }];
+    db.newsletter_editions_v2 = [{ id: 'my-letter', display_name: 'My letter', user_id: 'u1' }, { id: 'theirs', display_name: 'Theirs', user_id: 'u2' }];
+  });
+  it('lists both radars with no subscription yet, the owner\'s editions and the last run', async () => {
+    const r = await call('GET', '/radars');
+    expect(r.status).toBe(200);
+    const d = r.json.data as { radars: Array<Record<string, unknown>>; editions: Array<{ id: string }> };
+    expect(d.radars.map((x) => [x.radar, x.subscribed, x.enabled, x.slate_email])).toEqual([['trend', false, false, true], ['dev', false, false, true]]);
+    expect(d.radars[1].last_run).toMatchObject({ week_of: '2026-11-02', status: 'ok' });
+    expect(d.editions.map((e) => e.id)).toEqual(['my-letter']);
+  });
+  it('switches a radar on for the caller with their edition, channels, slate email and brand', async () => {
+    const r = await call('PUT', '/radar/trend', {
+      enabled: true, edition_id: 'my-letter', channels: ['website', 'li_agile'], slate_email: false,
+      brand: { name: 'Kent Smith Studio', cta_url: 'https://kentsmith.studio/call', pitch: '  ', hashtags: '' },
+    });
+    expect(r.status).toBe(200);
+    expect(db.radar_subscriptions_v2[0]).toMatchObject({
+      user_id: 'u1', radar: 'trend', enabled: true,
+      settings: { edition_id: 'my-letter', channels: ['website', 'li_agile'], slate_email: false, brand: { name: 'Kent Smith Studio', cta_url: 'https://kentsmith.studio/call' } },
+    });
+    // A second save changes only what it names; an empty edition unlinks it.
+    const again = await call('PUT', '/radar/trend', { enabled: false, edition_id: null });
+    expect(again.status).toBe(200);
+    expect(db.radar_subscriptions_v2[0]).toMatchObject({ enabled: false, settings: { channels: ['website', 'li_agile'], slate_email: false } });
+    expect((db.radar_subscriptions_v2[0].settings as Record<string, unknown>).edition_id).toBeUndefined();
+    expect((await call('GET', '/radars')).json.data).toMatchObject({ radars: [{ radar: 'trend', subscribed: true, enabled: false, brand: { name: 'Kent Smith Studio' } }, { radar: 'dev', subscribed: false }] });
+  });
+  it('refuses another user\'s edition or channel, a bad brand URL and an unknown radar', async () => {
+    const code = async (body: unknown) => ((await call('PUT', '/radar/trend', body)).json.error as { code: string }).code;
+    expect(await code({ edition_id: 'theirs' })).toBe('UNKNOWN_EDITION');
+    expect(await code({ channels: ['li_other'] })).toBe('UNKNOWN_CHANNEL');
+    expect((await call('PUT', '/radar/trend', { brand: { cta_url: 'not a url' } })).status).toBe(400);
+    expect((await call('PUT', '/radar/weather', { enabled: true })).status).toBe(404);
+    expect(db.radar_subscriptions_v2).toEqual([]);
+  });
+});

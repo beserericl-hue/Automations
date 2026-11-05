@@ -6,9 +6,9 @@
  * Roundup (each becomes a short LinkedIn link post). Both run weekly on the engine; "Run now" builds
  * this week's slate immediately.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, ApiError } from '../../lib/api';
 import { useUser } from '../../contexts/UserContext';
 import { useEngineJobQueue } from '../../hooks/useEngineJobQueue';
@@ -40,15 +40,157 @@ interface RadarData {
 const INFO: Record<Radar, { name: string; blurb: string; makes: string }> = {
   trend: {
     name: 'Trend Radar',
-    blurb: 'Founder and AI news ranked by how much it makes an idea-stage founder want a product built. Runs Mondays 6:00 AM ET.',
-    makes: 'Each topic you schedule becomes a TechAhir blog post and a LinkedIn article, with a sketchnote image.',
+    blurb: 'News from your feeds, ranked by how strongly it makes your ideal customer want what you offer. Runs Mondays 6:00 AM ET.',
+    makes: 'Each topic you schedule becomes a blog post and a LinkedIn article in your brand’s voice, with a sketchnote image.',
   },
   dev: {
     name: 'Dev Radar',
-    blurb: 'This week’s best AI + software-development articles and videos (Hacker News, YouTube, 15 feeds). Runs Sundays 6:00 AM ET.',
-    makes: 'Each item you schedule becomes a short LinkedIn post: our summary, the link, and the “comment newsletter” call to action. Two a weekday.',
+    blurb: 'This week’s best AI + software-development articles and videos (Hacker News, YouTube, your feeds). Runs Sundays 6:00 AM ET.',
+    makes: 'Each item you schedule becomes a short LinkedIn post: your summary, the link, and the “comment newsletter” call to action. Two a weekday.',
   },
 };
+
+interface RadarSetupData {
+  radar: Radar;
+  subscribed: boolean;
+  enabled: boolean;
+  edition_id: string | null;
+  channels: string[];
+  slate_email: boolean;
+  brand: Record<string, string>;
+  last_run: { week_of: string; status: string } | null;
+}
+interface RadarsResponse {
+  radars: RadarSetupData[];
+  editions: Array<{ id: string; name: string }>;
+}
+
+const BRAND_FIELDS: Array<{ key: string; label: string; hint: string; radar?: Radar; long?: boolean }> = [
+  { key: 'name', label: 'Brand name', hint: 'Who is speaking. e.g. Kent Smith Studio' },
+  { key: 'what_we_do', label: 'What you do', hint: 'One clause after the name: “…which ghostwrites business books in 90 days”' },
+  { key: 'audience', label: 'Ideal customer', hint: 'Who the posts and the ranking are for' },
+  { key: 'goal', label: 'What the content must achieve', hint: 'e.g. make founders realise they need a book before their next raise', radar: 'trend' },
+  { key: 'pitch', label: 'Your pitch, in a line', hint: 'The “How <brand> helps” section of every article', radar: 'trend' },
+  { key: 'cta_text', label: 'Call to action', hint: 'The link text at the end of every post', radar: 'trend' },
+  { key: 'cta_url', label: 'Call-to-action link', hint: 'https://…', radar: 'trend' },
+  { key: 'scoring_focus', label: 'What to rank high', hint: 'Plain words: what a top story looks like, what is off-topic. Blank keeps the MVP-demand ranking.', radar: 'trend', long: true },
+  { key: 'newsletter_name', label: 'Newsletter name', hint: 'Named in the call to action of every roundup post', radar: 'dev' },
+  { key: 'newsletter_cta', label: 'How readers subscribe', hint: "e.g. comment 'newsletter'", radar: 'dev' },
+  { key: 'hashtags', label: 'Hashtags always included', hint: '#ai #founders', long: false },
+];
+
+/** Switch a radar on for THIS account and say what it feeds, where it posts, and whose voice it uses.
+ *  Eric, 2026-11-05: "These Radars are not global, but account specific, so we need to be able to
+ *  initialize radars for other contents created by other users." A superuser impersonating a user
+ *  sets it up for them here. */
+function RadarSetup({ radar }: { radar: Radar }) {
+  const qc = useQueryClient();
+  const radars = useQuery({ queryKey: ['radars'], queryFn: () => apiFetch<{ success: boolean; data: RadarsResponse }>('/api/social/radars') });
+  const channels = useQuery({ queryKey: ['social-channels'], queryFn: () => apiFetch<{ success: boolean; data: Array<{ channel: string; kind: string; label: string; enabled: boolean }> }>('/api/social/channels') });
+  const current = radars.data?.data?.radars?.find((r) => r.radar === radar);
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ enabled: false, edition_id: '', channels: [] as string[], slate_email: true, brand: {} as Record<string, string> });
+  const [error, setError] = useState('');
+  const [saved, setSaved] = useState('');
+  useEffect(() => {
+    if (current) setForm({ enabled: current.enabled, edition_id: current.edition_id ?? '', channels: current.channels, slate_email: current.slate_email, brand: current.brand });
+  }, [current]);
+  useEffect(() => { if (current && !current.subscribed) setOpen(true); }, [current]);
+
+  const save = useMutation({
+    mutationFn: () => apiFetch(`/api/social/radar/${radar}`, {
+      method: 'PUT',
+      body: JSON.stringify({ enabled: form.enabled, edition_id: form.edition_id || null, channels: form.channels, slate_email: form.slate_email, brand: form.brand }),
+    }),
+    onSuccess: () => {
+      setError('');
+      setSaved(form.enabled ? 'Saved. This radar runs weekly for your account.' : 'Saved. This radar is switched off.');
+      void qc.invalidateQueries({ queryKey: ['radars'] });
+      void qc.invalidateQueries({ queryKey: ['radar', radar] });
+      void qc.invalidateQueries({ queryKey: ['studio', 'editions'] });
+    },
+    onError: (e) => { setSaved(''); setError(e instanceof ApiError ? e.message : 'Could not save the radar'); },
+  });
+
+  const editions = radars.data?.data?.editions ?? [];
+  const chans = (channels.data?.data ?? []).filter((c) => c.enabled);
+  const brand = (k: string, v: string) => setForm({ ...form, brand: { ...form.brand, [k]: v } });
+  return (
+    <section className="rounded border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900" data-testid={`radar-setup-${radar}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+          {INFO[radar].name} for your account
+          {current && (
+            <span className={`ml-2 rounded px-1.5 py-0.5 text-xs font-medium ${current.enabled ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`} data-testid={`radar-setup-${radar}-state`}>
+              {current.enabled ? 'on' : current.subscribed ? 'off' : 'not set up'}
+            </span>
+          )}
+        </h2>
+        <button type="button" onClick={() => setOpen((v) => !v)} data-testid={`radar-setup-${radar}-toggle`} className="rounded border border-gray-300 px-2 py-1 text-xs dark:border-gray-600">
+          {open ? 'Hide setup' : current?.subscribed ? 'Settings' : 'Set up'}
+        </button>
+      </div>
+      {open && (
+        <div className="mt-3 space-y-3 text-sm">
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} data-testid={`radar-setup-${radar}-enabled`} />
+            Run this radar weekly for my account
+          </label>
+          <label className="block">
+            <span className="text-gray-700 dark:text-gray-300">Feeds the edition</span>
+            <select value={form.edition_id} onChange={(e) => setForm({ ...form, edition_id: e.target.value })} data-testid={`radar-setup-${radar}-edition`}
+              className="mt-1 block w-full rounded border border-gray-300 px-2 py-1 dark:border-gray-600 dark:bg-gray-800">
+              <option value="">— none (slate only; no Content Studio) —</option>
+              {editions.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+            </select>
+            <span className="text-xs text-gray-500">The Content Studio works on this edition; its slate feeds the edition’s issues.</span>
+          </label>
+          <div>
+            <span className="text-gray-700 dark:text-gray-300">Posts go to</span>
+            <div className="mt-1 flex flex-wrap gap-3">
+              {chans.map((c) => (
+                <label key={c.channel} className="inline-flex items-center gap-1.5">
+                  <input type="checkbox" checked={form.channels.includes(c.channel)} data-testid={`radar-setup-${radar}-channel-${c.channel}`}
+                    onChange={(e) => setForm({ ...form, channels: e.target.checked ? [...form.channels, c.channel] : form.channels.filter((x) => x !== c.channel) })} />
+                  {c.label}
+                </label>
+              ))}
+              {!chans.length && <span className="text-xs text-gray-500">No channels yet — switch some on in Settings → Integrations.</span>}
+            </div>
+            <span className="text-xs text-gray-500">None ticked = every channel you have switched on.</span>
+          </div>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={form.slate_email} onChange={(e) => setForm({ ...form, slate_email: e.target.checked })} data-testid={`radar-setup-${radar}-slate-email`} />
+            Email me the slate when a run finishes
+          </label>
+          <details>
+            <summary className="cursor-pointer font-medium text-gray-800 dark:text-gray-100">Voice &amp; brand (blank fields keep the defaults)</summary>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {BRAND_FIELDS.filter((f) => !f.radar || f.radar === radar).map((f) => (
+                <label key={f.key} className={`block ${f.long ? 'sm:col-span-2' : ''}`}>
+                  <span className="text-gray-700 dark:text-gray-300">{f.label}</span>
+                  {f.long ? (
+                    <textarea value={form.brand[f.key] ?? ''} onChange={(e) => brand(f.key, e.target.value)} rows={4} placeholder={f.hint} data-testid={`radar-setup-${radar}-brand-${f.key}`}
+                      className="mt-1 block w-full rounded border border-gray-300 px-2 py-1 dark:border-gray-600 dark:bg-gray-800" />
+                  ) : (
+                    <input value={form.brand[f.key] ?? ''} onChange={(e) => brand(f.key, e.target.value)} placeholder={f.hint} data-testid={`radar-setup-${radar}-brand-${f.key}`}
+                      className="mt-1 block w-full rounded border border-gray-300 px-2 py-1 dark:border-gray-600 dark:bg-gray-800" />
+                  )}
+                </label>
+              ))}
+            </div>
+          </details>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => save.mutate()} disabled={save.isPending} data-testid={`radar-setup-${radar}-save`}
+              className="rounded bg-brand-600 px-3 py-1.5 font-medium text-white hover:bg-brand-700 disabled:opacity-50">{save.isPending ? 'Saving…' : 'Save radar'}</button>
+            {saved && <span className="text-xs text-green-700 dark:text-green-300" role="status">{saved}</span>}
+          </div>
+          {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
+        </div>
+      )}
+    </section>
+  );
+}
 
 export default function RadarPanel() {
   const { profile } = useUser();
@@ -128,6 +270,8 @@ export default function RadarPanel() {
         </div>
         {message && <p className="mt-2 text-sm text-gray-600 dark:text-gray-300" role="status">{message}</p>}
       </section>
+
+      <RadarSetup radar={radar} />
 
       {query.isError && <p className="text-sm text-red-600">Could not load the slate.</p>}
       {data && data.topics.length === 0 && (

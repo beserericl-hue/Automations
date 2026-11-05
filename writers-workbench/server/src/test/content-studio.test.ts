@@ -332,3 +332,27 @@ describe('content studio: history across weeks, own topics (Eric, 2026-11-05)', 
     expect(hub).not.toHaveBeenCalled();
   });
 });
+
+describe('radar posts in any newsletter (Eric, 2026-11-05)', () => {
+  it('the library lists every radar post and topic of the caller across editions and radars', async () => {
+    db.social_schedule_v2.push(
+      { id: 'p-other-ed', user_id: 'owner', edition_id: 'ai-mvp', display_number: 9, state: 'posted', title: 'From the other edition', radar_topic_id: 'old' },
+      { id: 'p-theirs', user_id: 'other', edition_id: 'theirs', display_number: 1, state: 'posted', title: 'Not mine' },
+    );
+    const r = await call('GET', '/library');
+    expect(r.status).toBe(200);
+    const d = r.json.data as { posts: Row[]; topics: Row[] };
+    expect(d.posts.map((p) => p.id)).toEqual(['p-other-ed']); // the draft #7 is not featurable yet; other users never appear
+    expect(d.topics.map((t) => t.id)).toEqual([TOPIC, 'v', 'old']);
+  });
+  it('an edition with no radar can still choose stories; another user\'s edition cannot', async () => {
+    engine.mockImplementation(async (_tool: string, body: Record<string, unknown>) => ({ status: 'ok', payload: { op: body.op, result: { edition: body.edition_id, action: body.action } } }));
+    const r = await call('PUT', '/plain/issue', { items: [{ kind: 'post', id: POST }] });
+    expect(r.status).toBe(200);
+    expect(r.json.data).toEqual({ edition: 'plain', action: 'set' });
+    expect(engine).toHaveBeenCalledWith('studio', expect.objectContaining({ op: 'issue', edition_id: 'plain', user_id: 'owner' }));
+    expect((await call('GET', '/theirs/issue')).status).toBe(404);
+    // Everything else still needs a radar-fed edition.
+    expect((await call('POST', '/plain/generate', { numbers: '1' })).status).toBe(404);
+  });
+});

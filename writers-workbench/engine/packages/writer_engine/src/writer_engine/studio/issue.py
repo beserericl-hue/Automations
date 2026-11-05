@@ -130,18 +130,15 @@ async def view(client: Any, ed: StudioEdition, selection: dict[str, Any] | None 
 async def _check_items(
     client: Any, ed: StudioEdition, items: Sequence[dict[str, Any]]
 ) -> list[dict[str, Any]]:
-    """Keep only the caller's own posts in this edition and topics of this edition's radar."""
+    """Keep only the caller's own posts and topics — from ANY of their editions and radars, so a radar
+    post can be featured in any of their newsletters (Eric, 2026-11-05). Never another user's."""
     post_ids = [str(i["id"]) for i in items if i.get("kind") == "post" and i.get("id")]
     topic_ids = [str(i["id"]) for i in items if i.get("kind") == "topic" and i.get("id")]
     own_posts = {
         str(p["id"]): p
         for p in (
             await _rows(
-                client.table(SCHEDULE)
-                .select("id,state")
-                .eq("user_id", ed.user_id)
-                .eq("edition_id", ed.edition_id)
-                .in_("id", post_ids)
+                client.table(SCHEDULE).select("id,state").eq("user_id", ed.user_id).in_("id", post_ids)
             )
             if post_ids
             else []
@@ -150,13 +147,7 @@ async def _check_items(
     own_topics = {
         str(t["id"])
         for t in (
-            await _rows(
-                client.table(TOPICS)
-                .select("id")
-                .eq("user_id", ed.user_id)
-                .eq("radar", ed.radar)
-                .in_("id", topic_ids)
-            )
+            await _rows(client.table(TOPICS).select("id").eq("user_id", ed.user_id).in_("id", topic_ids))
             if topic_ids
             else []
         )
@@ -171,7 +162,7 @@ async def _check_items(
             kind == "topic" and ident in own_topics
         )
         if not ok:
-            raise StudioError("NOT_FOUND", f"Not one of this edition's {kind}s: {ident}")
+            raise StudioError("NOT_FOUND", f"Not one of your {kind}s: {ident}")
         seen.add((kind, ident))
         out.append({"kind": kind, "id": ident})
     if len(out) > MAX_ITEMS:

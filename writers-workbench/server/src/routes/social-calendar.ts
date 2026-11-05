@@ -263,6 +263,110 @@ socialCalendarRouter.get('/radar/:radar', async (req: Request, res: Response) =>
   });
 });
 
+// ---------------------------------------------------------------------------- radar setup (per account)
+// A radar is the caller's own (radar_subscriptions_v2, one row per user per radar). Nothing here is
+// seeded any more: the owner switches a radar on, says which edition it feeds, which channels it posts
+// to, whether the slate is emailed, and whose brand the drafts speak in (settings.brand, read by
+// writer_engine.radar.brand). Eric, 2026-11-05: "These Radars are not global, but account specific."
+
+const BRAND_FIELD = z.string().trim().max(1500);
+const BrandSchema = z.object({
+  name: BRAND_FIELD.optional(),
+  what_we_do: BRAND_FIELD.optional(),
+  pitch: BRAND_FIELD.optional(),
+  cta_text: BRAND_FIELD.optional(),
+  cta_url: z.union([z.string().trim().url().max(2000), z.literal('')]).optional(),
+  audience: BRAND_FIELD.optional(),
+  goal: BRAND_FIELD.optional(),
+  scoring_focus: BRAND_FIELD.optional(),
+  newsletter_name: BRAND_FIELD.optional(),
+  newsletter_cta: BRAND_FIELD.optional(),
+  hashtags: BRAND_FIELD.optional(),
+}).strict();
+const RadarSettingsSchema = z.object({
+  enabled: z.boolean().optional(),
+  edition_id: z.string().trim().max(200).nullable().optional(),
+  channels: z.array(CHANNEL).max(10).optional(),
+  slate_email: z.boolean().optional(),
+  brand: BrandSchema.optional(),
+}).strict();
+
+/** The two radars with the caller's subscription (if any), its settings and its latest run. */
+socialCalendarRouter.get('/radars', async (req: Request, res: Response) => {
+  const userId = req.userId!;
+  const sb = getSupabaseAdmin();
+  const [{ data: subs }, { data: runs }, { data: editions }] = await Promise.all([
+    sb.from('radar_subscriptions_v2').select('radar, enabled, settings, updated_at').eq('user_id', userId),
+    sb.from('radar_runs_v2').select('radar, week_of, status, finished_at').eq('user_id', userId).order('week_of', { ascending: false }).limit(10),
+    sb.from('newsletter_editions_v2').select('id, display_name').eq('user_id', userId),
+  ]);
+  const bySub = new Map(((subs ?? []) as Array<Record<string, unknown>>).map((s) => [String(s.radar), s]));
+  const latest = new Map<string, Record<string, unknown>>();
+  for (const r of (runs ?? []) as Array<Record<string, unknown>>) if (!latest.has(String(r.radar))) latest.set(String(r.radar), r);
+  res.json({
+    success: true,
+    data: {
+      radars: ['trend', 'dev'].map((radar) => {
+        const s = bySub.get(radar);
+        const settings = ((s?.settings ?? {}) as Record<string, unknown>);
+        return {
+          radar,
+          subscribed: Boolean(s),
+          enabled: Boolean(s?.enabled),
+          edition_id: (settings.edition_id as string | undefined) ?? null,
+          channels: Array.isArray(settings.channels) ? (settings.channels as string[]) : [],
+          slate_email: settings.slate_email !== false,
+          brand: (settings.brand as Record<string, string> | undefined) ?? {},
+          last_run: latest.get(radar) ?? null,
+        };
+      }),
+      editions: ((editions ?? []) as Array<Record<string, unknown>>).map((e) => ({ id: String(e.id), name: String(e.display_name ?? e.id) })),
+    },
+  });
+});
+
+/** Create or update the caller's subscription to a radar. Only their own editions and channels are
+ *  accepted. A superuser impersonating a user sets it up for that user — this is configuration, not a
+ *  credential, so it is not refused like Integrations. */
+socialCalendarRouter.put('/radar/:radar', validateBody(RadarSettingsSchema), async (req: Request, res: Response) => {
+  const radar = String(req.params.radar);
+  if (!RADARS.has(radar)) return bad(res, 404, 'NOT_FOUND', 'No such radar');
+  const userId = req.userId!;
+  const body = req.body as z.infer<typeof RadarSettingsSchema>;
+  const sb = getSupabaseAdmin();
+  if (body.channels?.length) {
+    const unknown = await unknownChannels(userId, body.channels);
+    if (unknown.length) return bad(res, 400, 'UNKNOWN_CHANNEL', `Not one of your channels: ${unknown.join(', ')}`);
+  }
+  if (body.edition_id) {
+    const { data: ed } = await sb.from('newsletter_editions_v2').select('id, user_id').eq('user_id', userId).eq('id', body.edition_id).maybeSingle();
+    if (!ed) return bad(res, 400, 'UNKNOWN_EDITION', 'Not one of your editions');
+  }
+  const { data: existing } = await sb.from('radar_subscriptions_v2').select('enabled, settings').eq('user_id', userId).eq('radar', radar).maybeSingle();
+  const settings: Record<string, unknown> = { ...((existing?.settings ?? {}) as Record<string, unknown>) };
+  if (body.edition_id !== undefined) {
+    if (body.edition_id) settings.edition_id = body.edition_id;
+    else delete settings.edition_id;
+  }
+  if (body.channels !== undefined) {
+    if (body.channels.length) settings.channels = body.channels;
+    else delete settings.channels;
+  }
+  if (body.slate_email !== undefined) settings.slate_email = body.slate_email;
+  if (body.brand !== undefined) {
+    const brand: Record<string, string> = {};
+    for (const [k, v] of Object.entries(body.brand)) if (typeof v === 'string' && v.trim()) brand[k] = v.trim();
+    if (Object.keys(brand).length) settings.brand = brand;
+    else delete settings.brand;
+  }
+  const enabled = body.enabled ?? (existing ? existing.enabled !== false : true);
+  const { error } = existing
+    ? await sb.from('radar_subscriptions_v2').update({ enabled, settings }).eq('user_id', userId).eq('radar', radar)
+    : await sb.from('radar_subscriptions_v2').insert({ user_id: userId, radar, enabled, settings });
+  if (error) return bad(res, 500, 'DB_ERROR', error.message);
+  res.json({ success: true, data: { radar, enabled, settings } });
+});
+
 const RunSchema = z.object({ force: z.boolean().optional() });
 const ScheduleSchema = z.object({
   numbers: z.union([z.string().max(200), z.array(z.number().int().min(1).max(50)).max(50)]),

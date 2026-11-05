@@ -23,46 +23,15 @@ from pydantic import BaseModel
 
 from writer_engine.config import get_settings
 from writer_engine.llm import complete_structured, get_router
+from writer_engine.radar.brand import DEFAULT_BRAND, blog_system, brand_of, roundup_system
 from writer_engine.social import schedule as S
 from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("radar.drafts")
 
-BLOG_SYSTEM = (
-    "You are a senior content writer for TechAhir, which builds full, working, sellable MVPs for founders in days "
-    "(not throwaway prototypes). Write publish-ready content that showcases expertise and promotes the rapid 3-day "
-    "MVP service.\nOUTPUT FORMAT: output PLAIN TEXT in EXACTLY this structure and NOTHING else (no JSON, no code "
-    "fences, no commentary before or after):\nSEO_TITLE: <about 55 characters>\nTITLE: <the blog headline>\nMETA: "
-    "<about 155 characters>\nCATEGORY: <a short label like AI & DATA>\n===BLOG===\n<a 700-1100 word blog in "
-    "markdown: intro, ## H2 and ### H3 sections, a Key Takeaways list, ending with a short CTA paragraph as the "
-    "markdown link [Get your MVP built in 3 days](https://www.techahir.com/3day-minimum-viable-product-mvp), then a "
-    "final Sources line citing the primary source URL>\n===LINKEDIN===\n<a 400-700 word ARTICLE-STYLE LinkedIn post "
-    'UNDER 2900 characters: a strong hook, key insights (short subheads or bullets), THEN a "How TechAhir builds '
-    'working, sellable products in days" section (speed WITH discipline / no vibe-coding; senior developers as '
-    "project leaders and the human guardrail; virtually zero defects via customized-model QA), a takeaway, the SAME "
-    "CTA markdown link, and 3-5 hashtags>\n===END===\nGround the piece in the provided research summary and cite the "
-    "primary source. Do not fabricate facts, dates, figures, or quotes. Weave in the TechAhir positioning, "
-    "especially on AI-announcement topics."
-)
-
-ROUNDUP_SYSTEM = (
-    "You are the AI Dev Roundup social curator for TechAhir. You turn the week's best AI + software-development "
-    "articles and YouTube videos into SHORT LinkedIn posts that (1) summarize the source in our own words, (2) link "
-    "to the original, and (3) invite readers to comment 'newsletter' to subscribe to our weekly AI-for-developers "
-    "roundup. This is SOCIAL-FIRST: the output is a LinkedIn post, not a blog.\n\n"
-    "For EACH item draft ONE LinkedIn post using its title, source, url and angle. FORMAT:\n"
-    "- A strong one-line hook.\n"
-    "- 2-4 sentences summarizing IN OUR OWN WORDS what the article/video covers and why it matters to founders and "
-    "developers. NEVER copy the source's wording — paraphrase, stay accurate and neutral.\n"
-    "- A link line using the EXACT url given: use '🔗 Read:' for articles and '🎥 Watch:' for videos.\n"
-    "- The CTA (REQUIRED on every post): a line inviting readers to comment 'newsletter' to subscribe, e.g. "
-    "\"💬 Want these every week? Comment 'newsletter' and we'll add you to our AI-for-developers roundup.\"\n"
-    "- 3-5 relevant hashtags.\n"
-    "Keep each UNDER 2900 characters. Always credit the source by name. Do NOT reproduce the article body or the "
-    "video transcript; a short quoted phrase is fine, paragraphs are not. Never mention images.\n"
-    "Return exactly one post object per item, with i matching the item number, as this JSON object:\n"
-    '{"posts": [{"i": 0, "content": "<the full post text>"}]}'
-)
+BLOG_SYSTEM = blog_system(DEFAULT_BRAND)
+"""The TechAhir wording; ``draft_trend(..., settings=)`` builds the prompt for the subscription's brand."""
+ROUNDUP_SYSTEM = roundup_system(DEFAULT_BRAND)
 
 TREND_CHANNELS = ("website", "li_techahir", "li_agile", "li_personal")
 ROUNDUP_CHANNELS = ("li_techahir", "li_agile", "li_personal")
@@ -134,10 +103,12 @@ class RoundupPosts(BaseModel):
 
 
 async def draft_trend(
-    topics: Sequence[dict[str, Any]], *, router: Any = None
+    topics: Sequence[dict[str, Any]], *, router: Any = None, brand: dict[str, Any] | None = None
 ) -> tuple[list[dict[str, Any]], int]:
+    """``brand`` is the radar subscription's settings (its ``brand`` key names who is speaking)."""
     settings = get_settings()
     router = router or get_router(service="radar")
+    system = blog_system(brand_of(brand))
     drafted: list[dict[str, Any]] = []
     failed = 0
     for t in topics:
@@ -150,7 +121,7 @@ async def draft_trend(
             resp = await router.complete(
                 provider="anthropic",
                 model=settings.model_default,
-                system=BLOG_SYSTEM,
+                system=system,
                 prompt=user,
                 max_tokens=8000,
                 temperature=0.7,
@@ -181,7 +152,7 @@ async def draft_trend(
 
 
 async def draft_roundup(
-    topics: Sequence[dict[str, Any]], *, router: Any = None
+    topics: Sequence[dict[str, Any]], *, router: Any = None, brand: dict[str, Any] | None = None
 ) -> tuple[list[dict[str, Any]], int]:
     settings = get_settings()
     router = router or get_router(service="radar")
@@ -194,7 +165,7 @@ async def draft_roundup(
         router,
         provider="anthropic",
         model=settings.model_default,
-        system=ROUNDUP_SYSTEM,
+        system=roundup_system(brand_of(brand)),
         prompt=f"Draft {len(topics)} LinkedIn posts, one per item.\n\nITEMS:\n" + "\n".join(lines),
         schema=RoundupPosts,
         max_tokens=16000,
@@ -304,16 +275,18 @@ async def schedule_slate(
     channels: Sequence[str] | None,
     now: datetime,
     router: Any = None,
+    brand: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Draft ``topics`` and put them on the calendar. Returns what was scheduled and what failed."""
+    """Draft ``topics`` and put them on the calendar. Returns what was scheduled and what failed.
+    ``brand`` is the radar subscription's settings (whose voice the drafts are in)."""
     if radar == "trend":
-        drafted, failed = await draft_trend(topics, router=router)
+        drafted, failed = await draft_trend(topics, router=router, brand=brand)
         chans = list(channels or TREND_CHANNELS)
         taken = await S.taken_slots(client, user_id, now.astimezone(S.ET).date())
         slots = S.next_slots(now, len(drafted), weekdays_only=False, taken=taken)
         source, prefix = "trend_batch", "batch"
     else:
-        drafted, failed = await draft_roundup(topics, router=router)
+        drafted, failed = await draft_roundup(topics, router=router, brand=brand)
         drafted = S.interleave(drafted)
         chans = list(channels or ROUNDUP_CHANNELS)
         start = (now.astimezone(S.ET) + timedelta(days=1)).date()

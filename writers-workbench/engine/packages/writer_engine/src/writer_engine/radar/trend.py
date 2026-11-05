@@ -20,6 +20,7 @@ from pydantic import BaseModel
 
 from writer_engine.config import get_settings
 from writer_engine.llm import complete_structured, get_router
+from writer_engine.radar.brand import brand_of, scoring_system, summary_system
 from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("radar.trend")
@@ -292,8 +293,13 @@ async def fetch(http: httpx.AsyncClient, feeds: Sequence[tuple[str, str]]) -> tu
 
 
 async def build_slate(
-    http: httpx.AsyncClient, *, feeds: Sequence[tuple[str, str]], now: datetime
+    http: httpx.AsyncClient,
+    *,
+    feeds: Sequence[tuple[str, str]],
+    now: datetime,
+    brand: dict[str, Any] | None = None,
 ) -> tuple[list[Item], dict[str, Any]]:
+    """``brand`` is the radar subscription's settings; its ``brand`` key says whose demand we score for."""
     settings = get_settings()
     router = get_router(service="radar")
     raw, errors = await fetch(http, feeds)
@@ -311,7 +317,7 @@ async def build_slate(
         router,
         provider="anthropic",
         model=settings.model_default,
-        system=SCORING_SYSTEM,
+        system=scoring_system(brand_of(brand)),
         prompt=(
             f"Score these {len(short)} items. Return exactly {len(short)} objects (one per item; index i "
             f"matches the item number).\n\nITEMS:\n" + "\n".join(lines)
@@ -335,7 +341,7 @@ async def build_slate(
             router,
             provider="anthropic",
             model=settings.model_default,
-            system=SUMMARY_SYSTEM,
+            system=summary_system(brand_of(brand)),
             prompt=(
                 f"Write a 2-paragraph summary for each of the {len(slate)} articles below. Return exactly "
                 f"{len(slate)} summary objects (i matches the ITEM number).\n\n" + "\n\n---\n\n".join(blocks)
