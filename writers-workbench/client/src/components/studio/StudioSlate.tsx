@@ -14,6 +14,7 @@ export default function StudioSlate({ ctx }: { ctx: StudioContext }) {
   const [picked, setPicked] = useState<number[]>([]);
   const [range, setRange] = useState('');
   const [error, setError] = useState('');
+  const [own, setOwn] = useState({ title: '', url: '', angle: '' });
 
   const overview = useQuery({ queryKey: ['studio', ed, 'overview'], queryFn: () => studioApi.overview(ed) });
   const slate = useQuery({
@@ -39,6 +40,20 @@ export default function StudioSlate({ ctx }: { ctx: StudioContext }) {
       setRange('');
     },
     onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not start drafting'),
+  });
+
+  const addOwn = useMutation({
+    mutationFn: async () => {
+      const topic = (await studioApi.addTopic(ed, { title: own.title.trim(), ...(own.url.trim() ? { url: own.url.trim() } : {}), ...(own.angle.trim() ? { angle: own.angle.trim() } : {}) })).data;
+      const job = await studioApi.generate(ed, { topic_ids: [topic.id], week_of: topic.week_of });
+      return { topic, job };
+    },
+    onSuccess: ({ topic, job }) => {
+      ctx.track(job.jobId, `Drafting “${topic.title.slice(0, 60)}” (slate #${topic.rank})`);
+      setOwn({ title: '', url: '', angle: '' });
+      if (week && week !== topic.week_of) ctx.setWeek(topic.week_of);
+    },
+    onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not add the topic'),
   });
 
   const applyRange = () => {
@@ -79,6 +94,22 @@ export default function StudioSlate({ ctx }: { ctx: StudioContext }) {
           Generate {chosen.length || ''} draft{chosen.length === 1 ? '' : 's'}
         </button>
       </div>
+      <details className="rounded border border-gray-200 bg-white p-3 text-sm dark:border-gray-700 dark:bg-gray-900" data-testid="own-topic">
+        <summary className="cursor-pointer font-medium text-gray-800 dark:text-gray-100">Draft your own topic (not from the radar)</summary>
+        <p className="mt-1 text-xs text-gray-500">A title or a link you want written up. It joins this week’s slate at the next number and is drafted right away, like any radar topic. In the Assistant: <code>write about …</code> or paste a link.</p>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <input value={own.title} onChange={(e) => setOwn({ ...own, title: e.target.value })} placeholder="Title or idea" aria-label="Your topic" data-testid="own-topic-title"
+            className="rounded border border-gray-300 px-2 py-1 dark:border-gray-600 dark:bg-gray-800" />
+          <input value={own.url} onChange={(e) => setOwn({ ...own, url: e.target.value })} placeholder="https:// link (optional)" aria-label="Your topic's link" data-testid="own-topic-url"
+            className="rounded border border-gray-300 px-2 py-1 dark:border-gray-600 dark:bg-gray-800" />
+          <input value={own.angle} onChange={(e) => setOwn({ ...own, angle: e.target.value })} placeholder="Angle (optional): what the post should say" aria-label="Angle" data-testid="own-topic-angle"
+            className="rounded border border-gray-300 px-2 py-1 sm:col-span-2 dark:border-gray-600 dark:bg-gray-800" />
+        </div>
+        <button type="button" disabled={own.title.trim().length < 3 || addOwn.isPending} onClick={() => addOwn.mutate()} data-testid="own-topic-draft"
+          className="mt-2 rounded bg-brand-600 px-3 py-1.5 font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+          {addOwn.isPending ? 'Adding…' : 'Add to the slate and draft it'}
+        </button>
+      </details>
       {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
       {slate.isError && <p className="text-sm text-red-600">Could not load the slate.</p>}
       {slate.isSuccess && topics.length === 0 && <p className="text-sm text-gray-500">No slate yet. “Run radar now” builds this week’s.</p>}

@@ -282,3 +282,53 @@ describe('content studio: the slate email record (migration 052)', () => {
     expect(engine).not.toHaveBeenCalled();
   });
 });
+
+describe('content studio: history across weeks, own topics (Eric, 2026-11-05)', () => {
+  it('buckets every week\'s topics by what became of them, newest week first', async () => {
+    db.social_schedule_v2.push(
+      { id: 'p2', user_id: 'owner', edition_id: 'ai-dev-roundup', display_number: 8, state: 'cancelled', title: 'Gone', radar_topic_id: 'v', studio: { discarded_at: '2026-11-03T10:00:00Z' } },
+    );
+    const r = await call('GET', '/ai-dev-roundup/history');
+    expect(r.status).toBe(200);
+    const d = r.json.data as { weeks: Array<{ week_of: string; counts: Record<string, number>; topics: Array<Record<string, unknown>> }>; totals: Record<string, number> };
+    expect(d.weeks.map((w) => w.week_of)).toEqual(['2026-11-02', '2026-10-26']);
+    expect(d.weeks[0].topics.map((t) => [t.rank, t.bucket])).toEqual([[1, 'drafted'], [2, 'discarded']]);
+    expect(d.weeks[1].topics.map((t) => [t.rank, t.bucket])).toEqual([[1, 'not_drafted']]);
+    expect(d.totals).toEqual({ drafted: 1, discarded: 1, not_drafted: 1 });
+  });
+  it('maps post states to buckets', async () => {
+    const { historyBucket } = await import('../routes/content-studio.js');
+    expect(historyBucket(null)).toBe('not_drafted');
+    expect(historyBucket({ state: 'approved' })).toBe('drafted');
+    expect(historyBucket({ state: 'pending' })).toBe('scheduled');
+    expect(historyBucket({ state: 'partial' })).toBe('published');
+    expect(historyBucket({ state: 'cancelled', studio: {} })).toBe('cancelled');
+    expect(historyBucket({ state: 'failed' })).toBe('failed');
+  });
+  it('adds the owner\'s own topic to this week\'s slate at the next rank', async () => {
+    const { currentWeekOf } = await import('../routes/content-studio.js');
+    const week = currentWeekOf();
+    db.radar_topics_v2.push({ id: 'w', user_id: 'owner', radar: 'dev', week_of: week, rank: 4, title: 'x', url: 'https://x', item_type: 'article', angle: '' });
+    const r = await call('POST', '/ai-dev-roundup/topics', { title: 'Why agents need budgets', url: 'https://example.com/post', angle: 'cost control' });
+    expect(r.status).toBe(201);
+    const row = db.radar_topics_v2.find((t) => t.title === 'Why agents need budgets')!;
+    expect(row).toMatchObject({ user_id: 'owner', radar: 'dev', week_of: week, rank: 5, source: 'you', item_type: 'article', url: 'https://example.com/post', angle: 'cost control' });
+    expect((await call('POST', '/ai-dev-roundup/topics', { title: 'x' })).status).toBe(400);
+    expect((await call('POST', '/theirs/topics', { title: 'not mine at all' })).status).toBe(404);
+  });
+  it('the assistant drafts "write about …" by putting it on the slate first', async () => {
+    const { ownTopicCommand } = await import('../routes/content-studio.js');
+    expect(ownTopicCommand('write about agents that pay their own bills')).toEqual({ title: 'agents that pay their own bills' });
+    expect(ownTopicCommand('draft on: https://example.com/a-post')).toEqual({ title: 'example.com/a-post', url: 'https://example.com/a-post' });
+    expect(ownTopicCommand('https://example.com/bare')).toEqual({ title: 'example.com/bare', url: 'https://example.com/bare' });
+    expect(ownTopicCommand('generate 1-5')).toBeNull();
+    expect(ownTopicCommand('schedule all approved')).toBeNull();
+    const r = await call('POST', '/ai-dev-roundup/assistant', { message: 'write about agents that pay their own bills' });
+    expect(r.status).toBe(200);
+    expect(r.json.data).toMatchObject({ kind: 'queued', op: 'generate', jobId: 'j1', creditsCharged: 3 });
+    expect(String((r.json.data as Row).message)).toContain('agents that pay their own bills');
+    const topic = db.radar_topics_v2.find((t) => t.source === 'you')!;
+    expect(engine).toHaveBeenCalledWith('studio', expect.objectContaining({ op: 'generate', topic_ids: [topic.id], edition_id: 'ai-dev-roundup', user_id: 'owner' }));
+    expect(hub).not.toHaveBeenCalled();
+  });
+});

@@ -421,8 +421,14 @@ async def test_actions_move_only_posts_in_the_right_state() -> None:
     assert out["message"].startswith("Approved: #1.")
     assert [s["display_number"] for s in out["skipped"]] == [2]  # #9 is another edition's: not even found
     assert db.tables["social_schedule_v2"][0]["state"] == "approved"
-    await core.apply_action(db, ed, await core.own_posts(db, ed, numbers=[3]), "discard")
-    assert [p["display_number"] for p in db.tables["social_schedule_v2"]] == [1, 2, 9]
+    out = await core.apply_action(db, ed, await core.own_posts(db, ed, numbers=[3]), "discard")
+    # A discarded draft is kept (055): cancelled, stamped, out of review — the History tab shows it.
+    assert out["done"][0]["state"] == "discarded"
+    gone = next(p for p in db.tables["social_schedule_v2"] if p["display_number"] == 3)
+    assert gone["state"] == "cancelled" and gone["studio"]["discarded_at"]
+    assert [p["display_number"] for p in await core.own_posts(db, ed, numbers=[3])] == [3]
+    back = await core.apply_action(db, ed, await core.own_posts(db, ed, numbers=[3]), "requeue")
+    assert back["done"][0]["state"] == "draft" and "discarded_at" not in gone["studio"]
 
 
 @pytest.mark.asyncio
