@@ -15,7 +15,7 @@ export interface StudioEdition {
 
 export interface StudioChannel {
   channel: string;
-  kind: 'website' | 'linkedin';
+  kind: string; // 'website' or a Blotato platform (linkedin, facebook, threads, …)
   label: string;
   enabled: boolean;
 }

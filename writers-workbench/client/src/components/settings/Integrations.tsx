@@ -1,6 +1,7 @@
 /**
- * Settings → Integrations: your own Blotato account, the LinkedIn pages it posts to, and the blog
- * websites your posts go to (migration 043).
+ * Settings → Integrations: your own Blotato key and every account on it (LinkedIn, Facebook, Threads,
+ * X, Bluesky, Instagram, Pinterest, TikTok — migrations 043 + 055), and the blog websites your posts go to.
+ * Nothing about an account is typed: the key says what is on it, and each switch makes a channel.
  *
  * These are YOUR accounts. Another author's posts go out through their Blotato key and their blog,
  * never through ours, so the keys live here, per user — not in a server variable.
@@ -19,12 +20,30 @@ interface SecretStatus {
   last4: string | null;
   updated_at: string | null;
 }
-interface LinkedInTarget {
-  channel: string;
-  label: string;
+/** What a post needs before Blotato takes it on that platform (migration 055). */
+type Needs = 'text' | 'image' | 'video' | 'page';
+/** One place a post can go, read from the Blotato key: an account, or one of its pages / boards. */
+interface BlotatoTarget {
+  target_id: string;
+  platform: string;
+  account_id: string;
+  account_name: string;
   page_id: string | null;
-  account_override: string | null;
+  page_name: string | null;
+  board_id: string | null;
+  label: string;
+  needs: Needs;
+}
+interface SocialChannel {
+  channel: string;
+  kind: string;
+  label: string;
   enabled: boolean;
+  account_id: string | null;
+  page_id: string | null;
+  board_id: string | null;
+  target_id: string | null;
+  needs: Needs;
 }
 interface Website {
   channel: string;
@@ -39,8 +58,8 @@ interface Website {
 interface IntegrationsData {
   encryption_ready: boolean;
   read_only: boolean;
-  blotato: { account_id: string; key: SecretStatus };
-  linkedin: LinkedInTarget[];
+  blotato: { key: SecretStatus; accounts: BlotatoTarget[]; synced_at: string | null };
+  social: SocialChannel[];
   websites: Website[];
 }
 interface TestResult {
@@ -48,7 +67,7 @@ interface TestResult {
   status: number;
   message: string;
   header?: string;
-  accounts?: Array<{ id: string; platform: string; name: string }>;
+  accounts?: BlotatoTarget[];
 }
 
 const inputClass =
@@ -96,16 +115,6 @@ function Result({ result, testId }: { result: TestResult | null; testId: string 
       }`}
     >
       {result.message}
-      {result.accounts?.length ? (
-        <ul className="mt-1 list-disc pl-4">
-          {result.accounts.map((a) => (
-            <li key={`${a.platform}-${a.id}`}>
-              {a.platform} · account id <code>{a.id}</code>
-              {a.name ? ` · ${a.name}` : ''}
-            </li>
-          ))}
-        </ul>
-      ) : null}
     </div>
   );
 }
@@ -171,9 +180,10 @@ export default function Integrations() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Integrations</h1>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Your own accounts for the post calendar: the Blotato account that posts to LinkedIn, the LinkedIn pages it posts
-          to, and the blog websites your posts are published on. Keys and tokens are encrypted before they are stored and
-          are never shown again — only whether one is set and its last four characters.
+          Your own accounts for the post calendar: the Blotato key that posts to your social accounts (LinkedIn, Facebook,
+          Threads, X, Bluesky, Instagram, Pinterest, TikTok), and the blog websites your posts are published on. Keys and
+          tokens are encrypted before they are stored and are never shown again — only whether one is set and its last
+          four characters.
         </p>
       </div>
       {!data.encryption_ready ? (
@@ -187,7 +197,6 @@ export default function Integrations() {
         </p>
       ) : null}
       <BlotatoSection data={data} locked={locked} />
-      <LinkedInSection targets={data.linkedin} locked={locked} hasBlotato={data.blotato.key.set && Boolean(data.blotato.account_id)} />
       <WebsitesSection sites={data.websites} locked={locked} />
     </div>
   );
@@ -201,23 +210,21 @@ function BlotatoSection({ data, locked }: { data: IntegrationsData; locked: bool
   const qc = useQueryClient();
   const { addToast } = useToast();
   const [apiKey, setApiKey] = useState('');
-  const [accountId, setAccountId] = useState(data.blotato.account_id);
   const [err, setErr] = useState<string | null>(null);
   const [result, setResult] = useState<TestResult | null>(null);
+  const refresh = () => qc.invalidateQueries({ queryKey: ['integrations'] });
 
   const save = useMutation({
     mutationFn: async () => {
-      const body: Record<string, string> = {};
-      if (apiKey.trim()) body.api_key = apiKey.trim();
-      if (accountId.trim() !== data.blotato.account_id) body.account_id = accountId.trim();
-      if (!Object.keys(body).length) throw new Error('Nothing to save: enter a key or change the account id');
-      await apiFetch('/api/integrations/blotato', { method: 'PUT', body: JSON.stringify(body) });
+      if (!apiKey.trim()) throw new Error('Paste your Blotato API key first');
+      return (await apiFetch<ApiEnvelope<TestResult>>('/api/integrations/blotato', { method: 'PUT', body: JSON.stringify({ api_key: apiKey.trim() }) })).data!;
     },
-    onSuccess: () => {
+    onSuccess: (r) => {
       setApiKey('');
       setErr(null);
-      void qc.invalidateQueries({ queryKey: ['integrations'] });
-      addToast('Blotato settings saved', 'success');
+      setResult(r);
+      void refresh();
+      addToast(r.ok ? 'Blotato key saved and accounts read' : 'Blotato key saved', r.ok ? 'success' : 'info');
     },
     onError: (e) => setErr(errorText(e)),
   });
@@ -225,7 +232,7 @@ function BlotatoSection({ data, locked }: { data: IntegrationsData; locked: bool
     mutationFn: () => apiFetch('/api/integrations/blotato/key', { method: 'DELETE' }),
     onSuccess: () => {
       setResult(null);
-      void qc.invalidateQueries({ queryKey: ['integrations'] });
+      void refresh();
       addToast('Blotato key removed', 'success');
     },
     onError: (e) => setErr(errorText(e)),
@@ -238,18 +245,48 @@ function BlotatoSection({ data, locked }: { data: IntegrationsData; locked: bool
     onSuccess: (r) => {
       setErr(null);
       setResult(r);
+      if (!apiKey.trim()) void refresh(); // the saved key's list was stored
     },
     onError: (e) => {
       setResult(null);
       setErr(errorText(e));
     },
   });
+  const toggle = useMutation({
+    mutationFn: ({ target_id, enabled }: { target_id: string; enabled: boolean }) =>
+      apiFetch<ApiEnvelope<{ channel: string | null; enabled: boolean }>>('/api/integrations/blotato/targets', {
+        method: 'POST',
+        body: JSON.stringify({ target_id, enabled }),
+      }),
+    onSuccess: (_r, v) => {
+      setErr(null);
+      void refresh();
+      addToast(v.enabled ? 'Switched on — the calendar can post there now' : 'Switched off', 'success');
+    },
+    onError: (e) => setErr(errorText(e)),
+  });
+  const remove = useMutation({
+    mutationFn: (channel: string) => apiFetch(`/api/integrations/social/${channel}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      setErr(null);
+      void refresh();
+      addToast('Channel removed', 'success');
+    },
+    onError: (e) => setErr(errorText(e)),
+  });
+
+  const accounts = data.blotato.accounts;
+  const byTarget = new Map(data.social.filter((c) => c.target_id).map((c) => [c.target_id as string, c]));
+  const synced = new Set(accounts.map((a) => a.target_id));
+  // Channels made before the account list existed (or whose account left the key): still usable, shown apart.
+  const unmatched = data.social.filter((c) => !c.target_id || !synced.has(c.target_id));
+  const busy = locked || toggle.isPending;
 
   return (
     <Section
       testId="blotato-section"
-      title="Blotato (LinkedIn posting)"
-      hint="Your Blotato API key (Blotato → Settings → API) and the id of the LinkedIn account connected in Blotato. Test connection lists the accounts on the key; nothing is posted."
+      title="Blotato (social posting)"
+      hint="Your Blotato API key (Blotato → Settings → API). Everything on it — accounts, LinkedIn and Facebook pages, Pinterest boards — is read from the key; nothing is typed. Test connection re-reads it; nothing is posted."
     >
       <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
         API key: <SecretBadge status={data.blotato.key} testId="blotato-key-status" />
@@ -268,23 +305,12 @@ function BlotatoSection({ data, locked }: { data: IntegrationsData; locked: bool
           className={inputClass}
         />
       </Field>
-      <Field label="LinkedIn account id" htmlFor="blotato-account-id" hint="The Blotato account id of your connected LinkedIn account (Test connection shows it).">
-        <input
-          id="blotato-account-id"
-          data-testid="blotato-account-id"
-          value={accountId}
-          onChange={(e) => setAccountId(e.target.value)}
-          disabled={locked}
-          placeholder="9115"
-          className={inputClass}
-        />
-      </Field>
       <div className="flex flex-wrap gap-2">
         <button data-testid="blotato-save" className={primary} disabled={locked || save.isPending} onClick={() => { setErr(null); save.mutate(); }}>
           {save.isPending ? 'Saving…' : 'Save'}
         </button>
         <button data-testid="blotato-test" className={secondary} disabled={locked || test.isPending} onClick={() => test.mutate()}>
-          {test.isPending ? 'Testing…' : 'Test connection'}
+          {test.isPending ? 'Reading…' : data.blotato.key.set && !apiKey.trim() ? 'Refresh accounts' : 'Test connection'}
         </button>
         {data.blotato.key.set ? (
           <button
@@ -292,7 +318,7 @@ function BlotatoSection({ data, locked }: { data: IntegrationsData; locked: bool
             className={danger}
             disabled={locked || removeKey.isPending}
             onClick={() => {
-              if (window.confirm('Remove your Blotato API key? LinkedIn posts will fail until you add one again.')) removeKey.mutate();
+              if (window.confirm('Remove your Blotato API key? Social posts will fail until you add one again.')) removeKey.mutate();
             }}
           >
             Remove key
@@ -301,172 +327,82 @@ function BlotatoSection({ data, locked }: { data: IntegrationsData; locked: bool
       </div>
       <ErrorLine testId="blotato-error" message={err} />
       <Result testId="blotato-test-result" result={result} />
-    </Section>
-  );
-}
 
-// ---------------------------------------------------------------------------------------------
-// LinkedIn targets
-// ---------------------------------------------------------------------------------------------
-
-interface LinkedInForm {
-  label: string;
-  personal: boolean;
-  page_id: string;
-  enabled: boolean;
-}
-
-function LinkedInEditor({
-  initial,
-  onSave,
-  onCancel,
-  pending,
-  error,
-  idPrefix,
-}: {
-  initial: LinkedInForm;
-  onSave: (f: LinkedInForm) => void;
-  onCancel: () => void;
-  pending: boolean;
-  error: string | null;
-  idPrefix: string;
-}) {
-  const [f, setF] = useState(initial);
-  return (
-    <div data-testid={`${idPrefix}-form`} className="space-y-3 rounded-lg border border-brand-200 bg-brand-50/30 p-3 dark:border-brand-800 dark:bg-brand-950/20">
-      <Field label="Label" htmlFor={`${idPrefix}-label`}>
-        <input id={`${idPrefix}-label`} data-testid={`${idPrefix}-label`} value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} className={inputClass} placeholder="My company page" />
-      </Field>
-      <fieldset className="space-y-1">
-        <legend className="text-sm font-medium text-gray-700 dark:text-gray-300">Posts to</legend>
-        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <input type="radio" data-testid={`${idPrefix}-company`} checked={!f.personal} onChange={() => setF({ ...f, personal: false })} /> A company page
-        </label>
-        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <input type="radio" data-testid={`${idPrefix}-personal`} checked={f.personal} onChange={() => setF({ ...f, personal: true, page_id: '' })} /> My personal profile
-        </label>
-      </fieldset>
-      {!f.personal ? (
-        <Field label="LinkedIn page id" htmlFor={`${idPrefix}-page-id`} hint="The number in the page's admin URL: linkedin.com/company/<page id>/admin">
-          <input id={`${idPrefix}-page-id`} data-testid={`${idPrefix}-page-id`} inputMode="numeric" value={f.page_id} onChange={(e) => setF({ ...f, page_id: e.target.value })} className={inputClass} placeholder="104364682" />
-        </Field>
-      ) : null}
-      <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-        <input type="checkbox" data-testid={`${idPrefix}-enabled`} checked={f.enabled} onChange={(e) => setF({ ...f, enabled: e.target.checked })} /> Enabled
-      </label>
-      <ErrorLine testId={`${idPrefix}-error`} message={error} />
-      <div className="flex gap-2">
-        <button data-testid={`${idPrefix}-save`} className={primary} disabled={pending} onClick={() => onSave(f)}>
-          {pending ? 'Saving…' : 'Save'}
-        </button>
-        <button data-testid={`${idPrefix}-cancel`} className={secondary} onClick={onCancel}>
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function LinkedInSection({ targets, locked, hasBlotato }: { targets: LinkedInTarget[]; locked: boolean; hasBlotato: boolean }) {
-  const qc = useQueryClient();
-  const { addToast } = useToast();
-  const [editing, setEditing] = useState<string | null>(null); // channel key, or 'new'
-  const [err, setErr] = useState<string | null>(null);
-  const [rowErr, setRowErr] = useState<Record<string, string>>({});
-
-  const save = useMutation({
-    mutationFn: async ({ channel, f }: { channel: string | null; f: LinkedInForm }) => {
-      const body = { label: f.label.trim(), page_id: f.personal ? null : f.page_id.trim() || null, enabled: f.enabled };
-      if (!f.personal && !body.page_id) throw new Error('Enter the page id, or choose "My personal profile"');
-      if (channel) await apiFetch(`/api/integrations/linkedin/${channel}`, { method: 'PATCH', body: JSON.stringify(body) });
-      else await apiFetch('/api/integrations/linkedin', { method: 'POST', body: JSON.stringify(body) });
-    },
-    onSuccess: () => {
-      setEditing(null);
-      setErr(null);
-      void qc.invalidateQueries({ queryKey: ['integrations'] });
-      addToast('LinkedIn target saved', 'success');
-    },
-    onError: (e) => setErr(errorText(e)),
-  });
-  const remove = useMutation({
-    mutationFn: (channel: string) => apiFetch(`/api/integrations/linkedin/${channel}`, { method: 'DELETE' }),
-    onSuccess: (_r, channel) => {
-      setRowErr((m) => ({ ...m, [channel]: '' }));
-      void qc.invalidateQueries({ queryKey: ['integrations'] });
-      addToast('LinkedIn target removed', 'success');
-    },
-    onError: (e, channel) => setRowErr((m) => ({ ...m, [channel]: errorText(e) })),
-  });
-
-  return (
-    <Section
-      testId="linkedin-section"
-      title="LinkedIn targets"
-      hint="Where LinkedIn posts go, through your Blotato account. A company page needs its page id; your personal profile needs none."
-    >
-      {!hasBlotato && targets.length ? (
-        <p className="text-xs text-amber-700 dark:text-amber-400" data-testid="linkedin-needs-blotato">
-          These targets cannot post until your Blotato API key and account id are saved above.
+      <div>
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Post here</h3>
+        <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+          {accounts.length
+            ? `${accounts.length} place(s) on this key${data.blotato.synced_at ? `, read ${new Date(data.blotato.synced_at).toLocaleString()}` : ''}. Switch on the ones the calendar and the Content Studio may post to; each becomes a channel you can pick per post.`
+            : data.blotato.key.set
+              ? 'No accounts read yet — click Refresh accounts.'
+              : 'Save your key and the accounts on it appear here.'}
         </p>
-      ) : null}
-      {targets.length === 0 && editing !== 'new' ? (
-        <p data-testid="linkedin-empty" className="text-sm text-gray-500 dark:text-gray-400">No LinkedIn targets yet.</p>
-      ) : null}
-      <ul className="space-y-2">
-        {targets.map((t) =>
-          editing === t.channel ? (
-            <li key={t.channel}>
-              <LinkedInEditor
-                idPrefix={`li-edit-${t.channel}`}
-                initial={{ label: t.label, personal: !t.page_id, page_id: t.page_id ?? '', enabled: t.enabled }}
-                onSave={(f) => { setErr(null); save.mutate({ channel: t.channel, f }); }}
-                onCancel={() => { setEditing(null); setErr(null); }}
-                pending={save.isPending}
-                error={err}
-              />
-            </li>
-          ) : (
-            <li key={t.channel} data-testid={`li-row-${t.channel}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-700">
-              <div className="text-sm">
-                <span className="font-medium text-gray-900 dark:text-white">{t.label}</span>{' '}
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {t.page_id ? `company page ${t.page_id}` : 'personal profile'} · <code>{t.channel}</code>
-                  {t.enabled ? '' : ' · off'}
-                </span>
-                <ErrorLine testId={`li-row-error-${t.channel}`} message={rowErr[t.channel] || null} />
-              </div>
-              <div className="flex gap-2">
-                <button data-testid={`li-edit-${t.channel}`} className={secondary} disabled={locked} onClick={() => { setEditing(t.channel); setErr(null); }}>
-                  Edit
-                </button>
-                <button
-                  data-testid={`li-remove-${t.channel}`}
-                  className={danger}
-                  disabled={locked || remove.isPending}
-                  onClick={() => { if (window.confirm(`Remove ${t.label}?`)) remove.mutate(t.channel); }}
-                >
-                  Remove
-                </button>
-              </div>
-            </li>
-          ),
-        )}
-      </ul>
-      {editing === 'new' ? (
-        <LinkedInEditor
-          idPrefix="li-new"
-          initial={{ label: '', personal: false, page_id: '', enabled: true }}
-          onSave={(f) => { setErr(null); save.mutate({ channel: null, f }); }}
-          onCancel={() => { setEditing(null); setErr(null); }}
-          pending={save.isPending}
-          error={err}
-        />
-      ) : (
-        <button data-testid="li-add" className={secondary} disabled={locked} onClick={() => { setEditing('new'); setErr(null); }}>
-          Add LinkedIn target
-        </button>
-      )}
+        {accounts.length ? (
+          <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200 dark:divide-gray-800 dark:border-gray-700" data-testid="blotato-targets">
+            {accounts.map((a) => {
+              const ch = byTarget.get(a.target_id);
+              const on = Boolean(ch?.enabled);
+              const cannot = a.needs === 'video' || a.needs === 'page';
+              const note =
+                a.needs === 'video'
+                  ? 'video only — the calendar has nothing to post here'
+                  : a.needs === 'page'
+                    ? `connect a ${a.platform === 'pinterest' ? 'board' : 'page'} to this account in Blotato, then Refresh accounts`
+                    : a.needs === 'image'
+                      ? 'needs an image: only posts with a sketchnote or chosen image go here'
+                      : null;
+              return (
+                <li key={a.target_id} data-testid={`target-${a.target_id}`} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                  <label className={`flex items-center gap-2 text-sm ${cannot ? 'opacity-60' : ''}`}>
+                    <input
+                      type="checkbox"
+                      data-testid={`target-switch-${a.target_id}`}
+                      checked={on}
+                      disabled={busy || cannot}
+                      onChange={(e) => toggle.mutate({ target_id: a.target_id, enabled: e.target.checked })}
+                    />
+                    <span className="font-medium text-gray-900 dark:text-white">{a.label}</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      account <code>{a.account_id}</code>
+                      {a.page_id ? <> · page <code>{a.page_id}</code></> : null}
+                      {a.board_id ? <> · board <code>{a.board_id}</code></> : null}
+                      {ch ? <> · <code>{ch.channel}</code></> : null}
+                    </span>
+                  </label>
+                  {note ? <span className="text-xs text-amber-700 dark:text-amber-400">{note}</span> : null}
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+        {unmatched.length ? (
+          <div className="mt-3">
+            <p className="mb-1 text-xs text-gray-500 dark:text-gray-400">Channels not on the synced list (made by hand, or their account is no longer on this key):</p>
+            <ul className="space-y-1">
+              {unmatched.map((c) => (
+                <li key={c.channel} data-testid={`social-row-${c.channel}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700">
+                  <span>
+                    <span className="font-medium text-gray-900 dark:text-white">{c.label}</span>{' '}
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {c.kind} · <code>{c.channel}</code>
+                      {c.page_id ? ` · page ${c.page_id}` : ''}
+                      {c.enabled ? '' : ' · off'}
+                    </span>
+                  </span>
+                  <button
+                    data-testid={`social-remove-${c.channel}`}
+                    className={danger}
+                    disabled={locked || remove.isPending}
+                    onClick={() => { if (window.confirm(`Remove ${c.label}?`)) remove.mutate(c.channel); }}
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </div>
     </Section>
   );
 }
