@@ -41,9 +41,15 @@ export interface StudioContext {
   refresh: () => void;
 }
 
-export default function ContentStudio() {
-  const { editionId } = useParams<{ editionId?: string }>();
-  const navigate = useNavigate();
+export default function ContentStudio({ radar, embedded = false }: { radar?: 'trend' | 'dev'; embedded?: boolean } = {}) {
+  const routeParams = useParams<{ editionId?: string }>();
+  // Embedded on the Radars page: the edition is chosen locally (no URL change) and limited to this radar's.
+  const [localEdition, setLocalEdition] = useState<string | null>(null);
+  const routerNavigate = useNavigate();
+  const navigate = useCallback((to: string, opts?: { replace?: boolean }) => {
+    if (embedded) setLocalEdition(decodeURIComponent(to.split('/').pop() ?? ''));
+    else routerNavigate(to, opts);
+  }, [embedded, routerNavigate]);
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>('slate');
   // ?week=yyyy-mm-dd opens an older slate week directly.
@@ -54,12 +60,16 @@ export default function ContentStudio() {
   const [notices, setNotices] = useState<string[]>([]);
 
   const editions = useQuery({ queryKey: ['studio', 'editions'], queryFn: () => studioApi.editions() });
-  const list = useMemo(() => editions.data?.data ?? [], [editions.data]);
+  const list = useMemo(
+    () => (Array.isArray(editions.data?.data) ? editions.data.data : []).filter((e) => !radar || e.radar === radar),
+    [editions.data, radar],
+  );
+  const editionId = embedded ? (localEdition && list.some((e) => e.edition_id === localEdition) ? localEdition : list[0]?.edition_id) : routeParams.editionId;
   const edition = list.find((e) => e.edition_id === editionId) ?? null;
 
   useEffect(() => {
-    if (!editionId && list.length) navigate(`/newsletter/studio/${encodeURIComponent(list[0].edition_id)}`, { replace: true });
-  }, [editionId, list, navigate]);
+    if (!embedded && !editionId && list.length) navigate(`/newsletter/studio/${encodeURIComponent(list[0].edition_id)}`, { replace: true });
+  }, [embedded, editionId, list, navigate]);
   useEffect(() => setWeek(urlWeek), [editionId, urlWeek]);
 
   const refresh = useCallback(() => {
@@ -82,6 +92,13 @@ export default function ContentStudio() {
   }, [notify, refresh]);
 
   if (editions.isLoading) return <p className="text-sm text-gray-500">Loading…</p>;
+  if (!list.length && embedded) {
+    return (
+      <p className="rounded border border-gray-200 bg-white p-4 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300" data-testid="studio-empty">
+        No newsletter edition is fed by this radar yet. Pick one under “Voice &amp; brand → edition it feeds” above and the command line, review and scheduling controls appear here.
+      </p>
+    );
+  }
   if (!list.length) {
     return (
       <div className="space-y-2" data-testid="studio-empty">
@@ -109,20 +126,22 @@ export default function ContentStudio() {
     <div className="space-y-4" data-testid="content-studio">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Content Studio</h1>
+          {embedded
+            ? <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Posts &amp; command line</h2>
+            : <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Content Studio</h1>}
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Draft from the {edition.radar === 'trend' ? 'Trend' : 'Dev'} Radar slate, review, publish or schedule, and choose what goes into the next issue.
             Scheduled posts also appear on the <Link to="/newsletter/calendar" className="text-brand-700 hover:underline dark:text-brand-300">post calendar</Link>.
           </p>
         </div>
-        <label className="text-sm text-gray-700 dark:text-gray-300">
+        {(!embedded || list.length > 1) && <label className="text-sm text-gray-700 dark:text-gray-300">
           <span className="mr-2">Edition</span>
           <select aria-label="Studio edition" value={edition.edition_id} data-testid="studio-edition"
             onChange={(e) => navigate(`/newsletter/studio/${encodeURIComponent(e.target.value)}`)}
             className="rounded border border-gray-300 px-2 py-1 dark:border-gray-600 dark:bg-gray-800">
             {list.map((e) => <option key={e.edition_id} value={e.edition_id}>{e.name}</option>)}
           </select>
-        </label>
+        </label>}
       </header>
 
       {(jobs.length > 0 || notices.length > 0) && (
