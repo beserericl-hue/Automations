@@ -25,6 +25,7 @@ const RADARS = {
 beforeEach(() => {
   vi.mocked(apiFetch).mockReset().mockImplementation(async (path: string) => {
     if (path === '/api/social/radars') return { success: true, data: RADARS };
+    if (path === '/api/studio/editions') return { data: [{ edition_id: 'ai-mvp', name: 'The MVP Brief', radar: 'trend', channels: [], cadence: null }, { edition_id: 'ai-dev-roundup', name: 'AI Dev Roundup', radar: 'dev', channels: [], cadence: null }] };
     if (path === '/api/social/channels') return { success: true, data: [{ channel: 'website', kind: 'website', label: 'My blog', enabled: true }, { channel: 'threads_me', kind: 'threads', label: 'Threads · me', enabled: true }] };
     if (path.startsWith('/api/social/radar/trend') && !path.includes('/run')) return { success: true, data: { radar: 'trend', subscribed: false, week_of: null, run: null, topics: [], queued: {} } };
     return { success: true, data: {} };
@@ -54,5 +55,19 @@ describe('RadarPanel setup', () => {
     renderWithProviders(<RadarPanel />);
     await screen.findByTestId('radar-panel');
     expect(screen.getByTestId('radar-panel')).not.toHaveTextContent('TechAhir');
+  });
+
+  it('has the command line, command help, review and send-to-scheduler on the Radars page itself, per radar', async () => {
+    renderWithProviders(<RadarPanel />);
+    expect(await screen.findByTestId('studio-assistant')).toBeInTheDocument();
+    expect(screen.getByTestId('assistant-input')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('assistant-commands-toggle'));
+    expect(screen.getByTestId('assistant-commands')).toHaveTextContent('schedule all approved');
+    expect(screen.getByTestId('studio-tab-review')).toBeInTheDocument();
+    expect(screen.getByTestId('studio-tab-history')).toBeInTheDocument();
+    expect(screen.getByTestId('content-studio')).toHaveTextContent('Trend Radar');
+    // switching to the Dev radar shows the Dev radar's edition, not the Trend one
+    fireEvent.click(screen.getByRole('tab', { name: /dev/i }));
+    await waitFor(() => expect(screen.getByTestId('content-studio')).toHaveTextContent('Dev Radar'));
   });
 });

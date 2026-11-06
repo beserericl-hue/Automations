@@ -12,6 +12,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, ApiError } from '../../lib/api';
 import { useUser } from '../../contexts/UserContext';
 import { useEngineJobQueue } from '../../hooks/useEngineJobQueue';
+import ContentStudio from '../studio/ContentStudio';
 
 type Radar = 'trend' | 'dev';
 
@@ -272,6 +273,8 @@ export default function RadarPanel() {
       </section>
 
       <RadarSetup radar={radar} />
+
+      <ContentStudio key={radar} radar={radar} embedded />
 
       {query.isError && <p className="text-sm text-red-600">Could not load the slate.</p>}
       {data && data.topics.length === 0 && (
