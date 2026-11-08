@@ -538,7 +538,11 @@ async def schedule_posts(
         f"{'' if mode in ('now', 'at') else ('2:00 PM' if d['slot'] == 'afternoon' else '9:00 AM')}".strip()
         for d in done
     )
-    message = f"Scheduled {len(done)}: {when_txt}." if done else "Nothing to schedule: only approved posts go on the calendar (generate, approve, then schedule)."
+    message = (
+        f"Scheduled {len(done)}: {when_txt}."
+        if done
+        else "Nothing to schedule: only approved posts go on the calendar (generate, approve, then schedule)."
+    )
     if mode == "now" and done:
         message += " The publisher sends it within five minutes."
     if skipped:
