@@ -27,7 +27,8 @@ beforeEach(() => {
     if (path === '/api/social/radars') return { success: true, data: RADARS };
     if (path === '/api/studio/editions') return { data: [{ edition_id: 'ai-mvp', name: 'The MVP Brief', radar: 'trend', channels: [], cadence: null }, { edition_id: 'ai-dev-roundup', name: 'AI Dev Roundup', radar: 'dev', channels: [], cadence: null }] };
     if (path === '/api/social/channels') return { success: true, data: [{ channel: 'website', kind: 'website', label: 'My blog', enabled: true }, { channel: 'threads_me', kind: 'threads', label: 'Threads · me', enabled: true }] };
-    if (path.startsWith('/api/social/radar/trend') && !path.includes('/run')) return { success: true, data: { radar: 'trend', subscribed: false, week_of: null, run: null, topics: [], queued: {} } };
+    if (path.startsWith('/api/social/radar/trend') && !path.includes('/run')) return { success: true, data: { radar: 'trend', subscribed: false, week_of: '2026-11-02', run: null, queued: { t2: { display_number: 5, scheduled_date: '2026-11-10', slot: 'morning', state: 'pending' } },
+      topics: [1, 2, 3].map((n) => ({ id: `t${n}`, rank: n, title: `Topic ${n}`, url: 'https://x', source: 'S', item_type: 'article' })) } };
     return { success: true, data: {} };
   });
 });
@@ -69,5 +70,17 @@ describe('RadarPanel setup', () => {
     // switching to the Dev radar shows the Dev radar's edition, not the Trend one
     fireEvent.click(screen.getByRole('tab', { name: /dev/i }));
     await waitFor(() => expect(screen.getByTestId('content-studio')).toHaveTextContent('Dev Radar'));
+  });
+
+  it('"Select all" ticks every topic that is not already on the calendar; Clear unticks', async () => {
+    renderWithProviders(<RadarPanel />);
+    await screen.findByTestId('topic-1');
+    fireEvent.click(screen.getByTestId('radar-select-all'));
+    const box = (n: number) => screen.getByTestId(`topic-${n}`).querySelector('input') as HTMLInputElement;
+    expect(box(1).checked && box(3).checked).toBe(true);
+    expect(box(2).checked).toBe(false); // already scheduled
+    expect(screen.getByTestId('schedule-selected')).toHaveTextContent('Schedule 2 selected');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Clear' })[0]);
+    expect(box(1).checked).toBe(false);
   });
 });

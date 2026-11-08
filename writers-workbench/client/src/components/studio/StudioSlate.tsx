@@ -85,6 +85,8 @@ export default function StudioSlate({ ctx }: { ctx: StudioContext }) {
           onKeyDown={(e) => { if (e.key === 'Enter') applyRange(); }} data-testid="slate-range"
           className="w-48 rounded border border-gray-300 px-2 py-1 dark:border-gray-600 dark:bg-gray-800" />
         <button type="button" onClick={applyRange} className="rounded border border-gray-300 px-3 py-1.5 dark:border-gray-600" data-testid="slate-range-apply">Select</button>
+        <button type="button" onClick={() => setPicked(topics.map((t) => t.rank))} disabled={!topics.length} data-testid="slate-select-all"
+          className="rounded border border-gray-300 px-3 py-1.5 dark:border-gray-600 disabled:opacity-50">Select all</button>
         <button type="button" onClick={() => setPicked(undrafted)} disabled={!undrafted.length}
           className="rounded border border-gray-300 px-3 py-1.5 dark:border-gray-600 disabled:opacity-50">Select all not drafted</button>
         <button type="button" onClick={() => setPicked([])} disabled={!picked.length} className="rounded px-2 py-1.5 text-gray-500 disabled:opacity-50">Clear</button>
@@ -94,6 +96,9 @@ export default function StudioSlate({ ctx }: { ctx: StudioContext }) {
           Generate {chosen.length || ''} draft{chosen.length === 1 ? '' : 's'}
         </button>
       </div>
+      <p className="text-xs text-gray-500 dark:text-gray-400" data-testid="slate-hint">
+        Ticking topics chooses what to <b>draft</b>. Click Generate, then approve and schedule the drafts under Review (or type “approve all”, “schedule all approved” in the Assistant).
+      </p>
       <details className="rounded border border-gray-200 bg-white p-3 text-sm dark:border-gray-700 dark:bg-gray-900" data-testid="own-topic">
         <summary className="cursor-pointer font-medium text-gray-800 dark:text-gray-100">Draft your own topic (not from the radar)</summary>
         <p className="mt-1 text-xs text-gray-500">A title or a link you want written up. It joins this week’s slate at the next number and is drafted right away, like any radar topic. In the Assistant: <code>write about …</code> or paste a link.</p>

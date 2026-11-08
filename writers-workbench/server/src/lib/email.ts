@@ -17,6 +17,7 @@
  */
 
 import { logger } from './logger.js';
+import { getSupabaseAdmin } from '../services/supabase-admin.js';
 
 export interface Attachment {
   name: string;
@@ -44,6 +45,46 @@ export interface SendEmailResult {
   error?: string;
 }
 
+/**
+ * Mail held while a regression run is going. The DEV test runner writes `e2e_mail_hold` into
+ * app_config_global_v2 for the length of the run: {"until": ISO time, "addresses": [...]}. A send whose
+ * every recipient is on that list is skipped, so the test account's inbox is not flooded (Eric,
+ * 2026-11-08). Mail to anyone else goes out as usual, and the row expires by itself. The engine's
+ * Postal client applies the same rule (writer_engine/postal/test_hold.py).
+ */
+let holdCache: { at: number; held: Set<string> } | null = null;
+
+export function parseHold(value: unknown, now = Date.now()): Set<string> {
+  try {
+    const data = JSON.parse(String(value ?? '')) as { until?: string; addresses?: unknown };
+    const until = Date.parse(String(data.until ?? ''));
+    if (!Number.isFinite(until) || until <= now || !Array.isArray(data.addresses)) return new Set();
+    return new Set(data.addresses.map((a) => String(a).trim().toLowerCase()).filter(Boolean));
+  } catch {
+    return new Set();
+  }
+}
+
+export async function isHeld(recipients: string[]): Promise<boolean> {
+  const addrs = recipients.map((a) => a.trim().toLowerCase()).filter(Boolean);
+  if (!addrs.length) return false;
+  if (!holdCache || Date.now() - holdCache.at > 20_000) {
+    let held = new Set<string>();
+    try {
+      const { data } = await getSupabaseAdmin().from('app_config_global_v2').select('value').eq('key', 'e2e_mail_hold').maybeSingle();
+      held = parseHold((data as { value?: unknown } | null)?.value);
+    } catch {
+      /* a failed read holds nothing */
+    }
+    holdCache = { at: Date.now(), held };
+  }
+  return holdCache.held.size > 0 && addrs.every((a) => holdCache!.held.has(a));
+}
+
+export function resetHoldCache(): void {
+  holdCache = null;
+}
+
 function toArray(value: string | string[] | undefined): string[] {
   if (!value) return [];
   return Array.isArray(value) ? value : [value];
@@ -64,6 +105,11 @@ function resolveFrom(from?: string): string {
  */
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
   const dryRun = process.env.DRY_RUN_EMAIL === 'true';
+
+  if (await isHeld([...toArray(input.to), ...toArray(input.cc), ...toArray(input.bcc)])) {
+    logger.info({ to: input.to, subject: input.subject }, 'email: held for a regression run — not sent');
+    return { ok: true, messageId: 'e2e-held', mode: 'dry-run' };
+  }
 
   if (dryRun) {
     logger.info(

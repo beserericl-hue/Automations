@@ -95,6 +95,18 @@ describe('ContentStudio', () => {
     expect(await screen.findByTestId('studio-activity')).toHaveTextContent('Drafting 2 topics');
   });
 
+  it('Slate: "Select all" ticks every topic on the slate, and Clear unticks them', async () => {
+    render('/newsletter/studio/ai-dev-roundup');
+    await screen.findByTestId('slate-topic-1');
+    fireEvent.click(screen.getByTestId('slate-select-all'));
+    const boxes = screen.getAllByRole('checkbox', { name: /Select topic/ }) as HTMLInputElement[];
+    expect(boxes.length).toBeGreaterThan(1);
+    expect(boxes.every((b) => b.checked)).toBe(true);
+    expect(screen.getByTestId('slate-generate')).toHaveTextContent(`Generate ${boxes.length} drafts`);
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    expect(boxes.some((b) => b.checked)).toBe(false);
+  });
+
   it('reviews a draft with its LinkedIn count and approves it', async () => {
     render('/newsletter/studio/ai-dev-roundup');
     fireEvent.click(await screen.findByTestId('studio-tab-review'));

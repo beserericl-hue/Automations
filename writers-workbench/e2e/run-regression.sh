@@ -25,6 +25,12 @@ case "${E2E_SUPA_URL:-$SUPABASE_URL}" in
   *) echo "REFUSING TO RUN: Supabase URL is not DEV (gvbv...). Point at DEV before running." >&2; exit 2 ;;
 esac
 
+# Hold mail to the test inbox (unless the runner already did, and will release it).
+if [ -z "${E2E_MAIL_HOLD_SET:-}" ]; then
+  bash e2e/mail-hold.sh on
+  trap 'bash e2e/mail-hold.sh off' EXIT
+fi
+
 # Heavy = real engine/LLM/image jobs (>=90s internal timeouts).
 HEAVY=(
   regression/project-plan-write.spec.ts

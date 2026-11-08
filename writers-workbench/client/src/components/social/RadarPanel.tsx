@@ -263,7 +263,8 @@ export default function RadarPanel() {
             {running ? 'Running…' : 'Run now'}
           </button>
           <button type="button" onClick={() => setPicked(unqueued)} disabled={!unqueued.length}
-            className="rounded border border-gray-300 px-3 py-1.5 dark:border-gray-600 disabled:opacity-50">Select all not scheduled</button>
+            className="rounded border border-gray-300 px-3 py-1.5 dark:border-gray-600 disabled:opacity-50" data-testid="radar-select-all">Select all</button>
+          <button type="button" onClick={() => setPicked([])} disabled={!picked.length} className="rounded px-2 py-1.5 text-gray-500 disabled:opacity-50">Clear</button>
           <button type="button" onClick={() => schedule.mutate()} disabled={!picked.length || scheduling || schedule.isPending}
             className="rounded bg-brand-600 px-3 py-1.5 font-medium text-white hover:bg-brand-700 disabled:opacity-50" data-testid="schedule-selected">
             {scheduling ? 'Scheduling…' : `Schedule ${picked.length || ''} selected`.replace('  ', ' ')}

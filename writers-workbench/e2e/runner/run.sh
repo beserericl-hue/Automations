@@ -56,6 +56,11 @@ if [ "$WAIT_RESULT" = "timed out" ]; then
   exit 1
 fi
 
+# Hold mail to the test inbox for this run (about 60 notices otherwise); released on any exit.
+bash e2e/mail-hold.sh on
+export E2E_MAIL_HOLD_SET=1
+trap 'bash e2e/mail-hold.sh off' EXIT
+
 echo "=== Unauthenticated project ==="
 npx playwright test --project=chromium-noauth --reporter=line 2>&1 | tee "$LOGS/noauth.log"
 NOAUTH=${PIPESTATUS[0]}
