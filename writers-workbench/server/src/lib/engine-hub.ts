@@ -240,12 +240,27 @@ export async function callEngineWriteToolSync<T>(
 
 /** Poll an engine async job (queued load-bearing op). */
 export async function getEngineJob(jobId: string): Promise<{ status: string; result?: unknown; error?: string }> {
-  const resp = await engineFetch(`/internal/write/jobs/${encodeURIComponent(jobId)}`, { headers: { 'x-service-secret': serviceSecret() } });
+  let resp: Response;
+  try {
+    resp = await engineFetch(`/internal/write/jobs/${encodeURIComponent(jobId)}`, { headers: { 'x-service-secret': serviceSecret() } });
+  } catch (err) {
+    // The engine is restarting (a deploy) or unreachable for a moment: the job is not known to have failed.
+    logger.warn({ err, jobId }, 'engine-hub: job poll could not reach the engine; treating as still working');
+    return { status: 'in_progress' };
+  }
+  if (TRANSIENT_POLL_STATUS.has(resp.status)) {
+    // 502/503/504 come from the gateway being replaced mid-deploy. Reporting them as a failed job made the
+    // page abandon a long drafting run (Eric, 2026-11-08: "Drafting 24 topics failed: engine job poll 502").
+    logger.warn({ status: resp.status, jobId }, 'engine-hub: job poll got a gateway hiccup; treating as still working');
+    return { status: 'in_progress' };
+  }
   if (!resp.ok) {
     return { status: 'error', error: `engine job poll ${resp.status}` };
   }
   return (await resp.json()) as { status: string; result?: unknown; error?: string };
 }
+
+const TRANSIENT_POLL_STATUS = new Set([502, 503, 504]);
 
 /**
  * Cancel an async engine write-tool job (Fix Drift "Cancel"). Proxies the gateway's
