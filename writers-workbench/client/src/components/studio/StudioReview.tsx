@@ -16,6 +16,12 @@ function errText(e: unknown, fallback: string): string {
   return e instanceof ApiError ? e.message : fallback;
 }
 
+/** A YouTube link's own thumbnail: what LinkedIn shows for a link post. Other links have none we can know. */
+function linkPreview(url?: string | null): string {
+  const m = /(?:youtube\.com\/watch\?(?:[^#]*&)?v=|youtu\.be\/)([\w-]{11})/.exec(url ?? '');
+  return m ? `https://img.youtube.com/vi/${m[1]}/hqdefault.jpg` : '';
+}
+
 export default function StudioReview({ ctx }: { ctx: StudioContext }) {
   const ed = ctx.edition.edition_id;
   const posts = useQuery({
@@ -144,7 +150,9 @@ function DraftCard({ ctx, post, channels, ticked, onTick }: {
   onTick: (on: boolean) => void;
 }) {
   const ed = ctx.edition.edition_id;
-  const [open, setOpen] = useState(false);
+  // The text is what Eric reviews, so it is shown by default; Hide collapses a card.
+  const [open, setOpen] = useState(true);
+  const [publishOpen, setPublishOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(post);
   const [instruction, setInstruction] = useState('');
@@ -153,6 +161,7 @@ function DraftCard({ ctx, post, channels, ticked, onTick }: {
   useEffect(() => { if (!editing) setDraft(post); }, [post, editing]);
   const busy = ctx.jobs.some((j) => j.label.includes(`#${post.display_number}`));
   const isBlog = Boolean(post.body_md?.trim());
+  const previewUrl = linkPreview(post.source_url);
   const liCount = (editing ? draft.linkedin_content : post.linkedin_content)?.length ?? 0;
   const changed = useMemo(() => {
     const out: Partial<StudioPost> = {};
@@ -210,6 +219,9 @@ function DraftCard({ ctx, post, channels, ticked, onTick }: {
 
       {(open || editing) && (
         <div className="mt-3 space-y-3">
+          {!isBlog && !editing && (
+            <p className="text-xs text-gray-500" data-testid={`draft-${post.display_number}-noblog`}>LinkedIn post only: this slate item has no blog article, just the LinkedIn text and the link.</p>
+          )}
           {(isBlog || editing) && (
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Blog</h3>
@@ -240,9 +252,15 @@ function DraftCard({ ctx, post, channels, ticked, onTick }: {
           </div>
           <div className="space-y-1 text-sm">
             <h3 className="font-semibold text-gray-700 dark:text-gray-200">Image</h3>
+            {(post.image_url || previewUrl) && (
+              <img src={post.image_url || previewUrl} alt={post.image_url ? `Image for #${post.display_number}` : `Link preview for #${post.display_number}`}
+                className="max-h-48 rounded border border-gray-200 dark:border-gray-700" loading="lazy" data-testid={`draft-${post.display_number}-image`} />
+            )}
             <p className="text-gray-600 dark:text-gray-300">
-              {post.image_url ? <>Chosen image: <a href={post.image_url} target="_blank" rel="noreferrer" className="text-brand-700 hover:underline">{post.image_url}</a></>
-                : post.include_image ? 'A sketchnote is generated when it is published.' : 'No image (a link post unfurls its own preview).'}
+              {post.image_url ? 'Chosen image (used instead of a generated one).'
+                : post.include_image ? 'A sketchnote is generated when it is published, so there is nothing to preview yet.'
+                : previewUrl ? 'No image of its own: LinkedIn shows this link preview. Add a sketchnote below if you want one.'
+                : 'No image yet (a link post unfurls its own preview). Add a sketchnote below if you want one.'}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" onClick={() => act.mutate(post.include_image || post.image_url ? 'image_off' : 'image_on')} className="rounded border border-gray-300 px-2 py-1 dark:border-gray-600">
@@ -283,6 +301,11 @@ function DraftCard({ ctx, post, channels, ticked, onTick }: {
         )}
       </div>
       {open && !editing && (
+        <button type="button" onClick={() => setPublishOpen(!publishOpen)} className="mt-2 text-sm text-brand-700 hover:underline dark:text-brand-300" data-testid={`draft-${post.display_number}-publish-toggle`}>
+          {publishOpen ? 'Hide publish options' : 'Publish or schedule this one…'}
+        </button>
+      )}
+      {open && !editing && publishOpen && (
         <div className="mt-2"><PublishBar ctx={ctx} ids={[post.id]} channels={channels} defaultChannels={post.channels} compact /></div>
       )}
       {error && <p className="mt-2 text-sm text-red-600" role="alert">{error}</p>}
