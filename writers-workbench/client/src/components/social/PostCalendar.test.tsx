@@ -121,7 +121,7 @@ describe('RadarPanel', () => {
     const queued = await screen.findByTestId('topic-2');
     expect(queued).toHaveTextContent('On the calendar as #9');
     expect(queued.querySelector('input')).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Select all not scheduled' }));
+    fireEvent.click(screen.getByTestId('radar-select-all'));
     fireEvent.click(screen.getByTestId('schedule-selected'));
     await waitFor(() =>
       expect(vi.mocked(apiFetch)).toHaveBeenCalledWith('/api/social/radar/trend/schedule', {
