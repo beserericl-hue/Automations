@@ -9,8 +9,11 @@ goes through Postal like every other engine email, and no image is generated jus
 
 from __future__ import annotations
 
+from datetime import datetime
 from html import escape
 from typing import Any
+from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 from writer_engine.config import get_settings
 from writer_engine.library_helpers.email_recipients import load_recipient_config, resolve_recipients
@@ -128,7 +131,29 @@ async def _record_email(
         get_logger("studio.emailing").warning("studio.email_record_failed", error=str(exc)[:200])
 
 
-def digest_html(name: str, week_of: str | None, topics: list[dict[str, Any]]) -> str:
+_ET = ZoneInfo("America/New_York")
+
+
+def _studio_url(edition_id: str) -> str:
+    """Where the email's button goes: this edition's Content Studio chat in the Workbench."""
+    base = (get_settings().workbench_api_url or "").rstrip("/")
+    return f"{base}/newsletter/studio/{quote(edition_id, safe='')}" if base else ""
+
+
+def _long_date(d: datetime) -> str:
+    return f"{d.strftime('%A, %B')} {d.day}, {d.year}"
+
+
+def digest_html(
+    name: str,
+    week_of: str | None,
+    topics: list[dict[str, Any]],
+    *,
+    studio_url: str = "",
+    sent_on: datetime | None = None,
+) -> str:
+    """The slate email, as n8n's "This week in AI + software development" one was: a dated header, a
+    button into the studio chat, then articles and videos, each with its link in full."""
     arts = [t for t in topics if t.get("item_type") != "video" and t.get("url")]
     vids = [t for t in topics if t.get("item_type") == "video" and t.get("url")]
 
@@ -137,20 +162,30 @@ def digest_html(name: str, week_of: str | None, topics: list[dict[str, Any]]) ->
             f'<tr><td style="padding:8px 0;border-bottom:1px solid #f3f4f6"><b>{t.get("rank")}. '
             f'{escape(str(t.get("title") or ""))}</b><br><span style="color:#6b7280;font-size:13px">'
             f"{escape(str(t.get('source') or ''))} · {escape(str(t.get('angle') or ''))}</span><br>"
-            f'<a href="{escape(str(t.get("url")))}">{verb} →</a></td></tr>'
+            f'<a href="{escape(str(t.get("url")))}">{verb} → {escape(str(t.get("url")))}</a></td></tr>'
             for t in items
         )
 
     body = ""
+    if studio_url:
+        body += (
+            f'<p style="margin:0 0 14px"><a href="{escape(studio_url)}" style="display:inline-block;'
+            "background:#2563eb;color:#fff;text-decoration:none;font-weight:bold;padding:12px 18px;"
+            f'border-radius:6px">✍️ Open the {escape(name)} studio → draft &amp; post</a></p>'
+            '<p style="margin:0 0 18px;font-size:14px;color:#374151">In the studio, type a number to draft '
+            "a post from that story (<i>generate 3</i>), then <i>approve</i>, <i>revise</i>, <i>post it</i> or "
+            "<i>schedule for Tuesday afternoon</i>. <i>Commands</i> lists everything.</p>"
+        )
     if arts:
         body += f'<h2>📰 Articles</h2><table width="100%">{rows(arts, "🔗 Read")}</table>'
     if vids:
         body += f'<h2>🎥 Videos</h2><table width="100%">{rows(vids, "🎥 Watch")}</table>'
+    when = _long_date(sent_on) if sent_on else f"Week of {week_of or ''}"
     return _WRAP.format(
         kicker=escape(name),
-        title=f"Week of {escape(week_of or '')} · {len(arts)} articles + {len(vids)} videos",
+        title=f"{escape(when)} · {len(arts)} articles + {len(vids)} videos",
         body=body or "<p>No slate this week.</p>",
-        footer="The week's radar slate, from the Content Studio.",
+        footer="Sent by your Writer's Workbench. The week's radar slate, from the Content Studio.",
     )
 
 
@@ -161,13 +196,16 @@ async def email_digest(client: Any, ed: StudioEdition, week_of: str | None = Non
     to, bcc = await _recipient(client, ed.user_id)
     topics = view["topics"]
     arts = sum(1 for t in topics if t.get("item_type") != "video")
-    subject = f"{ed.name} — week of {view['week_of']} ({arts}+{len(topics) - arts})"
+    sent_on = datetime.now(_ET)
+    subject = f"{ed.name} — {_long_date(sent_on)} ({arts}+{len(topics) - arts})"
     res = await send_email(
         to=[to],
         bcc=[bcc] if bcc else None,
         from_addr=get_settings().newsletter_from_address,
         subject=subject,
-        html=digest_html(ed.name, view["week_of"], topics),
+        html=digest_html(
+            ed.name, view["week_of"], topics, studio_url=_studio_url(ed.edition_id), sent_on=sent_on
+        ),
     )
     record = await _record_digest(
         client,

@@ -352,3 +352,61 @@ def test_newsletter_sections_are_not_humanized_by_default(monkeypatch: pytest.Mo
     monkeypatch.setenv("HUMANIZE_NEWSLETTER_SEGMENTS", "true")
     get_settings.cache_clear()
     assert get_settings().humanize_newsletter_segments is True
+
+
+@pytest.mark.asyncio
+async def test_slate_email_has_the_studio_button_and_dated_subject(
+    monkeypatch: pytest.MonkeyPatch, fake_supabase: Any
+) -> None:
+    """The email Eric got from n8n (2026-11-08): a dated header, a button into the studio chat for THIS
+    edition, then the stories with their links in full. Now sent by the Workbench."""
+    from writer_engine.postal import client as postal_client
+    from writer_engine.studio import emailing
+    from writer_engine.studio.core import StudioEdition
+
+    monkeypatch.setenv("WORKBENCH_API_URL", "https://wb.example.com/")
+    get_settings.cache_clear()
+    ed = StudioEdition(user_id=OWNER, edition_id="ai-dev-roundup", radar="dev", name="AI Dev Roundup")
+    topics = [
+        {
+            "rank": 1,
+            "title": "A",
+            "url": "https://a.example/x",
+            "item_type": "article",
+            "source": "HN",
+            "angle": "ang",
+        },
+        {
+            "rank": 2,
+            "title": "V",
+            "url": "https://v.example/y",
+            "item_type": "video",
+            "source": "YT",
+            "angle": "",
+        },
+    ]
+    sent: dict[str, Any] = {}
+
+    async def view(_c: Any, _e: Any, _w: Any) -> dict[str, Any]:
+        return {"week_of": "2026-11-09", "topics": topics}
+
+    async def recipient(_c: Any, _u: str) -> tuple[str, str | None]:
+        return "owner@example.com", None
+
+    async def send_email(**kw: Any) -> Any:
+        sent.update(kw)
+        return type("R", (), {"message_id": "m"})()
+
+    monkeypatch.setattr(emailing, "slate", view)
+    monkeypatch.setattr(emailing, "_recipient", recipient)
+    monkeypatch.setattr(postal_client, "send_email", send_email)
+    await emailing.email_digest(fake_supabase, ed)
+    get_settings.cache_clear()
+
+    html = sent["html"]
+    assert 'href="https://wb.example.com/newsletter/studio/ai-dev-roundup"' in html
+    assert "Open the AI Dev Roundup studio" in html
+    assert "1 articles + 1 videos" in html
+    assert "Read → https://a.example/x" in html and "Watch → https://v.example/y" in html
+    assert sent["subject"].startswith("AI Dev Roundup — ") and sent["subject"].endswith("(1+1)")
+    assert "week of" not in sent["subject"]
