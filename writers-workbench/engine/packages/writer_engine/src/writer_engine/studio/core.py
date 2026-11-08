@@ -362,7 +362,30 @@ async def apply_action(
     message = f"{verb}: {', '.join('#' + str(d['display_number']) for d in done) or 'nothing'}."
     if skipped:
         message += " Skipped " + ", ".join(f"#{s['display_number']} ({s['reason']})" for s in skipped) + "."
+    if not done and not skipped:
+        message = _nothing_to_do(action)
     return {"done": done, "skipped": skipped, "message": message}
+
+
+def _nothing_to_do(action: str) -> str:
+    """Why a command matched no posts, and what to do next. Ticking topics on the Slate tab only chooses
+    what to DRAFT; approving, scheduling and the rest act on drafts, which exist only after "generate"
+    (Eric, 2026-11-08: "I selected all the posts, then clicked approve all. Nothing happened.")."""
+    if action == "approve":
+        return (
+            'There are no drafts to approve yet. Slate topics become drafts first: type "generate 1-24" '
+            "(or tick them on the Slate tab and click Generate), wait for the drafts to appear under "
+            'Review, then "approve all".'
+        )
+    if action == "unapprove":
+        return "No approved posts to move back to draft."
+    if action == "discard":
+        return "No drafts to discard."
+    if action in ("cancel", "unschedule"):
+        return 'Nothing is on the calendar to take off. "list the queue" shows what is scheduled.'
+    if action == "requeue":
+        return "No failed or cancelled posts to requeue."
+    return 'No posts matched. "list my drafts" shows what is there.'
 
 
 # --------------------------------------------------------------------------- scheduling
@@ -515,7 +538,7 @@ async def schedule_posts(
         f"{'' if mode in ('now', 'at') else ('2:00 PM' if d['slot'] == 'afternoon' else '9:00 AM')}".strip()
         for d in done
     )
-    message = f"Scheduled {len(done)}: {when_txt}." if done else "Nothing to schedule."
+    message = f"Scheduled {len(done)}: {when_txt}." if done else "Nothing to schedule: only approved posts go on the calendar (generate, approve, then schedule)."
     if mode == "now" and done:
         message += " The publisher sends it within five minutes."
     if skipped:

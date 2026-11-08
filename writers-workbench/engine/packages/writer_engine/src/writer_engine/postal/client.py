@@ -54,6 +54,11 @@ class PostalClient:
     ) -> PostalResult:
         if not self._api_url or not self._api_key:
             raise RuntimeError("Postal not configured — set POSTAL_API_URL + POSTAL_API_KEY")
+        from writer_engine.postal.test_hold import is_held
+
+        if await is_held([*to, *(cc or []), *(bcc or [])]):
+            # A regression run is mailing the test account: skip it (see postal/test_hold.py).
+            return PostalResult(message_id="e2e-held", status="held")
         body: dict[str, Any] = {"to": to, "from": from_addr, "subject": subject, "html_body": html}
         if text is not None:
             body["plain_body"] = text

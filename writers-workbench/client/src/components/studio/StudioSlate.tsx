@@ -96,6 +96,9 @@ export default function StudioSlate({ ctx }: { ctx: StudioContext }) {
           Generate {chosen.length || ''} draft{chosen.length === 1 ? '' : 's'}
         </button>
       </div>
+      <p className="text-xs text-gray-500 dark:text-gray-400" data-testid="slate-hint">
+        Ticking topics chooses what to <b>draft</b>. Click Generate, then approve and schedule the drafts under Review (or type “approve all”, “schedule all approved” in the Assistant).
+      </p>
       <details className="rounded border border-gray-200 bg-white p-3 text-sm dark:border-gray-700 dark:bg-gray-900" data-testid="own-topic">
         <summary className="cursor-pointer font-medium text-gray-800 dark:text-gray-100">Draft your own topic (not from the radar)</summary>
         <p className="mt-1 text-xs text-gray-500">A title or a link you want written up. It joins this week’s slate at the next number and is drafted right away, like any radar topic. In the Assistant: <code>write about …</code> or paste a link.</p>
