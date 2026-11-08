@@ -21,7 +21,7 @@ const TOPICS = [
 const DRAFT = {
   id: 'p1', display_number: 7, external_id: 'studio-dev', title: 'A talk', body_md: '', linkedin_content: 'Hook\n🔗 Watch: https://youtube.com/watch?v=a',
   seo_title: '', meta_description: '', category: 'VIDEO', include_image: false, image_url: null, channels: ['li_agile'], scheduled_date: null,
-  slot: 'morning', scheduled_at: null, post_at: null, state: 'draft', last_error: null, source: 'studio', item_type: 'video', source_url: 'https://youtube.com/watch?v=a',
+  slot: 'morning', scheduled_at: null, post_at: null, state: 'draft', last_error: null, source: 'studio', item_type: 'video', source_url: 'https://www.youtube.com/watch?v=NBZmxhcz5Io',
   radar_topic_id: 't2', studio: { rank: 2, revisions: [] }, deliveries: [],
 };
 
@@ -110,10 +110,20 @@ describe('ContentStudio', () => {
   it('reviews a draft with its LinkedIn count and approves it', async () => {
     render('/newsletter/studio/ai-dev-roundup');
     fireEvent.click(await screen.findByTestId('studio-tab-review'));
-    fireEvent.click(await screen.findByTestId('draft-7-open'));
-    expect(screen.getByTestId('draft-7-count')).toHaveTextContent(`${DRAFT.linkedin_content.length} / 3000`);
+    expect(await screen.findByTestId('draft-7-count')).toHaveTextContent(`${DRAFT.linkedin_content.length} / 3000`);
     fireEvent.click(screen.getByTestId('draft-7-approve'));
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith('/api/studio/ai-dev-roundup/posts/actions', expect.objectContaining({ body: JSON.stringify({ ids: ['p1'], action: 'approve' }) })));
+  });
+
+  it('shows each draft\'s text and image without a click: LinkedIn text, the link preview, and why there is no blog', async () => {
+    render('/newsletter/studio/ai-dev-roundup');
+    fireEvent.click(await screen.findByTestId('studio-tab-review'));
+    expect(await screen.findByTestId('draft-7-linkedin')).toHaveTextContent('Hook');
+    expect(screen.getByTestId('draft-7-noblog')).toHaveTextContent('LinkedIn post only');
+    expect(screen.getByTestId('draft-7-image')).toHaveAttribute('src', 'https://img.youtube.com/vi/NBZmxhcz5Io/hqdefault.jpg');
+    expect(screen.queryByTestId('draft-7-publish-toggle')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('draft-7-open'));
+    expect(screen.queryByTestId('draft-7-linkedin')).not.toBeInTheDocument();
   });
 
   it('sends the assistant a command and shows the answer', async () => {
