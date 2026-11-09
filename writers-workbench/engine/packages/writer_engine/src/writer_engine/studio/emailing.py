@@ -144,7 +144,19 @@ def _long_date(d: datetime) -> str:
     return f"{d.strftime('%A, %B')} {d.day}, {d.year}"
 
 
-def digest_html(
+TREND_KICKER = "AI & Software Engineering Radar"
+TREND_TITLE = "Weekly AI & Software Engineering Slate"
+
+
+def _short_date(d: datetime) -> str:
+    return f"{d.strftime('%b')} {d.day}, {d.year}"
+
+
+def _score_colour(score: int) -> str:
+    return "#b91c1c" if score >= 85 else "#c2410c" if score >= 70 else "#4b5563"
+
+
+def trend_digest_html(
     name: str,
     week_of: str | None,
     topics: list[dict[str, Any]],
@@ -152,8 +164,62 @@ def digest_html(
     studio_url: str = "",
     sent_on: datetime | None = None,
 ) -> str:
+    """The Trend radar's slate email, as n8n's "AI & Software Engineering Radar" one was: a dark header,
+    a "Want a draft?" box linking the studio, then a ranked table (#, score, title, driver · category)."""
+    when = _short_date(sent_on) if sent_on else f"week of {week_of or ''}"
+    rows = ""
+    for t in topics:
+        score = t.get("score")
+        why = " · ".join(str(x) for x in (t.get("driver_type"), t.get("category")) if x)
+        link = escape(str(t.get("url") or ""))
+        title = escape(str(t.get("title") or ""))
+        covered = t.get("also_covered_by") or []
+        also = f" · also covered by {escape(', '.join(str(c) for c in covered))}" if covered else ""
+        rows += (
+            '<tr><td style="padding:8px 6px;border-bottom:1px solid #f3f4f6;color:#6b7280;vertical-align:top">'
+            f'{t.get("rank")}</td><td style="padding:8px 6px;border-bottom:1px solid #f3f4f6;font-weight:bold;'
+            f'vertical-align:top;color:{_score_colour(int(score or 0))}">{"" if score is None else score}</td>'
+            '<td style="padding:8px 6px;border-bottom:1px solid #f3f4f6">'
+            f'<a href="{link}" style="color:#111827;font-weight:bold;text-decoration:none">{title}</a><br>'
+            f'<span style="color:#6b7280;font-size:12px">{escape(why)}{also}</span></td></tr>'
+        )
+    button = (
+        f'<p style="margin:0 0 16px;padding:12px 14px;background:#eff6ff;border:1px solid #bfdbfe;'
+        f'border-radius:6px;font-size:14px">📝 <b>Want a draft?</b> Open the '
+        f'<a href="{escape(studio_url)}" style="color:#1d4ed8;font-weight:bold">Content Studio</a> and just '
+        "tell it a topic number below — it researches the topic and drafts a blog post + LinkedIn post for you.</p>"
+        if studio_url
+        else ""
+    )
+    body = (
+        f'{button}<div style="font-size:12px;letter-spacing:.08em;color:#6b7280;margin-bottom:6px">RANKED TOPICS</div>'
+        '<table width="100%" cellspacing="0" style="font-size:14px"><tr style="font-size:11px;color:#9ca3af;'
+        'text-align:left"><th style="padding:4px 6px">#</th><th style="padding:4px 6px">Score</th>'
+        f"<th>Topic</th></tr>{rows}</table>"
+    )
+    return _WRAP.format(
+        kicker=escape(TREND_KICKER),
+        title=f'{escape(TREND_TITLE)}<br><span style="font-size:13px;font-weight:normal">Week of {escape(when)}'
+        f" · {len(topics)} ranked topics</span>",
+        body=body if topics else "<p>No slate this week.</p>",
+        footer="Sent by your Writer's Workbench. The week's radar slate, from the Content Studio.",
+    )
+
+
+def digest_html(
+    name: str,
+    week_of: str | None,
+    topics: list[dict[str, Any]],
+    *,
+    studio_url: str = "",
+    sent_on: datetime | None = None,
+    radar: str = "dev",
+) -> str:
     """The slate email, as n8n's "This week in AI + software development" one was: a dated header, a
-    button into the studio chat, then articles and videos, each with its link in full."""
+    button into the studio chat, then articles and videos, each with its link in full. The Trend radar
+    has its own layout (``trend_digest_html``): a ranked, scored table."""
+    if radar == "trend":
+        return trend_digest_html(name, week_of, topics, studio_url=studio_url, sent_on=sent_on)
     arts = [t for t in topics if t.get("item_type") != "video" and t.get("url")]
     vids = [t for t in topics if t.get("item_type") == "video" and t.get("url")]
 
@@ -197,14 +263,23 @@ async def email_digest(client: Any, ed: StudioEdition, week_of: str | None = Non
     topics = view["topics"]
     arts = sum(1 for t in topics if t.get("item_type") != "video")
     sent_on = datetime.now(_ET)
-    subject = f"{ed.name} — {_long_date(sent_on)} ({arts}+{len(topics) - arts})"
+    subject = (
+        f"{TREND_KICKER} — {_short_date(sent_on)} — {len(topics)} topics"
+        if ed.radar == "trend"
+        else f"{ed.name} — {_long_date(sent_on)} ({arts}+{len(topics) - arts})"
+    )
     res = await send_email(
         to=[to],
         bcc=[bcc] if bcc else None,
         from_addr=get_settings().newsletter_from_address,
         subject=subject,
         html=digest_html(
-            ed.name, view["week_of"], topics, studio_url=_studio_url(ed.edition_id), sent_on=sent_on
+            ed.name,
+            view["week_of"],
+            topics,
+            studio_url=_studio_url(ed.edition_id),
+            sent_on=sent_on,
+            radar=ed.radar,
         ),
     )
     record = await _record_digest(
