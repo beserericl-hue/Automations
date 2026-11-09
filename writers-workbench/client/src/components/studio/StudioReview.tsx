@@ -187,6 +187,11 @@ function DraftCard({ ctx, post, channels, ticked, onTick }: {
     onSuccess: (r) => ctx.track(r.jobId, `Redrafting #${post.display_number}`),
     onError: (e) => setError(errText(e, 'Could not redraft')),
   });
+  const makeImage = useMutation({
+    mutationFn: () => studioApi.makeImage(ed, post.id),
+    onSuccess: (r) => ctx.track(r.jobId, `Making the image for #${post.display_number}`),
+    onError: (e) => setError(errText(e, 'Could not start the image')),
+  });
   const undo = useMutation({ mutationFn: () => studioApi.undo(ed, post.id), onSuccess: (r) => ok(r.data.message), onError: (e) => setError(errText(e, 'Nothing to undo')) });
   const email = useMutation({ mutationFn: () => studioApi.email(ed, post.id), onSuccess: (r) => ok(r.data.message), onError: (e) => setError(errText(e, 'Could not email it')) });
   const act = useMutation({ mutationFn: (a: string) => studioApi.action(ed, [post.id], a), onSuccess: (r) => ok(r.data.message), onError: (e) => setError(errText(e, 'Could not do that')) });
@@ -258,11 +263,14 @@ function DraftCard({ ctx, post, channels, ticked, onTick }: {
             )}
             <p className="text-gray-600 dark:text-gray-300">
               {post.image_url ? 'Chosen image (used instead of a generated one).'
-                : post.include_image ? 'A sketchnote is generated when it is published, so there is nothing to preview yet.'
-                : previewUrl ? 'No image of its own: LinkedIn shows this link preview. Add a sketchnote below if you want one.'
-                : 'No image yet (a link post unfurls its own preview). Add a sketchnote below if you want one.'}
+                : post.include_image ? 'A sketchnote will be generated when it is published. Press Make image to see it now.'
+                : previewUrl ? 'No image of its own: LinkedIn shows this link preview. Press Make image for a sketchnote instead.'
+                : 'No image yet (a link post unfurls its own preview). Press Make image for a sketchnote.'}
             </p>
             <div className="flex flex-wrap items-center gap-2">
+              <button type="button" disabled={makeImage.isPending || busy} onClick={() => makeImage.mutate()} className="rounded bg-brand-600 px-2 py-1 font-medium text-white hover:bg-brand-700 disabled:opacity-50" data-testid={`draft-${post.display_number}-make-image`}>
+                {busy && !post.image_url ? 'Making the image…' : post.image_url ? 'Make a new image' : 'Make image'}
+              </button>
               <button type="button" onClick={() => act.mutate(post.include_image || post.image_url ? 'image_off' : 'image_on')} className="rounded border border-gray-300 px-2 py-1 dark:border-gray-600">
                 {post.include_image || post.image_url ? 'Remove image' : 'Add sketchnote'}
               </button>

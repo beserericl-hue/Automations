@@ -9,14 +9,18 @@ until someone decides to.
 
 from __future__ import annotations
 
+import asyncio
 import secrets
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
+import httpx
+
 from writer_engine.config import get_settings
 from writer_engine.llm import get_router
 from writer_engine.radar import drafts as D
+from writer_engine.social import channels as ch
 from writer_engine.telemetry.logging import get_logger
 
 from .core import EDITABLE, SCHEDULE, StudioEdition, StudioError, _rows, topics_by_id
@@ -337,4 +341,41 @@ async def restore_previous(client: Any, ed: StudioEdition, post: dict[str, Any])
     return {
         "post": {"id": row.get("id"), "display_number": row.get("display_number")},
         "message": f"Restored #{row.get('display_number')}.",
+    }
+
+
+async def make_image(
+    client: Any, ed: StudioEdition, post: dict[str, Any], *, make: Any = None
+) -> dict[str, Any]:
+    """Make the post's sketchnote now, so it can be seen before it is approved.
+
+    The same prompt and generator the publisher uses, saved as the post's chosen ``image_url`` (the
+    publisher posts a chosen image as it is, so what was reviewed is what goes out). The text and its
+    undo history are not touched. ``make`` lets tests stand in for the image service.
+    """
+    if post.get("state") not in EDITABLE:
+        raise StudioError("ALREADY_POSTED", f"#{post.get('display_number')} is {post.get('state')}")
+    key = get_settings().kieai_api_key
+    if make is None and not key:
+        raise StudioError("NO_IMAGE_KEY", "Image generation is not set up (KIEAI_API_KEY)")
+    context = str(post.get("body_md") or "").strip() or str(post.get("linkedin_content") or "")
+    prompt = ch.sketchnote_prompt(str(post.get("title") or ""), context)
+    if make is not None:
+        made = await make(prompt)
+    else:
+        async with httpx.AsyncClient() as http:
+            made = await ch.kie_sketchnote(http, prompt, api_key=key, sleep=asyncio.sleep)
+    if made is None:
+        raise StudioError(
+            "IMAGE_FAILED", f"Could not make an image for #{post.get('display_number')}; try again"
+        )
+    url = str(made[2])
+    studio = dict(post.get("studio") or {})
+    history = list(studio.get("revisions") or [])[-19:]
+    history.append({"at": datetime.now(UTC).isoformat(), "what": "make image"})
+    studio["revisions"] = history
+    row = await _save(client, ed, post, {"image_url": url, "include_image": True, "studio": studio})
+    return {
+        "post": {"id": row.get("id"), "display_number": row.get("display_number"), "title": row.get("title")},
+        "message": f"Made the image for #{row.get('display_number')}.",
     }

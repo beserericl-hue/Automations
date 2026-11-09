@@ -206,6 +206,9 @@ async def test_the_step_refuses_another_users_edition(monkeypatch: pytest.Monkey
         ("tighten #4", "revise", {"posts": "4", "instruction": "tighten it", "mode": "revise"}),
         ("regenerate #3", "revise", {"posts": "3", "mode": "regenerate"}),
         ("undo #3", "revise", {"posts": "3", "mode": "undo"}),
+        ("make image for #3", "revise", {"posts": "3", "mode": "image"}),
+        ("sketchnote 4", "revise", {"posts": "4", "mode": "image"}),
+        ("image on #3", "update", {"action": "image_on", "posts": "3"}),
         ("approve #3, #5", "update", {"action": "approve", "posts": "3, 5"}),
         ("approve all", "update", {"action": "approve", "posts": "all"}),
         ("cancel 4", "update", {"action": "cancel", "posts": "4"}),
@@ -386,6 +389,54 @@ async def test_the_humanizer_record_follows_the_text_through_revise_regenerate_a
     assert row["humanize"] is None
     await drafting.restore_previous(db, ed, await post())  # undo the undo: the redraft, with its record
     assert row["humanize"]["body_md"]["words_spent"] == 99
+
+
+@pytest.mark.asyncio
+async def test_make_image_saves_the_image_for_review_and_leaves_the_text_and_undo_alone() -> None:
+    db = _db()
+    ed = await core.resolve_edition(db, OWNER, "ai-mvp")
+    db.tables["social_schedule_v2"] = [
+        {
+            "id": "p1",
+            "display_number": 1,
+            "user_id": OWNER,
+            "edition_id": "ai-mvp",
+            "state": "draft",
+            "title": "Agents in a game",
+            "body_md": "",
+            "linkedin_content": "Hook\nhttps://youtu.be/x",
+            "include_image": False,
+            "image_url": None,
+            "studio": {"previous": {"title": "older"}},
+        }
+    ]
+    row = db.tables["social_schedule_v2"][0]
+    prompts: list[str] = []
+
+    async def make(prompt: str) -> tuple[bytes, str, str]:
+        prompts.append(prompt)
+        return b"png", "image/png", "https://cdn.example.com/a.png"
+
+    post = (await core.own_posts(db, ed, numbers=[1]))[0]
+    out = await drafting.make_image(db, ed, post, make=make)
+    assert out["message"] == "Made the image for #1."
+    assert row["image_url"] == "https://cdn.example.com/a.png" and row["include_image"] is True
+    assert "Agents in a game" in prompts[0] and "Hook" in prompts[0] and "youtu.be" not in prompts[0]
+    assert (
+        row["studio"]["previous"] == {"title": "older"}
+        and row["studio"]["revisions"][-1]["what"] == "make image"
+    )
+    assert row["linkedin_content"].startswith("Hook")
+
+    async def fail(prompt: str) -> None:
+        return None
+
+    with pytest.raises(core.StudioError) as err:
+        await drafting.make_image(db, ed, (await core.own_posts(db, ed, numbers=[1]))[0], make=fail)
+    assert err.value.code == "IMAGE_FAILED"
+    row["state"] = "posted"
+    with pytest.raises(core.StudioError):
+        await drafting.make_image(db, ed, (await core.own_posts(db, ed, numbers=[1]))[0], make=make)
 
 
 # ----------------------------------------------------------------------------- states + scheduling

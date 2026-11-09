@@ -13,6 +13,7 @@
  *   PATCH  /api/studio/:ed/posts/:id                  inline edit
  *   POST   /api/studio/:ed/posts/:id/revise           revise with an instruction             (engine job, charged)
  *   POST   /api/studio/:ed/posts/:id/regenerate       redraft from its topic                 (engine job, charged)
+ *   POST   /api/studio/:ed/posts/:id/image           make its sketchnote now, to see before approving (engine job, charged)
  *   POST   /api/studio/:ed/posts/:id/undo             back to the version before the last revise
  *   POST   /api/studio/:ed/posts/:id/email            email the draft to the caller
  *   POST   /api/studio/:ed/posts/actions              approve / unapprove / discard / cancel / requeue / unschedule / image_on / image_off
@@ -426,6 +427,13 @@ contentStudioRouter.post('/:ed/posts/:id/regenerate', async (req: Request, res: 
   if (!ed) return;
   if (!UUID.safeParse(req.params.id).success) return bad(res, 404, 'NOT_FOUND', 'Post not found');
   await studioJob(req, res, ed, { op: 'revise', mode: 'regenerate', post_ids: [String(req.params.id)] }, 1, 'regenerate');
+});
+
+contentStudioRouter.post('/:ed/posts/:id/image', async (req: Request, res: Response) => {
+  const ed = await edition(req, res);
+  if (!ed) return;
+  if (!UUID.safeParse(req.params.id).success) return bad(res, 404, 'NOT_FOUND', 'Post not found');
+  await studioJob(req, res, ed, { op: 'revise', mode: 'image', post_ids: [String(req.params.id)] }, 1, 'image');
 });
 
 contentStudioRouter.post('/:ed/posts/:id/undo', async (req: Request, res: Response) => {

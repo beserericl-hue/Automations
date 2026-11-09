@@ -198,6 +198,7 @@ export const studioApi = {
     apiFetch<{ data: unknown }>(`/api/studio/${encodeURIComponent(ed)}/posts/${id}`, { method: 'PATCH', body: JSON.stringify(changes) }),
   revise: (ed: string, id: string, instruction: string) =>
     apiFetch<{ jobId: string }>(`/api/studio/${encodeURIComponent(ed)}/posts/${id}/revise`, { method: 'POST', body: JSON.stringify({ instruction }) }),
+  makeImage: (ed: string, id: string) => apiFetch<{ jobId: string }>(`/api/studio/${encodeURIComponent(ed)}/posts/${id}/image`, { method: 'POST' }),
   regenerate: (ed: string, id: string) => apiFetch<{ jobId: string }>(`/api/studio/${encodeURIComponent(ed)}/posts/${id}/regenerate`, { method: 'POST' }),
   undo: (ed: string, id: string) => apiFetch<{ data: { message: string } }>(`/api/studio/${encodeURIComponent(ed)}/posts/${id}/undo`, { method: 'POST' }),
   email: (ed: string, id: string) => apiFetch<{ data: { message: string } }>(`/api/studio/${encodeURIComponent(ed)}/posts/${id}/email`, { method: 'POST' }),

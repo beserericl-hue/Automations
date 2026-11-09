@@ -6,7 +6,7 @@ own studio editions (owner + radar subscription); anything else is ``NOT_FOUND``
 ``slate``     {week_of?}                                    the week's ranked topics + what each became
 ``queue``     {status: drafts|approved|queue|all|one, posts?} posts of the edition
 ``generate``  {numbers "1-5, 8" | topic_ids [...], week_of?, redo?}   draft topics (task: LLM)
-``revise``    {posts|post_id, mode: revise|regenerate|undo, instruction?}  (task: LLM)
+``revise``    {posts|post_id, mode: revise|regenerate|undo|image, instruction?}  (task: LLM)
 ``update``    {action, posts|post_ids, changes?}           approve / unapprove / discard / cancel /
                                                             requeue / unschedule / image_on / image_off / edit
 ``schedule``  {posts|post_ids, mode: next|slot|at|now, day?, slot?, time?, at?, channels?}
@@ -150,6 +150,8 @@ async def op_revise(client: Any, ed: StudioEdition, p: dict[str, Any]) -> dict[s
             r = await drafting.regenerate(client, ed, post)
         elif mode == "undo":
             r = await drafting.restore_previous(client, ed, post)
+        elif mode == "image":
+            r = await drafting.make_image(client, ed, post)
         else:
             r = await drafting.revise(client, ed, post, str(p.get("instruction") or ""))
         out.append(r["post"])

@@ -362,7 +362,7 @@ CATALOG: tuple[ToolSpec, ...] = (
         "revise",
         "task",
         intent="CONTENT STUDIO: revise a draft with an instruction ('make #3 shorter'), regenerate it, or "
-        "undo the last revision. mode = revise|regenerate|undo",
+        "undo the last revision, or make its image now ('make image for #3'). mode = revise|regenerate|undo|image",
         params=("posts", "instruction", "mode"),
         aliases=("studio_revise",),
     ),
