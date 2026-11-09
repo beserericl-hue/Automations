@@ -23,7 +23,7 @@ _DAY = (
 
 HELP = (
     "I can: show the slate · generate 1-5, 8 · revise #3 to be shorter · regenerate #3 · undo #3 · "
-    "approve #3 (or approve all) · discard #3 · image on/off #3 · schedule #3 [tuesday afternoon | "
+    "approve #3 (or approve all) · discard #3 · image on/off #3 · make image for #3 · schedule #3 [tuesday afternoon | "
     "2026-11-10 | now] · schedule all approved · list the queue · cancel #4 · requeue #4 · email #3 · "
     "email the digest · put 1-6 in the newsletter · add #3 to the newsletter · remove #3 from the "
     "newsletter · show the newsletter · start a new issue."
@@ -100,6 +100,14 @@ def parse(message: str) -> tuple[str, dict[str, Any]] | None:
     ) or low in ("hi", "hello", "topics"):
         wk = re.search(r"\d{4}-\d{2}-\d{2}", low)
         return "slate", {"week_of": wk.group(0)} if wk else {}
+
+    # --- make an image for #N ("make image for #3", "sketchnote 3")
+    m = re.match(
+        rf"(?:(?:make|create|generate|draw)\s+)?(?:an?\s+|the\s+)?(?:image|picture|sketchnote)s?\s+(?:for|of)?\s*({_NUMS})$",
+        low,
+    )
+    if m:
+        return "revise", {"posts": _posts(m.group(1)), "mode": "image"}
 
     # --- regenerate / undo #N
     m = re.match(rf"(?:regenerate|redraft|re-draft|redo)\s+({_NUMS})$", low)

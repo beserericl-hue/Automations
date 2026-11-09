@@ -172,6 +172,14 @@ describe('content studio: ops go to the engine as the caller, on the edition', (
     expect((refused.json.error as Row).message).toBe('A posted post cannot be edited');
   });
 
+  it('makes a post\'s image as a charged engine job, for review before approval', async () => {
+    const r = await call('POST', `/ai-dev-roundup/posts/${POST}/image`);
+    expect(r.status).toBe(202);
+    expect(engine.mock.calls[0][1]).toMatchObject({ op: 'revise', mode: 'image', post_ids: [POST], async: true });
+    expect(deduct).toHaveBeenCalledWith('owner', 3, 'studio.image:ai-dev-roundup');
+    expect((await call('POST', '/ai-dev-roundup/posts/not-a-uuid/image')).status).toBe(404);
+  });
+
   it('schedules with a validated mode', async () => {
     expect((await call('POST', '/ai-dev-roundup/posts/schedule', { ids: [POST], mode: 'slot' })).status).toBe(400);
     expect((await call('POST', '/ai-dev-roundup/posts/schedule', { ids: [POST], mode: 'slot', day: '2026-11-10', slot: 'afternoon' })).status).toBe(200);

@@ -126,6 +126,13 @@ describe('ContentStudio', () => {
     expect(screen.queryByTestId('draft-7-linkedin')).not.toBeInTheDocument();
   });
 
+  it('Make image starts the engine image job for that post', async () => {
+    render('/newsletter/studio/ai-dev-roundup');
+    fireEvent.click(await screen.findByTestId('studio-tab-review'));
+    fireEvent.click(await screen.findByTestId('draft-7-make-image'));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith('/api/studio/ai-dev-roundup/posts/p1/image', { method: 'POST' }));
+  });
+
   it('sends the assistant a command and shows the answer', async () => {
     render('/newsletter/studio/ai-dev-roundup');
     fireEvent.change(await screen.findByTestId('assistant-input'), { target: { value: 'list my drafts' } });
