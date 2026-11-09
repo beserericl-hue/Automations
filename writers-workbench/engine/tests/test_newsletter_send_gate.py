@@ -410,3 +410,76 @@ async def test_slate_email_has_the_studio_button_and_dated_subject(
     assert "Read → https://a.example/x" in html and "Watch → https://v.example/y" in html
     assert sent["subject"].startswith("AI Dev Roundup — ") and sent["subject"].endswith("(1+1)")
     assert "week of" not in sent["subject"]
+
+
+@pytest.mark.asyncio
+async def test_trend_slate_email_is_the_scored_ranked_table_n8n_sent(
+    monkeypatch: pytest.MonkeyPatch, fake_supabase: Any
+) -> None:
+    """The second radar (Eric, 2026-11-09): the email n8n's Trend Radar sent — "AI & Software Engineering
+    Radar — Nov 9, 2026 — 14 topics", a "Want a draft?" box into the studio, then # / score / title with
+    the driver and category under each — now sent by the Workbench."""
+    from writer_engine.postal import client as postal_client
+    from writer_engine.studio import emailing
+    from writer_engine.studio.core import StudioEdition
+
+    monkeypatch.setenv("WORKBENCH_API_URL", "https://wb.example.com/")
+    get_settings.cache_clear()
+    ed = StudioEdition(user_id=OWNER, edition_id="ai-mvp", radar="trend", name="The MVP Brief")
+    topics = [
+        {
+            "rank": 1,
+            "title": "Base44 <big>",
+            "url": "https://a.example/1",
+            "item_type": "article",
+            "score": 95,
+            "driver_type": "demand trigger",
+            "category": "demand trigger",
+            "client_relevance": "MVP & startups",
+            "also_covered_by": ["HN"],
+            "angle": "Ship it first",
+            "summary": "What happened.\n\nWhy it matters.",
+            "source": "SaaStr",
+            "published_at": "2026-11-07T10:00:00+00:00",
+        },
+        {
+            "rank": 2,
+            "title": "Vercel",
+            "url": "https://a.example/2",
+            "item_type": "article",
+            "score": 72,
+            "driver_type": "AI dev tool/agent",
+            "category": "AI advances",
+            "also_covered_by": [],
+        },
+    ]
+    sent: dict[str, Any] = {}
+
+    async def view(_c: Any, _e: Any, _w: Any) -> dict[str, Any]:
+        return {"week_of": "2026-11-09", "topics": topics}
+
+    async def recipient(_c: Any, _u: str) -> tuple[str, str | None]:
+        return "owner@example.com", None
+
+    async def send_email(**kw: Any) -> Any:
+        sent.update(kw)
+        return type("R", (), {"message_id": "m"})()
+
+    monkeypatch.setattr(emailing, "slate", view)
+    monkeypatch.setattr(emailing, "_recipient", recipient)
+    monkeypatch.setattr(postal_client, "send_email", send_email)
+    await emailing.email_digest(fake_supabase, ed)
+    get_settings.cache_clear()
+
+    html = sent["html"]
+    assert sent["subject"].startswith("AI & Software Engineering Radar — ") and sent["subject"].endswith(
+        "— 2 topics"
+    )
+    assert "Weekly AI &amp; Software Engineering Slate" in html and "2 ranked topics" in html
+    assert 'href="https://wb.example.com/newsletter/studio/ai-mvp"' in html and "Want a draft?" in html
+    assert "RANKED TOPICS" in html and ">95<" in html and "demand trigger · MVP &amp; startups" in html
+    assert "also covered by HN" in html and "Base44 &lt;big&gt;" in html
+    assert (
+        "Blog angle:</b> Ship it first" in html and '<p style="margin:0 0 10px">Why it matters.</p>' in html
+    )
+    assert "Read the full article" in html and "SaaStr · 2026-11-07" in html
