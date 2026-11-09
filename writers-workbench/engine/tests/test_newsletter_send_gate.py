@@ -434,8 +434,13 @@ async def test_trend_slate_email_is_the_scored_ranked_table_n8n_sent(
             "item_type": "article",
             "score": 95,
             "driver_type": "demand trigger",
-            "category": "MVP & startups",
+            "category": "demand trigger",
+            "client_relevance": "MVP & startups",
             "also_covered_by": ["HN"],
+            "angle": "Ship it first",
+            "summary": "What happened.\n\nWhy it matters.",
+            "source": "SaaStr",
+            "published_at": "2026-11-07T10:00:00+00:00",
         },
         {
             "rank": 2,
@@ -474,3 +479,7 @@ async def test_trend_slate_email_is_the_scored_ranked_table_n8n_sent(
     assert 'href="https://wb.example.com/newsletter/studio/ai-mvp"' in html and "Want a draft?" in html
     assert "RANKED TOPICS" in html and ">95<" in html and "demand trigger · MVP &amp; startups" in html
     assert "also covered by HN" in html and "Base44 &lt;big&gt;" in html
+    assert (
+        "Blog angle:</b> Ship it first" in html and '<p style="margin:0 0 10px">Why it matters.</p>' in html
+    )
+    assert "Read the full article" in html and "SaaStr · 2026-11-07" in html

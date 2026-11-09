@@ -156,6 +156,51 @@ def _score_colour(score: int) -> str:
     return "#b91c1c" if score >= 85 else "#c2410c" if score >= 70 else "#4b5563"
 
 
+def _why(t: dict[str, Any]) -> str:
+    """ "demand trigger · MVP & startups": what drives the story and who it is for."""
+    return " · ".join(
+        str(x) for x in (t.get("driver_type"), t.get("client_relevance") or t.get("category")) if x
+    )
+
+
+def _cards(topics: list[dict[str, Any]]) -> str:
+    """One card per topic, as n8n's email had: header, the blog angle, the summary, a link to the article."""
+    out = ""
+    for t in topics:
+        paras = "".join(
+            f'<p style="margin:0 0 10px">{escape(p.strip())}</p>'
+            for p in str(t.get("summary") or "").split("\n\n")
+            if p.strip()
+        )
+        covered = t.get("also_covered_by") or []
+        also = (
+            f'<div style="color:#cbd5e1;font-size:12px;margin-top:4px">Also covered by: '
+            f"{escape(', '.join(str(c) for c in covered))}</div>"
+            if covered
+            else ""
+        )
+        day = str(t.get("published_at") or "")[:10]
+        meta = " · ".join(x for x in (escape(str(t.get("source") or "")), day) if x)
+        angle = (
+            '<div style="background:#eff6ff;border-bottom:1px solid #dbeafe;padding:10px 18px;font-size:13px;'
+            f'color:#1e3a8a"><b>Blog angle:</b> {escape(str(t.get("angle") or ""))}</div>'
+            if t.get("angle")
+            else ""
+        )
+        out += (
+            '<div style="border:1px solid #e2e8f0;border-radius:12px;margin:0 0 16px;overflow:hidden">'
+            '<div style="background:#0f172a;padding:14px 18px"><div style="color:#93c5fd;font-size:11px;'
+            f'font-weight:700;text-transform:uppercase;letter-spacing:.06em">#{t.get("rank")} · {escape(_why(t))}</div>'
+            f'<div style="margin-top:4px;font-size:17px;font-weight:800;color:#fff">{escape(str(t.get("title") or ""))}'
+            f'</div><div style="color:#cbd5e1;font-size:12px;margin-top:4px">{meta} · score '
+            f'<b style="color:#fff">{"" if t.get("score") is None else t.get("score")}</b></div>{also}</div>{angle}'
+            f'<div style="padding:14px 18px;font-size:14px;line-height:1.6;color:#1f2937">{paras}'
+            f'<div style="margin-top:8px"><a href="{escape(str(t.get("url") or ""))}" style="color:#2563eb;'
+            'font-weight:600;text-decoration:none">Read the full article →</a></div></div></div>'
+        )
+    return out
+
+
 def trend_digest_html(
     name: str,
     week_of: str | None,
@@ -170,7 +215,7 @@ def trend_digest_html(
     rows = ""
     for t in topics:
         score = t.get("score")
-        why = " · ".join(str(x) for x in (t.get("driver_type"), t.get("category")) if x)
+        why = _why(t)
         link = escape(str(t.get("url") or ""))
         title = escape(str(t.get("title") or ""))
         covered = t.get("also_covered_by") or []
@@ -196,6 +241,7 @@ def trend_digest_html(
         '<table width="100%" cellspacing="0" style="font-size:14px"><tr style="font-size:11px;color:#9ca3af;'
         'text-align:left"><th style="padding:4px 6px">#</th><th style="padding:4px 6px">Score</th>'
         f"<th>Topic</th></tr>{rows}</table>"
+        f'<div style="margin-top:20px">{_cards(topics)}</div>'
     )
     return _WRAP.format(
         kicker=escape(TREND_KICKER),
