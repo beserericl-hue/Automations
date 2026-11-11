@@ -36,6 +36,7 @@ import { landingPageRouter } from './routes/landing-page.js';
 import { bookPagesRouter } from './routes/book-pages.js';
 import { printRouter, printWebhookRouter } from './routes/print.js';
 import { audiobookRouter } from './routes/audiobook.js';
+import { CSP_DIRECTIVES } from './lib/csp.js';
 import { stripeWebhookRouter, autoRechargePausedEmail } from './routes/stripe-webhook.js';
 import { billingRouter } from './routes/billing.js';
 import { onBalanceLowered } from './services/credits.js';
@@ -115,27 +116,7 @@ app.use(
   helmet({
     contentSecurityPolicy: {
       useDefaults: true,
-      directives: {
-        'connect-src': [
-          "'self'",
-          'https://*.supabase.co',
-          'wss://*.supabase.co',
-          'https://*.elevenlabs.io',
-          'wss://*.elevenlabs.io',
-        ],
-        'img-src': ["'self'", 'data:', 'blob:', 'https:'],
-        // 'blob:' + 'wasm-unsafe-eval' are required by the ElevenLabs ConvAI widget ("Talk to Eve"):
-        // it loads its rawAudioProcessor AudioWorklet from a blob: URL (Chrome enforces script-src for
-        // AudioWorklet.addModule, NOT worker-src — this is why Eve failed on Chrome/PC with
-        // "Failed to load the rawAudioProcessor worklet module" while working on other browsers) and
-        // compiles a WASM audio module. Without these the widget throws and voice never initialises.
-        'script-src': ["'self'", 'blob:', "'wasm-unsafe-eval'", 'https://unpkg.com', 'https://*.elevenlabs.io'],
-        'media-src': ["'self'", 'blob:', 'data:', 'https://*.elevenlabs.io'],
-        'frame-src': ["'self'", 'https://*.elevenlabs.io'],
-        'worker-src': ["'self'", 'blob:', 'https://*.elevenlabs.io'],
-        'font-src': ["'self'", 'https:', 'data:'],
-        'style-src': ["'self'", 'https:', "'unsafe-inline'"],
-      },
+      directives: CSP_DIRECTIVES,
     },
   }),
 );
