@@ -238,7 +238,7 @@ describe('settings', () => {
       const put = await call(base, 'PUT', `/project/${PROJECT}/settings`, { volume: 1, voice: 'cedar', style: 'thriller', custom_style: 'a little slower', credits: false });
       expect(put.status).toBe(200);
       const r = await get(base);
-      expect(r.data.settings).toEqual({ voice: 'cedar', style: 'thriller', custom_style: 'a little slower', credits: false });
+      expect(r.data.settings).toEqual({ voice: 'cedar', style: 'thriller', custom_style: 'a little slower', credits: false, pronunciations: [] });
       expect(r.data.items.map((i: Row) => i.kind)).toEqual(['chapter', 'chapter']);
     });
   });
@@ -440,6 +440,79 @@ describe('preview and cover', () => {
       expect(r.data.voices.map((v: Row) => v.id)).toEqual(expect.arrayContaining(['marin', 'cedar', 'onyx']));
       expect(r.data.styles.map((s: Row) => s.id)).toEqual(['fiction', 'thriller', 'intimate', 'epic']);
       expect(r.data).toMatchObject({ credits_per_unit: 8, unit_words: 1000 });
+    });
+  });
+});
+
+
+describe('pronunciation guide', () => {
+  it('is cleaned on the way in: trimmed, blanks dropped, one line per word', async () => {
+    const { normalizePronunciations } = await import('../lib/audiobook.js');
+    expect(
+      normalizePronunciations([
+        { word: '  Siobhan ', say: ' Shivawn ' },
+        { word: 'Mara', say: '' },
+        { word: '', say: 'x' },
+        { word: 'Harrow   Vale', say: 'Hair-oh Vayle' },
+        { word: 'Siobhan', say: 'Shiv-awn' },
+        'junk',
+      ]),
+    ).toEqual([{ word: 'Siobhan', say: 'Shiv-awn' }, { word: 'Harrow Vale', say: 'Hair-oh Vayle' }]);
+    expect(normalizePronunciations('nope')).toEqual([]);
+  });
+
+  it('re-records only the chapters the word is in', async () => {
+    const { hashItem, normalizeSettings } = await import('../lib/audiobook.js');
+    const withMara = { kind: 'chapter' as const, title: 'Chapter 1', source_text: 'Mara opened the door.' };
+    const without = { kind: 'chapter' as const, title: 'Chapter 2', source_text: 'The river rose.' };
+    const none = normalizeSettings(null);
+    const guided = normalizeSettings({ pronunciations: [{ word: 'Mara', say: 'Mah-rah' }] });
+    expect(hashItem(withMara, guided)).not.toBe(hashItem(withMara, none));
+    expect(hashItem(without, guided)).toBe(hashItem(without, none));
+    // and changing how it is said changes the chapter again
+    const again = normalizeSettings({ pronunciations: [{ word: 'Mara', say: 'Mar-ah' }] });
+    expect(hashItem(withMara, again)).not.toBe(hashItem(withMara, guided));
+  });
+
+  it('saved with the narrator; a built book then shows only the chapters containing the name as changed', async () => {
+    chapters[0].content_text = `Mara opened the door. ${words(1500)}`;
+    await withServer(async (base) => {
+      await call(base, 'POST', `/project/${PROJECT}/build`, { volume: 1 });
+      for (const [k, n] of [['opening', 0], ['chapter', 1], ['chapter', 2], ['closing', 0]] as const) finish(k, n);
+      const put = await call(base, 'PUT', `/project/${PROJECT}/settings`, { volume: 1, pronunciations: [{ word: 'Mara', say: 'Mah-rah' }] });
+      expect(put.data.settings.pronunciations).toEqual([{ word: 'Mara', say: 'Mah-rah' }]);
+      const r = await get(base);
+      expect(r.data.settings.pronunciations).toEqual([{ word: 'Mara', say: 'Mah-rah' }]);
+      // only chapter 1 contains "Mara" (the credits are about the title and author)
+      expect(r.data.items.filter((i: Row) => i.stale).map((i: Row) => `${i.kind}-${i.chapter_number}`)).toEqual(['chapter-1']);
+      engineJobs.length = 0;
+      const b = await call(base, 'POST', `/project/${PROJECT}/build`, { volume: 1 });
+      expect(b.data).toMatchObject({ queued: 1, credits_charged: 16 });
+    });
+  });
+
+  it('a preview can say one word with the guide applied, instead of the opening', async () => {
+    await withServer(async (base) => {
+      await call(base, 'POST', `/project/${PROJECT}/preview`, { volume: 1, say: 'Siobhan', pronunciations: [{ word: 'Siobhan', say: 'Shivawn' }] });
+      expect(engineJobs[0]).toMatchObject({ op: 'audiobook-preview', text: 'Siobhan', pronunciations: [{ word: 'Siobhan', say: 'Shivawn' }] });
+    });
+  });
+
+  it('suggests names that recur mid-sentence, not sentence starts, days or the ones already in the guide', async () => {
+    const { suggestNames } = await import('../lib/audiobook.js');
+    const text = 'Siobhan ran. Then Siobhan hid, and Siobhan wept. She saw Tomas on Monday, and Tomas smiled; Tomas left. Later, the river rose. Then Harrow came. And Harrow went. Harrow stayed.';
+    // Mid-sentence only (the first Siobhan and Harrow open sentences), three or more times, never a weekday.
+    expect(suggestNames([text])).toEqual([{ word: 'Tomas', count: 3 }]);
+    expect(suggestNames([text, text])).toEqual([{ word: 'Tomas', count: 6 }, { word: 'Harrow', count: 4 }, { word: 'Siobhan', count: 4 }]);
+    expect(suggestNames([text, text], ['tomas'])).toEqual([{ word: 'Harrow', count: 4 }, { word: 'Siobhan', count: 4 }]);
+  });
+
+  it('the names route returns suggestions from this book\'s chapters', async () => {
+    chapters[0].content_text = 'He said Siobhan was gone, and then Siobhan came back, and Siobhan smiled.';
+    await withServer(async (base) => {
+      const r = await call(base, 'GET', `/project/${PROJECT}/names`);
+      expect(r.status).toBe(200);
+      expect(r.data.names).toEqual([{ word: 'Siobhan', count: 3 }]);
     });
   });
 });

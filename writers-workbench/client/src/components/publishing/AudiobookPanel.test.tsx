@@ -60,6 +60,7 @@ beforeEach(() => {
     const path = String(p);
     const method = (o as { method?: string } | undefined)?.method ?? 'GET';
     if (path === '/api/audiobook/options') return { success: true, data: OPTIONS } as never;
+    if (path.includes('/names')) return { success: true, data: { names: [{ word: 'Siobhan', count: 12 }, { word: 'Mara', count: 40 }] } } as never;
     if (path.startsWith('/api/audiobook/project/') && method === 'GET') return { success: true, data: state } as never;
     if (path.endsWith('/preview')) return { success: true, data: { audio_b64: 'bXAz', content_type: 'audio/mpeg' } } as never;
     if (path.endsWith('/build')) return { success: true, data: { queued: 4, skipped_in_progress: 0, credits_charged: 24 } } as never;
@@ -152,6 +153,59 @@ describe('AudiobookPanel', () => {
     await waitFor(() =>
       expect(bodyOf('/settings', 'PUT')).toEqual({ volume: 1, voice: 'cedar', style: 'thriller', custom_style: 'a touch slower', credits: false }),
     );
+  });
+
+  it('a changed style offers save and re-narrate next to the choices, with the price; it saves first, then builds', async () => {
+    state = book({
+      items: [item('opening', 0, 'Opening credits', ready('o')), item('chapter', 1, 'Chapter 1. The Door', ready('c1')), item('chapter', 2, 'Chapter 2. Rain', ready('c2')), item('closing', 0, 'Closing credits', ready('z'))],
+      summary: { total: 4, ready: 4, building: 0, failed: 0, stale: 0, missing: 0, duration_s: 3000, size_bytes: 72_000_000, out_of_spec: 0 },
+      cost: { credits_per_unit: 8, unit_words: 1000, to_build_credits: 0, total_credits: 24 },
+    });
+    renderWithProviders(<AudiobookPanel projectId="p1" volumeCount={1} />);
+    expect(await screen.findByTestId('audiobook-build')).toBeDisabled(); // everything is built
+    expect(screen.queryByTestId('audiobook-unsaved')).toBeNull();
+    fireEvent.click(screen.getByTestId('audiobook-style-thriller'));
+    const bar = screen.getByTestId('audiobook-unsaved');
+    expect(within(bar).getByText('Save narrator')).toBeInTheDocument();
+    fireEvent.click(within(bar).getByTestId('audiobook-save-renarrate'));
+    await waitFor(() => expect(bodyOf('/build')).toEqual({ volume: 1 }));
+    expect(bodyOf('/settings', 'PUT')).toMatchObject({ volume: 1, style: 'thriller' });
+    const order = mockFetch.mock.calls.map(([p]) => String(p)).filter((p) => p.endsWith('/settings') || p.endsWith('/build'));
+    expect(order).toEqual(['/api/audiobook/project/p1/settings', '/api/audiobook/project/p1/build']);
+  });
+
+  it('before anything is built, a changed narrator only offers Save (nothing to re-narrate)', async () => {
+    renderWithProviders(<AudiobookPanel projectId="p1" volumeCount={1} />);
+    fireEvent.click(await screen.findByTestId('audiobook-style-thriller'));
+    expect(screen.getByTestId('audiobook-save')).toBeInTheDocument();
+    expect(screen.queryByTestId('audiobook-save-renarrate')).toBeNull();
+  });
+
+  it('pronunciation guide: add a suggested name, say how it sounds, hear it, and save it with the narrator', async () => {
+    state = book({ settings: { voice: 'marin', style: 'fiction', custom_style: '', credits: true, pronunciations: [{ word: 'Mara', say: 'Mah-rah' }] } });
+    renderWithProviders(<AudiobookPanel projectId="p1" volumeCount={1} />);
+    const guide = await screen.findByTestId('audiobook-guide');
+    expect(screen.getByTestId('guide-word-0')).toHaveValue('Mara');
+    expect(screen.getByTestId('guide-say-0')).toHaveValue('Mah-rah');
+    // Names already in the guide are not offered again; others are, with how often they appear.
+    expect(within(guide).queryByTestId('guide-suggest-Mara')).toBeNull();
+    fireEvent.click(await within(guide).findByTestId('guide-suggest-Siobhan'));
+    fireEvent.change(screen.getByTestId('guide-say-1'), { target: { value: 'Shivawn' } });
+    fireEvent.click(screen.getByTestId('guide-hear-1'));
+    await waitFor(() => expect(bodyOf('/preview')).toMatchObject({ say: 'Siobhan' }));
+    expect(bodyOf('/preview').pronunciations).toEqual([{ word: 'Mara', say: 'Mah-rah' }, { word: 'Siobhan', say: 'Shivawn' }]);
+    fireEvent.click(screen.getByTestId('audiobook-save'));
+    await waitFor(() =>
+      expect(bodyOf('/settings', 'PUT').pronunciations).toEqual([{ word: 'Mara', say: 'Mah-rah' }, { word: 'Siobhan', say: 'Shivawn' }]),
+    );
+  });
+
+  it('a guide line can be removed, which makes the narrator unsaved', async () => {
+    state = book({ settings: { voice: 'marin', style: 'fiction', custom_style: '', credits: true, pronunciations: [{ word: 'Mara', say: 'Mah-rah' }] } });
+    renderWithProviders(<AudiobookPanel projectId="p1" volumeCount={1} />);
+    fireEvent.click(await screen.findByTestId('guide-remove-0'));
+    expect(screen.queryByTestId('guide-row-0')).toBeNull();
+    expect(screen.getByTestId('audiobook-unsaved')).toBeInTheDocument();
   });
 
   it('"Hear it on my book" reads with the voice and style on screen and plays the answer', async () => {

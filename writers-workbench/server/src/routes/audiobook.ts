@@ -33,6 +33,7 @@ import {
   BUCKET,
   CREDIT_WORDS,
   MAX_CUSTOM_STYLE,
+  MAX_PRONUNCIATIONS,
   SAMPLE_POSITION,
   STYLES,
   VOICES,
@@ -43,6 +44,7 @@ import {
   normalizeSettings,
   planAudiobook,
   squareCover,
+  suggestNames,
   type AudioSettings,
   type PlannedItem,
 } from '../lib/audiobook.js';
@@ -74,6 +76,9 @@ const SettingsBody = z.object({
   style: z.string().max(40).optional(),
   custom_style: z.string().max(MAX_CUSTOM_STYLE * 2).optional(),
   credits: z.boolean().optional(),
+  pronunciations: z.array(z.object({ word: z.string().max(120), say: z.string().max(160) })).max(MAX_PRONUNCIATIONS * 2).optional(),
+  /** Preview only: say this instead of the book's opening (one word or phrase of the guide). */
+  say: z.string().max(120).optional(),
 });
 const BuildBody = z.object({
   volume: z.number().int().min(1).max(12).default(1),
@@ -97,6 +102,7 @@ interface BookRow {
   style: string;
   custom_style: string;
   credits: boolean;
+  pronunciations: unknown;
 }
 
 interface ItemRow {
@@ -124,7 +130,7 @@ const ITEM_COLUMNS =
 async function findBook(userId: string, projectId: string, volume: number): Promise<BookRow | null> {
   const { data } = await getSupabaseAdmin()
     .from('audiobooks_v2')
-    .select('id, voice, style, custom_style, credits')
+    .select('id, voice, style, custom_style, credits, pronunciations')
     .eq('project_id', projectId)
     .eq('user_id', userId)
     .eq('volume_index', volume)
@@ -146,7 +152,7 @@ async function ensureBook(userId: string, projectId: string, volume: number, set
   const { data, error } = await sb
     .from('audiobooks_v2')
     .insert({ user_id: userId, project_id: projectId, volume_index: volume, ...s })
-    .select('id, voice, style, custom_style, credits')
+    .select('id, voice, style, custom_style, credits, pronunciations')
     .single();
   if (error || !data) throw new Error(error?.message ?? 'audiobook not created');
   return data as BookRow;
@@ -363,7 +369,8 @@ audiobookRouter.post('/project/:projectId/preview', previewLimiter, validateBody
       voice: s.voice,
       style: s.style,
       custom_style: s.custom_style,
-      text: first.source_text.slice(0, 1200),
+      text: body.say?.trim() || first.source_text.slice(0, 1200),
+      pronunciations: s.pronunciations,
     });
     res.json({ success: true, data: { audio_b64: out.audio_b64, content_type: out.content_type ?? 'audio/mpeg' } });
   } catch (err) {
@@ -476,6 +483,22 @@ audiobookRouter.post('/project/:projectId/build', validateBody(BuildBody), async
   const charged = chargeable(req) && queuedUnits > 0 ? queuedUnits * unitCost : 0;
   if (charged > 0) await deductCredits(userId, charged, `audiobook.narrate:${pid(req)}`);
   res.status(202).json({ success: true, data: { queued, skipped_in_progress: skippedBusy, credits_charged: charged } });
+});
+
+/** Names that appear often in the chapters and are not in the guide yet — where mispronunciations hide. */
+audiobookRouter.get('/project/:projectId/names', async (req: Request, res: Response) => {
+  const volume = VolumeQuery.safeParse(req.query.volume);
+  if (!volume.success) return bad(res, 400, 'VALIDATION', 'volume must be 1-12');
+  const source = await ownedSource(req, res, pid(req));
+  if (!source) return;
+  const book = await findBook(req.userId!, pid(req), volume.data);
+  const s = settingsOf(book);
+  const plan = planAudiobook(source, volume.data, s);
+  const names = suggestNames(
+    (plan?.items ?? []).filter((i) => i.kind === 'chapter').map((i) => `${i.title}.\n${i.source_text}`),
+    s.pronunciations.map((p) => p.word),
+  );
+  res.json({ success: true, data: { names } });
 });
 
 audiobookRouter.post('/project/:projectId/sample', validateBody(VolumeBody), async (req: Request, res: Response) => {

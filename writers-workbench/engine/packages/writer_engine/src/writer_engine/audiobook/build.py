@@ -139,8 +139,13 @@ async def build_item(item_id: str, user_id: str, tags: dict[str, str] | None = N
                 await _download(client, str(first["storage_path"])), seconds=SAMPLE_SECONDS, tags=meta
             )
         else:
-            title_line = str(item.get("title") or "") if kind == "chapter" else ""
-            segs = text.segments(str(item.get("source_text") or ""), title_line=title_line)
+            guide = book.get("pronunciations")
+            title_line = (
+                text.apply_pronunciations(str(item.get("title") or ""), guide) if kind == "chapter" else ""
+            )
+            segs = text.segments(
+                text.apply_pronunciations(str(item.get("source_text") or ""), guide), title_line=title_line
+            )
             chars = text.speech_chars(segs)
             if not chars:
                 raise BuildError("NO_TEXT", "there is no text to narrate")
@@ -213,9 +218,11 @@ async def build_item(item_id: str, user_id: str, tags: dict[str, str] | None = N
         raise
 
 
-async def preview(voice: str, style: str, custom_style: str, sample: str) -> dict[str, Any]:
+async def preview(
+    voice: str, style: str, custom_style: str, sample: str, pronunciations: object = None
+) -> dict[str, Any]:
     """A short, unmastered reading in the chosen voice and style, so the author can hear it first."""
-    body = text.clean(sample)[:PREVIEW_MAX_CHARS]
+    body = text.clean(text.apply_pronunciations(sample, pronunciations))[:PREVIEW_MAX_CHARS]
     if not body:
         raise BuildError("NO_TEXT", "there is no text to read")
     mp3 = await tts.synthesize(

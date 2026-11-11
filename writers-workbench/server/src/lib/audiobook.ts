@@ -59,14 +59,35 @@ export const STYLES: readonly Style[] = [
   { id: 'epic', label: 'Epic', description: 'Grand and dramatic, with weight on the big moments.' },
 ];
 
+/** One line of the author's pronunciation guide: the word as written, and how it sounds in plain letters. */
+export interface Pronunciation {
+  word: string;
+  say: string;
+}
+
+export const MAX_PRONUNCIATIONS = 200;
+
 export interface AudioSettings {
   voice: string;
   style: string;
   custom_style: string;
   credits: boolean;
+  pronunciations: Pronunciation[];
 }
 
-export const DEFAULT_SETTINGS: AudioSettings = { voice: 'marin', style: 'fiction', custom_style: '', credits: true };
+export const DEFAULT_SETTINGS: AudioSettings = { voice: 'marin', style: 'fiction', custom_style: '', credits: true, pronunciations: [] };
+
+/** A guide from a request or a stored row: trimmed, no blanks, one line per word (the last one wins), bounded. */
+export function normalizePronunciations(raw: unknown): Pronunciation[] {
+  if (!Array.isArray(raw)) return [];
+  const byWord = new Map<string, Pronunciation>();
+  for (const e of raw) {
+    const word = String((e as Pronunciation | null)?.word ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
+    const say = String((e as Pronunciation | null)?.say ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
+    if (word && say) byWord.set(word, { word, say });
+  }
+  return [...byWord.values()].slice(0, MAX_PRONUNCIATIONS);
+}
 
 export const MAX_CUSTOM_STYLE = 600;
 
@@ -79,6 +100,7 @@ export function normalizeSettings(raw: Partial<Record<keyof AudioSettings, unkno
     style: STYLES.some((s) => s.id === style) ? style : DEFAULT_SETTINGS.style,
     custom_style: String(raw?.custom_style ?? '').replace(/\s+/g, ' ').trim().slice(0, MAX_CUSTOM_STYLE),
     credits: raw?.credits === undefined ? DEFAULT_SETTINGS.credits : Boolean(raw.credits),
+    pronunciations: normalizePronunciations(raw?.pronunciations),
   };
 }
 
@@ -169,10 +191,44 @@ export function planAudiobook(source: BookSource, volumeIndex: number, settings:
 
 /** Identity of a recording's input: the same hash means the same words, voice and direction. */
 export function hashItem(item: Pick<PlannedItem, 'kind' | 'title' | 'source_text'>, s: AudioSettings): string {
+  // Only the guide entries that occur in THIS recording's words count: adding "Siobhan" re-records the
+  // chapters Siobhan is in, not the whole book.
+  const haystack = `${item.title}\n${item.source_text}`;
+  const guide = s.pronunciations
+    .filter((p) => haystack.includes(p.word))
+    .map((p) => `${p.word}=${p.say}`)
+    .sort()
+    .join('|');
   return createHash('sha256')
-    .update([item.kind, item.title, item.source_text, s.voice, s.style, s.custom_style].join('\u0000'))
+    .update([item.kind, item.title, item.source_text, s.voice, s.style, s.custom_style, guide].join('\u0000'))
     .digest('hex');
 }
+
+/** Words most often capitalized mid-sentence in the chapters: the names a voice is most likely to get wrong. */
+export function suggestNames(texts: string[], skip: string[] = [], limit = 40): { word: string; count: number }[] {
+  const counts = new Map<string, number>();
+  const known = new Set(skip.map((w) => w.toLowerCase()));
+  for (const text of texts) {
+    // A capitalized word not at the start of a sentence: the previous visible character is not . ! ? or an opening quote.
+    for (const m of text.matchAll(/(?<=[a-z,;:)—-]["”’']?\s+)[A-Z][a-z]+(?:['’-][A-Za-z]+)*/g)) {
+      const w = m[0].replace(/['’]s$/, '');
+      if (w.length < 3 || known.has(w.toLowerCase()) || COMMON_CAPITALIZED.has(w)) continue;
+      counts.set(w, (counts.get(w) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .filter(([, n]) => n >= 3)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([word, count]) => ({ word, count }));
+}
+
+/** Capitalized in running text but never a name worth a guide. */
+const COMMON_CAPITALIZED = new Set([
+  'God', 'Lord', 'Sir', 'Lady', 'Mister', 'Doctor', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday',
+  'Saturday', 'Sunday', 'January', 'February', 'March', 'April', 'June', 'July', 'August', 'September',
+  'October', 'November', 'December', 'Christmas', 'Yes', 'The', 'And', 'But', 'Not', 'That', 'This',
+]);
 
 /** Identity of the narrator settings alone (voice, style, the author's note). */
 export function styleHash(s: AudioSettings): string {
