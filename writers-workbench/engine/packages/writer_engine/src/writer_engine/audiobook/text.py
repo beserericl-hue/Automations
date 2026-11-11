@@ -117,5 +117,37 @@ def segments(body: str, *, title_line: str = "") -> list[Segment]:
     return out
 
 
+def pronunciation_entries(raw: object) -> list[tuple[str, str]]:
+    """The author's guide as (word, say) pairs: well-formed entries only, longest word first.
+
+    Longest first so "Harrow Vale" is respelled as a whole before "Harrow" gets a chance to be.
+    """
+    out: list[tuple[str, str]] = []
+    if isinstance(raw, list):
+        for e in raw[:300]:
+            if isinstance(e, dict):
+                word, say = (
+                    " ".join(str(e.get("word") or "").split()),
+                    " ".join(str(e.get("say") or "").split()),
+                )
+                if word and say:
+                    out.append((word[:60], say[:80]))
+    return sorted(out, key=lambda p: -len(p[0]))
+
+
+def apply_pronunciations(body: str, raw: object) -> str:
+    """Swap each guide word for its respelling, in the narration text only.
+
+    Whole words, case-sensitive ("Mara" is a name; "mara" is not), so "Mara's" becomes "Mah-rah's" and
+    "Maraud" is left alone. A multi-word entry matches across any run of spaces.
+    """
+    for word, say in pronunciation_entries(raw):
+        pattern = r"(?<!\w)" + r"\s+".join(re.escape(w) for w in word.split()) + r"(?!\w)"
+        body = re.sub(
+            pattern, say.replace("\\", "\\\\"), body
+        )  # a literal replacement, never a back-reference
+    return body
+
+
 def speech_chars(segs: list[Segment]) -> int:
     return sum(len(s.text) for s in segs)

@@ -36,11 +36,16 @@ interface Options {
   credits_per_unit: number;
   unit_words: number;
 }
+interface Pronunciation {
+  word: string;
+  say: string;
+}
 interface Settings {
   voice: string;
   style: string;
   custom_style: string;
   credits: boolean;
+  pronunciations: Pronunciation[];
 }
 type Status = 'none' | 'queued' | 'building' | 'ready' | 'failed';
 interface Item {
@@ -149,6 +154,12 @@ export default function AudiobookPanel({ projectId, volumeCount }: { projectId: 
     queryKey: ['audiobook-options'],
     queryFn: async () => (await apiFetch<ApiEnvelope<Options>>('/api/audiobook/options')).data!,
   });
+  const { data: suggested } = useQuery({
+    queryKey: ['audiobook-names', projectId, volume],
+    queryFn: async () =>
+      (await apiFetch<ApiEnvelope<{ names: { word: string; count: number }[] }>>(`/api/audiobook/project/${projectId}/names?volume=${volume}`)).data?.names ?? [],
+    staleTime: 60_000,
+  });
   const { data: book, error: loadError } = useQuery({
     queryKey: key,
     queryFn: async () => {
@@ -204,6 +215,28 @@ export default function AudiobookPanel({ projectId, volumeCount }: { projectId: 
     onError: (err) => addToast(messageOf(err), 'error'),
   });
 
+  // Save the new voice/delivery, then narrate everything that was recorded with the old one.
+  const renarrate = useMutation({
+    mutationFn: async (s: Settings) => {
+      await apiFetch(`/api/audiobook/project/${projectId}/settings`, { method: 'PUT', body: JSON.stringify({ volume, ...s }) });
+      return (
+        await apiFetch<ApiEnvelope<{ queued: number; skipped_in_progress: number; credits_charged: number }>>(
+          `/api/audiobook/project/${projectId}/build`,
+          { method: 'POST', body: JSON.stringify({ volume }) },
+        )
+      ).data!;
+    },
+    onSuccess: (r) => {
+      addToast(`Re-narrating ${r.queued} recording${r.queued === 1 ? '' : 's'}${r.credits_charged ? ` · ${r.credits_charged} credits` : ''}`, 'success');
+      void refresh();
+      void queryClient.invalidateQueries({ queryKey: ['credits'] });
+    },
+    onError: (err) => {
+      addToast(messageOf(err), 'error');
+      void refresh();
+    },
+  });
+
   const sample = useMutation({
     mutationFn: async () =>
       apiFetch(`/api/audiobook/project/${projectId}/sample`, { method: 'POST', body: JSON.stringify({ volume }) }),
@@ -221,11 +254,12 @@ export default function AudiobookPanel({ projectId, volumeCount }: { projectId: 
   // "Hear it": the opening of the author's own first chapter, in the voice and style on screen.
   const audio = useRef<HTMLAudioElement | null>(null);
   const preview = useMutation({
-    mutationFn: async () =>
+    // `say`: one word from the guide, read with the whole guide applied; omitted = the book's opening.
+    mutationFn: async (say?: string) =>
       (
         await apiFetch<ApiEnvelope<{ audio_b64: string; content_type: string }>>(
           `/api/audiobook/project/${projectId}/preview`,
-          { method: 'POST', body: JSON.stringify({ volume, ...form }) },
+          { method: 'POST', body: JSON.stringify({ volume, ...form, ...(say ? { say } : {}) }) },
         )
       ).data!,
     onSuccess: (r) => {
@@ -255,7 +289,11 @@ export default function AudiobookPanel({ projectId, volumeCount }: { projectId: 
   const s = book.summary;
   const busy = s.building > 0;
   const toBuild = s.missing + s.failed + s.stale;
+  const anyBuilt = s.ready + s.stale > 0;
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => setForm({ ...form, [k]: v });
+  const guide = form.pronunciations ?? [];
+  const setGuide = (next: Pronunciation[]) => set('pronunciations', next);
+  const offered = (suggested ?? []).filter((n) => !guide.some((g) => g.word === n.word)).slice(0, 12);
   const costNote = (credits: number) =>
     credits > 0 ? ` · ${credits} credits` : '';
 
@@ -317,7 +355,7 @@ export default function AudiobookPanel({ projectId, volumeCount }: { projectId: 
                 <button
                   type="button"
                   data-testid="audiobook-preview"
-                  onClick={() => preview.mutate()}
+                  onClick={() => preview.mutate(undefined)}
                   disabled={preview.isPending}
                   className={secondary}
                 >
@@ -367,6 +405,73 @@ export default function AudiobookPanel({ projectId, volumeCount }: { projectId: 
               />
             </label>
 
+            <div data-testid="audiobook-guide" className="space-y-2">
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                Pronunciation guide — for names the voice gets wrong. Write the word as you hear it should sound, in
+                plain letters (Siobhan → Shivawn). It changes the narration only, never your manuscript, and re-records
+                just the chapters the word appears in.
+              </p>
+              {guide.map((g, i) => (
+                <div key={i} className="flex flex-wrap items-center gap-2" data-testid={`guide-row-${i}`}>
+                  <input
+                    aria-label={`Word ${i + 1}`}
+                    data-testid={`guide-word-${i}`}
+                    value={g.word}
+                    maxLength={60}
+                    onChange={(e) => setGuide(guide.map((x, j) => (j === i ? { ...x, word: e.target.value } : x)))}
+                    placeholder="Name as written"
+                    className={`${field} w-44`}
+                  />
+                  <span className="text-gray-400">→</span>
+                  <input
+                    aria-label={`Sounds like ${i + 1}`}
+                    data-testid={`guide-say-${i}`}
+                    value={g.say}
+                    maxLength={80}
+                    onChange={(e) => setGuide(guide.map((x, j) => (j === i ? { ...x, say: e.target.value } : x)))}
+                    placeholder="Sounds like"
+                    className={`${field} w-44`}
+                  />
+                  <button
+                    type="button"
+                    data-testid={`guide-hear-${i}`}
+                    onClick={() => g.word.trim() && preview.mutate(g.word.trim())}
+                    disabled={preview.isPending || !g.word.trim()}
+                    className={secondary}
+                  >
+                    Hear it
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${g.word || 'entry'}`}
+                    data-testid={`guide-remove-${i}`}
+                    onClick={() => setGuide(guide.filter((_, j) => j !== i))}
+                    className="text-xs text-gray-400 hover:text-red-600"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" data-testid="guide-add" onClick={() => setGuide([...guide, { word: '', say: '' }])} className={secondary}>
+                  Add a word
+                </button>
+                {offered.length ? <span className="text-xs text-gray-500">Names that appear often in your chapters:</span> : null}
+                {offered.map((n) => (
+                  <button
+                    key={n.word}
+                    type="button"
+                    data-testid={`guide-suggest-${n.word}`}
+                    onClick={() => setGuide([...guide, { word: n.word, say: '' }])}
+                    className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300"
+                    title={`${n.count} times`}
+                  >
+                    {n.word} <span className="text-gray-400">×{n.count}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
               <input
                 type="checkbox"
@@ -376,6 +481,35 @@ export default function AudiobookPanel({ projectId, volumeCount }: { projectId: 
               />
               Speak opening credits (title, author, narrator) and closing credits
             </label>
+
+            {dirty ? (
+              <div
+                data-testid="audiobook-unsaved"
+                className="flex flex-wrap items-center gap-2 rounded-md bg-brand-50 p-2 text-xs text-brand-900 dark:bg-brand-950/40 dark:text-brand-100"
+              >
+                <span className="flex-1">You changed the narrator. Nothing is re-recorded until you say so.</span>
+                <button
+                  type="button"
+                  data-testid="audiobook-save"
+                  onClick={() => save.mutate(form)}
+                  disabled={save.isPending || renarrate.isPending}
+                  className={secondary}
+                >
+                  {save.isPending ? 'Saving…' : 'Save narrator'}
+                </button>
+                {anyBuilt ? (
+                  <button
+                    type="button"
+                    data-testid="audiobook-save-renarrate"
+                    onClick={() => renarrate.mutate(form)}
+                    disabled={save.isPending || renarrate.isPending}
+                    className={primary}
+                  >
+                    {renarrate.isPending ? 'Starting…' : `Save and re-narrate what changed${book.cost.total_credits ? ` · up to ${book.cost.total_credits} credits` : ''}`}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
           </fieldset>
 
           <div className="flex flex-wrap items-start gap-4 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
@@ -438,17 +572,7 @@ export default function AudiobookPanel({ projectId, volumeCount }: { projectId: 
                     ? `Build ${toBuild} recording${toBuild === 1 ? '' : 's'}${costNote(book.cost.to_build_credits)}`
                     : 'Everything is built'}
             </button>
-            {dirty ? (
-              <button
-                type="button"
-                data-testid="audiobook-save"
-                onClick={() => save.mutate(form)}
-                disabled={save.isPending}
-                className={secondary}
-              >
-                {save.isPending ? 'Saving…' : 'Save narrator'}
-              </button>
-            ) : null}
+            {dirty ? <span className="text-xs text-amber-700 dark:text-amber-400">Save the narrator first (above).</span> : null}
             <p data-testid="audiobook-summary" className="text-xs text-gray-600 dark:text-gray-400">
               {s.ready} of {s.total} recordings ready
               {s.ready ? ` · ${clock(s.duration_s)} · ${mb(s.size_bytes)}` : ''}

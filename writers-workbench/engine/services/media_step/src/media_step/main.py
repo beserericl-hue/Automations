@@ -583,6 +583,7 @@ async def _op_audiobook_preview(payload: dict) -> dict:
             str(payload.get("style") or ""),
             str(payload.get("custom_style") or ""),
             str(payload.get("text") or ""),
+            payload.get("pronunciations"),
         )
     except (build.BuildError, tts.TTSError) as exc:
         return {

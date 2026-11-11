@@ -385,3 +385,64 @@ def test_the_runtime_image_installs_ffmpeg():
     dockerfile = Path(__file__).resolve().parents[1] / "services/runtime/Dockerfile"
     assert "ffmpeg" in dockerfile.read_text()
     assert shutil is not None
+
+
+# ----------------------------------------------------------------------------- pronunciation guide
+
+
+def test_guide_respells_whole_words_only_case_sensitively_and_keeps_the_possessive():
+    guide = [{"word": "Mara", "say": "Mah-rah"}, {"word": "Siobhan", "say": "Shivawn"}]
+    out = text.apply_pronunciations(
+        "Mara met Siobhan. Mara's coat. The marauders, and Maraud, and mara.", guide
+    )
+    assert out == "Mah-rah met Shivawn. Mah-rah's coat. The marauders, and Maraud, and mara."
+
+
+def test_guide_matches_the_longest_entry_first_and_across_line_breaks():
+    guide = [{"word": "Harrow", "say": "Hair-oh"}, {"word": "Harrow Vale", "say": "Hair-oh Vayle"}]
+    assert text.apply_pronunciations("In Harrow Vale, near Harrow.\nHarrow\nVale", guide) == (
+        "In Hair-oh Vayle, near Hair-oh.\nHair-oh Vayle"
+    )
+
+
+def test_guide_ignores_malformed_entries_and_a_replacement_is_never_reread_as_a_pattern():
+    guide = [
+        {"word": "", "say": "x"},
+        {"word": "A", "say": ""},
+        "junk",
+        {"word": "Ng", "say": "\\1 (Ng)"},
+        None,
+    ]
+    assert text.apply_pronunciations("Ng and Ng", guide) == "\\1 (Ng) and \\1 (Ng)"
+    assert text.apply_pronunciations("unchanged", None) == "unchanged"
+    assert text.apply_pronunciations("unchanged", "nonsense") == "unchanged"
+
+
+async def test_build_narrates_the_respelling_not_the_name_and_keeps_the_manuscript(
+    monkeypatch: pytest.MonkeyPatch, narrated: list[dict[str, Any]]
+):
+    if not master.available():
+        pytest.skip("ffmpeg/ffprobe not installed")
+    db = _db(source="Siobhan opened the door.")
+    db.tables["audiobooks_v2"][0]["pronunciations"] = [{"word": "Siobhan", "say": "Shivawn"}]
+    db.tables["audiobook_chapters_v2"][0]["title"] = "Chapter 1. Siobhan"
+    _use(monkeypatch, db)
+    await build.build_item("c1", OWNER)
+    spoken = " ".join(c["text"] for c in narrated)
+    assert "Shivawn opened the door." in spoken and "Chapter 1. Shivawn" in spoken
+    assert "Siobhan" not in spoken
+    assert db.tables["audiobook_chapters_v2"][0]["source_text"] == "Siobhan opened the door."
+
+
+async def test_preview_applies_the_guide(monkeypatch: pytest.MonkeyPatch):
+    seen: dict[str, Any] = {}
+
+    async def fake_synth(
+        text_: str, *, voice: str, instructions: str, model: str = "", client: Any = None
+    ) -> bytes:
+        seen["text"] = text_
+        return b"mp3"
+
+    monkeypatch.setattr(tts, "synthesize", fake_synth)
+    await build.preview("ash", "fiction", "", "Siobhan.", [{"word": "Siobhan", "say": "Shivawn"}])
+    assert seen["text"] == "Shivawn."
