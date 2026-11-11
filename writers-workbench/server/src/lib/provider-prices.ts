@@ -158,6 +158,17 @@ export const PROVIDER_PRICES: PriceTable =
       "checked": "2026-11-11"
     },
     {
+      "provider": "elevenlabs",
+      "model": "eleven_multilingual_v2",
+      "aliases": [],
+      "per_unit": 0,
+      "unit_type": "characters",
+      "fallback_cost_source": "estimated",
+      "note": "Audiobook narration through the AUTHOR'S OWN ElevenLabs account and plan: the characters are billed to them by ElevenLabs, not to us, so the cost to us is recorded as 0.",
+      "source": "https://elevenlabs.io/pricing/api",
+      "checked": "2026-11-11"
+    },
+    {
       "provider": "kieai",
       "model": "google/nano-banana",
       "aliases": [],

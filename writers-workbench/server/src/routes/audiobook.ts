@@ -25,6 +25,7 @@ import { callEngineWriteTool, callEngineWriteToolSync } from '../lib/engine-hub.
 import { loadBookSource } from '../lib/book-source.js';
 import { downloadCover, findCover } from '../lib/book-cover.js';
 import { chargeable, refuseIfInsufficient } from '../lib/credit-charge.js';
+import { userSecret } from './integrations.js';
 import { rateKey } from '../lib/rate-key.js';
 import { getCreditCost } from '../services/credit-costs.js';
 import { deductCredits } from '../services/credits.js';
@@ -72,6 +73,7 @@ const VolumeQuery = z.coerce.number().int().min(1).max(12).default(1);
 
 const SettingsBody = z.object({
   volume: z.number().int().min(1).max(12).default(1),
+  provider: z.enum(['openai', 'elevenlabs']).optional(),
   voice: z.string().max(40).optional(),
   style: z.string().max(40).optional(),
   custom_style: z.string().max(MAX_CUSTOM_STYLE * 2).optional(),
@@ -98,6 +100,7 @@ function bad(res: Response, status: number, code: string, message: string): void
 
 interface BookRow {
   id: string;
+  provider: string;
   voice: string;
   style: string;
   custom_style: string;
@@ -130,7 +133,7 @@ const ITEM_COLUMNS =
 async function findBook(userId: string, projectId: string, volume: number): Promise<BookRow | null> {
   const { data } = await getSupabaseAdmin()
     .from('audiobooks_v2')
-    .select('id, voice, style, custom_style, credits, pronunciations')
+    .select('id, provider, voice, style, custom_style, credits, pronunciations')
     .eq('project_id', projectId)
     .eq('user_id', userId)
     .eq('volume_index', volume)
@@ -152,7 +155,7 @@ async function ensureBook(userId: string, projectId: string, volume: number, set
   const { data, error } = await sb
     .from('audiobooks_v2')
     .insert({ user_id: userId, project_id: projectId, volume_index: volume, ...s })
-    .select('id, voice, style, custom_style, credits, pronunciations')
+    .select('id, provider, voice, style, custom_style, credits, pronunciations')
     .single();
   if (error || !data) throw new Error(error?.message ?? 'audiobook not created');
   return data as BookRow;
@@ -227,6 +230,59 @@ audiobookRouter.get('/options', async (_req: Request, res: Response) => {
   });
 });
 
+interface ElevenVoice {
+  id: string;
+  name: string;
+  category: string;
+  /** "Your voice" for a clone the author made; the library's own voices are "ElevenLabs". */
+  yours: boolean;
+  labels: Record<string, string>;
+}
+
+/** The voices in the caller's own ElevenLabs account (their clones first). Needs their saved key. */
+audiobookRouter.get('/elevenlabs/voices', async (req: Request, res: Response) => {
+  let key: string | null = null;
+  try {
+    key = await userSecret(req.userId!, 'elevenlabs');
+  } catch (err) {
+    logger.error({ err: (err as Error).message }, 'audiobook: elevenlabs key unreadable');
+    return bad(res, 500, 'KEY_UNREADABLE', 'Could not read your saved ElevenLabs key — reconnect it.');
+  }
+  if (!key) return res.json({ success: true, data: { connected: false, voices: [] } });
+  const voices: ElevenVoice[] = [];
+  let token = '';
+  for (let page = 0; page < 5; page += 1) {
+    let r: globalThis.Response;
+    try {
+      r = await fetch(`${(process.env.ELEVENLABS_BASE_URL || 'https://api.elevenlabs.io').replace(/\/+$/, '')}/v2/voices?page_size=100${token ? `&next_page_token=${encodeURIComponent(token)}` : ''}`, {
+        headers: { 'xi-api-key': key },
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch {
+      return bad(res, 502, 'ELEVENLABS_UNREACHABLE', 'ElevenLabs could not be reached.');
+    }
+    if (r.status === 401 || r.status === 403) {
+      return res.json({ success: true, data: { connected: false, rejected: true, voices: [] } });
+    }
+    if (!r.ok) return bad(res, 502, 'ELEVENLABS_ERROR', `ElevenLabs answered ${r.status}.`);
+    const body = (await r.json()) as { voices?: Record<string, unknown>[]; has_more?: boolean; next_page_token?: string };
+    for (const v of body.voices ?? []) {
+      const category = String(v.category ?? '');
+      voices.push({
+        id: String(v.voice_id ?? ''),
+        name: String(v.name ?? ''),
+        category,
+        yours: ['cloned', 'professional', 'generated'].includes(category),
+        labels: Object.fromEntries(Object.entries((v.labels as Record<string, unknown>) ?? {}).map(([k, x]) => [k, String(x)])),
+      });
+    }
+    if (!body.has_more || !body.next_page_token) break;
+    token = body.next_page_token;
+  }
+  voices.sort((a, b) => Number(b.yours) - Number(a.yours) || a.name.localeCompare(b.name));
+  res.json({ success: true, data: { connected: true, voices: voices.filter((v) => v.id) } });
+});
+
 audiobookRouter.get('/project/:projectId', async (req: Request, res: Response) => {
   const volume = VolumeQuery.safeParse(req.query.volume);
   if (!volume.success) return bad(res, 400, 'VALIDATION', 'volume must be 1-12');
@@ -236,7 +292,9 @@ audiobookRouter.get('/project/:projectId', async (req: Request, res: Response) =
   const book = await findBook(req.userId!, pid(req), volume.data);
   const settings = settingsOf(book);
   const plan = planAudiobook(source, volume.data, settings);
-  const unitCost = await getCreditCost('audiobook_narration');
+  const ownAccount = settings.provider === 'elevenlabs';
+  // Through the author's own ElevenLabs account the characters are billed by ElevenLabs, not us.
+  const unitCost = ownAccount ? 0 : await getCreditCost('audiobook_narration');
 
   const rows: ItemRow[] = [];
   if (book) {
@@ -326,6 +384,7 @@ audiobookRouter.get('/project/:projectId', async (req: Request, res: Response) =
       sample,
       summary,
       cost: {
+        own_account: ownAccount,
         credits_per_unit: unitCost,
         unit_words: CREDIT_WORDS,
         to_build_credits: narrationUnits(planned.filter((p) => toBuild.some((i) => i.kind === p.kind && i.chapter_number === p.chapter_number))) * unitCost,
@@ -371,6 +430,7 @@ audiobookRouter.post('/project/:projectId/preview', previewLimiter, validateBody
       custom_style: s.custom_style,
       text: body.say?.trim() || first.source_text.slice(0, 1200),
       pronunciations: s.pronunciations,
+      provider: s.provider,
     });
     res.json({ success: true, data: { audio_b64: out.audio_b64, content_type: out.content_type ?? 'audio/mpeg' } });
   } catch (err) {
@@ -437,7 +497,7 @@ audiobookRouter.post('/project/:projectId/build', validateBody(BuildBody), async
     return res.json({ success: true, data: { queued: 0, skipped_in_progress: skippedBusy, credits_charged: 0 } });
   }
 
-  const unitCost = await getCreditCost('audiobook_narration');
+  const unitCost = settings.provider === 'elevenlabs' ? 0 : await getCreditCost('audiobook_narration');
   const cost = narrationUnits(todo.map((t) => t.item)) * unitCost;
   if (refuseIfInsufficient(req, res, cost)) return;
 

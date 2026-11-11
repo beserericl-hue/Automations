@@ -40,7 +40,20 @@ interface Pronunciation {
   word: string;
   say: string;
 }
+interface ElevenVoice {
+  id: string;
+  name: string;
+  category: string;
+  yours: boolean;
+  labels: Record<string, string>;
+}
+interface ElevenVoices {
+  connected: boolean;
+  rejected?: boolean;
+  voices: ElevenVoice[];
+}
 interface Settings {
+  provider: 'openai' | 'elevenlabs';
   voice: string;
   style: string;
   custom_style: string;
@@ -96,7 +109,7 @@ interface Audiobook {
     size_bytes: number;
     out_of_spec: number;
   };
-  cost: { credits_per_unit: number; unit_words: number; to_build_credits: number; total_credits: number };
+  cost: { own_account?: boolean; credits_per_unit: number; unit_words: number; to_build_credits: number; total_credits: number };
   cover: { available: boolean; url: string | null };
 }
 
@@ -180,6 +193,34 @@ export default function AudiobookPanel({ projectId, volumeCount }: { projectId: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedKey, volume]);
   const dirty = Boolean(book && form && JSON.stringify(form) !== savedKey);
+
+  // The author's own ElevenLabs account: their key (saved encrypted, never shown again) and their voices.
+  const [elKey, setElKey] = useState('');
+  const useEleven = form?.provider === 'elevenlabs';
+  const { data: eleven, refetch: refetchEleven } = useQuery({
+    queryKey: ['audiobook-eleven-voices'],
+    queryFn: async () => (await apiFetch<ApiEnvelope<ElevenVoices>>('/api/audiobook/elevenlabs/voices')).data!,
+    enabled: Boolean(useEleven),
+    staleTime: 60_000,
+  });
+  const connect = useMutation({
+    mutationFn: async (api_key: string) =>
+      (await apiFetch<ApiEnvelope<{ ok: boolean; voices: number }>>('/api/integrations/elevenlabs', { method: 'PUT', body: JSON.stringify({ api_key }) })).data!,
+    onSuccess: (r) => {
+      setElKey('');
+      addToast(`ElevenLabs connected · ${r.voices} voice${r.voices === 1 ? '' : 's'}`, 'success');
+      void refetchEleven();
+    },
+    onError: (err) => addToast(messageOf(err), 'error'),
+  });
+  const disconnect = useMutation({
+    mutationFn: async () => apiFetch('/api/integrations/elevenlabs/key', { method: 'DELETE' }),
+    onSuccess: () => {
+      addToast('ElevenLabs key removed', 'success');
+      void refetchEleven();
+    },
+    onError: (err) => addToast(messageOf(err), 'error'),
+  });
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: key });
 
@@ -334,29 +375,105 @@ export default function AudiobookPanel({ projectId, volumeCount }: { projectId: 
         <>
           <fieldset className="space-y-3 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
             <legend className="px-1 text-xs font-semibold text-gray-700 dark:text-gray-200">Narrator</legend>
+            <div className="flex flex-wrap gap-4 text-xs text-gray-700 dark:text-gray-300" role="radiogroup" aria-label="Narrator source">
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="radio"
+                  name="audiobook-provider"
+                  data-testid="audiobook-provider-openai"
+                  checked={!useEleven}
+                  onChange={() => setForm({ ...form, provider: 'openai', voice: book.settings.provider === 'openai' ? book.settings.voice : 'marin' })}
+                />
+                Workbench voices
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="radio"
+                  name="audiobook-provider"
+                  data-testid="audiobook-provider-elevenlabs"
+                  checked={useEleven}
+                  onChange={() => setForm({ ...form, provider: 'elevenlabs', voice: book.settings.provider === 'elevenlabs' ? book.settings.voice : '' })}
+                />
+                My ElevenLabs voices (your own account, including a clone of your voice)
+              </label>
+            </div>
+
+            {useEleven && eleven && !eleven.connected ? (
+              <div data-testid="audiobook-eleven-connect" className="space-y-2 rounded-md bg-gray-50 p-3 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                <p>
+                  {eleven.rejected
+                    ? 'ElevenLabs no longer accepts your saved key. Paste a new one.'
+                    : 'Paste an ElevenLabs API key with Text to Speech and Voices (read) access. It is saved encrypted to your account, used only to narrate your books, and never shown again.'}
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    data-testid="audiobook-eleven-key"
+                    value={elKey}
+                    onChange={(e) => setElKey(e.target.value)}
+                    placeholder="sk_…"
+                    className={`${field} w-72`}
+                  />
+                  <button
+                    type="button"
+                    data-testid="audiobook-eleven-connect-btn"
+                    onClick={() => connect.mutate(elKey.trim())}
+                    disabled={connect.isPending || elKey.trim().length < 16}
+                    className={primary}
+                  >
+                    {connect.isPending ? 'Checking…' : 'Connect ElevenLabs'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-xs text-gray-600 dark:text-gray-400">
-                Voice (American English)
+                {useEleven ? 'Voice (from your ElevenLabs account)' : 'Voice (American English)'}
                 <select
                   data-testid="audiobook-voice"
                   value={form.voice}
                   onChange={(e) => set('voice', e.target.value)}
+                  disabled={useEleven && !eleven?.connected}
                   className={`mt-1 ${field}`}
                 >
-                  {options.voices.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.label}
-                      {v.note ? ' — recommended' : ''}
-                    </option>
-                  ))}
+                  {useEleven ? (
+                    <>
+                      {!form.voice ? <option value="">Choose a voice…</option> : null}
+                      {(eleven?.voices ?? []).map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.name}
+                          {v.yours ? ' — your voice' : ''}
+                        </option>
+                      ))}
+                    </>
+                  ) : (
+                    options.voices.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.label}
+                        {v.note ? ' — recommended' : ''}
+                      </option>
+                    ))
+                  )}
                 </select>
+                {useEleven && eleven?.connected ? (
+                  <button
+                    type="button"
+                    data-testid="audiobook-eleven-disconnect"
+                    onClick={() => disconnect.mutate()}
+                    className="mt-1 text-xs text-gray-400 underline hover:text-red-600"
+                  >
+                    Disconnect ElevenLabs
+                  </button>
+                ) : null}
               </label>
               <div className="flex items-end gap-2">
                 <button
                   type="button"
                   data-testid="audiobook-preview"
                   onClick={() => preview.mutate(undefined)}
-                  disabled={preview.isPending}
+                  disabled={preview.isPending || (useEleven && !form.voice)}
                   className={secondary}
                 >
                   {preview.isPending ? 'Reading…' : 'Hear it on my book'}
@@ -393,9 +510,10 @@ export default function AudiobookPanel({ projectId, volumeCount }: { projectId: 
             </div>
 
             <label className="block text-xs text-gray-600 dark:text-gray-400">
-              Your own direction (optional)
+              Your own direction (optional){useEleven ? ' — not used by ElevenLabs, which follows the delivery style above' : ''}
               <textarea
                 data-testid="audiobook-custom-style"
+                disabled={useEleven}
                 value={form.custom_style}
                 maxLength={options.max_custom_style}
                 onChange={(e) => set('custom_style', e.target.value)}
@@ -581,10 +699,11 @@ export default function AudiobookPanel({ projectId, volumeCount }: { projectId: 
               {s.stale ? ` · ${s.stale} changed since recorded` : ''}
             </p>
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Narration is {book.cost.credits_per_unit} credits per {book.cost.unit_words.toLocaleString()} words of
-            chapter text (the whole book: {book.cost.total_credits} credits). Credits, the retail sample and
-            previews are free. Changing the voice or direction re-narrates every chapter.
+          <p className="text-xs text-gray-500 dark:text-gray-400" data-testid="audiobook-price">
+            {book.cost.own_account
+              ? 'Narrated through your own ElevenLabs account: no Workbench credits. It uses characters from your ElevenLabs plan (a full novel is hundreds of thousands), so check your plan’s allowance first. '
+              : `Narration is ${book.cost.credits_per_unit} credits per ${book.cost.unit_words.toLocaleString()} words of chapter text (the whole book: ${book.cost.total_credits} credits). Credits, the retail sample and previews are free. `}
+            Changing the voice or delivery re-narrates every chapter.
           </p>
           {s.out_of_spec > 0 ? (
             <p className="text-xs text-amber-700 dark:text-amber-400">

@@ -42,6 +42,7 @@ export const integrationsRouter = Router();
 integrationsRouter.use(requireAuth);
 
 const TABLE = 'user_integrations_v2';
+type IntegrationProvider = 'blotato' | 'website' | 'elevenlabs';
 const CHANNELS = 'social_channels_v2';
 const BLOTATO_BASE = (): string => (process.env.BLOTATO_BASE_URL || 'https://backend.blotato.com/v2').replace(/\/+$/, '');
 
@@ -164,7 +165,7 @@ async function ownChannel(userId: string, channel: string, kind: 'website' | 'so
 
 /** Insert or update the user's row for (provider, channel). The unique index is on an expression,
  *  which PostgREST cannot upsert against, so this is a read then a write. */
-async function saveIntegration(userId: string, provider: 'blotato' | 'website', channel: string | null, patch: Row): Promise<void> {
+async function saveIntegration(userId: string, provider: IntegrationProvider, channel: string | null, patch: Row): Promise<void> {
   const sb = getSupabaseAdmin();
   let q = sb.from(TABLE).select('id').eq('user_id', userId).eq('provider', provider);
   q = channel === null ? q.is('channel', null) : q.eq('channel', channel);
@@ -178,7 +179,7 @@ async function saveIntegration(userId: string, provider: 'blotato' | 'website', 
   }
 }
 
-function sealed(userId: string, provider: 'blotato' | 'website', channel: string | null, secret: string): Row {
+function sealed(userId: string, provider: IntegrationProvider, channel: string | null, secret: string): Row {
   return {
     secret_ciphertext: encryptSecret(secret, { userId, provider, channel }),
     secret_last4: last4(secret),
@@ -186,11 +187,16 @@ function sealed(userId: string, provider: 'blotato' | 'website', channel: string
   };
 }
 
-async function storedSecret(userId: string, provider: 'blotato' | 'website', channel: string | null): Promise<string | null> {
+async function storedSecret(userId: string, provider: IntegrationProvider, channel: string | null): Promise<string | null> {
   const rows = await integrationRows(userId);
   const row = rows.find((r) => r.provider === provider && (r.channel ?? null) === channel);
   if (!row?.secret_ciphertext) return null;
   return decryptSecret(String(row.secret_ciphertext), { userId, provider, channel });
+}
+
+/** A user's saved secret for an integration (decrypted), for the server's own calls on their behalf. */
+export async function userSecret(userId: string, provider: IntegrationProvider): Promise<string | null> {
+  return storedSecret(userId, provider, null);
 }
 
 function slug(label: string): string {
@@ -344,6 +350,7 @@ integrationsRouter.get('/', async (req: Request, res: Response) => {
       data: {
         encryption_ready: encryptionReady(),
         read_only: Boolean(req.isImpersonating),
+        elevenlabs: { key: secretStatus(integrations.find((r) => r.provider === 'elevenlabs')) },
         blotato: {
           key: secretStatus(blotato),
           accounts: Array.isArray(bcfg.accounts) ? (bcfg.accounts as BlotatoTarget[]) : [],
@@ -411,6 +418,61 @@ integrationsRouter.put('/blotato', async (req: Request, res: Response) => {
     sync = { ok: false, status: 0, message: `Key saved, but Blotato could not be reached (${(err as Error).name}); use Refresh accounts`, targets: [] };
   }
   res.json({ success: true, data: { ok: sync.ok, status: sync.status, message: sync.message, accounts: sync.targets } });
+});
+
+// ---------------------------------------------------------------------------------------------
+// ElevenLabs: the author's own account, for narrating an audiobook in their own (cloned) voice
+// ---------------------------------------------------------------------------------------------
+
+const ELEVENLABS_BASE = (): string => (process.env.ELEVENLABS_BASE_URL || 'https://api.elevenlabs.io').replace(/\/+$/, '');
+const ElevenLabsSchema = z.object({ api_key: SECRET }).strict();
+
+/** Ask ElevenLabs whether this key can list voices (the least it needs). Never returns or logs the key. */
+export async function checkElevenLabsKey(apiKey: string): Promise<{ ok: boolean; status: number; message: string; voices: number }> {
+  let r: globalThis.Response;
+  try {
+    r = await fetch(`${ELEVENLABS_BASE()}/v2/voices?page_size=100`, {
+      headers: { 'xi-api-key': apiKey },
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (err) {
+    return { ok: false, status: 0, message: `ElevenLabs could not be reached (${(err as Error).name})`, voices: 0 };
+  }
+  if (r.status === 401 || r.status === 403) {
+    return { ok: false, status: r.status, message: 'ElevenLabs refused that key. Create one with Text to Speech and Voices (read) access.', voices: 0 };
+  }
+  if (!r.ok) return { ok: false, status: r.status, message: `ElevenLabs answered ${r.status}`, voices: 0 };
+  const body = (await r.json().catch(() => ({}))) as { voices?: unknown[] };
+  return { ok: true, status: 200, message: 'Connected', voices: Array.isArray(body.voices) ? body.voices.length : 0 };
+}
+
+integrationsRouter.put('/elevenlabs', async (req: Request, res: Response) => {
+  if (refuseImpersonation(req, res)) return;
+  const body = parse(ElevenLabsSchema, req.body, res);
+  if (!body) return;
+  const userId = req.userId!;
+  // Saved only once ElevenLabs has accepted it: a typo should not look like a connection.
+  const check = await checkElevenLabsKey(body.api_key);
+  if (!check.ok) return bad(res, 422, 'KEY_REJECTED', check.message);
+  try {
+    await saveIntegration(userId, 'elevenlabs', null, sealed(userId, 'elevenlabs', null, body.api_key));
+  } catch (err) {
+    if (keyError(res, err)) return;
+    logger.error({ err: (err as Error).message }, 'integrations: elevenlabs save failed');
+    return bad(res, 500, 'DB_ERROR', 'Could not save the ElevenLabs key');
+  }
+  res.json({ success: true, data: { ok: true, voices: check.voices } });
+});
+
+integrationsRouter.delete('/elevenlabs/key', async (req: Request, res: Response) => {
+  if (refuseImpersonation(req, res)) return;
+  try {
+    await saveIntegration(req.userId!, 'elevenlabs', null, { secret_ciphertext: null, secret_last4: null, secret_updated_at: null });
+    res.json({ success: true });
+  } catch (err) {
+    logger.error({ err: (err as Error).message }, 'integrations: elevenlabs key delete failed');
+    bad(res, 500, 'DB_ERROR', 'Could not remove the key');
+  }
 });
 
 integrationsRouter.delete('/blotato/key', async (req: Request, res: Response) => {

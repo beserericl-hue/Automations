@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -28,6 +29,7 @@ BUCKET = "audiobooks"
 # Chunks of one chapter narrated at once. The provider allows far more; this keeps one chapter from
 # starving the others when a whole book is queued.
 CHUNK_CONCURRENCY = 4
+ELEVEN_CONCURRENCY = 2
 SAMPLE_SECONDS = 180.0
 PREVIEW_MAX_CHARS = 700
 
@@ -49,20 +51,50 @@ async def _one(query: Any) -> dict[str, Any] | None:
     return rows[0] if rows else None
 
 
-async def _narrate(
-    segs: list[text.Segment], *, voice: str, instructions: str, model: str
-) -> list[bytes | float]:
+# One speech call: (text, text before it, text after it, shared client) -> MP3 bytes.
+Speak = Callable[[str, str, str, httpx.AsyncClient], Awaitable[bytes]]
+
+
+def _speaker(
+    provider: str, *, voice: str, style: str, custom_style: str, model: str, eleven_key: str
+) -> tuple[Speak, int]:
+    """The speech function for a provider, and how many chunks of a chapter it takes at once."""
+    if provider == "elevenlabs":
+        # ElevenLabs plans cap concurrent requests (as low as 2-3), so stay under the lowest.
+        async def eleven(t: str, prev: str, nxt: str, http: httpx.AsyncClient) -> bytes:
+            return await tts.synthesize_elevenlabs(
+                t,
+                voice_id=voice,
+                api_key=eleven_key,
+                style=style,
+                previous_text=prev,
+                next_text=nxt,
+                client=http,
+            )
+
+        return eleven, ELEVEN_CONCURRENCY
+    instructions = styles.instructions_for(style, custom_style)
+
+    async def openai(t: str, _prev: str, _nxt: str, http: httpx.AsyncClient) -> bytes:
+        return await tts.synthesize(t, voice=voice, instructions=instructions, model=model, client=http)
+
+    return openai, CHUNK_CONCURRENCY
+
+
+async def _narrate(segs: list[text.Segment], *, speak: Speak, concurrency: int) -> list[bytes | float]:
     """The speech for every chunk, in order, with the pauses left as seconds."""
-    sem = asyncio.Semaphore(CHUNK_CONCURRENCY)
+    sem = asyncio.Semaphore(concurrency)
+    speech = [i for i, s in enumerate(segs) if not s.is_pause]
     async with httpx.AsyncClient(timeout=180.0) as http:
 
-        async def one(s: text.Segment) -> bytes:
+        async def one(i: int) -> bytes:
+            pos = speech.index(i)
+            prev = segs[speech[pos - 1]].text if pos > 0 else ""
+            nxt = segs[speech[pos + 1]].text if pos + 1 < len(speech) else ""
             async with sem:
-                return await tts.synthesize(
-                    s.text, voice=voice, instructions=instructions, model=model, client=http
-                )
+                return await speak(segs[i].text, prev, nxt, http)
 
-        tasks = [asyncio.create_task(one(s)) if not s.is_pause else None for s in segs]
+        tasks = [asyncio.create_task(one(i)) if not s.is_pause else None for i, s in enumerate(segs)]
         try:
             out: list[bytes | float] = []
             for s, t in zip(segs, tasks, strict=True):
@@ -149,24 +181,37 @@ async def build_item(item_id: str, user_id: str, tags: dict[str, str] | None = N
             chars = text.speech_chars(segs)
             if not chars:
                 raise BuildError("NO_TEXT", "there is no text to narrate")
-            instructions = styles.instructions_for(
-                str(book.get("style") or styles.DEFAULT_STYLE), str(book.get("custom_style") or "")
-            )
-            parts = await _narrate(
-                segs,
+            provider = str(book.get("provider") or "openai")
+            eleven_key = await _eleven_key(client, user_id) if provider == "elevenlabs" else ""
+            speak, concurrency = _speaker(
+                provider,
                 voice=str(item.get("voice") or book.get("voice") or tts.DEFAULT_VOICE),
-                instructions=instructions,
+                style=str(book.get("style") or styles.DEFAULT_STYLE),
+                custom_style=str(book.get("custom_style") or ""),
                 model=model,
+                eleven_key=eleven_key,
             )
+            parts = await _narrate(segs, speak=speak, concurrency=concurrency)
             result = await master.master(parts, tags=meta)
-            token_accounting.record_units(
-                provider="openai",
-                model=model,
-                units=round(result.duration_s / 60.0, 3),
-                unit_type="minutes",
-                operation="audiobook.narrate",
-                metadata={"chars": chars, "kind": kind, "voice": str(item.get("voice") or "")},
-            )
+            if provider == "elevenlabs":
+                # Billed to the author's own ElevenLabs plan in characters; recorded for the ledger only.
+                token_accounting.record_units(
+                    provider="elevenlabs",
+                    model=tts.ELEVEN_MODEL,
+                    units=chars,
+                    unit_type="characters",
+                    operation="audiobook.narrate",
+                    metadata={"kind": kind, "voice": str(item.get("voice") or "")},
+                )
+            else:
+                token_accounting.record_units(
+                    provider="openai",
+                    model=model,
+                    units=round(result.duration_s / 60.0, 3),
+                    unit_type="minutes",
+                    operation="audiobook.narrate",
+                    metadata={"chars": chars, "kind": kind, "voice": str(item.get("voice") or "")},
+                )
 
         path = storage_path(user_id, str(item["audiobook_id"]), int(item.get("position") or 0), kind)
         await _upload(client, path, result.mp3)
@@ -218,16 +263,41 @@ async def build_item(item_id: str, user_id: str, tags: dict[str, str] | None = N
         raise
 
 
+async def _eleven_key(client: Any, user_id: str) -> str:
+    """The author's own ElevenLabs API key, decrypted from their integration settings."""
+    from writer_engine.integrations import load_user_credentials
+
+    creds = await load_user_credentials(client, user_id)
+    if not creds.elevenlabs_api_key:
+        raise BuildError("NO_KEY", "connect your ElevenLabs API key first")
+    return creds.elevenlabs_api_key
+
+
 async def preview(
-    voice: str, style: str, custom_style: str, sample: str, pronunciations: object = None
+    voice: str,
+    style: str,
+    custom_style: str,
+    sample: str,
+    pronunciations: object = None,
+    provider: str = "openai",
+    user_id: str = "",
 ) -> dict[str, Any]:
     """A short, unmastered reading in the chosen voice and style, so the author can hear it first."""
     body = text.clean(text.apply_pronunciations(sample, pronunciations))[:PREVIEW_MAX_CHARS]
     if not body:
         raise BuildError("NO_TEXT", "there is no text to read")
-    mp3 = await tts.synthesize(
-        body, voice=voice, instructions=styles.instructions_for(style, custom_style), model=tts.DEFAULT_MODEL
-    )
+    if provider == "elevenlabs":
+        from writer_engine.supabase.client import get_supabase_admin
+
+        key = await _eleven_key(await get_supabase_admin(), user_id)
+        mp3 = await tts.synthesize_elevenlabs(body, voice_id=voice, api_key=key, style=style)
+    else:
+        mp3 = await tts.synthesize(
+            body,
+            voice=voice,
+            instructions=styles.instructions_for(style, custom_style),
+            model=tts.DEFAULT_MODEL,
+        )
     return {
         "audio_b64": base64.b64encode(mp3).decode("ascii"),
         "content_type": "audio/mpeg",
