@@ -39,8 +39,8 @@ export default function ProjectPublishing() {
         </Link>
         <h1 className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">Publish</h1>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Trim size, volumes, the Amazon listing copy, and the files KDP asks for. Everything here is
-          saved to the project.
+          Trim size, volumes, the Amazon listing copy, the files KDP asks for, printed copies and the
+          audiobook. Everything here is saved to the project.
         </p>
       </div>
       <PublishingPanel projectId={id} userId={profile?.user_id} />

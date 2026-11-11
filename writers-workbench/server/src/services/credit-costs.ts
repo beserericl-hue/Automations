@@ -62,6 +62,12 @@ export const DEFAULT_CREDIT_COSTS: Record<string, number> = {
   // read it ($0.004-$0.036), so an isolated single draft costs more than it is charged; the average
   // covers a working session. "Draft all missing" is this x the fields drafted. "Also by" is free.
   promo_copy: 2,
+  // Audiobook narration (routes/audiobook.ts): per started 1,000 words of chapter text (CREDIT_UNIT).
+  // ESTIMATED from the speech model's list price, not measured: ~$0.015 per minute of audio, and a
+  // narrator reads ~150 words a minute, so 1,000 words is ~6.7 minutes = ~$0.10 -> ~8 credits at the
+  // ~82 credits/$ the other prices use. A 100,000-word novel is ~820 credits. Owner decision pending;
+  // the superuser panel can change it. Opening/closing credits, the retail sample and previews are free.
+  audiobook_narration: 8,
   // Still explicitly zero: not charged on any entry point (not part of the 2026-11-03 decision).
   review_chapter: 0,
   format_kindle: 0, // the Export tab builds the .docx server-side, free
@@ -98,6 +104,8 @@ export const CREDIT_KEY_ALIASES: Record<string, string> = {
   'media.scrape-url': 'scrape_url',
   'media.cover-art': 'cover_art',
   'media.social-posts': 'social_repurpose',
+  'media.audiobook-chapter': 'audiobook_narration', // = POST /api/audiobook/project/:id/build (x1,000 words)
+  'media.audiobook-preview': 'list_content', // a few seconds of speech: free
   'chapter.write': 'write_chapter',
   'chapter.rewrite': 'write_chapter', // chapter-actions charges a rewrite as write_chapter
   'chapter.plan': 'brainstorm_chapter', // chapter-actions "outline" action -> engine plan op
@@ -133,6 +141,7 @@ export const CREDIT_KEY_ALIASES: Record<string, string> = {
 /** Keys whose price is per unit rather than per operation; the route multiplies by the units. */
 export const CREDIT_UNIT: Record<string, { words: number }> = {
   humanize_passage: { words: 100 },
+  audiobook_narration: { words: 1000 },
 };
 
 /** Units of a humanize request: one per started 100 words, never less than one. */
@@ -163,6 +172,7 @@ export const CREDIT_COST_INFO: Record<string, { label: string; group: CreditGrou
   repair_chapter: { label: 'Repair chapter (fix drift, fix Q/A, rewrite with research)', group: 'Editing & QA' },
   humanize_passage: { label: 'Humanize a passage', group: 'Editing & QA', unit: 'per 100 words' },
   promo_copy: { label: 'Promotion copy assistant (draft or revise a field)', group: 'Writing', unit: 'per field' },
+  audiobook_narration: { label: 'Audiobook narration', group: 'Media & social', unit: 'per 1,000 words' },
   review_chapter: { label: 'Review chapter', group: 'Editing & QA' },
   cover_art: { label: 'Cover art', group: 'Media & social' },
   generate_cover_art: { label: 'Cover art (n8n name)', group: 'Media & social' },

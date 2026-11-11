@@ -24,6 +24,7 @@ import { supabase } from '../../config/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { useEngineJobQueue } from '../../hooks/useEngineJobQueue';
 import PrintCopies from './PrintCopies';
+import AudiobookPanel from './AudiobookPanel';
 import SeriesPanel, { type SeriesView } from './SeriesPanel';
 import CoverChooser, { type CoverOption } from './CoverChooser';
 import AiField, { assistErrorMessage, useFieldHistory, useSavedCopy, type AssistResult } from './AiField';
@@ -1080,6 +1081,9 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
 
       {/* 5. Printed copies */}
       <PrintCopies projectId={projectId} volumeCount={volumeCount} />
+
+      {/* 6. The audiobook */}
+      <AudiobookPanel projectId={projectId} volumeCount={volumeCount} />
     </div>
   );
 }

@@ -122,6 +122,9 @@ HEAVY_OPS: frozenset[tuple[str, str]] = frozenset(
         ("brainstorm", "edit-outline"),  # re-emits the whole StoryOutline at 32768
         ("research", "run"),
         ("media", "cover-art"),  # KIE.AI createTask -> poll recordInfo, 180s ceiling of its own
+        # Audiobook: one chapter is dozens of speech calls plus ffmpeg mastering (minutes), and
+        # nobody holds a request open for it — the screen polls the recording's row.
+        ("media", "audiobook-chapter"),
         # E1: one tick walks every due feed, and each item can cost a ScraperAPI scrape plus two LLM
         # calls. Nobody is waiting on it, and it must not hold an interactive slot.
         ("ingestion", "run"),
@@ -157,6 +160,7 @@ INTERACTIVE_OPS: frozenset[tuple[str, str]] = frozenset(
         ("chapter", "extract-bible"),  # 4096 max_tokens
         ("brainstorm", "create-project"),  # a DB insert, no generation
         ("media", "social-posts"),
+        ("media", "audiobook-preview"),  # one short speech call, answered inline
         ("notify", "eve-callback"),
         ("library", "revert"),  # version swap
         ("library", "email-content"),  # one Postal send
