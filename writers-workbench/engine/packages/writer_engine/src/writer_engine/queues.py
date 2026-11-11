@@ -125,6 +125,7 @@ HEAVY_OPS: frozenset[tuple[str, str]] = frozenset(
         # Audiobook: one chapter is dozens of speech calls plus ffmpeg mastering (minutes), and
         # nobody holds a request open for it — the screen polls the recording's row.
         ("media", "audiobook-chapter"),
+        ("media", "audiobook-export"),  # downloads every recording, re-encodes the whole book
         # E1: one tick walks every due feed, and each item can cost a ScraperAPI scrape plus two LLM
         # calls. Nobody is waiting on it, and it must not hold an interactive slot.
         ("ingestion", "run"),

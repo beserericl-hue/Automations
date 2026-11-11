@@ -111,6 +111,20 @@ interface Audiobook {
   };
   cost: { own_account?: boolean; credits_per_unit: number; unit_words: number; to_build_credits: number; total_credits: number };
   cover: { available: boolean; url: string | null };
+  single_file: SingleFile;
+}
+interface SingleFile {
+  status: 'none' | 'queued' | 'building' | 'ready' | 'failed';
+  error: string | null;
+  bytes: number | null;
+  duration_s: number | null;
+  chapters: number | null;
+  quality: string;
+  filename: string;
+  stale: boolean;
+  can_build: boolean;
+  qualities: { id: string; label: string; detail: string; mb_per_hour: number }[];
+  default_quality: string;
 }
 
 function messageOf(err: unknown): string {
@@ -182,7 +196,11 @@ export default function AudiobookPanel({ projectId, volumeCount }: { projectId: 
       return data;
     },
     // Keep checking while anything is being narrated; stop when it is all at rest.
-    refetchInterval: (q) => ((q.state.data?.summary?.building ?? 0) > 0 ? 4000 : false),
+    refetchInterval: (q) => {
+      const d = q.state.data;
+      const fileBusy = d?.single_file?.status === 'queued' || d?.single_file?.status === 'building';
+      return (d?.summary?.building ?? 0) > 0 || fileBusy ? 4000 : false;
+    },
   });
 
   // The narrator form is the author's to edit; it follows the saved settings until they touch it.
@@ -289,6 +307,37 @@ export default function AudiobookPanel({ projectId, volumeCount }: { projectId: 
     mutationFn: async () =>
       apiFetch(`/api/audiobook/project/${projectId}/cover`, { method: 'POST', body: JSON.stringify({ volume }) }),
     onSuccess: () => void refresh(),
+    onError: (err) => addToast(messageOf(err), 'error'),
+  });
+
+  // The whole book as ONE .m4b for a listening app that imports from a link (BookPlayer).
+  const [fileQuality, setFileQuality] = useState<string | null>(null);
+  const [link, setLink] = useState<{ url: string; expires_at: string } | null>(null);
+  const makeFile = useMutation({
+    mutationFn: async (quality: string) =>
+      apiFetch(`/api/audiobook/project/${projectId}/export`, { method: 'POST', body: JSON.stringify({ volume, quality }) }),
+    onSuccess: () => {
+      setLink(null);
+      void refresh();
+    },
+    onError: (err) => addToast(messageOf(err), 'error'),
+  });
+  const getLink = useMutation({
+    mutationFn: async (_why: 'copy' | 'download') =>
+      (await apiFetch<ApiEnvelope<{ url: string; filename: string; expires_at: string }>>(`/api/audiobook/project/${projectId}/export/link`, { method: 'POST', body: JSON.stringify({ volume }) })).data!,
+    onSuccess: async (r, why) => {
+      setLink({ url: r.url, expires_at: r.expires_at });
+      if (why === 'download') {
+        window.location.assign(r.url);
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(r.url);
+        addToast('Link copied — paste it into BookPlayer', 'success');
+      } catch {
+        addToast('Select the link below and copy it', 'info');
+      }
+    },
     onError: (err) => addToast(messageOf(err), 'error'),
   });
 
@@ -790,6 +839,110 @@ export default function AudiobookPanel({ projectId, volumeCount }: { projectId: 
               <p className="text-xs text-gray-400">Available once the first chapter is narrated.</p>
             ) : null}
           </div>
+
+          {book.single_file ? (
+          <div data-testid="audiobook-single-file" className="space-y-2 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="flex-1 text-sm font-medium text-gray-900 dark:text-white">One file for your listening app</span>
+              {book.single_file.status === 'ready' ? (
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${book.single_file.stale ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300' : 'bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-300'}`}
+                >
+                  {book.single_file.stale ? 'Out of date' : 'Ready'}
+                </span>
+              ) : book.single_file.status === 'queued' || book.single_file.status === 'building' ? (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">Making the file…</span>
+              ) : book.single_file.status === 'failed' ? (
+                <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-950/40 dark:text-red-300">Failed</span>
+              ) : null}
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              A single <code>.m4b</code> with every chapter marked, the cover and the title inside, for a player such as
+              BookPlayer that imports an audiobook from a link. It is saved with your book, so reloading the page never
+              loses it. The separate chapter recordings above stay as they are.
+            </p>
+            <div className="flex flex-wrap gap-3" role="radiogroup" aria-label="File size">
+              {book.single_file.qualities.map((q) => {
+                const chosen = (fileQuality ?? book.single_file.quality ?? book.single_file.default_quality) === q.id;
+                const hours = (s.duration_s || 0) / 3600;
+                return (
+                  <label
+                    key={q.id}
+                    className={`cursor-pointer rounded-lg border p-2 text-xs ${chosen ? 'border-brand-500 bg-brand-50 text-brand-800 dark:bg-brand-950/40 dark:text-brand-200' : 'border-gray-200 text-gray-700 dark:border-gray-700 dark:text-gray-300'}`}
+                  >
+                    <input
+                      type="radio"
+                      name="audiobook-file-quality"
+                      data-testid={`file-quality-${q.id}`}
+                      checked={chosen}
+                      onChange={() => setFileQuality(q.id)}
+                      className="mr-2"
+                    />
+                    <span className="font-medium">{q.label}</span>
+                    <span className="block pl-5 text-gray-500 dark:text-gray-400">
+                      {q.detail}
+                      {hours > 0 ? ` · ≈ ${Math.max(1, Math.round(hours * q.mb_per_hour))} MB for this book` : ''}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                data-testid="file-make"
+                onClick={() => makeFile.mutate(fileQuality ?? book.single_file.quality ?? book.single_file.default_quality)}
+                disabled={
+                  makeFile.isPending ||
+                  !book.single_file.can_build ||
+                  book.single_file.status === 'queued' ||
+                  book.single_file.status === 'building'
+                }
+                title={book.single_file.can_build ? undefined : 'Build every recording first'}
+                className={primary}
+              >
+                {makeFile.isPending ? 'Starting…' : book.single_file.status === 'ready' ? 'Make the file again' : 'Make the audiobook file'}
+              </button>
+              {!book.single_file.can_build ? <span className="text-xs text-gray-400">Build every recording first.</span> : null}
+            </div>
+            {book.single_file.error ? (
+              <p data-testid="file-error" className="text-xs text-red-700 dark:text-red-400">
+                {book.single_file.error}
+              </p>
+            ) : null}
+            {book.single_file.status === 'ready' ? (
+              <div className="space-y-2">
+                <p data-testid="file-facts" className="text-xs text-gray-600 dark:text-gray-400">
+                  {book.single_file.filename} · {mb(book.single_file.bytes)} · {clock(book.single_file.duration_s)} ·{' '}
+                  {book.single_file.chapters} chapters
+                </p>
+                {book.single_file.stale ? (
+                  <p data-testid="file-stale" className="text-xs text-amber-700 dark:text-amber-400">
+                    A recording has been narrated again since this file was made (or you picked another size). Make the file
+                    again before you import it.
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" data-testid="file-copy-link" onClick={() => getLink.mutate('copy')} disabled={getLink.isPending} className={secondary}>
+                    Copy link for BookPlayer
+                  </button>
+                  <button type="button" data-testid="file-download" onClick={() => getLink.mutate('download')} disabled={getLink.isPending} className={secondary}>
+                    Download the .m4b
+                  </button>
+                </div>
+                {link ? (
+                  <div data-testid="file-link" className="space-y-1">
+                    <input readOnly value={link.url} onFocus={(e) => e.currentTarget.select()} className={`${field} text-xs`} aria-label="Link to the audiobook file" />
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Anyone with this link can download the file until {new Date(link.expires_at).toLocaleDateString()}. Make a new
+                      one any time.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+          ) : null}
 
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Every recording is mastered to the audiobook retail spec: MP3, 192 kbps constant bit rate, 44.1 kHz,

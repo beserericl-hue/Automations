@@ -49,6 +49,15 @@ function book(over: Record<string, any> = {}) {
     summary: { total: 4, ready: 0, building: 0, failed: 0, stale: 0, missing: 4, duration_s: 0, size_bytes: 0, out_of_spec: 0 },
     cost: { credits_per_unit: 8, unit_words: 1000, to_build_credits: 24, total_credits: 24 },
     cover: { available: true, url: null },
+    single_file: {
+      status: 'none', error: null, bytes: null, duration_s: null, chapters: null, quality: 'compact', filename: 'The-Ossuary.m4b',
+      stale: false, can_build: false, default_quality: 'compact',
+      qualities: [
+        { id: 'compact', label: 'Compact', detail: 'AAC mono 48 kbps · about 22 MB an hour', mb_per_hour: 22 },
+        { id: 'high', label: 'Higher quality', detail: 'AAC mono 64 kbps · about 30 MB an hour', mb_per_hour: 30 },
+        { id: 'small', label: 'Smallest', detail: 'AAC mono 32 kbps · about 15 MB an hour', mb_per_hour: 15 },
+      ],
+    },
     ...over,
   };
 }
@@ -77,6 +86,8 @@ beforeEach(() => {
     }
     if (path.includes('/names')) return { success: true, data: { names: [{ word: 'Siobhan', count: 12 }, { word: 'Mara', count: 40 }] } } as never;
     if (path.startsWith('/api/audiobook/project/') && method === 'GET') return { success: true, data: state } as never;
+    if (path.endsWith('/export/link')) return { success: true, data: { url: 'https://s/sign/The-Ossuary.m4b?token=t&download=The-Ossuary.m4b', filename: 'The-Ossuary.m4b', expires_at: '2099-01-08T00:00:00Z' } } as never;
+    if (path.endsWith('/export') && method === 'POST') return { success: true, data: { queued: true } } as never;
     if (path.endsWith('/preview')) return { success: true, data: { audio_b64: 'bXAz', content_type: 'audio/mpeg' } } as never;
     if (path.endsWith('/build')) return { success: true, data: { queued: 4, skipped_in_progress: 0, credits_charged: 24 } } as never;
     return { success: true, data: {} } as never;
@@ -269,6 +280,71 @@ describe('AudiobookPanel', () => {
     expect(screen.getByTestId('audiobook-build')).not.toHaveTextContent('credits');
     fireEvent.click(await screen.findByTestId('audiobook-eleven-disconnect'));
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith('/api/integrations/elevenlabs/key', { method: 'DELETE' }));
+  });
+
+  const allBuilt = {
+    items: [item('opening', 0, 'Opening credits', ready('o')), item('chapter', 1, 'Chapter 1. The Door', ready('c1')), item('chapter', 2, 'Chapter 2. Rain', ready('c2')), item('closing', 0, 'Closing credits', ready('z'))],
+    summary: { total: 4, ready: 4, building: 0, failed: 0, stale: 0, missing: 0, duration_s: 7200, size_bytes: 72_000_000, out_of_spec: 0 },
+    cost: { credits_per_unit: 8, unit_words: 1000, to_build_credits: 0, total_credits: 24 },
+  };
+  const sf = (over: Record<string, unknown>) => ({ ...book().single_file, ...over });
+
+  it('single file: not offered until every recording is built', async () => {
+    renderWithProviders(<AudiobookPanel projectId="p1" volumeCount={1} />);
+    const box = await screen.findByTestId('audiobook-single-file');
+    expect(box).toHaveTextContent('One file for your listening app');
+    expect(box).toHaveTextContent('reloading the page never loses it');
+    expect(within(box).getByTestId('file-make')).toBeDisabled();
+    expect(box).toHaveTextContent('Build every recording first');
+  });
+
+  it('single file: shows what each size will be for THIS book, defaults to compact, and sends the one chosen', async () => {
+    state = book({ ...allBuilt, single_file: sf({ can_build: true }) });
+    renderWithProviders(<AudiobookPanel projectId="p1" volumeCount={1} />);
+    const box = await screen.findByTestId('audiobook-single-file');
+    // 2 hours of audio: 22 / 30 / 15 MB an hour
+    expect(box).toHaveTextContent('≈ 44 MB for this book');
+    expect(box).toHaveTextContent('≈ 60 MB for this book');
+    expect(box).toHaveTextContent('≈ 30 MB for this book');
+    expect(within(box).getByTestId('file-quality-compact')).toBeChecked();
+    fireEvent.click(within(box).getByTestId('file-quality-small'));
+    fireEvent.click(within(box).getByTestId('file-make'));
+    await waitFor(() => expect(bodyOf('/export')).toEqual({ volume: 1, quality: 'small' }));
+  });
+
+  it('single file: while it is being made the button waits; when ready it shows size, length, chapters, and gives the link', async () => {
+    state = book({ ...allBuilt, single_file: sf({ can_build: true, status: 'building' }) });
+    const first = renderWithProviders(<AudiobookPanel projectId="p1" volumeCount={1} />);
+    const box = await screen.findByTestId('audiobook-single-file');
+    expect(box).toHaveTextContent('Making the file…');
+    expect(within(box).getByTestId('file-make')).toBeDisabled();
+    first.unmount();
+
+    state = book({ ...allBuilt, single_file: sf({ can_build: true, status: 'ready', bytes: 12_300_000, duration_s: 7200, chapters: 4 }) });
+    renderWithProviders(<AudiobookPanel projectId="p1" volumeCount={1} />);
+    const ready2 = await screen.findByTestId('file-facts');
+    expect(ready2).toHaveTextContent('The-Ossuary.m4b · 11.7 MB · 2:00:00 · 4 chapters');
+    expect(screen.queryByTestId('file-stale')).toBeNull();
+    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+    fireEvent.click(screen.getByTestId('file-copy-link'));
+    const shown = await screen.findByLabelText('Link to the audiobook file');
+    expect((shown as HTMLInputElement).value).toBe('https://s/sign/The-Ossuary.m4b?token=t&download=The-Ossuary.m4b');
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('https://s/sign/The-Ossuary.m4b?token=t&download=The-Ossuary.m4b');
+    expect(screen.getByTestId('file-link')).toHaveTextContent('Anyone with this link can download the file until');
+  });
+
+  it('single file: a file made from recordings that have since changed says so before it is imported', async () => {
+    state = book({ ...allBuilt, single_file: sf({ can_build: true, status: 'ready', bytes: 1_000_000, duration_s: 60, chapters: 4, stale: true }) });
+    renderWithProviders(<AudiobookPanel projectId="p1" volumeCount={1} />);
+    expect(await screen.findByTestId('file-stale')).toHaveTextContent('Make the file again before you import it');
+    expect(screen.getByTestId('audiobook-single-file')).toHaveTextContent('Out of date');
+  });
+
+  it('single file: a failure says why, in words that name what to change', async () => {
+    state = book({ ...allBuilt, single_file: sf({ can_build: true, status: 'failed', error: 'the audiobook file is 400 MB, more than your storage accepts in one file (Supabase\'s \'Upload file size limit\' defaults to 50 MB)' }) });
+    renderWithProviders(<AudiobookPanel projectId="p1" volumeCount={1} />);
+    expect(await screen.findByTestId('file-error')).toHaveTextContent('Upload file size limit');
+    expect(screen.getByTestId('file-make')).toBeEnabled(); // and it can be tried again
   });
 
   it('"Hear it on my book" reads with the voice and style on screen and plays the answer', async () => {

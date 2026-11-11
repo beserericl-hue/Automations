@@ -573,6 +573,22 @@ async def _op_audiobook_chapter(payload: dict) -> dict:
         return {"error": exc.code, "message": exc.message}
 
 
+async def _op_audiobook_export(payload: dict) -> dict:
+    """Join a book's finished recordings into one .m4b with chapter markers (``audiobooks_v2`` id)."""
+    from writer_engine.audiobook import build, export
+
+    try:
+        return await export.build_export(
+            str(payload.get("audiobook_id") or ""),
+            str(payload.get("user_id") or ""),
+            str(payload.get("fingerprint") or ""),
+            payload.get("tags") or {},
+            str(payload.get("quality") or "compact"),
+        )
+    except build.BuildError as exc:
+        return {"error": exc.code, "message": exc.message}
+
+
 async def _op_audiobook_preview(payload: dict) -> dict:
     """A short reading in a voice and style (base64 MP3), so the author can hear it before building."""
     from writer_engine.audiobook import build, tts
@@ -600,6 +616,7 @@ OPS = {
     "scrape-url": _op_scrape_url,
     "audiobook-chapter": _op_audiobook_chapter,
     "audiobook-preview": _op_audiobook_preview,
+    "audiobook-export": _op_audiobook_export,
 }
 
 

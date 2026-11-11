@@ -38,9 +38,14 @@ import {
   SAMPLE_POSITION,
   STYLES,
   VOICES,
+  DEFAULT_EXPORT_QUALITY,
+  EXPORT_QUALITIES,
+  exportFileName,
+  exportFingerprint,
   filenameFor,
   hashItem,
   narrationUnits,
+  normalizeQuality,
   styleHash,
   normalizeSettings,
   planAudiobook,
@@ -88,6 +93,10 @@ const BuildBody = z.object({
   item_ids: z.array(z.string().uuid()).max(500).optional(),
 });
 const VolumeBody = z.object({ volume: z.number().int().min(1).max(12).default(1) });
+const ExportBody = z.object({ volume: z.number().int().min(1).max(12).default(1), quality: z.string().max(20).optional() });
+
+/** A signed link people paste into a player: long enough to be used from a phone later, not forever. */
+const EXPORT_LINK_SECONDS = 7 * 24 * 3600;
 
 /** The :projectId of the route (express types a param as string or string[]). */
 function pid(req: Request): string {
@@ -124,11 +133,12 @@ interface ItemRow {
   rms_db: number | null;
   peak_db: number | null;
   spec_ok: boolean | null;
+  built_at: string | null;
   updated_at: string;
 }
 
 const ITEM_COLUMNS =
-  'id, kind, chapter_number, position, title, text_hash, voice, status, error, storage_path, size_bytes, duration_s, rms_db, peak_db, spec_ok, updated_at';
+  'id, kind, chapter_number, position, title, text_hash, voice, status, error, storage_path, size_bytes, duration_s, rms_db, peak_db, spec_ok, built_at, updated_at';
 
 async function findBook(userId: string, projectId: string, volume: number): Promise<BookRow | null> {
   const { data } = await getSupabaseAdmin()
@@ -163,6 +173,26 @@ async function ensureBook(userId: string, projectId: string, volume: number, set
 
 function settingsOf(book: BookRow | null): AudioSettings {
   return normalizeSettings(book);
+}
+
+interface ExportRow {
+  export_status: 'queued' | 'building' | 'ready' | 'failed' | null;
+  export_error: string | null;
+  export_path: string | null;
+  export_bytes: number | null;
+  export_duration_s: number | null;
+  export_chapters: number | null;
+  export_quality: string | null;
+  export_hash: string | null;
+  export_updated_at: string | null;
+}
+
+const EXPORT_COLUMNS =
+  'export_status, export_error, export_path, export_bytes, export_duration_s, export_chapters, export_quality, export_hash, export_updated_at';
+
+async function findExport(bookId: string): Promise<ExportRow | null> {
+  const { data } = await getSupabaseAdmin().from('audiobooks_v2').select(EXPORT_COLUMNS).eq('id', bookId).maybeSingle();
+  return (data as ExportRow | null) ?? null;
 }
 
 /** The row as the screen should read it: a job that stopped answering is interrupted, not "building". */
@@ -367,6 +397,32 @@ audiobookRouter.get('/project/:projectId', async (req: Request, res: Response) =
     out_of_spec: items.filter((i) => i.status === 'ready' && i.spec_ok === false).length,
   };
 
+  // The single-file audiobook (.m4b): what it is, whether it still matches the recordings.
+  const ex = book ? await findExport(book.id) : null;
+  const exQuality = normalizeQuality(ex?.export_quality);
+  const planKeys = new Set(planned.map((p) => `${p.kind}:${p.chapter_number}`));
+  const forExport = rows.filter((r) => planKeys.has(`${r.kind}:${r.chapter_number}`) && r.status === 'ready' && r.kind !== 'sample');
+  const allReady = planned.length > 0 && items.every((i) => i.status === 'ready' && !i.stale);
+  const exAge = ex?.export_updated_at ? now - new Date(ex.export_updated_at).getTime() : 0;
+  const exStatus =
+    ex?.export_status === 'building' && exAge > BUILDING_STALE_MS ? 'failed'
+      : ex?.export_status === 'queued' && exAge > QUEUED_STALE_MS ? 'failed'
+        : (ex?.export_status ?? 'none');
+  const singleFile = {
+    status: exStatus,
+    error: exStatus === 'failed' && ex?.export_status !== 'failed' ? 'The build stopped before it finished — make the file again.' : (ex?.export_error ?? null),
+    bytes: ex?.export_bytes != null ? Number(ex.export_bytes) : null,
+    duration_s: ex?.export_duration_s != null ? Number(ex.export_duration_s) : null,
+    chapters: ex?.export_chapters ?? null,
+    quality: exQuality,
+    filename: exportFileName(plan?.title ?? source.title),
+    // Made from recordings that have since been re-narrated (or a different size was asked for).
+    stale: Boolean(ex?.export_status === 'ready' && ex.export_hash !== exportFingerprint(forExport, exQuality)),
+    can_build: allReady,
+    qualities: EXPORT_QUALITIES,
+    default_quality: DEFAULT_EXPORT_QUALITY,
+  };
+
   // The book's cover (chosen or newest) and the square one already made from it.
   const cover = await findCover(getSupabaseAdmin(), pid(req), await outlineOf(req.userId!, pid(req)), volume.data).catch(() => null);
   const coverSigned = book ? (await signedUrls([coverPath(req.userId!, book.id)])).get(coverPath(req.userId!, book.id)) : undefined;
@@ -383,6 +439,7 @@ audiobookRouter.get('/project/:projectId', async (req: Request, res: Response) =
       items,
       sample,
       summary,
+      single_file: singleFile,
       cost: {
         own_account: ownAccount,
         credits_per_unit: unitCost,
@@ -559,6 +616,67 @@ audiobookRouter.get('/project/:projectId/names', async (req: Request, res: Respo
     s.pronunciations.map((p) => p.word),
   );
   res.json({ success: true, data: { names } });
+});
+
+/** Join the finished recordings into ONE .m4b (chapters, cover and title inside) for a player's link import. */
+audiobookRouter.post('/project/:projectId/export', validateBody(ExportBody), async (req: Request, res: Response) => {
+  const source = await ownedSource(req, res, pid(req));
+  if (!source) return;
+  const body = req.body as z.infer<typeof ExportBody>;
+  const book = await findBook(req.userId!, pid(req), body.volume);
+  if (!book) return bad(res, 422, 'NOT_BUILT', 'Build the audiobook first.');
+  const settings = settingsOf(book);
+  const plan = planAudiobook(source, body.volume, settings);
+  if (!plan) return bad(res, 422, 'NO_CHAPTERS', 'This book has no chapter text to narrate yet.');
+  const sb = getSupabaseAdmin();
+  const { data: rowData, error } = await sb.from('audiobook_chapters_v2').select(ITEM_COLUMNS).eq('audiobook_id', book.id);
+  if (error) return bad(res, 500, 'DB_ERROR', error.message);
+  const rows = (rowData ?? []) as unknown as ItemRow[];
+  const used: ItemRow[] = [];
+  for (const item of plan.items) {
+    const row = rows.find((r) => r.kind === item.kind && Number(r.chapter_number) === item.chapter_number);
+    if (!row || row.status !== 'ready' || row.text_hash !== hashItem(item, settings)) {
+      return bad(res, 422, 'NOT_READY', `“${item.title}” is not built (or has changed since it was recorded). Build every recording first.`);
+    }
+    used.push(row);
+  }
+  const cur = await findExport(book.id);
+  if (cur && (cur.export_status === 'queued' || cur.export_status === 'building')) {
+    const age = Date.now() - new Date(cur.export_updated_at ?? 0).getTime();
+    if (age < (cur.export_status === 'building' ? BUILDING_STALE_MS : QUEUED_STALE_MS)) {
+      return res.json({ success: true, data: { queued: false, already_running: true } });
+    }
+  }
+  const quality = normalizeQuality(body.quality);
+  const fingerprint = exportFingerprint(used, quality);
+  await sb.from('audiobooks_v2').update({ export_status: 'queued', export_error: null, export_quality: quality, export_updated_at: new Date().toISOString() }).eq('id', book.id);
+  try {
+    await callEngineWriteTool('media', {
+      op: 'audiobook-export', audiobook_id: book.id, user_id: req.userId!, fingerprint, quality,
+      tags: { album: plan.title, artist: plan.author }, async: true,
+    });
+  } catch (err) {
+    logger.error({ err }, 'audiobook: could not queue export');
+    await sb.from('audiobooks_v2').update({ export_status: 'failed', export_error: 'The narration service could not be reached — try again.', export_updated_at: new Date().toISOString() }).eq('id', book.id);
+    return bad(res, 502, 'ENGINE_UNREACHABLE', 'The narration service could not be reached — try again.');
+  }
+  res.status(202).json({ success: true, data: { queued: true, quality } });
+});
+
+/** A fresh link to the stored .m4b, valid for a week, that a player can import from. */
+audiobookRouter.post('/project/:projectId/export/link', validateBody(VolumeBody), async (req: Request, res: Response) => {
+  const source = await ownedSource(req, res, pid(req));
+  if (!source) return;
+  const { volume } = req.body as z.infer<typeof VolumeBody>;
+  const book = await findBook(req.userId!, pid(req), volume);
+  const ex = book ? await findExport(book.id) : null;
+  if (!book || !ex || ex.export_status !== 'ready' || !ex.export_path) {
+    return bad(res, 422, 'NO_EXPORT', 'Make the single-file audiobook first.');
+  }
+  const filename = ex.export_path.split('/').pop() ?? exportFileName(source.title);
+  const { data, error } = await getSupabaseAdmin().storage.from(BUCKET).createSignedUrl(ex.export_path, EXPORT_LINK_SECONDS, { download: filename });
+  if (error || !data?.signedUrl) return bad(res, 500, 'LINK_FAILED', 'Could not make the link.');
+  res.json({ success: true, data: { url: data.signedUrl, filename, expires_at: new Date(Date.now() + EXPORT_LINK_SECONDS * 1000).toISOString() } });
 });
 
 audiobookRouter.post('/project/:projectId/sample', validateBody(VolumeBody), async (req: Request, res: Response) => {

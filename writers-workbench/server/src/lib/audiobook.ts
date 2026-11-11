@@ -251,6 +251,35 @@ export function styleHash(s: AudioSettings): string {
   return createHash('sha256').update([s.voice, s.style, s.custom_style].join('\u0000')).digest('hex');
 }
 
+/** The single-file audiobook (.m4b): how small it is made. Sizes are per hour of audio. */
+export const EXPORT_QUALITIES = [
+  { id: 'compact', label: 'Compact', detail: 'AAC mono 48 kbps · about 22 MB an hour', mb_per_hour: 22 },
+  { id: 'high', label: 'Higher quality', detail: 'AAC mono 64 kbps · about 30 MB an hour', mb_per_hour: 30 },
+  { id: 'small', label: 'Smallest', detail: 'AAC mono 32 kbps · about 15 MB an hour — listen to a chapter first', mb_per_hour: 15 },
+] as const;
+export type ExportQuality = (typeof EXPORT_QUALITIES)[number]['id'];
+export const DEFAULT_EXPORT_QUALITY: ExportQuality = 'compact';
+
+export function normalizeQuality(raw: unknown): ExportQuality {
+  return EXPORT_QUALITIES.some((q) => q.id === raw) ? (raw as ExportQuality) : DEFAULT_EXPORT_QUALITY;
+}
+
+/** A URL-safe file name for the .m4b, from the book's title (the engine names the stored file the same way). */
+export function exportFileName(title: string): string {
+  return `${title.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'audiobook'}.m4b`;
+}
+
+/**
+ * Identity of what a single-file audiobook was made from: which recordings (and when each was made) and
+ * how small it was made. Re-narrate any chapter and the fingerprint moves, so the screen can say the file
+ * is out of date instead of handing over an audiobook that no longer matches its chapters.
+ */
+export function exportFingerprint(rows: { id: string; position: number; built_at: string | null }[], quality: ExportQuality): string {
+  return createHash('sha256')
+    .update([...rows].sort((a, b) => a.position - b.position).map((r) => `${r.position}:${r.id}:${r.built_at ?? ''}`).join('|') + `|q=${quality}`)
+    .digest('hex');
+}
+
 /** Credits for narrating these chapter recordings: per started 1,000 words each. Credits tracks are free. */
 export function narrationUnits(items: Pick<PlannedItem, 'kind' | 'words'>[]): number {
   return items.reduce((n, i) => (i.kind === 'chapter' ? n + Math.max(1, Math.ceil(i.words / CREDIT_WORDS)) : n), 0);

@@ -622,3 +622,309 @@ async def test_preview_with_elevenlabs_uses_the_callers_key(monkeypatch: pytest.
     out = await build.preview(VOICE, "intimate", "", "Hello *there*.", None, "elevenlabs", OWNER)
     assert seen == {"text": "Hello there.", "voice": VOICE, "key": FAKE_KEY, "style": "intimate"}
     assert out["content_type"] == "audio/mpeg"
+
+
+# ----------------------------------------------------------------------------- the single-file audiobook (.m4b)
+
+
+def test_file_name_is_url_safe_and_metadata_escapes_what_ffmetadata_treats_as_syntax():
+    from writer_engine.audiobook import export
+
+    assert export.file_name("The Hum Beneath Harrow Vale") == "The-Hum-Beneath-Harrow-Vale.m4b"
+    assert export.file_name("  ¡¿?  ") == "audiobook.m4b"
+    assert len(export.file_name("x" * 500)) <= 84
+    meta = export.metadata_file(
+        "A=B; C#D", "Eric", [("Chapter 1. It\\'s\nodd", 0, 1500), ("Two", 1500, 4000)]
+    )
+    assert meta.startswith(";FFMETADATA1\n")
+    assert "title=A\\=B\\; C\\#D" in meta
+    assert "[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=1500\n" in meta
+    assert "START=1500\nEND=4000\ntitle=Two" in meta
+    assert "\nodd" not in meta.replace("\\\n", "")  # the newline inside a title cannot start a new line
+
+
+def _cover_jpg() -> bytes:
+    import subprocess
+
+    with tempfile.TemporaryDirectory() as d:
+        out = Path(d) / "c.jpg"
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=c=0x1f3a5f:s=400x400",
+                "-frames:v",
+                "1",
+                str(out),
+            ],
+            check=True,
+        )
+        return out.read_bytes()
+
+
+def _probe_m4b(data: bytes) -> dict[str, Any]:
+    import json
+    import subprocess
+
+    with tempfile.TemporaryDirectory() as d:
+        f = Path(d) / "b.m4b"
+        f.write_bytes(data)
+        out = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_chapters",
+                "-show_streams",
+                "-show_format",
+                "-of",
+                "json",
+                str(f),
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    return json.loads(out)
+
+
+async def _exportable(
+    monkeypatch: pytest.MonkeyPatch, *, cover: bool = True
+) -> tuple[FakeSupabase, dict[str, float]]:
+    """A built book of four recordings of known lengths, stored, ready to be joined."""
+    db = FakeSupabase()
+    db.tables["audiobooks_v2"] = [{"id": BOOK, "user_id": OWNER, "project_id": "p1", "volume_index": 1}]
+    lengths = {"opening": 2.0, "c1": 5.0, "c2": 4.0, "closing": 2.0}
+    plan = [
+        ("opening", 0, 0, "Opening credits"),
+        ("chapter", 1, 1, "Chapter 1. The Door"),
+        ("chapter", 2, 2, "Chapter 2. Rain"),
+        ("closing", 0, 9998, "Closing credits"),
+    ]
+    db.tables["audiobook_chapters_v2"] = []
+    for (kind, n, pos, title), seconds in zip(plan, lengths.values(), strict=True):
+        mastered = await master.master([_tone_mp3(seconds, 0.4)])
+        path = f"{OWNER}/{BOOK}/{pos:03d}_{kind}.mp3"
+        db.objects[("audiobooks", path)] = (mastered.mp3, {})
+        db.tables["audiobook_chapters_v2"].append(
+            {
+                "id": f"r{pos}",
+                "audiobook_id": BOOK,
+                "kind": kind,
+                "chapter_number": n,
+                "position": pos,
+                "title": title,
+                "status": "ready",
+                "storage_path": path,
+            }
+        )
+    # a retail sample is never part of the book
+    db.tables["audiobook_chapters_v2"].append(
+        {
+            "id": "rs",
+            "audiobook_id": BOOK,
+            "kind": "sample",
+            "chapter_number": 0,
+            "position": 9999,
+            "title": "Retail sample",
+            "status": "ready",
+            "storage_path": f"{OWNER}/{BOOK}/9999_sample.mp3",
+        }
+    )
+    if cover:
+        db.objects[("audiobooks", f"{OWNER}/{BOOK}/cover.jpg")] = (_cover_jpg(), {})
+    _use(monkeypatch, db)
+    return db, lengths
+
+
+@needs_ffmpeg
+@pytest.mark.parametrize(
+    ("quality", "bitrate", "rate"),
+    [("compact", 48000, 32000), ("high", 64000, 44100), ("small", 32000, 32000)],
+)
+async def test_export_is_one_m4b_with_a_chapter_per_recording_the_cover_and_the_title_inside(
+    monkeypatch: pytest.MonkeyPatch, quality: str, bitrate: int, rate: int
+):
+    from writer_engine.audiobook import export
+
+    db, _ = await _exportable(monkeypatch)
+    out = await export.build_export(
+        BOOK, OWNER, "fp123", {"album": "The Hum Beneath Harrow Vale", "artist": "Eric Beser"}, quality
+    )
+    assert out["status"] == "ready" and out["chapters"] == 4
+
+    path = f"{OWNER}/{BOOK}/The-Hum-Beneath-Harrow-Vale.m4b"
+    data = db.objects[("audiobooks", path)][0]
+    assert db.objects[("audiobooks", path)][1]["content-type"] == "audio/mp4"
+    row = db.tables["audiobooks_v2"][0]
+    assert row["export_status"] == "ready" and row["export_error"] is None
+    assert (
+        row["export_path"],
+        row["export_bytes"],
+        row["export_chapters"],
+        row["export_hash"],
+        row["export_quality"],
+    ) == (path, len(data), 4, "fp123", quality)
+
+    probe = _probe_m4b(data)
+    audio = next(s for s in probe["streams"] if s["codec_type"] == "audio")
+    assert audio["codec_name"] == "aac" and audio["channels"] == 1 and int(audio["sample_rate"]) == rate
+    assert abs(int(audio["bit_rate"]) - bitrate) < bitrate * 0.15
+    video = [s for s in probe["streams"] if s["codec_type"] == "video"]
+    assert len(video) == 1 and video[0]["disposition"]["attached_pic"] == 1  # the cover is inside the file
+    # one chapter per recording, in listening order, joined end to end, the sample not among them
+    chapters = probe["chapters"]
+    assert [c["tags"]["title"] for c in chapters] == [
+        "Opening credits",
+        "Chapter 1. The Door",
+        "Chapter 2. Rain",
+        "Closing credits",
+    ]
+    starts = [float(c["start_time"]) for c in chapters]
+    ends = [float(c["end_time"]) for c in chapters]
+    assert starts[0] == 0 and all(abs(starts[i + 1] - ends[i]) < 0.01 for i in range(3))
+    assert abs(float(probe["format"]["duration"]) - ends[-1]) < 0.5
+    # each part carries its own room tone and pauses: 2 + 5 + 4 + 2 seconds of speech, plus 3.9 s of tone each
+    assert abs((ends[2] - starts[2]) - (4.0 + 0.9 + 3.0)) < 0.6
+    tags = probe["format"]["tags"]
+    assert (
+        tags["title"] == "The Hum Beneath Harrow Vale"
+        and tags["artist"] == "Eric Beser"
+        and tags["genre"] == "Audiobook"
+    )
+    assert abs(out["duration_s"] - float(probe["format"]["duration"])) < 0.1
+
+
+@needs_ffmpeg
+async def test_export_sizes_follow_the_setting_and_all_are_far_smaller_than_the_retail_files(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    from writer_engine.audiobook import export
+
+    sizes: dict[str, int] = {}
+    retail = 0
+    for q in ("small", "compact", "high"):
+        db, _ = await _exportable(monkeypatch)
+        retail = sum(
+            len(db.objects[("audiobooks", r["storage_path"])][0])
+            for r in db.tables["audiobook_chapters_v2"]
+            if r["kind"] != "sample"
+        )
+        await export.build_export(BOOK, OWNER, "", {"album": "B", "artist": "A"}, q)
+        sizes[q] = db.tables["audiobooks_v2"][0]["export_bytes"]
+    assert sizes["small"] < sizes["compact"] < sizes["high"] < retail / 2
+    assert sizes["compact"] < retail / 3
+
+
+@needs_ffmpeg
+async def test_export_without_a_made_cover_still_works_just_without_art(monkeypatch: pytest.MonkeyPatch):
+    from writer_engine.audiobook import export
+
+    db, _ = await _exportable(monkeypatch, cover=False)
+    await export.build_export(BOOK, OWNER, "", {"album": "B", "artist": "A"})
+    probe = _probe_m4b(db.objects[("audiobooks", f"{OWNER}/{BOOK}/B.m4b")][0])
+    assert not [s for s in probe["streams"] if s["codec_type"] == "video"]  # no art, no picture stream
+    assert len(probe["chapters"]) == 4
+
+
+async def test_export_refuses_until_every_recording_is_ready_and_says_so_on_the_row(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    from writer_engine.audiobook import export
+
+    db = FakeSupabase()
+    db.tables["audiobooks_v2"] = [{"id": BOOK, "user_id": OWNER}]
+    db.tables["audiobook_chapters_v2"] = [
+        {
+            "id": "a",
+            "audiobook_id": BOOK,
+            "kind": "chapter",
+            "chapter_number": 1,
+            "position": 1,
+            "title": "One",
+            "status": "ready",
+            "storage_path": "x",
+        },
+        {
+            "id": "b",
+            "audiobook_id": BOOK,
+            "kind": "chapter",
+            "chapter_number": 2,
+            "position": 2,
+            "title": "Two",
+            "status": "failed",
+            "storage_path": None,
+        },
+    ]
+    _use(monkeypatch, db)
+    monkeypatch.setattr(master, "available", lambda: True)
+    with pytest.raises(build.BuildError) as err:
+        await export.build_export(BOOK, OWNER)
+    assert err.value.code == "NOT_READY"
+    assert db.tables["audiobooks_v2"][0]["export_status"] == "failed"
+    assert "build every recording" in db.tables["audiobooks_v2"][0]["export_error"]
+
+
+async def test_export_of_another_users_book_is_not_found_and_untouched(monkeypatch: pytest.MonkeyPatch):
+    from writer_engine.audiobook import export
+
+    db = FakeSupabase()
+    db.tables["audiobooks_v2"] = [{"id": BOOK, "user_id": OWNER}]
+    _use(monkeypatch, db)
+    with pytest.raises(build.BuildError) as err:
+        await export.build_export(BOOK, "someone-else")
+    assert err.value.code == "NOT_FOUND"
+    assert "export_status" not in db.tables["audiobooks_v2"][0]
+
+
+@needs_ffmpeg
+async def test_a_file_larger_than_the_storage_limit_says_what_to_change_instead_of_a_raw_error(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import conftest
+
+    from writer_engine.audiobook import export
+
+    db, _ = await _exportable(monkeypatch)
+    real_upload = conftest.FakeBucket.upload
+
+    async def refuse(self: Any, path: str, content: bytes, file_options: dict[str, str] | None = None) -> Any:
+        if path.endswith(".m4b"):
+            raise RuntimeError(
+                "{'statusCode': 413, 'error': 'Payload too large', 'message': 'The object exceeded the maximum allowed size'}"
+            )
+        return await real_upload(self, path, content, file_options)
+
+    monkeypatch.setattr(conftest.FakeBucket, "upload", refuse)
+    with pytest.raises(build.BuildError) as err:
+        await export.build_export(BOOK, OWNER, "", {"album": "B", "artist": "A"})
+    assert err.value.code == "FILE_TOO_LARGE"
+    row = db.tables["audiobooks_v2"][0]
+    assert row["export_status"] == "failed"
+    assert "Upload file size limit" in row["export_error"] and "50 MB" in row["export_error"]
+
+
+async def test_a_chapter_recording_over_the_storage_limit_gets_the_same_plain_message(
+    monkeypatch: pytest.MonkeyPatch, narrated: list[dict[str, Any]]
+):
+    import conftest
+
+    if not master.available():
+        pytest.skip("ffmpeg/ffprobe not installed")
+    db = _db()
+    _use(monkeypatch, db)
+
+    async def refuse(self: Any, path: str, content: bytes, file_options: dict[str, str] | None = None) -> Any:
+        raise RuntimeError("The object exceeded the maximum allowed size")
+
+    monkeypatch.setattr(conftest.FakeBucket, "upload", refuse)
+    with pytest.raises(build.BuildError) as err:
+        await build.build_item("c1", OWNER)
+    assert err.value.code == "FILE_TOO_LARGE"
+    assert "split the chapter" in db.tables["audiobook_chapters_v2"][0]["error"]
