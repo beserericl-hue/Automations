@@ -15,11 +15,12 @@ import asyncio
 import base64
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import httpx
 
-from writer_engine.audiobook import master, styles, text, tts
+from writer_engine.audiobook import master, styles, text, tts, upload
 from writer_engine.telemetry import token_accounting
 from writer_engine.telemetry.logging import get_logger
 
@@ -120,20 +121,35 @@ def too_large(exc: BaseException) -> bool:
     return "entitytoolarge" in text or "payload too large" in text or "maximum allowed size" in text
 
 
-async def _upload(client: Any, path: str, mp3: bytes) -> None:
+async def store(client: Any, path: str, source: bytes | Path, content_type: str, what: str) -> int:
+    """Save a file to the audiobooks bucket; big ones by pieces so a dropped connection resumes, not restarts.
+
+    ``source`` is bytes or a file on disk (a big file is never read whole into memory). Returns the size.
+    """
+    size = upload.source_size(source)
     try:
-        await client.storage.from_(BUCKET).upload(
-            path, mp3, file_options={"content-type": "audio/mpeg", "x-upsert": "true"}
-        )
+        if size >= upload.RESUMABLE_OVER:
+            await upload.upload_resumable(bucket=BUCKET, path=path, source=source, content_type=content_type)
+        else:
+            data = source if isinstance(source, bytes) else await asyncio.to_thread(source.read_bytes)
+            await client.storage.from_(BUCKET).upload(
+                path, data, file_options={"content-type": content_type, "x-upsert": "true"}
+            )
     except Exception as exc:
-        if too_large(exc):
+        if too_large(exc) or (isinstance(exc, upload.UploadError) and exc.too_large):
             raise BuildError(
                 "FILE_TOO_LARGE",
-                f"this recording is {len(mp3) / 1e6:.0f} MB, more than your storage accepts in one file "
-                "(Supabase's 'Upload file size limit' defaults to 50 MB: raise it under Storage settings, "
-                "which needs a paid plan, or split the chapter)",
+                f"{what} is {size / 1e6:.0f} MB, more than your storage accepts in one file "
+                "(raise Supabase's 'Upload file size limit' under Storage settings; it needs a paid plan)",
             ) from exc
+        if isinstance(exc, upload.UploadError):
+            raise BuildError("UPLOAD_FAILED", f"could not save {what}: {exc}") from exc
         raise
+    return size
+
+
+async def _upload(client: Any, path: str, mp3: bytes) -> None:
+    await store(client, path, mp3, "audio/mpeg", "this recording")
 
 
 def storage_path(user_id: str, book_id: str, position: int, kind: str) -> str:

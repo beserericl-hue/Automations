@@ -7,6 +7,7 @@ numbers the screen shows are MEASURED on the file, and a test over a fake master
 from __future__ import annotations
 
 import asyncio
+import os
 import shutil
 import tempfile
 from pathlib import Path
@@ -907,7 +908,7 @@ async def test_a_file_larger_than_the_storage_limit_says_what_to_change_instead_
     assert err.value.code == "FILE_TOO_LARGE"
     row = db.tables["audiobooks_v2"][0]
     assert row["export_status"] == "failed"
-    assert "Upload file size limit" in row["export_error"] and "50 MB" in row["export_error"]
+    assert "Upload file size limit" in row["export_error"] and "paid plan" in row["export_error"]
 
 
 async def test_a_chapter_recording_over_the_storage_limit_gets_the_same_plain_message(
@@ -927,4 +928,220 @@ async def test_a_chapter_recording_over_the_storage_limit_gets_the_same_plain_me
     with pytest.raises(build.BuildError) as err:
         await build.build_item("c1", OWNER)
     assert err.value.code == "FILE_TOO_LARGE"
-    assert "split the chapter" in db.tables["audiobook_chapters_v2"][0]["error"]
+    assert "Upload file size limit" in db.tables["audiobook_chapters_v2"][0]["error"]
+
+
+# ----------------------------------------------------------------------------- big files go by pieces (resumable upload)
+
+
+class _TusServer:
+    """Just enough of Supabase's resumable-upload endpoint to hold the client to the protocol."""
+
+    def __init__(
+        self, *, fail_patch_at: set[int] | None = None, land_then_fail: set[int] | None = None
+    ) -> None:
+        self.received = bytearray()
+        self.created: dict[str, Any] = {}
+        self.patches: list[tuple[int, int]] = []
+        self.fail_patch_at = set(fail_patch_at or ())
+        self.land_then_fail = set(land_then_fail or ())
+        self.size = 0
+
+    def handler(self, request: Any) -> Any:
+        import base64
+
+        import httpx
+
+        h = request.headers
+        assert h["tus-resumable"] == "1.0.0" and h["authorization"].startswith("Bearer ")
+        if request.method == "POST":
+            self.size = int(h["upload-length"])
+            meta = dict(kv.split(" ", 1) for kv in h["upload-metadata"].split(","))
+            self.created = {k: base64.b64decode(v).decode() for k, v in meta.items()} | {
+                "upsert": h.get("x-upsert")
+            }
+            return httpx.Response(201, headers={"Location": "/storage/v1/upload/resumable/abc"})
+        if request.method == "HEAD":
+            return httpx.Response(200, headers={"Upload-Offset": str(len(self.received))})
+        assert request.method == "PATCH" and h["content-type"] == "application/offset+octet-stream"
+        offset = int(h["upload-offset"])
+        assert offset == len(self.received), "the client sent a piece from the wrong offset"
+        self.patches.append((offset, len(request.content)))
+        if offset in self.land_then_fail:
+            self.land_then_fail.discard(offset)
+            self.received += request.content  # it arrived, but the answer was lost
+            return httpx.Response(502)
+        if offset in self.fail_patch_at:
+            self.fail_patch_at.discard(offset)
+            return httpx.Response(503)
+        self.received += request.content
+        return httpx.Response(204, headers={"Upload-Offset": str(len(self.received))})
+
+
+async def _tus(server: _TusServer, source: Any, **kw: Any) -> int:
+    import httpx
+
+    from writer_engine.audiobook import upload
+
+    async def nap(_s: float) -> None:
+        return None
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(server.handler)) as c:
+        return await upload.upload_resumable(
+            bucket="audiobooks",
+            path="u/b/book.m4b",
+            source=source,
+            content_type="audio/mp4",
+            client=c,
+            base_url="https://x.supabase.co",
+            key="svc",
+            sleep=nap,
+            **kw,
+        )
+
+
+async def test_a_big_file_goes_in_pieces_with_the_right_name_and_type_and_arrives_whole():
+    data = os.urandom(2_500_000)
+    server = _TusServer()
+    assert await _tus(server, data, chunk=1_000_000) == len(data)
+    assert bytes(server.received) == data
+    assert server.created == {
+        "bucketName": "audiobooks",
+        "objectName": "u/b/book.m4b",
+        "contentType": "audio/mp4",
+        "cacheControl": "3600",
+        "upsert": "true",
+    }
+    assert server.patches == [(0, 1_000_000), (1_000_000, 1_000_000), (2_000_000, 500_000)]
+
+
+async def test_a_file_on_disk_is_sent_by_pieces_without_being_read_whole(tmp_path: Path):
+    f = tmp_path / "book.m4b"
+    data = os.urandom(1_700_000)
+    f.write_bytes(data)
+    server = _TusServer()
+    await _tus(server, f, chunk=700_000)
+    assert bytes(server.received) == data
+    assert [n for _o, n in server.patches] == [700_000, 700_000, 300_000]
+
+
+async def test_a_dropped_piece_is_resent_from_where_storage_says_it_got_to():
+    data = os.urandom(3_000_000)
+    server = _TusServer(fail_patch_at={1_000_000})
+    await _tus(server, data, chunk=1_000_000)
+    assert bytes(server.received) == data
+    assert server.patches.count((1_000_000, 1_000_000)) == 2  # tried twice, stored once
+
+
+async def test_a_piece_that_landed_but_whose_answer_was_lost_is_not_sent_twice():
+    data = os.urandom(3_000_000)
+    server = _TusServer(land_then_fail={1_000_000})
+    await _tus(server, data, chunk=1_000_000)
+    assert bytes(server.received) == data  # no duplicated bytes, no gap
+    assert server.patches.count((1_000_000, 1_000_000)) == 1
+
+
+async def test_a_file_whose_last_piece_landed_before_the_failure_finishes_cleanly():
+    data = os.urandom(1_500_000)
+    server = _TusServer(land_then_fail={1_000_000})
+    assert await _tus(server, data, chunk=1_000_000) == len(data)
+    assert bytes(server.received) == data
+
+
+async def test_the_size_limit_and_other_refusals_stop_at_once_with_a_readable_reason():
+    import httpx
+
+    from writer_engine.audiobook import upload
+
+    def refuse(request: Any) -> Any:
+        return httpx.Response(
+            413,
+            json={
+                "statusCode": "413",
+                "error": "Payload too large",
+                "message": "The object exceeded the maximum allowed size",
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(refuse)) as c:
+        with pytest.raises(upload.UploadError) as err:
+            await upload.upload_resumable(
+                bucket="b", path="p", source=b"x", content_type="a/b", client=c, base_url="https://x", key="k"
+            )
+    assert err.value.too_large is True
+
+    def unauthorized(request: Any) -> Any:
+        return httpx.Response(401, json={"message": "bad key"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(unauthorized)) as c:
+        with pytest.raises(upload.UploadError) as err2:
+            await upload.upload_resumable(
+                bucket="b", path="p", source=b"x", content_type="a/b", client=c, base_url="https://x", key="k"
+            )
+    assert err2.value.too_large is False and "401" in str(err2.value)
+
+
+async def test_it_gives_up_after_repeated_failures_instead_of_looping_forever():
+    from writer_engine.audiobook import upload
+
+    server = _TusServer(fail_patch_at=set())
+
+    def always_503(request: Any) -> Any:
+        import httpx
+
+        if request.method == "PATCH":
+            return httpx.Response(503)
+        return server.handler(request)
+
+    import httpx
+
+    async def nap(_s: float) -> None:
+        return None
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(always_503)) as c:
+        with pytest.raises(upload.UploadError, match="upload failed at 0 MB"):
+            await upload.upload_resumable(
+                bucket="b",
+                path="p",
+                source=b"x" * 10,
+                content_type="a/b",
+                client=c,
+                base_url="https://x",
+                key="k",
+                sleep=nap,
+            )
+
+
+async def test_store_sends_small_files_in_one_request_and_big_ones_by_pieces(monkeypatch: pytest.MonkeyPatch):
+    from writer_engine.audiobook import upload
+
+    db = FakeSupabase()
+    sent: list[tuple[str, int]] = []
+
+    async def fake_resumable(**kw: Any) -> int:
+        sent.append((kw["path"], upload.source_size(kw["source"])))
+        return upload.source_size(kw["source"])
+
+    monkeypatch.setattr(upload, "upload_resumable", fake_resumable)
+    monkeypatch.setattr(upload, "RESUMABLE_OVER", 1000)
+    assert await build.store(db, "u/small.mp3", b"x" * 999, "audio/mpeg", "this recording") == 999
+    assert db.objects[("audiobooks", "u/small.mp3")][0] == b"x" * 999 and not sent  # one ordinary request
+    assert await build.store(db, "u/big.mp3", b"y" * 1001, "audio/mpeg", "this recording") == 1001
+    assert sent == [("u/big.mp3", 1001)] and ("audiobooks", "u/big.mp3") not in db.objects
+
+
+async def test_store_turns_an_upload_failure_into_a_message_naming_the_file(monkeypatch: pytest.MonkeyPatch):
+    from writer_engine.audiobook import upload
+
+    async def boom(**_kw: Any) -> int:
+        raise upload.UploadError("upload failed at 120 MB: ReadTimeout")
+
+    monkeypatch.setattr(upload, "upload_resumable", boom)
+    monkeypatch.setattr(upload, "RESUMABLE_OVER", 10)
+    with pytest.raises(build.BuildError) as err:
+        await build.store(FakeSupabase(), "u/x.mp3", b"z" * 20, "audio/mpeg", "the audiobook file")
+    assert (
+        err.value.code == "UPLOAD_FAILED"
+        and "the audiobook file" in err.value.message
+        and "120 MB" in err.value.message
+    )

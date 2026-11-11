@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from writer_engine.audiobook import master
-from writer_engine.audiobook.build import BUCKET, BuildError, _download, _now, _one, too_large
+from writer_engine.audiobook.build import BuildError, _download, _now, _one, store
 from writer_engine.telemetry.logging import get_logger
 
 logger = get_logger("audiobook.export")
@@ -149,39 +149,26 @@ async def build_export(
             args += ["-movflags", "+faststart", "-f", "ipod", str(out)]
             await master._ffmpeg(*args)
 
-            data = out.read_bytes()
             seconds = await master.duration(out)
-
-        path = f"{user_id}/{audiobook_id}/{file_name(title)}"
-        try:
-            await client.storage.from_(BUCKET).upload(
-                path, data, file_options={"content-type": "audio/mp4", "x-upsert": "true"}
-            )
-        except Exception as exc:
-            if too_large(exc):
-                raise BuildError(
-                    "FILE_TOO_LARGE",
-                    f"the audiobook file is {len(data) / 1e6:.0f} MB, more than your storage accepts in one file "
-                    "(Supabase's 'Upload file size limit' defaults to 50 MB; raise it under Storage settings, "
-                    "which needs a paid plan), then make the file again",
-                ) from exc
-            raise
+            # Straight from disk, by pieces: a book's file is hundreds of MB and never read whole into memory.
+            path = f"{user_id}/{audiobook_id}/{file_name(title)}"
+            size = await store(client, path, out, "audio/mp4", "the audiobook file")
         done = {
             "export_status": "ready",
             "export_error": None,
             "export_path": path,
-            "export_bytes": len(data),
+            "export_bytes": size,
             "export_duration_s": seconds,
             "export_chapters": len(chapters),
             "export_hash": fingerprint or None,
             "export_quality": quality if quality in QUALITIES else DEFAULT_QUALITY,
         }
         await mark(done)
-        logger.info("audiobook.exported", book=audiobook_id, chapters=len(chapters), bytes=len(data))
+        logger.info("audiobook.exported", book=audiobook_id, chapters=len(chapters), bytes=size)
         return {
             "audiobook_id": audiobook_id,
             "status": "ready",
-            "bytes": len(data),
+            "bytes": size,
             "chapters": len(chapters),
             "duration_s": seconds,
         }
