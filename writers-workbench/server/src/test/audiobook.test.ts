@@ -461,6 +461,17 @@ describe('pronunciation guide', () => {
     expect(normalizePronunciations('nope')).toEqual([]);
   });
 
+  it('a recording made before the guide existed is not called changed: the fingerprint without a guide is the original formula', async () => {
+    const { createHash } = await import('node:crypto');
+    const { hashItem, normalizeSettings } = await import('../lib/audiobook.js');
+    const item = { kind: 'chapter' as const, title: 'Chapter 1', source_text: 'Mara opened the door.' };
+    const s = normalizeSettings({ voice: 'cedar', style: 'thriller', custom_style: 'slow' });
+    const original = createHash('sha256').update(['chapter', 'Chapter 1', 'Mara opened the door.', 'cedar', 'thriller', 'slow'].join('\u0000')).digest('hex');
+    expect(hashItem(item, s)).toBe(original);
+    // a guide that does not touch this chapter leaves it alone too
+    expect(hashItem(item, normalizeSettings({ voice: 'cedar', style: 'thriller', custom_style: 'slow', pronunciations: [{ word: 'Siobhan', say: 'Shivawn' }] }))).toBe(original);
+  });
+
   it('re-records only the chapters the word is in', async () => {
     const { hashItem, normalizeSettings } = await import('../lib/audiobook.js');
     const withMara = { kind: 'chapter' as const, title: 'Chapter 1', source_text: 'Mara opened the door.' };

@@ -199,9 +199,11 @@ export function hashItem(item: Pick<PlannedItem, 'kind' | 'title' | 'source_text
     .map((p) => `${p.word}=${p.say}`)
     .sort()
     .join('|');
-  return createHash('sha256')
-    .update([item.kind, item.title, item.source_text, s.voice, s.style, s.custom_style, guide].join('\u0000'))
-    .digest('hex');
+  const parts = [item.kind, item.title, item.source_text, s.voice, s.style, s.custom_style];
+  // Appended only when there is something to say, so a recording made before the guide existed (or one
+  // the guide does not touch) keeps the fingerprint it was made with and is not called "changed".
+  if (guide) parts.push(guide);
+  return createHash('sha256').update(parts.join('\u0000')).digest('hex');
 }
 
 /** Words most often capitalized mid-sentence in the chapters: the names a voice is most likely to get wrong. */
