@@ -13,6 +13,7 @@ type Row = Record<string, any>;
 const db: Record<string, Row[]> = {};
 const uploads: { path: string; body: Buffer; contentType?: string }[] = [];
 const engineJobs: Record<string, any>[] = [];
+const signed: { path: string; seconds: number; download?: string }[] = [];
 const deductions: { userId: string; amount: number; label: string }[] = [];
 let credits = 1000;
 let role = 'user';
@@ -99,6 +100,7 @@ vi.mock('../services/supabase-admin.js', () => {
   const storage = {
     from: () => ({
       upload: async (path: string, body: Buffer, o?: { contentType?: string }) => { uploads.push({ path, body, contentType: o?.contentType }); return { error: null }; },
+      createSignedUrl: async (path: string, seconds: number, o?: { download?: string }) => { signed.push({ path, seconds, download: o?.download }); return { data: { signedUrl: `https://dev.supabase.co/sign/${path}?token=t${o?.download ? `&download=${encodeURIComponent(o.download)}` : ''}` }, error: null }; },
       createSignedUrls: async (paths: string[]) => ({ data: paths.map((p) => ({ path: p, signedUrl: `https://dev.supabase.co/sign/${p}?token=t`, error: null })), error: null }),
     }),
   };
@@ -117,6 +119,7 @@ beforeEach(() => {
   db.writing_projects_v2 = [{ id: PROJECT, user_id: 'u1', outline: {} }];
   uploads.length = 0;
   engineJobs.length = 0;
+  signed.length = 0;
   deductions.length = 0;
   credits = 1000;
   role = 'user';
@@ -603,6 +606,112 @@ describe('narrating in the author\'s own ElevenLabs voice', () => {
     await withServer(async (base) => {
       await call(base, 'POST', `/project/${PROJECT}/preview`, { volume: 1, provider: 'elevenlabs', voice: VOICE });
       expect(engineJobs[0]).toMatchObject({ op: 'audiobook-preview', provider: 'elevenlabs', voice: VOICE, user_id: 'u1' });
+    });
+  });
+});
+
+
+describe('the single-file audiobook (.m4b) for a player that imports from a link', () => {
+  async function builtBook(base: string) {
+    await call(base, 'POST', `/project/${PROJECT}/build`, { volume: 1 });
+    for (const [k, n] of [['opening', 0], ['chapter', 1], ['chapter', 2], ['closing', 0]] as const) finish(k, n, { built_at: '2026-11-11T12:00:00.000Z' });
+    engineJobs.length = 0;
+    deductions.length = 0; // the narration build was charged; what follows (the single file) is not
+  }
+
+  it('is not offered until every recording is built, and refuses with the name of what is missing', async () => {
+    await withServer(async (base) => {
+      expect((await get(base)).data.single_file).toMatchObject({ status: 'none', can_build: false, default_quality: 'compact' });
+      const r = await call(base, 'POST', `/project/${PROJECT}/export`, { volume: 1 });
+      expect(r.status).toBe(422);
+      await call(base, 'POST', `/project/${PROJECT}/build`, { volume: 1 }); // queued, none finished
+      engineJobs.length = 0;
+      const again = await call(base, 'POST', `/project/${PROJECT}/export`, { volume: 1 });
+      expect(again.status).toBe(422);
+      expect(again.error.code).toBe('NOT_READY');
+      expect(again.error.message).toMatch(/Opening credits|Chapter 1/);
+      expect(engineJobs).toHaveLength(0);
+    });
+  });
+
+  it('queues one engine job with the recordings\' fingerprint, the chosen size and the tags, and costs nothing', async () => {
+    await withServer(async (base) => {
+      await builtBook(base);
+      expect((await get(base)).data.single_file.can_build).toBe(true);
+      const r = await call(base, 'POST', `/project/${PROJECT}/export`, { volume: 1 });
+      expect(r.status).toBe(202);
+      expect(r.data).toMatchObject({ queued: true, quality: 'compact' });
+      expect(deductions).toHaveLength(0);
+      expect(engineJobs).toHaveLength(1);
+      expect(engineJobs[0]).toMatchObject({ op: 'audiobook-export', user_id: 'u1', quality: 'compact', async: true, tags: { album: 'The Ossuary', artist: 'Eric Beser' } });
+      expect(String(engineJobs[0].fingerprint)).toMatch(/^[0-9a-f]{64}$/);
+      expect(db.audiobooks_v2[0]).toMatchObject({ export_status: 'queued', export_quality: 'compact' });
+      // an unknown size falls back; a known one is honoured
+      const hq = await call(base, 'POST', `/project/${PROJECT}/export`, { volume: 1, quality: 'high' });
+      expect(hq.data.already_running).toBe(true); // the first is still running: not built twice
+      expect(engineJobs).toHaveLength(1);
+    });
+  });
+
+  it('honours the size asked for, and falls back to compact for anything else', async () => {
+    await withServer(async (base) => {
+      await builtBook(base);
+      await call(base, 'POST', `/project/${PROJECT}/export`, { volume: 1, quality: 'small' });
+      expect(engineJobs[0].quality).toBe('small');
+      db.audiobooks_v2[0].export_status = 'failed';
+      await call(base, 'POST', `/project/${PROJECT}/export`, { volume: 1, quality: 'bogus' });
+      expect(engineJobs[1].quality).toBe('compact');
+    });
+  });
+
+  it('says the file is out of date once any recording it was made from is re-narrated, or a different size is asked for', async () => {
+    await withServer(async (base) => {
+      await builtBook(base);
+      await call(base, 'POST', `/project/${PROJECT}/export`, { volume: 1 });
+      const fingerprint = engineJobs[0].fingerprint;
+      // what the engine records when it finishes
+      Object.assign(db.audiobooks_v2[0], { export_status: 'ready', export_path: 'u1/b/The-Ossuary.m4b', export_bytes: 12_300_000, export_duration_s: 1986, export_chapters: 4, export_hash: fingerprint, export_updated_at: new Date().toISOString() });
+      let sf = (await get(base)).data.single_file;
+      expect(sf).toMatchObject({ status: 'ready', stale: false, bytes: 12_300_000, chapters: 4, quality: 'compact', filename: 'The-Ossuary.m4b' });
+      // chapter 2 is narrated again
+      db.audiobook_chapters_v2.find((r) => r.chapter_number === 2 && r.kind === 'chapter')!.built_at = '2026-11-11T13:00:00.000Z';
+      sf = (await get(base)).data.single_file;
+      expect(sf.stale).toBe(true);
+    });
+  });
+
+  it('a file build that stopped answering reads as failed, not building forever', async () => {
+    await withServer(async (base) => {
+      await builtBook(base);
+      Object.assign(db.audiobooks_v2[0], { export_status: 'building', export_updated_at: new Date(Date.now() - 2 * 3600_000).toISOString() });
+      const sf = (await get(base)).data.single_file;
+      expect(sf.status).toBe('failed');
+      expect(sf.error).toMatch(/stopped before it finished/);
+      const r = await call(base, 'POST', `/project/${PROJECT}/export`, { volume: 1 });
+      expect(r.status).toBe(202); // and can be started again
+    });
+  });
+
+  it('gives a fresh week-long link to the stored file, named for the book, only once it exists', async () => {
+    await withServer(async (base) => {
+      await builtBook(base);
+      expect((await call(base, 'POST', `/project/${PROJECT}/export/link`, { volume: 1 })).status).toBe(422);
+      Object.assign(db.audiobooks_v2[0], { export_status: 'ready', export_path: 'u1/b/The-Ossuary.m4b' });
+      const r = await call(base, 'POST', `/project/${PROJECT}/export/link`, { volume: 1 });
+      expect(r.status).toBe(200);
+      expect(r.data.url).toBe('https://dev.supabase.co/sign/u1/b/The-Ossuary.m4b?token=t&download=The-Ossuary.m4b');
+      expect(r.data.filename).toBe('The-Ossuary.m4b');
+      expect(signed[0]).toMatchObject({ path: 'u1/b/The-Ossuary.m4b', seconds: 7 * 24 * 3600 });
+      expect(Date.parse(r.data.expires_at)).toBeGreaterThan(Date.now() + 6 * 24 * 3600_000);
+    });
+  });
+
+  it('another user cannot ask for it', async () => {
+    await withServer(async (base) => {
+      await builtBook(base);
+      owner = 'u2';
+      expect((await call(base, 'POST', `/project/${PROJECT}/export`, { volume: 1 })).status).toBe(404);
+      expect((await call(base, 'POST', `/project/${PROJECT}/export/link`, { volume: 1 })).status).toBe(404);
     });
   });
 });

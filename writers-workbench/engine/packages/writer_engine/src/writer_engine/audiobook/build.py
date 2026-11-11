@@ -114,10 +114,26 @@ async def _download(client: Any, path: str) -> bytes:
     return bytes(data)
 
 
+def too_large(exc: BaseException) -> bool:
+    """Did storage refuse the file for its size? (Supabase answers 413 EntityTooLarge past its limit.)"""
+    text = f"{type(exc).__name__} {exc}".lower()
+    return "entitytoolarge" in text or "payload too large" in text or "maximum allowed size" in text
+
+
 async def _upload(client: Any, path: str, mp3: bytes) -> None:
-    await client.storage.from_(BUCKET).upload(
-        path, mp3, file_options={"content-type": "audio/mpeg", "x-upsert": "true"}
-    )
+    try:
+        await client.storage.from_(BUCKET).upload(
+            path, mp3, file_options={"content-type": "audio/mpeg", "x-upsert": "true"}
+        )
+    except Exception as exc:
+        if too_large(exc):
+            raise BuildError(
+                "FILE_TOO_LARGE",
+                f"this recording is {len(mp3) / 1e6:.0f} MB, more than your storage accepts in one file "
+                "(Supabase's 'Upload file size limit' defaults to 50 MB: raise it under Storage settings, "
+                "which needs a paid plan, or split the chapter)",
+            ) from exc
+        raise
 
 
 def storage_path(user_id: str, book_id: str, position: int, kind: str) -> str:
