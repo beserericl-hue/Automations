@@ -136,7 +136,7 @@ async function withServer<T>(fn: (base: string) => Promise<T>): Promise<T> {
   try { return await fn(`http://localhost:${(server.address() as AddressInfo).port}/api/audiobook`); } finally { server.close(); }
 }
 const call = (base: string, method: string, path: string, body?: unknown): Promise<any> =>
-  realFetch(`${base}${path}`, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }).then(async (r) => ({ status: r.status, ...(await r.json()) }));
+  realFetch(`${base}${path}`, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }).then(async (r) => ({ status: r.status, ...((await r.json()) as Record<string, unknown>) }));
 const get = (base: string) => call(base, 'GET', `/project/${PROJECT}`);
 
 /** What the engine does when a recording finishes. */
