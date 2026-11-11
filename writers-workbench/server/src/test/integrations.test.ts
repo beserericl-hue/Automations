@@ -407,6 +407,79 @@ describe('Website blogs', () => {
   });
 });
 
+describe('ElevenLabs (the author\'s own account, for narrating in their own voice)', () => {
+  const KEY = 'sk_test_0123456789abcdef0123456789abcdef';
+  function stubEleven(status: number, voices: unknown[] = [], seen: Array<{ url: string; key: string | null }> = []) {
+    const realFetch = fetch;
+    vi.stubGlobal('fetch', async (u: string, o: RequestInit) => {
+      if (!String(u).includes('elevenlabs.io')) return realFetch(u, o);
+      seen.push({ url: String(u), key: new Headers(o.headers).get('xi-api-key') });
+      return new Response(JSON.stringify({ voices }), { status });
+    });
+    return seen;
+  }
+
+  it('checks the key with ElevenLabs, then stores it encrypted with its last four and no other copy', async () => {
+    const seen = stubEleven(200, [{ voice_id: 'a' }, { voice_id: 'b' }]);
+    const r = await call('PUT', '/elevenlabs', { api_key: KEY });
+    expect(r.status).toBe(200);
+    expect(r.json.data).toEqual({ ok: true, voices: 2 });
+    expect(r.text).not.toContain(KEY);
+    expect(seen[0]).toMatchObject({ key: KEY });
+    const row = db.user_integrations_v2.find((x) => x.provider === 'elevenlabs')!;
+    expect(row).toMatchObject({ user_id: 'u1', channel: null, secret_last4: 'cdef' });
+    expect(String(row.secret_ciphertext)).toMatch(/^v1\./);
+    expect(JSON.stringify(db)).not.toContain(KEY);
+    expect(decryptSecret(String(row.secret_ciphertext), { userId: 'u1', provider: 'elevenlabs', channel: null })).toBe(KEY);
+    // the status the Settings page and the audiobook screen read: set + last4, never the key
+    const g = await call('GET', '/');
+    expect(g.json.data.elevenlabs.key).toMatchObject({ set: true, last4: 'cdef' });
+    expect(g.text).not.toContain(KEY);
+  });
+
+  it('a key ElevenLabs refuses is not saved, and the reason is readable', async () => {
+    stubEleven(401);
+    const r = await call('PUT', '/elevenlabs', { api_key: KEY });
+    expect(r.status).toBe(422);
+    expect(r.json.error.code).toBe('KEY_REJECTED');
+    expect(r.json.error.message).toMatch(/refused that key/);
+    expect(db.user_integrations_v2.some((x) => x.provider === 'elevenlabs')).toBe(false);
+  });
+
+  it('is not saved when ElevenLabs cannot be reached, so a typo never looks like a connection', async () => {
+    const realFetch = fetch;
+    vi.stubGlobal('fetch', async (u: string, o: RequestInit) => { if (String(u).includes('elevenlabs.io')) throw new TypeError('network'); return realFetch(u, o); });
+    const r = await call('PUT', '/elevenlabs', { api_key: KEY });
+    expect(r.status).toBe(422);
+    expect(db.user_integrations_v2.some((x) => x.provider === 'elevenlabs')).toBe(false);
+  });
+
+  it('refuses without the encryption key, and saves nothing', async () => {
+    stubEleven(200);
+    delete process.env.INTEGRATIONS_ENCRYPTION_KEY;
+    const r = await call('PUT', '/elevenlabs', { api_key: KEY });
+    expect(r.status).toBe(503);
+    expect(db.user_integrations_v2.some((x) => x.provider === 'elevenlabs')).toBe(false);
+  });
+
+  it('validates input and removes the key', async () => {
+    expect((await call('PUT', '/elevenlabs', { api_key: 'short' })).json.error.code).toBe('VALIDATION_ERROR');
+    expect((await call('PUT', '/elevenlabs', { api_key: KEY, voice: 'x' })).status).toBe(400);
+    stubEleven(200);
+    await call('PUT', '/elevenlabs', { api_key: KEY });
+    expect((await call('DELETE', '/elevenlabs/key')).status).toBe(200);
+    expect(db.user_integrations_v2.find((x) => x.provider === 'elevenlabs')!.secret_ciphertext).toBeNull();
+  });
+
+  it('cannot be changed while impersonating', async () => {
+    auth.impersonating = true;
+    for (const [m, p, b] of [['PUT', '/elevenlabs', { api_key: KEY }], ['DELETE', '/elevenlabs/key', undefined]] as const) {
+      const r = await call(m, p, b);
+      expect(r.status, `${m} ${p}`).toBe(403);
+    }
+  });
+});
+
 describe('impersonation', () => {
   it('can read status but not change or use credentials', async () => {
     auth.impersonating = true;

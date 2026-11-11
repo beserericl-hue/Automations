@@ -109,6 +109,7 @@ class UserCredentials:
     user_id: str
     blotato_api_key: str = ""
     blotato_account_id: str = ""
+    elevenlabs_api_key: str = ""
     website_tokens: dict[str, str] = field(default_factory=dict)
     problems: list[str] = field(default_factory=list)
     """Rows that exist but could not be read (decrypt failure, missing key). Reported in deliveries."""
@@ -151,6 +152,8 @@ async def load_user_credentials(client: Any, user_id: str) -> UserCredentials:
         if provider == "blotato":
             creds.blotato_api_key = secret
             creds.blotato_account_id = str(config.get("account_id") or "").strip()
+        elif provider == "elevenlabs":
+            creds.elevenlabs_api_key = secret
         elif provider == "website" and channel:
             if secret:
                 creds.website_tokens[str(channel)] = secret

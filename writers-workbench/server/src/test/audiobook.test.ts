@@ -28,6 +28,8 @@ vi.mock('../middleware/auth.js', () => ({
     next();
   },
 }));
+const secrets: Record<string, string> = {};
+vi.mock('../routes/integrations.js', () => ({ userSecret: async (u: string, p: string) => secrets[`${u}:${p}`] ?? null }));
 vi.mock('../lib/logger.js', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 vi.mock('../services/credit-costs.js', () => ({ getCreditCost: async () => 8 }));
 vi.mock('../services/credits.js', () => ({
@@ -120,6 +122,7 @@ beforeEach(() => {
   role = 'user';
   engineDown = false;
   owner = 'u1';
+  for (const k of Object.keys(secrets)) delete secrets[k];
   chapters.length = 0;
   chapters.push(
     { chapter_number: 1, title: 'The Door', content_text: words(1500), status: 'approved' },
@@ -238,7 +241,7 @@ describe('settings', () => {
       const put = await call(base, 'PUT', `/project/${PROJECT}/settings`, { volume: 1, voice: 'cedar', style: 'thriller', custom_style: 'a little slower', credits: false });
       expect(put.status).toBe(200);
       const r = await get(base);
-      expect(r.data.settings).toEqual({ voice: 'cedar', style: 'thriller', custom_style: 'a little slower', credits: false, pronunciations: [] });
+      expect(r.data.settings).toEqual({ provider: 'openai', voice: 'cedar', style: 'thriller', custom_style: 'a little slower', credits: false, pronunciations: [] });
       expect(r.data.items.map((i: Row) => i.kind)).toEqual(['chapter', 'chapter']);
     });
   });
@@ -524,6 +527,82 @@ describe('pronunciation guide', () => {
       const r = await call(base, 'GET', `/project/${PROJECT}/names`);
       expect(r.status).toBe(200);
       expect(r.data.names).toEqual([{ word: 'Siobhan', count: 3 }]);
+    });
+  });
+});
+
+
+describe('narrating in the author\'s own ElevenLabs voice', () => {
+  const VOICE = 'Kb1hixP8KFa4kdSpc4yT';
+  const KEY = 'sk_test_0123456789abcdef0123456789abcdef';
+
+  it('accepts a voice id from the author\'s account, and anything else falls back to the Workbench voices', async () => {
+    const { normalizeSettings } = await import('../lib/audiobook.js');
+    expect(normalizeSettings({ provider: 'elevenlabs', voice: VOICE })).toMatchObject({ provider: 'elevenlabs', voice: VOICE });
+    expect(normalizeSettings({ provider: 'elevenlabs', voice: 'marin' })).toMatchObject({ provider: 'openai', voice: 'marin' });
+    expect(normalizeSettings({ provider: 'elevenlabs', voice: '../../x' })).toMatchObject({ provider: 'openai', voice: 'marin' });
+    expect(normalizeSettings({ provider: 'nope', voice: VOICE })).toMatchObject({ provider: 'openai' });
+  });
+
+  it('a recording\'s fingerprint changes with the provider but an OpenAI recording keeps its original one', async () => {
+    const { hashItem, normalizeSettings } = await import('../lib/audiobook.js');
+    const item = { kind: 'chapter' as const, title: 'Chapter 1', source_text: 'Hello.' };
+    const openai = hashItem(item, normalizeSettings({ voice: 'cedar' }));
+    const eleven = hashItem(item, normalizeSettings({ provider: 'elevenlabs', voice: VOICE }));
+    expect(eleven).not.toBe(openai);
+    // the delivery note does not reach ElevenLabs, so editing it does not make a recording "changed"
+    expect(hashItem(item, normalizeSettings({ provider: 'elevenlabs', voice: VOICE, custom_style: 'slow' }))).toBe(eleven);
+    // but the delivery style does (it sets the voice's stability)
+    expect(hashItem(item, normalizeSettings({ provider: 'elevenlabs', voice: VOICE, style: 'epic' }))).not.toBe(eleven);
+  });
+
+  it('lists the voices in the author\'s account, their own clones first, and says so when no key is connected', async () => {
+    await withServer(async (base) => {
+      expect((await call(base, 'GET', '/elevenlabs/voices')).data).toEqual({ connected: false, voices: [] });
+      secrets['u1:elevenlabs'] = KEY;
+      const realFetch = globalThis.fetch;
+      const seen: string[] = [];
+      vi.stubGlobal('fetch', async (u: string, o: RequestInit) => {
+        if (!String(u).includes('elevenlabs.io')) return realFetch(u, o);
+        seen.push(`${u}|${new Headers(o.headers).get('xi-api-key')}`);
+        return new Response(JSON.stringify({ has_more: false, voices: [
+          { voice_id: 'premade00001', name: 'Adam', category: 'premade', labels: { accent: 'american' } },
+          { voice_id: VOICE, name: 'Eric Beser', category: 'professional', labels: {} },
+        ] }), { status: 200 });
+      });
+      const r = await call(base, 'GET', '/elevenlabs/voices');
+      expect(r.data.connected).toBe(true);
+      expect(r.data.voices.map((v: Row) => [v.name, v.yours])).toEqual([['Eric Beser', true], ['Adam', false]]);
+      expect(seen[0]).toContain(`|${KEY}`);
+      expect(JSON.stringify(r)).not.toContain(KEY);
+      // a key ElevenLabs no longer accepts is reported, not thrown
+      vi.stubGlobal('fetch', async (u: string, o: RequestInit) => (String(u).includes('elevenlabs.io') ? new Response('{}', { status: 401 }) : realFetch(u, o)));
+      expect((await call(base, 'GET', '/elevenlabs/voices')).data).toEqual({ connected: false, rejected: true, voices: [] });
+      vi.unstubAllGlobals();
+    });
+  });
+
+  it('is saved with the narrator, queued with the provider, and costs no Workbench credits', async () => {
+    credits = 0; // nothing to spend: ElevenLabs bills the author\'s own plan
+    await withServer(async (base) => {
+      const put = await call(base, 'PUT', `/project/${PROJECT}/settings`, { volume: 1, provider: 'elevenlabs', voice: VOICE, style: 'epic' });
+      expect(put.data.settings).toMatchObject({ provider: 'elevenlabs', voice: VOICE, style: 'epic' });
+      const state = (await get(base)).data;
+      expect(state.settings).toMatchObject({ provider: 'elevenlabs', voice: VOICE });
+      expect(state.cost).toMatchObject({ own_account: true, credits_per_unit: 0, to_build_credits: 0, total_credits: 0 });
+
+      const b = await call(base, 'POST', `/project/${PROJECT}/build`, { volume: 1 });
+      expect(b.status).toBe(202);
+      expect(b.data).toMatchObject({ queued: 4, credits_charged: 0 });
+      expect(deductions).toHaveLength(0);
+      expect(db.audiobook_chapters_v2.every((r) => r.voice === VOICE)).toBe(true);
+    });
+  });
+
+  it('the preview carries the provider so the engine reads the right voice with the right key', async () => {
+    await withServer(async (base) => {
+      await call(base, 'POST', `/project/${PROJECT}/preview`, { volume: 1, provider: 'elevenlabs', voice: VOICE });
+      expect(engineJobs[0]).toMatchObject({ op: 'audiobook-preview', provider: 'elevenlabs', voice: VOICE, user_id: 'u1' });
     });
   });
 });

@@ -67,7 +67,13 @@ export interface Pronunciation {
 
 export const MAX_PRONUNCIATIONS = 200;
 
+export const ELEVEN_VOICE_ID = /^[A-Za-z0-9]{8,40}$/;
+
+/** Who speaks: the Workbench's own narrator voices (OpenAI), or the author's own ElevenLabs account. */
+export type Provider = 'openai' | 'elevenlabs';
+
 export interface AudioSettings {
+  provider: Provider;
   voice: string;
   style: string;
   custom_style: string;
@@ -75,7 +81,7 @@ export interface AudioSettings {
   pronunciations: Pronunciation[];
 }
 
-export const DEFAULT_SETTINGS: AudioSettings = { voice: 'marin', style: 'fiction', custom_style: '', credits: true, pronunciations: [] };
+export const DEFAULT_SETTINGS: AudioSettings = { provider: 'openai', voice: 'marin', style: 'fiction', custom_style: '', credits: true, pronunciations: [] };
 
 /** A guide from a request or a stored row: trimmed, no blanks, one line per word (the last one wins), bounded. */
 export function normalizePronunciations(raw: unknown): Pronunciation[] {
@@ -95,8 +101,11 @@ export const MAX_CUSTOM_STYLE = 600;
 export function normalizeSettings(raw: Partial<Record<keyof AudioSettings, unknown>> | null | undefined): AudioSettings {
   const voice = String(raw?.voice ?? '');
   const style = String(raw?.style ?? '');
+  // An ElevenLabs voice is whatever voice id the author's account has: an id, not one of our names.
+  const elevenVoice = raw?.provider === 'elevenlabs' && ELEVEN_VOICE_ID.test(voice);
   return {
-    voice: VOICES.some((v) => v.id === voice) ? voice : DEFAULT_SETTINGS.voice,
+    provider: elevenVoice ? 'elevenlabs' : 'openai',
+    voice: elevenVoice ? voice : VOICES.some((v) => v.id === voice) ? voice : DEFAULT_SETTINGS.voice,
     style: STYLES.some((s) => s.id === style) ? style : DEFAULT_SETTINGS.style,
     custom_style: String(raw?.custom_style ?? '').replace(/\s+/g, ' ').trim().slice(0, MAX_CUSTOM_STYLE),
     credits: raw?.credits === undefined ? DEFAULT_SETTINGS.credits : Boolean(raw.credits),
@@ -200,6 +209,11 @@ export function hashItem(item: Pick<PlannedItem, 'kind' | 'title' | 'source_text
     .sort()
     .join('|');
   const parts = [item.kind, item.title, item.source_text, s.voice, s.style, s.custom_style];
+  // Only for the author's own ElevenLabs voice (an OpenAI recording keeps its original fingerprint).
+  // The delivery note does not reach ElevenLabs, so it is not part of what makes a recording "changed".
+  if (s.provider === 'elevenlabs') {
+    parts.splice(5, 1, 'elevenlabs');
+  }
   // Appended only when there is something to say, so a recording made before the guide existed (or one
   // the guide does not touch) keeps the fingerprint it was made with and is not called "changed".
   if (guide) parts.push(guide);

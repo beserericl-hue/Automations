@@ -34,6 +34,11 @@ const item = (kind: string, n: number, title: string, over: Record<string, unkno
 });
 const ready = (id: string) => ({ id, status: 'ready', duration_s: 754, size_bytes: 18_100_000, rms_db: -20.4, peak_db: -3.5, spec_ok: true, url: `https://s/${id}.mp3?token=t`, download_url: `https://s/${id}.mp3?token=t&download=x` });
 
+const ELEVEN_VOICES = [
+  { id: 'Kb1hixP8KFa4kdSpc4yT', name: 'Eric Beser', category: 'professional', yours: true, labels: {} },
+  { id: 'premade00001', name: 'Adam', category: 'premade', yours: false, labels: {} },
+];
+let eleven: Record<string, any> = { connected: false, voices: [] };
 let state: Record<string, any>;
 function book(over: Record<string, any> = {}) {
   return {
@@ -55,11 +60,21 @@ const bodyOf = (suffix: string, method = 'POST') => {
 
 beforeEach(() => {
   state = book();
+  eleven = { connected: false, voices: [] };
   mockFetch.mockReset();
   mockFetch.mockImplementation(async (p, o) => {
     const path = String(p);
     const method = (o as { method?: string } | undefined)?.method ?? 'GET';
     if (path === '/api/audiobook/options') return { success: true, data: OPTIONS } as never;
+    if (path === '/api/audiobook/elevenlabs/voices') return { success: true, data: eleven } as never;
+    if (path === '/api/integrations/elevenlabs' && method === 'PUT') {
+      eleven = { connected: true, voices: ELEVEN_VOICES };
+      return { success: true, data: { ok: true, voices: 2 } } as never;
+    }
+    if (path === '/api/integrations/elevenlabs/key' && method === 'DELETE') {
+      eleven = { connected: false, voices: [] };
+      return { success: true } as never;
+    }
     if (path.includes('/names')) return { success: true, data: { names: [{ word: 'Siobhan', count: 12 }, { word: 'Mara', count: 40 }] } } as never;
     if (path.startsWith('/api/audiobook/project/') && method === 'GET') return { success: true, data: state } as never;
     if (path.endsWith('/preview')) return { success: true, data: { audio_b64: 'bXAz', content_type: 'audio/mpeg' } } as never;
@@ -206,6 +221,54 @@ describe('AudiobookPanel', () => {
     fireEvent.click(await screen.findByTestId('guide-remove-0'));
     expect(screen.queryByTestId('guide-row-0')).toBeNull();
     expect(screen.getByTestId('audiobook-unsaved')).toBeInTheDocument();
+  });
+
+  it('ElevenLabs: connect the key once, pick your own voice clone, save, and hear it', async () => {
+    renderWithProviders(<AudiobookPanel projectId="p1" volumeCount={1} />);
+    fireEvent.click(await screen.findByTestId('audiobook-provider-elevenlabs'));
+    // not connected: asks for the key, with the voice list locked
+    const box = await screen.findByTestId('audiobook-eleven-connect');
+    expect(box).toHaveTextContent('saved encrypted');
+    expect(screen.getByTestId('audiobook-voice')).toBeDisabled();
+    expect(screen.getByTestId('audiobook-eleven-connect-btn')).toBeDisabled(); // nothing typed
+    fireEvent.change(screen.getByTestId('audiobook-eleven-key'), { target: { value: 'sk_test_0123456789abcdef' } });
+    fireEvent.click(screen.getByTestId('audiobook-eleven-connect-btn'));
+    await waitFor(() => expect(bodyOf('/api/integrations/elevenlabs', 'PUT')).toEqual({ api_key: 'sk_test_0123456789abcdef' }));
+    // connected: the box is gone (the key field is emptied), the voices are the author's, their clone first
+    await waitFor(() => expect(screen.queryByTestId('audiobook-eleven-connect')).toBeNull());
+    const select = screen.getByTestId('audiobook-voice') as HTMLSelectElement;
+    expect(select).toBeEnabled();
+    expect([...select.options].map((o) => o.textContent)).toEqual(['Choose a voice…', 'Eric Beser — your voice', 'Adam']);
+    fireEvent.change(select, { target: { value: 'Kb1hixP8KFa4kdSpc4yT' } });
+    // the delivery note does not reach ElevenLabs
+    expect(screen.getByTestId('audiobook-custom-style')).toBeDisabled();
+    fireEvent.click(screen.getByTestId('audiobook-save'));
+    await waitFor(() => expect(bodyOf('/settings', 'PUT')).toMatchObject({ provider: 'elevenlabs', voice: 'Kb1hixP8KFa4kdSpc4yT' }));
+    fireEvent.click(screen.getByTestId('audiobook-preview'));
+    await waitFor(() => expect(bodyOf('/preview')).toMatchObject({ provider: 'elevenlabs', voice: 'Kb1hixP8KFa4kdSpc4yT' }));
+  });
+
+  it('ElevenLabs: a key that ElevenLabs no longer accepts asks for a new one', async () => {
+    eleven = { connected: false, rejected: true, voices: [] };
+    state = book({ settings: { provider: 'elevenlabs', voice: 'Kb1hixP8KFa4kdSpc4yT', style: 'fiction', custom_style: '', credits: true, pronunciations: [] } });
+    renderWithProviders(<AudiobookPanel projectId="p1" volumeCount={1} />);
+    expect(await screen.findByTestId('audiobook-eleven-connect')).toHaveTextContent('no longer accepts your saved key');
+
+  });
+
+  it('ElevenLabs: says it costs no Workbench credits and names what it does use', async () => {
+    eleven = { connected: true, voices: ELEVEN_VOICES };
+    state = book({
+      settings: { provider: 'elevenlabs', voice: 'Kb1hixP8KFa4kdSpc4yT', style: 'fiction', custom_style: '', credits: true, pronunciations: [] },
+      cost: { own_account: true, credits_per_unit: 0, unit_words: 1000, to_build_credits: 0, total_credits: 0 },
+    });
+    renderWithProviders(<AudiobookPanel projectId="p1" volumeCount={1} />);
+    expect(await screen.findByTestId('audiobook-price')).toHaveTextContent('no Workbench credits');
+    expect(screen.getByTestId('audiobook-price')).toHaveTextContent('characters from your ElevenLabs plan');
+    expect(screen.getByTestId('audiobook-build')).toHaveTextContent('Build the audiobook');
+    expect(screen.getByTestId('audiobook-build')).not.toHaveTextContent('credits');
+    fireEvent.click(await screen.findByTestId('audiobook-eleven-disconnect'));
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledWith('/api/integrations/elevenlabs/key', { method: 'DELETE' }));
   });
 
   it('"Hear it on my book" reads with the voice and style on screen and plays the answer', async () => {

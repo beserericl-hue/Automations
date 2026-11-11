@@ -584,6 +584,8 @@ async def _op_audiobook_preview(payload: dict) -> dict:
             str(payload.get("custom_style") or ""),
             str(payload.get("text") or ""),
             payload.get("pronunciations"),
+            str(payload.get("provider") or "openai"),
+            str(payload.get("user_id") or ""),
         )
     except (build.BuildError, tts.TTSError) as exc:
         return {

@@ -446,3 +446,179 @@ async def test_preview_applies_the_guide(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(tts, "synthesize", fake_synth)
     await build.preview("ash", "fiction", "", "Siobhan.", [{"word": "Siobhan", "say": "Shivawn"}])
     assert seen["text"] == "Shivawn."
+
+
+# ----------------------------------------------------------------------------- ElevenLabs (the author's own account)
+
+FAKE_KEY = "sk_test_not_a_real_key_0123456789abcdef"
+VOICE = "Kb1hixP8KFa4kdSpc4yT"
+
+
+def _eleven_client(handler: Any) -> Any:
+    import httpx
+
+    return httpx.AsyncClient(transport=httpx.MockTransport(handler))
+
+
+async def test_elevenlabs_request_carries_the_voice_the_key_the_style_and_the_neighbouring_text():
+    import json
+
+    seen: dict[str, Any] = {}
+
+    def handler(request: Any) -> Any:
+        import httpx
+
+        seen["url"] = str(request.url)
+        seen["key"] = request.headers.get("xi-api-key")
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, content=b"mp3-bytes")
+
+    async with _eleven_client(handler) as c:
+        out = await tts.synthesize_elevenlabs(
+            "Middle.",
+            voice_id=VOICE,
+            api_key=FAKE_KEY,
+            style="epic",
+            previous_text="A" * 900,
+            next_text="B" * 900,
+            client=c,
+        )
+    assert out == b"mp3-bytes"
+    assert seen["url"] == f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE}?output_format=mp3_44100_128"
+    assert seen["key"] == FAKE_KEY
+    body = seen["body"]
+    assert body["model_id"] == "eleven_multilingual_v2" and body["text"] == "Middle."
+    assert body["voice_settings"]["stability"] == 0.32  # the Epic delivery: a wider, more expressive read
+    assert body["previous_text"] == "A" * 400 and body["next_text"] == "B" * 400
+
+
+async def test_elevenlabs_refusals_are_readable_and_never_contain_the_key():
+    import httpx
+
+    for status, detail, expect in [
+        (401, {"detail": {"status": "invalid_api_key"}}, "refused your API key"),
+        (402, {"detail": {"status": "quota_exceeded"}}, "out of characters"),
+        (404, {"detail": {"status": "voice_not_found"}}, "not in your ElevenLabs account"),
+    ]:
+
+        def handler(request: Any, status: int = status, detail: dict = detail) -> Any:
+            return httpx.Response(status, json=detail)
+
+        async with _eleven_client(handler) as c:
+            with pytest.raises(tts.TTSError) as err:
+                await tts.synthesize_elevenlabs(
+                    "x", voice_id=VOICE, api_key=FAKE_KEY, style="fiction", client=c
+                )
+        assert expect in str(err.value) and FAKE_KEY not in str(err.value)
+
+
+async def test_elevenlabs_needs_a_key_and_a_well_formed_voice_id_before_any_request():
+    with pytest.raises(tts.TTSError, match="connect your ElevenLabs"):
+        await tts.synthesize_elevenlabs("x", voice_id=VOICE, api_key="", style="fiction")
+    for bad in ["", "../../etc", "a/b", "short", "x" * 80]:
+        with pytest.raises(tts.TTSError, match="choose one of your ElevenLabs voices"):
+            await tts.synthesize_elevenlabs("x", voice_id=bad, api_key=FAKE_KEY, style="fiction")
+
+
+async def test_build_with_elevenlabs_uses_the_authors_decrypted_key_their_voice_and_two_at_a_time(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    if not master.available():
+        pytest.skip("ffmpeg/ffprobe not installed")
+    from writer_engine import integrations
+
+    key = b"k" * 32
+    sealed = integrations.encrypt(FAKE_KEY, user_id=OWNER, provider="elevenlabs", channel=None, key=key)
+    monkeypatch.setattr(integrations, "load_key", lambda raw=None: key)
+
+    long_text = "\n\n".join(
+        f"Paragraph {i}. " + "The wind carried the smell of rain. " * 30 for i in range(8)
+    )
+    db = _db(source=long_text)
+    db.tables["audiobooks_v2"][0].update(provider="elevenlabs", voice=VOICE, style="epic")
+    db.tables["audiobook_chapters_v2"][0]["voice"] = VOICE
+    db.tables["user_integrations_v2"] = [
+        {
+            "user_id": OWNER,
+            "provider": "elevenlabs",
+            "channel": None,
+            "config": {},
+            "secret_ciphertext": sealed,
+        }
+    ]
+    _use(monkeypatch, db)
+
+    chunk = _tone_mp3(1.0, 0.4)
+    calls: list[dict[str, Any]] = []
+    live = {"now": 0, "max": 0}
+
+    async def fake_eleven(
+        text_: str,
+        *,
+        voice_id: str,
+        api_key: str,
+        style: str,
+        previous_text: str = "",
+        next_text: str = "",
+        client: Any = None,
+    ) -> bytes:
+        live["now"] += 1
+        live["max"] = max(live["max"], live["now"])
+        await asyncio.sleep(0.02)
+        live["now"] -= 1
+        calls.append(
+            {"voice": voice_id, "key": api_key, "style": style, "prev": previous_text, "next": next_text}
+        )
+        return chunk
+
+    monkeypatch.setattr(tts, "synthesize_elevenlabs", fake_eleven)
+
+    async def no_openai(*_a: Any, **_k: Any) -> bytes:
+        raise AssertionError("OpenAI must not be called for an ElevenLabs book")
+
+    monkeypatch.setattr(tts, "synthesize", no_openai)
+    out = await build.build_item("c1", OWNER)
+    assert out["status"] == "ready"
+    assert {c["voice"] for c in calls} == {VOICE} and {c["key"] for c in calls} == {FAKE_KEY}
+    assert {c["style"] for c in calls} == {"epic"}
+    assert live["max"] <= build.ELEVEN_CONCURRENCY
+    # continuity: every chunk but the first knows what came before it, every one but the last what follows
+    assert sum(1 for c in calls if c["prev"]) == len(calls) - 1 or len(calls) == 1
+    assert db.tables["audiobook_chapters_v2"][0]["status"] == "ready"
+
+
+async def test_build_with_elevenlabs_and_no_connected_key_fails_clearly_without_calling_anyone(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    db = _db()
+    db.tables["audiobooks_v2"][0].update(provider="elevenlabs", voice=VOICE)
+    db.tables["user_integrations_v2"] = []
+    _use(monkeypatch, db)
+    monkeypatch.setattr(master, "available", lambda: True)
+    with pytest.raises(build.BuildError) as err:
+        await build.build_item("c1", OWNER)
+    assert err.value.code == "NO_KEY"
+    assert db.tables["audiobook_chapters_v2"][0]["status"] == "failed"
+    assert "connect your ElevenLabs API key" in db.tables["audiobook_chapters_v2"][0]["error"]
+
+
+async def test_preview_with_elevenlabs_uses_the_callers_key(monkeypatch: pytest.MonkeyPatch):
+    seen: dict[str, Any] = {}
+
+    async def fake_eleven(text_: str, *, voice_id: str, api_key: str, style: str, **_k: Any) -> bytes:
+        seen.update(text=text_, voice=voice_id, key=api_key, style=style)
+        return b"mp3"
+
+    async def key_of(_client: Any, user_id: str) -> str:
+        assert user_id == OWNER
+        return FAKE_KEY
+
+    async def admin() -> Any:
+        return object()
+
+    monkeypatch.setattr(tts, "synthesize_elevenlabs", fake_eleven)
+    monkeypatch.setattr(build, "_eleven_key", key_of)
+    monkeypatch.setattr("writer_engine.supabase.client.get_supabase_admin", admin)
+    out = await build.preview(VOICE, "intimate", "", "Hello *there*.", None, "elevenlabs", OWNER)
+    assert seen == {"text": "Hello there.", "voice": VOICE, "key": FAKE_KEY, "style": "intimate"}
+    assert out["content_type"] == "audio/mpeg"
