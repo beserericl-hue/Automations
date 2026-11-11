@@ -8,6 +8,13 @@ FROM python:3.12-slim AS base
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
 
+# ffmpeg + ffprobe: the audiobook step joins the narration, levels it into the retail loudness window
+# and encodes the 192 kbps MP3 (writer_engine.audiobook.master). Without them an audiobook build
+# fails with FFMPEG_MISSING rather than producing an unchecked file.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=ghcr.io/astral-sh/uv:0.5.13 /uv /usr/local/bin/uv
 
 # The LOCK FILE, and --frozen with no fallback.

@@ -1,4 +1,4 @@
-"""media-step — cover-art / social-posts / scrape-url.
+"""media-step — cover-art / social-posts / scrape-url / audiobook-chapter / audiobook-preview.
 
 cover-art generates a book cover via KIE.AI (google/nano-banana), falls back to OpenAI DALL-E 3,
 and persists the image to Supabase Storage (``cover-images`` bucket) — mirroring the n8n
@@ -559,7 +559,45 @@ async def _op_scrape_url(payload: dict) -> dict:
     }
 
 
-OPS = {"cover-art": _op_cover_art, "social-posts": _op_social_posts, "scrape-url": _op_scrape_url}
+async def _op_audiobook_chapter(payload: dict) -> dict:
+    """Narrate and master one audiobook recording (``audiobook_chapters_v2`` row ``item_id``)."""
+    from writer_engine.audiobook import build
+
+    try:
+        return await build.build_item(
+            str(payload.get("item_id") or ""),
+            str(payload.get("user_id") or ""),
+            tags=payload.get("tags") or {},
+        )
+    except build.BuildError as exc:
+        return {"error": exc.code, "message": exc.message}
+
+
+async def _op_audiobook_preview(payload: dict) -> dict:
+    """A short reading in a voice and style (base64 MP3), so the author can hear it before building."""
+    from writer_engine.audiobook import build, tts
+
+    try:
+        return await build.preview(
+            str(payload.get("voice") or ""),
+            str(payload.get("style") or ""),
+            str(payload.get("custom_style") or ""),
+            str(payload.get("text") or ""),
+        )
+    except (build.BuildError, tts.TTSError) as exc:
+        return {
+            "error": getattr(exc, "code", "TTS_FAILED"),
+            "message": getattr(exc, "message", None) or str(exc),
+        }
+
+
+OPS = {
+    "cover-art": _op_cover_art,
+    "social-posts": _op_social_posts,
+    "scrape-url": _op_scrape_url,
+    "audiobook-chapter": _op_audiobook_chapter,
+    "audiobook-preview": _op_audiobook_preview,
+}
 
 
 async def handler(inp: StepInput) -> StepOutput:

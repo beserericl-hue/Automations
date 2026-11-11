@@ -15,8 +15,17 @@ import type { BuildPackageOptions, PackageChapter, PackageSettings } from './kdp
 
 export type BookSource = Omit<BuildPackageOptions, 'onlyVolume' | 'onlyApproved'>;
 
-/** Null when the project is not this user's (or does not exist). Throws on a failed read. */
-export async function loadBookSource(projectId: string, userId: string): Promise<BookSource | null> {
+/**
+ * Null when the project is not this user's (or does not exist). Throws on a failed read.
+ *
+ * `withArt: false` skips downloading the cover pictures — for a reader that only needs the text and
+ * the titles (the audiobook screen polls this while a build runs; a book's cover is megabytes).
+ */
+export async function loadBookSource(
+  projectId: string,
+  userId: string,
+  opts: { withArt?: boolean } = {},
+): Promise<BookSource | null> {
   const supabase = getSupabaseAdmin();
   const { data: project, error: projError } = await supabase
     .from('writing_projects_v2')
@@ -69,17 +78,19 @@ export async function loadBookSource(projectId: string, userId: string): Promise
   // The whole book's cover, and each book's own where the author chose one for it.
   let art: Buffer | null = null;
   const artByVolume: Record<string, Buffer> = {};
-  try {
-    const whole = await findCover(supabase, projectId, outline);
-    art = await downloadCover(supabase, whole);
-    for (const v of plan?.volumes ?? []) {
-      const own = await findCover(supabase, projectId, outline, v.index);
-      if (!own || own.id === whole?.id) continue;
-      const bytes = await downloadCover(supabase, own);
-      if (bytes) artByVolume[String(v.index)] = bytes;
+  if (opts.withArt !== false) {
+    try {
+      const whole = await findCover(supabase, projectId, outline);
+      art = await downloadCover(supabase, whole);
+      for (const v of plan?.volumes ?? []) {
+        const own = await findCover(supabase, projectId, outline, v.index);
+        if (!own || own.id === whole?.id) continue;
+        const bytes = await downloadCover(supabase, own);
+        if (bytes) artByVolume[String(v.index)] = bytes;
+      }
+    } catch (err) {
+      logger.warn({ err, projectId }, 'book source: cover art unavailable');
     }
-  } catch (err) {
-    logger.warn({ err, projectId }, 'book source: cover art unavailable');
   }
 
   const volumeCount = Math.max(1, plan?.volumes?.length ?? 1);

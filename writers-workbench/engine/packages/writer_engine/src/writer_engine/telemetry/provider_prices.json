@@ -106,6 +106,17 @@
       "checked": "2026-11-02"
     },
     {
+      "provider": "openai",
+      "model": "gpt-4o-mini-tts",
+      "aliases": [],
+      "per_unit": 0.015,
+      "unit_type": "minutes",
+      "fallback_cost_source": "estimated",
+      "note": "Audiobook narration. OpenAI lists about $0.015 per minute of generated speech (text input $0.60/M tokens + audio output $12/M tokens); units are minutes of audio returned, so rows are 'estimated'.",
+      "source": "https://developers.openai.com/api/docs/pricing",
+      "checked": "2026-11-11"
+    },
+    {
       "provider": "kieai",
       "model": "google/nano-banana",
       "aliases": [],
