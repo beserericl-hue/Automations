@@ -244,7 +244,7 @@ describe('settings', () => {
       const put = await call(base, 'PUT', `/project/${PROJECT}/settings`, { volume: 1, voice: 'cedar', style: 'thriller', custom_style: 'a little slower', credits: false });
       expect(put.status).toBe(200);
       const r = await get(base);
-      expect(r.data.settings).toEqual({ provider: 'openai', voice: 'cedar', style: 'thriller', custom_style: 'a little slower', credits: false, pronunciations: [] });
+      expect(r.data.settings).toEqual({ provider: 'openai', voice: 'cedar', style: 'thriller', custom_style: 'a little slower', credits: false, pronunciations: [], narrator_name: '' });
       expect(r.data.items.map((i: Row) => i.kind)).toEqual(['chapter', 'chapter']);
     });
   });
@@ -583,6 +583,50 @@ describe('narrating in the author\'s own ElevenLabs voice', () => {
       expect((await call(base, 'GET', '/elevenlabs/voices')).data).toEqual({ connected: false, rejected: true, voices: [] });
       vi.unstubAllGlobals();
     });
+  });
+
+  it('names the author in the opening credit when the voice is their own clone, and says A.I. for any other voice', async () => {
+    const { openingText, planAudiobook, normalizeSettings } = await import('../lib/audiobook.js');
+    expect(openingText('The Ossuary', 'Eric Beser', 'Eric Beser')).toBe('The Ossuary. Written by Eric Beser. Narrated by Eric Beser.');
+    expect(openingText('The Ossuary', 'Eric Beser')).toBe('The Ossuary. Written by Eric Beser. Narrated by an A.I. voice.');
+    // a built-in voice can never carry a person's name, even if one is sent
+    expect(normalizeSettings({ provider: 'openai', voice: 'marin', narrator_name: 'Eric Beser' }).narrator_name).toBe('');
+    const { loadBookSource } = await import('../lib/book-source.js');
+    const src = (await loadBookSource(PROJECT, 'u1'))!;
+    const mine = planAudiobook(src, 1, normalizeSettings({ provider: 'elevenlabs', voice: VOICE, narrator_name: 'Eric Beser' }))!;
+    expect(mine.items[0].source_text).toBe('The Ossuary. Written by Eric Beser. Narrated by Eric Beser.');
+    expect(mine.items[0].source_text).not.toContain('A.I.');
+  });
+
+  it('looks the name up in the author\'s ElevenLabs account when the narrator is saved: their own voice is named, a library voice is an A.I. voice', async () => {
+    secrets['u1:elevenlabs'] = KEY;
+    const realFetch = globalThis.fetch;
+    vi.stubGlobal('fetch', async (u: string, o: RequestInit) => {
+      if (!String(u).includes('elevenlabs.io')) return realFetch(u, o);
+      return new Response(JSON.stringify({ has_more: false, voices: [
+        { voice_id: 'premade00001', name: 'Adam', category: 'premade', labels: {} },
+        { voice_id: VOICE, name: 'Eric Beser', category: 'professional', labels: {} },
+      ] }), { status: 200 });
+    });
+    try {
+      await withServer(async (base) => {
+        const own = await call(base, 'PUT', `/project/${PROJECT}/settings`, { volume: 1, provider: 'elevenlabs', voice: VOICE });
+        expect(own.data.settings.narrator_name).toBe('Eric Beser');
+        // a client cannot choose the name: it comes from the account
+        const forged = await call(base, 'PUT', `/project/${PROJECT}/settings`, { volume: 1, provider: 'elevenlabs', voice: 'premade00001', narrator_name: 'Somebody Else' });
+        expect(forged.data.settings.narrator_name).toBe('');
+        await call(base, 'PUT', `/project/${PROJECT}/settings`, { volume: 1, provider: 'elevenlabs', voice: VOICE });
+        const b = await call(base, 'POST', `/project/${PROJECT}/build`, { volume: 1 });
+        expect(b.status).toBe(202);
+        const opening = db.audiobook_chapters_v2.find((r) => r.kind === 'opening')!;
+        expect(opening.source_text).toBe('The Ossuary. Written by Eric Beser. Narrated by Eric Beser.');
+        // back to a built-in voice: the credit says so again
+        await call(base, 'PUT', `/project/${PROJECT}/settings`, { volume: 1, provider: 'openai', voice: 'marin' });
+        expect(((await get(base)).data.settings as Row).narrator_name).toBe('');
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('is saved with the narrator, queued with the provider, and costs no Workbench credits', async () => {

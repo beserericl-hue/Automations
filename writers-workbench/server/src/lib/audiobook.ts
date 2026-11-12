@@ -79,9 +79,11 @@ export interface AudioSettings {
   custom_style: string;
   credits: boolean;
   pronunciations: Pronunciation[];
+  /** The author's own ElevenLabs voice's name, for "Narrated by <name>". Empty: say it is an A.I. voice. */
+  narrator_name: string;
 }
 
-export const DEFAULT_SETTINGS: AudioSettings = { provider: 'openai', voice: 'marin', style: 'fiction', custom_style: '', credits: true, pronunciations: [] };
+export const DEFAULT_SETTINGS: AudioSettings = { provider: 'openai', voice: 'marin', style: 'fiction', custom_style: '', credits: true, pronunciations: [], narrator_name: '' };
 
 /** A guide from a request or a stored row: trimmed, no blanks, one line per word (the last one wins), bounded. */
 export function normalizePronunciations(raw: unknown): Pronunciation[] {
@@ -110,6 +112,8 @@ export function normalizeSettings(raw: Partial<Record<keyof AudioSettings, unkno
     custom_style: String(raw?.custom_style ?? '').replace(/\s+/g, ' ').trim().slice(0, MAX_CUSTOM_STYLE),
     credits: raw?.credits === undefined ? DEFAULT_SETTINGS.credits : Boolean(raw.credits),
     pronunciations: normalizePronunciations(raw?.pronunciations),
+    // Only an ElevenLabs voice can carry a person's name; the built-in voices are always A.I. voices.
+    narrator_name: elevenVoice ? String(raw?.narrator_name ?? '').replace(/\s+/g, ' ').trim().slice(0, 80) : '',
   };
 }
 
@@ -150,10 +154,14 @@ export function spokenChapterTitle(number: number, title: string | null | undefi
   return t || 'Untitled';
 }
 
-/** The words spoken before the first chapter. The narrator is named for what it is. */
-export function openingText(title: string, author: string): string {
+/**
+ * The words spoken before the first chapter. The narrator is named for what it is: a person's name when the
+ * author reads in their own cloned voice, an A.I. voice otherwise.
+ */
+export function openingText(title: string, author: string, narrator = ''): string {
   const by = author.trim() ? ` Written by ${author.trim()}.` : '';
-  return `${title.trim()}.${by} Narrated by an A.I. voice.`;
+  const who = narrator.trim() ? narrator.trim() : 'an A.I. voice';
+  return `${title.trim()}.${by} Narrated by ${who}.`;
 }
 
 export function closingText(title: string, author: string): string {
@@ -176,7 +184,7 @@ export function planAudiobook(source: BookSource, volumeIndex: number, settings:
 
   const items: PlannedItem[] = [];
   if (settings.credits) {
-    const text = openingText(parts.fullTitle, source.author);
+    const text = openingText(parts.fullTitle, source.author, settings.narrator_name);
     items.push({ kind: 'opening', chapter_number: 0, position: OPENING_POSITION, title: 'Opening credits', source_text: text, words: countWords(text) });
   }
   parts.rows.forEach((c, i) => {

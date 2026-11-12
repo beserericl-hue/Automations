@@ -115,6 +115,7 @@ interface BookRow {
   custom_style: string;
   credits: boolean;
   pronunciations: unknown;
+  narrator_name: string | null;
 }
 
 interface ItemRow {
@@ -143,7 +144,7 @@ const ITEM_COLUMNS =
 async function findBook(userId: string, projectId: string, volume: number): Promise<BookRow | null> {
   const { data } = await getSupabaseAdmin()
     .from('audiobooks_v2')
-    .select('id, provider, voice, style, custom_style, credits, pronunciations')
+    .select('id, provider, voice, style, custom_style, credits, pronunciations, narrator_name')
     .eq('project_id', projectId)
     .eq('user_id', userId)
     .eq('volume_index', volume)
@@ -165,7 +166,7 @@ async function ensureBook(userId: string, projectId: string, volume: number, set
   const { data, error } = await sb
     .from('audiobooks_v2')
     .insert({ user_id: userId, project_id: projectId, volume_index: volume, ...s })
-    .select('id, provider, voice, style, custom_style, credits, pronunciations')
+    .select('id, provider, voice, style, custom_style, credits, pronunciations, narrator_name')
     .single();
   if (error || !data) throw new Error(error?.message ?? 'audiobook not created');
   return data as BookRow;
@@ -269,16 +270,20 @@ interface ElevenVoice {
   labels: Record<string, string>;
 }
 
+type VoiceLookup =
+  | { ok: true; voices: ElevenVoice[] }
+  | { ok: false; connected: boolean; rejected?: boolean; status: number; code: string; message: string };
+
 /** The voices in the caller's own ElevenLabs account (their clones first). Needs their saved key. */
-audiobookRouter.get('/elevenlabs/voices', async (req: Request, res: Response) => {
+async function fetchElevenVoices(userId: string): Promise<VoiceLookup> {
   let key: string | null = null;
   try {
-    key = await userSecret(req.userId!, 'elevenlabs');
+    key = await userSecret(userId, 'elevenlabs');
   } catch (err) {
     logger.error({ err: (err as Error).message }, 'audiobook: elevenlabs key unreadable');
-    return bad(res, 500, 'KEY_UNREADABLE', 'Could not read your saved ElevenLabs key — reconnect it.');
+    return { ok: false, connected: false, status: 500, code: 'KEY_UNREADABLE', message: 'Could not read your saved ElevenLabs key — reconnect it.' };
   }
-  if (!key) return res.json({ success: true, data: { connected: false, voices: [] } });
+  if (!key) return { ok: false, connected: false, status: 200, code: 'NOT_CONNECTED', message: 'ElevenLabs is not connected.' };
   const voices: ElevenVoice[] = [];
   let token = '';
   for (let page = 0; page < 5; page += 1) {
@@ -289,12 +294,12 @@ audiobookRouter.get('/elevenlabs/voices', async (req: Request, res: Response) =>
         signal: AbortSignal.timeout(15_000),
       });
     } catch {
-      return bad(res, 502, 'ELEVENLABS_UNREACHABLE', 'ElevenLabs could not be reached.');
+      return { ok: false, connected: true, status: 502, code: 'ELEVENLABS_UNREACHABLE', message: 'ElevenLabs could not be reached.' };
     }
     if (r.status === 401 || r.status === 403) {
-      return res.json({ success: true, data: { connected: false, rejected: true, voices: [] } });
+      return { ok: false, connected: false, rejected: true, status: 200, code: 'REJECTED', message: 'ElevenLabs rejected the saved key.' };
     }
-    if (!r.ok) return bad(res, 502, 'ELEVENLABS_ERROR', `ElevenLabs answered ${r.status}.`);
+    if (!r.ok) return { ok: false, connected: true, status: 502, code: 'ELEVENLABS_ERROR', message: `ElevenLabs answered ${r.status}.` };
     const body = (await r.json()) as { voices?: Record<string, unknown>[]; has_more?: boolean; next_page_token?: string };
     for (const v of body.voices ?? []) {
       const category = String(v.category ?? '');
@@ -310,8 +315,42 @@ audiobookRouter.get('/elevenlabs/voices', async (req: Request, res: Response) =>
     token = body.next_page_token;
   }
   voices.sort((a, b) => Number(b.yours) - Number(a.yours) || a.name.localeCompare(b.name));
-  res.json({ success: true, data: { connected: true, voices: voices.filter((v) => v.id) } });
+  return { ok: true, voices: voices.filter((v) => v.id) };
+}
+
+audiobookRouter.get('/elevenlabs/voices', async (req: Request, res: Response) => {
+  const found = await fetchElevenVoices(req.userId!);
+  if (found.ok) return res.json({ success: true, data: { connected: true, voices: found.voices } });
+  if (found.status === 200) return res.json({ success: true, data: { connected: false, ...(found.rejected ? { rejected: true } : {}), voices: [] } });
+  return bad(res, found.status, found.code, found.message);
 });
+
+/**
+ * The spoken credit names the narrator for what it is. When the author reads in their OWN ElevenLabs voice
+ * (a clone they made) the name comes from that voice in their account, so the opening says
+ * "Narrated by <their name>", never "an A.I. voice". Any other voice (the built-in ones, an ElevenLabs
+ * library voice) keeps the A.I. wording. If ElevenLabs cannot be asked and the voice is unchanged, the
+ * name already saved stands.
+ */
+async function withNarrator(userId: string, s: AudioSettings, saved?: AudioSettings): Promise<AudioSettings> {
+  if (s.provider !== 'elevenlabs') return { ...s, narrator_name: '' };
+  const found = await fetchElevenVoices(userId);
+  if (found.ok) {
+    const mine = found.voices.find((v) => v.id === s.voice && v.yours);
+    return { ...s, narrator_name: mine ? mine.name.trim().slice(0, 80) : '' };
+  }
+  const same = saved && saved.provider === 'elevenlabs' && saved.voice === s.voice;
+  return { ...s, narrator_name: same ? saved.narrator_name : '' };
+}
+
+/** A stored book whose own-voice narrator name has not been looked up yet (made before 060): look it up and keep it. */
+async function resolvedBook(userId: string, book: BookRow | null): Promise<BookRow | null> {
+  if (!book || book.provider !== 'elevenlabs' || (book.narrator_name ?? '').trim()) return book;
+  const s = await withNarrator(userId, settingsOf(book), settingsOf(book));
+  if (!s.narrator_name) return book;
+  await getSupabaseAdmin().from('audiobooks_v2').update({ narrator_name: s.narrator_name }).eq('id', book.id);
+  return { ...book, narrator_name: s.narrator_name };
+}
 
 audiobookRouter.get('/project/:projectId', async (req: Request, res: Response) => {
   const volume = VolumeQuery.safeParse(req.query.volume);
@@ -319,7 +358,7 @@ audiobookRouter.get('/project/:projectId', async (req: Request, res: Response) =
   const source = await ownedSource(req, res, pid(req));
   if (!source) return;
 
-  const book = await findBook(req.userId!, pid(req), volume.data);
+  const book = await resolvedBook(req.userId!, await findBook(req.userId!, pid(req), volume.data));
   const settings = settingsOf(book);
   const plan = planAudiobook(source, volume.data, settings);
   const ownAccount = settings.provider === 'elevenlabs';
@@ -459,7 +498,7 @@ audiobookRouter.put('/project/:projectId/settings', validateBody(SettingsBody), 
   if (!source) return;
   const body = req.body as z.infer<typeof SettingsBody>;
   const current = settingsOf(await findBook(req.userId!, pid(req), body.volume));
-  const next = normalizeSettings({ ...current, ...stripUndefined(body) });
+  const next = await withNarrator(req.userId!, normalizeSettings({ ...current, ...stripUndefined(body) }), current);
   const book = await ensureBook(req.userId!, pid(req), body.volume, next);
   res.json({ success: true, data: { id: book.id, settings: next } });
 });
@@ -522,7 +561,7 @@ audiobookRouter.post('/project/:projectId/build', validateBody(BuildBody), async
   if (!source) return;
   const body = req.body as z.infer<typeof BuildBody>;
   const userId = req.userId!;
-  const book = await ensureBook(userId, pid(req), body.volume);
+  const book = (await resolvedBook(userId, await ensureBook(userId, pid(req), body.volume)))!;
   const settings = settingsOf(book);
   const plan = planAudiobook(source, body.volume, settings);
   if (!plan) return bad(res, 422, 'NO_CHAPTERS', 'This book has no chapter text to narrate yet.');
@@ -623,7 +662,7 @@ audiobookRouter.post('/project/:projectId/export', validateBody(ExportBody), asy
   const source = await ownedSource(req, res, pid(req));
   if (!source) return;
   const body = req.body as z.infer<typeof ExportBody>;
-  const book = await findBook(req.userId!, pid(req), body.volume);
+  const book = await resolvedBook(req.userId!, await findBook(req.userId!, pid(req), body.volume));
   if (!book) return bad(res, 422, 'NOT_BUILT', 'Build the audiobook first.');
   const settings = settingsOf(book);
   const plan = planAudiobook(source, body.volume, settings);
