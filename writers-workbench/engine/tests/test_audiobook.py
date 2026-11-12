@@ -954,6 +954,9 @@ class _TusServer:
 
         h = request.headers
         assert h["tus-resumable"] == "1.0.0" and h["authorization"].startswith("Bearer ")
+        # Every request, not just the first: a re-narrated recording replaces its earlier file, and storage
+        # answers the first piece with 409 "already exists" when the piece does not say it may.
+        assert h["x-upsert"] == "true", f"{request.method} without x-upsert"
         if request.method == "POST":
             self.size = int(h["upload-length"])
             meta = dict(kv.split(" ", 1) for kv in h["upload-metadata"].split(","))

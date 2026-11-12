@@ -70,7 +70,9 @@ async def upload_resumable(
     if not base or not secret:
         raise UploadError("Supabase is not configured on the engine")
     size = source_size(source)
-    headers = {"Authorization": f"Bearer {secret}", "apikey": secret, "Tus-Resumable": "1.0.0"}
+    # x-upsert on EVERY request, not only the first: a re-narrated recording replaces the earlier file, and
+    # storage answers the first piece with 409 "resource already exists" unless the piece carries it too.
+    headers = {"Authorization": f"Bearer {secret}", "apikey": secret, "Tus-Resumable": "1.0.0", "x-upsert": "true"}
 
     async def read(offset: int, n: int) -> bytes:
         if isinstance(source, bytes):
@@ -94,7 +96,6 @@ async def upload_resumable(
                 "Upload-Metadata": _meta(
                     bucketName=bucket, objectName=path, contentType=content_type, cacheControl="3600"
                 ),
-                "x-upsert": "true",
             },
         )
         if created.status_code not in (200, 201):
@@ -124,13 +125,13 @@ async def upload_resumable(
                         break
                     if r.status_code == 413 or (r.status_code < 500 and r.status_code != 409):
                         raise _refusal(r)
-                    failure: Exception = UploadError(f"storage answered {r.status_code}")
+                    failure: Exception = UploadError(f"storage answered {r.status_code}: {r.text[:160]}")
                 except httpx.TransportError as exc:
                     failure = exc
                 if attempt == RETRIES_PER_PIECE:
-                    raise UploadError(f"upload failed at {offset / 1e6:.0f} MB: {type(failure).__name__}")
+                    raise UploadError(f"upload failed at {offset / 1e6:.0f} MB: {type(failure).__name__}: {failure}"[:300])
                 logger.warning(
-                    "audiobook.upload_retry", offset=offset, attempt=attempt, error=type(failure).__name__
+                    "audiobook.upload_retry", offset=offset, attempt=attempt, error=f"{type(failure).__name__}: {failure}"[:200]
                 )
                 await sleep(min(2.0**attempt, 20.0))
                 # Ask storage how far it got, rather than guessing: the lost piece may have landed.
