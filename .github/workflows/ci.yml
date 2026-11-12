@@ -119,7 +119,9 @@ jobs:
   # from Railway and emails the result.
   e2e-dev:
     name: E2E against DEV (no credentials)
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: GitHub moved latest to Ubuntu 26.04, which Playwright cannot install
+    # chromium on ("does not support chromium on ubuntu26.04-x64"). Move this when Playwright supports it.
+    runs-on: ubuntu-24.04
     needs: [changes, build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop' && needs.changes.outputs.workbench == 'true'
     env:
