@@ -72,7 +72,12 @@ async def upload_resumable(
     size = source_size(source)
     # x-upsert on EVERY request, not only the first: a re-narrated recording replaces the earlier file, and
     # storage answers the first piece with 409 "resource already exists" unless the piece carries it too.
-    headers = {"Authorization": f"Bearer {secret}", "apikey": secret, "Tus-Resumable": "1.0.0", "x-upsert": "true"}
+    headers = {
+        "Authorization": f"Bearer {secret}",
+        "apikey": secret,
+        "Tus-Resumable": "1.0.0",
+        "x-upsert": "true",
+    }
 
     async def read(offset: int, n: int) -> bytes:
         if isinstance(source, bytes):
@@ -129,9 +134,14 @@ async def upload_resumable(
                 except httpx.TransportError as exc:
                     failure = exc
                 if attempt == RETRIES_PER_PIECE:
-                    raise UploadError(f"upload failed at {offset / 1e6:.0f} MB: {type(failure).__name__}: {failure}"[:300])
+                    raise UploadError(
+                        f"upload failed at {offset / 1e6:.0f} MB: {type(failure).__name__}: {failure}"[:300]
+                    )
                 logger.warning(
-                    "audiobook.upload_retry", offset=offset, attempt=attempt, error=f"{type(failure).__name__}: {failure}"[:200]
+                    "audiobook.upload_retry",
+                    offset=offset,
+                    attempt=attempt,
+                    error=f"{type(failure).__name__}: {failure}"[:200],
                 )
                 await sleep(min(2.0**attempt, 20.0))
                 # Ask storage how far it got, rather than guessing: the lost piece may have landed.
