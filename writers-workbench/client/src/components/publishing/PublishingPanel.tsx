@@ -340,6 +340,14 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
     onError: (err: Error) => addToast(err.message || 'Could not restore', 'error'),
   });
 
+  /** From a "no description" blocker: open the field editor on that book and bring it into view. */
+  const writeDescription = (blocker: string) => {
+    const vol = Number(/^volume (\d+):/.exec(blocker)?.[1] ?? 1);
+    setVolumeTab(vol);
+    setEdit(editFrom(data?.marketing?.[String(vol)] ?? null));
+    window.setTimeout(() => document.getElementById('marketing-copy')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  };
+
   /** "Draft all missing": only the package fields that are empty in the editor, at a total shown first. */
   const askDraftAll = () => {
     const start = edit ?? editFrom(marketing);
@@ -489,7 +497,20 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
           {readiness.blockers.length ? (
             <ul className="mt-2 list-disc pl-4 text-xs text-red-700 dark:text-red-400 space-y-0.5">
               {readiness.blockers.map((b) => (
-                <li key={b}>{b}</li>
+                <li key={b}>
+                  {b}
+                  {/* The description box is in Marketing copy, a long way down: take the author to it. */}
+                  {/listing copy|blurb is empty/.test(b) ? (
+                    <button
+                      type="button"
+                      data-testid="write-description"
+                      onClick={() => writeDescription(b)}
+                      className="ml-2 rounded border border-brand-300 px-2 py-0.5 text-[11px] font-medium text-brand-700 hover:bg-brand-50 dark:border-brand-700 dark:text-brand-300 dark:hover:bg-brand-950/40"
+                    >
+                      Write the description
+                    </button>
+                  ) : null}
+                </li>
               ))}
             </ul>
           ) : null}
@@ -643,6 +664,7 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
       {/* Named for what it is rather than where it goes. "Amazon listing copy" is precise and it is
           not what anyone searches a page for; "marketing" is the word people arrive with. */}
       <Section
+        id="marketing-copy"
         title="Marketing copy"
         subtitle="The book's description, back cover, hook, keywords and categories — what Amazon shows a buyer. Written from the manuscript, then reviewed: ask for a change in words, or edit any field yourself."
       >
@@ -1116,16 +1138,18 @@ const inputClass =
   'block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white';
 
 function Section({
+  id,
   title,
   subtitle,
   children,
 }: {
+  id?: string;
   title: string;
   subtitle?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 space-y-4 dark:border-gray-800 dark:bg-gray-900">
+    <div id={id} className="rounded-lg border border-gray-200 bg-white p-4 space-y-4 dark:border-gray-800 dark:bg-gray-900">
       <div>
         <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h2>
         {subtitle ? <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{subtitle}</p> : null}
