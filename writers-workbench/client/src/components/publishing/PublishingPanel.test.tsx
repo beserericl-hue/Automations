@@ -127,3 +127,23 @@ describe('Publish tab — Draft all missing', () => {
     expect(screen.getByTestId('ai-draft-also_by')).toHaveTextContent('Fill from my projects');
   });
 });
+
+describe('Publish tab — the missing-description blocker', () => {
+  it('takes the author to the description box: one button on the blocker opens the editor', async () => {
+    const base = mockFetch.getMockImplementation()!;
+    mockFetch.mockImplementation(async (p, o) => {
+      const path = String(p);
+      if (path === '/api/publishing/project/p1') return { success: true, data: { ...STATE, marketing: {} } } as never;
+      if (path.endsWith('/readiness')) {
+        return { success: true, data: { ready: false, blockers: ['no listing copy — KDP will not accept a book with no description'], gaps: [], volume_count: 1, trim: '6x9' } } as never;
+      }
+      return base(p, o);
+    });
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
+    renderWithProviders(<PublishingPanel projectId="p1" userId="u1" />);
+    expect(screen.queryByTestId('listing-editor')).toBeNull();
+    fireEvent.click(await screen.findByTestId('write-description'));
+    const editor = await screen.findByTestId('listing-editor');
+    expect(within(editor).getByLabelText('Description')).toHaveValue('');
+  });
+});
