@@ -344,6 +344,8 @@ describe('closing scene and recap routes', () => {
       const e = await call(base, 'PUT', '/series/books/1/coda', { text: 'Renata lifted the binder, and the dead were all on the wrong side of the line.' });
       expect(e.data.series.books[0].coda_draft.edited_at).toBeTruthy();
       expect(db.published_content_v2[0].content_text).toBe(CHAPTER); // editing the draft writes nothing to the book
+      // The engine's check of the edited words clears it, as the check job does.
+      Object.assign(outline()._series.codas['1'], { needs_check: false, problems: [] });
       const j = await call(base, 'POST', '/series/books/1/coda/apply');
       expect(j.success).toBe(true);
       expect(db.published_content_v2[0].content_text).toBe(`${CHAPTER}\n\n---\n\nRenata lifted the binder, and the dead were all on the wrong side of the line.\n`);
@@ -487,6 +489,51 @@ describe('the email that follows a change to the book', () => {
       await call(base, 'POST', '/series/books/2/recap/apply');
       expect(sendMail.mock.calls[0][0].subject).toContain('Recap added to Book 2');
       expect(sendMail.mock.calls[0][0].html).toContain('drawn from 3 chapters of the earlier books');
+    });
+  });
+});
+
+
+describe('a closing scene the check still objects to', () => {
+  it('cannot be added while problems stand, and the message says what they are', async () => {
+    seed({ codas: { '1': codaDraft({ problems: ['the original journal is not in a sub-basement'] }) } });
+    await withServer(async (base) => {
+      const j = await call(base, 'POST', '/series/books/1/coda/apply');
+      expect(j.error.code).toBe('UNRESOLVED_PROBLEMS');
+      expect(j.error.message).toContain('sub-basement');
+      expect(db.published_content_v2[0].content_text).toBe(CHAPTER);
+      expect(db.content_versions_v2).toHaveLength(0);
+    });
+  });
+
+  it('marks an edit as unchecked, will not add it until it is checked, and sends the edited words to the check', async () => {
+    seed({ codas: { '1': codaDraft() } });
+    engineJob.mockResolvedValue({ job_id: 'jc', status: 'queued' });
+    await withServer(async (base) => {
+      const e = await call(base, 'PUT', '/series/books/1/coda', { text: 'Renata closed the journal and slid it into her bag, and did not look at the page again.' });
+      expect(e.data.series.books[0].coda_draft.needs_check).toBe(true);
+      expect((await call(base, 'POST', '/series/books/1/coda/apply')).error.code).toBe('UNRESOLVED_PROBLEMS');
+      const c = await call(base, 'POST', '/series/books/1/coda/check');
+      expect(c).toMatchObject({ success: true, jobId: 'jc' });
+      expect(engineJob).toHaveBeenCalledWith('chapter', expect.objectContaining({
+        op: 'check-book-coda', persist: true, async: true, text: 'Renata closed the journal and slid it into her bag, and did not look at the page again.',
+        book: { index: 1, first_chapter: 0, last_chapter: 30 }, next_book: { index: 2, first_chapter: 31, last_chapter: 61 },
+      }));
+    });
+  });
+
+  it('can be added once a check has cleared it', async () => {
+    seed({ codas: { '1': codaDraft({ problems: [], needs_check: false, checked_at: 'x' }) } });
+    await withServer(async (base) => {
+      expect((await call(base, 'POST', '/series/books/1/coda/apply')).success).toBe(true);
+    });
+  });
+
+  it('refuses to check a book with no scene, or one already in the book', async () => {
+    seed({ codas: { '2': codaDraft({ applied_at: 'x' }) } });
+    await withServer(async (base) => {
+      expect((await call(base, 'POST', '/series/books/1/coda/check')).error.code).toBe('NO_DRAFT');
+      expect((await call(base, 'POST', '/series/books/2/coda/check')).error.code).toBe('ALREADY_APPLIED');
     });
   });
 });

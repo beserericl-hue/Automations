@@ -6361,7 +6361,10 @@ async def _op_draft_book_coda(payload: dict) -> dict:
             update={
                 "beat": (
                     f"{plan.beat} The scene ends on this hook, left unresolved: {plan.hook} "
-                    f"Write {BOOK_CODA_MIN_WORDS} to {BOOK_CODA_MAX_WORDS} words.{feedback}"
+                    f"Write {BOOK_CODA_MIN_WORDS} to {BOOK_CODA_MAX_WORDS} words, and aim for the low end. Stay inside "
+                    "this beat: present action and sensation only. No backstory, flashback, memory or reasoning about the "
+                    "past, no one's history or family, and nothing the next book shows later: every such addition "
+                    f"collides with a chapter elsewhere in the book.{feedback}"
                 )
             }
         )
@@ -6416,7 +6419,11 @@ async def _op_draft_book_coda(payload: dict) -> dict:
             continue
         failure = ""
         break
-    if failure:
+    # A scene the check still has problems with, but whose length is right, is kept for the author with the problems
+    # listed: each is usually one sentence, and the author edits it and has it checked again. Nothing else is kept.
+    in_range = BOOK_CODA_MIN_WORDS <= words <= BOOK_CODA_MAX_WORDS
+    unresolved = problems if (failure and in_range and problems) else []
+    if failure and not unresolved:
         return await reject(failure)
     scores = {k: v for k, v in qa.model_dump(mode="json").items() if k in QA_DIMS} if qa else None
     draft = {
@@ -6438,6 +6445,7 @@ async def _op_draft_book_coda(payload: dict) -> dict:
         else None,
         "research_failed": research_failed,
         "existing_inconsistencies": existing,
+        "problems": unresolved,
         "continuity_checked": (
             f"against this book's frame thread, all {len(next_book_all or nframe)} chapters of the next "
             f"book in outline, the first {CONTINUITY_OPENING_CHARS:,} characters of its first "
@@ -6453,6 +6461,104 @@ async def _op_draft_book_coda(payload: dict) -> dict:
     if payload.get("persist"):
         await _store_series_piece(project_id, "codas", book.get("index"), draft)
     return {"ok": True, **draft}
+
+
+async def _update_series_piece(project_id: str, bucket: str, index: Any, patch: dict[str, Any]) -> bool:
+    """Merge `patch` into a stored, not-yet-applied series piece. Read fresh, written back whole."""
+    from datetime import UTC, datetime
+
+    from writer_engine.supabase.client import get_supabase_admin
+
+    client = await get_supabase_admin()
+    r = await client.table("writing_projects_v2").select("outline").eq("id", project_id).limit(1).execute()
+    outline = dict(((getattr(r, "data", None) or [{}])[0]).get("outline") or {})
+    series = dict(outline.get("_series") or {})
+    pieces = dict(series.get(bucket) or {})
+    piece = dict(pieces.get(str(index)) or {})
+    if not piece or piece.get("applied_at"):
+        return False
+    pieces[str(index)] = {**piece, **patch}
+    series[bucket] = pieces
+    outline["_series"] = series
+    await (
+        client.table("writing_projects_v2")
+        .update({"outline": outline, "updated_at": datetime.now(UTC).isoformat()})
+        .eq("id", project_id)
+        .execute()
+    )
+    return True
+
+
+async def _op_check_book_coda(payload: dict) -> dict:
+    """Run the continuity check on a closing scene's text as the author has edited it.
+
+    The same check that judges a drafted scene, on the words as they stand now. The result replaces the stored
+    piece's problems: an empty list lets it be added to the book.
+    """
+    from writer_engine.config import get_settings
+
+    project_id = str(payload.get("project_id") or "")
+    book = payload.get("book") if isinstance(payload.get("book"), dict) else None
+    text = str(payload.get("text") or "").strip()
+    if not project_id or not book or not text:
+        return {"ok": False, "reason": "project_id, book and text required"}
+    rows = await _project_chapter_rows(project_id)
+    brows = _rows_of_book(rows, book)
+    if not brows:
+        return {"ok": False, "reason": "no chapters in that book"}
+    nxt = payload.get("next_book") if isinstance(payload.get("next_book"), dict) else None
+    nrows = _rows_of_book(rows, nxt) if nxt else []
+    ctx = await _load_context(project_id, {})
+    outline = ctx.get("outline") or {}
+    act = _frame_act(outline)
+    frame = _frame_rows(outline, brows, act)
+    anchor = frame[-1] if frame else brows[-1]
+    tail = " ".join(str(anchor.get("content_text") or "").split()[-BOOK_CODA_TAIL_WORDS:])
+    nframe_text = _frame_rows(outline, nrows, act)
+    nframe = nframe_text or _outline_range_rows(outline, nxt, act)
+    next_book_all = _outline_range_rows(outline, nxt)
+    opening_rows: list[dict] = []
+    for r in [*nrows[:1], *nframe_text[:2]]:
+        if r not in opening_rows:
+            opening_rows.append(r)
+    next_opening = str(nrows[0].get("content_text") or "")[:BOOK_ENDING_NEXT_OPENING_CHARS] if nrows else ""
+    corpus = "\n".join(str(x.get("content_text") or "") for x in rows)
+    try:
+        problems, existing = await _coda_continuity(
+            get_router(service=STEP_NAME),
+            get_settings().model_default,
+            text=text,
+            outline=outline,
+            frame=frame,
+            next_book=next_book_all or nframe,
+            opening_rows=opening_rows,
+            tail=tail,
+            roster_text=_roster_text(ctx.get("roster") or []),
+            unknown_terms=_new_names(text, corpus + "\n" + next_opening),
+            canon=await _canon_grounding(ctx, text[:1800], user_id=payload.get("user_id")),
+        )
+    except ProviderNotRegistered:
+        return {"ok": False, "reason": "no provider"}
+    except Exception as exc:  # noqa: BLE001 - the author is told why, not left with a silent job
+        logger.warning("series.coda.check_failed", error=str(exc)[:200])
+        return {"ok": False, "reason": f"the check failed ({type(exc).__name__}): {str(exc)[:120]}"}
+    result = {
+        "ok": True,
+        "problems": problems,
+        "existing_inconsistencies": existing,
+        "new_names": _new_names(text, corpus + "\n" + next_opening),
+        "words": len(text.split()),
+    }
+    if payload.get("persist"):
+        from datetime import UTC, datetime
+
+        await _update_series_piece(
+            project_id,
+            "codas",
+            book.get("index"),
+            {**result, "ok": None, "needs_check": False, "checked_at": datetime.now(UTC).isoformat()},
+        )
+    return result
 
 
 async def _op_draft_book_recap(payload: dict) -> dict:
@@ -6610,6 +6716,7 @@ OPS = {
     "series-description": _op_series_description,
     "draft-book-ending": _op_draft_book_ending,
     "draft-book-coda": _op_draft_book_coda,
+    "check-book-coda": _op_check_book_coda,
     "draft-book-recap": _op_draft_book_recap,
     "author-bio": _op_author_bio,
     "rewrite": _op_rewrite,

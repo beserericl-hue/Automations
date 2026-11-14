@@ -849,13 +849,13 @@ class TestContinuityAgainstTheBooksAround:
         # The check reads the scene against the next book's opening, not just the cast and the arc.
         assert "Susquehannock" in prompts[1] and CODA_TEXT[:40] in prompts[1]
 
-    def test_a_scene_that_keeps_contradicting_is_refused_with_the_problems(
+    def test_a_scene_that_keeps_contradicting_is_kept_for_the_author_with_the_problems(
         self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
     ) -> None:
         bad = ContinuityFindings(problems=["invents a provenance card that appears nowhere in the book"])
         answer(monkeypatch, PLAN, bad, bad, bad)
         out = asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
-        assert out["ok"] is False and "provenance card" in out["reason"]
+        assert out["ok"] is True and any("provenance card" in p for p in out["problems"])
 
     def test_the_planner_is_told_to_invent_no_plot(
         self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
@@ -1025,3 +1025,100 @@ class TestPreEmption:
         )
         out = asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
         assert out["ok"] is True and "pre-empts chapter 85" in beats[1]
+
+
+class TestTheWriterStaysInsideTheBeat:
+    def test_the_writer_is_told_no_backstory_or_history_because_it_collides_with_other_chapters(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Real runs padded scenes with Winifred's marriage and with the 1996 and 2004 hearings, which later chapters show.
+        answer(monkeypatch, PLAN, CLEAN)
+        asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        beat = pipeline["write_brief"].beat
+        assert "Stay inside this beat" in beat and "No backstory, flashback, memory" in beat
+        assert "aim for the low end" in beat
+
+
+class TestANearMissIsKeptForTheAuthor:
+    def test_a_scene_the_check_still_objects_to_is_kept_with_its_problems_not_thrown_away(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        stored: list[tuple[str, Any, dict[str, Any]]] = []
+
+        async def keep(_pid: str, bucket: str, index: Any, draft: dict[str, Any]) -> bool:
+            stored.append((bucket, index, draft))
+            return True
+
+        monkeypatch.setattr(M, "_store_series_piece", keep)
+        bad = ContinuityFindings(
+            problems=["the original journal is not in a sub-basement; chapter 30 has it on a desk"]
+        )
+        answer(monkeypatch, PLAN, bad, bad, bad)
+        out = asyncio.run(
+            M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2, "persist": True})
+        )
+        assert out["ok"] is True and out["problems"] == [
+            "the original journal is not in a sub-basement; chapter 30 has it on a desk"
+        ]
+        assert out["text"] and stored[0][2]["problems"] == out["problems"]
+
+    def test_a_scene_of_the_wrong_length_is_still_refused_outright(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        pipeline["text"] = "Too short."
+        answer(monkeypatch, PLAN)
+        out = asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert out["ok"] is False
+
+
+class TestCheckingTheAuthorsEdit:
+    def test_the_check_runs_on_the_text_as_edited_and_clears_the_problems_when_there_are_none(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        patches: list[dict[str, Any]] = []
+
+        async def update(_pid: str, bucket: str, index: Any, patch: dict[str, Any]) -> bool:
+            assert (bucket, index) == ("codas", 1)
+            patches.append(patch)
+            return True
+
+        monkeypatch.setattr(M, "_update_series_piece", update)
+        prompts = answer(monkeypatch, CLEAN)
+        out = asyncio.run(
+            M._op_check_book_coda(
+                {
+                    "project_id": PROJECT,
+                    "book": BOOK1,
+                    "next_book": BOOK2,
+                    "text": "The author's own edited scene.",
+                    "persist": True,
+                }
+            )
+        )
+        assert out["ok"] is True and out["problems"] == []
+        assert "The author's own edited scene." in prompts[0]
+        assert (
+            patches[0]["needs_check"] is False and patches[0]["problems"] == [] and patches[0]["checked_at"]
+        )
+
+    def test_a_problem_found_in_an_edit_is_reported_and_kept(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        patches: list[dict[str, Any]] = []
+
+        async def update(_pid: str, _bucket: str, _index: Any, patch: dict[str, Any]) -> bool:
+            patches.append(patch)
+            return True
+
+        monkeypatch.setattr(M, "_update_series_piece", update)
+        answer(monkeypatch, ContinuityFindings(problems=["still names a page"]))
+        out = asyncio.run(
+            M._op_check_book_coda(
+                {"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2, "text": "Edited.", "persist": True}
+            )
+        )
+        assert out["problems"] == ["still names a page"] and patches[0]["problems"] == ["still names a page"]
+
+    def test_the_check_needs_a_text(self, pipeline: dict[str, Any]) -> None:
+        out = asyncio.run(M._op_check_book_coda({"project_id": PROJECT, "book": BOOK1, "text": ""}))
+        assert out["ok"] is False
