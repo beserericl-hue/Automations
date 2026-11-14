@@ -187,3 +187,69 @@ describe('SeriesPanel — the series description has the copy assistant', () => 
     await waitFor(() => expect(bodyOf('/series')).toEqual({ description: { text: 'Three books, one box.', tagline: '' } }));
   });
 });
+
+
+describe('closing scene and recap', () => {
+  const CODA = {
+    chapter_number: 30, chapter_title: 'Winifred', text: 'Renata lifted the binder and read the plot twice.', words: 9, new_names: ['Esteban'],
+    hook: 'Someone will lift the binder who is not her.', resolved: 'The secret is no longer Marcus’s alone.', carried: 'What Renata will do.',
+    research_topics: ['discovery notice'], drift: { findings: [] }, qa: { story_turn_density: 0.71, character_consistency: 0.95 },
+    drafted_at: '2026-11-14T12:00:00Z',
+  };
+  const WITH_CODA: SeriesView = { ...SERIES, books: [{ ...SERIES.books[0], coda_draft: CODA }, SERIES.books[1]] };
+
+  it('starts the engine job for a closing scene with the author’s direction, and offers a recap only for a later book', async () => {
+    mockFetch.mockImplementation(async () => ({ success: true, jobId: 'j1' }) as never);
+    render();
+    expect(screen.getByTestId('coda-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('recap-1')).toBeNull(); // the first book has nothing to recap
+    expect(screen.queryByTestId('coda-2')).toBeNull(); // the last book needs no cliffhanger
+    expect(screen.getByTestId('recap-2')).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId('coda-1-direction'), { target: { value: 'End on the survey plot.' } });
+    fireEvent.click(screen.getByTestId('coda-1-draft'));
+    await waitFor(() => expect(bodyOf('/books/1/coda', 'POST')).toEqual({ direction: 'End on the survey plot.' }));
+  });
+
+  it('shows what the engine checked, lets the author edit the words, and adds it to the book only on request', async () => {
+    mockFetch.mockImplementation(async (p, o) => {
+      const path = String(p);
+      const method = (o as { method?: string } | undefined)?.method;
+      if (path.endsWith('/coda') && method === 'PUT') return { success: true, data: { series: WITH_CODA } } as never;
+      if (path.endsWith('/coda/apply')) return { success: true, data: { series: WITH_CODA } } as never;
+      return { success: true, data: { series: SERIES } } as never;
+    });
+    render(WITH_CODA);
+    expect(screen.getByText(/Ends on: Someone will lift the binder/)).toBeInTheDocument();
+    expect(screen.getByText(/Researched: discovery notice/)).toBeInTheDocument();
+    expect(screen.getByText(/Drift check: no drift found/)).toBeInTheDocument();
+    expect(screen.getByText(/Esteban/)).toBeInTheDocument();
+    // Nothing is added by drafting; the author's edits must be saved before it can be added.
+    const box = screen.getByTestId('coda-1-text');
+    fireEvent.change(box, { target: { value: 'Renata lifted the binder. The dead were all on the wrong side of the line.' } });
+    expect(screen.getByTestId('coda-1-apply')).toBeDisabled();
+    fireEvent.click(screen.getByTestId('coda-1-save'));
+    await waitFor(() =>
+      expect(bodyOf('/books/1/coda')).toEqual({ text: 'Renata lifted the binder. The dead were all on the wrong side of the line.' }),
+    );
+    fireEvent.change(box, { target: { value: CODA.text } });
+    fireEvent.click(screen.getByTestId('coda-1-apply'));
+    await waitFor(() => expect(mockFetch.mock.calls.some(([p]) => String(p).endsWith('/books/1/coda/apply'))).toBe(true));
+  });
+
+  it('shows a closing scene already in the book as read-only', () => {
+    render({ ...WITH_CODA, books: [{ ...WITH_CODA.books[0], coda_draft: { ...CODA, applied_at: '2026-11-14T13:00:00Z' } }, SERIES.books[1]] });
+    expect(screen.getByText(/In the book since/)).toBeInTheDocument();
+    expect(screen.getByTestId('coda-1-text')).toHaveAttribute('readonly');
+    expect(screen.queryByTestId('coda-1-apply')).toBeNull();
+  });
+
+  it('says why the engine could not make one, and offers to try again or clear the message', async () => {
+    mockFetch.mockImplementation(async () => ({ success: true, jobId: 'j9' }) as never);
+    render({ ...SERIES, books: [{ ...SERIES.books[0], coda_draft: { ...CODA, text: '', failed: 'the scene came back 1700 words twice', words: 0 } }, SERIES.books[1]] });
+    expect(screen.getByTestId('coda-1-failed')).toHaveTextContent('the scene came back 1700 words twice');
+    expect(screen.queryByTestId('coda-1-apply')).toBeNull();
+    expect(screen.getByTestId('coda-1-clear')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('coda-1-draft'));
+    await waitFor(() => expect(mockFetch.mock.calls.some(([p]) => String(p).endsWith('/books/1/coda'))).toBe(true));
+  });
+});

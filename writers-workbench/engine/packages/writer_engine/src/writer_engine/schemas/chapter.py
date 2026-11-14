@@ -639,3 +639,48 @@ class BookEndingDraft(BaseModel):
     new_ending: str = ""
     resolved: str = ""
     carried: str = ""
+
+
+class CodaPlan(BaseModel):
+    """The plan for one closing scene added after a book's last chapter, before any prose is written.
+
+    It is the chapter outline for the scene (the same fields a sub-chapter brief carries), the hook it
+    ends on, what it settles and hands on, and the real-world details it needs checked first.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    title: str = ""
+    beat: str = ""
+    pov_character: str = ""
+    characters: list[str] = Field(default_factory=list)
+    setting: str = ""
+    emotional_tone: str = ""
+    story_turn: str = ""
+    arc_beat: str = ""
+    connects_to_book_arc: str = ""
+    # The last beat of the scene: what the reader is left wanting the next book to answer.
+    hook: str = ""
+    resolved: str = ""
+    carried: str = ""
+    # One sentence for the chapter outline's beat, and one for the next book's opening chapter's bridge.
+    outline_beat: str = ""
+    next_bridge: str = ""
+    # Concrete real-world or in-book facts the scene depends on, to check before it is written.
+    research_questions: list[str] = Field(default_factory=list)
+
+
+class RecapDraft(BaseModel):
+    """A spoken "previously" recap for the front of a book in a series."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    text: str = ""
+
+
+class UnsupportedClaims(BaseModel):
+    """Claims in a recap that the source material does not support."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    claims: list[str] = Field(default_factory=list)

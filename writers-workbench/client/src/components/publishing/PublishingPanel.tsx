@@ -627,6 +627,7 @@ export default function PublishingPanel({ projectId, userId }: { projectId: stri
       {/* 2. Series */}
       <SeriesPanel
         projectId={projectId}
+        userId={userId}
         series={data.series}
         planned={Boolean(plan)}
         planning={planning || planVolumes.isPending}

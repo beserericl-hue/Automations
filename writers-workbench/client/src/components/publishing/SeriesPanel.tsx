@@ -12,6 +12,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, ApiError, type ApiEnvelope } from '../../lib/api';
 import { useToast } from '../../contexts/ToastContext';
 import AiField, { useFieldHistory, useSavedCopy } from './AiField';
+import SeriesPiece, { type PieceDraft } from './SeriesPiece';
+import { useEngineJobQueue } from '../../hooks/useEngineJobQueue';
 
 export interface EndingDraft {
   chapter_number: number;
@@ -43,6 +45,8 @@ export interface SeriesBook {
   title_stale: boolean;
   suggestions: { title: string; phrase: string; why: string }[];
   ending_draft: EndingDraft | null;
+  coda_draft?: PieceDraft | null;
+  recap_draft?: PieceDraft | null;
 }
 
 export interface SeriesView {
@@ -55,6 +59,7 @@ export interface SeriesView {
 
 interface Props {
   projectId: string;
+  userId?: string;
   series: SeriesView | undefined;
   planned: boolean;
   planning: boolean;
@@ -79,6 +84,7 @@ function messageOf(err: unknown): string {
 
 export default function SeriesPanel({
   projectId,
+  userId,
   series,
   planned,
   planning,
@@ -91,6 +97,7 @@ export default function SeriesPanel({
 }: Props) {
   const queryClient = useQueryClient();
   const { addToast } = useToast();
+  const { trackJob, stateOf } = useEngineJobQueue(userId);
   const base = `/api/publishing/project/${projectId}/series`;
   const [name, setName] = useState('');
   const [titles, setTitles] = useState<Record<string, string>>({});
@@ -420,6 +427,35 @@ export default function SeriesPanel({
                       )}
                     </div>
                   )}
+
+                  {!last ? (
+                    <SeriesPiece
+                      kind="coda"
+                      book={b.index}
+                      base={base}
+                      draft={b.coda_draft ?? null}
+                      working={stateOf(`${projectId}:coda:${b.index}`) === 'queued'}
+                      onStarted={(jobId) => trackJob(`${projectId}:coda:${b.index}`, jobId, [stateKey])}
+                      onChanged={(s, note) => {
+                        refresh(s);
+                        if (note) addToast(note, 'success');
+                      }}
+                    />
+                  ) : null}
+                  {b.index > 1 ? (
+                    <SeriesPiece
+                      kind="recap"
+                      book={b.index}
+                      base={base}
+                      draft={b.recap_draft ?? null}
+                      working={stateOf(`${projectId}:recap:${b.index}`) === 'queued'}
+                      onStarted={(jobId) => trackJob(`${projectId}:recap:${b.index}`, jobId, [stateKey])}
+                      onChanged={(s, note) => {
+                        refresh(s);
+                        if (note) addToast(note, 'success');
+                      }}
+                    />
+                  ) : null}
                 </li>
               );
             })}

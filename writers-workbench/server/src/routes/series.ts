@@ -7,6 +7,11 @@
  *   POST /api/publishing/project/:projectId/series/books/:index/ending     draft a revised close
  *   POST /api/publishing/project/:projectId/series/books/:index/ending/apply
  *   DELETE /api/publishing/project/:projectId/series/books/:index/ending   discard the draft
+ *   POST /api/publishing/project/:projectId/series/books/:index/coda       draft a closing scene (engine job)
+ *   PUT  .../series/books/:index/coda          edit the draft's words
+ *   POST .../series/books/:index/coda/apply    add it after the book's last chapter, and update the outline
+ *   DELETE .../series/books/:index/coda        discard it
+ *   POST/PUT/POST apply/DELETE .../series/books/:index/recap   the same for a recap at the front of a book
  *
  * The engine writes the suggestions; it never chooses. A title, a pitch and an ending all reach the
  * book only when the author picks them, and a changed chapter is snapshotted first.
@@ -17,16 +22,23 @@ import { z } from 'zod';
 import { validateBody } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
-import { callEngineWriteToolSync } from '../lib/engine-hub.js';
+import { callEngineWriteTool, callEngineWriteToolSync } from '../lib/engine-hub.js';
 import { logger } from '../lib/logger.js';
 import { loadProject, marketingKey, saveOutline } from './publishing.js';
 import {
+  chapterWithCoda,
+  chapterWithRecap,
+  outlineWithCoda,
+  outlineWithRecap,
   plannedBooks,
   seriesName,
   seriesView,
   storedSeries,
+  textHash,
   withSeries,
+  type CodaDraft,
   type EndingDraft,
+  type RecapPiece,
   type TitleSuggestion,
 } from '../lib/series.js';
 
@@ -272,3 +284,227 @@ seriesRouter.delete('/project/:projectId/series/books/:index/ending', async (req
     next(err);
   }
 });
+
+
+// ---------------------------------------------------------------------------------------------
+// Closing scenes and recaps
+//
+// The engine writes them through the chapter pipeline (a planned chapter-outline entry, research, the
+// book's craft, arc and cast, a drift check against the scene's own beat, a QA score) and keeps the draft on
+// the project. Nothing reaches the book until the author applies it, after reading it and editing it. Applying
+// snapshots the chapter and the outline first, adds the piece, and brings the outline into line with the book.
+// ---------------------------------------------------------------------------------------------
+
+const DirectionBody = z.object({ direction: z.string().trim().max(1200).optional() });
+const PieceTextBody = z.object({ text: z.string().trim().min(40).max(30000) });
+
+function wordCount(text: string): number {
+  return text.split(/\s+/).filter(Boolean).length;
+}
+
+const range = (b: { index: number; first_chapter: number; last_chapter: number }) => ({
+  index: b.index,
+  first_chapter: b.first_chapter,
+  last_chapter: b.last_chapter,
+});
+
+seriesRouter.post('/project/:projectId/series/books/:index/coda', validateBody(DirectionBody), async (req, res) => {
+  const project = await loadProject(req, res);
+  if (!project) return;
+  const outline: Outline = { ...(project.outline ?? {}) };
+  const books = plannedBooks(outline);
+  const index = bookIndex(req);
+  const book = books.find((b) => b.index === index);
+  if (!book) return fail(res, 404, 'NO_SUCH_BOOK', 'That book is not in the current plan.');
+  const next = books.find((b) => b.index === index + 1);
+  if (storedSeries(outline).codas?.[String(index)]?.applied_at) {
+    return fail(res, 409, 'ALREADY_APPLIED', 'That closing scene is already in the book. Edit the chapter to change it.');
+  }
+  try {
+    const job = await callEngineWriteTool('chapter', {
+      op: 'draft-book-coda',
+      project_id: project.id,
+      user_id: req.userId!,
+      book: range(book),
+      next_book: next ? range(next) : null,
+      direction: (req.body as { direction?: string }).direction ?? '',
+      resolves: book.ending_resolves ?? '',
+      carries: book.ending_carries ?? '',
+      persist: true,
+      async: true,
+    });
+    logger.info({ projectId: project.id, index, jobId: job.job_id }, 'series: closing scene queued');
+    res.status(202).json({ success: true, jobId: job.job_id, engineJob: true, status: job.status ?? 'queued' });
+  } catch (err) {
+    logger.error({ err, projectId: project.id, index }, 'series: closing scene failed to start');
+    fail(res, 502, 'ENGINE', err instanceof Error ? err.message : 'Engine error');
+  }
+});
+
+seriesRouter.post('/project/:projectId/series/books/:index/recap', async (req, res) => {
+  const project = await loadProject(req, res);
+  if (!project) return;
+  const outline: Outline = { ...(project.outline ?? {}) };
+  const books = plannedBooks(outline);
+  const index = bookIndex(req);
+  const book = books.find((b) => b.index === index);
+  if (!book) return fail(res, 404, 'NO_SUCH_BOOK', 'That book is not in the current plan.');
+  const previous = books.filter((b) => b.index < index);
+  if (!previous.length) return fail(res, 422, 'FIRST_BOOK', 'The first book has no earlier book to recap.');
+  if (storedSeries(outline).recaps?.[String(index)]?.applied_at) {
+    return fail(res, 409, 'ALREADY_APPLIED', 'That recap is already in the book. Edit the chapter to change it.');
+  }
+  try {
+    const job = await callEngineWriteTool('chapter', {
+      op: 'draft-book-recap',
+      project_id: project.id,
+      user_id: req.userId!,
+      book: range(book),
+      previous_books: previous.map(range),
+      series_name: seriesName(outline, project.title),
+      persist: true,
+      async: true,
+    });
+    logger.info({ projectId: project.id, index, jobId: job.job_id }, 'series: recap queued');
+    res.status(202).json({ success: true, jobId: job.job_id, engineJob: true, status: job.status ?? 'queued' });
+  } catch (err) {
+    logger.error({ err, projectId: project.id, index }, 'series: recap failed to start');
+    fail(res, 502, 'ENGINE', err instanceof Error ? err.message : 'Engine error');
+  }
+});
+
+type PieceKind = 'coda' | 'recap';
+const BUCKET: Record<PieceKind, 'codas' | 'recaps'> = { coda: 'codas', recap: 'recaps' };
+
+for (const kind of ['coda', 'recap'] as PieceKind[]) {
+  const bucket = BUCKET[kind];
+  const noun = kind === 'coda' ? 'closing scene' : 'recap';
+
+  // The author's own words win: the draft's text is replaced, and nothing else about it.
+  seriesRouter.put(`/project/:projectId/series/books/:index/${kind}`, validateBody(PieceTextBody), async (req, res, next) => {
+    try {
+      const project = await loadProject(req, res);
+      if (!project) return;
+      const outline: Outline = { ...(project.outline ?? {}) };
+      const index = bookIndex(req);
+      const piece = storedSeries(outline)[bucket]?.[String(index)] as CodaDraft | RecapPiece | undefined;
+      if (!piece || piece.failed) return fail(res, 404, 'NO_DRAFT', `There is no drafted ${noun} for that book.`);
+      if (piece.applied_at) return fail(res, 409, 'ALREADY_APPLIED', `That ${noun} is already in the book; edit the chapter.`);
+      const text = (req.body as { text: string }).text;
+      const next_ = withSeries(outline, (s) => ({
+        ...s,
+        [bucket]: { ...(s[bucket] ?? {}), [String(index)]: { ...piece, text, words: wordCount(text), edited_at: new Date().toISOString() } },
+      }));
+      await saveOutline(project.id, req.userId!, next_);
+      res.json({ success: true, data: { series: seriesView(next_, project.title) } });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  seriesRouter.delete(`/project/:projectId/series/books/:index/${kind}`, async (req, res, next) => {
+    try {
+      const project = await loadProject(req, res);
+      if (!project) return;
+      const outline: Outline = { ...(project.outline ?? {}) };
+      const key = String(bookIndex(req));
+      const next_ = withSeries(outline, (s) => {
+        const pieces = { ...(s[bucket] ?? {}) };
+        delete pieces[key];
+        return { ...s, [bucket]: pieces };
+      });
+      await saveOutline(project.id, req.userId!, next_);
+      res.json({ success: true, data: { series: seriesView(next_, project.title) } });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  seriesRouter.post(`/project/:projectId/series/books/:index/${kind}/apply`, async (req, res, next) => {
+    try {
+      const project = await loadProject(req, res);
+      if (!project) return;
+      const outline: Outline = { ...(project.outline ?? {}) };
+      const index = bookIndex(req);
+      const piece = storedSeries(outline)[bucket]?.[String(index)] as CodaDraft | RecapPiece | undefined;
+      if (!piece || piece.failed) return fail(res, 404, 'NO_DRAFT', `There is no drafted ${noun} for that book.`);
+      if (piece.applied_at) return fail(res, 409, 'ALREADY_APPLIED', `That ${noun} is already in the book.`);
+      // A private copy of the outline as it stands: the snapshot and any rollback must not depend on an object
+      // that something later in this request might change.
+      const originalOutline: Outline = JSON.parse(JSON.stringify(project.outline ?? {}));
+      const supabase = getSupabaseAdmin();
+      const { data: chapter } = await supabase
+        .from('published_content_v2')
+        .select('id, content_text')
+        .eq('id', piece.content_id)
+        .eq('user_id', req.userId!)
+        .maybeSingle();
+      const text = String(chapter?.content_text ?? '');
+      // Written for the chapter as it was. If it has been edited since, the piece may no longer fit it.
+      if (!chapter || textHash(text) !== piece.base_hash) {
+        return fail(res, 409, 'CHAPTER_CHANGED', `The chapter has changed since this ${noun} was drafted. Draft it again.`);
+      }
+      const { data: last } = await supabase
+        .from('content_versions_v2')
+        .select('version_number')
+        .eq('content_id', piece.content_id)
+        .order('version_number', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const { error: chapterSnapError } = await supabase.from('content_versions_v2').insert({
+        content_id: piece.content_id,
+        user_id: req.userId!,
+        version_number: ((last?.version_number as number | undefined) ?? 0) + 1,
+        content_text: text,
+        changed_by: kind === 'coda' ? 'series_coda' : 'series_recap',
+        change_note: `Before adding the ${noun} for book ${index}`,
+      });
+      // No snapshot, no change: the message promises the earlier text can be taken back.
+      if (chapterSnapError) throw new Error(`could not save the chapter's earlier text: ${chapterSnapError.message}`);
+      // The outline too: a prior copy is kept so the change can be taken back, then it is brought into line.
+      const { data: lastOutline } = await supabase
+        .from('outline_versions_v2')
+        .select('version_number')
+        .eq('project_id', project.id)
+        .order('version_number', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const { error: outlineSnapError } = await supabase.from('outline_versions_v2').insert({
+        user_id: req.userId!,
+        project_id: project.id,
+        version_number: ((lastOutline?.version_number as number | undefined) ?? 0) + 1,
+        outline: originalOutline,
+        revision_note: `Before adding the ${noun} for book ${index}`,
+      });
+      if (outlineSnapError) throw new Error(`could not save the outline's earlier version: ${outlineSnapError.message}`);
+      const updated =
+        kind === 'coda'
+          ? chapterWithCoda(text, piece.text)
+          : chapterWithRecap(text, seriesName(outline, project.title), piece.text);
+      const withText = kind === 'coda' ? outlineWithCoda(outline, piece as CodaDraft) : outlineWithRecap(outline, piece.chapter_number);
+      const next_ = withSeries(withText, (s) => ({
+        ...s,
+        [bucket]: { ...(s[bucket] ?? {}), [String(index)]: { ...piece, applied_at: new Date().toISOString() } },
+      }));
+      // The outline first: saving it checks the new outline against its schema and throws before anything has
+      // changed. The chapter is written last, and if that fails the outline is put back, so the two never
+      // disagree about what the book holds.
+      await saveOutline(project.id, req.userId!, next_);
+      const { error } = await supabase
+        .from('published_content_v2')
+        .update({ content_text: updated, updated_at: new Date().toISOString() })
+        .eq('id', piece.content_id)
+        .eq('user_id', req.userId!);
+      if (error) {
+        await saveOutline(project.id, req.userId!, originalOutline).catch((e) =>
+          logger.error({ err: e, projectId: project.id }, 'series: outline could not be put back after a failed apply'),
+        );
+        throw new Error(error.message);
+      }
+      logger.info({ userId: req.userId, projectId: project.id, index, kind, contentId: piece.content_id }, 'series: piece applied');
+      res.json({ success: true, data: { series: seriesView(next_, project.title) } });
+    } catch (err) {
+      next(err);
+    }
+  });
+}

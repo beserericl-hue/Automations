@@ -10,6 +10,8 @@
  * chapter moved would be wrong, and so would keeping it without saying so.
  */
 
+import { createHash } from 'node:crypto';
+
 export interface SeriesBookTitle {
   title: string;
   first_chapter: number;
@@ -40,6 +42,56 @@ export interface EndingDraft {
   applied_at?: string;
 }
 
+/**
+ * A closing scene drafted for the end of one book. The engine plans it as a chapter-outline entry, researches
+ * it, writes it from the book's craft, arc and cast, and checks it for drift; it waits here until the author has
+ * read it, edited it and applied it.
+ */
+export interface CodaDraft {
+  content_id: string;
+  /** Hash of the chapter's text when the scene was written for it: apply refuses if the chapter has moved on. */
+  base_hash: string;
+  chapter_number: number;
+  chapter_title: string;
+  next_chapter_number: number | null;
+  text: string;
+  words: number;
+  /** The chapter-outline entry for the scene (a sub-chapter brief). */
+  brief: Record<string, unknown>;
+  hook: string;
+  resolved: string;
+  carried: string;
+  outline_beat: string;
+  next_bridge: string;
+  research_topics: string[];
+  research: string;
+  drift: unknown;
+  qa: Record<string, number> | null;
+  new_names: string[];
+  direction: string;
+  drafted_at: string;
+  edited_at?: string;
+  applied_at?: string;
+  /** Why the engine could not make one. Kept so the author reads it, instead of a job that just ends. */
+  failed?: string;
+}
+
+/** A "previously" recap drafted for the front of a book, from the earlier books only. */
+export interface RecapPiece {
+  content_id: string;
+  base_hash: string;
+  chapter_number: number;
+  chapter_title: string;
+  text: string;
+  words: number;
+  sources: number;
+  new_names: string[];
+  drafted_at: string;
+  edited_at?: string;
+  applied_at?: string;
+  failed?: string;
+}
+
 export interface StoredSeries {
   name?: string;
   description?: { text: string; tagline: string; source: 'generated' | 'edited'; updated_at: string };
@@ -47,6 +99,8 @@ export interface StoredSeries {
   suggestions?: Record<string, TitleSuggestion[]>;
   suggested_at?: string;
   endings?: Record<string, EndingDraft>;
+  codas?: Record<string, CodaDraft>;
+  recaps?: Record<string, RecapPiece>;
 }
 
 export interface PlannedBook {
@@ -101,6 +155,8 @@ export function seriesView(outline: Outline | null, projectTitle: string) {
       title_stale: Boolean(chosen && (chosen.first_chapter !== b.first_chapter || chosen.last_chapter !== b.last_chapter)),
       suggestions: s.suggestions?.[String(b.index)] ?? [],
       ending_draft: s.endings?.[String(b.index)] ?? null,
+      coda_draft: s.codas?.[String(b.index)] ?? null,
+      recap_draft: s.recaps?.[String(b.index)] ?? null,
     };
   });
   return {
@@ -114,4 +170,75 @@ export function seriesView(outline: Outline | null, projectTitle: string) {
 
 export function withSeries(outline: Outline, patch: (s: StoredSeries) => StoredSeries): Outline {
   return { ...outline, _series: patch({ ...storedSeries(outline) }) };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Closing scenes and recaps: how they sit in the book and in its outline
+// ---------------------------------------------------------------------------------------------
+
+export const SCENE_BREAK = '\n\n---\n\n';
+
+/** The fingerprint of a chapter's text, for "has this chapter changed since the piece was written for it". */
+export function textHash(text: string): string {
+  return createHash('sha256').update(text, 'utf8').digest('hex');
+}
+
+/** The chapter with the closing scene after it, set off by the book's own scene break. */
+export function chapterWithCoda(chapterText: string, coda: string): string {
+  return `${chapterText.trimEnd()}${SCENE_BREAK}${coda.trim()}\n`;
+}
+
+export function recapHeading(seriesTitle: string): string {
+  return `**Previously, in ${seriesTitle}**`;
+}
+
+/** The chapter with the recap before it. */
+export function chapterWithRecap(chapterText: string, seriesTitle: string, recap: string): string {
+  return `${recapHeading(seriesTitle)}\n\n${recap.trim()}${SCENE_BREAK}${chapterText.trimStart()}`;
+}
+
+type Chapter = Record<string, unknown>;
+
+function mapChapter(outline: Outline, chapterNumber: unknown, edit: (c: Chapter) => Chapter): Outline {
+  const chapters = (outline.chapters as Chapter[] | undefined) ?? [];
+  return {
+    ...outline,
+    chapters: chapters.map((c) => (String(c?.chapter_number) === String(chapterNumber) ? edit({ ...c }) : c)),
+  };
+}
+
+/**
+ * The outline after a closing scene is applied, so the outline says what the book now contains: the chapter's
+ * beat names the scene, its chapter outline gains the scene as its last sub-chapter (only when the chapter
+ * already has one: a chapter rewritten from a list holding only the scene would lose the rest), and the next
+ * book's first chapter records how it picks up from it.
+ */
+export function outlineWithCoda(outline: Outline, d: CodaDraft): Outline {
+  let next = mapChapter(outline, d.chapter_number, (c) => {
+    const beat = String(c.beat ?? '').trim();
+    if (d.outline_beat && !beat.includes(d.outline_beat)) c.beat = `${beat} ${d.outline_beat}`.trim();
+    const co = c.chapter_outline as { sub_chapters?: unknown[] } | null | undefined;
+    if (co && Array.isArray(co.sub_chapters) && co.sub_chapters.length) {
+      c.chapter_outline = { ...co, sub_chapters: [...co.sub_chapters, { ...d.brief, number: co.sub_chapters.length + 1 }] };
+    }
+    return c;
+  });
+  if (d.next_chapter_number != null && d.next_bridge) {
+    next = mapChapter(next, d.next_chapter_number, (c) => {
+      const bridge = String(c.bridge_from_prior ?? '').trim();
+      if (!bridge.includes(d.next_bridge)) c.bridge_from_prior = `${bridge} After the closing scene of the previous book: ${d.next_bridge}`.trim();
+      return c;
+    });
+  }
+  return next;
+}
+
+/** The outline after a recap is applied: the chapter it opens records that it begins with one. */
+export function outlineWithRecap(outline: Outline, chapterNumber: number): Outline {
+  const note = 'Opens with a spoken recap of the previous book.';
+  return mapChapter(outline, chapterNumber, (c) => {
+    const bridge = String(c.bridge_from_prior ?? '').trim();
+    if (!bridge.includes(note)) c.bridge_from_prior = `${bridge} ${note}`.trim();
+    return c;
+  });
 }
