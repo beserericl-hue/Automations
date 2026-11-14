@@ -135,6 +135,10 @@ def _series_piece_email(op: str, body: dict, result: dict) -> tuple[str, str]:
         ("Carries forward", result.get("carried")),
         ("Researched", ", ".join(map(str, result.get("research_topics") or [])) or None),
         (
+            "Already in your book, not caused by this scene",
+            "; ".join(result.get("existing_inconsistencies") or []) or None,
+        ),
+        (
             "Drift check",
             (f"{findings} finding(s) corrected or noted" if findings else "no drift found")
             if op == "draft-book-coda"

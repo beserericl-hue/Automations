@@ -5985,6 +5985,8 @@ BOOK_RECAP_MIN_WORDS = 150
 BOOK_RECAP_MAX_WORDS = 380
 RECAP_BEAT_CHARS = 520
 CODA_VIRTUAL_CHAPTER = 9999
+CONTINUITY_OPENING_CHARS = 14000
+"""How much of each of the next book's first chapters the continuity check reads: enough to reach a fact well into it."""
 """A chapter number no book has, so the closing scene is checked against its own beat as a chapter is."""
 
 
@@ -6087,40 +6089,61 @@ async def _coda_continuity(
     text: str,
     outline: dict[str, Any],
     frame: list[dict],
-    nframe: list[dict],
+    next_book: list[dict],
     opening_rows: list[dict],
     tail: str,
     roster_text: str,
-) -> list[str]:
-    """What a drafted closing scene contradicts or invents, read against the books around it.
+    unknown_terms: list[str],
+    canon: str,
+) -> tuple[list[str], list[str]]:
+    """What a drafted closing scene contradicts or invents against the books around it.
 
-    The drift pass checks a scene against its own planned beat, the cast and the arc. It does not read the
-    scene against the book that follows, which is where a closing scene is most likely to be wrong: a date, a
-    page number, a document or a turn of plot that the next book states differently or never mentions. This
-    reads it against the next book's outline and its opening chapters, this book's frame thread, and the cast.
+    Returns (problems this scene creates, inconsistencies already in the book).
+
+    The drift pass checks a scene against its own planned beat, the cast and the arc. This reads it against the
+    book that follows and against the book's own canon. Real runs showed what that takes:
+    - it must read far enough into the next book (a contradicting fact sat 7,300 characters into a chapter the check
+      read 3,500 characters of);
+    - it must see every chapter of the next book in outline, and what the writer was shown from the book's canon;
+    - a name or document found nowhere in the book is an invention to judge, not just to list;
+    - an inconsistency that already exists between the book's own chapters (a name spelled two ways) is not the
+      scene's fault: it is reported to the author and never holds the scene back.
     """
     opening = "\n\n".join(
-        f"CHAPTER {r.get('chapter_number')} ({r.get('title')}), OPENING:\n{str(r.get('content_text') or '')[:3500]}"
+        f"CHAPTER {r.get('chapter_number')} ({r.get('title')}), FROM ITS START:\n"
+        f"{str(r.get('content_text') or '')[:CONTINUITY_OPENING_CHARS]}"
         for r in opening_rows[:3]
     )
     system = (
-        "You check a new closing scene against the book it ends and the book that follows. List only real "
-        "problems, each with the phrase from the scene:\n"
-        "1. a fact in the scene that contradicts the next book's opening or outline (a date, a number, a page, "
-        "a season, a place, a document, who knows what);\n"
-        "2. a fact that contradicts what the earlier chapters establish;\n"
-        "3. anything plot that appears nowhere in the book or the outline: a new document, object, discovery, "
-        "location, relationship, deadline or backstory;\n"
-        "4. a person acting against what they know or have been told.\n"
-        "Not style, not quality. If there are no problems reply with an empty list. Reply with strict JSON "
-        "matching ContinuityFindings {problems}."
+        "You check a new closing scene against the book it ends and the book that follows. In `problems` list only "
+        "what THIS SCENE gets wrong, each with the phrase from the scene:\n"
+        "1. a fact in the scene that contradicts the next book (its opening chapters or its outline): a date, a "
+        "number, a page, a season, a place, a document, who knows what, who does what;\n"
+        "2. a fact that contradicts what the earlier chapters or the retrieved canon establish;\n"
+        "3. anything plot that appears nowhere in the book or the outline: a new document, treaty, quotation, "
+        "object, discovery, person, location, relationship, deadline or backstory. Terms listed as NOT FOUND "
+        "ANYWHERE IN THE BOOK that are a person, place, document or quotation are inventions: report each. Ignore "
+        "ordinary words in that list;\n"
+        "4. a person acting against what they know or have been told;\n"
+        "5. PRE-EMPTION: the scene shows, reveals or resolves, even in part, something the next book presents as "
+        "happening later or as being learned later (an event in its outline, a discovery in its opening chapters, a "
+        "document first shown there). A scene must end before the next book begins and leave all of that untouched. "
+        "Pre-emption is always a problem in this scene, never an `existing_inconsistencies` item, even when the "
+        "scene agrees with the outline's account.\n"
+        "Do NOT put in `problems` an inconsistency that already exists between the book's own chapters or outline "
+        "(for example a name spelled two ways, or two chapters that disagree): put each in "
+        "`existing_inconsistencies` instead, one line each, so the author can fix it. Not style, not quality. "
+        "If there is nothing, reply with empty lists. Reply with strict JSON matching ContinuityFindings "
+        "{problems, existing_inconsistencies}."
     )
     prompt = (
         f"THE NEW CLOSING SCENE:\n{text}\n\n"
+        f"NOT FOUND ANYWHERE IN THE BOOK: {', '.join(unknown_terms) if unknown_terms else '(nothing)'}\n\n"
         f"THE CAST:\n{roster_text}\n\n"
-        f"THIS BOOK'S FRAME-THREAD OUTLINE:\n{_beats_of(outline, frame[-10:], 500) or '(none)'}\n\n"
+        f"FROM THE BOOK'S OWN CANON (retrieved for this scene):\n{canon or '(none retrieved)'}\n\n"
+        f"THIS BOOK'S FRAME-THREAD OUTLINE:\n{_beats_of(outline, frame[-20:], 450) or '(none)'}\n\n"
         f"WHERE THIS BOOK'S FRAME THREAD LAST STOOD:\n…{tail}\n\n"
-        f"THE NEXT BOOK'S FRAME-THREAD OUTLINE:\n{_beats_of(outline, nframe[:14], 500) or '(none)'}\n\n"
+        f"THE NEXT BOOK, CHAPTER BY CHAPTER (outline):\n{_beats_of(outline, next_book, 350) or '(none)'}\n\n"
         f"{opening}\n"
     )
     found, _ = await complete_structured(
@@ -6130,9 +6153,12 @@ async def _coda_continuity(
         system=system,
         prompt=prompt,
         schema=ContinuityFindings,
-        max_tokens=2048,
+        max_tokens=3072,
     )
-    return [p.strip() for p in found.problems if p.strip()]
+    return (
+        [p.strip() for p in found.problems if p.strip()],
+        [p.strip() for p in found.existing_inconsistencies if p.strip()],
+    )
 
 
 async def _op_draft_book_coda(payload: dict) -> dict:
@@ -6164,6 +6190,7 @@ async def _op_draft_book_coda(payload: dict) -> dict:
     # The next book's outline exists before its text does: lean on it when that is all there is.
     nframe_text = _frame_rows(outline, nrows, act)
     nframe = nframe_text or _outline_range_rows(outline, nxt, act)
+    next_book_all = _outline_range_rows(outline, nxt)
     # What the next book actually opens with, whatever thread it is in, then its first frame chapters.
     opening_rows: list[dict] = []
     for r in [*nrows[:1], *nframe_text[:2]]:
@@ -6197,6 +6224,9 @@ async def _op_draft_book_coda(payload: dict) -> dict:
         "resolved, and never a fact the next book's opening or outline contradicts or needs for itself.\n\n"
         "Rules:\n"
         "- Only people and places already in the cast, the book or the next book's opening.\n"
+        "- Do not enact, reveal, show or resolve any event, discovery or document that the next book's outline or "
+        "opening presents: the scene ends before that book begins and leaves all of it untouched. Do not even stage "
+        "the first moment of one. Use only what THIS book has already put on the page.\n"
         "- Invent nothing that is plot: no new document, object, discovery, place, relationship, date or deadline. "
         "The hook is a consequence or an escalation of what is already on the page. Wherever the next book's opening "
         "states a date, a number, a page, a season or who knows what, use it exactly.\n"
@@ -6324,6 +6354,8 @@ async def _op_draft_book_coda(payload: dict) -> dict:
     text, words, drift, qa = "", 0, None, None
     failure = ""
     problems: list[str] = []
+    existing: list[str] = []
+    corpus = "\n".join(str(x.get("content_text") or "") for x in rows)
     for _attempt in range(3):
         writer_brief = brief.model_copy(
             update={
@@ -6351,16 +6383,18 @@ async def _op_draft_book_coda(payload: dict) -> dict:
             words = len(text.split())
             problems = []
             if BOOK_CODA_MIN_WORDS <= words <= BOOK_CODA_MAX_WORDS:
-                problems = await _coda_continuity(
+                problems, existing = await _coda_continuity(
                     router,
                     settings.model_default,
                     text=text,
                     outline=outline,
                     frame=frame,
-                    nframe=nframe,
+                    next_book=next_book_all or nframe,
                     opening_rows=opening_rows,
                     tail=tail,
                     roster_text=roster_text,
+                    unknown_terms=_new_names(text, corpus + "\n" + next_opening),
+                    canon=await _canon_grounding(ctx, text[:1800], user_id=payload.get("user_id")),
                 )
         except ProviderNotRegistered:
             return await reject("no provider")
@@ -6384,7 +6418,6 @@ async def _op_draft_book_coda(payload: dict) -> dict:
         break
     if failure:
         return await reject(failure)
-    corpus = "\n".join(str(x.get("content_text") or "") for x in rows)
     scores = {k: v for k, v in qa.model_dump(mode="json").items() if k in QA_DIMS} if qa else None
     draft = {
         "content_id": last.get("id"),
@@ -6404,9 +6437,11 @@ async def _op_draft_book_coda(payload: dict) -> dict:
         if (nrows or _outline_range_rows(outline, nxt))
         else None,
         "research_failed": research_failed,
+        "existing_inconsistencies": existing,
         "continuity_checked": (
-            f"against this book's frame thread, the next book's outline ({len(nframe)} chapters) and "
-            f"its opening ({len(opening_rows[:3])} chapters)"
+            f"against this book's frame thread, all {len(next_book_all or nframe)} chapters of the next "
+            f"book in outline, the first {CONTINUITY_OPENING_CHARS:,} characters of its first "
+            f"{len(opening_rows[:3])} chapters, and the book's retrieved canon"
         ),
         "research_topics": [*stored_topics, *live_topics],
         "research": research[:6000],

@@ -30,6 +30,7 @@ export interface PieceDraft {
   research_topics?: string[];
   drift?: { findings?: unknown[] } | null;
   continuity_checked?: string;
+  existing_inconsistencies?: string[];
   qa?: Record<string, number> | null;
   // Recaps only.
   sources?: number;
@@ -180,8 +181,18 @@ export default function SeriesPiece({
           {usable.research_topics?.length ? (
             <p className="text-gray-500 dark:text-gray-400">Researched: {usable.research_topics.join('; ')}</p>
           ) : null}
+          {usable.existing_inconsistencies?.length ? (
+            <div data-testid={`${kind}-${book}-existing`} className="rounded border border-amber-200 bg-amber-50 p-2 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+              <p className="font-medium">Already in your book, not caused by this scene:</p>
+              <ul className="ml-4 list-disc">
+                {usable.existing_inconsistencies.map((x) => (
+                  <li key={x}>{x}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           {usable.continuity_checked ? (
-            <p className="text-gray-500 dark:text-gray-400">Continuity: read {usable.continuity_checked}; no contradictions or invented plot found.</p>
+            <p className="text-gray-500 dark:text-gray-400">Continuity: read {usable.continuity_checked}; no contradictions or invented plot found in the scene.</p>
           ) : null}
           {kind === 'coda' ? (
             <p className="text-gray-500 dark:text-gray-400">

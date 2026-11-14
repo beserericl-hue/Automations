@@ -882,3 +882,146 @@ class TestRecapKnowsTheCast:
         )
         assert "THE CAST" in prompts[0] and "Marcus" in prompts[0]
         assert "THE CAST" in prompts[1]  # the claim check reads against it too
+
+
+class TestContinuityCheckReach:
+    """Each of these is a way the check failed on the real book, now pinned."""
+
+    @staticmethod
+    def _rows_with_a_deep_fact() -> list[dict[str, Any]]:
+        deep = (
+            "Filler sentence about nothing at all. " * 300
+            + "The 1692 treaty named the Piscataway as a people."
+        )
+        return [
+            *ROWS[:2],
+            {"id": "c31", "chapter_number": 31, "title": "Stratum IV", "content_text": deep},
+        ]
+
+    def test_a_fact_far_into_the_next_chapter_reaches_the_check(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The real miss: a treaty at character 7,292 of chapter 60, behind a 3,500-character window.
+        rows = self._rows_with_a_deep_fact()
+        assert rows[2]["content_text"].index("1692") > 8000
+
+        async def get_rows(_pid: str) -> list[dict]:
+            return rows
+
+        monkeypatch.setattr(M, "_project_chapter_rows", get_rows)
+        prompts = answer(monkeypatch, PLAN, CLEAN)
+        asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert "The 1692 treaty named the Piscataway" in prompts[1]
+
+    def test_the_whole_next_book_is_seen_in_outline_not_just_its_frame_thread(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        wide = {
+            **FRAME_OUTLINE,
+            "chapters": [
+                *FRAME_OUTLINE["chapters"],
+                {
+                    "chapter_number": 32,
+                    "title": "Stratum V",
+                    "act": "Stratum V",
+                    "beat": "The reservation stone is set.",
+                },
+            ],
+        }
+
+        async def load(_pid: str, _payload: Any = None) -> dict[str, Any]:
+            return {"title": "The Ossuary", "genre_slug": "post-apocalyptic", "outline": wide, "roster": []}
+
+        monkeypatch.setattr(M, "_load_context", load)
+        prompts = answer(monkeypatch, PLAN, CLEAN)
+        asyncio.run(
+            M._op_draft_book_coda(
+                {
+                    "project_id": PROJECT,
+                    "book": BOOK1,
+                    "next_book": {"index": 2, "first_chapter": 31, "last_chapter": 32},
+                }
+            )
+        )
+        assert "The reservation stone is set." in prompts[1] and "The fort post stands." in prompts[1]
+
+    def test_names_found_nowhere_in_the_book_and_the_retrieved_canon_go_to_the_judge(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        pipeline["text"] = CODA_TEXT + " Governor Lyonell Copley read the Articles aloud."
+
+        async def canon(_ctx: Any, beat: str, *, user_id: Any) -> str:
+            return "CANON: Winifred kept a cedar box under her bed."
+
+        monkeypatch.setattr(M, "_canon_grounding", canon)
+        prompts = answer(monkeypatch, PLAN, CLEAN)
+        asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert "NOT FOUND ANYWHERE IN THE BOOK" in prompts[1] and "Lyonell" in prompts[1]
+        assert "cedar box under her bed" in prompts[1]
+
+    def test_an_inconsistency_already_in_the_book_is_reported_not_held_against_the_scene(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The real blocker: a surname spelled two ways in the manuscript stopped every scene that mentioned her.
+        found = ContinuityFindings(
+            problems=[],
+            existing_inconsistencies=["the lawyer is 'Okafor' in chapter 5 and 'Okonkwo' in chapter 25"],
+        )
+        answer(monkeypatch, PLAN, found)
+        out = asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert out["ok"] is True
+        assert out["existing_inconsistencies"] == [
+            "the lawyer is 'Okafor' in chapter 5 and 'Okonkwo' in chapter 25"
+        ]
+
+    def test_the_judge_is_told_to_sort_the_two_kinds_of_problem(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        systems: list[str] = []
+
+        async def fake(_router: Any, **k: Any) -> tuple[Any, None]:
+            systems.append(k["system"])
+            return (PLAN if len(systems) == 1 else CLEAN), None
+
+        monkeypatch.setattr(M, "complete_structured", fake)
+        asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert "existing_inconsistencies" in systems[1] and "Do NOT put in `problems`" in systems[1]
+        assert "invention" in systems[1].lower() or "inventions" in systems[1].lower()
+
+
+class TestPreEmption:
+    def test_the_judge_is_told_a_scene_that_plays_the_next_books_events_is_a_problem(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Two real misses: a scene that showed Marcus learning from the journal what chapter 30 first shows, and one that
+        # had Sylvia file the report that chapter 85 first shows. The check called the second "consistent with the outline".
+        systems: list[str] = []
+
+        async def fake(_router: Any, **k: Any) -> tuple[Any, None]:
+            systems.append(k["system"])
+            return (PLAN if len(systems) == 1 else CLEAN), None
+
+        monkeypatch.setattr(M, "complete_structured", fake)
+        asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert "PRE-EMPTION" in systems[1] and "never an `existing_inconsistencies` item" in systems[1]
+        # The planner is told the same thing before anything is written.
+        assert "Do not enact, reveal, show or resolve any event" in systems[0]
+
+    def test_a_pre_empting_scene_is_sent_back_and_the_writer_is_told_why(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        beats: list[str] = []
+
+        async def write(**k: Any) -> tuple[str, int, int]:
+            beats.append(k["brief"].beat)
+            return CODA_TEXT, 0, 0
+
+        monkeypatch.setattr(M, "_write_subchapter", write)
+        answer(
+            monkeypatch,
+            PLAN,
+            ContinuityFindings(problems=["pre-empts chapter 85: Sylvia files the hydrology report here"]),
+            CLEAN,
+        )
+        out = asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert out["ok"] is True and "pre-empts chapter 85" in beats[1]

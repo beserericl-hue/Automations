@@ -252,4 +252,10 @@ describe('closing scene and recap', () => {
     fireEvent.click(screen.getByTestId('coda-1-draft'));
     await waitFor(() => expect(mockFetch.mock.calls.some(([p]) => String(p).endsWith('/books/1/coda'))).toBe(true));
   });
+
+  it('lists what is already inconsistent in the book, apart from the scene', () => {
+    render({ ...WITH_CODA, books: [{ ...WITH_CODA.books[0], coda_draft: { ...CODA, existing_inconsistencies: ["the lawyer is 'Okafor' in chapter 5 and 'Okonkwo' in chapter 25"] } }, SERIES.books[1]] });
+    expect(screen.getByTestId('coda-1-existing')).toHaveTextContent("Okafor' in chapter 5");
+    expect(screen.getByTestId('coda-1-existing')).toHaveTextContent('not caused by this scene');
+  });
 });
