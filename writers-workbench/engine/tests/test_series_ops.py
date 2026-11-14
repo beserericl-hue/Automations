@@ -8,6 +8,7 @@ spliced in at a sentence that is not in the chapter.
 from __future__ import annotations
 
 import asyncio
+import types
 from typing import Any
 
 import pytest
@@ -629,3 +630,171 @@ class TestSeriesPiecesAreKept:
             )
         )
         assert out["ok"] is True and stored == [("recaps", 2)]
+
+
+class TestQaFindingsOnThePieces:
+    def test_a_scene_of_the_wrong_length_is_written_again_with_the_count_told_to_the_writer(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        beats: list[str] = []
+        texts = ["Too short.", CODA_TEXT]
+
+        async def write(**k: Any) -> tuple[str, int, int]:
+            beats.append(k["brief"].beat)
+            return texts.pop(0), 0, 0
+
+        monkeypatch.setattr(M, "_write_subchapter", write)
+        answer(monkeypatch, PLAN)
+        out = asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert out["ok"] is True and len(beats) == 2
+        assert "Your last draft was 2 words" in beats[1]
+
+    def test_the_outline_keeps_the_scenes_plan_not_the_instructions_for_writing_it(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        answer(monkeypatch, PLAN)
+        out = asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert out["brief"]["beat"] == PLAN.beat
+        assert "words" not in out["brief"]["beat"] and "hook" not in out["brief"]["beat"]
+        # The writer is told the hook and the length.
+        assert (
+            "Someone will lift the binder" in pipeline["write_brief"].beat
+            and "450 to 1500 words" in pipeline["write_brief"].beat
+        )
+
+    def test_a_failure_anywhere_in_the_run_is_a_reason_the_author_can_read_and_is_kept(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        kept: list[tuple[str, Any, dict[str, Any]]] = []
+
+        async def keep(_pid: str, bucket: str, index: Any, draft: dict[str, Any]) -> bool:
+            kept.append((bucket, index, draft))
+            return True
+
+        async def broken(*_a: Any, **_k: Any) -> Any:
+            raise ValueError("malformed drift json")
+
+        monkeypatch.setattr(M, "_store_series_piece", keep)
+        monkeypatch.setattr(M, "_drift_correct_pass", broken)
+        answer(monkeypatch, PLAN)
+        out = asyncio.run(
+            M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2, "persist": True})
+        )
+        assert (
+            out["ok"] is False and "ValueError" in out["reason"] and "malformed drift json" in out["reason"]
+        )
+        assert kept == [("codas", 1, {"failed": out["reason"]})]
+
+    def test_a_piece_already_in_the_book_is_never_replaced_by_a_new_draft(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        written: list[dict[str, Any]] = []
+
+        class Table:
+            def __init__(self, applied: bool) -> None:
+                self.applied = applied
+
+            def select(self, *_a: Any) -> Table:
+                return self
+
+            def update(self, row: dict[str, Any]) -> Table:
+                written.append(row)
+                return self
+
+            def eq(self, *_a: Any) -> Table:
+                return self
+
+            def limit(self, *_a: Any) -> Table:
+                return self
+
+            async def execute(self) -> Any:
+                return types.SimpleNamespace(
+                    data=[
+                        {"outline": {"_series": {"codas": {"1": {"applied_at": "x", "text": "in the book"}}}}}
+                    ]
+                )
+
+        class Client:
+            def table(self, _n: str) -> Table:
+                return Table(True)
+
+        async def client() -> Client:
+            return Client()
+
+        import writer_engine.supabase.client as sc
+
+        monkeypatch.setattr(sc, "get_supabase_admin", client)
+        assert (
+            asyncio.run(M._store_series_piece(PROJECT, "codas", 1, {"text": "new", "research": "big"}))
+            is False
+        )
+        assert written == []
+
+    def test_the_kept_draft_leaves_out_the_research_text_but_keeps_its_topics(self) -> None:
+        stored: dict[str, Any] = {}
+
+        class Table:
+            def select(self, *_a: Any) -> Table:
+                return self
+
+            def update(self, row: dict[str, Any]) -> Table:
+                stored.update(row["outline"]["_series"]["codas"]["1"])
+                return self
+
+            def eq(self, *_a: Any) -> Table:
+                return self
+
+            def limit(self, *_a: Any) -> Table:
+                return self
+
+            async def execute(self) -> Any:
+                return types.SimpleNamespace(data=[{"outline": {}}])
+
+        class Client:
+            def table(self, _n: str) -> Table:
+                return Table()
+
+        async def client() -> Client:
+            return Client()
+
+        import writer_engine.supabase.client as sc
+
+        original = sc.get_supabase_admin
+        sc.get_supabase_admin = client  # type: ignore[assignment]
+        try:
+            assert asyncio.run(
+                M._store_series_piece(
+                    PROJECT, "codas", 1, {"text": "t", "research": "big " * 1000, "research_topics": ["a"]}
+                )
+            )
+        finally:
+            sc.get_supabase_admin = original  # type: ignore[assignment]
+        assert "research" not in stored and stored["research_topics"] == ["a"] and stored["drafted_at"]
+
+    def test_what_the_planner_read_the_ending_as_settling_reaches_the_scene_plan(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        prompts = answer(monkeypatch, PLAN)
+        asyncio.run(
+            M._op_draft_book_coda(
+                {
+                    "project_id": PROJECT,
+                    "book": BOOK1,
+                    "next_book": BOOK2,
+                    "resolves": "the ring is placed",
+                    "carries": "who saw it",
+                }
+            )
+        )
+        assert "the ring is placed" in prompts[0] and "who saw it" in prompts[0]
+
+    def test_a_next_book_with_no_text_yet_is_not_treated_as_the_last_book(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        prompts = answer(monkeypatch, PLAN)
+        unwritten = {"index": 2, "first_chapter": 90, "last_chapter": 99}
+        out = asyncio.run(
+            M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": unwritten})
+        )
+        assert out["ok"] is True
+        assert "not written yet" in prompts[0] and "This is the last book" not in prompts[0]

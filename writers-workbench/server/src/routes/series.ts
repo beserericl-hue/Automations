@@ -317,6 +317,9 @@ seriesRouter.post('/project/:projectId/series/books/:index/coda', validateBody(D
   const book = books.find((b) => b.index === index);
   if (!book) return fail(res, 404, 'NO_SUCH_BOOK', 'That book is not in the current plan.');
   const next = books.find((b) => b.index === index + 1);
+  if (storedSeries(outline).codas?.[String(index)]?.applied_at) {
+    return fail(res, 409, 'ALREADY_APPLIED', 'That closing scene is already in the book. Edit the chapter to change it.');
+  }
   try {
     const job = await callEngineWriteTool('chapter', {
       op: 'draft-book-coda',
@@ -348,6 +351,9 @@ seriesRouter.post('/project/:projectId/series/books/:index/recap', async (req, r
   if (!book) return fail(res, 404, 'NO_SUCH_BOOK', 'That book is not in the current plan.');
   const previous = books.filter((b) => b.index < index);
   if (!previous.length) return fail(res, 422, 'FIRST_BOOK', 'The first book has no earlier book to recap.');
+  if (storedSeries(outline).recaps?.[String(index)]?.applied_at) {
+    return fail(res, 409, 'ALREADY_APPLIED', 'That recap is already in the book. Edit the chapter to change it.');
+  }
   try {
     const job = await callEngineWriteTool('chapter', {
       op: 'draft-book-recap',
@@ -382,7 +388,7 @@ for (const kind of ['coda', 'recap'] as PieceKind[]) {
       const outline: Outline = { ...(project.outline ?? {}) };
       const index = bookIndex(req);
       const piece = storedSeries(outline)[bucket]?.[String(index)] as CodaDraft | RecapPiece | undefined;
-      if (!piece) return fail(res, 404, 'NO_DRAFT', `There is no drafted ${noun} for that book.`);
+      if (!piece || piece.failed) return fail(res, 404, 'NO_DRAFT', `There is no drafted ${noun} for that book.`);
       if (piece.applied_at) return fail(res, 409, 'ALREADY_APPLIED', `That ${noun} is already in the book; edit the chapter.`);
       const text = (req.body as { text: string }).text;
       const next_ = withSeries(outline, (s) => ({
@@ -421,8 +427,11 @@ for (const kind of ['coda', 'recap'] as PieceKind[]) {
       const outline: Outline = { ...(project.outline ?? {}) };
       const index = bookIndex(req);
       const piece = storedSeries(outline)[bucket]?.[String(index)] as CodaDraft | RecapPiece | undefined;
-      if (!piece) return fail(res, 404, 'NO_DRAFT', `There is no drafted ${noun} for that book.`);
+      if (!piece || piece.failed) return fail(res, 404, 'NO_DRAFT', `There is no drafted ${noun} for that book.`);
       if (piece.applied_at) return fail(res, 409, 'ALREADY_APPLIED', `That ${noun} is already in the book.`);
+      // A private copy of the outline as it stands: the snapshot and any rollback must not depend on an object
+      // that something later in this request might change.
+      const originalOutline: Outline = JSON.parse(JSON.stringify(project.outline ?? {}));
       const supabase = getSupabaseAdmin();
       const { data: chapter } = await supabase
         .from('published_content_v2')
@@ -442,7 +451,7 @@ for (const kind of ['coda', 'recap'] as PieceKind[]) {
         .order('version_number', { ascending: false })
         .limit(1)
         .maybeSingle();
-      await supabase.from('content_versions_v2').insert({
+      const { error: chapterSnapError } = await supabase.from('content_versions_v2').insert({
         content_id: piece.content_id,
         user_id: req.userId!,
         version_number: ((last?.version_number as number | undefined) ?? 0) + 1,
@@ -450,6 +459,8 @@ for (const kind of ['coda', 'recap'] as PieceKind[]) {
         changed_by: kind === 'coda' ? 'series_coda' : 'series_recap',
         change_note: `Before adding the ${noun} for book ${index}`,
       });
+      // No snapshot, no change: the message promises the earlier text can be taken back.
+      if (chapterSnapError) throw new Error(`could not save the chapter's earlier text: ${chapterSnapError.message}`);
       // The outline too: a prior copy is kept so the change can be taken back, then it is brought into line.
       const { data: lastOutline } = await supabase
         .from('outline_versions_v2')
@@ -458,29 +469,38 @@ for (const kind of ['coda', 'recap'] as PieceKind[]) {
         .order('version_number', { ascending: false })
         .limit(1)
         .maybeSingle();
-      await supabase.from('outline_versions_v2').insert({
+      const { error: outlineSnapError } = await supabase.from('outline_versions_v2').insert({
         user_id: req.userId!,
         project_id: project.id,
         version_number: ((lastOutline?.version_number as number | undefined) ?? 0) + 1,
-        outline: project.outline ?? {},
+        outline: originalOutline,
         revision_note: `Before adding the ${noun} for book ${index}`,
       });
+      if (outlineSnapError) throw new Error(`could not save the outline's earlier version: ${outlineSnapError.message}`);
       const updated =
         kind === 'coda'
           ? chapterWithCoda(text, piece.text)
           : chapterWithRecap(text, seriesName(outline, project.title), piece.text);
-      const { error } = await supabase
-        .from('published_content_v2')
-        .update({ content_text: updated, updated_at: new Date().toISOString() })
-        .eq('id', piece.content_id)
-        .eq('user_id', req.userId!);
-      if (error) throw new Error(error.message);
       const withText = kind === 'coda' ? outlineWithCoda(outline, piece as CodaDraft) : outlineWithRecap(outline, piece.chapter_number);
       const next_ = withSeries(withText, (s) => ({
         ...s,
         [bucket]: { ...(s[bucket] ?? {}), [String(index)]: { ...piece, applied_at: new Date().toISOString() } },
       }));
+      // The outline first: saving it checks the new outline against its schema and throws before anything has
+      // changed. The chapter is written last, and if that fails the outline is put back, so the two never
+      // disagree about what the book holds.
       await saveOutline(project.id, req.userId!, next_);
+      const { error } = await supabase
+        .from('published_content_v2')
+        .update({ content_text: updated, updated_at: new Date().toISOString() })
+        .eq('id', piece.content_id)
+        .eq('user_id', req.userId!);
+      if (error) {
+        await saveOutline(project.id, req.userId!, originalOutline).catch((e) =>
+          logger.error({ err: e, projectId: project.id }, 'series: outline could not be put back after a failed apply'),
+        );
+        throw new Error(error.message);
+      }
       logger.info({ userId: req.userId, projectId: project.id, index, kind, contentId: piece.content_id }, 'series: piece applied');
       res.json({ success: true, data: { series: seriesView(next_, project.title) } });
     } catch (err) {

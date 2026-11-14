@@ -138,6 +138,8 @@ describe('the series view', () => {
 
 type Row = Record<string, unknown>;
 const db: Record<string, Row[]> = {};
+// A table whose next insert or update fails, to prove what happens when the database says no.
+const failing = { insert: null as string | null, update: null as string | null };
 vi.mock('../middleware/auth.js', () => ({
   requireAuth: (req: { userId?: string }, _res: unknown, next: () => void) => { req.userId = 'u1'; next(); },
   requireTierFeature: () => (_req: unknown, _res: unknown, next: () => void) => next(),
@@ -158,10 +160,15 @@ vi.mock('../services/supabase-admin.js', () => {
       select: () => q, order: () => q, limit: () => q, in: () => q,
       eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), q),
       is: (c: string, v: unknown) => (filters.push((r) => (r[c] ?? null) === v), q),
-      insert: (r: Row) => { (db[table] ??= []).push({ ...r }); return Promise.resolve({ error: null }); },
+      insert: (r: Row) => {
+        if (failing.insert === table) return Promise.resolve({ error: { message: 'insert refused' } });
+        (db[table] ??= []).push({ ...r });
+        return Promise.resolve({ error: null });
+      },
       update: (p: Row) => ((patch = p), q),
       maybeSingle: () => Promise.resolve({ data: table === 'content_versions_v2' ? null : rows()[0] ?? null, error: null }),
       then: (resolve: (v: unknown) => void) => {
+        if (patch && failing.update === table) return resolve({ data: null, error: { message: 'update refused' } });
         if (patch) { for (const r of rows()) Object.assign(r, patch); return resolve({ data: rows(), error: null }); }
         resolve({ data: rows(), error: null });
       },
@@ -175,6 +182,8 @@ const CHAPTER = 'Marcus carried the box. He set it on the table. I need to think
 beforeEach(() => {
   engine.mockReset();
   engineJob.mockReset();
+  failing.insert = null;
+  failing.update = null;
   db.outline_versions_v2 = [];
   db.writing_projects_v2 = [{
     id: 'p1', user_id: 'u1', title: 'The Ossuary', genre_slug: null, deleted_at: null,
@@ -372,6 +381,70 @@ describe('closing scene and recap routes', () => {
       const j = await call(base, 'DELETE', '/series/books/1/coda');
       expect(j.data.series.books[0].coda_draft).toBeNull();
       expect(db.published_content_v2[0].content_text).toBe(CHAPTER);
+    });
+  });
+});
+
+
+const statusOf = (base: string, method: string, path: string): Promise<number> =>
+  fetch(`${base}/api/publishing/project/p1${path}`, { method }).then((r) => r.status);
+
+describe('closing scene and recap: what QA found', () => {
+  it('will not draft over a piece that is already in the book, so it cannot be added twice', async () => {
+    seed({ codas: { '1': codaDraft({ applied_at: 'x' }) }, recaps: { '2': { applied_at: 'x' } } });
+    await withServer(async (base) => {
+      expect((await call(base, 'POST', '/series/books/1/coda')).error.code).toBe('ALREADY_APPLIED');
+      expect((await call(base, 'POST', '/series/books/2/recap')).error.code).toBe('ALREADY_APPLIED');
+      expect(engineJob).not.toHaveBeenCalled();
+    });
+  });
+
+  it('changes nothing when the earlier text could not be kept', async () => {
+    seed({ codas: { '1': codaDraft() } });
+    failing.insert = 'content_versions_v2';
+    await withServer(async (base) => {
+      expect(await statusOf(base, 'POST', '/series/books/1/coda/apply')).toBe(500);
+      expect(db.published_content_v2[0].content_text).toBe(CHAPTER);
+      expect(outline()._series.codas['1'].applied_at).toBeUndefined();
+    });
+  });
+
+  it('changes nothing when the outline’s earlier version could not be kept', async () => {
+    seed({ codas: { '1': codaDraft() } });
+    failing.insert = 'outline_versions_v2';
+    await withServer(async (base) => {
+      expect(await statusOf(base, 'POST', '/series/books/1/coda/apply')).toBe(500);
+      expect(db.published_content_v2[0].content_text).toBe(CHAPTER);
+    });
+  });
+
+  it('leaves the chapter alone when the outline cannot be saved', async () => {
+    seed({ codas: { '1': codaDraft() } });
+    failing.update = 'writing_projects_v2';
+    await withServer(async (base) => {
+      expect(await statusOf(base, 'POST', '/series/books/1/coda/apply')).toBe(500);
+      expect(db.published_content_v2[0].content_text).toBe(CHAPTER);
+    });
+  });
+
+  it('puts the outline back when the chapter cannot be written, so the two never disagree', async () => {
+    seed({ codas: { '1': codaDraft() } });
+    const before = JSON.stringify(outline());
+    failing.update = 'published_content_v2';
+    await withServer(async (base) => {
+      expect(await statusOf(base, 'POST', '/series/books/1/coda/apply')).toBe(500);
+      expect(db.published_content_v2[0].content_text).toBe(CHAPTER);
+      expect(JSON.stringify(outline())).toBe(before);
+    });
+  });
+
+  it('shows a failed draft’s reason, cannot apply or edit it, and lets the author clear it', async () => {
+    seed({ codas: { '1': { failed: 'the scene came back 1700 words twice', drafted_at: 'x' } } });
+    await withServer(async (base) => {
+      expect((await call(base, 'POST', '/series/books/1/coda/apply')).error.code).toBe('NO_DRAFT');
+      expect((await call(base, 'PUT', '/series/books/1/coda', { text: 'x'.repeat(50) })).error.code).toBe('NO_DRAFT');
+      const cleared = await call(base, 'DELETE', '/series/books/1/coda');
+      expect(cleared.data.series.books[0].coda_draft).toBeNull();
     });
   });
 });

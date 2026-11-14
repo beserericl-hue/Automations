@@ -242,4 +242,14 @@ describe('closing scene and recap', () => {
     expect(screen.getByTestId('coda-1-text')).toHaveAttribute('readonly');
     expect(screen.queryByTestId('coda-1-apply')).toBeNull();
   });
+
+  it('says why the engine could not make one, and offers to try again or clear the message', async () => {
+    mockFetch.mockImplementation(async () => ({ success: true, jobId: 'j9' }) as never);
+    render({ ...SERIES, books: [{ ...SERIES.books[0], coda_draft: { ...CODA, text: '', failed: 'the scene came back 1700 words twice', words: 0 } }, SERIES.books[1]] });
+    expect(screen.getByTestId('coda-1-failed')).toHaveTextContent('the scene came back 1700 words twice');
+    expect(screen.queryByTestId('coda-1-apply')).toBeNull();
+    expect(screen.getByTestId('coda-1-clear')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('coda-1-draft'));
+    await waitFor(() => expect(mockFetch.mock.calls.some(([p]) => String(p).endsWith('/books/1/coda'))).toBe(true));
+  });
 });

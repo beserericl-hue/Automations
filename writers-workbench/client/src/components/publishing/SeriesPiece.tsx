@@ -32,6 +32,8 @@ export interface PieceDraft {
   qa?: Record<string, number> | null;
   // Recaps only.
   sources?: number;
+  /** Why the engine could not make one. */
+  failed?: string;
 }
 
 const DEFAULT_DIRECTION =
@@ -70,7 +72,10 @@ export default function SeriesPiece({
   const [direction, setDirection] = useState(DEFAULT_DIRECTION);
   const [text, setText] = useState('');
   useEffect(() => setText(draft?.text ?? ''), [draft?.text]);
-  const edited = Boolean(draft && text.trim() !== draft.text.trim());
+  // A failed attempt is a reason, not a draft: there is nothing to read or add.
+  const failedWhy = draft?.failed;
+  const usable = draft && !failedWhy ? draft : null;
+  const edited = Boolean(usable && text.trim() !== usable.text.trim());
   const words = text.split(/\s+/).filter(Boolean).length;
 
   const start = useMutation({
@@ -110,10 +115,10 @@ export default function SeriesPiece({
     onError: (err) => addToast(messageOf(err), 'error'),
   });
 
-  const lowest = draft?.qa
-    ? Object.entries(draft.qa).sort((a, b) => a[1] - b[1])[0]
+  const lowest = usable?.qa
+    ? Object.entries(usable.qa).sort((a, b) => a[1] - b[1])[0]
     : undefined;
-  const driftCount = draft?.drift?.findings?.length ?? 0;
+  const driftCount = usable?.drift?.findings?.length ?? 0;
 
   return (
     <div data-testid={`${kind}-${book}`} className="space-y-2 rounded-md bg-gray-50 p-2 dark:bg-gray-800/60">
@@ -121,7 +126,13 @@ export default function SeriesPiece({
         {kind === 'coda' ? 'Closing scene' : 'Recap at the front of this book'}
       </p>
 
-      {!draft || working ? (
+      {failedWhy && !working ? (
+        <p data-testid={`${kind}-${book}-failed`} className="rounded border border-red-200 bg-red-50 p-2 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+          The last attempt did not produce a {noun}: {failedWhy}
+        </p>
+      ) : null}
+
+      {!usable || working ? (
         <>
           <p className="text-gray-500 dark:text-gray-400">
             {kind === 'coda'
@@ -147,47 +158,52 @@ export default function SeriesPiece({
             disabled={working || start.isPending}
             className={primary}
           >
-            {working || start.isPending ? `Drafting the ${noun}… (a few minutes)` : `Draft the ${noun}`}
+            {working || start.isPending ? `Drafting the ${noun}… (a few minutes)` : failedWhy ? `Try the ${noun} again` : `Draft the ${noun}`}
           </button>
+          {failedWhy && !working ? (
+            <button data-testid={`${kind}-${book}-clear`} onClick={() => act.mutate('discard')} disabled={act.isPending} className={`${button} ml-2`}>
+              Clear this message
+            </button>
+          ) : null}
         </>
       ) : (
         <>
           <p className="text-gray-600 dark:text-gray-400">
-            For the {kind === 'coda' ? 'end of' : 'start of'} chapter {draft.chapter_number}, “{draft.chapter_title}”:{' '}
-            {draft.applied_at ? draft.words : words} words
-            {draft.edited_at ? ' · edited by you' : ''}
+            For the {kind === 'coda' ? 'end of' : 'start of'} chapter {usable.chapter_number}, “{usable.chapter_title}”:{' '}
+            {usable.applied_at ? usable.words : words} words
+            {usable.edited_at ? ' · edited by you' : ''}
           </p>
-          {draft.hook ? <p className="text-gray-600 dark:text-gray-400">Ends on: {draft.hook}</p> : null}
-          {draft.resolved ? <p className="text-gray-600 dark:text-gray-400">Settles: {draft.resolved}</p> : null}
-          {draft.carried ? <p className="text-gray-600 dark:text-gray-400">Carries forward: {draft.carried}</p> : null}
-          {draft.research_topics?.length ? (
-            <p className="text-gray-500 dark:text-gray-400">Researched: {draft.research_topics.join('; ')}</p>
+          {usable.hook ? <p className="text-gray-600 dark:text-gray-400">Ends on: {usable.hook}</p> : null}
+          {usable.resolved ? <p className="text-gray-600 dark:text-gray-400">Settles: {usable.resolved}</p> : null}
+          {usable.carried ? <p className="text-gray-600 dark:text-gray-400">Carries forward: {usable.carried}</p> : null}
+          {usable.research_topics?.length ? (
+            <p className="text-gray-500 dark:text-gray-400">Researched: {usable.research_topics.join('; ')}</p>
           ) : null}
           {kind === 'coda' ? (
             <p className="text-gray-500 dark:text-gray-400">
               Drift check: {driftCount ? `${driftCount} finding${driftCount === 1 ? '' : 's'} corrected or noted` : 'no drift found'}
               {lowest ? ` · weakest craft score: ${lowest[0].replace(/_/g, ' ')} ${lowest[1].toFixed(2)}` : ''}
             </p>
-          ) : draft.sources ? (
-            <p className="text-gray-500 dark:text-gray-400">Drawn from {draft.sources} chapters of the earlier books.</p>
+          ) : usable.sources ? (
+            <p className="text-gray-500 dark:text-gray-400">Drawn from {usable.sources} chapters of the earlier books.</p>
           ) : null}
-          {draft.new_names.length ? (
+          {usable.new_names.length ? (
             <p className="text-amber-700 dark:text-amber-400">
-              Names that are not in the book yet: {draft.new_names.join(', ')}. Check them before using this.
+              Names that are not in the book yet: {usable.new_names.join(', ')}. Check them before using this.
             </p>
           ) : null}
           <textarea
             data-testid={`${kind}-${book}-text`}
             aria-label={`The ${noun}, editable`}
-            value={draft.applied_at ? draft.text : text}
-            readOnly={Boolean(draft.applied_at)}
+            value={usable.applied_at ? usable.text : text}
+            readOnly={Boolean(usable.applied_at)}
             onChange={(e) => setText(e.target.value)}
             rows={14}
             className="w-full rounded border border-brand-200 bg-white p-2 text-sm leading-relaxed text-gray-800 dark:border-brand-800 dark:bg-gray-900 dark:text-gray-200"
           />
-          {draft.applied_at ? (
+          {usable.applied_at ? (
             <p className="text-green-700 dark:text-green-400">
-              In the book since {new Date(draft.applied_at).toLocaleString()}. To change it now, edit the chapter; the earlier chapter is in
+              In the book since {new Date(usable.applied_at).toLocaleString()}. To change it now, edit the chapter; the earlier chapter is in
               its Versions.
             </p>
           ) : (

@@ -72,6 +72,8 @@ export interface CodaDraft {
   drafted_at: string;
   edited_at?: string;
   applied_at?: string;
+  /** Why the engine could not make one. Kept so the author reads it, instead of a job that just ends. */
+  failed?: string;
 }
 
 /** A "previously" recap drafted for the front of a book, from the earlier books only. */
@@ -87,6 +89,7 @@ export interface RecapPiece {
   drafted_at: string;
   edited_at?: string;
   applied_at?: string;
+  failed?: string;
 }
 
 export interface StoredSeries {

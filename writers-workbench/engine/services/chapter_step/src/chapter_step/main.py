@@ -9,6 +9,7 @@ the service boots and tests run without live keys.
 from __future__ import annotations
 
 import asyncio
+import functools
 import hashlib
 import json
 import re
@@ -6015,11 +6016,15 @@ def _beats_of(outline: dict[str, Any], rows: list[dict], limit: int = 700) -> st
     return "\n".join(out)
 
 
-async def _store_series_piece(project_id: str, bucket: str, index: Any, draft: dict[str, Any]) -> None:
+async def _store_series_piece(project_id: str, bucket: str, index: Any, draft: dict[str, Any]) -> bool:
     """Keep a drafted series piece on the project outline under `_series.<bucket>[index]`.
 
     Read fresh and written back whole, like the volume plan: the draft is the author's to read when they come
-    back, whether or not the page that asked for it is still open.
+    back, whether or not the page that asked for it is still open. The outline is read here, immediately
+    before it is written, not at the start of the run, so a change made while the draft was being written is
+    not undone. A piece already in the book is never replaced: that would let it be added twice. The research
+    text is not kept (its topics are): it is large, and it would travel with every read of the outline.
+    Returns whether the piece was kept.
     """
     from datetime import UTC, datetime
 
@@ -6030,7 +6035,10 @@ async def _store_series_piece(project_id: str, bucket: str, index: Any, draft: d
     outline = dict(((getattr(r, "data", None) or [{}])[0]).get("outline") or {})
     series = dict(outline.get("_series") or {})
     pieces = dict(series.get(bucket) or {})
-    pieces[str(index)] = {**draft, "drafted_at": datetime.now(UTC).isoformat()}
+    if (pieces.get(str(index)) or {}).get("applied_at"):
+        return False
+    kept = {k: v for k, v in draft.items() if k != "research"}
+    pieces[str(index)] = {**kept, "drafted_at": datetime.now(UTC).isoformat()}
     series[bucket] = pieces
     outline["_series"] = series
     await (
@@ -6039,6 +6047,36 @@ async def _store_series_piece(project_id: str, bucket: str, index: Any, draft: d
         .eq("id", project_id)
         .execute()
     )
+    return True
+
+
+async def _reject_series_piece(payload: dict, bucket: str, reason: str) -> dict:
+    """Refuse a draft with a reason the author can read: kept on the project like a draft, because a job that
+    ends quietly looks like nothing happened."""
+    raw = payload.get("book")
+    book: dict[str, Any] = raw if isinstance(raw, dict) else {}
+    project_id = str(payload.get("project_id") or "")
+    if payload.get("persist") and project_id and book.get("index") is not None:
+        try:
+            await _store_series_piece(project_id, bucket, book.get("index"), {"failed": reason})
+        except Exception as exc:  # noqa: BLE001 - the refusal still reaches the caller
+            logger.warning("series.piece.failure_not_kept", error=str(exc)[:200])
+    return {"ok": False, "reason": reason}
+
+
+def _outline_range_rows(outline: dict[str, Any], book: dict | None, act: str = "") -> list[dict]:
+    """The outline's own entries for a book's chapters, written or not, optionally only one act's."""
+    if not book:
+        return []
+    lo, hi = int(book.get("first_chapter", 0)), int(book.get("last_chapter", 10**9))
+    out = []
+    for c in (outline or {}).get("chapters") or []:
+        if not isinstance(c, dict):
+            continue
+        n = _coerce_chapter_number(c.get("chapter_number"), -1)
+        if lo <= n <= hi and (not act or str(c.get("act") or "") == act):
+            out.append({"chapter_number": n, "title": c.get("title")})
+    return sorted(out, key=lambda r: r["chapter_number"])
 
 
 async def _op_draft_book_coda(payload: dict) -> dict:
@@ -6055,10 +6093,11 @@ async def _op_draft_book_coda(payload: dict) -> dict:
     book = payload.get("book") if isinstance(payload.get("book"), dict) else None
     if not project_id or not book:
         return {"ok": False, "reason": "project_id and book required"}
+    reject = functools.partial(_reject_series_piece, payload, "codas")
     rows = await _project_chapter_rows(project_id)
     brows = _rows_of_book(rows, book)
     if not brows:
-        return {"ok": False, "reason": "no chapters in that book"}
+        return await reject("no chapters in that book")
     last = brows[-1]
     nxt = payload.get("next_book") if isinstance(payload.get("next_book"), dict) else None
     nrows = _rows_of_book(rows, nxt) if nxt else []
@@ -6066,13 +6105,20 @@ async def _op_draft_book_coda(payload: dict) -> dict:
     outline = ctx.get("outline") or {}
     act = _frame_act(outline)
     frame = _frame_rows(outline, brows, act)
-    nframe = _frame_rows(outline, nrows, act)
+    # The next book's outline exists before its text does: lean on it when that is all there is.
+    nframe = _frame_rows(outline, nrows, act) or _outline_range_rows(outline, nxt, act)
     anchor = frame[-1] if frame else last
     tail = " ".join(str(anchor.get("content_text") or "").split()[-BOOK_CODA_TAIL_WORDS:])
     next_opening = str(nrows[0].get("content_text") or "")[:BOOK_ENDING_NEXT_OPENING_CHARS] if nrows else ""
     roster = ctx.get("roster") or []
     roster_text = _roster_text(roster)
     direction = str(payload.get("direction") or "").strip()[:1200]
+    judge_note = ""
+    if payload.get("carries") or payload.get("resolves"):
+        judge_note = (
+            f"WHAT A REVIEWER READ THE CURRENT ENDING AS SETTLING: {payload.get('resolves') or 'nothing'}; "
+            f"AND CARRYING FORWARD: {payload.get('carries') or 'nothing'}.\n\n"
+        )
     settings = get_settings()
     strategy = model_plan(str(payload.get("llm_strategy") or ""), settings)
     router = get_router(service=STEP_NAME)
@@ -6100,6 +6146,7 @@ async def _op_draft_book_coda(payload: dict) -> dict:
         f"THE STORY: {_arc_summary(outline)}\n\n"
         f"THE ARC GUIDE:\n{_arc_block(outline)}\n\n"
         f"AUTHOR'S DIRECTION: {direction or 'A season-finale hook that makes the reader need the next book.'}\n\n"
+        f"{judge_note}"
         f"CAST:\n{roster_text}\n\n"
         f"THIS BOOK'S FRAME-THREAD CHAPTERS (outline beats):\n{_beats_of(outline, frame[-8:]) or '(none)'}\n\n"
         f"WHERE THE FRAME THREAD LAST STOOD (end of chapter {anchor.get('chapter_number')}, {anchor.get('title')}):\n…{tail}\n\n"
@@ -6109,7 +6156,13 @@ async def _op_draft_book_coda(payload: dict) -> dict:
             f"THE NEXT BOOK'S FRAME-THREAD OUTLINE:\n{_beats_of(outline, nframe[:3]) or '(none)'}\n\n"
             f"THE NEXT BOOK'S OPENING:\n{next_opening}\n"
             if next_opening
-            else "This is the last book.\n"
+            else (
+                "The next book is not written yet. Its outline, above, is all there is: keep the hook open "
+                "and do not use up anything that outline needs for itself.\n"
+                f"THE NEXT BOOK'S FRAME-THREAD OUTLINE:\n{_beats_of(outline, nframe[:3]) or '(none)'}\n"
+                if nxt
+                else "This is the last book.\n"
+            )
         )
     )
     try:
@@ -6123,23 +6176,28 @@ async def _op_draft_book_coda(payload: dict) -> dict:
             max_tokens=4096,
         )
     except ProviderNotRegistered:
-        return {"ok": False, "reason": "no provider"}
+        return await reject("no provider")
     except ValueError as exc:
-        return {"ok": False, "reason": f"unreadable plan: {str(exc)[:120]}"}
+        return await reject(f"unreadable plan: {str(exc)[:120]}")
     if not plan.beat.strip() or not plan.hook.strip():
-        return {"ok": False, "reason": "the plan had no scene or no hook"}
+        return await reject("the plan had no scene or no hook")
 
     # Research first, as for a chapter: the project's own cited study for the thread, topped up with a live
     # pass on exactly what the plan said it was unsure of.
     anchor_n = _coerce_chapter_number(anchor.get("chapter_number"), 0)
     period = chapter_period(outline, anchor_n, "")
     questions = "; ".join(q.strip() for q in plan.research_questions[:4] if q.strip())
-    live, live_topics = await _chapter_research(
-        f"{plan.beat} | Verify: {questions}" if questions else plan.beat,
-        period=period,
-        title=ctx["title"],
-        focus=_research_focus(ctx),
-    )
+    research_failed = False
+    try:
+        live, live_topics = await _chapter_research(
+            f"{plan.beat} | Verify: {questions}" if questions else plan.beat,
+            period=period,
+            title=ctx["title"],
+            focus=_research_focus(ctx),
+        )
+    except Exception as exc:  # noqa: BLE001 - the project's own study still grounds the scene; the author is told
+        logger.warning("series.coda.research_failed", error=str(exc)[:200])
+        live, live_topics, research_failed = "", [], True
     stored, stored_topics, _n = _stored_research(outline, anchor_n)
     research = "\n\n".join(
         b
@@ -6178,12 +6236,11 @@ async def _op_draft_book_coda(payload: dict) -> dict:
         if canon
         else f"THE FRAME THREAD, WHERE IT LAST STOOD (this scene follows it; do not repeat it):\n…{tail}"
     )
+    # What is kept in the outline is the scene's plan. The writer is also told the hook and the length, which
+    # are instructions for writing it, not part of the story's outline.
     brief = SubChapterBrief(
         title=plan.title or "Closing scene",
-        beat=(
-            f"{plan.beat} The scene ends on this hook, left unresolved: {plan.hook}"
-            f" (Book closing scene, {BOOK_CODA_MIN_WORDS} to {BOOK_CODA_MAX_WORDS} words.)"
-        ),
+        beat=plan.beat,
         pov_character=plan.pov_character,
         story_turn=plan.story_turn or plan.hook,
         arc_beat=plan.arc_beat,
@@ -6192,30 +6249,47 @@ async def _op_draft_book_coda(payload: dict) -> dict:
         emotional_tone=plan.emotional_tone,
         connects_to_book_arc=plan.connects_to_book_arc,
     )
-    try:
-        text, _cr, _cw = await _write_subchapter(
-            system=_cached_write_system(write_system, header, research, canon),
-            brief=brief,
-            idx=0,
-            total=1,
-            prior_tail="",
-            chapter_number=_coerce_chapter_number(last.get("chapter_number"), 0),
-            model=strategy.draft,
+    cached = _cached_write_system(write_system, header, research, canon)
+    beat_text = _chapter_outline_beat(virtual, CODA_VIRTUAL_CHAPTER)
+    feedback = ""
+    text, words, drift, qa = "", 0, None, None
+    for _attempt in range(2):
+        writer_brief = brief.model_copy(
+            update={
+                "beat": (
+                    f"{plan.beat} The scene ends on this hook, left unresolved: {plan.hook} "
+                    f"Write {BOOK_CODA_MIN_WORDS} to {BOOK_CODA_MAX_WORDS} words.{feedback}"
+                )
+            }
         )
-        beat_text = _chapter_outline_beat(virtual, CODA_VIRTUAL_CHAPTER)
-        text, drift, _passes = await _drift_correct_pass(
-            text, ctx=vctx, req=req, roster_text=roster_text, period=period, model=strategy.polish
+        try:
+            text, _cr, _cw = await _write_subchapter(
+                system=cached,
+                brief=writer_brief,
+                idx=0,
+                total=1,
+                prior_tail="",
+                chapter_number=_coerce_chapter_number(last.get("chapter_number"), 0),
+                model=strategy.draft,
+            )
+            text, drift, _passes = await _drift_correct_pass(
+                text, ctx=vctx, req=req, roster_text=roster_text, period=period, model=strategy.polish
+            )
+            qa = await _score_chapter(text, period, roster_text, beat=beat_text)
+        except ProviderNotRegistered:
+            return await reject("no provider")
+        except Exception as exc:  # noqa: BLE001 - the author is told why, not left with a silent job
+            logger.warning("series.coda.write_failed", error=str(exc)[:200])
+            return await reject(f"writing the scene failed ({type(exc).__name__}): {str(exc)[:120]}")
+        text = _strip_em_dashes(text).strip()
+        words = len(text.split())
+        if BOOK_CODA_MIN_WORDS <= words <= BOOK_CODA_MAX_WORDS:
+            break
+        feedback = f" Your last draft was {words} words. Write it again at {BOOK_CODA_MIN_WORDS} to {BOOK_CODA_MAX_WORDS}."
+    else:
+        return await reject(
+            f"the scene came back {words} words twice; a closing scene is {BOOK_CODA_MIN_WORDS} to {BOOK_CODA_MAX_WORDS}"
         )
-        qa = await _score_chapter(text, period, roster_text, beat=beat_text)
-    except ProviderNotRegistered:
-        return {"ok": False, "reason": "no provider"}
-    text = _strip_em_dashes(text).strip()
-    words = len(text.split())
-    if words < BOOK_CODA_MIN_WORDS or words > BOOK_CODA_MAX_WORDS:
-        return {
-            "ok": False,
-            "reason": f"the scene came back {words} words; a closing scene is {BOOK_CODA_MIN_WORDS} to {BOOK_CODA_MAX_WORDS}",
-        }
     corpus = "\n".join(str(x.get("content_text") or "") for x in rows)
     scores = {k: v for k, v in qa.model_dump(mode="json").items() if k in QA_DIMS} if qa else None
     draft = {
@@ -6232,7 +6306,10 @@ async def _op_draft_book_coda(payload: dict) -> dict:
         "carried": plan.carried.strip(),
         "outline_beat": plan.outline_beat.strip(),
         "next_bridge": plan.next_bridge.strip(),
-        "next_chapter_number": nrows[0].get("chapter_number") if nrows else None,
+        "next_chapter_number": (nrows or _outline_range_rows(outline, nxt))[0].get("chapter_number")
+        if (nrows or _outline_range_rows(outline, nxt))
+        else None,
+        "research_failed": research_failed,
         "research_topics": [*stored_topics, *live_topics],
         "research": research[:6000],
         "drift": drift.model_dump(mode="json") if drift else None,
@@ -6258,11 +6335,12 @@ async def _op_draft_book_recap(payload: dict) -> dict:
     previous = [b for b in (payload.get("previous_books") or []) if isinstance(b, dict)]
     if not project_id or not book or not previous:
         return {"ok": False, "reason": "project_id, book and previous_books required"}
+    reject = functools.partial(_reject_series_piece, payload, "recaps")
     rows = await _project_chapter_rows(project_id)
     this_rows = _rows_of_book(rows, book)
     prev_rows = [r for b in previous for r in _rows_of_book(rows, b)]
     if not this_rows or not prev_rows:
-        return {"ok": False, "reason": "no chapters to recap or to place it in front of"}
+        return await reject("no chapters to recap or to place it in front of")
     ctx = await _load_context(project_id, {})
     outline = ctx.get("outline") or {}
     series_name = str(payload.get("series_name") or ctx.get("title") or "").strip()
@@ -6345,10 +6423,13 @@ async def _op_draft_book_recap(payload: dict) -> dict:
                 await _store_series_piece(project_id, "recaps", book.get("index"), piece)
             return {"ok": True, **piece}
     except ProviderNotRegistered:
-        return {"ok": False, "reason": "no provider"}
+        return await reject("no provider")
     except ValueError as exc:
-        return {"ok": False, "reason": f"unreadable answer: {str(exc)[:120]}"}
-    return {"ok": False, "reason": f"the recap was refused twice: {problem}"}
+        return await reject(f"unreadable answer: {str(exc)[:120]}")
+    except Exception as exc:  # noqa: BLE001 - the author is told why, not left with a silent job
+        logger.warning("series.recap.failed", error=str(exc)[:200])
+        return await reject(f"the recap failed ({type(exc).__name__}): {str(exc)[:120]}")
+    return await reject(f"the recap was refused twice: {problem}")
 
 
 async def _op_humanize_passage(payload: dict) -> dict:
