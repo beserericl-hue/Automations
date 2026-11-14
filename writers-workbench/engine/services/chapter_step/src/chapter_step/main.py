@@ -34,6 +34,7 @@ from writer_engine.schemas.chapter import (
     BookMarketing,
     ChapterCraftQa,
     CodaPlan,
+    ContinuityFindings,
     DriftFinding,
     DriftReport,
     DriftScanResult,
@@ -6079,6 +6080,61 @@ def _outline_range_rows(outline: dict[str, Any], book: dict | None, act: str = "
     return sorted(out, key=lambda r: r["chapter_number"])
 
 
+async def _coda_continuity(
+    router: Any,
+    model: str,
+    *,
+    text: str,
+    outline: dict[str, Any],
+    frame: list[dict],
+    nframe: list[dict],
+    opening_rows: list[dict],
+    tail: str,
+    roster_text: str,
+) -> list[str]:
+    """What a drafted closing scene contradicts or invents, read against the books around it.
+
+    The drift pass checks a scene against its own planned beat, the cast and the arc. It does not read the
+    scene against the book that follows, which is where a closing scene is most likely to be wrong: a date, a
+    page number, a document or a turn of plot that the next book states differently or never mentions. This
+    reads it against the next book's outline and its opening chapters, this book's frame thread, and the cast.
+    """
+    opening = "\n\n".join(
+        f"CHAPTER {r.get('chapter_number')} ({r.get('title')}), OPENING:\n{str(r.get('content_text') or '')[:3500]}"
+        for r in opening_rows[:3]
+    )
+    system = (
+        "You check a new closing scene against the book it ends and the book that follows. List only real "
+        "problems, each with the phrase from the scene:\n"
+        "1. a fact in the scene that contradicts the next book's opening or outline (a date, a number, a page, "
+        "a season, a place, a document, who knows what);\n"
+        "2. a fact that contradicts what the earlier chapters establish;\n"
+        "3. anything plot that appears nowhere in the book or the outline: a new document, object, discovery, "
+        "location, relationship, deadline or backstory;\n"
+        "4. a person acting against what they know or have been told.\n"
+        "Not style, not quality. If there are no problems reply with an empty list. Reply with strict JSON "
+        "matching ContinuityFindings {problems}."
+    )
+    prompt = (
+        f"THE NEW CLOSING SCENE:\n{text}\n\n"
+        f"THE CAST:\n{roster_text}\n\n"
+        f"THIS BOOK'S FRAME-THREAD OUTLINE:\n{_beats_of(outline, frame[-10:], 500) or '(none)'}\n\n"
+        f"WHERE THIS BOOK'S FRAME THREAD LAST STOOD:\n…{tail}\n\n"
+        f"THE NEXT BOOK'S FRAME-THREAD OUTLINE:\n{_beats_of(outline, nframe[:14], 500) or '(none)'}\n\n"
+        f"{opening}\n"
+    )
+    found, _ = await complete_structured(
+        router,
+        provider="anthropic",
+        model=model,
+        system=system,
+        prompt=prompt,
+        schema=ContinuityFindings,
+        max_tokens=2048,
+    )
+    return [p.strip() for p in found.problems if p.strip()]
+
+
 async def _op_draft_book_coda(payload: dict) -> dict:
     """Draft a closing scene for the end of one book, through the chapter pipeline.
 
@@ -6106,7 +6162,13 @@ async def _op_draft_book_coda(payload: dict) -> dict:
     act = _frame_act(outline)
     frame = _frame_rows(outline, brows, act)
     # The next book's outline exists before its text does: lean on it when that is all there is.
-    nframe = _frame_rows(outline, nrows, act) or _outline_range_rows(outline, nxt, act)
+    nframe_text = _frame_rows(outline, nrows, act)
+    nframe = nframe_text or _outline_range_rows(outline, nxt, act)
+    # What the next book actually opens with, whatever thread it is in, then its first frame chapters.
+    opening_rows: list[dict] = []
+    for r in [*nrows[:1], *nframe_text[:2]]:
+        if r not in opening_rows:
+            opening_rows.append(r)
     anchor = frame[-1] if frame else last
     tail = " ".join(str(anchor.get("content_text") or "").split()[-BOOK_CODA_TAIL_WORDS:])
     next_opening = str(nrows[0].get("content_text") or "")[:BOOK_ENDING_NEXT_OPENING_CHARS] if nrows else ""
@@ -6135,6 +6197,9 @@ async def _op_draft_book_coda(payload: dict) -> dict:
         "resolved, and never a fact the next book's opening or outline contradicts or needs for itself.\n\n"
         "Rules:\n"
         "- Only people and places already in the cast, the book or the next book's opening.\n"
+        "- Invent nothing that is plot: no new document, object, discovery, place, relationship, date or deadline. "
+        "The hook is a consequence or an escalation of what is already on the page. Wherever the next book's opening "
+        "states a date, a number, a page, a season or who knows what, use it exactly.\n"
         "- `research_questions`: up to 4 concrete questions about real-world procedure, law, dates or "
         "in-book facts the scene leans on that you are not certain of. Leave empty if none.\n"
         "- `outline_beat` is one sentence for the chapter outline; `next_bridge` is one sentence for the "
@@ -6257,7 +6322,9 @@ async def _op_draft_book_coda(payload: dict) -> dict:
     beat_text = _chapter_outline_beat(virtual, CODA_VIRTUAL_CHAPTER)
     feedback = ""
     text, words, drift, qa = "", 0, None, None
-    for _attempt in range(2):
+    failure = ""
+    problems: list[str] = []
+    for _attempt in range(3):
         writer_brief = brief.model_copy(
             update={
                 "beat": (
@@ -6280,20 +6347,43 @@ async def _op_draft_book_coda(payload: dict) -> dict:
                 text, ctx=vctx, req=req, roster_text=roster_text, period=period, model=strategy.polish
             )
             qa = await _score_chapter(text, period, roster_text, beat=beat_text)
+            text = _strip_em_dashes(text).strip()
+            words = len(text.split())
+            problems = []
+            if BOOK_CODA_MIN_WORDS <= words <= BOOK_CODA_MAX_WORDS:
+                problems = await _coda_continuity(
+                    router,
+                    settings.model_default,
+                    text=text,
+                    outline=outline,
+                    frame=frame,
+                    nframe=nframe,
+                    opening_rows=opening_rows,
+                    tail=tail,
+                    roster_text=roster_text,
+                )
         except ProviderNotRegistered:
             return await reject("no provider")
         except Exception as exc:  # noqa: BLE001 - the author is told why, not left with a silent job
             logger.warning("series.coda.write_failed", error=str(exc)[:200])
             return await reject(f"writing the scene failed ({type(exc).__name__}): {str(exc)[:120]}")
-        text = _strip_em_dashes(text).strip()
-        words = len(text.split())
-        if BOOK_CODA_MIN_WORDS <= words <= BOOK_CODA_MAX_WORDS:
-            break
-        feedback = f" Your last draft was {words} words. Write it again at {BOOK_CODA_MIN_WORDS} to {BOOK_CODA_MAX_WORDS}."
-    else:
-        return await reject(
-            f"the scene came back {words} words twice; a closing scene is {BOOK_CODA_MIN_WORDS} to {BOOK_CODA_MAX_WORDS}"
-        )
+        if not BOOK_CODA_MIN_WORDS <= words <= BOOK_CODA_MAX_WORDS:
+            failure = f"the scene came back {words} words; a closing scene is {BOOK_CODA_MIN_WORDS} to {BOOK_CODA_MAX_WORDS}"
+            feedback = f" Your last draft was {words} words. Write it again at {BOOK_CODA_MIN_WORDS} to {BOOK_CODA_MAX_WORDS}."
+            continue
+        if problems:
+            failure = "the scene contradicts or invents against the books around it: " + "; ".join(
+                problems[:5]
+            )
+            feedback = (
+                " Your last draft was rejected for continuity. Write it again and fix every one of these, "
+                "inventing nothing that is plot: " + "; ".join(problems[:6])
+            )
+            continue
+        failure = ""
+        break
+    if failure:
+        return await reject(failure)
     corpus = "\n".join(str(x.get("content_text") or "") for x in rows)
     scores = {k: v for k, v in qa.model_dump(mode="json").items() if k in QA_DIMS} if qa else None
     draft = {
@@ -6314,6 +6404,10 @@ async def _op_draft_book_coda(payload: dict) -> dict:
         if (nrows or _outline_range_rows(outline, nxt))
         else None,
         "research_failed": research_failed,
+        "continuity_checked": (
+            f"against this book's frame thread, the next book's outline ({len(nframe)} chapters) and "
+            f"its opening ({len(opening_rows[:3])} chapters)"
+        ),
         "research_topics": [*stored_topics, *live_topics],
         "research": research[:6000],
         "drift": drift.model_dump(mode="json") if drift else None,
@@ -6348,7 +6442,9 @@ async def _op_draft_book_recap(payload: dict) -> dict:
     ctx = await _load_context(project_id, {})
     outline = ctx.get("outline") or {}
     series_name = str(payload.get("series_name") or ctx.get("title") or "").strip()
+    cast = _roster_text(ctx.get("roster") or [])
     source = (
+        f"THE CAST (who is related to whom is as stated here, and nowhere else):\n{cast}\n\n"
         f"WHAT HAPPENED, CHAPTER BY CHAPTER (outline beats):\n{_beats_of(outline, prev_rows, RECAP_BEAT_CHARS)}\n\n"
         f"THE LAST PAGES OF THE PREVIOUS BOOK:\n{str(prev_rows[-1].get('content_text') or '')[-3000:]}"
     )
@@ -6360,7 +6456,8 @@ async def _op_draft_book_recap(payload: dict) -> dict:
         f"author's voice: plain, concrete, spoken aloud by a narrator. {BOOK_RECAP_MIN_WORDS} to "
         f"{BOOK_RECAP_MAX_WORDS} words, in short paragraphs.\n\n"
         "Rules:\n"
-        "- Say only what the SOURCE says. No new facts, no guesses, no names that are not in it.\n"
+        "- Say only what the SOURCE says. No new facts, no guesses, no names that are not in it. Do not state "
+        "how two people are related unless the cast says so.\n"
         "- Cover what a returning reader needs to be oriented: who, what is at stake, what changed.\n"
         "- Do not reveal or describe anything that happens in the book this recap opens. The last line only tells "
         "the reader that the story continues in this book, without naming an event, a person's action or a place.\n"

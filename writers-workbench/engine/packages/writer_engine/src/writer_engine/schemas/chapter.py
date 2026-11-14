@@ -684,3 +684,11 @@ class UnsupportedClaims(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     claims: list[str] = Field(default_factory=list)
+
+
+class ContinuityFindings(BaseModel):
+    """What a new closing scene contradicts, or invents, against the books around it."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    problems: list[str] = Field(default_factory=list)

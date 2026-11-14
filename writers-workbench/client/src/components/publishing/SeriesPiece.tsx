@@ -29,6 +29,7 @@ export interface PieceDraft {
   carried?: string;
   research_topics?: string[];
   drift?: { findings?: unknown[] } | null;
+  continuity_checked?: string;
   qa?: Record<string, number> | null;
   // Recaps only.
   sources?: number;
@@ -178,6 +179,9 @@ export default function SeriesPiece({
           {usable.carried ? <p className="text-gray-600 dark:text-gray-400">Carries forward: {usable.carried}</p> : null}
           {usable.research_topics?.length ? (
             <p className="text-gray-500 dark:text-gray-400">Researched: {usable.research_topics.join('; ')}</p>
+          ) : null}
+          {usable.continuity_checked ? (
+            <p className="text-gray-500 dark:text-gray-400">Continuity: read {usable.continuity_checked}; no contradictions or invented plot found.</p>
           ) : null}
           {kind === 'coda' ? (
             <p className="text-gray-500 dark:text-gray-400">
