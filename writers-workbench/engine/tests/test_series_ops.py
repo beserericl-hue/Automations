@@ -17,6 +17,7 @@ from chapter_step import main as M
 from writer_engine.schemas.chapter import (
     BookEndingDraft,
     CodaPlan,
+    ContinuityFindings,
     RecapDraft,
     SeriesDescription,
     SeriesTitleBook,
@@ -456,6 +457,7 @@ def pipeline(chapters: None, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     return seen
 
 
+CLEAN = ContinuityFindings(problems=[])
 PLAN = CodaPlan(
     title="The Plot Under the Binder",
     beat="Renata finds the survey plot Marcus has held back.",
@@ -475,7 +477,7 @@ class TestBookCoda:
     def test_plans_researches_writes_and_checks_the_scene_against_its_own_beat(
         self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        prompts = answer(monkeypatch, PLAN)
+        prompts = answer(monkeypatch, PLAN, CLEAN)
         out = asyncio.run(
             M._op_draft_book_coda(
                 {
@@ -508,7 +510,7 @@ class TestBookCoda:
         self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
     ) -> None:
         pipeline["text"] = "Too short."
-        answer(monkeypatch, PLAN)
+        answer(monkeypatch, PLAN, CLEAN)
         out = asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
         assert out["ok"] is False and "words" in out["reason"]
 
@@ -523,7 +525,7 @@ class TestBookCoda:
         self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
     ) -> None:
         pipeline["text"] = CODA_TEXT + " Esteban Ruiz looked up from the desk."
-        answer(monkeypatch, PLAN)
+        answer(monkeypatch, PLAN, CLEAN)
         out = asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
         assert out["ok"] is True and any(n in ("Esteban", "Ruiz", "Esteban Ruiz") for n in out["new_names"])
 
@@ -595,7 +597,7 @@ class TestSeriesPiecesAreKept:
             stored.append((bucket, index, draft))
 
         monkeypatch.setattr(M, "_store_series_piece", keep)
-        answer(monkeypatch, PLAN)
+        answer(monkeypatch, PLAN, CLEAN)
         out = asyncio.run(
             M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2, "persist": True})
         )
@@ -611,7 +613,7 @@ class TestSeriesPiecesAreKept:
             raise AssertionError("must not store")
 
         monkeypatch.setattr(M, "_store_series_piece", keep)
-        answer(monkeypatch, PLAN)
+        answer(monkeypatch, PLAN, CLEAN)
         assert asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1}))["ok"] is True
 
     def test_a_recap_is_kept_under_the_book_it_opens(
@@ -644,7 +646,7 @@ class TestQaFindingsOnThePieces:
             return texts.pop(0), 0, 0
 
         monkeypatch.setattr(M, "_write_subchapter", write)
-        answer(monkeypatch, PLAN)
+        answer(monkeypatch, PLAN, CLEAN)
         out = asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
         assert out["ok"] is True and len(beats) == 2
         assert "Your last draft was 2 words" in beats[1]
@@ -652,7 +654,7 @@ class TestQaFindingsOnThePieces:
     def test_the_outline_keeps_the_scenes_plan_not_the_instructions_for_writing_it(
         self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        answer(monkeypatch, PLAN)
+        answer(monkeypatch, PLAN, CLEAN)
         out = asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
         assert out["brief"]["beat"] == PLAN.beat
         assert "words" not in out["brief"]["beat"] and "hook" not in out["brief"]["beat"]
@@ -676,7 +678,7 @@ class TestQaFindingsOnThePieces:
 
         monkeypatch.setattr(M, "_store_series_piece", keep)
         monkeypatch.setattr(M, "_drift_correct_pass", broken)
-        answer(monkeypatch, PLAN)
+        answer(monkeypatch, PLAN, CLEAN)
         out = asyncio.run(
             M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2, "persist": True})
         )
@@ -774,7 +776,7 @@ class TestQaFindingsOnThePieces:
     def test_what_the_planner_read_the_ending_as_settling_reaches_the_scene_plan(
         self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        prompts = answer(monkeypatch, PLAN)
+        prompts = answer(monkeypatch, PLAN, CLEAN)
         asyncio.run(
             M._op_draft_book_coda(
                 {
@@ -791,7 +793,7 @@ class TestQaFindingsOnThePieces:
     def test_a_next_book_with_no_text_yet_is_not_treated_as_the_last_book(
         self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        prompts = answer(monkeypatch, PLAN)
+        prompts = answer(monkeypatch, PLAN, CLEAN)
         unwritten = {"index": 2, "first_chapter": 90, "last_chapter": 99}
         out = asyncio.run(
             M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": unwritten})
@@ -822,3 +824,61 @@ class TestFoundByARealRun:
         answer(monkeypatch, CodaPlan(beat="A scene.", hook=""))
         out = asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
         assert out["ok"] is False and out["reason"] == "the plan came back with no hook"
+
+
+class TestContinuityAgainstTheBooksAround:
+    def test_a_scene_that_contradicts_the_next_book_is_written_again_with_the_problems_told_to_the_writer(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        beats: list[str] = []
+
+        async def write(**k: Any) -> tuple[str, int, int]:
+            beats.append(k["brief"].beat)
+            return CODA_TEXT, 0, 0
+
+        monkeypatch.setattr(M, "_write_subchapter", write)
+        prompts = answer(
+            monkeypatch,
+            PLAN,
+            ContinuityFindings(problems=["texts 'page 211' but the next book opens on page forty-one"]),
+            CLEAN,
+        )
+        out = asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert out["ok"] is True and len(beats) == 2
+        assert "page 211" in beats[1] and "inventing nothing that is plot" in beats[1]
+        # The check reads the scene against the next book's opening, not just the cast and the arc.
+        assert "Susquehannock" in prompts[1] and CODA_TEXT[:40] in prompts[1]
+
+    def test_a_scene_that_keeps_contradicting_is_refused_with_the_problems(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        bad = ContinuityFindings(problems=["invents a provenance card that appears nowhere in the book"])
+        answer(monkeypatch, PLAN, bad, bad, bad)
+        out = asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert out["ok"] is False and "provenance card" in out["reason"]
+
+    def test_the_planner_is_told_to_invent_no_plot(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        systems: list[str] = []
+
+        async def fake(_router: Any, **k: Any) -> tuple[Any, None]:
+            systems.append(k["system"])
+            return (PLAN if len(systems) == 1 else CLEAN), None
+
+        monkeypatch.setattr(M, "complete_structured", fake)
+        asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert "Invent nothing that is plot" in systems[0]
+        assert "ContinuityFindings" in systems[1]
+
+
+class TestRecapKnowsTheCast:
+    def test_the_recap_and_its_checker_are_given_the_cast_so_relationships_are_not_guessed(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        prompts = answer(monkeypatch, RecapDraft(text=RECAP_TEXT), UnsupportedClaims(claims=[]))
+        asyncio.run(
+            M._op_draft_book_recap({"project_id": PROJECT, "book": RECAP_BOOK, "previous_books": [BOOK1]})
+        )
+        assert "THE CAST" in prompts[0] and "Marcus" in prompts[0]
+        assert "THE CAST" in prompts[1]  # the claim check reads against it too
