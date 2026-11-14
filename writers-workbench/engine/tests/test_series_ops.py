@@ -15,10 +15,13 @@ from chapter_step import main as M
 
 from writer_engine.schemas.chapter import (
     BookEndingDraft,
+    CodaPlan,
+    RecapDraft,
     SeriesDescription,
     SeriesTitleBook,
     SeriesTitleCandidate,
     SeriesTitles,
+    UnsupportedClaims,
 )
 
 CH30 = (
@@ -376,3 +379,253 @@ class TestMarketingGetsTheDatesFromTheRecord:
         assert "No dashes of any kind" in system
         # Book 1's copy sold a Book 3 scene (Winifred at the 1935 dig, chapter 76) taken from the record.
         assert "a scene from a later book is a promise this one does not keep" in system
+
+
+FRAME_OUTLINE = {
+    "story_arc_name": "The Stratigraphic Ascent",
+    "premise": "A repatriation dig on a Potomac bluff.",
+    "dramatic_question": "Can the bones go home?",
+    "chapters": [
+        {
+            "chapter_number": 1,
+            "title": "The Surface",
+            "act": "The Surface",
+            "beat": "Sylvia arrives.",
+            "period": "2011",
+        },
+        {
+            "chapter_number": 30,
+            "title": "Winifred",
+            "act": "The Surface",
+            "beat": "Marcus and Renata read the journal.",
+            "period": "2011",
+        },
+        {
+            "chapter_number": 31,
+            "title": "Stratum IV",
+            "act": "Stratum IV",
+            "beat": "The fort post stands.",
+            "period": "1674",
+        },
+    ],
+}
+PROJECT = "11111111-1111-1111-1111-111111111111"
+CODA_TEXT = " ".join(["Renata set the stapler down and read the plot twice."] * 70)
+
+
+@pytest.fixture
+def pipeline(chapters: None, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    seen: dict[str, Any] = {}
+
+    async def load(_pid: str, _payload: Any = None) -> dict[str, Any]:
+        return {
+            "title": "The Ossuary",
+            "genre_slug": "post-apocalyptic",
+            "outline": FRAME_OUTLINE,
+            "roster": [{"name": "Marcus", "description": "tribal member"}],
+        }
+
+    async def research(beat: str, *, period: str, title: str, focus: str = "") -> tuple[str, list[str]]:
+        seen["research_beat"] = beat
+        return "Inadvertent discoveries must be reported.", ["discovery notice"]
+
+    async def canon(_ctx: Any, beat: str, *, user_id: Any) -> str:
+        seen["canon_beat"] = beat
+        return ""
+
+    async def write(**k: Any) -> tuple[str, int, int]:
+        seen["write_brief"] = k["brief"]
+        seen["write_system"] = k["system"]
+        return seen.get("text", CODA_TEXT), 0, 0
+
+    async def drift(text: str, *, ctx: Any, req: Any, **_k: Any) -> tuple[str, None, int]:
+        seen["drift_chapter"] = req.chapter_number
+        seen["drift_beat"] = M._chapter_outline_beat(ctx["outline"], req.chapter_number)
+        return text, None, 0
+
+    async def score(*_a: Any, **_k: Any) -> None:
+        return None
+
+    monkeypatch.setattr(M, "_load_context", load)
+    monkeypatch.setattr(M, "_chapter_research", research)
+    monkeypatch.setattr(M, "_canon_grounding", canon)
+    monkeypatch.setattr(M, "_write_subchapter", write)
+    monkeypatch.setattr(M, "_drift_correct_pass", drift)
+    monkeypatch.setattr(M, "_score_chapter", score)
+    return seen
+
+
+PLAN = CodaPlan(
+    title="The Plot Under the Binder",
+    beat="Renata finds the survey plot Marcus has held back.",
+    pov_character="Renata Voss",
+    characters=["Renata Voss"],
+    story_turn="She understands what Marcus has not said.",
+    hook="Someone will lift the binder who is not her.",
+    resolved="The secret is no longer Marcus's alone.",
+    carried="What Renata will do with it.",
+    outline_beat="Closing scene: Renata finds the held survey plot.",
+    next_bridge="Renata brings Marcus the journal.",
+    research_questions=["What must a discovery notice trigger?"],
+)
+
+
+class TestBookCoda:
+    def test_plans_researches_writes_and_checks_the_scene_against_its_own_beat(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        prompts = answer(monkeypatch, PLAN)
+        out = asyncio.run(
+            M._op_draft_book_coda(
+                {
+                    "project_id": PROJECT,
+                    "user_id": "u",
+                    "book": BOOK1,
+                    "next_book": BOOK2,
+                    "direction": "season finale",
+                }
+            )
+        )
+        assert out["ok"] is True
+        assert out["content_id"] == "c30" and out["words"] >= M.BOOK_CODA_MIN_WORDS
+        assert out["hook"] == "Someone will lift the binder who is not her."
+        assert out["outline_beat"].startswith("Closing scene") and out["next_bridge"]
+        # Planned from the arc guide and the author's direction, with the next book's opening to lead into.
+        assert "season finale" in prompts[0] and "Susquehannock" in prompts[0]
+        assert "STRATIGRAPHIC" in prompts[0].upper()
+        # Researched on exactly what the plan was unsure of, and the study was folded into the writer's system.
+        assert "discovery notice" in out["research_topics"]
+        assert "What must a discovery notice trigger?" in pipeline["research_beat"]
+        assert "Inadvertent discoveries" in pipeline["write_system"]
+        # Written as a section of the book, checked for drift against the scene's own planned beat.
+        assert pipeline["write_brief"].pov_character == "Renata Voss"
+        assert "Someone will lift the binder" in pipeline["write_brief"].beat
+        assert pipeline["drift_chapter"] == M.CODA_VIRTUAL_CHAPTER
+        assert "Renata finds the survey plot" in pipeline["drift_beat"]
+
+    def test_refuses_a_scene_outside_the_length_a_closing_scene_can_be(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        pipeline["text"] = "Too short."
+        answer(monkeypatch, PLAN)
+        out = asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert out["ok"] is False and "words" in out["reason"]
+
+    def test_refuses_a_plan_with_no_hook(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        answer(monkeypatch, CodaPlan(beat="A scene.", hook=""))
+        out = asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert out["ok"] is False and "hook" in out["reason"]
+
+    def test_reports_a_name_that_is_not_in_the_book(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        pipeline["text"] = CODA_TEXT + " Esteban Ruiz looked up from the desk."
+        answer(monkeypatch, PLAN)
+        out = asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert out["ok"] is True and any(n in ("Esteban", "Ruiz", "Esteban Ruiz") for n in out["new_names"])
+
+
+RECAP_BOOK = {"index": 2, "first_chapter": 31, "last_chapter": 31}
+RECAP_TEXT = " ".join(["Sylvia walks the bluff above the Potomac and Marcus holds the report."] * 14)
+
+
+class TestBookRecap:
+    def test_a_supported_recap_is_returned(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        prompts = answer(monkeypatch, RecapDraft(text=RECAP_TEXT), UnsupportedClaims(claims=[]))
+        out = asyncio.run(
+            M._op_draft_book_recap(
+                {
+                    "project_id": PROJECT,
+                    "book": RECAP_BOOK,
+                    "previous_books": [BOOK1],
+                    "series_name": "The Ossuary",
+                }
+            )
+        )
+        assert out["ok"] is True and out["chapter_number"] == 31 and out["content_id"] == "c31"
+        assert "SOURCE" in prompts[0] and "Sylvia arrives" in prompts[0]
+        # The book it precedes is given only for the last line to lead into.
+        assert "Susquehannock" in prompts[0]
+
+    def test_an_unsupported_claim_is_sent_back_once_and_the_corrected_recap_accepted(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        prompts = answer(
+            monkeypatch,
+            RecapDraft(text=RECAP_TEXT),
+            UnsupportedClaims(claims=["Marcus burns the report"]),
+            RecapDraft(text=RECAP_TEXT),
+            UnsupportedClaims(claims=[]),
+        )
+        out = asyncio.run(
+            M._op_draft_book_recap({"project_id": PROJECT, "book": RECAP_BOOK, "previous_books": [BOOK1]})
+        )
+        assert out["ok"] is True
+        assert "Marcus burns the report" in prompts[2]
+
+    def test_a_name_that_is_not_in_the_earlier_books_is_refused_twice(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        bad = RecapDraft(text=RECAP_TEXT + " Esteban Ruiz arrives with a letter.")
+        answer(monkeypatch, bad, bad)
+        out = asyncio.run(
+            M._op_draft_book_recap({"project_id": PROJECT, "book": RECAP_BOOK, "previous_books": [BOOK1]})
+        )
+        assert out["ok"] is False and "Ruiz" in out["reason"]
+
+    def test_needs_an_earlier_book(self, pipeline: dict[str, Any]) -> None:
+        out = asyncio.run(
+            M._op_draft_book_recap({"project_id": PROJECT, "book": RECAP_BOOK, "previous_books": []})
+        )
+        assert out["ok"] is False
+
+
+class TestSeriesPiecesAreKept:
+    def test_a_coda_is_kept_on_the_project_for_the_author_when_asked(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        stored: list[tuple[str, Any, dict[str, Any]]] = []
+
+        async def keep(_pid: str, bucket: str, index: Any, draft: dict[str, Any]) -> None:
+            stored.append((bucket, index, draft))
+
+        monkeypatch.setattr(M, "_store_series_piece", keep)
+        answer(monkeypatch, PLAN)
+        out = asyncio.run(
+            M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2, "persist": True})
+        )
+        assert out["ok"] is True
+        assert [(b, i) for b, i, _ in stored] == [("codas", 1)]
+        # What is kept is what the author is shown, and it carries the hash of the chapter it was written for.
+        assert stored[0][2]["text"] == out["text"] and len(stored[0][2]["base_hash"]) == 64
+
+    def test_nothing_is_kept_unless_asked(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async def keep(*_a: Any, **_k: Any) -> None:
+            raise AssertionError("must not store")
+
+        monkeypatch.setattr(M, "_store_series_piece", keep)
+        answer(monkeypatch, PLAN)
+        assert asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1}))["ok"] is True
+
+    def test_a_recap_is_kept_under_the_book_it_opens(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        stored: list[tuple[str, Any]] = []
+
+        async def keep(_pid: str, bucket: str, index: Any, _draft: dict[str, Any]) -> None:
+            stored.append((bucket, index))
+
+        monkeypatch.setattr(M, "_store_series_piece", keep)
+        answer(monkeypatch, RecapDraft(text=RECAP_TEXT), UnsupportedClaims(claims=[]))
+        out = asyncio.run(
+            M._op_draft_book_recap(
+                {"project_id": PROJECT, "book": RECAP_BOOK, "previous_books": [BOOK1], "persist": True}
+            )
+        )
+        assert out["ok"] is True and stored == [("recaps", 2)]
