@@ -101,9 +101,70 @@ def _deliverable_html(tool: str, op: str, result: dict) -> str:
     return ""
 
 
+_SERIES_PIECE_OPS = {"draft-book-coda": "Closing scene", "draft-book-recap": "Recap"}
+
+
+def _series_piece_email(op: str, body: dict, result: dict) -> tuple[str, str]:
+    """The email for a drafted closing scene or recap: the text itself, what the engine checked, and what to do
+    next. A refusal says why, because a job that ends quietly looks like nothing happened."""
+    label = _SERIES_PIECE_OPS[op]
+    raw_book = body.get("book")
+    book: dict[str, Any] = raw_book if isinstance(raw_book, dict) else {}
+    where = f"Book {book.get('index')}" if book.get("index") is not None else "your book"
+    project = body.get("title") or body.get("series_name") or body.get("project_id") or "your project"
+    sans = "font-family:system-ui,sans-serif"
+    if not result.get("ok"):
+        reason = escape(str(result.get("reason") or "no reason was given"))
+        subject = f"[Writer's Workbench] {label} for {where} could not be drafted — {project}"
+        html = (
+            f"<h2 style='{sans}'>The {label.lower()} for {escape(where)} could not be drafted</h2>"
+            f"<p style='{sans}'>{reason}</p>"
+            f"<p style='{sans}'>Nothing in your book changed. You can try again from the Series panel on the Publish page.</p>"
+        )
+        return subject, html
+    qa = result.get("qa") or {}
+    qa_vals = {k: v for k, v in qa.items() if isinstance(v, (int, float))}
+    weakest = min(qa_vals.items(), key=lambda kv: kv[1]) if qa_vals else None
+    drift = result.get("drift") or {}
+    findings = len(drift.get("findings") or []) if isinstance(drift, dict) else 0
+    rows = [
+        ("For", f"{where}, chapter {result.get('chapter_number')}: {result.get('chapter_title')}"),
+        ("Words", f"{result.get('words'):,}" if result.get("words") else None),
+        ("Ends on", result.get("hook")),
+        ("Settles", result.get("resolved")),
+        ("Carries forward", result.get("carried")),
+        ("Researched", ", ".join(map(str, result.get("research_topics") or [])) or None),
+        (
+            "Drift check",
+            (f"{findings} finding(s) corrected or noted" if findings else "no drift found")
+            if op == "draft-book-coda"
+            else None,
+        ),
+        ("Weakest craft score", f"{weakest[0].replace('_', ' ')} {weakest[1]:.2f}" if weakest else None),
+        ("Names not yet in the book", ", ".join(result.get("new_names") or []) or None),
+    ]
+    table = "".join(
+        f"<tr><td style='padding:2px 12px 2px 0;color:#666;vertical-align:top'>{escape(k)}</td><td style='padding:2px 0'>{escape(str(v))}</td></tr>"
+        for k, v in rows
+        if v
+    )
+    subject = f"[Writer's Workbench] {label} drafted for {where} — {project}"
+    html = (
+        f"<h2 style='{sans}'>The {label.lower()} for {escape(where)} is drafted</h2>"
+        f"<table style='{sans};font-size:14px'>{table}</table>"
+        "<p style='font-family:system-ui,sans-serif'>It is in the Series panel on the Publish page, ready to read and edit. "
+        "It goes into the book when you add it.</p>"
+        "<hr><div style='font-family:Georgia,serif;font-size:15px;line-height:1.6;white-space:pre-wrap'>"
+        f"{escape(str(result.get('text') or ''))}</div>"
+    )
+    return subject, html
+
+
 def build_task_email(tool: str, body: dict, result: dict) -> tuple[str, str]:
     """Return (subject, html) for a completed task — the deliverable + a metadata block."""
     op = str(body.get("op") or "")
+    if tool == "chapter" and op in _SERIES_PIECE_OPS:
+        return _series_piece_email(op, body, result)
     chapter = body.get("chapter_number")
     # G8: thread the work's own title (research topic / outline title / content title) into the label.
     result_title = (

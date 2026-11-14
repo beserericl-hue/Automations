@@ -48,3 +48,36 @@ def test_email_gating() -> None:
     assert (
         asyncio.run(send_task_completion_email("chapter", {"notify": False}, {"content_text": "x"})) is False
     )
+
+
+def test_a_drafted_closing_scene_is_emailed_with_its_text_and_what_was_checked() -> None:
+    subject, html = build_task_email(
+        "chapter",
+        {"op": "draft-book-coda", "book": {"index": 1}, "title": "The Ossuary"},
+        {
+            "ok": True,
+            "chapter_number": 29,
+            "chapter_title": "Triangular projectile point",
+            "words": 812,
+            "hook": "Someone will lift the binder.",
+            "research_topics": ["discovery notice"],
+            "qa": {"story_turn_density": 0.71, "character_consistency": 0.95},
+            "drift": {"findings": []},
+            "new_names": ["Esteban"],
+            "text": "Renata lifted the <binder>.",
+        },
+    )
+    assert "Closing scene drafted for Book 1" in subject
+    assert "Renata lifted the &lt;binder&gt;." in html  # the text, escaped
+    assert "Someone will lift the binder." in html and "story turn density 0.71" in html and "Esteban" in html
+    assert "no drift found" in html
+
+
+def test_a_draft_that_could_not_be_made_says_why_and_that_nothing_changed() -> None:
+    subject, html = build_task_email(
+        "chapter",
+        {"op": "draft-book-recap", "book": {"index": 2}},
+        {"ok": False, "reason": "the recap was refused twice: it names Ruiz"},
+    )
+    assert "could not be drafted" in subject and "Book 2" in subject
+    assert "names Ruiz" in html and "Nothing in your book changed" in html

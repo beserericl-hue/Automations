@@ -147,6 +147,8 @@ vi.mock('../middleware/auth.js', () => ({
 vi.mock('../lib/logger.js', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 const engine = vi.fn();
 const engineJob = vi.fn();
+const sendMail = vi.fn();
+vi.mock('../lib/email.js', () => ({ sendEmail: (...a: unknown[]) => sendMail(...a) }));
 vi.mock('../lib/engine-hub.js', () => ({
   callEngineWriteToolSync: (...a: unknown[]) => engine(...a),
   callEngineWriteTool: (...a: unknown[]) => engineJob(...a),
@@ -182,6 +184,9 @@ const CHAPTER = 'Marcus carried the box. He set it on the table. I need to think
 beforeEach(() => {
   engine.mockReset();
   engineJob.mockReset();
+  sendMail.mockReset();
+  sendMail.mockResolvedValue({ ok: true });
+  db.users_v2 = [{ user_id: 'u1', email: 'eric@example.com' }];
   failing.insert = null;
   failing.update = null;
   db.outline_versions_v2 = [];
@@ -445,6 +450,43 @@ describe('closing scene and recap: what QA found', () => {
       expect((await call(base, 'PUT', '/series/books/1/coda', { text: 'x'.repeat(50) })).error.code).toBe('NO_DRAFT');
       const cleared = await call(base, 'DELETE', '/series/books/1/coda');
       expect(cleared.data.series.books[0].coda_draft).toBeNull();
+    });
+  });
+});
+
+
+describe('the email that follows a change to the book', () => {
+  it('tells the author what went in, with the words, and what changed in the outline', async () => {
+    seed({ codas: { '1': codaDraft({ research_topics: ['discovery notice'], new_names: [] }) }, books: { '1': { title: 'The Color of Old Pewter', first_chapter: 0, last_chapter: 30, source: 'edited', chosen_at: 'x' } } });
+    await withServer(async (base) => {
+      await call(base, 'POST', '/series/books/1/coda/apply');
+      expect(sendMail).toHaveBeenCalledTimes(1);
+      const m = sendMail.mock.calls[0][0];
+      expect(m.to).toBe('eric@example.com');
+      expect(m.subject).toContain('Closing scene added to Book 1, The Color of Old Pewter');
+      expect(m.html).toContain(SCENE);
+      expect(m.html).toContain('Chapter 31 now records how it picks up: Renata brings Marcus the journal.');
+      expect(m.html).toContain('researched: discovery notice');
+      expect(m.html).toContain('Nothing was re-recorded');
+    });
+  });
+
+  it('does not fail the change when the email cannot be sent', async () => {
+    seed({ codas: { '1': codaDraft() } });
+    sendMail.mockRejectedValue(new Error('postal down'));
+    await withServer(async (base) => {
+      const j = await call(base, 'POST', '/series/books/1/coda/apply');
+      expect(j.success).toBe(true);
+      expect(db.published_content_v2[0].content_text).toContain(SCENE);
+    });
+  });
+
+  it('says what a recap is in the same way', async () => {
+    seed({ recaps: { '2': { content_id: 'c30', base_hash: textHash(CHAPTER), chapter_number: 31, chapter_title: 'Stratum IV', text: 'Sylvia walks the bluff.', words: 4, sources: 3, new_names: [], drafted_at: 'x' } } });
+    await withServer(async (base) => {
+      await call(base, 'POST', '/series/books/2/recap/apply');
+      expect(sendMail.mock.calls[0][0].subject).toContain('Recap added to Book 2');
+      expect(sendMail.mock.calls[0][0].html).toContain('drawn from 3 chapters of the earlier books');
     });
   });
 });
