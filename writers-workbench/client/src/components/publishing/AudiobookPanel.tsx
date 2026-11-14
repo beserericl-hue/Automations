@@ -33,6 +33,7 @@ interface Options {
   voices: Voice[];
   styles: Style[];
   max_custom_style: number;
+  max_narrator_credit?: number;
   credits_per_unit: number;
   unit_words: number;
 }
@@ -59,6 +60,8 @@ interface Settings {
   custom_style: string;
   credits: boolean;
   pronunciations: Pronunciation[];
+  narrator_credit_mode?: 'auto' | 'custom' | 'none';
+  narrator_credit?: string;
 }
 type Status = 'none' | 'queued' | 'building' | 'ready' | 'failed';
 interface Item {
@@ -393,7 +396,8 @@ export default function AudiobookPanel({ projectId, volumeCount }: { projectId: 
         data-testid="audiobook-notice"
         className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
       >
-        The narrator is a synthetic (A.I.) voice, and the opening credits say so. Audible’s standard ACX route
+        The narrator is a synthetic voice. Unless you change it under “Narrator credit”, the opening credits say so.
+        Whatever you choose, check each store’s rules on disclosing A.I. narration. Audible’s standard ACX route
         accepts human narration unless a program authorizes otherwise, so check the store’s rules before you
         submit these files; they suit stores that take A.I. narration, your own site and direct delivery.
       </p>
@@ -648,6 +652,40 @@ export default function AudiobookPanel({ projectId, volumeCount }: { projectId: 
               />
               Speak opening credits (title, author, narrator) and closing credits
             </label>
+
+            {form.credits ? (
+              <div className="space-y-1.5" data-testid="audiobook-credit-box">
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300" htmlFor="audiobook-credit-mode">
+                  Narrator credit
+                </label>
+                <select
+                  id="audiobook-credit-mode"
+                  data-testid="audiobook-credit-mode"
+                  value={form.narrator_credit_mode ?? 'auto'}
+                  onChange={(e) => set('narrator_credit_mode', e.target.value as 'auto' | 'custom' | 'none')}
+                  className="w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-900"
+                >
+                  <option value="auto">Automatic: “Narrated by” my own ElevenLabs voice’s name, otherwise “an A.I. voice”</option>
+                  <option value="custom">My own words</option>
+                  <option value="none">Say nothing about the narrator</option>
+                </select>
+                {(form.narrator_credit_mode ?? 'auto') === 'custom' ? (
+                  <input
+                    type="text"
+                    data-testid="audiobook-credit-text"
+                    value={form.narrator_credit ?? ''}
+                    maxLength={options.max_narrator_credit ?? 200}
+                    onChange={(e) => set('narrator_credit', e.target.value)}
+                    placeholder="For example: Read by the author, in a voice made from their own."
+                    aria-label="Spoken narrator credit"
+                    className="w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-900"
+                  />
+                ) : null}
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Only the opening recording changes; the chapters keep their recordings. The title and author are still spoken.
+                </p>
+              </div>
+            ) : null}
 
             {dirty ? (
               <div

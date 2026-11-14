@@ -108,7 +108,7 @@ describe('AudiobookPanel', () => {
   it('says the narrator is a synthetic voice and what that means for Audible’s ACX route', async () => {
     renderWithProviders(<AudiobookPanel projectId="p1" volumeCount={1} />);
     const notice = await screen.findByTestId('audiobook-notice');
-    expect(notice).toHaveTextContent('synthetic (A.I.) voice');
+    expect(notice).toHaveTextContent('synthetic voice');
     expect(notice).toHaveTextContent('ACX');
   });
 
@@ -179,6 +179,22 @@ describe('AudiobookPanel', () => {
     await waitFor(() =>
       expect(bodyOf('/settings', 'PUT')).toEqual({ volume: 1, voice: 'cedar', style: 'thriller', custom_style: 'a touch slower', credits: false }),
     );
+  });
+
+  it('the narrator credit is the author\'s to write: automatic, their own words, or nothing, and it is saved with the narrator', async () => {
+    renderWithProviders(<AudiobookPanel projectId="p1" volumeCount={1} />);
+    const mode = await screen.findByTestId('audiobook-credit-mode');
+    expect(mode).toHaveValue('auto');
+    expect(screen.queryByTestId('audiobook-credit-text')).toBeNull();
+    fireEvent.change(mode, { target: { value: 'custom' } });
+    fireEvent.change(await screen.findByTestId('audiobook-credit-text'), { target: { value: 'Read by the author.' } });
+    fireEvent.click(screen.getByTestId('audiobook-save'));
+    await waitFor(() => expect(bodyOf('/settings', 'PUT')).toMatchObject({ narrator_credit_mode: 'custom', narrator_credit: 'Read by the author.' }));
+    fireEvent.change(screen.getByTestId('audiobook-credit-mode'), { target: { value: 'none' } });
+    expect(screen.queryByTestId('audiobook-credit-text')).toBeNull();
+    // With the credits switched off there is nothing to word.
+    fireEvent.click(screen.getByTestId('audiobook-credits'));
+    expect(screen.queryByTestId('audiobook-credit-box')).toBeNull();
   });
 
   it('a changed style offers save and re-narrate next to the choices, with the price; it saves first, then builds', async () => {
