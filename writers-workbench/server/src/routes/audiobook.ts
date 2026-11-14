@@ -34,6 +34,7 @@ import {
   BUCKET,
   CREDIT_WORDS,
   MAX_CUSTOM_STYLE,
+  MAX_NARRATOR_CREDIT,
   MAX_PRONUNCIATIONS,
   SAMPLE_POSITION,
   STYLES,
@@ -83,6 +84,8 @@ const SettingsBody = z.object({
   style: z.string().max(40).optional(),
   custom_style: z.string().max(MAX_CUSTOM_STYLE * 2).optional(),
   credits: z.boolean().optional(),
+  narrator_credit_mode: z.enum(['auto', 'custom', 'none']).optional(),
+  narrator_credit: z.string().max(MAX_NARRATOR_CREDIT * 2).optional(),
   pronunciations: z.array(z.object({ word: z.string().max(120), say: z.string().max(160) })).max(MAX_PRONUNCIATIONS * 2).optional(),
   /** Preview only: say this instead of the book's opening (one word or phrase of the guide). */
   say: z.string().max(120).optional(),
@@ -116,6 +119,8 @@ interface BookRow {
   credits: boolean;
   pronunciations: unknown;
   narrator_name: string | null;
+  narrator_credit_mode: string | null;
+  narrator_credit: string | null;
 }
 
 interface ItemRow {
@@ -144,7 +149,7 @@ const ITEM_COLUMNS =
 async function findBook(userId: string, projectId: string, volume: number): Promise<BookRow | null> {
   const { data } = await getSupabaseAdmin()
     .from('audiobooks_v2')
-    .select('id, provider, voice, style, custom_style, credits, pronunciations, narrator_name')
+    .select('id, provider, voice, style, custom_style, credits, pronunciations, narrator_name, narrator_credit_mode, narrator_credit')
     .eq('project_id', projectId)
     .eq('user_id', userId)
     .eq('volume_index', volume)
@@ -166,7 +171,7 @@ async function ensureBook(userId: string, projectId: string, volume: number, set
   const { data, error } = await sb
     .from('audiobooks_v2')
     .insert({ user_id: userId, project_id: projectId, volume_index: volume, ...s })
-    .select('id, provider, voice, style, custom_style, credits, pronunciations, narrator_name')
+    .select('id, provider, voice, style, custom_style, credits, pronunciations, narrator_name, narrator_credit_mode, narrator_credit')
     .single();
   if (error || !data) throw new Error(error?.message ?? 'audiobook not created');
   return data as BookRow;
@@ -255,6 +260,7 @@ audiobookRouter.get('/options', async (_req: Request, res: Response) => {
       voices: VOICES,
       styles: STYLES,
       max_custom_style: MAX_CUSTOM_STYLE,
+      max_narrator_credit: MAX_NARRATOR_CREDIT,
       credits_per_unit: await getCreditCost('audiobook_narration'),
       unit_words: CREDIT_WORDS,
     },

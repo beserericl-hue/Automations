@@ -81,9 +81,27 @@ export interface AudioSettings {
   pronunciations: Pronunciation[];
   /** The author's own ElevenLabs voice's name, for "Narrated by <name>". Empty: say it is an A.I. voice. */
   narrator_name: string;
+  /** How the opening names the narrator: the automatic wording, the author's own sentence, or not at all. */
+  narrator_credit_mode: CreditMode;
+  /** The author's own sentence, spoken exactly as written when the mode is "custom". */
+  narrator_credit: string;
 }
 
-export const DEFAULT_SETTINGS: AudioSettings = { provider: 'openai', voice: 'marin', style: 'fiction', custom_style: '', credits: true, pronunciations: [], narrator_name: '' };
+export type CreditMode = 'auto' | 'custom' | 'none';
+export const CREDIT_MODES: readonly CreditMode[] = ['auto', 'custom', 'none'];
+export const MAX_NARRATOR_CREDIT = 200;
+
+export const DEFAULT_SETTINGS: AudioSettings = {
+  provider: 'openai',
+  voice: 'marin',
+  style: 'fiction',
+  custom_style: '',
+  credits: true,
+  pronunciations: [],
+  narrator_name: '',
+  narrator_credit_mode: 'auto',
+  narrator_credit: '',
+};
 
 /** A guide from a request or a stored row: trimmed, no blanks, one line per word (the last one wins), bounded. */
 export function normalizePronunciations(raw: unknown): Pronunciation[] {
@@ -114,7 +132,16 @@ export function normalizeSettings(raw: Partial<Record<keyof AudioSettings, unkno
     pronunciations: normalizePronunciations(raw?.pronunciations),
     // Only an ElevenLabs voice can carry a person's name; the built-in voices are always A.I. voices.
     narrator_name: elevenVoice ? String(raw?.narrator_name ?? '').replace(/\s+/g, ' ').trim().slice(0, 80) : '',
+    ...normalizeCredit(raw?.narrator_credit_mode, raw?.narrator_credit),
   };
+}
+
+/** The author's choice for the narrator credit. "Custom" with nothing written is the automatic wording. */
+function normalizeCredit(modeRaw: unknown, textRaw: unknown): Pick<AudioSettings, 'narrator_credit_mode' | 'narrator_credit'> {
+  const text = String(textRaw ?? '').replace(/\s+/g, ' ').trim().slice(0, MAX_NARRATOR_CREDIT);
+  const mode = CREDIT_MODES.find((m) => m === modeRaw) ?? 'auto';
+  if (mode === 'custom' && !text) return { narrator_credit_mode: 'auto', narrator_credit: '' };
+  return { narrator_credit_mode: mode, narrator_credit: mode === 'custom' ? text : '' };
 }
 
 export interface PlannedItem {
@@ -158,10 +185,22 @@ export function spokenChapterTitle(number: number, title: string | null | undefi
  * The words spoken before the first chapter. The narrator is named for what it is: a person's name when the
  * author reads in their own cloned voice, an A.I. voice otherwise.
  */
-export function openingText(title: string, author: string, narrator = ''): string {
+export function openingText(
+  title: string,
+  author: string,
+  narrator = '',
+  credit: { mode: CreditMode; text: string } = { mode: 'auto', text: '' },
+): string {
   const by = author.trim() ? ` Written by ${author.trim()}.` : '';
+  const head = `${title.trim()}.${by}`;
+  // The author's own choice wins over the automatic wording: their sentence as written, or none at all.
+  if (credit.mode === 'none') return head;
+  if (credit.mode === 'custom' && credit.text.trim()) {
+    const own = credit.text.trim();
+    return `${head} ${/[.!?…]$/.test(own) ? own : `${own}.`}`;
+  }
   const who = narrator.trim() ? narrator.trim() : 'an A.I. voice';
-  return `${title.trim()}.${by} Narrated by ${who}.`;
+  return `${head} Narrated by ${who}.`;
 }
 
 export function closingText(title: string, author: string): string {
@@ -184,7 +223,7 @@ export function planAudiobook(source: BookSource, volumeIndex: number, settings:
 
   const items: PlannedItem[] = [];
   if (settings.credits) {
-    const text = openingText(parts.fullTitle, source.author, settings.narrator_name);
+    const text = openingText(parts.fullTitle, source.author, settings.narrator_name, { mode: settings.narrator_credit_mode, text: settings.narrator_credit });
     items.push({ kind: 'opening', chapter_number: 0, position: OPENING_POSITION, title: 'Opening credits', source_text: text, words: countWords(text) });
   }
   parts.rows.forEach((c, i) => {

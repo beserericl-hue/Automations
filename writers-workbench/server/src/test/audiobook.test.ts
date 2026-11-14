@@ -173,6 +173,28 @@ describe('the plan', () => {
     expect(bare.items.map((i) => [i.kind, i.position])).toEqual([['chapter', 1], ['chapter', 2]]);
   });
 
+  it('the narrator credit is the author\'s choice: automatic wording, their own sentence as written, or none', async () => {
+    const { openingText, planAudiobook, normalizeSettings, hashItem } = await import('../lib/audiobook.js');
+    expect(openingText('The Ossuary', 'Eric Beser')).toBe('The Ossuary. Written by Eric Beser. Narrated by an A.I. voice.');
+    expect(openingText('The Ossuary', 'Eric Beser', '', { mode: 'none', text: '' })).toBe('The Ossuary. Written by Eric Beser.');
+    expect(openingText('The Ossuary', 'Eric Beser', '', { mode: 'custom', text: 'Read by the author' })).toBe('The Ossuary. Written by Eric Beser. Read by the author.');
+    expect(openingText('The Ossuary', 'Eric Beser', 'Eric Beser', { mode: 'custom', text: 'In the author\'s own voice!' })).toBe("The Ossuary. Written by Eric Beser. In the author's own voice!");
+    // Custom with nothing written is the automatic wording, and text is dropped unless the mode is custom.
+    expect(normalizeSettings({ narrator_credit_mode: 'custom', narrator_credit: '  ' })).toMatchObject({ narrator_credit_mode: 'auto', narrator_credit: '' });
+    expect(normalizeSettings({ narrator_credit_mode: 'none', narrator_credit: 'x' })).toMatchObject({ narrator_credit_mode: 'none', narrator_credit: '' });
+    expect(normalizeSettings({ narrator_credit_mode: 'bogus' })).toMatchObject({ narrator_credit_mode: 'auto' });
+    expect(normalizeSettings({ narrator_credit_mode: 'custom', narrator_credit: 'a'.repeat(500) }).narrator_credit).toHaveLength(200);
+    // The plan speaks it, and changing it changes the opening recording only.
+    const { loadBookSource } = await import('../lib/book-source.js');
+    const src = (await loadBookSource(PROJECT, 'u1'))!;
+    const auto = planAudiobook(src, 1, normalizeSettings(null))!;
+    const none = planAudiobook(src, 1, normalizeSettings({ narrator_credit_mode: 'none' }))!;
+    expect(none.items[0].source_text).toBe('The Ossuary. Written by Eric Beser.');
+    const s = normalizeSettings(null);
+    expect(hashItem(auto.items[0], s)).not.toBe(hashItem(none.items[0], s));
+    expect(hashItem(auto.items[1], s)).toBe(hashItem(none.items[1], s));
+  });
+
   it('a recording is identified by its words, voice and direction — and by nothing else', async () => {
     const { hashItem, normalizeSettings } = await import('../lib/audiobook.js');
     const item = { kind: 'chapter' as const, title: 'Chapter 1', source_text: 'Hello.' };
@@ -244,7 +266,7 @@ describe('settings', () => {
       const put = await call(base, 'PUT', `/project/${PROJECT}/settings`, { volume: 1, voice: 'cedar', style: 'thriller', custom_style: 'a little slower', credits: false });
       expect(put.status).toBe(200);
       const r = await get(base);
-      expect(r.data.settings).toEqual({ provider: 'openai', voice: 'cedar', style: 'thriller', custom_style: 'a little slower', credits: false, pronunciations: [], narrator_name: '' });
+      expect(r.data.settings).toEqual({ provider: 'openai', voice: 'cedar', style: 'thriller', custom_style: 'a little slower', credits: false, pronunciations: [], narrator_name: '', narrator_credit_mode: 'auto', narrator_credit: '' });
       expect(r.data.items.map((i: Row) => i.kind)).toEqual(['chapter', 'chapter']);
     });
   });
