@@ -549,8 +549,8 @@ class TestBookRecap:
         )
         assert out["ok"] is True and out["chapter_number"] == 31 and out["content_id"] == "c31"
         assert "SOURCE" in prompts[0] and "Sylvia arrives" in prompts[0]
-        # The book it precedes is given only for the last line to lead into.
-        assert "Susquehannock" in prompts[0]
+        # The book it precedes is not shown to the writer: nothing in it can leak into the recap.
+        assert "Susquehannock" not in prompts[0]
 
     def test_an_unsupported_claim_is_sent_back_once_and_the_corrected_recap_accepted(
         self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
@@ -572,11 +572,11 @@ class TestBookRecap:
         self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
     ) -> None:
         bad = RecapDraft(text=RECAP_TEXT + " Esteban Ruiz arrives with a letter.")
-        answer(monkeypatch, bad, bad)
+        answer(monkeypatch, bad, bad, bad)
         out = asyncio.run(
             M._op_draft_book_recap({"project_id": PROJECT, "book": RECAP_BOOK, "previous_books": [BOOK1]})
         )
-        assert out["ok"] is False and "Ruiz" in out["reason"]
+        assert out["ok"] is False and "Ruiz" in out["reason"] and "three times" in out["reason"]
 
     def test_needs_an_earlier_book(self, pipeline: dict[str, Any]) -> None:
         out = asyncio.run(
@@ -798,3 +798,27 @@ class TestQaFindingsOnThePieces:
         )
         assert out["ok"] is True
         assert "not written yet" in prompts[0] and "This is the last book" not in prompts[0]
+
+
+class TestFoundByARealRun:
+    def test_the_plan_instructions_name_every_field_the_engine_reads(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A real run came back "no scene or no hook": the model was told "match CodaPlan" without being told the keys.
+        systems: list[str] = []
+
+        async def fake(_router: Any, **k: Any) -> tuple[Any, None]:
+            systems.append(k["system"])
+            return PLAN, None
+
+        monkeypatch.setattr(M, "complete_structured", fake)
+        asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        for key in CodaPlan.model_fields:
+            assert key in systems[0], f"the plan instructions never name `{key}`"
+
+    def test_a_plan_with_no_hook_says_which_part_was_missing(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        answer(monkeypatch, CodaPlan(beat="A scene.", hook=""))
+        out = asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert out["ok"] is False and out["reason"] == "the plan came back with no hook"

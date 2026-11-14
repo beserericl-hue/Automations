@@ -6139,8 +6139,11 @@ async def _op_draft_book_coda(payload: dict) -> dict:
         "in-book facts the scene leans on that you are not certain of. Leave empty if none.\n"
         "- `outline_beat` is one sentence for the chapter outline; `next_bridge` is one sentence for the "
         "next book's first chapter outline entry, saying how it picks up from this scene.\n"
-        "- No em dashes.\n"
-        "Reply with strict JSON matching CodaPlan."
+        "- No em dashes.\n\n"
+        "Reply with strict JSON with exactly these keys: title; beat (what happens in the scene, 2 to 4 sentences); "
+        "pov_character; characters (list of names); setting; emotional_tone; story_turn (what changes by the "
+        "end of the scene); arc_beat; connects_to_book_arc; hook (the unresolved last beat the reader is left "
+        "with); resolved; carried; outline_beat; next_bridge; research_questions (list, may be empty)."
     )
     prompt = (
         f"THE STORY: {_arc_summary(outline)}\n\n"
@@ -6179,8 +6182,9 @@ async def _op_draft_book_coda(payload: dict) -> dict:
         return await reject("no provider")
     except ValueError as exc:
         return await reject(f"unreadable plan: {str(exc)[:120]}")
-    if not plan.beat.strip() or not plan.hook.strip():
-        return await reject("the plan had no scene or no hook")
+    missing = [name for name, value in (("scene", plan.beat), ("hook", plan.hook)) if not value.strip()]
+    if missing:
+        return await reject(f"the plan came back with no {' or '.join(missing)}")
 
     # Research first, as for a chapter: the project's own cited study for the thread, topped up with a live
     # pass on exactly what the plan said it was unsure of.
@@ -6344,7 +6348,6 @@ async def _op_draft_book_recap(payload: dict) -> dict:
     ctx = await _load_context(project_id, {})
     outline = ctx.get("outline") or {}
     series_name = str(payload.get("series_name") or ctx.get("title") or "").strip()
-    opening = str(this_rows[0].get("content_text") or "")[:3500]
     source = (
         f"WHAT HAPPENED, CHAPTER BY CHAPTER (outline beats):\n{_beats_of(outline, prev_rows, RECAP_BEAT_CHARS)}\n\n"
         f"THE LAST PAGES OF THE PREVIOUS BOOK:\n{str(prev_rows[-1].get('content_text') or '')[-3000:]}"
@@ -6359,18 +6362,18 @@ async def _op_draft_book_recap(payload: dict) -> dict:
         "Rules:\n"
         "- Say only what the SOURCE says. No new facts, no guesses, no names that are not in it.\n"
         "- Cover what a returning reader needs to be oriented: who, what is at stake, what changed.\n"
-        "- Do not reveal anything that happens in the book this recap opens. Its opening is given only so "
-        "the last line can lead into it without repeating it.\n"
+        "- Do not reveal or describe anything that happens in the book this recap opens. The last line only tells "
+        "the reader that the story continues in this book, without naming an event, a person's action or a place.\n"
         "- Weight the most recent book most; earlier books in a line or two.\n"
         "- No em dashes. No heading; the app adds it.\n"
         "Reply with strict JSON matching RecapDraft {text}."
     )
-    base_prompt = f"SOURCE:\n{source}\n\nTHE OPENING OF THE BOOK THIS RECAP PRECEDES:\n{opening}\n"
+    base_prompt = f"SOURCE:\n{source}\n"
     fix = ""
     text = ""
     problem = ""
     try:
-        for _attempt in range(2):
+        for _attempt in range(3):
             draft, _ = await complete_structured(
                 router,
                 provider="anthropic",
@@ -6429,7 +6432,7 @@ async def _op_draft_book_recap(payload: dict) -> dict:
     except Exception as exc:  # noqa: BLE001 - the author is told why, not left with a silent job
         logger.warning("series.recap.failed", error=str(exc)[:200])
         return await reject(f"the recap failed ({type(exc).__name__}): {str(exc)[:120]}")
-    return await reject(f"the recap was refused twice: {problem}")
+    return await reject(f"the recap was refused three times: {problem}")
 
 
 async def _op_humanize_passage(payload: dict) -> dict:

@@ -23,6 +23,8 @@ import { validateBody } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import { callEngineWriteTool, callEngineWriteToolSync } from '../lib/engine-hub.js';
+import { sendEmail } from '../lib/email.js';
+import { pieceAppliedEmail } from '../lib/series-mail.js';
 import { logger } from '../lib/logger.js';
 import { loadProject, marketingKey, saveOutline } from './publishing.js';
 import {
@@ -30,6 +32,7 @@ import {
   chapterWithRecap,
   outlineWithCoda,
   outlineWithRecap,
+  bookTitle,
   plannedBooks,
   seriesName,
   seriesView,
@@ -502,6 +505,42 @@ for (const kind of ['coda', 'recap'] as PieceKind[]) {
         throw new Error(error.message);
       }
       logger.info({ userId: req.userId, projectId: project.id, index, kind, contentId: piece.content_id }, 'series: piece applied');
+      // Told in writing, with the words in the message. Best-effort: the change is made whether or not mail goes.
+      try {
+        const { data: user } = await supabase.from('users_v2').select('email').eq('user_id', req.userId!).maybeSingle();
+        const to = String((user as { email?: string } | null)?.email ?? '').trim();
+        if (to) {
+          const sameChapter = (outline.chapters as Record<string, unknown>[] | undefined)?.find((c) => String(c?.chapter_number) === String(piece.chapter_number));
+          const subs = (sameChapter?.chapter_outline as { sub_chapters?: unknown[] } | null | undefined)?.sub_chapters;
+          const coda = piece as CodaDraft;
+          const changes =
+            kind === 'coda'
+              ? [
+                  coda.outline_beat ? `Chapter ${piece.chapter_number}'s outline beat now includes: ${coda.outline_beat}` : '',
+                  Array.isArray(subs) && subs.length ? `Chapter ${piece.chapter_number}'s chapter outline gained the scene as sub-chapter ${subs.length + 1}` : '',
+                  coda.next_chapter_number != null && coda.next_bridge ? `Chapter ${coda.next_chapter_number} now records how it picks up: ${coda.next_bridge}` : '',
+                ].filter(Boolean)
+              : [`Chapter ${piece.chapter_number}'s outline now notes that it opens with a recap of the previous book`];
+          const checks =
+            kind === 'coda'
+              ? [
+                  coda.hook ? `ends on: ${coda.hook}` : '',
+                  coda.research_topics?.length ? `researched: ${coda.research_topics.join(', ')}` : '',
+                  `drift check: ${(coda.drift as { findings?: unknown[] } | null)?.findings?.length ? `${(coda.drift as { findings: unknown[] }).findings.length} finding(s) corrected or noted` : 'no drift found'}`,
+                  piece.new_names?.length ? `names not yet in the book: ${piece.new_names.join(', ')}` : 'no names outside the book',
+                ].filter(Boolean)
+              : [`drawn from ${(piece as RecapPiece).sources} chapters of the earlier books`, piece.new_names?.length ? `names not yet in the book: ${piece.new_names.join(', ')}` : 'no names outside the earlier books'];
+          const base = process.env.PUBLIC_APP_URL?.trim().replace(/\/$/, '') ?? '';
+          const mail = pieceAppliedEmail({
+            kind, bookIndex: index, bookTitle: bookTitle(outline, index), seriesTitle: seriesName(outline, project.title),
+            chapterNumber: piece.chapter_number, chapterTitle: piece.chapter_title, text: piece.text, words: piece.words,
+            outlineChanges: changes, checks, link: base ? `${base}/projects/${project.id}/publish` : '',
+          });
+          await sendEmail({ to, ...mail });
+        }
+      } catch (err) {
+        logger.warn({ err, projectId: project.id, index, kind }, 'series: the change email could not be sent');
+      }
       res.json({ success: true, data: { series: seriesView(next_, project.title) } });
     } catch (err) {
       next(err);
