@@ -6330,7 +6330,7 @@ async def _op_draft_book_recap(payload: dict) -> dict:
                 problem = "unsupported: " + "; ".join(c.strip() for c in check.claims[:4])
                 fix = f"\n\nYour last draft was rejected because the source does not support: {problem}. Write it again."
                 continue
-            draft = {
+            piece: dict[str, Any] = {
                 "content_id": this_rows[0].get("id"),
                 "base_hash": hashlib.sha256(str(this_rows[0].get("content_text") or "").encode()).hexdigest(),
                 "chapter_number": this_rows[0].get("chapter_number"),
@@ -6342,8 +6342,8 @@ async def _op_draft_book_recap(payload: dict) -> dict:
                 "unsupported": [],
             }
             if payload.get("persist"):
-                await _store_series_piece(project_id, "recaps", book.get("index"), draft)
-            return {"ok": True, **draft}
+                await _store_series_piece(project_id, "recaps", book.get("index"), piece)
+            return {"ok": True, **piece}
     except ProviderNotRegistered:
         return {"ok": False, "reason": "no provider"}
     except ValueError as exc:
