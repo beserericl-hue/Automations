@@ -252,4 +252,33 @@ describe('closing scene and recap', () => {
     fireEvent.click(screen.getByTestId('coda-1-draft'));
     await waitFor(() => expect(mockFetch.mock.calls.some(([p]) => String(p).endsWith('/books/1/coda'))).toBe(true));
   });
+
+  it('lists what is already inconsistent in the book, apart from the scene', () => {
+    render({ ...WITH_CODA, books: [{ ...WITH_CODA.books[0], coda_draft: { ...CODA, existing_inconsistencies: ["the lawyer is 'Okafor' in chapter 5 and 'Okonkwo' in chapter 25"] } }, SERIES.books[1]] });
+    expect(screen.getByTestId('coda-1-existing')).toHaveTextContent("Okafor' in chapter 5");
+    expect(screen.getByTestId('coda-1-existing')).toHaveTextContent('not caused by this scene');
+  });
+
+  it('blocks a scene the check objects to, lists what to fix, and offers to check it again', async () => {
+    mockFetch.mockImplementation(async () => ({ success: true, jobId: 'jc' }) as never);
+    render({ ...WITH_CODA, books: [{ ...WITH_CODA.books[0], coda_draft: { ...CODA, problems: ['the original journal is not in a sub-basement'] } }, SERIES.books[1]] });
+    expect(screen.getByTestId('coda-1-problems')).toHaveTextContent('sub-basement');
+    expect(screen.getByTestId('coda-1-apply')).toBeDisabled();
+    fireEvent.click(screen.getByTestId('coda-1-check'));
+    await waitFor(() => expect(mockFetch.mock.calls.some(([p]) => String(p).endsWith('/books/1/coda/check'))).toBe(true));
+  });
+
+  it('asks for a check after an edit, and the author must save the edit first', () => {
+    render({ ...WITH_CODA, books: [{ ...WITH_CODA.books[0], coda_draft: { ...CODA, problems: [], needs_check: true } }, SERIES.books[1]] });
+    expect(screen.getByTestId('coda-1-unchecked')).toBeInTheDocument();
+    expect(screen.getByTestId('coda-1-apply')).toBeDisabled();
+    fireEvent.change(screen.getByTestId('coda-1-text'), { target: { value: 'More edits, not yet saved.' } });
+    expect(screen.getByTestId('coda-1-check')).toBeDisabled();
+  });
+
+  it('lets a checked, clean scene be added', () => {
+    render({ ...WITH_CODA, books: [{ ...WITH_CODA.books[0], coda_draft: { ...CODA, problems: [], needs_check: false } }, SERIES.books[1]] });
+    expect(screen.queryByTestId('coda-1-check')).toBeNull();
+    expect(screen.getByTestId('coda-1-apply')).not.toBeDisabled();
+  });
 });

@@ -81,3 +81,12 @@ def test_a_draft_that_could_not_be_made_says_why_and_that_nothing_changed() -> N
     )
     assert "could not be drafted" in subject and "Book 2" in subject
     assert "names Ruiz" in html and "Nothing in your book changed" in html
+
+
+def test_the_email_lists_what_is_already_inconsistent_in_the_book() -> None:
+    _, html = build_task_email(
+        "chapter",
+        {"op": "draft-book-coda", "book": {"index": 1}},
+        {"ok": True, "text": "x", "existing_inconsistencies": ["the lawyer's surname is spelled two ways"]},
+    )
+    assert "not caused by this scene" in html and "spelled two ways" in html

@@ -68,6 +68,13 @@ export interface CodaDraft {
   drift: unknown;
   qa: Record<string, number> | null;
   new_names: string[];
+  /** What the continuity check still objects to. A scene with any cannot be added until an edit passes the check. */
+  problems?: string[];
+  /** The words were edited after the last check. */
+  needs_check?: boolean;
+  checked_at?: string;
+  existing_inconsistencies?: string[];
+  continuity_checked?: string;
   direction: string;
   drafted_at: string;
   edited_at?: string;

@@ -30,6 +30,11 @@ export interface PieceDraft {
   research_topics?: string[];
   drift?: { findings?: unknown[] } | null;
   continuity_checked?: string;
+  existing_inconsistencies?: string[];
+  /** What the continuity check still objects to: the scene cannot be added until an edit passes. */
+  problems?: string[];
+  /** Edited since the last check. */
+  needs_check?: boolean;
   qa?: Record<string, number> | null;
   // Recaps only.
   sources?: number;
@@ -77,6 +82,8 @@ export default function SeriesPiece({
   const failedWhy = draft?.failed;
   const usable = draft && !failedWhy ? draft : null;
   const edited = Boolean(usable && text.trim() !== usable.text.trim());
+  const problems = usable?.problems ?? [];
+  const blocked = kind === 'coda' && Boolean(usable && (problems.length > 0 || usable.needs_check));
   const words = text.split(/\s+/).filter(Boolean).length;
 
   const start = useMutation({
@@ -90,6 +97,16 @@ export default function SeriesPiece({
     onSuccess: (jobId) => {
       if (jobId) onStarted(jobId);
       addToast(`Drafting the ${noun}. This takes a few minutes; you can leave this page.`, 'success');
+    },
+    onError: (err) => addToast(messageOf(err), 'error'),
+  });
+
+  // A closing scene goes back through the continuity check after the author edits it.
+  const check = useMutation({
+    mutationFn: async () => (await apiFetch<{ jobId?: string }>(`${path}/check`, { method: 'POST' })).jobId,
+    onSuccess: (jobId) => {
+      if (jobId) onStarted(jobId);
+      addToast('Checking your edit against the books around it. This takes a minute.', 'success');
     },
     onError: (err) => addToast(messageOf(err), 'error'),
   });
@@ -180,8 +197,32 @@ export default function SeriesPiece({
           {usable.research_topics?.length ? (
             <p className="text-gray-500 dark:text-gray-400">Researched: {usable.research_topics.join('; ')}</p>
           ) : null}
+          {kind === 'coda' && problems.length ? (
+            <div data-testid={`${kind}-${book}-problems`} className="rounded border border-red-200 bg-red-50 p-2 text-red-900 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">
+              <p className="font-medium">The check still objects to this scene. Edit the words, save, then check it again:</p>
+              <ul className="ml-4 list-disc">
+                {problems.map((x) => (
+                  <li key={x}>{x}</li>
+                ))}
+              </ul>
+            </div>
+          ) : kind === 'coda' && usable.needs_check ? (
+            <p data-testid={`${kind}-${book}-unchecked`} className="text-amber-700 dark:text-amber-400">
+              Edited since the last check. Check it before it can be added to the book.
+            </p>
+          ) : null}
+          {usable.existing_inconsistencies?.length ? (
+            <div data-testid={`${kind}-${book}-existing`} className="rounded border border-amber-200 bg-amber-50 p-2 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+              <p className="font-medium">Already in your book, not caused by this scene:</p>
+              <ul className="ml-4 list-disc">
+                {usable.existing_inconsistencies.map((x) => (
+                  <li key={x}>{x}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           {usable.continuity_checked ? (
-            <p className="text-gray-500 dark:text-gray-400">Continuity: read {usable.continuity_checked}; no contradictions or invented plot found.</p>
+            <p className="text-gray-500 dark:text-gray-400">Continuity: read {usable.continuity_checked}; no contradictions or invented plot found in the scene.</p>
           ) : null}
           {kind === 'coda' ? (
             <p className="text-gray-500 dark:text-gray-400">
@@ -217,12 +258,23 @@ export default function SeriesPiece({
                   Save my edits
                 </button>
               ) : null}
+              {blocked ? (
+                <button
+                  data-testid={`${kind}-${book}-check`}
+                  onClick={() => check.mutate()}
+                  disabled={check.isPending || edited}
+                  title={edited ? 'Save your edits first' : undefined}
+                  className={primary}
+                >
+                  {check.isPending ? 'Starting the check…' : 'Check it'}
+                </button>
+              ) : null}
               <button
                 data-testid={`${kind}-${book}-apply`}
                 onClick={() => act.mutate('apply')}
-                disabled={act.isPending || edited}
-                title={edited ? 'Save your edits first' : undefined}
-                className={primary}
+                disabled={act.isPending || edited || blocked}
+                title={blocked ? 'The continuity check has to pass first' : edited ? 'Save your edits first' : undefined}
+                className={blocked ? button : primary}
               >
                 Add it to the book
               </button>

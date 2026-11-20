@@ -376,6 +376,37 @@ seriesRouter.post('/project/:projectId/series/books/:index/recap', async (req, r
   }
 });
 
+seriesRouter.post('/project/:projectId/series/books/:index/coda/check', async (req, res) => {
+  const project = await loadProject(req, res);
+  if (!project) return;
+  const outline: Outline = { ...(project.outline ?? {}) };
+  const books = plannedBooks(outline);
+  const index = bookIndex(req);
+  const book = books.find((b) => b.index === index);
+  if (!book) return fail(res, 404, 'NO_SUCH_BOOK', 'That book is not in the current plan.');
+  const piece = storedSeries(outline).codas?.[String(index)];
+  if (!piece || piece.failed || !piece.text) return fail(res, 404, 'NO_DRAFT', 'There is no closing scene for that book to check.');
+  if (piece.applied_at) return fail(res, 409, 'ALREADY_APPLIED', 'That closing scene is already in the book.');
+  const next = books.find((b) => b.index === index + 1);
+  try {
+    const job = await callEngineWriteTool('chapter', {
+      op: 'check-book-coda',
+      project_id: project.id,
+      user_id: req.userId!,
+      book: range(book),
+      next_book: next ? range(next) : null,
+      text: piece.text,
+      persist: true,
+      async: true,
+    });
+    logger.info({ projectId: project.id, index, jobId: job.job_id }, 'series: closing scene check queued');
+    res.status(202).json({ success: true, jobId: job.job_id, engineJob: true, status: job.status ?? 'queued' });
+  } catch (err) {
+    logger.error({ err, projectId: project.id, index }, 'series: closing scene check failed to start');
+    fail(res, 502, 'ENGINE', err instanceof Error ? err.message : 'Engine error');
+  }
+});
+
 type PieceKind = 'coda' | 'recap';
 const BUCKET: Record<PieceKind, 'codas' | 'recaps'> = { coda: 'codas', recap: 'recaps' };
 
@@ -396,7 +427,11 @@ for (const kind of ['coda', 'recap'] as PieceKind[]) {
       const text = (req.body as { text: string }).text;
       const next_ = withSeries(outline, (s) => ({
         ...s,
-        [bucket]: { ...(s[bucket] ?? {}), [String(index)]: { ...piece, text, words: wordCount(text), edited_at: new Date().toISOString() } },
+        [bucket]: {
+          ...(s[bucket] ?? {}),
+          // Edited words have not been through the continuity check: a closing scene must be checked again.
+          [String(index)]: { ...piece, text, words: wordCount(text), edited_at: new Date().toISOString(), ...(kind === 'coda' ? { needs_check: true } : {}) },
+        },
       }));
       await saveOutline(project.id, req.userId!, next_);
       res.json({ success: true, data: { series: seriesView(next_, project.title) } });
@@ -432,6 +467,17 @@ for (const kind of ['coda', 'recap'] as PieceKind[]) {
       const piece = storedSeries(outline)[bucket]?.[String(index)] as CodaDraft | RecapPiece | undefined;
       if (!piece || piece.failed) return fail(res, 404, 'NO_DRAFT', `There is no drafted ${noun} for that book.`);
       if (piece.applied_at) return fail(res, 409, 'ALREADY_APPLIED', `That ${noun} is already in the book.`);
+      const open = piece as CodaDraft;
+      if (kind === 'coda' && (open.problems?.length || open.needs_check)) {
+        return fail(
+          res,
+          409,
+          'UNRESOLVED_PROBLEMS',
+          open.problems?.length
+            ? `The continuity check still objects to this scene: ${open.problems.slice(0, 3).join(' | ')}. Edit it and check it again.`
+            : 'This scene was edited after its last continuity check. Check it before adding it to the book.',
+        );
+      }
       // A private copy of the outline as it stands: the snapshot and any rollback must not depend on an object
       // that something later in this request might change.
       const originalOutline: Outline = JSON.parse(JSON.stringify(project.outline ?? {}));

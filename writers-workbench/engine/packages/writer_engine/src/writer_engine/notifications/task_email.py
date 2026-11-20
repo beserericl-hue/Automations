@@ -101,7 +101,11 @@ def _deliverable_html(tool: str, op: str, result: dict) -> str:
     return ""
 
 
-_SERIES_PIECE_OPS = {"draft-book-coda": "Closing scene", "draft-book-recap": "Recap"}
+_SERIES_PIECE_OPS = {
+    "draft-book-coda": "Closing scene",
+    "draft-book-recap": "Recap",
+    "check-book-coda": "Closing scene check",
+}
 
 
 def _series_piece_email(op: str, body: dict, result: dict) -> tuple[str, str]:
@@ -122,6 +126,21 @@ def _series_piece_email(op: str, body: dict, result: dict) -> tuple[str, str]:
             f"<p style='{sans}'>Nothing in your book changed. You can try again from the Series panel on the Publish page.</p>"
         )
         return subject, html
+    if op == "check-book-coda":
+        problems = result.get("problems") or []
+        subject = f"[Writer's Workbench] Closing scene checked for {where} — {project}"
+        verdict = (
+            "<p style='" + sans + "'>The continuity check passed. It can be added to the book.</p>"
+            if not problems
+            else "<p style='"
+            + sans
+            + "'>Still to fix before it can be added:</p><ul style='"
+            + sans
+            + "'>"
+            + "".join(f"<li>{escape(str(x))}</li>" for x in problems)
+            + "</ul>"
+        )
+        return subject, f"<h2 style='{sans}'>Closing scene check for {escape(where)}</h2>{verdict}"
     qa = result.get("qa") or {}
     qa_vals = {k: v for k, v in qa.items() if isinstance(v, (int, float))}
     weakest = min(qa_vals.items(), key=lambda kv: kv[1]) if qa_vals else None
@@ -134,6 +153,10 @@ def _series_piece_email(op: str, body: dict, result: dict) -> tuple[str, str]:
         ("Settles", result.get("resolved")),
         ("Carries forward", result.get("carried")),
         ("Researched", ", ".join(map(str, result.get("research_topics") or [])) or None),
+        (
+            "Already in your book, not caused by this scene",
+            "; ".join(result.get("existing_inconsistencies") or []) or None,
+        ),
         (
             "Drift check",
             (f"{findings} finding(s) corrected or noted" if findings else "no drift found")

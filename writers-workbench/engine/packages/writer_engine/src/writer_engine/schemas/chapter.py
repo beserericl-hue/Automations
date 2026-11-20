@@ -692,3 +692,6 @@ class ContinuityFindings(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     problems: list[str] = Field(default_factory=list)
+    # Inconsistencies already in the book itself (a name spelled two ways), which this scene did not cause: told to the
+    # author, never held against the scene.
+    existing_inconsistencies: list[str] = Field(default_factory=list)

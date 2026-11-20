@@ -849,13 +849,13 @@ class TestContinuityAgainstTheBooksAround:
         # The check reads the scene against the next book's opening, not just the cast and the arc.
         assert "Susquehannock" in prompts[1] and CODA_TEXT[:40] in prompts[1]
 
-    def test_a_scene_that_keeps_contradicting_is_refused_with_the_problems(
+    def test_a_scene_that_keeps_contradicting_is_kept_for_the_author_with_the_problems(
         self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
     ) -> None:
         bad = ContinuityFindings(problems=["invents a provenance card that appears nowhere in the book"])
         answer(monkeypatch, PLAN, bad, bad, bad)
         out = asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
-        assert out["ok"] is False and "provenance card" in out["reason"]
+        assert out["ok"] is True and any("provenance card" in p for p in out["problems"])
 
     def test_the_planner_is_told_to_invent_no_plot(
         self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
@@ -882,3 +882,243 @@ class TestRecapKnowsTheCast:
         )
         assert "THE CAST" in prompts[0] and "Marcus" in prompts[0]
         assert "THE CAST" in prompts[1]  # the claim check reads against it too
+
+
+class TestContinuityCheckReach:
+    """Each of these is a way the check failed on the real book, now pinned."""
+
+    @staticmethod
+    def _rows_with_a_deep_fact() -> list[dict[str, Any]]:
+        deep = (
+            "Filler sentence about nothing at all. " * 300
+            + "The 1692 treaty named the Piscataway as a people."
+        )
+        return [
+            *ROWS[:2],
+            {"id": "c31", "chapter_number": 31, "title": "Stratum IV", "content_text": deep},
+        ]
+
+    def test_a_fact_far_into_the_next_chapter_reaches_the_check(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The real miss: a treaty at character 7,292 of chapter 60, behind a 3,500-character window.
+        rows = self._rows_with_a_deep_fact()
+        assert rows[2]["content_text"].index("1692") > 8000
+
+        async def get_rows(_pid: str) -> list[dict]:
+            return rows
+
+        monkeypatch.setattr(M, "_project_chapter_rows", get_rows)
+        prompts = answer(monkeypatch, PLAN, CLEAN)
+        asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert "The 1692 treaty named the Piscataway" in prompts[1]
+
+    def test_the_whole_next_book_is_seen_in_outline_not_just_its_frame_thread(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        wide = {
+            **FRAME_OUTLINE,
+            "chapters": [
+                *FRAME_OUTLINE["chapters"],
+                {
+                    "chapter_number": 32,
+                    "title": "Stratum V",
+                    "act": "Stratum V",
+                    "beat": "The reservation stone is set.",
+                },
+            ],
+        }
+
+        async def load(_pid: str, _payload: Any = None) -> dict[str, Any]:
+            return {"title": "The Ossuary", "genre_slug": "post-apocalyptic", "outline": wide, "roster": []}
+
+        monkeypatch.setattr(M, "_load_context", load)
+        prompts = answer(monkeypatch, PLAN, CLEAN)
+        asyncio.run(
+            M._op_draft_book_coda(
+                {
+                    "project_id": PROJECT,
+                    "book": BOOK1,
+                    "next_book": {"index": 2, "first_chapter": 31, "last_chapter": 32},
+                }
+            )
+        )
+        assert "The reservation stone is set." in prompts[1] and "The fort post stands." in prompts[1]
+
+    def test_names_found_nowhere_in_the_book_and_the_retrieved_canon_go_to_the_judge(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        pipeline["text"] = CODA_TEXT + " Governor Lyonell Copley read the Articles aloud."
+
+        async def canon(_ctx: Any, beat: str, *, user_id: Any) -> str:
+            return "CANON: Winifred kept a cedar box under her bed."
+
+        monkeypatch.setattr(M, "_canon_grounding", canon)
+        prompts = answer(monkeypatch, PLAN, CLEAN)
+        asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert "NOT FOUND ANYWHERE IN THE BOOK" in prompts[1] and "Lyonell" in prompts[1]
+        assert "cedar box under her bed" in prompts[1]
+
+    def test_an_inconsistency_already_in_the_book_is_reported_not_held_against_the_scene(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The real blocker: a surname spelled two ways in the manuscript stopped every scene that mentioned her.
+        found = ContinuityFindings(
+            problems=[],
+            existing_inconsistencies=["the lawyer is 'Okafor' in chapter 5 and 'Okonkwo' in chapter 25"],
+        )
+        answer(monkeypatch, PLAN, found)
+        out = asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert out["ok"] is True
+        assert out["existing_inconsistencies"] == [
+            "the lawyer is 'Okafor' in chapter 5 and 'Okonkwo' in chapter 25"
+        ]
+
+    def test_the_judge_is_told_to_sort_the_two_kinds_of_problem(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        systems: list[str] = []
+
+        async def fake(_router: Any, **k: Any) -> tuple[Any, None]:
+            systems.append(k["system"])
+            return (PLAN if len(systems) == 1 else CLEAN), None
+
+        monkeypatch.setattr(M, "complete_structured", fake)
+        asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert "existing_inconsistencies" in systems[1] and "Do NOT put in `problems`" in systems[1]
+        assert "invention" in systems[1].lower() or "inventions" in systems[1].lower()
+
+
+class TestPreEmption:
+    def test_the_judge_is_told_a_scene_that_plays_the_next_books_events_is_a_problem(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Two real misses: a scene that showed Marcus learning from the journal what chapter 30 first shows, and one that
+        # had Sylvia file the report that chapter 85 first shows. The check called the second "consistent with the outline".
+        systems: list[str] = []
+
+        async def fake(_router: Any, **k: Any) -> tuple[Any, None]:
+            systems.append(k["system"])
+            return (PLAN if len(systems) == 1 else CLEAN), None
+
+        monkeypatch.setattr(M, "complete_structured", fake)
+        asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert "PRE-EMPTION" in systems[1] and "never an `existing_inconsistencies` item" in systems[1]
+        # The planner is told the same thing before anything is written.
+        assert "Do not enact, reveal, show or resolve any event" in systems[0]
+
+    def test_a_pre_empting_scene_is_sent_back_and_the_writer_is_told_why(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        beats: list[str] = []
+
+        async def write(**k: Any) -> tuple[str, int, int]:
+            beats.append(k["brief"].beat)
+            return CODA_TEXT, 0, 0
+
+        monkeypatch.setattr(M, "_write_subchapter", write)
+        answer(
+            monkeypatch,
+            PLAN,
+            ContinuityFindings(problems=["pre-empts chapter 85: Sylvia files the hydrology report here"]),
+            CLEAN,
+        )
+        out = asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert out["ok"] is True and "pre-empts chapter 85" in beats[1]
+
+
+class TestTheWriterStaysInsideTheBeat:
+    def test_the_writer_is_told_no_backstory_or_history_because_it_collides_with_other_chapters(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Real runs padded scenes with Winifred's marriage and with the 1996 and 2004 hearings, which later chapters show.
+        answer(monkeypatch, PLAN, CLEAN)
+        asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        beat = pipeline["write_brief"].beat
+        assert "Stay inside this beat" in beat and "No backstory, flashback, memory" in beat
+        assert "aim for the low end" in beat
+
+
+class TestANearMissIsKeptForTheAuthor:
+    def test_a_scene_the_check_still_objects_to_is_kept_with_its_problems_not_thrown_away(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        stored: list[tuple[str, Any, dict[str, Any]]] = []
+
+        async def keep(_pid: str, bucket: str, index: Any, draft: dict[str, Any]) -> bool:
+            stored.append((bucket, index, draft))
+            return True
+
+        monkeypatch.setattr(M, "_store_series_piece", keep)
+        bad = ContinuityFindings(
+            problems=["the original journal is not in a sub-basement; chapter 30 has it on a desk"]
+        )
+        answer(monkeypatch, PLAN, bad, bad, bad)
+        out = asyncio.run(
+            M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2, "persist": True})
+        )
+        assert out["ok"] is True and out["problems"] == [
+            "the original journal is not in a sub-basement; chapter 30 has it on a desk"
+        ]
+        assert out["text"] and stored[0][2]["problems"] == out["problems"]
+
+    def test_a_scene_of_the_wrong_length_is_still_refused_outright(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        pipeline["text"] = "Too short."
+        answer(monkeypatch, PLAN)
+        out = asyncio.run(M._op_draft_book_coda({"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2}))
+        assert out["ok"] is False
+
+
+class TestCheckingTheAuthorsEdit:
+    def test_the_check_runs_on_the_text_as_edited_and_clears_the_problems_when_there_are_none(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        patches: list[dict[str, Any]] = []
+
+        async def update(_pid: str, bucket: str, index: Any, patch: dict[str, Any]) -> bool:
+            assert (bucket, index) == ("codas", 1)
+            patches.append(patch)
+            return True
+
+        monkeypatch.setattr(M, "_update_series_piece", update)
+        prompts = answer(monkeypatch, CLEAN)
+        out = asyncio.run(
+            M._op_check_book_coda(
+                {
+                    "project_id": PROJECT,
+                    "book": BOOK1,
+                    "next_book": BOOK2,
+                    "text": "The author's own edited scene.",
+                    "persist": True,
+                }
+            )
+        )
+        assert out["ok"] is True and out["problems"] == []
+        assert "The author's own edited scene." in prompts[0]
+        assert (
+            patches[0]["needs_check"] is False and patches[0]["problems"] == [] and patches[0]["checked_at"]
+        )
+
+    def test_a_problem_found_in_an_edit_is_reported_and_kept(
+        self, pipeline: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        patches: list[dict[str, Any]] = []
+
+        async def update(_pid: str, _bucket: str, _index: Any, patch: dict[str, Any]) -> bool:
+            patches.append(patch)
+            return True
+
+        monkeypatch.setattr(M, "_update_series_piece", update)
+        answer(monkeypatch, ContinuityFindings(problems=["still names a page"]))
+        out = asyncio.run(
+            M._op_check_book_coda(
+                {"project_id": PROJECT, "book": BOOK1, "next_book": BOOK2, "text": "Edited.", "persist": True}
+            )
+        )
+        assert out["problems"] == ["still names a page"] and patches[0]["problems"] == ["still names a page"]
+
+    def test_the_check_needs_a_text(self, pipeline: dict[str, Any]) -> None:
+        out = asyncio.run(M._op_check_book_coda({"project_id": PROJECT, "book": BOOK1, "text": ""}))
+        assert out["ok"] is False
