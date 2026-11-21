@@ -468,7 +468,16 @@ for (const kind of ['coda', 'recap'] as PieceKind[]) {
       if (!piece || piece.failed) return fail(res, 404, 'NO_DRAFT', `There is no drafted ${noun} for that book.`);
       if (piece.applied_at) return fail(res, 409, 'ALREADY_APPLIED', `That ${noun} is already in the book.`);
       const open = piece as CodaDraft;
-      if (kind === 'coda' && (open.problems?.length || open.needs_check)) {
+      // The author may add a scene they have read although the check objects (the check is a judge, and it has
+      // been wrong); that is a decision made on the page with the objections in front of them, so it is
+      // allowed only when asked for, and the objections travel with the restore points and the email.
+      const override = kind === 'coda' && (req.body as { override?: unknown } | undefined)?.override === true;
+      const overruled = override && (open.problems?.length || open.needs_check)
+        ? open.problems?.length
+          ? open.problems
+          : ['The scene was edited after its last continuity check and was not checked again.']
+        : [];
+      if (kind === 'coda' && !override && (open.problems?.length || open.needs_check)) {
         return fail(
           res,
           409,
@@ -506,7 +515,7 @@ for (const kind of ['coda', 'recap'] as PieceKind[]) {
         version_number: ((last?.version_number as number | undefined) ?? 0) + 1,
         content_text: text,
         changed_by: kind === 'coda' ? 'series_coda' : 'series_recap',
-        change_note: `Before adding the ${noun} for book ${index}`,
+        change_note: `Before adding the ${noun} for book ${index}${overruled.length ? ` (added over the continuity check's objections: ${overruled.join(' | ').slice(0, 600)})` : ''}`,
       });
       // No snapshot, no change: the message promises the earlier text can be taken back.
       if (chapterSnapError) throw new Error(`could not save the chapter's earlier text: ${chapterSnapError.message}`);
@@ -523,7 +532,7 @@ for (const kind of ['coda', 'recap'] as PieceKind[]) {
         project_id: project.id,
         version_number: ((lastOutline?.version_number as number | undefined) ?? 0) + 1,
         outline: originalOutline,
-        revision_note: `Before adding the ${noun} for book ${index}`,
+        revision_note: `Before adding the ${noun} for book ${index}${overruled.length ? ' (added over the continuity check\'s objections)' : ''}`,
       });
       if (outlineSnapError) throw new Error(`could not save the outline's earlier version: ${outlineSnapError.message}`);
       const updated =
@@ -574,6 +583,7 @@ for (const kind of ['coda', 'recap'] as PieceKind[]) {
                   coda.research_topics?.length ? `researched: ${coda.research_topics.join(', ')}` : '',
                   `drift check: ${(coda.drift as { findings?: unknown[] } | null)?.findings?.length ? `${(coda.drift as { findings: unknown[] }).findings.length} finding(s) corrected or noted` : 'no drift found'}`,
                   piece.new_names?.length ? `names not yet in the book: ${piece.new_names.join(', ')}` : 'no names outside the book',
+                  ...overruled.map((x) => `ADDED OVER THE CHECK'S OBJECTION: ${x}`),
                 ].filter(Boolean)
               : [`drawn from ${(piece as RecapPiece).sources} chapters of the earlier books`, piece.new_names?.length ? `names not yet in the book: ${piece.new_names.join(', ')}` : 'no names outside the earlier books'];
           const base = process.env.PUBLIC_APP_URL?.trim().replace(/\/$/, '') ?? '';

@@ -506,6 +506,20 @@ describe('a closing scene the check still objects to', () => {
     });
   });
 
+  it('can be added when the author asks to add it anyway, and the objections travel with it', async () => {
+    seed({ codas: { '1': codaDraft({ problems: ['the original journal is not in a sub-basement'] }) } });
+    await withServer(async (base) => {
+      // An ordinary apply, or any other value for override, is still refused.
+      expect((await call(base, 'POST', '/series/books/1/coda/apply', { override: 'yes' })).error.code).toBe('UNRESOLVED_PROBLEMS');
+      const j = await call(base, 'POST', '/series/books/1/coda/apply', { override: true });
+      expect(j.success).toBe(true);
+      expect(db.published_content_v2[0].content_text).not.toBe(CHAPTER);
+      expect(db.content_versions_v2[0].change_note).toContain("added over the continuity check's objections");
+      expect(db.content_versions_v2[0].change_note).toContain('sub-basement');
+      expect(sendMail.mock.calls[0][0].html).toContain("ADDED OVER THE CHECK'S OBJECTION: the original journal is not in a sub-basement");
+    });
+  });
+
   it('marks an edit as unchecked, will not add it until it is checked, and sends the edited words to the check', async () => {
     seed({ codas: { '1': codaDraft() } });
     engineJob.mockResolvedValue({ job_id: 'jc', status: 'queued' });

@@ -77,6 +77,9 @@ export default function SeriesPiece({
   const path = `${base}/books/${book}/${kind}`;
   const [direction, setDirection] = useState(DEFAULT_DIRECTION);
   const [text, setText] = useState('');
+  // Adding a scene the check objected to takes an explicit, informed second step.
+  const [confirmAnyway, setConfirmAnyway] = useState(false);
+  const [readIt, setReadIt] = useState(false);
   useEffect(() => setText(draft?.text ?? ''), [draft?.text]);
   // A failed attempt is a reason, not a draft: there is nothing to read or add.
   const failedWhy = draft?.failed;
@@ -112,18 +115,18 @@ export default function SeriesPiece({
   });
 
   const act = useMutation({
-    mutationFn: async (what: 'save' | 'apply' | 'discard') => {
-      const url = what === 'apply' ? `${path}/apply` : path;
-      const method = what === 'save' ? 'PUT' : what === 'apply' ? 'POST' : 'DELETE';
-      const s = (
-        await apiFetch<ApiEnvelope<{ series: SeriesView }>>(url, { method, body: what === 'save' ? JSON.stringify({ text }) : undefined })
-      ).data!.series;
+    mutationFn: async (what: 'save' | 'apply' | 'apply-anyway' | 'discard') => {
+      const applying = what === 'apply' || what === 'apply-anyway';
+      const url = applying ? `${path}/apply` : path;
+      const method = what === 'save' ? 'PUT' : applying ? 'POST' : 'DELETE';
+      const body = what === 'save' ? JSON.stringify({ text }) : what === 'apply-anyway' ? JSON.stringify({ override: true }) : undefined;
+      const s = (await apiFetch<ApiEnvelope<{ series: SeriesView }>>(url, { method, body })).data!.series;
       return { s, what };
     },
     onSuccess: ({ s, what }) => {
       onChanged(
         s,
-        what === 'apply'
+        what === 'apply' || what === 'apply-anyway'
           ? `The ${noun} is in the book and the outline is updated. The earlier chapter and outline are in their versions.`
           : what === 'save'
             ? 'Your edits are saved to the draft.'
@@ -253,6 +256,45 @@ export default function SeriesPiece({
             </p>
           ) : (
             <div className="flex flex-wrap gap-2">
+              {blocked && confirmAnyway ? (
+                <div
+                  data-testid={`${kind}-${book}-anyway-confirm`}
+                  className="w-full space-y-2 rounded border border-amber-300 bg-amber-50 p-2 text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+                >
+                  <p>
+                    The continuity check objects to this scene. If you add it anyway, the objections are kept in the chapter's restore
+                    point and written in the email, and you can take the scene back from there.
+                  </p>
+                  <label className="flex items-start gap-2">
+                    <input
+                      id={`${kind}-${book}-read-it`}
+                      type="checkbox"
+                      checked={readIt}
+                      onChange={(e) => setReadIt(e.target.checked)}
+                    />
+                    <span>I have read this scene and the objections, and I want it in my book as it is.</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      data-testid={`${kind}-${book}-anyway-go`}
+                      onClick={() => act.mutate('apply-anyway')}
+                      disabled={!readIt || act.isPending}
+                      className={primary}
+                    >
+                      Add it to the book anyway
+                    </button>
+                    <button
+                      onClick={() => {
+                        setConfirmAnyway(false);
+                        setReadIt(false);
+                      }}
+                      className={button}
+                    >
+                      Not yet
+                    </button>
+                  </div>
+                </div>
+              ) : null}
               {edited ? (
                 <button data-testid={`${kind}-${book}-save`} onClick={() => act.mutate('save')} disabled={act.isPending} className={button}>
                   Save my edits
@@ -278,6 +320,17 @@ export default function SeriesPiece({
               >
                 Add it to the book
               </button>
+              {blocked ? (
+                <button
+                  data-testid={`${kind}-${book}-anyway`}
+                  onClick={() => setConfirmAnyway(true)}
+                  disabled={act.isPending || edited || confirmAnyway}
+                  title={edited ? 'Save your edits first' : undefined}
+                  className={button}
+                >
+                  Add it anyway…
+                </button>
+              ) : null}
               <button data-testid={`${kind}-${book}-discard`} onClick={() => act.mutate('discard')} disabled={act.isPending} className={button}>
                 Discard
               </button>
