@@ -6,6 +6,8 @@ import { useEffect, useRef, useCallback, useState, forwardRef, useImperativeHand
 import { UNSAFE_DataRouterContext } from 'react-router-dom';
 import { useContext } from 'react';
 import EditorToolbar from './EditorToolbar';
+import { FormatBlock } from './FormatBlock';
+import FormatBlockPanel from './FormatBlockPanel';
 import {
   findInDoc,
   findAllInDoc,
@@ -48,6 +50,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
   const typingRef = useRef(false);
   // The find box: the phrase, how many places it is, and which one is showing.
   const [findQuery, setFindQuery] = useState('');
+  const [formatOpen, setFormatOpen] = useState(false);
   const [findCount, setFindCount] = useState(0);
   const [findIndex, setFindIndex] = useState(0);
 
@@ -63,6 +66,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
       }),
       RevealHighlight,
       FindHighlight,
+      FormatBlock,
     ],
     content,
     editable,
@@ -241,7 +245,8 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
 
   return (
     <div className="flex flex-col h-full">
-      {editable && <EditorToolbar editor={editor} onSave={saveNow} />}
+      {editable && <EditorToolbar editor={editor} onSave={saveNow} onFormatBlock={() => setFormatOpen((o) => !o)} formatOpen={formatOpen} />}
+      {editable && formatOpen && <FormatBlockPanel editor={editor} />}
       <div
         className={`flex flex-wrap items-center gap-2 border border-gray-200 bg-white px-3 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-900 ${
           editable ? 'border-t-0' : 'rounded-t-lg'

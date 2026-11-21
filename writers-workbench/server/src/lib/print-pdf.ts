@@ -21,6 +21,7 @@
  * generates the interior before anything makes a cover.
  */
 
+import { isBlockClose, isBlockOpen, type BlockStyle } from './html-prose.js';
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -110,13 +111,24 @@ function loadFont(file: string): Buffer {
 }
 
 /** Plain manuscript prose -> paragraphs and scene breaks. */
-export function paragraphsOf(text: string): { kind: 'p' | 'break'; text: string }[] {
-  const out: { kind: 'p' | 'break'; text: string }[] = [];
+export function paragraphsOf(text: string): { kind: 'p' | 'break'; text: string; block?: BlockStyle }[] {
+  const out: { kind: 'p' | 'break'; text: string; block?: BlockStyle }[] = [];
+  let inBlock: BlockStyle | null = null;
   for (const raw of (text || '').split(/\n\s*\n/)) {
     const block = raw.trim();
     if (!block) continue;
+    // A formatting block: its paragraphs carry the block's style; the fence lines are not printed.
+    const opening = isBlockOpen(block);
+    if (opening) {
+      inBlock = opening;
+      continue;
+    }
+    if (inBlock && isBlockClose(block)) {
+      inBlock = null;
+      continue;
+    }
     if (SCENE_BREAK.test(block)) out.push({ kind: 'break', text: '' });
-    else out.push({ kind: 'p', text: block.replace(/\s*\n\s*/g, ' ') });
+    else out.push({ kind: 'p', text: block.replace(/\s*\n\s*/g, ' '), ...(inBlock ? { block: inBlock } : {}) });
   }
   return out;
 }
@@ -161,6 +173,7 @@ export async function buildPrintPdf(opts: PrintPdfOptions): Promise<PrintPdfResu
   });
   doc.registerFont('body', serif);
   doc.registerFont('display', sans);
+  doc.registerFont('typewriter', loadFont('CourierPrime-Regular.ttf'));
 
   const chunks: Buffer[] = [];
   doc.on('data', (c: Buffer) => chunks.push(c));
@@ -287,6 +300,27 @@ export async function buildPrintPdf(opts: PrintPdfOptions): Promise<PrintPdfResu
         doc.text('* * *', textLeft(), doc.y, { width: textW, align: 'center', characterSpacing: 3 });
         doc.moveDown(0.6);
         first = true;
+        continue;
+      }
+      if (block.block) {
+        // A styled block: its own face, size, alignment, indent and line spacing. Serif and sans are the
+        // book's faces; typewriter is Courier Prime. Handwriting and italics have no matching face in the
+        // print file, so they print in the serif.
+        const b = block.block;
+        const size = (bodySize * b.size) / 100;
+        const indent = b.indent * size;
+        doc.font(b.font === 'sans' ? 'display' : b.font === 'typewriter' ? 'typewriter' : 'body').fontSize(size);
+        doc.moveDown(0.5);
+        doc.text(plain(block.text), textLeft() + indent, y === topM ? topM : doc.y, {
+          width: textW - indent,
+          align: b.align,
+          lineGap: size * b.spacing - size,
+          paragraphGap: size * 0.4,
+        });
+        doc.font('body').fontSize(bodySize);
+        bodyPages.add(physical);
+        first = true;
+        y = 0;
         continue;
       }
       doc.text(plain(block.text), textLeft(), y === topM ? topM : doc.y, {

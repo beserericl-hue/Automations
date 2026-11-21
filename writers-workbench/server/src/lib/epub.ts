@@ -19,6 +19,7 @@
  *  - Every chapter is its own XHTML file. One giant document is valid and makes readers crawl.
  */
 
+import { blockCss, isBlockClose, isBlockOpen } from './html-prose.js';
 import JSZip from 'jszip';
 import type { MatterSection } from './bookmatter.js';
 
@@ -53,6 +54,8 @@ h1 .num { display: block; font-size: 0.62em; letter-spacing: 0.18em; text-transf
 p { margin: 0; text-indent: 1.3em; text-align: justify; }
 p.first { text-indent: 0; }
 p.first::first-letter { font-size: 1.6em; line-height: 1; }
+.fb p, p.fbp { text-indent: 0; text-align: inherit; margin: 0 0 0.6em; font-size: inherit; }
+.fb p:last-child { margin-bottom: 0; }
 .dinkus { text-indent: 0; text-align: center; margin: 1.2em 0; color: #666; letter-spacing: 0.5em; }
 .draft { color: #999; font-size: 0.8em; font-style: italic; text-indent: 0; margin-bottom: 1em; }
 nav ol { list-style: none; padding-left: 0; line-height: 1.9; }
@@ -80,9 +83,23 @@ function esc(s: string): string {
 export function proseToXhtml(text: string): string {
   const out: string[] = [];
   let first = true;
+  let inBlock = false;
   for (const raw of (text || '').split(/\n\s*\n/)) {
     const block = raw.trim();
     if (!block) continue;
+    // A formatting block: a styled run of paragraphs fenced by ":::block {style}" and ":::".
+    const style = isBlockOpen(block);
+    if (style) {
+      out.push(`<div class="fb" style="${esc(blockCss(style))}">`);
+      inBlock = true;
+      continue;
+    }
+    if (inBlock && isBlockClose(block)) {
+      out.push('</div>');
+      inBlock = false;
+      first = true;
+      continue;
+    }
     if (/^-{3,}$/.test(block) || /^(\*\s*){3,}$/.test(block)) {
       out.push('<p class="dinkus">* * *</p>');
       first = true; // the paragraph after a break opens a new scene
@@ -93,9 +110,10 @@ export function proseToXhtml(text: string): string {
     // The content must not start or end with whitespace, or arithmetic and stray asterisks
     // ("5 * 3 and 2 * 4") are silently turned into italics spanning half a sentence.
     body = body.replace(/\*(\S|\S[^*\n]*\S)\*/g, '<em>$1</em>');
-    out.push(`<p${first ? ' class="first"' : ''}>${body}</p>`);
+    out.push(`<p${first && !inBlock ? ' class="first"' : inBlock ? ' class="fbp"' : ''}>${body}</p>`);
     first = false;
   }
+  if (inBlock) out.push('</div>');
   return out.join('\n');
 }
 

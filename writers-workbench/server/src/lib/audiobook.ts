@@ -9,6 +9,7 @@
  * The narration itself (speech, mastering, storage) is the engine's `media.audiobook-chapter` op;
  * see engine/packages/writer_engine/src/writer_engine/audiobook/.
  */
+import { stripBlockMarkers } from './html-prose.js';
 import { createHash } from 'node:crypto';
 import type { BookSource } from './book-source.js';
 import { plannedVolumes, volumeParts } from './kdp-package.js';
@@ -228,7 +229,7 @@ export function planAudiobook(source: BookSource, volumeIndex: number, settings:
   }
   parts.rows.forEach((c, i) => {
     const number = Number(c.chapter_number ?? i + 1);
-    const text = String(c.content_text ?? '');
+    const text = stripBlockMarkers(String(c.content_text ?? ''));
     items.push({
       kind: 'chapter',
       chapter_number: number,
