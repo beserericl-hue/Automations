@@ -6,6 +6,7 @@
  * is two different books.
  */
 
+import { htmlToProse } from './html-prose.js';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
 import { downloadCover, findCover } from './book-cover.js';
 import { marketingKey, publishingOf } from '../routes/publishing.js';
@@ -52,7 +53,10 @@ export async function loadBookSource(
       .order('chapter_number', { ascending: true })
       .range(page * 1000, page * 1000 + 999);
     if (error) throw new Error('CHAPTERS_UNREADABLE');
-    chapters.push(...((data || []) as unknown as PackageChapter[]));
+    // The editor saves a chapter as HTML; the book files read prose.
+    chapters.push(
+      ...((data || []) as unknown as PackageChapter[]).map((c) => ({ ...c, content_text: c.content_text == null ? c.content_text : htmlToProse(c.content_text) })),
+    );
     if ((data || []).length < 1000) break;
   }
 
