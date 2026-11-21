@@ -183,6 +183,42 @@ export function plainText(s: string): string {
 }
 
 /**
+ * Where a plain-text quote sits in a chapter that has been saved as HTML.
+ *
+ * A review finding quotes the chapter as plain text, paragraphs separated by a blank line. Once the
+ * editor has saved the chapter, those paragraphs are `<p>` elements, so the exact quote is nowhere in
+ * the stored text, and the finding could be read but never applied. This finds the span that runs
+ * from the quote's first word to its last through any tags and whitespace between them. Null when
+ * the words are not there, which means the passage has been rewritten.
+ */
+export function locateSpan(text: string, quote: string): { from: number; to: number } | null {
+  const words = plainText(quote).split(' ').filter(Boolean);
+  if (words.length < 3) return null;
+  const esc = (w: string) =>
+    w
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/&/g, '(?:&|&amp;)')
+      .replace(/'/g, "(?:'|&#39;|&apos;)")
+      .replace(/"/g, '(?:"|&quot;)');
+  const re = new RegExp(words.map(esc).join('(?:\\s|<[^>]*>)+'));
+  const m = re.exec(text);
+  return m ? { from: m.index, to: m.index + m[0].length } : null;
+}
+
+/** A replacement written as plain text, in the form the stored chapter uses at the passage it replaces. */
+export function replacementForSpan(replacement: string, spanText: string): string {
+  if (!/<[^>]+>/.test(spanText) && !/<\/?p\b/i.test(spanText)) return replacement;
+  return replacement
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .split(/\n\s*\n/)
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .join('</p><p>');
+}
+
+/**
  * Build the craft-Q/A annotations for a chapter from `metadata.craft_findings`.
  *
  * Shared by the GET and the apply handler so a finding can never be listed with one target span and
@@ -210,7 +246,7 @@ export function buildCraftAnnotations(
     // that is no longer there means the passage has been rewritten since — by Apply, the Humanizer
     // or the author's own hand. That finding is answered: it is reported as fixed, with no one-click
     // fix (its target is gone) and no place among the active findings.
-    const anchored = quote && chapterText.includes(quote) ? quote : null;
+    const anchored = quote && (chapterText.includes(quote) || locateSpan(chapterText, quote)) ? quote : null;
     // "Still there" is judged on the words, not the bytes: once the editor saves, the chapter is HTML,
     // and an italic phrase or a paragraph break inside the quote would otherwise read as a rewrite.
     const present = Boolean(anchored) || Boolean(quote && plainText(chapterText).includes(plainText(quote)));
@@ -539,7 +575,10 @@ contentActionsRouter.post(
       }
 
       const text = chapter.content_text || '';
-      if (!text.includes(target.target_text)) {
+      // A chapter the editor has saved is HTML: a quote taken from the plain text is then found by its
+      // words, through the tags between them, and the replacement is written the way the chapter is.
+      const span = text.includes(target.target_text) ? null : locateSpan(text, target.target_text);
+      if (!span && !text.includes(target.target_text)) {
         res.status(422).json({
           success: false,
           error: {
@@ -570,7 +609,9 @@ contentActionsRouter.post(
 
       // Replace ALL exact-match occurrences of the target so an "Elena Rodriguez"
       // case-file table that drifts twice in the same chapter is fully fixed.
-      const newText = text.split(target.target_text).join(target.replacement_text);
+      const newText = span
+        ? text.slice(0, span.from) + replacementForSpan(target.replacement_text, text.slice(span.from, span.to)) + text.slice(span.to)
+        : text.split(target.target_text).join(target.replacement_text);
 
       // Mark the annotation dismissed so the UI doesn't re-surface it after apply.
       dismissed.add(annotationId);
@@ -583,7 +624,7 @@ contentActionsRouter.post(
         .eq('user_id', userId);
 
       logger.info(
-        { userId, contentId: id, annotationId, source, replacements: text.split(target.target_text).length - 1 },
+        { userId, contentId: id, annotationId, source, replacements: span ? 1 : text.split(target.target_text).length - 1 },
         'content-actions: annotation applied',
       );
 
@@ -592,7 +633,7 @@ contentActionsRouter.post(
         applied: {
           annotationId,
           source,
-          replacements: text.split(target.target_text).length - 1,
+          replacements: span ? 1 : text.split(target.target_text).length - 1,
           target_text: target.target_text,
           replacement_text: target.replacement_text,
         },
@@ -693,7 +734,7 @@ contentActionsRouter.post(
         .update({ metadata: { ...meta, craft_findings: { ...block, findings } } })
         .eq('id', chapter.id)
         .eq('user_id', userId);
-      res.json({ success: true, data: { replacement: result.text, applicable: at >= 0, new_names: result.new_names ?? [] } });
+      res.json({ success: true, data: { replacement: result.text, applicable: at >= 0 || locateSpan(text, quote) !== null, new_names: result.new_names ?? [] } });
     } catch (err) {
       logger.error({ err, userId, contentId: id }, 'content-actions: annotation suggest failed');
       res.status(500).json({ success: false, error: { code: 'SUGGEST_FAILED', message: err instanceof Error ? err.message : 'Could not write a suggestion' } });

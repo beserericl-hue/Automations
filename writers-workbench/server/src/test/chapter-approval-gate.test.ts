@@ -216,8 +216,10 @@ describe('craft annotations', () => {
     const a = buildCraftAnnotations(meta([{ dimension: 'prose_transparent', problem: 'p', quote, replacement: 'x' }]), 7, html, dismissedNone);
     expect(a[0].resolved).toBeUndefined();
     expect(a[0].evidence_quote).toBe(quote);
-    // No exact span to swap, so no one-click replace — but still shown and findable.
-    expect(a[0].suggestion).toEqual({ action: 'note' });
+    // No exact span, but the words are found through the tags between them, so the one-click replace
+    // is still offered (and the apply handler swaps the located span).
+    expect(a[0].suggestion?.action).toBe('replace');
+    expect(a[0].suggestion?.replacement_text).toBe('x');
   });
 
   it('never calls a chapter-wide finding fixed — it has no passage to rewrite', () => {
