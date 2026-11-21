@@ -199,3 +199,65 @@ export function findInDoc(doc: PMNode, quote: string): FindResult | null {
 
 /** Below this, an opening is common enough to match a paragraph it has nothing to do with. */
 const MIN_PARTIAL_CHARS = 24;
+
+/**
+ * Every place a typed phrase occurs, for the editor's find box.
+ *
+ * Same projection as the review panel's "show in manuscript" (whitespace collapsed, curly and straight
+ * quotes folded, italics markers ignored), so a phrase copied from a report, which has straight quotes
+ * and no paragraph breaks, finds the passage that has curly ones and a break. Case is ignored. Matches
+ * never overlap. Nothing is changed in the document.
+ */
+export function findAllInDoc(doc: PMNode, query: string): RevealRange[] {
+  const needle = fold(normalise(query)).toLowerCase();
+  if (needle.length < 2) return [];
+  const index = buildIndex(doc, true);
+  const out: RevealRange[] = [];
+  let at = index.text.indexOf(needle);
+  while (at >= 0 && out.length < 2000) {
+    out.push({ from: index.posAt[at], to: index.posAt[at + needle.length - 1] + 1 });
+    at = index.text.indexOf(needle, at + needle.length);
+  }
+  return out;
+}
+
+export const findPluginKey = new PluginKey<DecorationSet>('find-matches');
+export const FIND_CLASS = 'find-match';
+export const FIND_CURRENT_CLASS = 'find-current';
+
+/** What `setMeta` carries: the matches and which one is current, or null to clear. */
+export type FindMeta = { ranges: RevealRange[]; current: number } | null;
+
+/** Marks every match of the find box, with a stronger mark on the current one. Presentation only. */
+export const FindHighlight = Extension.create({
+  name: 'findHighlight',
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin<DecorationSet>({
+        key: findPluginKey,
+        state: {
+          init: () => DecorationSet.empty,
+          apply(tr, current) {
+            const meta = tr.getMeta(findPluginKey) as FindMeta | undefined;
+            if (meta === null) return DecorationSet.empty;
+            if (meta) {
+              return DecorationSet.create(
+                tr.doc,
+                meta.ranges.map((r, i) =>
+                  Decoration.inline(r.from, r.to, {
+                    class: i === meta.current ? `${FIND_CLASS} ${FIND_CURRENT_CLASS}` : FIND_CLASS,
+                  }),
+                ),
+              );
+            }
+            return current.map(tr.mapping, tr.doc);
+          },
+        },
+        props: {
+          decorations: (state) => findPluginKey.getState(state) ?? DecorationSet.empty,
+        },
+      }),
+    ];
+  },
+});

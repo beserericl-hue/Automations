@@ -58,3 +58,35 @@ describe('a refetch does not erase what is being typed', () => {
     expect(container.querySelector('.ProseMirror')!.textContent).toBe('Rewritten by the engine');
   });
 });
+
+describe('the find box', () => {
+  const DOC = '<p>He was sixty-three years old, or near enough.</p><p>“It was not carved.” He was sixty-three years old.</p>';
+
+  it('marks every match, counts them and steps through them, without editing the chapter', async () => {
+    const { fireEvent, waitFor } = await import('../../test/test-utils');
+    const onChange = vi.fn();
+    const { container } = renderWithProviders(<RichTextEditor content={DOC} onChange={onChange} />);
+    fireEvent.change(screen.getByLabelText('Find a phrase in this chapter'), { target: { value: 'sixty-three years old' } });
+    await waitFor(() => expect(screen.getByTestId('find-count')).toHaveTextContent('1 of 2'));
+    expect(container.querySelectorAll('.find-match')).toHaveLength(2);
+    expect(container.querySelectorAll('.find-current')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Next match' }));
+    await waitFor(() => expect(screen.getByTestId('find-count')).toHaveTextContent('2 of 2'));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(container.querySelector('.ProseMirror')!.innerHTML).not.toContain('find-match="');
+  });
+
+  it('finds a phrase pasted with straight quotes in text that has curly ones', async () => {
+    const { fireEvent, waitFor } = await import('../../test/test-utils');
+    renderWithProviders(<RichTextEditor content={DOC} onChange={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText('Find a phrase in this chapter'), { target: { value: '"It was not carved."' } });
+    await waitFor(() => expect(screen.getByTestId('find-count')).toHaveTextContent('1 of 1'));
+  });
+
+  it('says when the phrase is not in the chapter', async () => {
+    const { fireEvent, waitFor } = await import('../../test/test-utils');
+    renderWithProviders(<RichTextEditor content={DOC} onChange={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText('Find a phrase in this chapter'), { target: { value: 'fifty-three years old' } });
+    await waitFor(() => expect(screen.getByTestId('find-count')).toHaveTextContent('not found'));
+  });
+});

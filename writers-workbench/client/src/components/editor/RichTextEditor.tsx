@@ -6,7 +6,15 @@ import { useEffect, useRef, useCallback, useState, forwardRef, useImperativeHand
 import { UNSAFE_DataRouterContext } from 'react-router-dom';
 import { useContext } from 'react';
 import EditorToolbar from './EditorToolbar';
-import { findInDoc, RevealHighlight, revealPluginKey, REVEAL_CLASS } from './RevealHighlight';
+import {
+  findInDoc,
+  findAllInDoc,
+  FindHighlight,
+  findPluginKey,
+  RevealHighlight,
+  revealPluginKey,
+  REVEAL_CLASS,
+} from './RevealHighlight';
 
 interface RichTextEditorProps {
   content: string;
@@ -38,6 +46,10 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
   // Typing not yet handed to onChange. A ref, not state, because the content effect below must see
   // it the moment a refetch lands, not on the next render.
   const typingRef = useRef(false);
+  // The find box: the phrase, how many places it is, and which one is showing.
+  const [findQuery, setFindQuery] = useState('');
+  const [findCount, setFindCount] = useState(0);
+  const [findIndex, setFindIndex] = useState(0);
 
   const editor = useEditor({
     extensions: [
@@ -50,6 +62,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
         HTMLAttributes: { class: 'text-brand-600 underline hover:text-brand-700' },
       }),
       RevealHighlight,
+      FindHighlight,
     ],
     content,
     editable,
@@ -174,6 +187,44 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
 
   useImperativeHandle(ref, () => ({ reveal, clearReveal, getSelectedText }), [reveal, clearReveal, getSelectedText]);
 
+  // Find box. Marks every match and scrolls to the current one. The marks are decorations, so the
+  // chapter does not go dirty and nothing is saved by looking.
+  const showFind = useCallback(
+    (query: string, wanted: number, scroll: boolean) => {
+      if (!editor) return;
+      const ranges = findAllInDoc(editor.state.doc, query);
+      const current = ranges.length ? ((wanted % ranges.length) + ranges.length) % ranges.length : 0;
+      editor.view.dispatch(editor.state.tr.setMeta(findPluginKey, ranges.length ? { ranges, current } : null));
+      setFindCount(ranges.length);
+      setFindIndex(current);
+      if (scroll && ranges.length) {
+        requestAnimationFrame(() => {
+          editor.view.dom.querySelector('.find-current')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+      }
+    },
+    [editor],
+  );
+
+  useEffect(() => {
+    showFind(findQuery, 0, true);
+  }, [findQuery, showFind]);
+
+  // Edits move the text under the marks: recount, keeping the position, without scrolling.
+  useEffect(() => {
+    if (!editor || !findQuery) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const onUpdate = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => showFind(findQuery, findIndex, false), 400);
+    };
+    editor.on('update', onUpdate);
+    return () => {
+      editor.off('update', onUpdate);
+      if (timer) clearTimeout(timer);
+    };
+  }, [editor, findQuery, findIndex, showFind]);
+
   const saveNow = useCallback(() => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
@@ -190,7 +241,66 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
   return (
     <div className="flex flex-col h-full">
       {editable && <EditorToolbar editor={editor} onSave={saveNow} />}
-      <div className="flex-1 overflow-y-auto border border-gray-200 rounded-b-lg bg-white dark:border-gray-700 dark:bg-gray-900">
+      <div
+        className={`flex flex-wrap items-center gap-2 border border-gray-200 bg-white px-3 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-900 ${
+          editable ? 'border-t-0' : 'rounded-t-lg'
+        }`}
+        role="search"
+      >
+        <input
+          id="chapter-find"
+          type="search"
+          value={findQuery}
+          onChange={(e) => setFindQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              showFind(findQuery, findIndex + (e.shiftKey ? -1 : 1), true);
+            } else if (e.key === 'Escape') {
+              setFindQuery('');
+            }
+          }}
+          placeholder="Find a phrase in this chapter (paste it here)"
+          aria-label="Find a phrase in this chapter"
+          className="min-w-0 flex-1 basis-56 rounded border border-gray-300 px-2 py-1 text-xs focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+        />
+        {findQuery.trim().length >= 2 && (
+          <>
+            <span
+              data-testid="find-count"
+              className={findCount ? 'text-gray-600 dark:text-gray-300' : 'text-red-600 dark:text-red-400'}
+            >
+              {findCount ? `${findIndex + 1} of ${findCount}` : 'not found'}
+            </span>
+            <button
+              type="button"
+              onClick={() => showFind(findQuery, findIndex - 1, true)}
+              disabled={findCount < 2}
+              aria-label="Previous match"
+              className="rounded border border-gray-300 px-2 py-0.5 text-gray-600 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              onClick={() => showFind(findQuery, findIndex + 1, true)}
+              disabled={findCount < 2}
+              aria-label="Next match"
+              className="rounded border border-gray-300 px-2 py-0.5 text-gray-600 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+            >
+              ↓
+            </button>
+            <button
+              type="button"
+              onClick={() => setFindQuery('')}
+              className="rounded px-2 py-0.5 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"
+            >
+              Clear
+            </button>
+          </>
+        )}
+      </div>
+      <div className="flex-1 overflow-y-auto border border-t-0 border-gray-200 rounded-b-lg bg-white dark:border-gray-700 dark:bg-gray-900">
         <EditorContent editor={editor} />
       </div>
       <div className="flex items-center justify-between px-4 py-2 text-xs text-gray-400 border-t border-gray-200 dark:border-gray-700">
