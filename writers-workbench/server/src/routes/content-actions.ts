@@ -18,7 +18,7 @@ import { z } from 'zod';
 import { validateBody } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { getSupabaseAdmin } from '../services/supabase-admin.js';
-import { callEngineWriteTool, hubBackend } from '../lib/engine-hub.js';
+import { callEngineWriteTool, callEngineWriteToolSync, hubBackend } from '../lib/engine-hub.js';
 import { logger } from '../lib/logger.js';
 import { getNamedQueue } from '../lib/queue.js';
 import { addTrackedJob } from '../lib/jobs/job-tracker.js';
@@ -603,6 +603,100 @@ contentActionsRouter.post(
         success: false,
         error: { code: 'INTERNAL', message: err instanceof Error ? err.message : 'Internal error' },
       });
+    }
+  },
+);
+
+const SuggestAnnotationSchema = z.object({ annotationId: z.string().min(1) });
+
+/**
+ * @openapi
+ * /content/{id}/annotations/suggest:
+ *   post:
+ *     tags: [Content]
+ *     summary: Write a suggested replacement for a craft finding that has none
+ *     description: >
+ *       Pacing and prose findings often arrive with a problem and a quote but no wording. This asks
+ *       the engine to rewrite that one passage to answer that one finding, stores the result on the
+ *       finding, and returns it. Nothing in the chapter changes; the author applies it, edits it or
+ *       sends it to the humanizer from the panel.
+ */
+contentActionsRouter.post(
+  '/:id/annotations/suggest',
+  validateBody(SuggestAnnotationSchema),
+  async (req: Request, res: Response) => {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED' } });
+      return;
+    }
+    const { id } = req.params;
+    const { annotationId } = req.body as z.infer<typeof SuggestAnnotationSchema>;
+    try {
+      const supabase = getSupabaseAdmin();
+      const { data: chapter } = await supabase
+        .from('published_content_v2')
+        .select('id, project_id, chapter_number, content_text, metadata')
+        .eq('id', id)
+        .eq('user_id', userId)
+        .is('deleted_at', null)
+        .single();
+      if (!chapter) {
+        res.status(404).json({ success: false, error: { code: 'NOT_FOUND' } });
+        return;
+      }
+      const meta = (chapter.metadata as Record<string, unknown>) || {};
+      const text = (chapter.content_text as string | null) || '';
+      const annotation = buildCraftAnnotations(meta, chapter.chapter_number, text, new Set()).find((a) => a.id === annotationId);
+      if (!annotation || annotation.source !== 'craft_qa' || annotation.resolved) {
+        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'That finding is not open any more.' } });
+        return;
+      }
+      const quote = annotation.evidence_quote;
+      if (!quote) {
+        res.status(422).json({ success: false, error: { code: 'NO_PASSAGE', message: 'This finding has no passage to rewrite. Re-run the Q/A check for the chapter.' } });
+        return;
+      }
+      const at = text.indexOf(quote);
+      const flat = plainText(text);
+      const flatQuote = plainText(quote);
+      const flatAt = flat.indexOf(flatQuote);
+      const before = at >= 0 ? plainText(text.slice(Math.max(0, at - 2400), at)) : flatAt >= 0 ? flat.slice(Math.max(0, flatAt - 1200), flatAt) : '';
+      const after = at >= 0 ? plainText(text.slice(at + quote.length, at + quote.length + 2400)) : flatAt >= 0 ? flat.slice(flatAt + flatQuote.length, flatAt + flatQuote.length + 1200) : '';
+      const raw = annotation.raw as Record<string, unknown>;
+      const result = await callEngineWriteToolSync<{ ok?: boolean; text?: string; reason?: string; new_names?: string[] }>('chapter', {
+        op: 'suggest-passage-fix',
+        passage: flatQuote,
+        problem: String(raw.problem ?? annotation.message),
+        fix: String(raw.fix ?? ''),
+        before,
+        after,
+        project_id: chapter.project_id ?? undefined,
+        chapter_number: chapter.chapter_number ?? undefined,
+        user_id: userId,
+      });
+      if (!result.ok || !result.text) {
+        res.status(422).json({ success: false, error: { code: 'NO_SUGGESTION', message: result.reason || 'The engine could not write a safe replacement.' } });
+        return;
+      }
+      // Kept on the finding, so a reload shows it and the panel's own Apply, Edit and Humanizer all
+      // work from the stored wording.
+      const block = (meta.craft_findings as Record<string, unknown> | undefined) || {};
+      const findings = (Array.isArray(block.findings) ? block.findings : []).map((f) => {
+        const row = f as Record<string, unknown>;
+        return row.quote === quote && (row.dimension ?? 'craft') === (raw.dimension ?? 'craft')
+          ? { ...row, replacement: result.text, replacement_by: 'suggest-passage-fix' }
+          : f;
+      });
+      await supabase
+        .from('published_content_v2')
+        .update({ metadata: { ...meta, craft_findings: { ...block, findings } } })
+        .eq('id', chapter.id)
+        .eq('user_id', userId);
+      res.json({ success: true, data: { replacement: result.text, applicable: at >= 0, new_names: result.new_names ?? [] } });
+    } catch (err) {
+      logger.error({ err, userId, contentId: id }, 'content-actions: annotation suggest failed');
+      res.status(500).json({ success: false, error: { code: 'SUGGEST_FAILED', message: err instanceof Error ? err.message : 'Could not write a suggestion' } });
     }
   },
 );

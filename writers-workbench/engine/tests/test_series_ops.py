@@ -1122,3 +1122,55 @@ class TestCheckingTheAuthorsEdit:
     def test_the_check_needs_a_text(self, pipeline: dict[str, Any]) -> None:
         out = asyncio.run(M._op_check_book_coda({"project_id": PROJECT, "book": BOOK1, "text": ""}))
         assert out["ok"] is False
+
+
+class TestSuggestPassageFix:
+    PASSAGE = (
+        "The room smelled of burned coffee. The folding chairs scraped against the linoleum as the "
+        "last observers filed out. Marcus nodded back."
+    )
+
+    def run(self, **extra: Any) -> dict:
+        return asyncio.run(M._op_suggest_passage_fix({"passage": self.PASSAGE, "problem": "flat", **extra}))
+
+    def test_returns_a_rewrite_of_about_the_same_length(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(M, "get_router", lambda service=None: object())
+        prompts = answer(
+            monkeypatch,
+            types.SimpleNamespace(
+                text="Marcus breathed in burned coffee. Chairs scraped the linoleum as the last observers left. "
+                "He nodded back."
+            ),
+        )
+        out = self.run(before="She spoke.", after="He left.")
+        assert out["ok"] is True
+        assert "burned coffee" in out["text"]
+        assert "She spoke." in prompts[0] and "He left." in prompts[0]
+
+    def test_refuses_a_rewrite_that_is_far_from_the_length_and_says_why(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(M, "get_router", lambda service=None: object())
+        answer(
+            monkeypatch,
+            types.SimpleNamespace(text="Marcus nodded."),
+            types.SimpleNamespace(text="Marcus nodded."),
+        )
+        out = self.run()
+        assert out["ok"] is False
+        assert "length" in out["reason"]
+
+    def test_strips_em_dashes(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(M, "get_router", lambda service=None: object())
+        answer(
+            monkeypatch,
+            types.SimpleNamespace(
+                text="Marcus breathed in burned coffee — stale. Chairs scraped the linoleum as the last "
+                "observers left. He nodded back."
+            ),
+        )
+        assert "—" not in self.run()["text"]
+
+    def test_empty_passage_is_refused(self) -> None:
+        out = asyncio.run(M._op_suggest_passage_fix({"passage": "  "}))
+        assert out["ok"] is False

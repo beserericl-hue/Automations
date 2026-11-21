@@ -41,6 +41,7 @@ from writer_engine.schemas.chapter import (
     GenreEval,
     PassageEdit,
     PassageFix,
+    PassageRewrite,
     RecapDraft,
     RepairCheck,
     RevisedMarketing,
@@ -6707,6 +6708,109 @@ async def _op_humanize_passage(payload: dict) -> dict:
     }
 
 
+PASSAGE_FIX_MIN_RATIO = 0.6
+PASSAGE_FIX_MAX_RATIO = 1.5
+
+
+async def _op_suggest_passage_fix(payload: dict) -> dict:
+    """Write a replacement for ONE quoted passage that answers ONE review finding.
+
+    The review panel shows findings (pacing, flat paragraph, prose clarity) that carry no suggested
+    wording. This writes it, on request, for that passage only: nothing is saved here, and the
+    author reads it, edits it, runs it through the humanizer or applies it. Safeguards match the
+    rest of the engine: the book's cast is in the prompt, a rewrite that drops a name the passage
+    uses is refused, the em-dash ban is applied, and a result far from the passage's length is
+    refused, because every whole-text repair that was allowed to wander came back shorter or longer
+    than the original.
+    """
+    passage = str(payload.get("passage") or "").strip()
+    if not passage:
+        return {"ok": False, "reason": "There is no passage to rewrite."}
+    words = len(passage.split())
+    if words > 600:
+        return {
+            "ok": False,
+            "reason": f"That passage is {words} words; suggest a change for up to 600 at a time.",
+        }
+    problem = str(payload.get("problem") or "").strip()[:800]
+    fix = str(payload.get("fix") or "").strip()[:800]
+    before = str(payload.get("before") or "").strip()[-1200:]
+    after = str(payload.get("after") or "").strip()[:1200]
+    roster_text = ""
+    project_id = str(payload.get("project_id") or "")
+    if project_id:
+        try:
+            ctx = await _load_context(project_id, {})
+            roster_text = _roster_text(ctx.get("roster") or [])
+        except Exception as exc:  # noqa: BLE001 - the cast is a help, not a requirement
+            logger.warning("passage_fix.context_failed", error=str(exc)[:160])
+    from writer_engine.config import get_settings
+
+    router = get_router(service=STEP_NAME)
+    system = (
+        "You are the author's editor. Rewrite ONE passage of a novel to answer ONE review finding. Keep the "
+        "author's voice, point of view, tense and diction. Keep every fact, event, name, number and what each "
+        "character knows exactly as the passage has it: change how it is told, never what happens. Fix the "
+        "problem named: for a pacing problem, bring the turn forward and cut the lingering; for a flat paragraph, "
+        "put a character in contact with the thing described (an action, a choice, a reaction) instead of "
+        "describing it from outside; for unclear prose, say it plainly. Keep it close to the original length "
+        "(between 60% and 150% of its words). It must join the text before and after it without a seam. No em "
+        'dashes. No new characters, places or objects. Reply with strict JSON {"text": the rewritten passage}.'
+    )
+    prompt = (
+        f"THE FINDING: {problem or '(not stated)'}\n"
+        f"WHAT THE REVIEWER SUGGESTED: {fix or '(nothing specific)'}\n\n"
+        f"THE CAST:\n{roster_text or '(not given)'}\n\n"
+        f"TEXT JUST BEFORE THE PASSAGE:\n…{before}\n\n"
+        f"THE PASSAGE TO REWRITE:\n{passage}\n\n"
+        f"TEXT JUST AFTER THE PASSAGE:\n{after}…"
+    )
+    reason = "the rewrite could not be produced"
+    for attempt in range(2):
+        try:
+            out, _resp = await complete_structured(
+                router,
+                provider="anthropic",
+                model=get_settings().model_default,
+                system=system,
+                prompt=prompt
+                if attempt == 0
+                else prompt + f"\n\nYour previous answer was refused: {reason}. Try again and respect that.",
+                schema=PassageRewrite,
+                max_tokens=2048,
+            )
+        except ProviderNotRegistered:
+            return {"ok": False, "reason": "No writing model is available on this server."}
+        except ValueError as exc:
+            reason = f"the model's answer could not be read ({str(exc)[:80]})"
+            continue
+        text = _strip_em_dashes(out.text.strip())
+        if not text or text == passage:
+            reason = "it came back unchanged"
+            continue
+        ratio = len(text.split()) / max(1, words)
+        if not PASSAGE_FIX_MIN_RATIO <= ratio <= PASSAGE_FIX_MAX_RATIO:
+            reason = f"it was {ratio:.0%} of the passage's length; it must stay between 60% and 150%"
+            continue
+        names = _new_names(text, passage + "\n" + roster_text) if roster_text else []
+        lost = [
+            n
+            for n in re.findall(r"\b[A-Z][a-z]{2,}\b", passage)
+            if n not in text and roster_text and n in roster_text
+        ]
+        if lost:
+            reason = f"it dropped {', '.join(sorted(set(lost))[:3])}, who is in the passage"
+            continue
+        return {
+            "ok": True,
+            "text": text,
+            "words": len(text.split()),
+            "original_words": words,
+            "new_names": names,
+        }
+    return {"ok": False, "reason": f"The engine could not write a safe replacement: {reason}."}
+
+
 OPS = {
     "write": _op_write,
     "plan": _op_plan,
@@ -6730,6 +6834,7 @@ OPS = {
     "newsletter": _op_newsletter,
     "short-story": _op_short_story,
     "humanize-passage": _op_humanize_passage,
+    "suggest-passage-fix": _op_suggest_passage_fix,
 }
 
 
