@@ -101,6 +101,13 @@ async function dismissAnnotation(args: {
   });
 }
 
+async function suggestAnnotation(args: { contentId: string; annotationId: string }): Promise<unknown> {
+  return apiFetch(`/api/content/${args.contentId}/annotations/suggest`, {
+    method: 'POST',
+    body: JSON.stringify({ annotationId: args.annotationId }),
+  });
+}
+
 export default function AnnotationsPanel({ contentId, onReveal, onHumanize }: AnnotationsPanelProps) {
   const queryClient = useQueryClient();
   // Which finding the manuscript is currently showing, and how well its quote matched.
@@ -125,6 +132,14 @@ export default function AnnotationsPanel({ contentId, onReveal, onHumanize }: An
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['chapter-annotations', contentId] });
       queryClient.invalidateQueries({ queryKey: ['content-detail', contentId] });
+    },
+  });
+
+  // A finding that arrives with no wording of its own: ask the engine to write it, for that passage only.
+  const suggest = useMutation({
+    mutationFn: suggestAnnotation,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chapter-annotations', contentId] });
     },
   });
 
@@ -203,6 +218,8 @@ export default function AnnotationsPanel({ contentId, onReveal, onHumanize }: An
             onDismiss={(a) => dismiss.mutate({ contentId, annotationId: a.id, source: a.source })}
             applyState={apply}
             dismissState={dismiss}
+            onSuggest={(a) => suggest.mutate({ contentId, annotationId: a.id })}
+            suggestState={suggest}
             onReveal={onReveal ? reveal : undefined}
             onHumanize={onHumanize}
             shown={shown}
@@ -219,6 +236,8 @@ export default function AnnotationsPanel({ contentId, onReveal, onHumanize }: An
             onDismiss={(a) => dismiss.mutate({ contentId, annotationId: a.id, source: a.source })}
             applyState={apply}
             dismissState={dismiss}
+            onSuggest={(a) => suggest.mutate({ contentId, annotationId: a.id })}
+            suggestState={suggest}
             onReveal={onReveal ? reveal : undefined}
             onHumanize={onHumanize}
             shown={shown}
@@ -235,6 +254,8 @@ export default function AnnotationsPanel({ contentId, onReveal, onHumanize }: An
             onDismiss={(a) => dismiss.mutate({ contentId, annotationId: a.id, source: a.source })}
             applyState={apply}
             dismissState={dismiss}
+            onSuggest={(a) => suggest.mutate({ contentId, annotationId: a.id })}
+            suggestState={suggest}
             onReveal={onReveal ? reveal : undefined}
             onHumanize={onHumanize}
             shown={shown}
@@ -281,6 +302,8 @@ function SourceSection({
   onDismiss,
   applyState,
   dismissState,
+  onSuggest,
+  suggestState,
   onReveal,
   onHumanize,
   shown,
@@ -292,6 +315,8 @@ function SourceSection({
   onDismiss: (a: UnifiedAnnotation) => void;
   applyState: { isPending: boolean; isError: boolean; error: unknown; variables?: { annotationId?: string } };
   dismissState: { isPending: boolean; variables?: { annotationId?: string } };
+  onSuggest: (a: UnifiedAnnotation) => void;
+  suggestState: { isPending: boolean; isError: boolean; error: unknown; variables?: { annotationId?: string } };
   onReveal?: (a: UnifiedAnnotation) => void;
   onHumanize?: (text: string, passage: string) => void;
   shown: { id: string; result: RevealResult } | null;
@@ -312,6 +337,9 @@ function SourceSection({
             applyPending={applyState.isPending && applyState.variables?.annotationId === a.id}
             applyError={applyState.isError && applyState.variables?.annotationId === a.id ? (applyState.error as Error)?.message : undefined}
             dismissPending={dismissState.isPending && dismissState.variables?.annotationId === a.id}
+            onSuggest={a.source === 'craft_qa' && a.evidence_quote ? () => onSuggest(a) : undefined}
+            suggestPending={suggestState.isPending && suggestState.variables?.annotationId === a.id}
+            suggestError={suggestState.isError && suggestState.variables?.annotationId === a.id ? (suggestState.error as Error)?.message : undefined}
             onReveal={onReveal ? () => onReveal(a) : undefined}
             onHumanize={onHumanize}
             revealed={shown?.id === a.id ? shown.result : null}
@@ -329,6 +357,9 @@ function AnnotationRow({
   applyPending,
   applyError,
   dismissPending,
+  onSuggest,
+  suggestPending,
+  suggestError,
   onReveal,
   onHumanize,
   revealed,
@@ -339,6 +370,9 @@ function AnnotationRow({
   applyPending: boolean;
   applyError?: string;
   dismissPending: boolean;
+  onSuggest?: () => void;
+  suggestPending?: boolean;
+  suggestError?: string;
   onReveal?: () => void;
   onHumanize?: (text: string, passage: string) => void;
   revealed: RevealResult | null;
@@ -491,6 +525,7 @@ function AnnotationRow({
           {applyError && (
             <p className="mt-1 text-xs text-red-500">{applyError}</p>
           )}
+          {suggestError && <p className="mt-1 text-xs text-red-500">{suggestError}</p>}
         </div>
         <div className="flex shrink-0 flex-col gap-1.5">
           {canApply && draft === null && (
@@ -515,6 +550,18 @@ function AnnotationRow({
                 Edit first
               </button>
             </>
+          )}
+          {/* A finding with no wording of its own: ask the engine to write a replacement for this
+              passage. It then shows as the suggested replacement, with Apply Fix, Edit first and
+              Open in Humanizer. */}
+          {onSuggest && !annotation.suggestion?.replacement_text && (
+            <button
+              onClick={onSuggest}
+              disabled={suggestPending}
+              className="rounded-lg bg-violet-600 px-3 py-1 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+            >
+              {suggestPending ? 'Writing…' : 'Suggest a change'}
+            </button>
           )}
           <button
             onClick={onDismiss}

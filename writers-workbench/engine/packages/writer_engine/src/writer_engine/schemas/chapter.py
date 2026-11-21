@@ -678,6 +678,14 @@ class RecapDraft(BaseModel):
     text: str = ""
 
 
+class PassageRewrite(BaseModel):
+    """One passage rewritten to answer one review finding."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    text: str = ""
+
+
 class UnsupportedClaims(BaseModel):
     """Claims in a recap that the source material does not support."""
 

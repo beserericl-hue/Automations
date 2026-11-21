@@ -238,3 +238,26 @@ describe('a finding whose passage has been rewritten', () => {
     expect(screen.queryByRole('button', { name: 'Apply Fix' })).toBeNull();
   });
 });
+
+describe('a finding with no suggested wording', () => {
+  const BARE = { ...ANNOTATION, id: 'craft_qa:ch7:3', suggestion: { action: 'note' as const } };
+
+  it('offers Suggest a change, asks for it by finding, and has no Apply Fix until there is wording', async () => {
+    mockFetch.mockImplementation(async (path: string) =>
+      path.endsWith('/annotations') ? ({ ...RESPONSE, annotations: [BARE] } as never) : ({ success: true } as never),
+    );
+    renderWithProviders(<AnnotationsPanel contentId="c1" />);
+    expect(screen.queryByRole('button', { name: 'Apply Fix' })).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: 'Suggest a change' }));
+    await waitFor(() => expect(mockFetch.mock.calls.some(([p]) => String(p).endsWith('/annotations/suggest'))).toBe(true));
+    const call = mockFetch.mock.calls.find(([p]) => String(p).endsWith('/annotations/suggest'));
+    expect(call, 'no suggest request was made').toBeTruthy();
+    expect(JSON.parse(String((call![1] as { body?: string }).body))).toEqual({ annotationId: 'craft_qa:ch7:3' });
+  });
+
+  it('does not offer it when the finding already has wording', async () => {
+    renderWithProviders(<AnnotationsPanel contentId="c1" />);
+    await screen.findByRole('button', { name: 'Apply Fix' });
+    expect(screen.queryByRole('button', { name: 'Suggest a change' })).toBeNull();
+  });
+});
