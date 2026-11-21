@@ -36,6 +36,7 @@ const CreditsPage = lazyRetry(() => import('./components/credits/CreditsPage'));
 const AuthorProfile = lazyRetry(() => import('./components/settings/AuthorProfile'));
 const Integrations = lazyRetry(() => import('./components/settings/Integrations'));
 const ProjectPublishing = lazyRetry(() => import('./components/publishing/ProjectPublishing'));
+const BookEndingReview = lazyRetry(() => import('./components/publishing/BookEndingReview'));
 
 // Compose Newsletter 2a (S4) — newsletter route stubs. S6/S7/S8 fill in the
 // Generate / Execution Status / Approvals real pages; the rest stay stubs
@@ -94,6 +95,7 @@ export default function App() {
                     <Route path="projects/:id" element={<ProjectDetail />} />
                     <Route path="projects/:id/bible" element={<StoryBiblePanel />} />
                     <Route path="projects/:id/publish" element={<ProjectPublishing />} />
+                    <Route path="projects/:id/books/:index/ending" element={<BookEndingReview />} />
                     <Route path="trash" element={<TrashView />} />
                     <Route path="library" element={<ContentLibrary />} />
                     {/* Legacy routes redirect to Content Library with filter */}

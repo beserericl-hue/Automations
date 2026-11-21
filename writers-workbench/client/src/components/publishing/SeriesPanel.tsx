@@ -29,6 +29,15 @@ export interface EndingDraft {
   applied_at?: string;
 }
 
+export interface CliffhangerOption {
+  title: string;
+  hook: string;
+  scene: string;
+  uses: string;
+  avoid: string;
+  new_names?: string[];
+}
+
 export interface SeriesBook {
   index: number;
   first_chapter: number;
@@ -47,6 +56,7 @@ export interface SeriesBook {
   ending_draft: EndingDraft | null;
   coda_draft?: PieceDraft | null;
   recap_draft?: PieceDraft | null;
+  cliffhangers?: { options?: CliffhangerOption[]; drafted_at?: string; failed?: string } | null;
 }
 
 export interface SeriesView {

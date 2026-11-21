@@ -313,6 +313,22 @@ describe('the pieces in the book and its outline', () => {
 });
 
 describe('closing scene and recap routes', () => {
+  it('starts the cliffhanger recommendations with this book and the next, and has none for the last book', async () => {
+    engineJob.mockResolvedValue({ job_id: 'jk', status: 'queued' });
+    await withServer(async (base) => {
+      const j = await call(base, 'POST', '/series/books/1/cliffhangers');
+      expect(j).toMatchObject({ success: true, jobId: 'jk', engineJob: true });
+      expect(engineJob).toHaveBeenCalledWith('chapter', expect.objectContaining({
+        op: 'recommend-cliffhangers', async: true, persist: true,
+        book: expect.objectContaining({ index: 1 }), next_book: expect.objectContaining({ index: 2 }),
+      }));
+      engineJob.mockClear();
+      const last = await call(base, 'POST', '/series/books/3/cliffhangers');
+      expect(last.error?.code).toMatch(/LAST_BOOK|NO_SUCH_BOOK/);
+      expect(engineJob).not.toHaveBeenCalled();
+    });
+  });
+
   it('starts the engine job for a closing scene with the books’ ranges, the author’s direction, and keeps nothing itself', async () => {
     engineJob.mockResolvedValue({ job_id: 'j1', status: 'queued' });
     await withServer(async (base) => {

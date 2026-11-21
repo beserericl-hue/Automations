@@ -61,6 +61,7 @@ export default function SeriesPiece({
   working,
   onStarted,
   onChanged,
+  suggestedDirection,
 }: {
   kind: 'coda' | 'recap';
   book: number;
@@ -71,11 +72,16 @@ export default function SeriesPiece({
   working: boolean;
   onStarted: (jobId: string) => void;
   onChanged: (s: SeriesView, note?: string) => void;
+  /** A direction chosen elsewhere (a recommended cliffhanger): it becomes the direction to draft from. */
+  suggestedDirection?: string;
 }) {
   const { addToast } = useToast();
   const noun = kind === 'coda' ? 'closing scene' : 'recap';
   const path = `${base}/books/${book}/${kind}`;
-  const [direction, setDirection] = useState(DEFAULT_DIRECTION);
+  const [direction, setDirection] = useState(suggestedDirection || DEFAULT_DIRECTION);
+  useEffect(() => {
+    if (suggestedDirection) setDirection(suggestedDirection);
+  }, [suggestedDirection]);
   const [text, setText] = useState('');
   // Adding a scene the check objected to takes an explicit, informed second step.
   const [confirmAnyway, setConfirmAnyway] = useState(false);
